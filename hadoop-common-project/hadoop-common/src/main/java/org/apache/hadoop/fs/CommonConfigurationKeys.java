@@ -21,6 +21,9 @@ package org.apache.hadoop.fs;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
+import org.apache.hadoop.io.erasurecode.rawcoder.RSRawErasureCoderFactory;
+import org.apache.hadoop.io.erasurecode.rawcoder.RSRawErasureCoderFactoryLegacy;
+import org.apache.hadoop.io.erasurecode.rawcoder.XORRawErasureCoderFactory;
 
 /** 
  * This class contains constants for configuration keys used
@@ -91,17 +94,24 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String IPC_CALLQUEUE_IMPL_KEY = "callqueue.impl";
   public static final String IPC_CALLQUEUE_IDENTITY_PROVIDER_KEY = "identity-provider.impl";
 
-  /** Internal buffer size for Lzo compressor/decompressors */
-  public static final String  IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_KEY =
-    "io.compression.codec.lzo.buffersize";
-  /** Default value for IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_KEY */
-  public static final int     IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_DEFAULT =
-    64*1024;
   /** This is for specifying the implementation for the mappings from
    * hostnames to the racks they belong to
    */
   public static final String  NET_TOPOLOGY_CONFIGURED_NODE_MAPPING_KEY =
-    "net.topology.configured.node.mapping";
+      "net.topology.configured.node.mapping";
+
+  /**
+   * Supported compression codec classes
+   */
+  public static final String IO_COMPRESSION_CODECS_KEY = "io.compression.codecs";
+
+  /** Internal buffer size for Lzo compressor/decompressors */
+  public static final String  IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_KEY =
+    "io.compression.codec.lzo.buffersize";
+
+  /** Default value for IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_KEY */
+  public static final int     IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_DEFAULT =
+    64*1024;
 
   /** Internal buffer size for Snappy compressor/decompressors */
   public static final String IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY =
@@ -131,6 +141,12 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
    * Service Authorization
    */
   public static final String 
+  HADOOP_SECURITY_SERVICE_AUTHORIZATION_DEFAULT_ACL = 
+      "security.service.authorization.default.acl";
+  public static final String 
+  HADOOP_SECURITY_SERVICE_AUTHORIZATION_DEFAULT_BLOCKED_ACL =
+      "security.service.authorization.default.acl.blocked";
+  public static final String
   HADOOP_SECURITY_SERVICE_AUTHORIZATION_REFRESH_POLICY = 
       "security.refresh.policy.protocol.acl";
   public static final String 
@@ -139,6 +155,15 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String 
   HADOOP_SECURITY_SERVICE_AUTHORIZATION_REFRESH_USER_MAPPINGS =
       "security.refresh.user.mappings.protocol.acl";
+  public static final String
+  HADOOP_SECURITY_SERVICE_AUTHORIZATION_REFRESH_CALLQUEUE =
+      "security.refresh.callqueue.protocol.acl";
+  public static final String
+  HADOOP_SECURITY_SERVICE_AUTHORIZATION_GENERIC_REFRESH =
+      "security.refresh.generic.protocol.acl";
+  public static final String
+  HADOOP_SECURITY_SERVICE_AUTHORIZATION_TRACING =
+      "security.trace.protocol.acl";
   public static final String 
   SECURITY_HA_SERVICE_PROTOCOL_ACL = "security.ha.service.protocol.acl";
   public static final String 
@@ -199,6 +224,11 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
       "ha.failover-controller.graceful-fence.connection.retries";
   public static final int HA_FC_GRACEFUL_FENCE_CONNECTION_RETRIES_DEFAULT = 1;
 
+  /** number of zookeeper operation retry times in ActiveStandbyElector */
+  public static final String HA_FC_ELECTOR_ZK_OP_RETRIES_KEY =
+      "ha.failover-controller.active-standby-elector.zk.op.retries";
+  public static final int HA_FC_ELECTOR_ZK_OP_RETRIES_DEFAULT = 3;
+
   /* Timeout that the CLI (manual) FC waits for monitorHealth, getServiceState */
   public static final String HA_FC_CLI_CHECK_TIMEOUT_KEY =
     "ha.failover-controller.cli-check.rpc-timeout.ms";
@@ -242,6 +272,10 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String  IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY = "ipc.client.fallback-to-simple-auth-allowed";
   public static final boolean IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT = false;
 
+  public static final String IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SASL_KEY =
+    "ipc.client.connect.max.retries.on.sasl";
+  public static final int    IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SASL_DEFAULT = 5;
+
   /** How often the server scans for idle connections */
   public static final String IPC_CLIENT_CONNECTION_IDLESCANINTERVAL_KEY =
       "ipc.client.connection.idle-scan-interval.ms";
@@ -257,6 +291,11 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final boolean RPC_METRICS_QUANTILE_ENABLE_DEFAULT = false;
   public static final String  RPC_METRICS_PERCENTILES_INTERVALS_KEY =
       "rpc.metrics.percentiles.intervals";
+  
+  /** Allowed hosts for nfs exports */
+  public static final String NFS_EXPORTS_ALLOWED_HOSTS_SEPARATOR = ";";
+  public static final String NFS_EXPORTS_ALLOWED_HOSTS_KEY = "nfs.exports.allowed.hosts";
+  public static final String NFS_EXPORTS_ALLOWED_HOSTS_KEY_DEFAULT = "* rw";
 
   public static final String DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY =
       "dfs.leader.check.interval";
@@ -285,4 +324,32 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String HOPS_GROUPS_ENABLE =
       "hops.groups.updater.round";
   public static final boolean HOPS_GROUPS_ENABLE_DEFAULT = true;
+  
+  /** Raw coder factory for the RS default codec. */
+  public static final String IO_ERASURECODE_CODEC_RS_DEFAULT_RAWCODER_KEY =
+      "io.erasurecode.codec.rs-default.rawcoder";
+  public static final String IO_ERASURECODE_CODEC_RS_DEFAULT_RAWCODER_DEFAULT =
+      RSRawErasureCoderFactory.class.getCanonicalName();
+  
+   /** Raw coder factory for the RS legacy codec. */
+  public static final String IO_ERASURECODE_CODEC_RS_LEGACY_RAWCODER_KEY =
+      "io.erasurecode.codec.rs-legacy.rawcoder";
+  public static final String IO_ERASURECODE_CODEC_RS_LEGACY_RAWCODER_DEFAULT =
+      RSRawErasureCoderFactoryLegacy.class.getCanonicalName();
+  
+   /** Raw coder factory for the XOR codec. */
+  public static final String IO_ERASURECODE_CODEC_XOR_RAWCODER_KEY =
+      "io.erasurecode.codec.xor.rawcoder";
+  public static final String IO_ERASURECODE_CODEC_XOR_RAWCODER_DEFAULT =
+      XORRawErasureCoderFactory.class.getCanonicalName();
+
+  /**
+   * Timeout value for RPC client on waiting for response.
+   */
+  public static final String IPC_CLIENT_RPC_TIMEOUT_KEY
+          = "ipc.client.rpc-timeout.ms";
+  /**
+   * Default value for IPC_CLIENT_RPC_TIMEOUT_KEY.
+   */
+  public static final int IPC_CLIENT_RPC_TIMEOUT_DEFAULT = 0;
 }

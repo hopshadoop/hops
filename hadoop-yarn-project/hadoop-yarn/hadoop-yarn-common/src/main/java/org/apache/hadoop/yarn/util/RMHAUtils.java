@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.util;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -27,15 +30,10 @@ import org.apache.hadoop.ha.HAServiceTarget;
 import org.apache.hadoop.yarn.client.RMHAServiceTarget;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
 @Private
 @Unstable
 public class RMHAUtils {
 
-  //TODO update this function to use the leader election in order to find RMs
   public static String findActiveRMHAId(YarnConfiguration conf) {
     YarnConfiguration yarnConf = new YarnConfiguration(conf);
     Collection<String> rmIds =
@@ -58,8 +56,8 @@ public class RMHAUtils {
   private static HAServiceState getHAState(YarnConfiguration yarnConf)
       throws Exception {
     HAServiceTarget haServiceTarget;
-    int rpcTimeoutForChecks = yarnConf
-        .getInt(CommonConfigurationKeys.HA_FC_CLI_CHECK_TIMEOUT_KEY,
+    int rpcTimeoutForChecks =
+        yarnConf.getInt(CommonConfigurationKeys.HA_FC_CLI_CHECK_TIMEOUT_KEY,
             CommonConfigurationKeys.HA_FC_CLI_CHECK_TIMEOUT_DEFAULT);
 
     yarnConf.set(CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_USER_NAME_KEY,
@@ -78,8 +76,8 @@ public class RMHAUtils {
     List<String> addrs = new ArrayList<String>();
     if (YarnConfiguration.useHttps(conf)) {
       for (String id : rmIds) {
-        String addr =
-            conf.get(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS + "." + id);
+        String addr = conf.get(
+            YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS + "." + id);
         if (addr != null) {
           addrs.add(addr);
         }

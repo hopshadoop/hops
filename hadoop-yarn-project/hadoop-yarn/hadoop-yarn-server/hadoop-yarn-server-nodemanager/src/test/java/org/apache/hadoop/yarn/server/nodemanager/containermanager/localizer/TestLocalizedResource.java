@@ -1,21 +1,29 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
+
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -39,17 +47,9 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.even
 import org.junit.Test;
 import org.mockito.ArgumentMatcher;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Matchers.isA;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 public class TestLocalizedResource {
 
-  static ContainerId getMockContainer(int id) {
+  static ContainerId getMockContainer(long id) {
     ApplicationId appId = mock(ApplicationId.class);
     when(appId.getClusterTimestamp()).thenReturn(314159265L);
     when(appId.getId()).thenReturn(3);
@@ -57,7 +57,7 @@ public class TestLocalizedResource {
     when(appAttemptId.getApplicationId()).thenReturn(appId);
     when(appAttemptId.getAttemptId()).thenReturn(0);
     ContainerId container = mock(ContainerId.class);
-    when(container.getId()).thenReturn(id);
+    when(container.getContainerId()).thenReturn(id);
     when(container.getApplicationAttemptId()).thenReturn(appAttemptId);
     return container;
   }
@@ -77,11 +77,11 @@ public class TestLocalizedResource {
       // mock resource
       LocalResource apiRsrc = createMockResource();
 
-      final ContainerId container0 = getMockContainer(0);
+      final ContainerId container0 = getMockContainer(0L);
       final Credentials creds0 = new Credentials();
       final LocalResourceVisibility vis0 = LocalResourceVisibility.PRIVATE;
       final LocalizerContext ctxt0 =
-          new LocalizerContext("yak", container0, creds0);
+        new LocalizerContext("yak", container0, creds0);
       LocalResourceRequest rsrcA = new LocalResourceRequest(apiRsrc);
       LocalizedResource local = new LocalizedResource(rsrcA, dispatcher);
       local.handle(new ResourceRequestEvent(rsrcA, vis0, ctxt0));
@@ -89,22 +89,22 @@ public class TestLocalizedResource {
 
       // Register C0, verify request event
       LocalizerEventMatcher matchesL0Req =
-          new LocalizerEventMatcher(container0, creds0, vis0,
-              LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION);
+        new LocalizerEventMatcher(container0, creds0, vis0,
+            LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION);
       verify(localizerBus).handle(argThat(matchesL0Req));
       assertEquals(ResourceState.DOWNLOADING, local.getState());
 
       // Register C1, verify request event
       final Credentials creds1 = new Credentials();
-      final ContainerId container1 = getMockContainer(1);
+      final ContainerId container1 = getMockContainer(1L);
       final LocalizerContext ctxt1 =
-          new LocalizerContext("yak", container1, creds1);
+        new LocalizerContext("yak", container1, creds1);
       final LocalResourceVisibility vis1 = LocalResourceVisibility.PUBLIC;
       local.handle(new ResourceRequestEvent(rsrcA, vis1, ctxt1));
       dispatcher.await();
       LocalizerEventMatcher matchesL1Req =
-          new LocalizerEventMatcher(container1, creds1, vis1,
-              LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION);
+        new LocalizerEventMatcher(container1, creds1, vis1,
+            LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION);
       verify(localizerBus).handle(argThat(matchesL1Req));
 
       // Release C0 container localization, verify no notification
@@ -120,28 +120,28 @@ public class TestLocalizedResource {
       assertEquals(ResourceState.DOWNLOADING, local.getState());
 
       // Register C2, C3
-      final ContainerId container2 = getMockContainer(2);
+      final ContainerId container2 = getMockContainer(2L);
       final LocalResourceVisibility vis2 = LocalResourceVisibility.PRIVATE;
       final Credentials creds2 = new Credentials();
       final LocalizerContext ctxt2 =
-          new LocalizerContext("yak", container2, creds2);
+        new LocalizerContext("yak", container2, creds2);
 
-      final ContainerId container3 = getMockContainer(3);
+      final ContainerId container3 = getMockContainer(3L);
       final LocalResourceVisibility vis3 = LocalResourceVisibility.PRIVATE;
       final Credentials creds3 = new Credentials();
       final LocalizerContext ctxt3 =
-          new LocalizerContext("yak", container3, creds3);
+        new LocalizerContext("yak", container3, creds3);
 
       local.handle(new ResourceRequestEvent(rsrcA, vis2, ctxt2));
       local.handle(new ResourceRequestEvent(rsrcA, vis3, ctxt3));
       dispatcher.await();
       LocalizerEventMatcher matchesL2Req =
-          new LocalizerEventMatcher(container2, creds2, vis2,
-              LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION);
+        new LocalizerEventMatcher(container2, creds2, vis2,
+            LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION);
       verify(localizerBus).handle(argThat(matchesL2Req));
       LocalizerEventMatcher matchesL3Req =
-          new LocalizerEventMatcher(container3, creds3, vis3,
-              LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION);
+        new LocalizerEventMatcher(container3, creds3, vis3,
+            LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION);
       verify(localizerBus).handle(argThat(matchesL3Req));
 
       // Successful localization. verify notification C2, C3
@@ -149,26 +149,26 @@ public class TestLocalizedResource {
       local.handle(new ResourceLocalizedEvent(rsrcA, locA, 10));
       dispatcher.await();
       ContainerEventMatcher matchesC2Localized =
-          new ContainerEventMatcher(container2,
-              ContainerEventType.RESOURCE_LOCALIZED);
+        new ContainerEventMatcher(container2,
+            ContainerEventType.RESOURCE_LOCALIZED);
       ContainerEventMatcher matchesC3Localized =
-          new ContainerEventMatcher(container3,
-              ContainerEventType.RESOURCE_LOCALIZED);
+        new ContainerEventMatcher(container3,
+            ContainerEventType.RESOURCE_LOCALIZED);
       verify(containerBus).handle(argThat(matchesC2Localized));
       verify(containerBus).handle(argThat(matchesC3Localized));
       assertEquals(ResourceState.LOCALIZED, local.getState());
 
       // Register C4, verify notification
-      final ContainerId container4 = getMockContainer(4);
+      final ContainerId container4 = getMockContainer(4L);
       final Credentials creds4 = new Credentials();
       final LocalizerContext ctxt4 =
-          new LocalizerContext("yak", container4, creds4);
+        new LocalizerContext("yak", container4, creds4);
       final LocalResourceVisibility vis4 = LocalResourceVisibility.PRIVATE;
       local.handle(new ResourceRequestEvent(rsrcA, vis4, ctxt4));
       dispatcher.await();
       ContainerEventMatcher matchesC4Localized =
-          new ContainerEventMatcher(container4,
-              ContainerEventType.RESOURCE_LOCALIZED);
+        new ContainerEventMatcher(container4,
+            ContainerEventType.RESOURCE_LOCALIZED);
       verify(containerBus).handle(argThat(matchesC4Localized));
       assertEquals(ResourceState.LOCALIZED, local.getState());
     } finally {
@@ -179,7 +179,7 @@ public class TestLocalizedResource {
   static LocalResource createMockResource() {
     // mock rsrc location
     org.apache.hadoop.yarn.api.records.URL uriA =
-        mock(org.apache.hadoop.yarn.api.records.URL.class);
+      mock(org.apache.hadoop.yarn.api.records.URL.class);
     when(uriA.getScheme()).thenReturn("file");
     when(uriA.getHost()).thenReturn(null);
     when(uriA.getFile()).thenReturn("/localA/rsrc");
@@ -205,33 +205,27 @@ public class TestLocalizedResource {
       this.creds = creds;
       this.idRef = idRef;
     }
-
     @Override
     public boolean matches(Object o) {
-      if (!(o instanceof LocalizerResourceRequestEvent)) {
-        return false;
-      }
+      if (!(o instanceof LocalizerResourceRequestEvent)) return false;
       LocalizerResourceRequestEvent evt = (LocalizerResourceRequestEvent) o;
-      return idRef == evt.getContext().getContainerId() &&
-          type == evt.getType() && vis == evt.getVisibility() &&
-          creds == evt.getContext().getCredentials();
+      return idRef == evt.getContext().getContainerId()
+          && type == evt.getType()
+          && vis == evt.getVisibility()
+          && creds == evt.getContext().getCredentials();
     }
   }
 
   static class ContainerEventMatcher extends ArgumentMatcher<ContainerEvent> {
     private final ContainerId idRef;
     private final ContainerEventType type;
-
     public ContainerEventMatcher(ContainerId idRef, ContainerEventType type) {
       this.idRef = idRef;
       this.type = type;
     }
-
     @Override
     public boolean matches(Object o) {
-      if (!(o instanceof ContainerEvent)) {
-        return false;
-      }
+      if (!(o instanceof ContainerEvent)) return false;
       ContainerEvent evt = (ContainerEvent) o;
       return idRef == evt.getContainerID() && type == evt.getType();
     }

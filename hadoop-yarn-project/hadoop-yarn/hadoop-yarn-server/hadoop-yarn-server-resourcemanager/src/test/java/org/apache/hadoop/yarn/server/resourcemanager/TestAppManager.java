@@ -19,14 +19,25 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionStateImpl;
-import io.hops.ha.common.TransactionStateManager;
-import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
+
+import static org.mockito.Matchers.isA;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.ConcurrentMap;
+
+import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.MockApps;
@@ -48,7 +59,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.MockRMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.AMLivelinessMonitor;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
@@ -56,37 +67,31 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
+import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
+import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.concurrent.ConcurrentMap;
-
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.isA;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Testing applications being retired from RM.
+ *
  */
 
-public class TestAppManager {
+public class TestAppManager{
   private Log LOG = LogFactory.getLog(TestAppManager.class);
-  private static RMAppEventType appEventType = RMAppEventType.KILL;
+  private static RMAppEventType appEventType = RMAppEventType.KILL; 
 
   public synchronized RMAppEventType getAppEventType() {
     return appEventType;
-  }
-
+  } 
   public synchronized void setAppEventType(RMAppEventType newType) {
     appEventType = newType;
-  }
+  } 
 
 
   public static List<RMApp> newRMApps(int n, long time, RMAppState state) {
@@ -97,45 +102,37 @@ public class TestAppManager {
     return list;
   }
 
-  public static RMContext mockRMContext(int n, long time) {
+  public RMContext mockRMContext(int n, long time) {
     final List<RMApp> apps = newRMApps(n, time, RMAppState.FINISHED);
     final ConcurrentMap<ApplicationId, RMApp> map = Maps.newConcurrentMap();
     for (RMApp app : apps) {
       map.put(app.getApplicationId(), app);
     }
     Dispatcher rmDispatcher = new AsyncDispatcher();
+    ContainerAllocationExpirer containerAllocationExpirer = new ContainerAllocationExpirer(
+        rmDispatcher);
+    AMLivelinessMonitor amLivelinessMonitor = new AMLivelinessMonitor(
+        rmDispatcher);
+    AMLivelinessMonitor amFinishingMonitor = new AMLivelinessMonitor(
+        rmDispatcher);
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
-    TransactionStateManager tsm = new TransactionStateManager();
-    RMContext context =
-        new RMContextImpl(rmDispatcher, null,
-            null, null, null, null, null, writer,
-            new YarnConfiguration(), tsm) {
-          @Override
-          public ConcurrentMap<ApplicationId, RMApp> getRMApps() {
-            return map;
-          }
-        };
-    
-    AMLivelinessMonitor amLivelinessMonitor =
-        new AMLivelinessMonitor(rmDispatcher, context);
-    ((RMContextImpl) context).setAMLivelinessMonitor(amLivelinessMonitor);
-    
-     AMLivelinessMonitor amFinishingMonitor =
-        new AMLivelinessMonitor(rmDispatcher, context);
-    ((RMContextImpl) context).setAMFinishingMonitor(amFinishingMonitor);
-    
-    ContainerAllocationExpirer containerAllocationExpirer =
-        new ContainerAllocationExpirer(rmDispatcher, context);
-    ((RMContextImpl) context).setContainerAllocationExpirer(
-            containerAllocationExpirer);
-    
-    
-    ((RMContextImpl) context).setStateStore(mock(RMStateStore.class));
+    RMContext context = new RMContextImpl(rmDispatcher,
+        containerAllocationExpirer, amLivelinessMonitor, amFinishingMonitor,
+        null, null, null, null, null) {
+      @Override
+      public ConcurrentMap<ApplicationId, RMApp> getRMApps() {
+        return map;
+      }
+    };
+    ((RMContextImpl)context).setStateStore(mock(RMStateStore.class));
+    metricsPublisher = mock(SystemMetricsPublisher.class);
+    context.setSystemMetricsPublisher(metricsPublisher);
+    context.setRMApplicationHistoryWriter(writer);
     return context;
   }
 
-  public class TestAppManagerDispatcher
-      implements EventHandler<RMAppManagerEvent> {
+  public class TestAppManagerDispatcher implements
+      EventHandler<RMAppManagerEvent> {
 
 
     public TestAppManagerDispatcher() {
@@ -143,22 +140,24 @@ public class TestAppManager {
 
     @Override
     public void handle(RMAppManagerEvent event) {
-      // do nothing
-    }
-  }
+       // do nothing
+    }   
+  }   
 
-  public class TestDispatcher implements EventHandler<RMAppEvent> {
+  public class TestDispatcher implements
+      EventHandler<RMAppEvent> {
 
     public TestDispatcher() {
     }
 
     @Override
     public void handle(RMAppEvent event) {
+      //RMApp rmApp = this.rmContext.getRMApps().get(appID);
       setAppEventType(event.getType());
       System.out.println("in handle routine " + getAppEventType().toString());
-    }
-  }
-
+    }   
+  }   
+  
 
   // Extend and make the functions we want to test public
   public class TestRMAppManager extends RMAppManager {
@@ -175,46 +174,44 @@ public class TestAppManager {
     }
 
     public void checkAppNumCompletedLimit() {
-      super.checkAppNumCompletedLimit(null);
+      super.checkAppNumCompletedLimit();
     }
 
     public void finishApplication(ApplicationId appId) {
-      super.finishApplication(appId, null);
+      super.finishApplication(appId);
     }
 
     public int getCompletedAppsListSize() {
       return super.getCompletedAppsListSize();
     }
-
     public int getCompletedAppsInStateStore() {
       return this.completedAppsInStateStore;
     }
-
     public void submitApplication(
         ApplicationSubmissionContext submissionContext, String user)
-        throws YarnException {
+            throws YarnException {
       super.submitApplication(submissionContext, System.currentTimeMillis(),
-          user,
-          new TransactionStateImpl(TransactionState.TransactionType.RM));
+        user);
     }
   }
 
-  protected void addToCompletedApps(TestRMAppManager appMonitor,
-      RMContext rmContext) {
+  protected void addToCompletedApps(TestRMAppManager appMonitor, RMContext rmContext) {
     for (RMApp app : rmContext.getRMApps().values()) {
-      if (app.getState() == RMAppState.FINISHED ||
-          app.getState() == RMAppState.KILLED ||
-          app.getState() == RMAppState.FAILED) {
+      if (app.getState() == RMAppState.FINISHED
+          || app.getState() == RMAppState.KILLED 
+          || app.getState() == RMAppState.FAILED) {
         appMonitor.finishApplication(app.getApplicationId());
       }
     }
   }
 
   private RMContext rmContext;
+  private SystemMetricsPublisher metricsPublisher;
   private TestRMAppManager appMonitor;
   private ApplicationSubmissionContext asContext;
   private ApplicationId appId;
 
+  @SuppressWarnings("deprecation")
   @Before
   public void setUp() {
     long now = System.currentTimeMillis();
@@ -224,9 +221,9 @@ public class TestAppManager {
     Configuration conf = new Configuration();
     ApplicationMasterService masterService =
         new ApplicationMasterService(rmContext, scheduler);
-    appMonitor =
-        new TestRMAppManager(rmContext, new ClientToAMTokenSecretManagerInRM(),
-            scheduler, masterService, new ApplicationACLsManager(conf), conf);
+    appMonitor = new TestRMAppManager(rmContext,
+        new ClientToAMTokenSecretManagerInRM(), scheduler, masterService,
+        new ApplicationACLsManager(conf), conf);
 
     appId = MockApps.newAppID(1);
     RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
@@ -241,7 +238,7 @@ public class TestAppManager {
   @After
   public void tearDown() {
     setAppEventType(RMAppEventType.KILL);
-    ((Service) rmContext.getDispatcher()).stop();
+    ((Service)rmContext.getDispatcher()).stop();
   }
 
   @Test
@@ -253,10 +250,10 @@ public class TestAppManager {
     RMContext rmContext = mockRMContext(10, now - 10);
     Configuration conf = new YarnConfiguration();
     conf.setInt(YarnConfiguration.RM_MAX_COMPLETED_APPLICATIONS, 10);
-    TestRMAppManager appMonitor = new TestRMAppManager(rmContext, conf);
+    TestRMAppManager appMonitor = new TestRMAppManager(rmContext,conf);
 
-    Assert.assertEquals("Number of apps incorrect before checkAppTimeLimit", 10,
-        rmContext.getRMApps().size());
+    Assert.assertEquals("Number of apps incorrect before checkAppTimeLimit",
+        10, rmContext.getRMApps().size());
 
     // add them to completed apps list
     addToCompletedApps(appMonitor, rmContext);
@@ -267,10 +264,9 @@ public class TestAppManager {
         rmContext.getRMApps().size());
     Assert.assertEquals("Number of completed apps incorrect after check", 10,
         appMonitor.getCompletedAppsListSize());
-    verify(rmContext.getStateStore(), never())
-        .removeApplication(isA(RMApp.class), any(TransactionState.class));
+    verify(rmContext.getStateStore(), never()).removeApplication(
+      isA(RMApp.class));
   }
-
 
   @Test
   public void testRMAppRetireSome() throws Exception {
@@ -278,12 +274,12 @@ public class TestAppManager {
 
     RMContext rmContext = mockRMContext(10, now - 20000);
     Configuration conf = new YarnConfiguration();
-    conf.setInt(YarnConfiguration.RM_STATE_STORE_MAX_COMPLETED_APPLICATIONS, 3);
+    conf.setInt(YarnConfiguration.RM_STATE_STORE_MAX_COMPLETED_APPLICATIONS, 3); 
     conf.setInt(YarnConfiguration.RM_MAX_COMPLETED_APPLICATIONS, 3);
     TestRMAppManager appMonitor = new TestRMAppManager(rmContext, conf);
 
-    Assert.assertEquals("Number of apps incorrect before", 10,
-        rmContext.getRMApps().size());
+    Assert.assertEquals("Number of apps incorrect before", 10, rmContext
+        .getRMApps().size());
 
     // add them to completed apps list
     addToCompletedApps(appMonitor, rmContext);
@@ -294,9 +290,8 @@ public class TestAppManager {
         rmContext.getRMApps().size());
     Assert.assertEquals("Number of completed apps incorrect after check", 3,
         appMonitor.getCompletedAppsListSize());
-    //TODO we do not use the statestore anymore, do the same test but with transaction state and db
-    //    verify(rmContext.getStateStore(), times(7)).removeApplication(
-    //      isA(RMApp.class), any(TransactionState.class));
+    verify(rmContext.getStateStore(), times(7)).removeApplication(
+      isA(RMApp.class));
   }
 
   @Test
@@ -340,8 +335,8 @@ public class TestAppManager {
     app = new MockRMApp(9, now - 20000, RMAppState.FAILED);
     rmContext.getRMApps().put(app.getApplicationId(), app);
 
-    Assert.assertEquals("Number of apps incorrect before", 10,
-        rmContext.getRMApps().size());
+    Assert.assertEquals("Number of apps incorrect before", 10, rmContext
+        .getRMApps().size());
 
     // add them to completed apps list
     addToCompletedApps(appMonitor, rmContext);
@@ -353,9 +348,8 @@ public class TestAppManager {
     Assert.assertEquals("Number of completed apps incorrect after check", 2,
         appMonitor.getCompletedAppsListSize());
     // 6 applications in final state, 4 of them are removed
-    //TODO we do not use the statestore anymore, do the same test but with transaction state and db
-    //    verify(rmContext.getStateStore(), times(4)).removeApplication(
-    //      isA(RMApp.class), any(TransactionState.class));
+    verify(rmContext.getStateStore(), times(4)).removeApplication(
+      isA(RMApp.class));
   }
 
   @Test
@@ -363,11 +357,10 @@ public class TestAppManager {
     long now = System.currentTimeMillis();
 
     RMContext rmContext = mockRMContext(10, now - 20000);
-    TestRMAppManager appMonitor =
-        new TestRMAppManager(rmContext, new Configuration());
+    TestRMAppManager appMonitor = new TestRMAppManager(rmContext, new Configuration());
 
-    Assert.assertEquals("Number of apps incorrect before", 10,
-        rmContext.getRMApps().size());
+    Assert.assertEquals("Number of apps incorrect before", 10, rmContext
+        .getRMApps().size());
 
     appMonitor.finishApplication(null);
 
@@ -384,8 +377,8 @@ public class TestAppManager {
     conf.setInt(YarnConfiguration.RM_STATE_STORE_MAX_COMPLETED_APPLICATIONS, 0);
     conf.setInt(YarnConfiguration.RM_MAX_COMPLETED_APPLICATIONS, 0);
     TestRMAppManager appMonitor = new TestRMAppManager(rmContext, conf);
-    Assert.assertEquals("Number of apps incorrect before", 10,
-        rmContext.getRMApps().size());
+    Assert.assertEquals("Number of apps incorrect before", 10, rmContext
+        .getRMApps().size());
 
     addToCompletedApps(appMonitor, rmContext);
     Assert.assertEquals("Number of completed apps incorrect", 10,
@@ -397,9 +390,8 @@ public class TestAppManager {
         rmContext.getRMApps().size());
     Assert.assertEquals("Number of completed apps incorrect after check", 0,
         appMonitor.getCompletedAppsListSize());
-    //TODO we do not use the statestore anymore, do the same test but with transaction state and db
-    //    verify(rmContext.getStateStore(), times(10)).removeApplication(
-    //      isA(RMApp.class), any(TransactionState.class));
+    verify(rmContext.getStateStore(), times(10)).removeApplication(
+      isA(RMApp.class));
   }
 
   @Test
@@ -409,10 +401,9 @@ public class TestAppManager {
     Configuration conf = new YarnConfiguration();
     int maxAppsInMemory = 8;
     int maxAppsInStateStore = 4;
-    conf.setInt(YarnConfiguration.RM_MAX_COMPLETED_APPLICATIONS,
-        maxAppsInMemory);
+    conf.setInt(YarnConfiguration.RM_MAX_COMPLETED_APPLICATIONS, maxAppsInMemory);
     conf.setInt(YarnConfiguration.RM_STATE_STORE_MAX_COMPLETED_APPLICATIONS,
-        maxAppsInStateStore);
+      maxAppsInStateStore);
     TestRMAppManager appMonitor = new TestRMAppManager(rmContext, conf);
 
     addToCompletedApps(appMonitor, rmContext);
@@ -421,16 +412,15 @@ public class TestAppManager {
     appMonitor.checkAppNumCompletedLimit();
 
     Assert.assertEquals("Number of apps incorrect after # completed check",
-        maxAppsInMemory, rmContext.getRMApps().size());
+      maxAppsInMemory, rmContext.getRMApps().size());
     Assert.assertEquals("Number of completed apps incorrect after check",
-        maxAppsInMemory, appMonitor.getCompletedAppsListSize());
+      maxAppsInMemory, appMonitor.getCompletedAppsListSize());
 
     int numRemoveAppsFromStateStore = 10 - maxAppsInStateStore;
-    //TODO we do not use the statestore anymore, do the same test but with transaction state and db
-    //    verify(rmContext.getStateStore(), times(numRemoveAppsFromStateStore))
-    //      .removeApplication(isA(RMApp.class), any(TransactionState.class));
+    verify(rmContext.getStateStore(), times(numRemoveAppsFromStateStore))
+      .removeApplication(isA(RMApp.class));
     Assert.assertEquals(maxAppsInStateStore,
-        appMonitor.getCompletedAppsInStateStore());
+      appMonitor.getCompletedAppsInStateStore());
   }
 
   @Test
@@ -439,11 +429,9 @@ public class TestAppManager {
     RMContext rmContext = mockRMContext(10, now - 20000);
     Configuration conf = new YarnConfiguration();
     int maxAppsInMemory = 8;
-    conf.setInt(YarnConfiguration.RM_MAX_COMPLETED_APPLICATIONS,
-        maxAppsInMemory);
+    conf.setInt(YarnConfiguration.RM_MAX_COMPLETED_APPLICATIONS, maxAppsInMemory);
     // larger than maxCompletedAppsInMemory, reset to RM_MAX_COMPLETED_APPLICATIONS.
-    conf.setInt(YarnConfiguration.RM_STATE_STORE_MAX_COMPLETED_APPLICATIONS,
-        1000);
+    conf.setInt(YarnConfiguration.RM_STATE_STORE_MAX_COMPLETED_APPLICATIONS, 1000);
     TestRMAppManager appMonitor = new TestRMAppManager(rmContext, conf);
 
     addToCompletedApps(appMonitor, rmContext);
@@ -453,27 +441,24 @@ public class TestAppManager {
 
     int numRemoveApps = 10 - maxAppsInMemory;
     Assert.assertEquals("Number of apps incorrect after # completed check",
-        maxAppsInMemory, rmContext.getRMApps().size());
+      maxAppsInMemory, rmContext.getRMApps().size());
     Assert.assertEquals("Number of completed apps incorrect after check",
-        maxAppsInMemory, appMonitor.getCompletedAppsListSize());
-    //TODO we do not use the statestore anymore, do the same test but with transaction state and db
-    //    verify(rmContext.getStateStore(), times(numRemoveApps)).removeApplication(
-    //      isA(RMApp.class), any(TransactionState.class));
+      maxAppsInMemory, appMonitor.getCompletedAppsListSize());
+    verify(rmContext.getStateStore(), times(numRemoveApps)).removeApplication(
+      isA(RMApp.class));
     Assert.assertEquals(maxAppsInMemory,
-        appMonitor.getCompletedAppsInStateStore());
+      appMonitor.getCompletedAppsInStateStore());
   }
 
   protected void setupDispatcher(RMContext rmContext, Configuration conf) {
     TestDispatcher testDispatcher = new TestDispatcher();
-    TestAppManagerDispatcher testAppManagerDispatcher =
+    TestAppManagerDispatcher testAppManagerDispatcher = 
         new TestAppManagerDispatcher();
     rmContext.getDispatcher().register(RMAppEventType.class, testDispatcher);
-    rmContext.getDispatcher()
-        .register(RMAppManagerEventType.class, testAppManagerDispatcher);
-    ((Service) rmContext.getDispatcher()).init(conf);
-    ((Service) rmContext.getDispatcher()).start();
-    Assert.assertEquals("app event type is wrong before", RMAppEventType.KILL,
-        appEventType);
+    rmContext.getDispatcher().register(RMAppManagerEventType.class, testAppManagerDispatcher);
+    ((Service)rmContext.getDispatcher()).init(conf);
+    ((Service)rmContext.getDispatcher()).start();
+    Assert.assertEquals("app event type is wrong before", RMAppEventType.KILL, appEventType);
   }
 
   @Test
@@ -482,31 +467,34 @@ public class TestAppManager {
     RMApp app = rmContext.getRMApps().get(appId);
     Assert.assertNotNull("app is null", app);
     Assert.assertEquals("app id doesn't match", appId, app.getApplicationId());
-    Assert.assertEquals("app state doesn't match", RMAppState.NEW,
-        app.getState());
+    Assert.assertEquals("app state doesn't match", RMAppState.NEW, app.getState());
+    verify(metricsPublisher).appACLsUpdated(
+        any(RMApp.class), any(String.class), anyLong());
 
     // wait for event to be processed
     int timeoutSecs = 0;
-    while ((getAppEventType() == RMAppEventType.KILL) && timeoutSecs++ < 20) {
+    while ((getAppEventType() == RMAppEventType.KILL) && 
+        timeoutSecs++ < 20) {
       Thread.sleep(1000);
     }
     Assert.assertEquals("app event type sent is wrong", RMAppEventType.START,
         getAppEventType());
   }
 
-  @Test(timeout = 30000)
+  @Test (timeout = 30000)
   public void testRMAppSubmitMaxAppAttempts() throws Exception {
-    int[] globalMaxAppAttempts = new int[]{10, 1};
-    int[][] individualMaxAppAttempts =
-        new int[][]{new int[]{9, 10, 11, 0}, new int[]{1, 10, 0, -1}};
-    int[][] expectedNums =
-        new int[][]{new int[]{9, 10, 10, 10}, new int[]{1, 1, 1, 1}};
+    int[] globalMaxAppAttempts = new int[] { 10, 1 };
+    int[][] individualMaxAppAttempts = new int[][]{
+        new int[]{ 9, 10, 11, 0 },
+        new int[]{ 1, 10, 0, -1 }};
+    int[][] expectedNums = new int[][]{
+        new int[]{ 9, 10, 10, 10 },
+        new int[]{ 1, 1, 1, 1 }};
     for (int i = 0; i < globalMaxAppAttempts.length; ++i) {
       for (int j = 0; j < individualMaxAppAttempts.length; ++j) {
         ResourceScheduler scheduler = mockResourceScheduler();
         Configuration conf = new Configuration();
-        conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
-            globalMaxAppAttempts[i]);
+        conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, globalMaxAppAttempts[i]);
         ApplicationMasterService masterService =
             new ApplicationMasterService(rmContext, scheduler);
         TestRMAppManager appMonitor = new TestRMAppManager(rmContext,
@@ -534,13 +522,12 @@ public class TestAppManager {
     }
   }
 
-  @Test(timeout = 30000)
+  @Test (timeout = 30000)
   public void testRMAppSubmitDuplicateApplicationId() throws Exception {
     ApplicationId appId = MockApps.newAppID(0);
     asContext.setApplicationId(appId);
     RMApp appOrig = rmContext.getRMApps().get(appId);
-    Assert.assertTrue("app name matches but shouldn't",
-        "testApp1" != appOrig.getName());
+    Assert.assertTrue("app name matches but shouldn't", "testApp1" != appOrig.getName());
 
     // our testApp1 should be rejected and original app with same id should be left in place
     try {
@@ -555,11 +542,11 @@ public class TestAppManager {
     RMApp app = rmContext.getRMApps().get(appId);
     Assert.assertNotNull("app is null", app);
     Assert.assertEquals("app id doesn't match", appId, app.getApplicationId());
-    Assert.assertEquals("app state doesn't match", RMAppState.FINISHED,
-        app.getState());
+    Assert.assertEquals("app state doesn't match", RMAppState.FINISHED, app.getState());
   }
 
-  @Test(timeout = 30000)
+  @SuppressWarnings("deprecation")
+  @Test (timeout = 30000)
   public void testRMAppSubmitInvalidResourceRequest() throws Exception {
     asContext.setResource(Resources.createResource(
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB + 1));
@@ -573,20 +560,25 @@ public class TestAppManager {
       // Exception is expected
       // TODO Change this to assert the expected exception type - post YARN-142
       // sub-task related to specialized exceptions.
-      Assert.assertTrue(
-          "The thrown exception is not" + " InvalidResourceRequestException",
+      Assert.assertTrue("The thrown exception is not" +
+          " InvalidResourceRequestException",
           e.getMessage().contains("Invalid resource request"));
     }
   }
 
-  @Test(timeout = 30000)
+  @Test (timeout = 30000)
   public void testEscapeApplicationSummary() {
     RMApp app = mock(RMAppImpl.class);
-    when(app.getApplicationId()).thenReturn(ApplicationId.newInstance(100L, 1));
+    when(app.getApplicationId()).thenReturn(
+        ApplicationId.newInstance(100L, 1));
     when(app.getName()).thenReturn("Multiline\n\n\r\rAppName");
     when(app.getUser()).thenReturn("Multiline\n\n\r\rUserName");
     when(app.getQueue()).thenReturn("Multiline\n\n\r\rQueueName");
     when(app.getState()).thenReturn(RMAppState.RUNNING);
+    when(app.getApplicationType()).thenReturn("MAPREDUCE");
+    RMAppMetrics metrics =
+        new RMAppMetrics(Resource.newInstance(1234, 56), 10, 1, 16384, 64);
+    when(app.getRMAppMetrics()).thenReturn(metrics);
 
     RMAppManager.ApplicationSummary.SummaryBuilder summary =
         new RMAppManager.ApplicationSummary().createAppSummary(app);
@@ -596,29 +588,35 @@ public class TestAppManager {
     Assert.assertFalse(msg.contains("\r"));
 
     String escaped = "\\n\\n\\r\\r";
-    Assert.assertTrue(msg.contains("Multiline" + escaped + "AppName"));
-    Assert.assertTrue(msg.contains("Multiline" + escaped + "UserName"));
-    Assert.assertTrue(msg.contains("Multiline" + escaped + "QueueName"));
-  }
+    Assert.assertTrue(msg.contains("Multiline" + escaped +"AppName"));
+    Assert.assertTrue(msg.contains("Multiline" + escaped +"UserName"));
+    Assert.assertTrue(msg.contains("Multiline" + escaped +"QueueName"));
+    Assert.assertTrue(msg.contains("memorySeconds=16384"));
+    Assert.assertTrue(msg.contains("vcoreSeconds=64"));
+    Assert.assertTrue(msg.contains("preemptedAMContainers=1"));
+    Assert.assertTrue(msg.contains("preemptedNonAMContainers=10"));
+    Assert.assertTrue(msg.contains("preemptedResources=<memory:1234\\, vCores:56>"));
+    Assert.assertTrue(msg.contains("applicationType=MAPREDUCE"));
+ }
 
   private static ResourceScheduler mockResourceScheduler() {
     ResourceScheduler scheduler = mock(ResourceScheduler.class);
-    when(scheduler.getMinimumResourceCapability()).thenReturn(Resources
-            .createResource(
-                YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB));
-    when(scheduler.getMaximumResourceCapability()).thenReturn(Resources
-            .createResource(
-                YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB));
+    when(scheduler.getMinimumResourceCapability()).thenReturn(
+        Resources.createResource(
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB));
+    when(scheduler.getMaximumResourceCapability()).thenReturn(
+        Resources.createResource(
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB));
+    ResourceCalculator rc = new DefaultResourceCalculator();
+    when(scheduler.getResourceCalculator()).thenReturn(rc);
     return scheduler;
   }
 
   private static ContainerLaunchContext mockContainerLaunchContext(
       RecordFactory recordFactory) {
-    ContainerLaunchContext amContainer =
-        recordFactory.newRecordInstance(ContainerLaunchContext.class);
-    amContainer
-        .setApplicationACLs(new HashMap<ApplicationAccessType, String>());
-    ;
+    ContainerLaunchContext amContainer = recordFactory.newRecordInstance(
+        ContainerLaunchContext.class);
+    amContainer.setApplicationACLs(new HashMap<ApplicationAccessType, String>());;
     return amContainer;
   }
 

@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice;
 
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.service.AbstractService;
@@ -34,18 +38,15 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.Container
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerHistoryData;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerStartData;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Map;
-
 /**
  * Dummy implementation of {@link ApplicationHistoryStore}. If this
  * implementation is used, no history data will be persisted.
+ * 
  */
 @Unstable
 @Private
-public class NullApplicationHistoryStore extends AbstractService
-    implements ApplicationHistoryStore {
+public class NullApplicationHistoryStore extends AbstractService implements
+    ApplicationHistoryStore {
 
   public NullApplicationHistoryStore() {
     super(NullApplicationHistoryStore.class.getName());
@@ -94,8 +95,8 @@ public class NullApplicationHistoryStore extends AbstractService
   }
 
   @Override
-  public Map<ApplicationAttemptId, ApplicationAttemptHistoryData> getApplicationAttempts(
-      ApplicationId appId) throws IOException {
+  public Map<ApplicationAttemptId, ApplicationAttemptHistoryData>
+      getApplicationAttempts(ApplicationId appId) throws IOException {
     return Collections.emptyMap();
   }
 

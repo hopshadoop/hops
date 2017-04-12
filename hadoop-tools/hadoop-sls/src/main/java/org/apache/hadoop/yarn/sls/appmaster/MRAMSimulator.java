@@ -27,6 +27,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
@@ -45,6 +47,8 @@ import org.apache.hadoop.yarn.sls.scheduler.ContainerSimulator;
 import org.apache.hadoop.yarn.sls.SLSRunner;
 import org.apache.log4j.Logger;
 
+@Private
+@Unstable
 public class MRAMSimulator extends AMSimulator {
   /*
   Vocabulary Used: 
@@ -141,8 +145,7 @@ public class MRAMSimulator extends AMSimulator {
   }
 
   @Override
-  public void firstStep()
-          throws YarnException, IOException, InterruptedException {
+  public void firstStep() throws Exception {
     super.firstStep();
     
     requestAMContainer();
@@ -176,26 +179,8 @@ public class MRAMSimulator extends AMSimulator {
         return rm.getApplicationMasterService().allocate(request);
       }
     });
-
-    // waiting until the AM container is allocated
-    while (true) {
-      if (response != null && ! response.getAllocatedContainers().isEmpty()) {
-        // get AM container
-        Container container = response.getAllocatedContainers().get(0);
-        se.getNmMap().get(container.getNodeId())
-                .addNewContainer(container, -1L);
-        // start AM container
-        amContainer = container;
-        LOG.debug(MessageFormat.format("Application {0} starts its " +
-                "AM container ({1}).", appId, amContainer.getId()));
-        isAMContainerRunning = true;
-        break;
-      }
-      // this sleep time is different from HeartBeat
-      Thread.sleep(1000);
-      // send out empty request
-      sendContainerRequest();
-      response = responseQueue.take();
+    if (response != null) {
+      responseQueue.put(response);
     }
   }
 
@@ -203,6 +188,26 @@ public class MRAMSimulator extends AMSimulator {
   @SuppressWarnings("unchecked")
   protected void processResponseQueue()
           throws InterruptedException, YarnException, IOException {
+    // Check whether receive the am container
+    if (!isAMContainerRunning) {
+      if (!responseQueue.isEmpty()) {
+        AllocateResponse response = responseQueue.take();
+        if (response != null
+            && !response.getAllocatedContainers().isEmpty()) {
+          // Get AM container
+          Container container = response.getAllocatedContainers().get(0);
+          se.getNmMap().get(container.getNodeId())
+              .addNewContainer(container, -1L);
+          // Start AM container
+          amContainer = container;
+          LOG.debug(MessageFormat.format("Application {0} starts its " +
+              "AM container ({1}).", appId, amContainer.getId()));
+          isAMContainerRunning = true;
+        }
+      }
+      return;
+    }
+
     while (! responseQueue.isEmpty()) {
       AllocateResponse response = responseQueue.take();
 
@@ -259,6 +264,7 @@ public class MRAMSimulator extends AMSimulator {
         LOG.debug(MessageFormat.format("Application {0} sends out event " +
                 "to clean up its AM container.", appId));
         isFinished = true;
+        break;
       }
 
       // check allocated containers
@@ -386,7 +392,7 @@ public class MRAMSimulator extends AMSimulator {
   }
 
   @Override
-  public void lastStep() {
+  public void lastStep() throws Exception {
     super.lastStep();
 
     // clear data structures

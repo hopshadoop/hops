@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
@@ -29,11 +28,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationSubmissionContextProto
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SubmitApplicationRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SubmitApplicationRequestProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
 public class SubmitApplicationRequestPBImpl extends SubmitApplicationRequest {
-  SubmitApplicationRequestProto proto =
-      SubmitApplicationRequestProto.getDefaultInstance();
+  SubmitApplicationRequestProto proto = SubmitApplicationRequestProto.getDefaultInstance();
   SubmitApplicationRequestProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -50,7 +50,7 @@ public class SubmitApplicationRequestPBImpl extends SubmitApplicationRequest {
   }
   
   public SubmitApplicationRequestProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -63,9 +63,8 @@ public class SubmitApplicationRequestPBImpl extends SubmitApplicationRequest {
   
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -79,15 +78,13 @@ public class SubmitApplicationRequestPBImpl extends SubmitApplicationRequest {
 
   private void mergeLocalToBuilder() {
     if (this.applicationSubmissionContext != null) {
-      builder.setApplicationSubmissionContext(
-          convertToProtoFormat(this.applicationSubmissionContext));
+      builder.setApplicationSubmissionContext(convertToProtoFormat(this.applicationSubmissionContext));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -99,7 +96,7 @@ public class SubmitApplicationRequestPBImpl extends SubmitApplicationRequest {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public ApplicationSubmissionContext getApplicationSubmissionContext() {
@@ -110,30 +107,26 @@ public class SubmitApplicationRequestPBImpl extends SubmitApplicationRequest {
     if (!p.hasApplicationSubmissionContext()) {
       return null;
     }
-    this.applicationSubmissionContext =
-        convertFromProtoFormat(p.getApplicationSubmissionContext());
+    this.applicationSubmissionContext = convertFromProtoFormat(p.getApplicationSubmissionContext());
     return this.applicationSubmissionContext;
   }
 
   @Override
-  public void setApplicationSubmissionContext(
-      ApplicationSubmissionContext applicationSubmissionContext) {
+  public void setApplicationSubmissionContext(ApplicationSubmissionContext applicationSubmissionContext) {
     maybeInitBuilder();
-    if (applicationSubmissionContext == null) {
+    if (applicationSubmissionContext == null) 
       builder.clearApplicationSubmissionContext();
-    }
     this.applicationSubmissionContext = applicationSubmissionContext;
   }
 
-  private ApplicationSubmissionContextPBImpl convertFromProtoFormat(
-      ApplicationSubmissionContextProto p) {
+  private ApplicationSubmissionContextPBImpl convertFromProtoFormat(ApplicationSubmissionContextProto p) {
     return new ApplicationSubmissionContextPBImpl(p);
   }
 
-  private ApplicationSubmissionContextProto convertToProtoFormat(
-      ApplicationSubmissionContext t) {
-    return ((ApplicationSubmissionContextPBImpl) t).getProto();
+  private ApplicationSubmissionContextProto convertToProtoFormat(ApplicationSubmissionContext t) {
+    return ((ApplicationSubmissionContextPBImpl)t).getProto();
   }
+
 
 
 }  

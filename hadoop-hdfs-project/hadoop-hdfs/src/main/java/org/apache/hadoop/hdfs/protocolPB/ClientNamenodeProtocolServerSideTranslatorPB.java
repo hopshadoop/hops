@@ -224,6 +224,10 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto.newBuilder()
           .build();
 
+  public static final ClientNamenodeProtocolProtos.FlushUsersCacheResponseProto
+      VOID_FLUSH_CACHE = ClientNamenodeProtocolProtos.FlushUsersCacheResponseProto
+      .newBuilder().build();
+
   /**
    * Constructor
    *
@@ -1017,6 +1021,19 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
     try {
       server.changeConf(request.getPropsList(), request.getNewValsList());
       return VOID_CHANGECONF_RESPONSE;
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.FlushUsersCacheResponseProto flushCache(
+      RpcController controller,
+      ClientNamenodeProtocolProtos.FlushUsersCacheRequestProto request)
+      throws ServiceException {
+    try {
+      server.flushCache(request.getUserName(), request.getGroupName());
+      return VOID_FLUSH_CACHE;
     } catch (IOException ex) {
       throw new ServiceException(ex);
     }

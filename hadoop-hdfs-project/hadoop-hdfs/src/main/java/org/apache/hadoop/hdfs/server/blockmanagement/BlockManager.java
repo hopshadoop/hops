@@ -217,7 +217,7 @@ public class BlockManager {
    * notified of all block deletions that might have been pending
    * when the failover happened.
    */
-  private final Set<Block> postponedMisreplicatedBlocks = Sets.newHashSet();
+  private final Set<Block> postponedMisreplicatedBlocks = Sets.newConcurrentHashSet();
 
   /**
    * Maps a StorageID to the set of blocks that are "extra" for this
@@ -2505,7 +2505,7 @@ public class BlockManager {
     }
 
     if (fsNamesystem.isErasureCodingEnabled()) {
-      INode iNode = EntityManager.find(INode.Finder.ByINodeId, bc.getId());
+      INode iNode = EntityManager.find(INode.Finder.ByINodeIdFTIS, bc.getId());
       if (iNode.isUnderConstruction() == false &&
           numBeforeAdding.liveReplicas() == 0 && numLiveReplicas > 0) {
         EncodingStatus status =
@@ -2631,7 +2631,7 @@ public class BlockManager {
                 (List<INodeIdentifier>) getParams()[0];
             for (INodeIdentifier inodeIdentifier : inodeIdentifiers) {
               INode inode = EntityManager
-                  .find(INode.Finder.ByINodeId, inodeIdentifier.getInodeId());
+                  .find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId());
               for (BlockInfo block : ((INodeFile) inode).getBlocks()) {
                 MisReplicationResult res = processMisReplicatedBlock(block);
                 if (LOG.isTraceEnabled()) {

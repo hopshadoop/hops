@@ -27,10 +27,10 @@ import org.apache.hadoop.yarn.util.Records;
 /**
  * <p>The request sent by the client to the <code>ResourceManager</code>
  * to abort a submitted application.</p>
- * <p/>
+ * 
  * <p>The request includes the {@link ApplicationId} of the application to be
  * aborted.</p>
- *
+ * 
  * @see ApplicationClientProtocol#forceKillApplication(KillApplicationRequest)
  */
 @Public
@@ -38,9 +38,8 @@ import org.apache.hadoop.yarn.util.Records;
 public abstract class KillApplicationRequest {
 
   @Public
-  @Stable
-  public static KillApplicationRequest newInstance(
-      ApplicationId applicationId) {
+  @Stable 
+  public static KillApplicationRequest newInstance(ApplicationId applicationId) {
     KillApplicationRequest request =
         Records.newRecord(KillApplicationRequest.class);
     request.setApplicationId(applicationId);
@@ -49,7 +48,6 @@ public abstract class KillApplicationRequest {
 
   /**
    * Get the <code>ApplicationId</code> of the application to be aborted.
-   *
    * @return <code>ApplicationId</code> of the application to be aborted
    */
   @Public

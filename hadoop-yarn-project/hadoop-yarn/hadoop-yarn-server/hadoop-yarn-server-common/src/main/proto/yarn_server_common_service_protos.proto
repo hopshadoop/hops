@@ -17,34 +17,21 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
-
 option java_outer_classname = "YarnServerCommonServiceProtos";
-
 option java_generic_services = true;
-
 option java_generate_equals_and_hash = true;
-
 package hadoop.yarn;
 
 import "yarn_protos.proto";
-
 import "yarn_server_common_protos.proto";
-
-message RMNodeMsgRequestProto {
-  optional int32 id = 1;
-  optional int32 type = 2;
-}
-
-message RMNodeMsgResponseProto {
-  optional int32 result = 1;
-}
 
 message RegisterNodeManagerRequestProto {
   optional NodeIdProto node_id = 1;
   optional int32 http_port = 3;
   optional ResourceProto resource = 4;
   optional string nm_version = 5;
-  repeated ContainerStatusProto containerStatuses = 6;
+  repeated NMContainerStatusProto container_statuses = 6;
+  repeated ApplicationIdProto runningApplications = 7;
 }
 
 message RegisterNodeManagerResponseProto {
@@ -71,5 +58,39 @@ message NodeHeartbeatResponseProto {
   repeated ApplicationIdProto applications_to_cleanup = 6;
   optional int64 nextHeartBeatInterval = 7;
   optional string diagnostics_message = 8;
-  optional bool nextheartbeat = 9;
+  repeated ContainerIdProto containers_to_be_removed_from_nm = 9;
+  repeated SystemCredentialsForAppsProto system_credentials_for_apps = 10;
+  optional bool nextheartbeat = 11;
+}
+
+message SystemCredentialsForAppsProto {
+  optional ApplicationIdProto appId = 1;
+  optional bytes credentialsForApp = 2;
+}
+
+message NMContainerStatusProto {
+  optional ContainerIdProto container_id = 1;
+  optional ContainerStateProto container_state = 2;
+  optional ResourceProto resource = 3;
+  optional PriorityProto priority = 4;
+  optional string diagnostics = 5 [default = "N/A"];
+  optional int32 container_exit_status = 6;
+  optional int64 creation_time = 7;
+}
+
+message SCMUploaderNotifyRequestProto {
+  optional string resource_key = 1;
+  optional string filename = 2;
+}
+
+message SCMUploaderNotifyResponseProto {
+  optional bool accepted = 1;
+}
+
+message SCMUploaderCanUploadRequestProto {
+  optional string resource_key = 1;
+}
+
+message SCMUploaderCanUploadResponseProto {
+  optional bool uploadable = 1;
 }

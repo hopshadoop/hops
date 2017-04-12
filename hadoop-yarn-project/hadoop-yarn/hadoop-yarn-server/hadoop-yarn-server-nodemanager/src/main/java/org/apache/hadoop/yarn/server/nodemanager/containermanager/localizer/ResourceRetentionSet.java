@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
 
-import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
-
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+
+import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 
 public class ResourceRetentionSet {
 
@@ -32,7 +32,7 @@ public class ResourceRetentionSet {
   private long currentSize;
   private final long targetSize;
   private final DeletionService delService;
-  private final SortedMap<LocalizedResource, LocalResourcesTracker> retain;
+  private final SortedMap<LocalizedResource,LocalResourcesTracker> retain;
 
   ResourceRetentionSet(DeletionService delService, long targetSize) {
     this(delService, targetSize, new LRUComparator());
@@ -41,11 +41,11 @@ public class ResourceRetentionSet {
   ResourceRetentionSet(DeletionService delService, long targetSize,
       Comparator<? super LocalizedResource> cmp) {
     this(delService, targetSize,
-        new TreeMap<LocalizedResource, LocalResourcesTracker>(cmp));
+        new TreeMap<LocalizedResource,LocalResourcesTracker>(cmp));
   }
 
   ResourceRetentionSet(DeletionService delService, long targetSize,
-      SortedMap<LocalizedResource, LocalResourcesTracker> retain) {
+      SortedMap<LocalizedResource,LocalResourcesTracker> retain) {
     this.retain = retain;
     this.delService = delService;
     this.targetSize = targetSize;
@@ -60,10 +60,10 @@ public class ResourceRetentionSet {
       }
       retain.put(resource, newTracker);
     }
-    for (Iterator<Map.Entry<LocalizedResource, LocalResourcesTracker>> i =
-             retain.entrySet().iterator();
-         currentSize - delSize > targetSize && i.hasNext(); ) {
-      Map.Entry<LocalizedResource, LocalResourcesTracker> rsrc = i.next();
+    for (Iterator<Map.Entry<LocalizedResource,LocalResourcesTracker>> i =
+           retain.entrySet().iterator();
+         currentSize - delSize > targetSize && i.hasNext();) {
+      Map.Entry<LocalizedResource,LocalResourcesTracker> rsrc = i.next();
       LocalizedResource resource = rsrc.getKey();
       LocalResourcesTracker tracker = rsrc.getValue();
       if (tracker.remove(resource, delService)) {
@@ -89,7 +89,6 @@ public class ResourceRetentionSet {
       }
       return ret > 0 ? 1 : -1;
     }
-
     public boolean equals(Object other) {
       return this == other;
     }

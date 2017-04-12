@@ -1273,6 +1273,15 @@ public interface ClientProtocol {
   public void changeConf(List<String> props, List<String> newVals)
       throws IOException;
 
+  /**
+   * Flush the cache for a specified user/group
+   * @param userName
+   *         the user name to flush its data in the cache, could be null.
+   * @param groupName
+   *         the group name to flush its data in the cache, could be null.
+   * @throws IOException
+   */
+  public void flushCache(String userName, String groupName) throws IOException;
 
   ///////////////////////////////////////
   // Erasure coding

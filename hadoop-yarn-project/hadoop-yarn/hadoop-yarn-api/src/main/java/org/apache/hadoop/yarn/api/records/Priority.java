@@ -23,8 +23,9 @@ import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The priority assigned to a ResourceRequest or Application or Container
- * allocation
+ * The priority assigned to a ResourceRequest or Application or Container 
+ * allocation 
+ *
  */
 @Public
 @Stable
@@ -42,7 +43,6 @@ public abstract class Priority implements Comparable<Priority> {
 
   /**
    * Get the assigned priority
-   *
    * @return the assigned priority
    */
   @Public
@@ -51,9 +51,7 @@ public abstract class Priority implements Comparable<Priority> {
   
   /**
    * Set the assigned priority
-   *
-   * @param priority
-   *     the assigned priority
+   * @param priority the assigned priority
    */
   @Public
   @Stable
@@ -69,19 +67,15 @@ public abstract class Priority implements Comparable<Priority> {
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj) {
+    if (this == obj)
       return true;
-    }
-    if (obj == null) {
+    if (obj == null)
       return false;
-    }
-    if (getClass() != obj.getClass()) {
+    if (getClass() != obj.getClass())
       return false;
-    }
     Priority other = (Priority) obj;
-    if (getPriority() != other.getPriority()) {
+    if (getPriority() != other.getPriority())
       return false;
-    }
     return true;
   }
 

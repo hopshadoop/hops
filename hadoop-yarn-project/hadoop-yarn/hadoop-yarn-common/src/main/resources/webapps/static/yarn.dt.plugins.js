@@ -75,14 +75,39 @@ jQuery.fn.dataTableExt.oApi.fnSetFilteringDelay = function ( oSettings, iDelay )
 
 function renderHadoopDate(data, type, full) {
   if (type === 'display' || type === 'filter') {
-    if(data === '0') {
+    if(data === '0'|| data === '-1') {
       return "N/A";
     }
-    return new Date(parseInt(data)).toUTCString();
+    var date = new Date(parseInt(data));
+    var monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    var weekdayList = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    var offsetMinutes = date.getTimezoneOffset();
+    var offset
+    if (offsetMinutes <= 0) {
+      offset = "+" + zeroPad(-offsetMinutes / 60 * 100, 4);
+    } else {
+      offset = "-" + zeroPad(offsetMinutes / 60 * 100, 4);
+    }
+
+    // EEE MMM dd HH:mm:ss Z yyyy
+    return weekdayList[date.getDay()] + " " +
+        monthList[date.getMonth()] + " " +
+        date.getDate() + " " +
+        zeroPad(date.getHours(), 2) + ":" +
+        zeroPad(date.getMinutes(), 2) + ":" +
+        zeroPad(date.getSeconds(), 2) + " " +
+        offset + " " +
+        date.getFullYear();
   }
   // 'sort', 'type' and undefined all just use the number
   // If date is 0, then for purposes of sorting it should be consider max_int
   return data === '0' ? '9007199254740992' : data;  
+}
+
+function zeroPad(n, width) {
+  n = n + '';
+  return n.length >= width ? n : new Array(width - n.length + 1).join('0') + n;
 }
 
 function renderHadoopElapsedTime(data, type, full) {
@@ -114,27 +139,20 @@ function renderHadoopElapsedTime(data, type, full) {
   return data;  
 }
 
+//JSON array element is formatted like
+//"<a href="/proxy/application_1360183373897_0001>">application_1360183373897_0001</a>"
+//this function removes <a> tag and return a string value for sorting
 function parseHadoopID(data, type, full) {
   if (type === 'display') {
     return data;
   }
-  //Return the visible string rather than the entire HTML tag
-  if (type === 'filter') {
-    return data.split('>')[1].split('<')[0];
-  }
-  //Parse the ID for 'sort', 'type' and undefined
-  //The number after the last '_' and before the end tag '<'
-  var splits = data.split('_');
-  return splits[parseInt(splits.length-1)].split('<')[0];
-}
 
-//JSON array element is "20000 attempt_1360183373897_0001_m_000002_0"
-function parseHadoopAttemptID(data, type, full) {
-  if (type === 'display' || type === 'filter') {
-    return data.split(' ')[1];
-  }
-  //For sorting use the order as defined in the JSON element
-  return data.split(' ')[0];
+  var splits =  data.split('>');
+  // Return original string if there is no HTML tag
+  if (splits.length === 1) return data;
+
+  //Return the visible string rather than the entire HTML tag
+  return splits[1].split('<')[0];
 }
 
 function parseHadoopProgress(data, type, full) {

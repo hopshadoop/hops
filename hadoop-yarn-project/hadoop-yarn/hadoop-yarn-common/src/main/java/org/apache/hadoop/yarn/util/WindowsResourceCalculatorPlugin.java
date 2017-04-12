@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.util;
 
+import java.io.IOException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -25,13 +27,11 @@ import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.apache.hadoop.util.StringUtils;
 
-import java.io.IOException;
-
 @Private
 public class WindowsResourceCalculatorPlugin extends ResourceCalculatorPlugin {
   
-  static final Log LOG =
-      LogFactory.getLog(WindowsResourceCalculatorPlugin.class);
+  static final Log LOG = LogFactory
+      .getLog(WindowsResourceCalculatorPlugin.class);
   
   long vmemSize;
   long memSize;
@@ -64,8 +64,8 @@ public class WindowsResourceCalculatorPlugin extends ResourceCalculatorPlugin {
   }
 
   String getSystemInfoInfoFromShell() {
-    ShellCommandExecutor shellExecutor =
-        new ShellCommandExecutor(new String[]{Shell.WINUTILS, "systeminfo"});
+    ShellCommandExecutor shellExecutor = new ShellCommandExecutor(
+        new String[] { Shell.WINUTILS, "systeminfo" });
     try {
       shellExecutor.execute();
       return shellExecutor.getOutput();
@@ -85,8 +85,8 @@ public class WindowsResourceCalculatorPlugin extends ResourceCalculatorPlugin {
       String sysInfoStr = getSystemInfoInfoFromShell();
       if (sysInfoStr != null) {
         final int sysInfoSplitCount = 7;
-        String[] sysInfo =
-            sysInfoStr.substring(0, sysInfoStr.indexOf("\r\n")).split(",");
+        String[] sysInfo = sysInfoStr.substring(0, sysInfoStr.indexOf("\r\n"))
+            .split(",");
         if (sysInfo.length == sysInfoSplitCount) {
           try {
             vmemSize = Long.parseLong(sysInfo[0]);
@@ -97,88 +97,71 @@ public class WindowsResourceCalculatorPlugin extends ResourceCalculatorPlugin {
             cpuFrequencyKhz = Long.parseLong(sysInfo[5]);
             cumulativeCpuTimeMs = Long.parseLong(sysInfo[6]);
             if (lastCumCpuTimeMs != -1) {
-              cpuUsage = (cumulativeCpuTimeMs - lastCumCpuTimeMs) /
-                  (refreshInterval * 1.0f);
+              cpuUsage = (cumulativeCpuTimeMs - lastCumCpuTimeMs)
+                  / (refreshInterval * 1.0f);
             }
 
           } catch (NumberFormatException nfe) {
             LOG.warn("Error parsing sysInfo." + nfe);
           }
         } else {
-          LOG.warn(
-              "Expected split length of sysInfo to be " + sysInfoSplitCount +
-                  ". Got " + sysInfo.length);
+          LOG.warn("Expected split length of sysInfo to be "
+              + sysInfoSplitCount + ". Got " + sysInfo.length);
         }
       }
     }
   }
   
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public long getVirtualMemorySize() {
     refreshIfNeeded();
     return vmemSize;
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public long getPhysicalMemorySize() {
     refreshIfNeeded();
     return memSize;
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public long getAvailableVirtualMemorySize() {
     refreshIfNeeded();
     return vmemAvailable;
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public long getAvailablePhysicalMemorySize() {
     refreshIfNeeded();
     return memAvailable;
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public int getNumProcessors() {
     refreshIfNeeded();
     return numProcessors;
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public long getCpuFrequency() {
     refreshIfNeeded();
     return -1;
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public long getCumulativeCpuTime() {
     refreshIfNeeded();
     return cumulativeCpuTimeMs;
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public float getCpuUsage() {
     refreshIfNeeded();

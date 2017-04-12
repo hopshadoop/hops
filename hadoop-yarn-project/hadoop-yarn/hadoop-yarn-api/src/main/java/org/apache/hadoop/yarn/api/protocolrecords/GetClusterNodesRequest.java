@@ -18,27 +18,27 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.util.EnumSet;
+
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.util.EnumSet;
-
 /**
  * <p>The request from clients to get a report of all nodes
  * in the cluster from the <code>ResourceManager</code>.</p>
- * <p/>
+ *
  * The request will ask for all nodes in the given {@link NodeState}s.
  *
- * @see ApplicationClientProtocol#getClusterNodes(GetClusterNodesRequest)
+ * @see ApplicationClientProtocol#getClusterNodes(GetClusterNodesRequest) 
  */
 @Public
 @Stable
 public abstract class GetClusterNodesRequest {
   @Public
-  @Stable
+  @Stable 
   public static GetClusterNodesRequest newInstance(EnumSet<NodeState> states) {
     GetClusterNodesRequest request =
         Records.newRecord(GetClusterNodesRequest.class);
@@ -47,7 +47,7 @@ public abstract class GetClusterNodesRequest {
   }
   
   @Public
-  @Stable
+  @Stable 
   public static GetClusterNodesRequest newInstance() {
     GetClusterNodesRequest request =
         Records.newRecord(GetClusterNodesRequest.class);

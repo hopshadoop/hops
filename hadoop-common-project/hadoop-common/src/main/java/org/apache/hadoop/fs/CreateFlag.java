@@ -47,6 +47,10 @@ import org.apache.hadoop.classification.InterfaceStability;
  * <li> SYNC_BLOCK - to force closed blocks to the disk device.
  * In addition {@link Syncable#hsync()} should be called after each write,
  * if true synchronous behavior is required.</li>
+ * <li> LAZY_PERSIST - Create the block on transient storage (RAM) if
+ * available.</li>
+ * <li> APPEND_NEWBLOCK - Append data to a new block instead of end of the last
+ * partial block.</li>
  * </ol>
  * 
  * Following combination is not valid and will result in 
@@ -79,7 +83,27 @@ public enum CreateFlag {
   /**
    * Force closed blocks to disk. Similar to POSIX O_SYNC. See javadoc for description.
    */
-  SYNC_BLOCK((short) 0x08);
+  SYNC_BLOCK((short) 0x08),
+
+  /**
+   * Create the block on transient storage (RAM) if available. If
+   * transient storage is unavailable then the block will be created
+   * on disk.
+   *
+   * HDFS will make a best effort to lazily write these files to persistent
+   * storage, however file contents may be lost at any time due to process/
+   * node restarts, hence there is no guarantee of data durability.
+   *
+   * This flag must only be used for intermediate data whose loss can be
+   * tolerated by the application.
+   */
+  LAZY_PERSIST((short) 0x10),
+
+  /**
+   * Append data to a new block instead of the end of the last partial block.
+   * This is only useful for APPEND.
+   */
+  NEW_BLOCK((short) 0x20);
 
   private final short mode;
 
@@ -133,6 +157,18 @@ public enum CreateFlag {
     } else if (!flag.contains(CREATE)) {
       throw new FileNotFoundException("Non existing file: " + path.toString()
           + ". Create option is not specified in " + flag);
+    }
+  }
+
+  /**
+   * Validate the CreateFlag for the append operation. The flag must contain
+   * APPEND, and cannot contain OVERWRITE.
+   */
+  public static void validateForAppend(EnumSet<CreateFlag> flag) {
+    validate(flag);
+    if (!flag.contains(APPEND)) {
+      throw new HadoopIllegalArgumentException(flag
+          + " does not contain APPEND");
     }
   }
 }

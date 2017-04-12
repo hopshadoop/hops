@@ -68,6 +68,7 @@ public class CommitterEventHandler extends AbstractService
   private BlockingQueue<CommitterEvent> eventQueue =
       new LinkedBlockingQueue<CommitterEvent>();
   private final AtomicBoolean stopped;
+  private final ClassLoader jobClassLoader;
   private Thread jobCommitThread = null;
   private int commitThreadCancelTimeoutMs;
   private long commitWindowMs;
@@ -79,11 +80,17 @@ public class CommitterEventHandler extends AbstractService
 
   public CommitterEventHandler(AppContext context, OutputCommitter committer,
       RMHeartbeatHandler rmHeartbeatHandler) {
+    this(context, committer, rmHeartbeatHandler, null);
+  }
+  
+  public CommitterEventHandler(AppContext context, OutputCommitter committer,
+      RMHeartbeatHandler rmHeartbeatHandler, ClassLoader jobClassLoader) {
     super("CommitterEventHandler");
     this.context = context;
     this.committer = committer;
     this.rmHeartbeatHandler = rmHeartbeatHandler;
     this.stopped = new AtomicBoolean(false);
+    this.jobClassLoader = jobClassLoader;
   }
 
   @Override
@@ -109,9 +116,23 @@ public class CommitterEventHandler extends AbstractService
 
   @Override
   protected void serviceStart() throws Exception {
-    ThreadFactory tf = new ThreadFactoryBuilder()
-      .setNameFormat("CommitterEvent Processor #%d")
-      .build();
+    ThreadFactoryBuilder tfBuilder = new ThreadFactoryBuilder()
+        .setNameFormat("CommitterEvent Processor #%d");
+    if (jobClassLoader != null) {
+      // if the job classloader is enabled, we need to use the job classloader
+      // as the thread context classloader (TCCL) of these threads in case the
+      // committer needs to load another class via TCCL
+      ThreadFactory backingTf = new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+          Thread thread = new Thread(r);
+          thread.setContextClassLoader(jobClassLoader);
+          return thread;
+        }
+      };
+      tfBuilder.setThreadFactory(backingTf);
+    }
+    ThreadFactory tf = tfBuilder.build();
     launcherPool = new ThreadPoolExecutor(5, 5, 1,
         TimeUnit.HOURS, new LinkedBlockingQueue<Runnable>(), tf);
     eventHandlingThread = new Thread(new Runnable() {
@@ -181,7 +202,7 @@ public class CommitterEventHandler extends AbstractService
   private synchronized void cancelJobCommit() {
     Thread threadCommitting = jobCommitThread;
     if (threadCommitting != null && threadCommitting.isAlive()) {
-      LOG.info("Canceling commit");
+      LOG.info("Cancelling commit");
       threadCommitting.interrupt();
 
       // wait up to configured timeout for commit thread to finish
@@ -240,27 +261,38 @@ public class CommitterEventHandler extends AbstractService
       }
     }
 
-    private void touchz(Path p) throws IOException {
-      fs.create(p, false).close();
+    // If job commit is repeatable, then we should allow
+    // startCommitFile/endCommitSuccessFile/endCommitFailureFile to be written
+    // by other AM before.
+    private void touchz(Path p, boolean overwrite) throws IOException {
+      fs.create(p, overwrite).close();
     }
-    
+
     @SuppressWarnings("unchecked")
     protected void handleJobCommit(CommitterJobCommitEvent event) {
+      boolean commitJobIsRepeatable = false;
       try {
-        touchz(startCommitFile);
+        commitJobIsRepeatable = committer.isCommitJobRepeatable(
+            event.getJobContext());
+      } catch (IOException e) {
+        LOG.warn("Exception in committer.isCommitJobRepeatable():", e);
+      }
+
+      try {
+        touchz(startCommitFile, commitJobIsRepeatable);
         jobCommitStarted();
         waitForValidCommitWindow();
         committer.commitJob(event.getJobContext());
-        touchz(endCommitSuccessFile);
+        touchz(endCommitSuccessFile, commitJobIsRepeatable);
         context.getEventHandler().handle(
             new JobCommitCompletedEvent(event.getJobID()));
       } catch (Exception e) {
+        LOG.error("Could not commit job", e);
         try {
-          touchz(endCommitFailureFile);
+          touchz(endCommitFailureFile, commitJobIsRepeatable);
         } catch (Exception e2) {
           LOG.error("could not create failure file.", e2);
         }
-        LOG.error("Could not commit job", e);
         context.getEventHandler().handle(
             new JobCommitFailedEvent(event.getJobID(),
                 StringUtils.stringifyException(e)));

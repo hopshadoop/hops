@@ -23,15 +23,11 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.net.URI;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSError;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
@@ -43,7 +39,6 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.counters.Limits;
-import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
@@ -56,6 +51,7 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
@@ -86,9 +82,9 @@ class YarnChild {
     final InetSocketAddress address =
         NetUtils.createSocketAddrForHost(host, port);
     final TaskAttemptID firstTaskid = TaskAttemptID.forName(args[2]);
-    int jvmIdInt = Integer.parseInt(args[3]);
+    long jvmIdLong = Long.parseLong(args[3]);
     JVMId jvmId = new JVMId(firstTaskid.getJobID(),
-        firstTaskid.getTaskType() == TaskType.MAP, jvmIdInt);
+        firstTaskid.getTaskType() == TaskType.MAP, jvmIdLong);
 
     // initialize metrics
     DefaultMetricsSystem.initialize(
@@ -163,6 +159,7 @@ class YarnChild {
         @Override
         public Object run() throws Exception {
           // use job-specified working directory
+          setEncryptedSpillKeyIfRequired(taskFinal);
           FileSystem.get(job).setWorkingDirectory(job.getWorkingDirectory());
           taskFinal.run(job, umbilical); // run the task
           return null;
@@ -170,7 +167,9 @@ class YarnChild {
       });
     } catch (FSError e) {
       LOG.fatal("FSError from child", e);
-      umbilical.fsError(taskid, e.getMessage());
+      if (!ShutdownHookManager.get().isShutdownInProgress()) {
+        umbilical.fsError(taskid, e.getMessage());
+      }
     } catch (Exception exception) {
       LOG.warn("Exception running child : "
           + StringUtils.stringifyException(exception));
@@ -195,22 +194,44 @@ class YarnChild {
       }
       // Report back any failures, for diagnostic purposes
       if (taskid != null) {
-        umbilical.fatalError(taskid, StringUtils.stringifyException(exception));
+        if (!ShutdownHookManager.get().isShutdownInProgress()) {
+          umbilical.fatalError(taskid,
+              StringUtils.stringifyException(exception));
+        }
       }
     } catch (Throwable throwable) {
       LOG.fatal("Error running child : "
     	        + StringUtils.stringifyException(throwable));
       if (taskid != null) {
-        Throwable tCause = throwable.getCause();
-        String cause = tCause == null
-                                 ? throwable.getMessage()
-                                 : StringUtils.stringifyException(tCause);
-        umbilical.fatalError(taskid, cause);
+        if (!ShutdownHookManager.get().isShutdownInProgress()) {
+          Throwable tCause = throwable.getCause();
+          String cause =
+              tCause == null ? throwable.getMessage() : StringUtils
+                  .stringifyException(tCause);
+          umbilical.fatalError(taskid, cause);
+        }
       }
     } finally {
       RPC.stopProxy(umbilical);
       DefaultMetricsSystem.shutdown();
       TaskLog.syncLogsShutdown(logSyncer);
+    }
+  }
+
+  /**
+   * Utility method to check if the Encrypted Spill Key needs to be set into the
+   * user credentials of the user running the Map / Reduce Task
+   * @param task The Map / Reduce task to set the Encrypted Spill information in
+   * @throws Exception
+   */
+  public static void setEncryptedSpillKeyIfRequired(Task task) throws
+          Exception {
+    if ((task != null) && (task.getEncryptedSpillKey() != null) && (task
+            .getEncryptedSpillKey().length > 1)) {
+      Credentials creds =
+              UserGroupInformation.getCurrentUser().getCredentials();
+      TokenCache.setEncryptedSpillKey(task.getEncryptedSpillKey(), creds);
+      UserGroupInformation.getCurrentUser().addCredentials(creds);
     }
   }
 
@@ -293,7 +314,7 @@ class YarnChild {
     task.localizeConfiguration(job);
 
     // Set up the DistributedCache related configs
-    setupDistributedCacheConfig(job);
+    MRApps.setupDistributedCacheLocal(job);
 
     // Overwrite the localized task jobconf which is linked to in the current
     // work-dir.
@@ -301,62 +322,6 @@ class YarnChild {
     writeLocalJobFile(localTaskFile, job);
     task.setJobFile(localTaskFile.toString());
     task.setConf(job);
-  }
-
-  /**
-   * Set up the DistributedCache related configs to make
-   * {@link DistributedCache#getLocalCacheFiles(Configuration)}
-   * and
-   * {@link DistributedCache#getLocalCacheArchives(Configuration)}
-   * working.
-   * @param job
-   * @throws IOException
-   */
-  private static void setupDistributedCacheConfig(final JobConf job)
-      throws IOException {
-
-    String localWorkDir = System.getenv("PWD");
-    //        ^ ^ all symlinks are created in the current work-dir
-
-    // Update the configuration object with localized archives.
-    URI[] cacheArchives = DistributedCache.getCacheArchives(job);
-    if (cacheArchives != null) {
-      List<String> localArchives = new ArrayList<String>();
-      for (int i = 0; i < cacheArchives.length; ++i) {
-        URI u = cacheArchives[i];
-        Path p = new Path(u);
-        Path name =
-            new Path((null == u.getFragment()) ? p.getName()
-                : u.getFragment());
-        String linkName = name.toUri().getPath();
-        localArchives.add(new Path(localWorkDir, linkName).toUri().getPath());
-      }
-      if (!localArchives.isEmpty()) {
-        job.set(MRJobConfig.CACHE_LOCALARCHIVES, StringUtils
-            .arrayToString(localArchives.toArray(new String[localArchives
-                .size()])));
-      }
-    }
-
-    // Update the configuration object with localized files.
-    URI[] cacheFiles = DistributedCache.getCacheFiles(job);
-    if (cacheFiles != null) {
-      List<String> localFiles = new ArrayList<String>();
-      for (int i = 0; i < cacheFiles.length; ++i) {
-        URI u = cacheFiles[i];
-        Path p = new Path(u);
-        Path name =
-            new Path((null == u.getFragment()) ? p.getName()
-                : u.getFragment());
-        String linkName = name.toUri().getPath();
-        localFiles.add(new Path(localWorkDir, linkName).toUri().getPath());
-      }
-      if (!localFiles.isEmpty()) {
-        job.set(MRJobConfig.CACHE_LOCALFILES,
-            StringUtils.arrayToString(localFiles
-                .toArray(new String[localFiles.size()])));
-      }
-    }
   }
 
   private static final FsPermission urw_gr =

@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -29,15 +32,11 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Ap
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 
-import java.util.HashMap;
-import java.util.Map;
-
 public class MockApp implements Application {
 
   final String user;
   final ApplicationId appId;
-  Map<ContainerId, Container> containers =
-      new HashMap<ContainerId, Container>();
+  Map<ContainerId, Container> containers = new HashMap<ContainerId, Container>();
   ApplicationState appState;
   Application app;
 
@@ -49,10 +48,10 @@ public class MockApp implements Application {
     super();
     this.user = user;
     // Add an application and the corresponding containers
-    RecordFactory recordFactory =
-        RecordFactoryProvider.getRecordFactory(new Configuration());
-    this.appId =
-        BuilderUtils.newApplicationId(recordFactory, clusterTimeStamp, uniqId);
+    RecordFactory recordFactory = RecordFactoryProvider
+        .getRecordFactory(new Configuration());
+    this.appId = BuilderUtils.newApplicationId(recordFactory, clusterTimeStamp,
+        uniqId);
     appState = ApplicationState.NEW;
   }
 
@@ -76,7 +75,6 @@ public class MockApp implements Application {
     return appState;
   }
 
-  public void handle(ApplicationEvent event) {
-  }
+  public void handle(ApplicationEvent event) {}
 
 }

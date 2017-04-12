@@ -20,12 +20,17 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 public enum RMStateStoreEventType {
   STORE_APP_ATTEMPT,
-  //gautier done
   STORE_APP,
-  //done gautier
   UPDATE_APP,
-  //gautier done
   UPDATE_APP_ATTEMPT,
-  //done gautier
-  REMOVE_APP //done gautier
+  REMOVE_APP,
+  FENCED,
+
+  // Below events should be called synchronously
+  STORE_MASTERKEY,
+  REMOVE_MASTERKEY,
+  STORE_DELEGATION_TOKEN,
+  REMOVE_DELEGATION_TOKEN,
+  UPDATE_DELEGATION_TOKEN,
+  UPDATE_AMRM_TOKEN
 }

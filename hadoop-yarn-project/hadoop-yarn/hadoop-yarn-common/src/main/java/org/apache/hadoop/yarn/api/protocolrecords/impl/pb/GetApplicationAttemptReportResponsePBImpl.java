@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptReportResponse;
@@ -28,10 +27,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationAttemptReportProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptReportResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptReportResponseProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
-public class GetApplicationAttemptReportResponsePBImpl
-    extends GetApplicationAttemptReportResponse {
+public class GetApplicationAttemptReportResponsePBImpl extends
+    GetApplicationAttemptReportResponse {
 
   GetApplicationAttemptReportResponseProto proto =
       GetApplicationAttemptReportResponseProto.getDefaultInstance();
@@ -80,8 +81,8 @@ public class GetApplicationAttemptReportResponsePBImpl
 
   private void mergeLocalToBuilder() {
     if (this.applicationAttemptReport != null) {
-      builder.setApplicationAttemptReport(
-          convertToProtoFormat(this.applicationAttemptReport));
+      builder
+        .setApplicationAttemptReport(convertToProtoFormat(this.applicationAttemptReport));
     }
   }
 

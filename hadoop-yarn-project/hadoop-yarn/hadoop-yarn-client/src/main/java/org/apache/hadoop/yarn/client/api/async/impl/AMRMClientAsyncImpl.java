@@ -1,24 +1,29 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.client.api.async.impl;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -26,7 +31,6 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
-import org.apache.hadoop.yarn.api.records.AMCommand;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
@@ -38,19 +42,16 @@ import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
 import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
 import org.apache.hadoop.yarn.client.api.impl.AMRMClientImpl;
+import org.apache.hadoop.yarn.exceptions.ApplicationAttemptNotFoundException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
-import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import com.google.common.annotations.VisibleForTesting;
 
 @Private
 @Unstable
-public class AMRMClientAsyncImpl<T extends ContainerRequest>
-    extends AMRMClientAsync<T> {
+public class AMRMClientAsyncImpl<T extends ContainerRequest> 
+extends AMRMClientAsync<T> {
   
   private static final Log LOG = LogFactory.getLog(AMRMClientAsyncImpl.class);
   
@@ -81,12 +82,12 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
     keepRunning = true;
     savedException = null;
   }
-
+    
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
     client.init(conf);
-  }
+  }  
   
   @Override
   protected void serviceStart() throws Exception {
@@ -118,15 +119,16 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
     heartbeatIntervalMs.set(interval);
   }
   
-  public List<? extends Collection<T>> getMatchingRequests(Priority priority,
-      String resourceName, Resource capability) {
+  public List<? extends Collection<T>> getMatchingRequests(
+                                                   Priority priority, 
+                                                   String resourceName, 
+                                                   Resource capability) {
     return client.getMatchingRequests(priority, resourceName, capability);
   }
   
   /**
    * Registers this application master with the resource manager. On successful
    * registration, starts the heartbeating thread.
-   *
    * @throws YarnException
    * @throws IOException
    */
@@ -141,19 +143,15 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
 
   /**
    * Unregister the application master. This must be called in the end.
-   *
-   * @param appStatus
-   *     Success/Failure status of the master
-   * @param appMessage
-   *     Diagnostics message on failure
-   * @param appTrackingUrl
-   *     New URL to get master info
+   * @param appStatus Success/Failure status of the master
+   * @param appMessage Diagnostics message on failure
+   * @param appTrackingUrl New URL to get master info
    * @throws YarnException
    * @throws IOException
    */
   public void unregisterApplicationMaster(FinalApplicationStatus appStatus,
-      String appMessage, String appTrackingUrl)
-      throws YarnException, IOException {
+      String appMessage, String appTrackingUrl) throws YarnException,
+      IOException {
     synchronized (unregisterHeartbeatLock) {
       keepRunning = false;
       client.unregisterApplicationMaster(appStatus, appMessage, appTrackingUrl);
@@ -162,22 +160,18 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
 
   /**
    * Request containers for resources before calling <code>allocate</code>
-   *
-   * @param req
-   *     Resource request
+   * @param req Resource request
    */
   public void addContainerRequest(T req) {
     client.addContainerRequest(req);
   }
 
   /**
-   * Remove previous container request. The previous container request may have
-   * already been sent to the ResourceManager. So even after the remove request
-   * the app must be prepared to receive an allocation for the previous request
+   * Remove previous container request. The previous container request may have 
+   * already been sent to the ResourceManager. So even after the remove request 
+   * the app must be prepared to receive an allocation for the previous request 
    * even after the remove request
-   *
-   * @param req
-   *     Resource request
+   * @param req Resource request
    */
   public void removeContainerRequest(T req) {
     client.removeContainerRequest(req);
@@ -188,7 +182,6 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
    * the container or wants to give up the container then it can release them.
    * The app needs to make new requests for the released resource capability if
    * it still needs it. eg. it released non-local resources
-   *
    * @param containerId
    */
   public void releaseAssignedContainer(ContainerId containerId) {
@@ -198,7 +191,6 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
   /**
    * Get the currently available resources in the cluster.
    * A valid value is available after a call to allocate has been made
-   *
    * @return Currently available resources
    */
   public Resource getAvailableResources() {
@@ -208,11 +200,23 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
   /**
    * Get the current number of nodes in the cluster.
    * A valid values is available after a call to allocate has been made
-   *
    * @return Current number of nodes in the cluster
    */
   public int getClusterNodeCount() {
     return client.getClusterNodeCount();
+  }
+
+  /**
+   * Update application's blacklist with addition or removal resources.
+   *
+   * @param blacklistAdditions list of resources which should be added to the
+   *        application blacklist
+   * @param blacklistRemovals list of resources which should be removed from the
+   *        application blacklist
+   */
+  public void updateBlacklist(List<String> blacklistAdditions,
+                              List<String> blacklistRemovals) {
+    client.updateBlacklist(blacklistAdditions, blacklistRemovals);
   }
   
   private class HeartbeatThread extends Thread {
@@ -231,6 +235,10 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
 
           try {
             response = client.allocate(progress);
+          } catch (ApplicationAttemptNotFoundException e) {
+            handler.onShutdownRequest();
+            LOG.info("Shutdown requested. Stopping callback.");
+            return;
           } catch (Throwable ex) {
             LOG.error("Exception on heartbeat", ex);
             savedException = ex;
@@ -238,23 +246,17 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
             handlerThread.interrupt();
             return;
           }
-        }
-        if (response != null) {
-          while (true) {
-            try {
-              responseQueue.put(response);
-              if (response.getAMCommand() == AMCommand.AM_RESYNC ||
-                  response.getAMCommand() == AMCommand.AM_SHUTDOWN) {
-                return;
+          if (response != null) {
+            while (true) {
+              try {
+                responseQueue.put(response);
+                break;
+              } catch (InterruptedException ex) {
+                LOG.debug("Interrupted while waiting to put on response queue", ex);
               }
-              break;
-            } catch (InterruptedException ex) {
-              LOG.debug("Interrupted while waiting to put on response queue",
-                  ex);
             }
           }
         }
-        
         try {
           Thread.sleep(heartbeatIntervalMs.get());
         } catch (InterruptedException ex) {
@@ -276,7 +278,7 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
         }
         try {
           AllocateResponse response;
-          if (savedException != null) {
+          if(savedException != null) {
             LOG.error("Stopping callback due to: ", savedException);
             handler.onError(savedException);
             return;
@@ -286,21 +288,6 @@ public class AMRMClientAsyncImpl<T extends ContainerRequest>
           } catch (InterruptedException ex) {
             LOG.info("Interrupted while waiting for queue", ex);
             continue;
-          }
-
-          if (response.getAMCommand() != null) {
-            switch (response.getAMCommand()) {
-              case AM_RESYNC:
-              case AM_SHUTDOWN:
-                handler.onShutdownRequest();
-                LOG.info("Shutdown requested. Stopping callback.");
-                return;
-              default:
-                String msg = "Unhandled value of RM AMCommand: " +
-                    response.getAMCommand();
-                LOG.error(msg);
-                throw new YarnRuntimeException(msg);
-            }
           }
           List<NodeReport> updatedNodes = response.getUpdatedNodes();
           if (!updatedNodes.isEmpty()) {

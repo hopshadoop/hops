@@ -1,28 +1,27 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.webproxy;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.io.IOException;
+import java.net.URI;
+
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.service.AbstractService;
@@ -30,16 +29,18 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 
-import java.io.IOException;
-import java.net.URI;
+import com.google.common.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class WebAppProxy extends AbstractService {
-  public static final String FETCHER_ATTRIBUTE = "AppUrlFetcher";
-  public static final String IS_SECURITY_ENABLED_ATTRIBUTE =
-      "IsSecurityEnabled";
+  public static final String FETCHER_ATTRIBUTE= "AppUrlFetcher";
+  public static final String IS_SECURITY_ENABLED_ATTRIBUTE = "IsSecurityEnabled";
   public static final String PROXY_HOST_ATTRIBUTE = "proxyHost";
-  private static final Log LOG = LogFactory.getLog(WebAppProxy.class);
+  private static final Logger LOG = LoggerFactory.getLogger(
+      WebAppProxy.class);
   
   private HttpServer2 proxyServer = null;
   private String bindAddress = null;
@@ -55,8 +56,7 @@ public class WebAppProxy extends AbstractService {
   
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    String auth =
-        conf.get(CommonConfigurationKeys.HADOOP_SECURITY_AUTHENTICATION);
+    String auth =  conf.get(CommonConfigurationKeys.HADOOP_SECURITY_AUTHENTICATION);
     if (auth == null || "simple".equals(auth)) {
       isSecurityEnabled = false;
     } else if ("kerberos".equals(auth)) {
@@ -72,8 +72,8 @@ public class WebAppProxy extends AbstractService {
 
     fetcher = new AppReportFetcher(conf);
     bindAddress = conf.get(YarnConfiguration.PROXY_ADDRESS);
-    if (bindAddress == null || bindAddress.isEmpty()) {
-      throw new YarnRuntimeException(YarnConfiguration.PROXY_ADDRESS +
+    if(bindAddress == null || bindAddress.isEmpty()) {
+      throw new YarnRuntimeException(YarnConfiguration.PROXY_ADDRESS + 
           " is not set so the proxy will not run.");
     }
     LOG.info("Instantiating Proxy at " + bindAddress);
@@ -83,7 +83,7 @@ public class WebAppProxy extends AbstractService {
       bindAddress = parts[0];
       port = Integer.parseInt(parts[1]);
     }
-    acl = new AccessControlList(conf.get(YarnConfiguration.YARN_ADMIN_ACL,
+    acl = new AccessControlList(conf.get(YarnConfiguration.YARN_ADMIN_ACL, 
         YarnConfiguration.DEFAULT_YARN_ADMIN_ACL));
     super.serviceInit(conf);
   }
@@ -92,10 +92,11 @@ public class WebAppProxy extends AbstractService {
   protected void serviceStart() throws Exception {
     try {
       Configuration conf = getConfig();
-      HttpServer2.Builder b = new HttpServer2.Builder().setName("proxy")
-          .addEndpoint(URI.create(
-                  WebAppUtils.getHttpSchemePrefix(conf) + bindAddress + ":" +
-                      port)).setFindPort(port == 0).setConf(getConfig())
+      HttpServer2.Builder b = new HttpServer2.Builder()
+          .setName("proxy")
+          .addEndpoint(
+              URI.create(WebAppUtils.getHttpSchemePrefix(conf) + bindAddress
+                  + ":" + port)).setFindPort(port == 0).setConf(getConfig())
           .setACL(acl);
       if (YarnConfiguration.useHttps(conf)) {
         WebAppUtils.loadSslConfiguration(b);
@@ -109,33 +110,34 @@ public class WebAppProxy extends AbstractService {
       proxyServer.setAttribute(PROXY_HOST_ATTRIBUTE, proxyHost);
       proxyServer.start();
     } catch (IOException e) {
-      LOG.fatal("Could not start proxy web server", e);
-      throw new YarnRuntimeException("Could not start proxy web server", e);
+      LOG.error("Could not start proxy web server",e);
+      throw e;
     }
     super.serviceStart();
   }
   
   @Override
   protected void serviceStop() throws Exception {
-    if (proxyServer != null) {
+    if(proxyServer != null) {
       try {
         proxyServer.stop();
       } catch (Exception e) {
-        LOG.fatal("Error stopping proxy web server", e);
-        throw new YarnRuntimeException("Error stopping proxy web server", e);
+        LOG.error("Error stopping proxy web server", e);
+        throw new YarnRuntimeException("Error stopping proxy web server",e);
       }
     }
-    if (this.fetcher != null) {
+    if(this.fetcher != null) {
       this.fetcher.stop();
     }
     super.serviceStop();
   }
 
   public void join() {
-    if (proxyServer != null) {
+    if(proxyServer != null) {
       try {
         proxyServer.join();
       } catch (InterruptedException e) {
+        // ignored
       }
     }
   }

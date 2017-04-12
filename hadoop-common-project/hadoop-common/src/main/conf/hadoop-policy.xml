@@ -1,8 +1,6 @@
 <?xml version="1.0"?>
 <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
 <!--
-
- Copyright 2011 The Apache Software Foundation
  
  Licensed to the Apache Software Foundation (ASF) under one
  or more contributor license agreements.  See the NOTICE file
@@ -85,7 +83,7 @@
   </property>
 
   <property>
-    <name>security.refresh.usertogroups.mappings.protocol.acl</name>
+    <name>security.refresh.user.mappings.protocol.acl</name>
     <value>*</value>
     <description>ACL for RefreshUserMappingsProtocol. Used to refresh
     users mappings. The ACL is a comma-separated list of user and
@@ -216,4 +214,13 @@
     A special value of "*" means all users are allowed.</description>
   </property>
 
+  <property>
+    <name>security.applicationhistory.protocol.acl</name>
+    <value>*</value>
+    <description>ACL for ApplicationHistoryProtocol, used by the timeline
+    server and the generic history service client to communicate with each other.
+    The ACL is a comma-separated list of user and group names. The user and
+    group list is separated by a blank. For e.g. "alice,bob users,wheel".
+    A special value of "*" means all users are allowed.</description>
+  </property>
 </configuration>

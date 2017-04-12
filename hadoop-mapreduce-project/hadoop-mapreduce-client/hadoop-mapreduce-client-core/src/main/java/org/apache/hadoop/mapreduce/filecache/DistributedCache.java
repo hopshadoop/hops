@@ -115,7 +115,7 @@ import java.net.URI;
  *       }
  *     }
  *     
- * </pre></blockquote></p>
+ * </pre></blockquote>
  *
  * It is also very common to use the DistributedCache by using
  * {@link org.apache.hadoop.util.GenericOptionsParser}.
@@ -235,7 +235,6 @@ public class DistributedCache {
    * DistributedCache and MapReduce code.
    * @param conf The configuration which stored the timestamps
    * @return a long array of timestamps
-   * @throws IOException
    * @deprecated Use {@link JobContext#getArchiveTimestamps()} instead
    */
   @Deprecated
@@ -250,7 +249,6 @@ public class DistributedCache {
    * DistributedCache and MapReduce code.
    * @param conf The configuration which stored the timestamps
    * @return a long array of timestamps
-   * @throws IOException
    * @deprecated Use {@link JobContext#getFileTimestamps()} instead
    */
   @Deprecated
@@ -434,7 +432,6 @@ public class DistributedCache {
    * internal DistributedCache and MapReduce code.
    * @param conf The configuration which stored the timestamps
    * @return a string array of booleans 
-   * @throws IOException
    */
   public static boolean[] getFileVisibilities(Configuration conf) {
     return parseBooleans(conf.getStrings(MRJobConfig.CACHE_FILE_VISIBILITIES));
@@ -473,7 +470,7 @@ public class DistributedCache {
         if (fragment == null) {
           return false;
         }
-        String lowerCaseFragment = fragment.toLowerCase();
+        String lowerCaseFragment = StringUtils.toLowerCase(fragment);
         if (fragments.contains(lowerCaseFragment)) {
           return false;
         }
@@ -488,7 +485,7 @@ public class DistributedCache {
         if (fragment == null) {
           return false;
         }
-        String lowerCaseFragment = fragment.toLowerCase();
+        String lowerCaseFragment = StringUtils.toLowerCase(fragment);
         if (fragments.contains(lowerCaseFragment)) {
           return false;
         }

@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.proto.SecurityProtos.TokenProto;
@@ -32,11 +31,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerLaunchContextProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StartContainerRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StartContainerRequestProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
 public class StartContainerRequestPBImpl extends StartContainerRequest {
-  StartContainerRequestProto proto =
-      StartContainerRequestProto.getDefaultInstance();
+  StartContainerRequestProto proto = StartContainerRequestProto.getDefaultInstance();
   StartContainerRequestProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -54,7 +54,7 @@ public class StartContainerRequestPBImpl extends StartContainerRequest {
   }
   
   public StartContainerRequestProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -67,9 +67,8 @@ public class StartContainerRequestPBImpl extends StartContainerRequest {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -83,18 +82,16 @@ public class StartContainerRequestPBImpl extends StartContainerRequest {
 
   private void mergeLocalToBuilder() {
     if (this.containerLaunchContext != null) {
-      builder.setContainerLaunchContext(
-          convertToProtoFormat(this.containerLaunchContext));
+      builder.setContainerLaunchContext(convertToProtoFormat(this.containerLaunchContext));
     }
-    if (this.containerToken != null) {
+    if(this.containerToken != null) {
       builder.setContainerToken(convertToProtoFormat(this.containerToken));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -106,7 +103,7 @@ public class StartContainerRequestPBImpl extends StartContainerRequest {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public ContainerLaunchContext getContainerLaunchContext() {
@@ -117,18 +114,15 @@ public class StartContainerRequestPBImpl extends StartContainerRequest {
     if (!p.hasContainerLaunchContext()) {
       return null;
     }
-    this.containerLaunchContext =
-        convertFromProtoFormat(p.getContainerLaunchContext());
+    this.containerLaunchContext = convertFromProtoFormat(p.getContainerLaunchContext());
     return this.containerLaunchContext;
   }
 
   @Override
-  public void setContainerLaunchContext(
-      ContainerLaunchContext containerLaunchContext) {
+  public void setContainerLaunchContext(ContainerLaunchContext containerLaunchContext) {
     maybeInitBuilder();
-    if (containerLaunchContext == null) {
+    if (containerLaunchContext == null) 
       builder.clearContainerLaunchContext();
-    }
     this.containerLaunchContext = containerLaunchContext;
   }
 
@@ -148,21 +142,20 @@ public class StartContainerRequestPBImpl extends StartContainerRequest {
   @Override
   public void setContainerToken(Token containerToken) {
     maybeInitBuilder();
-    if (containerToken == null) {
+    if(containerToken == null) {
       builder.clearContainerToken();
     }
     this.containerToken = containerToken;
   }
 
-  private ContainerLaunchContextPBImpl convertFromProtoFormat(
-      ContainerLaunchContextProto p) {
+  private ContainerLaunchContextPBImpl convertFromProtoFormat(ContainerLaunchContextProto p) {
     return new ContainerLaunchContextPBImpl(p);
   }
 
-  private ContainerLaunchContextProto convertToProtoFormat(
-      ContainerLaunchContext t) {
-    return ((ContainerLaunchContextPBImpl) t).getProto();
+  private ContainerLaunchContextProto convertToProtoFormat(ContainerLaunchContext t) {
+    return ((ContainerLaunchContextPBImpl)t).getProto();
   }
+
 
 
   private TokenPBImpl convertFromProtoFormat(TokenProto containerProto) {
@@ -170,6 +163,6 @@ public class StartContainerRequestPBImpl extends StartContainerRequest {
   }
 
   private TokenProto convertToProtoFormat(Token container) {
-    return ((TokenPBImpl) container).getProto();
+    return ((TokenPBImpl)container).getProto();
   }
 }  

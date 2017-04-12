@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptsResponse;
@@ -28,14 +31,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationAttemptReportProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptsResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptsResponseProtoOrBuilder;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
-public class GetApplicationAttemptsResponsePBImpl
-    extends GetApplicationAttemptsResponse {
+public class GetApplicationAttemptsResponsePBImpl extends
+    GetApplicationAttemptsResponse {
 
   GetApplicationAttemptsResponseProto proto =
       GetApplicationAttemptsResponseProto.getDefaultInstance();
@@ -147,8 +148,8 @@ public class GetApplicationAttemptsResponsePBImpl
           public Iterator<ApplicationAttemptReportProto> iterator() {
             return new Iterator<ApplicationAttemptReportProto>() {
 
-              Iterator<ApplicationAttemptReport> iter =
-                  applicationAttemptList.iterator();
+              Iterator<ApplicationAttemptReport> iter = applicationAttemptList
+                .iterator();
 
               @Override
               public boolean hasNext() {

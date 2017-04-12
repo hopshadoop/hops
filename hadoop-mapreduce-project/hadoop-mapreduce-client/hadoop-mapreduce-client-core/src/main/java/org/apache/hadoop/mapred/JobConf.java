@@ -66,11 +66,12 @@ import org.apache.log4j.Level;
  *   </li>
  *   <li>
  *   While some job parameters are straight-forward to set 
- *   (e.g. {@link #setNumReduceTasks(int)}), some parameters interact subtly 
- *   rest of the framework and/or job-configuration and is relatively more 
- *   complex for the user to control finely (e.g. {@link #setNumMapTasks(int)}).
+ *   (e.g. {@link #setNumReduceTasks(int)}), some parameters interact subtly
+ *   with the rest of the framework and/or job-configuration and is relatively
+ *   more complex for the user to control finely
+ *   (e.g. {@link #setNumMapTasks(int)}).
  *   </li>
- * </ol></p>
+ * </ol>
  * 
  * <p><code>JobConf</code> typically specifies the {@link Mapper}, combiner 
  * (if any), {@link Partitioner}, {@link Reducer}, {@link InputFormat} and 
@@ -101,7 +102,7 @@ import org.apache.log4j.Level;
  *     
  *     job.setInputFormat(SequenceFileInputFormat.class);
  *     job.setOutputFormat(SequenceFileOutputFormat.class);
- * </pre></blockquote></p>
+ * </pre></blockquote>
  * 
  * @see JobClient
  * @see ClusterStatus
@@ -111,7 +112,7 @@ import org.apache.log4j.Level;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class JobConf extends Configuration {
-  
+
   private static final Log LOG = LogFactory.getLog(JobConf.class);
 
   static{
@@ -150,7 +151,9 @@ public class JobConf extends Configuration {
   /**
    * A value which if set for memory related configuration options,
    * indicates that the options are turned off.
+   * Deprecated because it makes no sense in the context of MR2.
    */
+  @Deprecated
   public static final long DISABLED_MEMORY_LIMIT = -1L;
 
   /**
@@ -478,7 +481,7 @@ public class JobConf extends Configuration {
 
   /** A new map/reduce configuration where the behavior of reading from the
    * default resources can be turned off.
-   * <p/>
+   * <p>
    * If the parameter {@code loadDefaults} is false, the new instance
    * will not load resources from the default files.
    *
@@ -746,7 +749,6 @@ public class JobConf extends Configuration {
 
   /**
    * Should the map outputs be compressed before transfer?
-   * Uses the SequenceFile compression.
    * 
    * @param compress should the map outputs be compressed?
    */
@@ -882,7 +884,7 @@ public class JobConf extends Configuration {
       JobContext.KEY_COMPARATOR, null, RawComparator.class);
     if (theClass != null)
       return ReflectionUtils.newInstance(theClass, this);
-    return WritableComparator.get(getMapOutputKeyClass().asSubclass(WritableComparable.class));
+    return WritableComparator.get(getMapOutputKeyClass().asSubclass(WritableComparable.class), this);
   }
 
   /**
@@ -986,19 +988,19 @@ public class JobConf extends Configuration {
   /**
    * Set the user defined {@link RawComparator} comparator for
    * grouping keys in the input to the combiner.
-   * <p/>
+   *
    * <p>This comparator should be provided if the equivalence rules for keys
    * for sorting the intermediates are different from those for grouping keys
    * before each call to
    * {@link Reducer#reduce(Object, java.util.Iterator, OutputCollector, Reporter)}.</p>
-   * <p/>
+   *
    * <p>For key-value pairs (K1,V1) and (K2,V2), the values (V1, V2) are passed
    * in a single call to the reduce function if K1 and K2 compare as equal.</p>
-   * <p/>
+   *
    * <p>Since {@link #setOutputKeyComparatorClass(Class)} can be used to control
    * how keys are sorted, this can be used in conjunction to simulate
    * <i>secondary sort on values</i>.</p>
-   * <p/>
+   *
    * <p><i>Note</i>: This is not a guarantee of the combiner sort being
    * <i>stable</i> in any sense. (In any case, with the order of available
    * map-outputs to the combiner being non-deterministic, it wouldn't make
@@ -1203,7 +1205,7 @@ public class JobConf extends Configuration {
    *   <li> be side-effect free</li>
    *   <li> have the same input and output key types and the same input and 
    *        output value types</li>
-   * </ul></p>
+   * </ul>
    * 
    * <p>Typically the combiner is same as the <code>Reducer</code> for the  
    * job i.e. {@link #setReducerClass(Class)}.</p>
@@ -1302,7 +1304,7 @@ public class JobConf extends Configuration {
    * A custom {@link InputFormat} is typically used to accurately control 
    * the number of map tasks for the job.</p>
    * 
-   * <h4 id="NoOfMaps">How many maps?</h4>
+   * <b id="NoOfMaps">How many maps?</b>
    * 
    * <p>The number of maps is usually driven by the total size of the inputs 
    * i.e. total number of blocks of the input files.</p>
@@ -1343,7 +1345,7 @@ public class JobConf extends Configuration {
   /**
    * Set the requisite number of reduce tasks for this job.
    * 
-   * <h4 id="NoOfReduces">How many reduces?</h4>
+   * <b id="NoOfReduces">How many reduces?</b>
    * 
    * <p>The right number of reduces seems to be <code>0.95</code> or 
    * <code>1.75</code> multiplied by (&lt;<i>no. of nodes</i>&gt; * 
@@ -1363,7 +1365,7 @@ public class JobConf extends Configuration {
    * reserve a few reduce slots in the framework for speculative-tasks, failures
    * etc.</p> 
    *
-   * <h4 id="ReducerNone">Reducer NONE</h4>
+   * <b id="ReducerNone">Reducer NONE</b>
    * 
    * <p>It is legal to set the number of reduce-tasks to <code>zero</code>.</p>
    * 
@@ -1641,8 +1643,7 @@ public class JobConf extends Configuration {
    */
   public String getProfileParams() {
     return get(JobContext.TASK_PROFILE_PARAMS,
-               "-agentlib:hprof=cpu=samples,heap=sites,force=n,thread=y," +
-                 "verbose=n,file=%s");
+        MRJobConfig.DEFAULT_TASK_PROFILE_PARAMS);
   }
 
   /**
@@ -1687,9 +1688,9 @@ public class JobConf extends Configuration {
    * given task's stdout, stderr, syslog, jobconf files as arguments.</p>
    * 
    * <p>The debug command, run on the node where the map failed, is:</p>
-   * <p><pre><blockquote> 
+   * <p><blockquote><pre>
    * $script $stdout $stderr $syslog $jobconf.
-   * </blockquote></pre></p>
+   * </pre></blockquote>
    * 
    * <p> The script file is distributed through {@link DistributedCache} 
    * APIs. The script needs to be symlinked. </p>
@@ -1699,7 +1700,7 @@ public class JobConf extends Configuration {
    * job.setMapDebugScript("./myscript");
    * DistributedCache.createSymlink(job);
    * DistributedCache.addCacheFile("/debug/scripts/myscript#myscript");
-   * </pre></blockquote></p>
+   * </pre></blockquote>
    * 
    * @param mDbgScript the script name
    */
@@ -1724,9 +1725,9 @@ public class JobConf extends Configuration {
    * is given task's stdout, stderr, syslog, jobconf files as arguments.</p>
    * 
    * <p>The debug command, run on the node where the map failed, is:</p>
-   * <p><pre><blockquote> 
+   * <p><blockquote><pre>
    * $script $stdout $stderr $syslog $jobconf.
-   * </blockquote></pre></p>
+   * </pre></blockquote>
    * 
    * <p> The script file is distributed through {@link DistributedCache} 
    * APIs. The script file needs to be symlinked </p>
@@ -1736,7 +1737,7 @@ public class JobConf extends Configuration {
    * job.setReduceDebugScript("./myscript");
    * DistributedCache.createSymlink(job);
    * DistributedCache.addCacheFile("/debug/scripts/myscript#myscript");
-   * </pre></blockquote></p>
+   * </pre></blockquote>
    * 
    * @param rDbgScript the script name
    */
@@ -1779,8 +1780,6 @@ public class JobConf extends Configuration {
    * 
    * @param uri the job end notification uri
    * @see JobStatus
-   * @see <a href="{@docRoot}/org/apache/hadoop/mapred/JobClient.html#
-   *       JobCompletionAndChaining">Job Completion and Chaining</a>
    */
   public void setJobEndNotificationURI(String uri) {
     set(JobContext.MR_JOB_END_NOTIFICATION_URL, uri);
@@ -1809,27 +1808,19 @@ public class JobConf extends Configuration {
    * Get memory required to run a map task of the job, in MB.
    * 
    * If a value is specified in the configuration, it is returned.
-   * Else, it returns {@link #DISABLED_MEMORY_LIMIT}.
-   * <p/>
+   * Else, it returns {@link JobContext#DEFAULT_MAP_MEMORY_MB}.
+   * <p>
    * For backward compatibility, if the job configuration sets the
    * key {@link #MAPRED_TASK_MAXVMEM_PROPERTY} to a value different
    * from {@link #DISABLED_MEMORY_LIMIT}, that value will be used
    * after converting it from bytes to MB.
    * @return memory required to run a map task of the job, in MB,
-   *          or {@link #DISABLED_MEMORY_LIMIT} if unset.
    */
   public long getMemoryForMapTask() {
     long value = getDeprecatedMemoryValue();
-    if (value == DISABLED_MEMORY_LIMIT) {
-      value = normalizeMemoryConfigValue(
-                getLong(JobConf.MAPREDUCE_JOB_MAP_MEMORY_MB_PROPERTY,
-                          DISABLED_MEMORY_LIMIT));
-    }
-    // In case that M/R 1.x applications use the old property name
-    if (value == DISABLED_MEMORY_LIMIT) {
-      value = normalizeMemoryConfigValue(
-                getLong(JobConf.MAPRED_JOB_MAP_MEMORY_MB_PROPERTY,
-                          DISABLED_MEMORY_LIMIT));
+    if (value < 0) {
+      return getLong(JobConf.MAPRED_JOB_MAP_MEMORY_MB_PROPERTY,
+          JobContext.DEFAULT_MAP_MEMORY_MB);
     }
     return value;
   }
@@ -1844,27 +1835,19 @@ public class JobConf extends Configuration {
    * Get memory required to run a reduce task of the job, in MB.
    * 
    * If a value is specified in the configuration, it is returned.
-   * Else, it returns {@link #DISABLED_MEMORY_LIMIT}.
-   * <p/>
+   * Else, it returns {@link JobContext#DEFAULT_REDUCE_MEMORY_MB}.
+   * <p>
    * For backward compatibility, if the job configuration sets the
    * key {@link #MAPRED_TASK_MAXVMEM_PROPERTY} to a value different
    * from {@link #DISABLED_MEMORY_LIMIT}, that value will be used
    * after converting it from bytes to MB.
-   * @return memory required to run a reduce task of the job, in MB,
-   *          or {@link #DISABLED_MEMORY_LIMIT} if unset.
+   * @return memory required to run a reduce task of the job, in MB.
    */
   public long getMemoryForReduceTask() {
     long value = getDeprecatedMemoryValue();
-    if (value == DISABLED_MEMORY_LIMIT) {
-      value = normalizeMemoryConfigValue(
-                getLong(JobConf.MAPREDUCE_JOB_REDUCE_MEMORY_MB_PROPERTY,
-                        DISABLED_MEMORY_LIMIT));
-    }
-    // In case that M/R 1.x applications use the old property name
-    if (value == DISABLED_MEMORY_LIMIT) {
-      value = normalizeMemoryConfigValue(
-                getLong(JobConf.MAPRED_JOB_REDUCE_MEMORY_MB_PROPERTY,
-                        DISABLED_MEMORY_LIMIT));
+    if (value < 0) {
+      return getLong(JobConf.MAPRED_JOB_REDUCE_MEMORY_MB_PROPERTY,
+          JobContext.DEFAULT_REDUCE_MEMORY_MB);
     }
     return value;
   }
@@ -1876,8 +1859,7 @@ public class JobConf extends Configuration {
   private long getDeprecatedMemoryValue() {
     long oldValue = getLong(MAPRED_TASK_MAXVMEM_PROPERTY, 
         DISABLED_MEMORY_LIMIT);
-    oldValue = normalizeMemoryConfigValue(oldValue);
-    if (oldValue != DISABLED_MEMORY_LIMIT) {
+    if (oldValue > 0) {
       oldValue /= (1024*1024);
     }
     return oldValue;
@@ -1921,39 +1903,6 @@ public class JobConf extends Configuration {
     return val;
   }
 
-  /**
-   * Compute the number of slots required to run a single map task-attempt
-   * of this job.
-   * @param slotSizePerMap cluster-wide value of the amount of memory required
-   *                       to run a map-task
-   * @return the number of slots required to run a single map task-attempt
-   *          1 if memory parameters are disabled.
-   */
-  int computeNumSlotsPerMap(long slotSizePerMap) {
-    if ((slotSizePerMap==DISABLED_MEMORY_LIMIT) ||
-        (getMemoryForMapTask()==DISABLED_MEMORY_LIMIT)) {
-      return 1;
-    }
-    return (int)(Math.ceil((float)getMemoryForMapTask() / (float)slotSizePerMap));
-  }
-  
-  /**
-   * Compute the number of slots required to run a single reduce task-attempt
-   * of this job.
-   * @param slotSizePerReduce cluster-wide value of the amount of memory 
-   *                          required to run a reduce-task
-   * @return the number of slots required to run a single reduce task-attempt
-   *          1 if memory parameters are disabled
-   */
-  int computeNumSlotsPerReduce(long slotSizePerReduce) {
-    if ((slotSizePerReduce==DISABLED_MEMORY_LIMIT) ||
-        (getMemoryForReduceTask()==DISABLED_MEMORY_LIMIT)) {
-      return 1;
-    }
-    return 
-    (int)(Math.ceil((float)getMemoryForReduceTask() / (float)slotSizePerReduce));
-  }
-
   /** 
    * Find a jar that contains a class of the same name, if any.
    * It will return a jar file, even if that is not the first thing
@@ -1961,7 +1910,6 @@ public class JobConf extends Configuration {
    * 
    * @param my_class the class to find.
    * @return a jar file that contains the class, or null.
-   * @throws IOException
    */
   public static String findContainingJar(Class my_class) {
     return ClassUtil.findContainingJar(my_class);
@@ -1970,19 +1918,17 @@ public class JobConf extends Configuration {
   /**
    * Get the memory required to run a task of this job, in bytes. See
    * {@link #MAPRED_TASK_MAXVMEM_PROPERTY}
-   * <p/>
+   * <p>
    * This method is deprecated. Now, different memory limits can be
    * set for map and reduce tasks of a job, in MB. 
-   * <p/>
+   * <p>
    * For backward compatibility, if the job configuration sets the
-   * key {@link #MAPRED_TASK_MAXVMEM_PROPERTY} to a value different
-   * from {@link #DISABLED_MEMORY_LIMIT}, that value is returned. 
+   * key {@link #MAPRED_TASK_MAXVMEM_PROPERTY}, that value is returned. 
    * Otherwise, this method will return the larger of the values returned by 
    * {@link #getMemoryForMapTask()} and {@link #getMemoryForReduceTask()}
    * after converting them into bytes.
    *
-   * @return Memory required to run a task of this job, in bytes,
-   *          or {@link #DISABLED_MEMORY_LIMIT}, if unset.
+   * @return Memory required to run a task of this job, in bytes.
    * @see #setMaxVirtualMemoryForTask(long)
    * @deprecated Use {@link #getMemoryForMapTask()} and
    *             {@link #getMemoryForReduceTask()}
@@ -1993,22 +1939,15 @@ public class JobConf extends Configuration {
       "getMaxVirtualMemoryForTask() is deprecated. " +
       "Instead use getMemoryForMapTask() and getMemoryForReduceTask()");
 
-    long value = getLong(MAPRED_TASK_MAXVMEM_PROPERTY, DISABLED_MEMORY_LIMIT);
-    value = normalizeMemoryConfigValue(value);
-    if (value == DISABLED_MEMORY_LIMIT) {
-      value = Math.max(getMemoryForMapTask(), getMemoryForReduceTask());
-      value = normalizeMemoryConfigValue(value);
-      if (value != DISABLED_MEMORY_LIMIT) {
-        value *= 1024*1024;
-      }
-    }
+    long value = getLong(MAPRED_TASK_MAXVMEM_PROPERTY,
+        Math.max(getMemoryForMapTask(), getMemoryForReduceTask()) * 1024 * 1024);
     return value;
   }
 
   /**
    * Set the maximum amount of memory any task of this job can use. See
    * {@link #MAPRED_TASK_MAXVMEM_PROPERTY}
-   * <p/>
+   * <p>
    * mapred.task.maxvmem is split into
    * mapreduce.map.memory.mb
    * and mapreduce.map.memory.mb,mapred
@@ -2027,9 +1966,8 @@ public class JobConf extends Configuration {
   public void setMaxVirtualMemoryForTask(long vmem) {
     LOG.warn("setMaxVirtualMemoryForTask() is deprecated."+
       "Instead use setMemoryForMapTask() and setMemoryForReduceTask()");
-    if(vmem != DISABLED_MEMORY_LIMIT && vmem < 0) {
-      setMemoryForMapTask(DISABLED_MEMORY_LIMIT);
-      setMemoryForReduceTask(DISABLED_MEMORY_LIMIT);
+    if (vmem < 0) {
+      throw new IllegalArgumentException("Task memory allocation may not be < 0");
     }
 
     if(get(JobConf.MAPRED_TASK_MAXVMEM_PROPERTY) == null) {

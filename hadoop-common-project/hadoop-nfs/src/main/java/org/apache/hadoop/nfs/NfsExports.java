@@ -27,10 +27,12 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.commons.net.util.SubnetUtils;
 import org.apache.commons.net.util.SubnetUtils.SubnetInfo;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.nfs.nfs3.Nfs3Constant;
 import org.apache.hadoop.util.LightWeightCache;
 import org.apache.hadoop.util.LightWeightGSet;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
+import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.base.Preconditions;
 
@@ -44,14 +46,20 @@ public class NfsExports {
   
   public static synchronized NfsExports getInstance(Configuration conf) {
     if (exports == null) {
-      String matchHosts = conf.get(Nfs3Constant.EXPORTS_ALLOWED_HOSTS_KEY,
-          Nfs3Constant.EXPORTS_ALLOWED_HOSTS_KEY_DEFAULT);
-      int cacheSize = conf.getInt(Nfs3Constant.EXPORTS_CACHE_SIZE_KEY,
-          Nfs3Constant.EXPORTS_CACHE_SIZE_DEFAULT);
+      String matchHosts = conf.get(
+          CommonConfigurationKeys.NFS_EXPORTS_ALLOWED_HOSTS_KEY,
+          CommonConfigurationKeys.NFS_EXPORTS_ALLOWED_HOSTS_KEY_DEFAULT);
+      int cacheSize = conf.getInt(Nfs3Constant.NFS_EXPORTS_CACHE_SIZE_KEY,
+          Nfs3Constant.NFS_EXPORTS_CACHE_SIZE_DEFAULT);
       long expirationPeriodNano = conf.getLong(
-          Nfs3Constant.EXPORTS_CACHE_EXPIRYTIME_MILLIS_KEY,
-          Nfs3Constant.EXPORTS_CACHE_EXPIRYTIME_MILLIS_DEFAULT) * 1000 * 1000;
-      exports = new NfsExports(cacheSize, expirationPeriodNano, matchHosts);
+          Nfs3Constant.NFS_EXPORTS_CACHE_EXPIRYTIME_MILLIS_KEY,
+          Nfs3Constant.NFS_EXPORTS_CACHE_EXPIRYTIME_MILLIS_DEFAULT) * 1000 * 1000;
+      try {
+        exports = new NfsExports(cacheSize, expirationPeriodNano, matchHosts);
+      } catch (IllegalArgumentException e) {
+        LOG.error("Invalid NFS Exports provided: ", e);
+        return exports;
+      }
     }
     return exports;
   }
@@ -69,7 +77,16 @@ public class NfsExports {
   
   private static final Pattern CIDR_FORMAT_LONG = 
       Pattern.compile(SLASH_FORMAT_LONG);
-  
+
+  // Hostnames are composed of series of 'labels' concatenated with dots.
+  // Labels can be between 1-63 characters long, and can only take
+  // letters, digits & hyphens. They cannot start and end with hyphens. For
+  // more details, refer RFC-1123 & http://en.wikipedia.org/wiki/Hostname
+  private static final String LABEL_FORMAT =
+      "[a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?";
+  private static final Pattern HOSTNAME_FORMAT =
+      Pattern.compile("^(" + LABEL_FORMAT + "\\.)*" + LABEL_FORMAT + "$");
+
   static class AccessCacheEntry implements LightWeightCache.Entry{
     private final String hostAddr;
     private AccessPrivilege access;
@@ -140,7 +157,7 @@ public class NfsExports {
     accessCache = new LightWeightCache<AccessCacheEntry, AccessCacheEntry>(
         cacheSize, cacheSize, expirationPeriodNano, 0);        
     String[] matchStrings = matchHosts.split(
-        Nfs3Constant.EXPORTS_ALLOWED_HOSTS_SEPARATOR);
+        CommonConfigurationKeys.NFS_EXPORTS_ALLOWED_HOSTS_SEPARATOR);
     mMatches = new ArrayList<Match>(matchStrings.length);
     for(String mStr : matchStrings) {
       if (LOG.isDebugEnabled()) {
@@ -343,10 +360,10 @@ public class NfsExports {
     AccessPrivilege privilege = AccessPrivilege.READ_ONLY;
     switch (parts.length) {
     case 1:
-      host = parts[0].toLowerCase().trim();
+      host = StringUtils.toLowerCase(parts[0]).trim();
       break;
     case 2:
-      host = parts[0].toLowerCase().trim();
+      host = StringUtils.toLowerCase(parts[0]).trim();
       String option = parts[1].trim();
       if ("rw".equalsIgnoreCase(option)) {
         privilege = AccessPrivilege.READ_WRITE;
@@ -374,15 +391,19 @@ public class NfsExports {
       return new CIDRMatch(privilege,
           new SubnetUtils(pair[0], pair[1]).getInfo());
     } else if (host.contains("*") || host.contains("?") || host.contains("[")
-        || host.contains("]")) {
+        || host.contains("]") || host.contains("(") || host.contains(")")) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Using Regex match for '" + host + "' and " + privilege);
       }
       return new RegexMatch(privilege, host);
+    } else if (HOSTNAME_FORMAT.matcher(host).matches()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Using exact match for '" + host + "' and " + privilege);
+      }
+      return new ExactMatch(privilege, host);
+    } else {
+      throw new IllegalArgumentException("Invalid hostname provided '" + host
+          + "'");
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Using exact match for '" + host + "' and " + privilege);
-    }
-    return new ExactMatch(privilege, host);
   }
 }

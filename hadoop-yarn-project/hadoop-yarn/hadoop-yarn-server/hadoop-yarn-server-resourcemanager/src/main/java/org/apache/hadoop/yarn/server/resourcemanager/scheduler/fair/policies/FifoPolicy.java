@@ -17,17 +17,19 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.Serializable;
+import java.util.Collection;
+import java.util.Comparator;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.Schedulable;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.SchedulingPolicy;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-import java.io.Serializable;
-import java.util.Collection;
-import java.util.Comparator;
+import com.google.common.annotations.VisibleForTesting;
 
 @Private
 @Unstable
@@ -85,6 +87,37 @@ public class FifoPolicy extends SchedulingPolicy {
     }
     earliest.setFairShare(Resources.clone(totalResources));
   }
+
+  @Override
+  public void computeSteadyShares(Collection<? extends FSQueue> queues,
+      Resource totalResources) {
+    // Nothing needs to do, as leaf queue doesn't have to calculate steady
+    // fair shares for applications.
+  }
+
+  @Override
+  public boolean checkIfUsageOverFairShare(Resource usage, Resource fairShare) {
+    throw new UnsupportedOperationException(
+        "FifoPolicy doesn't support checkIfUsageOverFairshare operation, " +
+            "as FifoPolicy only works for FSLeafQueue.");
+  }
+
+  @Override
+  public boolean checkIfAMResourceUsageOverLimit(Resource usage, Resource maxAMResource) {
+    return usage.getMemory() > maxAMResource.getMemory();
+  }
+
+  @Override
+  public Resource getHeadroom(Resource queueFairShare,
+                              Resource queueUsage, Resource maxAvailable) {
+    int queueAvailableMemory = Math.max(
+        queueFairShare.getMemory() - queueUsage.getMemory(), 0);
+    Resource headroom = Resources.createResource(
+        Math.min(maxAvailable.getMemory(), queueAvailableMemory),
+        maxAvailable.getVirtualCores());
+    return headroom;
+  }
+
 
   @Override
   public byte getApplicableDepth() {

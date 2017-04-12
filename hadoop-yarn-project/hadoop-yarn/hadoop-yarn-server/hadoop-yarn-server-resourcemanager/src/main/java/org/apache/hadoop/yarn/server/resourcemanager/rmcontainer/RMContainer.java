@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
+import java.util.List;
+
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -26,14 +28,15 @@ import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.event.EventHandler;
 
 /**
- * Represents the ResourceManager's view of an application container. See
+ * Represents the ResourceManager's view of an application container. See 
  * {@link RMContainerImpl} for an implementation. Containers may be in one
  * of several states, given in {@link RMContainerState}. An RMContainer
- * instance may exist even if there is no actual running container, such as
- * when resources are being reserved to fill space for a future container
+ * instance may exist even if there is no actual running container, such as 
+ * when resources are being reserved to fill space for a future container 
  * allocation.
  */
 public interface RMContainer extends EventHandler<RMContainerEvent> {
@@ -50,12 +53,6 @@ public interface RMContainer extends EventHandler<RMContainerEvent> {
 
   NodeId getReservedNode();
   
-
-  NodeId getNodeId();
-  
-  String getUser();
-
-  
   Priority getReservedPriority();
 
   Resource getAllocatedResource();
@@ -64,12 +61,9 @@ public interface RMContainer extends EventHandler<RMContainerEvent> {
 
   Priority getAllocatedPriority();
 
-  long getStartTime();
+  long getCreationTime();
 
   long getFinishTime();
-  
-
-  void recover(io.hops.metadata.yarn.entity.RMContainer hopRMContainer);
 
   String getDiagnosticsInfo();
 
@@ -80,5 +74,10 @@ public interface RMContainer extends EventHandler<RMContainerEvent> {
   ContainerState getContainerState();
   
   ContainerReport createContainerReport();
+  
+  boolean isAMContainer();
+  
+  List<ResourceRequest> getResourceRequests();
 
+  String getNodeHttpAddress();
 }

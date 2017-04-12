@@ -25,8 +25,10 @@ import java.util.Arrays;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.v2.api.HSAdminRefreshProtocol;
 import org.apache.hadoop.mapreduce.v2.hs.HSProxies;
-import org.apache.hadoop.mapreduce.v2.hs.protocol.HSAdminRefreshProtocol;
 import org.apache.hadoop.mapreduce.v2.jobhistory.JHAdminConfig;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -41,8 +43,23 @@ public class HSAdmin extends Configured implements Tool {
     super();
   }
 
-  public HSAdmin(Configuration conf) {
+  public HSAdmin(JobConf conf) {
     super(conf);
+  }
+
+  @Override
+  public void setConf(Configuration conf) {
+    if (conf != null) {
+      conf = addSecurityConfiguration(conf);
+    }
+    super.setConf(conf);
+  }
+
+  private Configuration addSecurityConfiguration(Configuration conf) {
+    conf = new JobConf(conf);
+    conf.set(CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_USER_NAME_KEY,
+        conf.get(JHAdminConfig.MR_HISTORY_PRINCIPAL, ""));
+    return conf;
   }
 
   /**
@@ -331,7 +348,8 @@ public class HSAdmin extends Configured implements Tool {
   }
 
   public static void main(String[] args) throws Exception {
-    int result = ToolRunner.run(new HSAdmin(), args);
+    JobConf conf = new JobConf();
+    int result = ToolRunner.run(new HSAdmin(conf), args);
     System.exit(result);
   }
 }

@@ -68,7 +68,7 @@ public class TestMultipleArchiveFiles extends TestStreaming
     dfs = new MiniDFSCluster.Builder(conf).build();
     fileSys = dfs.getFileSystem();
     namenode = fileSys.getUri().getAuthority();
-    mr  = new MiniMRCluster(1, namenode, 1);
+    mr  = new MiniMRCluster(1, namenode, 1, false);
 
     map = XARGS_CAT;
     reduce = CAT;

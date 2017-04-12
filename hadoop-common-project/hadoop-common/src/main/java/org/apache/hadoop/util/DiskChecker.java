@@ -78,6 +78,20 @@ public class DiskChecker {
            (mkdirsWithExistsCheck(new File(parent)) &&
                                       (canonDir.mkdir() || canonDir.exists()));
   }
+
+  /**
+   * Recurse down a directory tree, checking all child directories.
+   * @param dir
+   * @throws DiskErrorException
+   */
+  public static void checkDirs(File dir) throws DiskErrorException {
+    checkDir(dir);
+    for (File child : dir.listFiles()) {
+      if (child.isDirectory()) {
+        checkDirs(child);
+      }
+    }
+  }
   
   /**
    * Create the directory if it doesn't exist and check that dir is readable,
@@ -88,7 +102,7 @@ public class DiskChecker {
    */
   public static void checkDir(File dir) throws DiskErrorException {
     if (!mkdirsWithExistsCheck(dir)) {
-      throw new DiskErrorException("Can not create directory: "
+      throw new DiskErrorException("Cannot create directory: "
                                    + dir.toString());
     }
     checkDirAccess(dir);

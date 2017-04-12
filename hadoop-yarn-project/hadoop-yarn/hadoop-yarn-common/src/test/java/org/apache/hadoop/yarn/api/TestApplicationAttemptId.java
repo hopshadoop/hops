@@ -19,7 +19,8 @@
 
 package org.apache.hadoop.yarn.api;
 
-import junit.framework.Assert;
+import org.junit.Assert;
+
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.junit.Test;
@@ -55,8 +56,8 @@ public class TestApplicationAttemptId {
     Assert.assertEquals("appattempt_" + ts + "_543627_33492611", a6.toString());
   }
 
-  private ApplicationAttemptId createAppAttemptId(long clusterTimeStamp, int id,
-      int attemptId) {
+  private ApplicationAttemptId createAppAttemptId(
+      long clusterTimeStamp, int id, int attemptId) {
     ApplicationId appId = ApplicationId.newInstance(clusterTimeStamp, id);
     return ApplicationAttemptId.newInstance(appId, attemptId);
   }

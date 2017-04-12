@@ -13,9 +13,14 @@
  */
 package org.apache.hadoop.security.authentication.server;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.net.HttpCookie;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
@@ -23,6 +28,7 @@ import java.util.Vector;
 
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
@@ -33,6 +39,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.authentication.util.Signer;
+import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
+import org.apache.hadoop.security.authentication.util.StringSignerSecretProviderCreator;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -74,6 +82,8 @@ public class TestAuthenticationFilter {
       Assert.fail();
     } catch (ServletException ex) {
       // Expected
+      Assert.assertEquals("Authentication type must be specified: simple|kerberos|<class>", 
+          ex.getMessage());
     } catch (Exception ex) {
       Assert.fail();
     } finally {
@@ -143,39 +153,97 @@ public class TestAuthenticationFilter {
   }
 
   @Test
-  public void testInit() throws Exception {
-
+  public void testFallbackToRandomSecretProvider() throws Exception {
     // minimal configuration & simple auth handler (Pseudo)
     AuthenticationFilter filter = new AuthenticationFilter();
     try {
       FilterConfig config = Mockito.mock(FilterConfig.class);
       Mockito.when(config.getInitParameter(AuthenticationFilter.AUTH_TYPE)).thenReturn("simple");
-      Mockito.when(config.getInitParameter(AuthenticationFilter.AUTH_TOKEN_VALIDITY)).thenReturn(
+      Mockito.when(config.getInitParameter(
+          AuthenticationFilter.AUTH_TOKEN_VALIDITY)).thenReturn(
           (new Long(TOKEN_VALIDITY_SEC)).toString());
       Mockito.when(config.getInitParameterNames()).thenReturn(
-        new Vector<String>(Arrays.asList(AuthenticationFilter.AUTH_TYPE,
-                                 AuthenticationFilter.AUTH_TOKEN_VALIDITY)).elements());
+          new Vector<>(Arrays.asList(AuthenticationFilter.AUTH_TYPE,
+                                     AuthenticationFilter.AUTH_TOKEN_VALIDITY)).elements());
+      ServletContext context = Mockito.mock(ServletContext.class);
+      Mockito.when(context.getAttribute(AuthenticationFilter.SIGNER_SECRET_PROVIDER_ATTRIBUTE))
+          .thenReturn(null);
+      Mockito.when(config.getServletContext()).thenReturn(context);
       filter.init(config);
       Assert.assertEquals(PseudoAuthenticationHandler.class, filter.getAuthenticationHandler().getClass());
       Assert.assertTrue(filter.isRandomSecret());
+      Assert.assertFalse(filter.isCustomSignerSecretProvider());
       Assert.assertNull(filter.getCookieDomain());
       Assert.assertNull(filter.getCookiePath());
       Assert.assertEquals(TOKEN_VALIDITY_SEC, filter.getValidity());
     } finally {
       filter.destroy();
     }
-
-    // custom secret
-    filter = new AuthenticationFilter();
+  }
+  @Test
+  public void testInit() throws Exception {
+    // custom secret as inline
+    AuthenticationFilter filter = new AuthenticationFilter();
     try {
       FilterConfig config = Mockito.mock(FilterConfig.class);
       Mockito.when(config.getInitParameter(AuthenticationFilter.AUTH_TYPE)).thenReturn("simple");
-      Mockito.when(config.getInitParameter(AuthenticationFilter.SIGNATURE_SECRET)).thenReturn("secret");
       Mockito.when(config.getInitParameterNames()).thenReturn(
-        new Vector<String>(Arrays.asList(AuthenticationFilter.AUTH_TYPE,
-                                 AuthenticationFilter.SIGNATURE_SECRET)).elements());
+          new Vector<>(Arrays.asList(AuthenticationFilter.AUTH_TYPE))
+              .elements());
+      ServletContext context = Mockito.mock(ServletContext.class);
+      Mockito.when(context.getAttribute(
+          AuthenticationFilter.SIGNER_SECRET_PROVIDER_ATTRIBUTE)).thenReturn(
+            new SignerSecretProvider() {
+              @Override
+              public void init(Properties config, ServletContext servletContext,
+                      long tokenValidity) {
+              }
+              @Override
+              public byte[] getCurrentSecret() {
+                return null;
+              }
+              @Override
+              public byte[][] getAllSecrets() {
+                return null;
+              }
+            });
+      Mockito.when(config.getServletContext()).thenReturn(context);
       filter.init(config);
       Assert.assertFalse(filter.isRandomSecret());
+      Assert.assertTrue(filter.isCustomSignerSecretProvider());
+    } finally {
+      filter.destroy();
+    }
+
+    // custom secret by file
+    File testDir = new File(System.getProperty("test.build.data",
+        "target/test-dir"));
+    testDir.mkdirs();
+    String secretValue = "hadoop";
+    File secretFile = new File(testDir, "http-secret.txt");
+    Writer writer = new FileWriter(secretFile);
+    writer.write(secretValue);
+    writer.close();
+
+    filter = new AuthenticationFilter();
+    try {
+      FilterConfig config = Mockito.mock(FilterConfig.class);
+      Mockito.when(config.getInitParameter(
+          AuthenticationFilter.AUTH_TYPE)).thenReturn("simple");
+      Mockito.when(config.getInitParameter(
+          AuthenticationFilter.SIGNATURE_SECRET_FILE))
+          .thenReturn(secretFile.getAbsolutePath());
+      Mockito.when(config.getInitParameterNames()).thenReturn(
+          new Vector<String>(Arrays.asList(AuthenticationFilter.AUTH_TYPE,
+              AuthenticationFilter.SIGNATURE_SECRET_FILE)).elements());
+      ServletContext context = Mockito.mock(ServletContext.class);
+      Mockito.when(context.getAttribute(
+          AuthenticationFilter.SIGNER_SECRET_PROVIDER_ATTRIBUTE))
+          .thenReturn(null);
+      Mockito.when(config.getServletContext()).thenReturn(context);
+      filter.init(config);
+      Assert.assertFalse(filter.isRandomSecret());
+      Assert.assertFalse(filter.isCustomSignerSecretProvider());
     } finally {
       filter.destroy();
     }
@@ -191,6 +259,7 @@ public class TestAuthenticationFilter {
         new Vector<String>(Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                                  AuthenticationFilter.COOKIE_DOMAIN,
                                  AuthenticationFilter.COOKIE_PATH)).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
       Assert.assertEquals(".foo.com", filter.getCookieDomain());
       Assert.assertEquals("/bar", filter.getCookiePath());
@@ -211,6 +280,7 @@ public class TestAuthenticationFilter {
         new Vector<String>(
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
       Assert.assertTrue(DummyAuthenticationHandler.init);
     } finally {
@@ -222,6 +292,8 @@ public class TestAuthenticationFilter {
     filter = new AuthenticationFilter();
     try {
       FilterConfig config = Mockito.mock(FilterConfig.class);
+      ServletContext sc = Mockito.mock(ServletContext.class);
+      Mockito.when(config.getServletContext()).thenReturn(sc);
       Mockito.when(config.getInitParameter(AuthenticationFilter.AUTH_TYPE)).thenReturn("kerberos");
       Mockito.when(config.getInitParameterNames()).thenReturn(
         new Vector<String>(Arrays.asList(AuthenticationFilter.AUTH_TYPE)).elements());
@@ -230,6 +302,28 @@ public class TestAuthenticationFilter {
       // Expected
     } finally {
       Assert.assertEquals(KerberosAuthenticationHandler.class, filter.getAuthenticationHandler().getClass());
+      filter.destroy();
+    }
+  }
+  
+  @Test
+  public void testInitCaseSensitivity() throws Exception {
+    // minimal configuration & simple auth handler (Pseudo)
+    AuthenticationFilter filter = new AuthenticationFilter();
+    try {
+      FilterConfig config = Mockito.mock(FilterConfig.class);
+      Mockito.when(config.getInitParameter(AuthenticationFilter.AUTH_TYPE)).thenReturn("SimPle");
+      Mockito.when(config.getInitParameter(AuthenticationFilter.AUTH_TOKEN_VALIDITY)).thenReturn(
+          (new Long(TOKEN_VALIDITY_SEC)).toString());
+      Mockito.when(config.getInitParameterNames()).thenReturn(
+          new Vector<String>(Arrays.asList(AuthenticationFilter.AUTH_TYPE,
+              AuthenticationFilter.AUTH_TOKEN_VALIDITY)).elements());
+      getMockedServletContextWithStringSigner(config);
+
+      filter.init(config);
+      Assert.assertEquals(PseudoAuthenticationHandler.class, 
+          filter.getAuthenticationHandler().getClass());
+    } finally {
       filter.destroy();
     }
   }
@@ -247,6 +341,7 @@ public class TestAuthenticationFilter {
         new Vector<String>(
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
@@ -262,6 +357,7 @@ public class TestAuthenticationFilter {
   @Test
   public void testGetToken() throws Exception {
     AuthenticationFilter filter = new AuthenticationFilter();
+
     try {
       FilterConfig config = Mockito.mock(FilterConfig.class);
       Mockito.when(config.getInitParameter("management.operation.return")).
@@ -274,11 +370,14 @@ public class TestAuthenticationFilter {
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         AuthenticationFilter.SIGNATURE_SECRET,
                         "management.operation.return")).elements());
+      SignerSecretProvider secretProvider =
+          getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       AuthenticationToken token = new AuthenticationToken("u", "p", DummyAuthenticationHandler.TYPE);
       token.setExpires(System.currentTimeMillis() + TOKEN_VALIDITY_SEC);
-      Signer signer = new Signer("secret".getBytes());
+
+      Signer signer = new Signer(secretProvider);
       String tokenSigned = signer.sign(token.toString());
 
       Cookie cookie = new Cookie(AuthenticatedURL.AUTH_COOKIE, tokenSigned);
@@ -307,12 +406,19 @@ public class TestAuthenticationFilter {
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         AuthenticationFilter.SIGNATURE_SECRET,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       AuthenticationToken token =
           new AuthenticationToken("u", "p", DummyAuthenticationHandler.TYPE);
       token.setExpires(System.currentTimeMillis() - TOKEN_VALIDITY_SEC);
-      Signer signer = new Signer("secret".getBytes());
+      SignerSecretProvider secretProvider =
+          StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+      Properties secretProviderProps = new Properties();
+      secretProviderProps.setProperty(
+              AuthenticationFilter.SIGNATURE_SECRET, "secret");
+      secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+      Signer signer = new Signer(secretProvider);
       String tokenSigned = signer.sign(token.toString());
 
       Cookie cookie = new Cookie(AuthenticatedURL.AUTH_COOKIE, tokenSigned);
@@ -348,11 +454,18 @@ public class TestAuthenticationFilter {
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         AuthenticationFilter.SIGNATURE_SECRET,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       AuthenticationToken token = new AuthenticationToken("u", "p", "invalidtype");
       token.setExpires(System.currentTimeMillis() + TOKEN_VALIDITY_SEC);
-      Signer signer = new Signer("secret".getBytes());
+      SignerSecretProvider secretProvider =
+          StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+      Properties secretProviderProps = new Properties();
+      secretProviderProps.setProperty(
+              AuthenticationFilter.SIGNATURE_SECRET, "secret");
+      secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+      Signer signer = new Signer(secretProvider);
       String tokenSigned = signer.sign(token.toString());
 
       Cookie cookie = new Cookie(AuthenticatedURL.AUTH_COOKIE, tokenSigned);
@@ -373,6 +486,23 @@ public class TestAuthenticationFilter {
     }
   }
 
+  private static SignerSecretProvider getMockedServletContextWithStringSigner(
+      FilterConfig config) throws Exception {
+    Properties secretProviderProps = new Properties();
+    secretProviderProps.setProperty(AuthenticationFilter.SIGNATURE_SECRET,
+                                    "secret");
+    SignerSecretProvider secretProvider =
+        StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+    secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+
+    ServletContext context = Mockito.mock(ServletContext.class);
+    Mockito.when(context.getAttribute(
+            AuthenticationFilter.SIGNER_SECRET_PROVIDER_ATTRIBUTE))
+            .thenReturn(secretProvider);
+    Mockito.when(config.getServletContext()).thenReturn(context);
+    return secretProvider;
+  }
+
   @Test
   public void testDoFilterNotAuthenticated() throws Exception {
     AuthenticationFilter filter = new AuthenticationFilter();
@@ -386,6 +516,7 @@ public class TestAuthenticationFilter {
         new Vector<String>(
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
@@ -405,11 +536,11 @@ public class TestAuthenticationFilter {
         }
       ).when(chain).doFilter(Mockito.<ServletRequest>anyObject(), Mockito.<ServletResponse>anyObject());
 
+      Mockito.when(response.containsHeader("WWW-Authenticate")).thenReturn(true);
       filter.doFilter(request, response, chain);
 
       Mockito.verify(response).sendError(
           HttpServletResponse.SC_UNAUTHORIZED, "Authentication required");
-      Mockito.verify(response).setHeader("WWW-Authenticate", "dummyauth");
     } finally {
       filter.destroy();
     }
@@ -435,6 +566,7 @@ public class TestAuthenticationFilter {
             AuthenticationFilter.AUTH_TOKEN_VALIDITY,
             AuthenticationFilter.SIGNATURE_SECRET, "management.operation" +
             ".return", "expired.token")).elements());
+    getMockedServletContextWithStringSigner(config);
 
     if (withDomainPath) {
       Mockito.when(config.getInitParameter(AuthenticationFilter
@@ -488,7 +620,13 @@ public class TestAuthenticationFilter {
         Mockito.verify(chain).doFilter(Mockito.any(ServletRequest.class),
                 Mockito.any(ServletResponse.class));
 
-        Signer signer = new Signer("secret".getBytes());
+        SignerSecretProvider secretProvider =
+            StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+        Properties secretProviderProps = new Properties();
+        secretProviderProps.setProperty(
+                AuthenticationFilter.SIGNATURE_SECRET, "secret");
+        secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+        Signer signer = new Signer(secretProvider);
         String value = signer.verifyAndExtract(v);
         AuthenticationToken token = AuthenticationToken.parse(value);
         assertThat(token.getExpires(), not(0L));
@@ -508,21 +646,17 @@ public class TestAuthenticationFilter {
 
   private static void parseCookieMap(String cookieHeader, HashMap<String,
           String> cookieMap) {
-    for (String pair : cookieHeader.split(";")) {
-      String p = pair.trim();
-      int idx = p.indexOf('=');
-      final String k, v;
-      if (idx == -1) {
-        k = p;
-        v = null;
-      } else if (idx == p.length()) {
-        k = p.substring(0, idx - 1);
-        v = null;
-      } else {
-        k = p.substring(0, idx);
-        v = p.substring(idx + 1);
+    List<HttpCookie> cookies = HttpCookie.parse(cookieHeader);
+    for (HttpCookie cookie : cookies) {
+      if (AuthenticatedURL.AUTH_COOKIE.equals(cookie.getName())) {
+        cookieMap.put(cookie.getName(), cookie.getValue());
+        if (cookie.getPath() != null) {
+          cookieMap.put("Path", cookie.getPath());
+        }
+        if (cookie.getDomain() != null) {
+          cookieMap.put("Domain", cookie.getDomain());
+        }
       }
-      cookieMap.put(k, v);
     }
   }
 
@@ -559,6 +693,7 @@ public class TestAuthenticationFilter {
         new Vector<String>(
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
@@ -566,7 +701,13 @@ public class TestAuthenticationFilter {
 
       AuthenticationToken token = new AuthenticationToken("u", "p", "t");
       token.setExpires(System.currentTimeMillis() + TOKEN_VALIDITY_SEC);
-      Signer signer = new Signer("secret".getBytes());
+      SignerSecretProvider secretProvider =
+          StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+      Properties secretProviderProps = new Properties();
+      secretProviderProps.setProperty(
+              AuthenticationFilter.SIGNATURE_SECRET, "secret");
+      secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+      Signer signer = new Signer(secretProvider);
       String tokenSigned = signer.sign(token.toString());
 
       Cookie cookie = new Cookie(AuthenticatedURL.AUTH_COOKIE, tokenSigned);
@@ -609,6 +750,7 @@ public class TestAuthenticationFilter {
         new Vector<String>(
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
@@ -672,6 +814,7 @@ public class TestAuthenticationFilter {
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         AuthenticationFilter.SIGNATURE_SECRET,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
@@ -679,13 +822,20 @@ public class TestAuthenticationFilter {
 
       AuthenticationToken token = new AuthenticationToken("u", "p", DummyAuthenticationHandler.TYPE);
       token.setExpires(System.currentTimeMillis() - TOKEN_VALIDITY_SEC);
-      Signer signer = new Signer(secret.getBytes());
+      SignerSecretProvider secretProvider =
+          StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+      Properties secretProviderProps = new Properties();
+      secretProviderProps.setProperty(
+              AuthenticationFilter.SIGNATURE_SECRET, secret);
+      secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+      Signer signer = new Signer(secretProvider);
       String tokenSigned = signer.sign(token.toString());
 
       Cookie cookie = new Cookie(AuthenticatedURL.AUTH_COOKIE, tokenSigned);
       Mockito.when(request.getCookies()).thenReturn(new Cookie[]{cookie});
 
       HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
+      Mockito.when(response.containsHeader("WWW-Authenticate")).thenReturn(true);
       FilterChain chain = Mockito.mock(FilterChain.class);
 
       verifyUnauthorized(filter, request, response, chain);
@@ -739,6 +889,7 @@ public class TestAuthenticationFilter {
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         AuthenticationFilter.SIGNATURE_SECRET,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
@@ -746,13 +897,20 @@ public class TestAuthenticationFilter {
 
       AuthenticationToken token = new AuthenticationToken("u", "p", "invalidtype");
       token.setExpires(System.currentTimeMillis() + TOKEN_VALIDITY_SEC);
-      Signer signer = new Signer(secret.getBytes());
+      SignerSecretProvider secretProvider =
+          StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+      Properties secretProviderProps = new Properties();
+      secretProviderProps.setProperty(
+              AuthenticationFilter.SIGNATURE_SECRET, secret);
+      secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+      Signer signer = new Signer(secretProvider);
       String tokenSigned = signer.sign(token.toString());
 
       Cookie cookie = new Cookie(AuthenticatedURL.AUTH_COOKIE, tokenSigned);
       Mockito.when(request.getCookies()).thenReturn(new Cookie[]{cookie});
 
       HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
+      Mockito.when(response.containsHeader("WWW-Authenticate")).thenReturn(true);
       FilterChain chain = Mockito.mock(FilterChain.class);
 
       verifyUnauthorized(filter, request, response, chain);
@@ -774,6 +932,7 @@ public class TestAuthenticationFilter {
         new Vector<String>(
           Arrays.asList(AuthenticationFilter.AUTH_TYPE,
                         "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
       filter.init(config);
 
       HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
@@ -793,7 +952,13 @@ public class TestAuthenticationFilter {
 
       AuthenticationToken token = new AuthenticationToken("u", "p", "t");
       token.setExpires(System.currentTimeMillis() + TOKEN_VALIDITY_SEC);
-      Signer signer = new Signer("secret".getBytes());
+      SignerSecretProvider secretProvider =
+          StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+      Properties secretProviderProps = new Properties();
+      secretProviderProps.setProperty(
+              AuthenticationFilter.SIGNATURE_SECRET, "secret");
+      secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+      Signer signer = new Signer(secretProvider);
       String tokenSigned = signer.sign(token.toString());
       Cookie cookie = new Cookie(AuthenticatedURL.AUTH_COOKIE, tokenSigned);
       Mockito.when(request.getCookies()).thenReturn(new Cookie[]{cookie});

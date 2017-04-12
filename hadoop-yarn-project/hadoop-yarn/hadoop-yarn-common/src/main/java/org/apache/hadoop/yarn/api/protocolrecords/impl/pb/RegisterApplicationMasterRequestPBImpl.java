@@ -19,19 +19,18 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterRequestProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
-public class RegisterApplicationMasterRequestPBImpl
-    extends RegisterApplicationMasterRequest {
-  RegisterApplicationMasterRequestProto proto =
-      RegisterApplicationMasterRequestProto.getDefaultInstance();
+public class RegisterApplicationMasterRequestPBImpl extends RegisterApplicationMasterRequest {
+  RegisterApplicationMasterRequestProto proto = RegisterApplicationMasterRequestProto.getDefaultInstance();
   RegisterApplicationMasterRequestProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -39,14 +38,13 @@ public class RegisterApplicationMasterRequestPBImpl
     builder = RegisterApplicationMasterRequestProto.newBuilder();
   }
 
-  public RegisterApplicationMasterRequestPBImpl(
-      RegisterApplicationMasterRequestProto proto) {
+  public RegisterApplicationMasterRequestPBImpl(RegisterApplicationMasterRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
   public RegisterApplicationMasterRequestProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -59,9 +57,8 @@ public class RegisterApplicationMasterRequestPBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -77,9 +74,8 @@ public class RegisterApplicationMasterRequestPBImpl
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -94,8 +90,7 @@ public class RegisterApplicationMasterRequestPBImpl
 
   @Override
   public String getHost() {
-    RegisterApplicationMasterRequestProtoOrBuilder p =
-        viaProto ? proto : builder;
+    RegisterApplicationMasterRequestProtoOrBuilder p = viaProto ? proto : builder;
     return p.getHost();
   }
 
@@ -111,8 +106,7 @@ public class RegisterApplicationMasterRequestPBImpl
 
   @Override
   public int getRpcPort() {
-    RegisterApplicationMasterRequestProtoOrBuilder p =
-        viaProto ? proto : builder;
+    RegisterApplicationMasterRequestProtoOrBuilder p = viaProto ? proto : builder;
     return p.getRpcPort();
   }
 
@@ -124,8 +118,7 @@ public class RegisterApplicationMasterRequestPBImpl
 
   @Override
   public String getTrackingUrl() {
-    RegisterApplicationMasterRequestProtoOrBuilder p =
-        viaProto ? proto : builder;
+    RegisterApplicationMasterRequestProtoOrBuilder p = viaProto ? proto : builder;
     return p.getTrackingUrl();
   }
 

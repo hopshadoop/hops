@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainersResponse;
@@ -28,16 +31,14 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerReportProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainersResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainersResponseProtoOrBuilder;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
 public class GetContainersResponsePBImpl extends GetContainersResponse {
 
-  GetContainersResponseProto proto =
-      GetContainersResponseProto.getDefaultInstance();
+  GetContainersResponseProto proto = GetContainersResponseProto
+    .getDefaultInstance();
   GetContainersResponseProto.Builder builder = null;
   boolean viaProto = false;
 

@@ -44,16 +44,20 @@ public class CorruptReplicaContext
   public void update(CorruptReplica hopCorruptReplica)
       throws TransactionContextException {
     super.update(hopCorruptReplica);
-    log("added-corrupt", "bid", hopCorruptReplica.getBlockId(), "sid",
-        hopCorruptReplica.getStorageId());
+    if(isLogDebugEnabled()) {
+      log("added-corrupt", "bid", hopCorruptReplica.getBlockId(), "sid",
+              hopCorruptReplica.getStorageId());
+    }
   }
 
   @Override
   public void remove(CorruptReplica hopCorruptReplica)
       throws TransactionContextException {
     super.remove(hopCorruptReplica);
-    log("removed-corrupt", "bid", hopCorruptReplica.getBlockId(), "sid",
-        hopCorruptReplica.getStorageId());
+    if(isLogDebugEnabled()) {
+      log("removed-corrupt", "bid", hopCorruptReplica.getBlockId(), "sid",
+              hopCorruptReplica.getStorageId());
+    }
   }
 
   @Override

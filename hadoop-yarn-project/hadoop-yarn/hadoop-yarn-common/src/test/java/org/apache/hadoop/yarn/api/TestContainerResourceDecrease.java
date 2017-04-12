@@ -18,7 +18,8 @@
 
 package org.apache.hadoop.yarn.api;
 
-import junit.framework.Assert;
+import org.junit.Assert;
+
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -31,15 +32,15 @@ import org.junit.Test;
 public class TestContainerResourceDecrease {
   @Test
   public void testResourceDecreaseContext() {
-    ContainerId containerId = ContainerId.newInstance(
-        ApplicationAttemptId.newInstance(ApplicationId.newInstance(1234, 3), 3),
-        7);
+    ContainerId containerId = ContainerId
+        .newContainerId(ApplicationAttemptId.newInstance(
+            ApplicationId.newInstance(1234, 3), 3), 7);
     Resource resource = Resource.newInstance(1023, 3);
-    ContainerResourceDecrease ctx =
-        ContainerResourceDecrease.newInstance(containerId, resource);
+    ContainerResourceDecrease ctx = ContainerResourceDecrease.newInstance(
+        containerId, resource);
 
     // get proto and recover to ctx
-    ContainerResourceDecreaseProto proto =
+    ContainerResourceDecreaseProto proto = 
         ((ContainerResourceDecreasePBImpl) ctx).getProto();
     ctx = new ContainerResourceDecreasePBImpl(proto);
 
@@ -50,11 +51,11 @@ public class TestContainerResourceDecrease {
   
   @Test
   public void testResourceDecreaseContextWithNull() {
-    ContainerResourceDecrease ctx =
-        ContainerResourceDecrease.newInstance(null, null);
+    ContainerResourceDecrease ctx = ContainerResourceDecrease.newInstance(null,
+        null);
     
     // get proto and recover to ctx;
-    ContainerResourceDecreaseProto proto =
+    ContainerResourceDecreaseProto proto = 
         ((ContainerResourceDecreasePBImpl) ctx).getProto();
     ctx = new ContainerResourceDecreasePBImpl(proto);
 

@@ -28,8 +28,8 @@ public abstract class ContainerResourceIncrease {
   @Public
   public static ContainerResourceIncrease newInstance(
       ContainerId existingContainerId, Resource targetCapability, Token token) {
-    ContainerResourceIncrease context =
-        Records.newRecord(ContainerResourceIncrease.class);
+    ContainerResourceIncrease context = Records
+        .newRecord(ContainerResourceIncrease.class);
     context.setContainerId(existingContainerId);
     context.setCapability(targetCapability);
     context.setContainerToken(token);
@@ -62,7 +62,7 @@ public abstract class ContainerResourceIncrease {
   @Override
   public boolean equals(Object other) {
     if (other instanceof ContainerResourceIncrease) {
-      ContainerResourceIncrease ctx = (ContainerResourceIncrease) other;
+      ContainerResourceIncrease ctx = (ContainerResourceIncrease)other;
       
       if (getContainerId() == null && ctx.getContainerId() != null) {
         return false;

@@ -104,7 +104,7 @@ public class TestEncryptedShuffle {
     fileSystem.setPermission(
       new Path("/hadoop/mapred/system"), FsPermission.valueOf("-rwx------"));
     FileSystem.setDefaultUri(conf, fileSystem.getUri());
-    mrCluster = MiniMRClientClusterFactory.create(this.getClass(), 1, conf);
+    mrCluster = MiniMRClientClusterFactory.create(this.getClass(), 1, conf, false);
 
     // so the minicluster conf is avail to the containers.
     Writer writer = new FileWriter(classpathDir + "/core-site.xml");

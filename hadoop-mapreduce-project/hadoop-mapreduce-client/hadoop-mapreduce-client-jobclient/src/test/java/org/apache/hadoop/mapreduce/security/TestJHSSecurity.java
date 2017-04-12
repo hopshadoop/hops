@@ -26,7 +26,7 @@ import java.net.InetSocketAddress;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -55,14 +55,12 @@ import org.apache.hadoop.yarn.util.Records;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestJHSSecurity {
 
   private static final Log LOG = LogFactory.getLog(TestJHSSecurity.class);
-
-  @Ignore("HOPS fails on vanilla")
+  
   @Test
   public void testDelegationToken() throws IOException, InterruptedException {
 
@@ -200,6 +198,11 @@ public class TestJHSSecurity {
         fail("Unexpected exception" + e);
       }
       cancelDelegationToken(loggedInUser, hsService, token);
+
+      // Testing the token with different renewer to cancel the token
+      Token tokenWithDifferentRenewer = getDelegationToken(loggedInUser,
+          hsService, "yarn");
+      cancelDelegationToken(loggedInUser, hsService, tokenWithDifferentRenewer);
       if (clientUsingDT != null) {
 //        RPC.stopProxy(clientUsingDT);
         clientUsingDT = null;

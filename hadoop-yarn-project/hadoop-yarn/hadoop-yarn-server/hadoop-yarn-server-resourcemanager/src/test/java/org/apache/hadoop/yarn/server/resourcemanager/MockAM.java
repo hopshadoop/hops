@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import junit.framework.Assert;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
@@ -30,6 +32,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.Priority;
@@ -40,22 +43,18 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.util.Records;
-
-import java.lang.reflect.UndeclaredThrowableException;
-import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.List;
+import org.junit.Assert;
 
 public class MockAM {
-  public static final Log LOG = LogFactory.getLog(MockAM.class);
-  
+
   private volatile int responseId = 0;
   private final ApplicationAttemptId attemptId;
-  private final RMContext context;
+  private RMContext context;
   private ApplicationMasterProtocol amRMProtocol;
+  private UserGroupInformation ugi;
+  private volatile AllocateResponse lastResponse;
 
-  private final List<ResourceRequest> requests =
-      new ArrayList<ResourceRequest>();
+  private final List<ResourceRequest> requests = new ArrayList<ResourceRequest>();
   private final List<ContainerId> releases = new ArrayList<ContainerId>();
 
   public MockAM(RMContext context, ApplicationMasterProtocol amRMProtocol,
@@ -64,33 +63,28 @@ public class MockAM {
     this.amRMProtocol = amRMProtocol;
     this.attemptId = attemptId;
   }
-  
-  void setAMRMProtocol(ApplicationMasterProtocol amRMProtocol) {
+
+  public void setAMRMProtocol(ApplicationMasterProtocol amRMProtocol,
+      RMContext context) {
+    this.context = context;
     this.amRMProtocol = amRMProtocol;
   }
 
   public void waitForState(RMAppAttemptState finalState) throws Exception {
-    waitForState(finalState, null);
-  }
-
-  public void waitForState(RMAppAttemptState finalState, MockNM nm)
-      throws Exception {
     RMApp app = context.getRMApps().get(attemptId.getApplicationId());
     RMAppAttempt attempt = app.getRMAppAttempt(attemptId);
     int timeoutSecs = 0;
-    while (!finalState.equals(attempt.getState()) && timeoutSecs++ < 40) {
-      LOG.info(
-          "AppAttempt : " + attemptId + " State is : " + attempt.getState() +
-              " Waiting for state : " + finalState);
-      if (nm != null) {
-        nm.nodeHeartbeat(true);
-      }
+    while (!finalState.equals(attempt.getAppAttemptState())
+        && timeoutSecs++ < 40) {
+      System.out
+          .println("AppAttempt : " + attemptId + " State is : " 
+              + attempt.getAppAttemptState()
+              + " Waiting for state : " + finalState);
       Thread.sleep(1000);
     }
-    System.out.println("AppAttempt State is : " + attempt.getState());
-    Assert
-        .assertEquals("AppAttempt state is not correct (timedout)", finalState,
-            attempt.getState());
+    System.out.println("AppAttempt State is : " + attempt.getAppAttemptState());
+    Assert.assertEquals("AppAttempt state is not correct (timedout)",
+        finalState, attempt.getAppAttemptState());
   }
 
   public RegisterApplicationMasterResponse registerAppAttempt()
@@ -106,23 +100,26 @@ public class MockAM {
     responseId = 0;
     final RegisterApplicationMasterRequest req =
         Records.newRecord(RegisterApplicationMasterRequest.class);
-    req.setHost("test");
+    req.setHost("");
     req.setRpcPort(1);
     req.setTrackingUrl("");
-    UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(attemptId.toString());
-    Token<AMRMTokenIdentifier> token =
-        context.getRMApps().get(attemptId.getApplicationId())
-            .getRMAppAttempt(attemptId).getAMRMToken();
-    ugi.addTokenIdentifier(token.decodeIdentifier());
+    if (ugi == null) {
+      ugi = UserGroupInformation.createRemoteUser(
+          attemptId.toString());
+      Token<AMRMTokenIdentifier> token =
+          context.getRMApps().get(attemptId.getApplicationId())
+              .getRMAppAttempt(attemptId).getAMRMToken();
+      ugi.addTokenIdentifier(token.decodeIdentifier());
+    }
     try {
-      return ugi.doAs(
-          new PrivilegedExceptionAction<RegisterApplicationMasterResponse>() {
-            @Override
-            public RegisterApplicationMasterResponse run() throws Exception {
-              return amRMProtocol.registerApplicationMaster(req);
-            }
-          });
+      return ugi
+        .doAs(
+            new PrivilegedExceptionAction<RegisterApplicationMasterResponse>() {
+          @Override
+          public RegisterApplicationMasterResponse run() throws Exception {
+            return amRMProtocol.registerApplicationMaster(req);
+          }
+        });
     } catch (UndeclaredThrowableException e) {
       throw (Exception) e.getCause();
     }
@@ -143,35 +140,57 @@ public class MockAM {
   public void addContainerToBeReleased(ContainerId containerId) {
     releases.add(containerId);
   }
-
-  public AllocateResponse allocate(String host, int memory, int numContainers,
+  
+  public AllocateResponse allocate(
+      String host, int memory, int numContainers,
       List<ContainerId> releases) throws Exception {
+    return allocate(host, memory, numContainers, releases, null);
+  }
+  
+  public AllocateResponse allocate(
+      String host, int memory, int numContainers,
+      List<ContainerId> releases, String labelExpression) throws Exception {
     List<ResourceRequest> reqs =
-        createReq(new String[]{host}, memory, 1, numContainers);
+        createReq(new String[] { host }, memory, 1, numContainers,
+            labelExpression);
     return allocate(reqs, releases);
   }
-
-  public List<ResourceRequest> createReq(String[] hosts, int memory,
-      int priority, int containers) throws Exception {
-    List<ResourceRequest> reqs = new ArrayList<ResourceRequest>();
-    for (String host : hosts) {
-      ResourceRequest hostReq =
-          createResourceReq(host, memory, priority, containers);
-      reqs.add(hostReq);
-      ResourceRequest rackReq =
-          createResourceReq("/default-rack", memory, priority, containers);
-      reqs.add(rackReq);
-    }
-
-    ResourceRequest offRackReq =
-        createResourceReq(ResourceRequest.ANY, memory, priority, containers);
-    reqs.add(offRackReq);
-    return reqs;
-
+  
+  public List<ResourceRequest> createReq(String[] hosts, int memory, int priority,
+      int containers) throws Exception {
+    return createReq(hosts, memory, priority, containers, null);
   }
 
-  public ResourceRequest createResourceReq(String resource, int memory,
-      int priority, int containers) throws Exception {
+  public List<ResourceRequest> createReq(String[] hosts, int memory, int priority,
+      int containers, String labelExpression) throws Exception {
+    List<ResourceRequest> reqs = new ArrayList<ResourceRequest>();
+    for (String host : hosts) {
+      // only add host/rack request when asked host isn't ANY
+      if (!host.equals(ResourceRequest.ANY)) {
+        ResourceRequest hostReq =
+            createResourceReq(host, memory, priority, containers,
+                labelExpression);
+        reqs.add(hostReq);
+        ResourceRequest rackReq =
+            createResourceReq("/default-rack", memory, priority, containers,
+                labelExpression);
+        reqs.add(rackReq);
+      }
+    }
+
+    ResourceRequest offRackReq = createResourceReq(ResourceRequest.ANY, memory,
+        priority, containers, labelExpression);
+    reqs.add(offRackReq);
+    return reqs;
+  }
+  
+  public ResourceRequest createResourceReq(String resource, int memory, int priority,
+      int containers) throws Exception {
+    return createResourceReq(resource, memory, priority, containers, null);
+  }
+
+  public ResourceRequest createResourceReq(String resource, int memory, int priority,
+      int containers, String labelExpression) throws Exception {
     ResourceRequest req = Records.newRecord(ResourceRequest.class);
     req.setResourceName(resource);
     req.setNumContainers(containers);
@@ -181,19 +200,36 @@ public class MockAM {
     Resource capability = Records.newRecord(Resource.class);
     capability.setMemory(memory);
     req.setCapability(capability);
+    if (labelExpression != null) {
+     req.setNodeLabelExpression(labelExpression); 
+    }
     return req;
   }
 
-  public AllocateResponse allocate(List<ResourceRequest> resourceRequest,
-      List<ContainerId> releases) throws Exception {
-    final AllocateRequest req = AllocateRequest
-        .newInstance(++responseId, 0F, resourceRequest, releases, null);
+  public AllocateResponse allocate(
+      List<ResourceRequest> resourceRequest, List<ContainerId> releases)
+      throws Exception {
+    final AllocateRequest req =
+        AllocateRequest.newInstance(0, 0F, resourceRequest,
+          releases, null);
+    return allocate(req);
+  }
+
+  public AllocateResponse allocate(AllocateRequest allocateRequest)
+            throws Exception {
     UserGroupInformation ugi =
         UserGroupInformation.createRemoteUser(attemptId.toString());
     Token<AMRMTokenIdentifier> token =
         context.getRMApps().get(attemptId.getApplicationId())
             .getRMAppAttempt(attemptId).getAMRMToken();
     ugi.addTokenIdentifier(token.decodeIdentifier());
+    lastResponse = doAllocateAs(ugi, allocateRequest);
+    return lastResponse;
+  }
+
+  public AllocateResponse doAllocateAs(UserGroupInformation ugi,
+      final AllocateRequest req) throws Exception {
+    req.setResponseId(++responseId);
     try {
       return ugi.doAs(new PrivilegedExceptionAction<AllocateResponse>() {
         @Override
@@ -205,12 +241,22 @@ public class MockAM {
       throw (Exception) e.getCause();
     }
   }
+  
+  public AllocateResponse doHeartbeat() throws Exception {
+    return allocate(null, null);
+  }
 
   public void unregisterAppAttempt() throws Exception {
     waitForState(RMAppAttemptState.RUNNING);
-    final FinishApplicationMasterRequest req = FinishApplicationMasterRequest
-        .newInstance(FinalApplicationStatus.SUCCEEDED, "", "");
-    unregisterAppAttempt(req, true);
+    unregisterAppAttempt(true);
+  }
+
+  public void unregisterAppAttempt(boolean waitForStateRunning)
+      throws Exception {
+    final FinishApplicationMasterRequest req =
+        FinishApplicationMasterRequest.newInstance(
+            FinalApplicationStatus.SUCCEEDED, "", "");
+    unregisterAppAttempt(req, waitForStateRunning);
   }
 
   public void unregisterAppAttempt(final FinishApplicationMasterRequest req,
@@ -218,22 +264,46 @@ public class MockAM {
     if (waitForStateRunning) {
       waitForState(RMAppAttemptState.RUNNING);
     }
-    UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(attemptId.toString());
-    Token<AMRMTokenIdentifier> token =
-        context.getRMApps().get(attemptId.getApplicationId())
-            .getRMAppAttempt(attemptId).getAMRMToken();
-    ugi.addTokenIdentifier(token.decodeIdentifier());
-    ugi.doAs(new PrivilegedExceptionAction<Object>() {
-      @Override
-      public Object run() throws Exception {
-        amRMProtocol.finishApplicationMaster(req);
-        return null;
-      }
-    });
+    if (ugi == null) {
+      ugi =  UserGroupInformation.createRemoteUser(attemptId.toString());
+      Token<AMRMTokenIdentifier> token =
+          context.getRMApps()
+              .get(attemptId.getApplicationId())
+              .getRMAppAttempt(attemptId).getAMRMToken();
+      ugi.addTokenIdentifier(token.decodeIdentifier());
+    }
+    try {
+      ugi.doAs(new PrivilegedExceptionAction<Object>() {
+        @Override
+        public Object run() throws Exception {
+          amRMProtocol.finishApplicationMaster(req);
+          return null;
+        }
+      });
+    } catch (UndeclaredThrowableException e) {
+      throw (Exception) e.getCause();
+    }
   }
 
   public ApplicationAttemptId getApplicationAttemptId() {
     return this.attemptId;
+  }
+  
+  public List<Container> allocateAndWaitForContainers(int nContainer,
+      int memory, MockNM nm) throws Exception {
+    // AM request for containers
+    allocate("ANY", memory, nContainer, null);
+    // kick the scheduler
+    nm.nodeHeartbeat(true);
+    List<Container> conts =
+        allocate(new ArrayList<ResourceRequest>(), null)
+            .getAllocatedContainers();
+    while (conts.size() < nContainer) {
+      nm.nodeHeartbeat(true);
+      conts.addAll(allocate(new ArrayList<ResourceRequest>(),
+          new ArrayList<ContainerId>()).getAllocatedContainers());
+      Thread.sleep(500);
+    }
+    return conts;
   }
 }

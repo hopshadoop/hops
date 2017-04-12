@@ -18,22 +18,31 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.event.AbstractEventTransaction;
+import org.apache.hadoop.yarn.event.AbstractEvent;
 
-public class RMAppAttemptEvent
-    extends AbstractEventTransaction<RMAppAttemptEventType> {
+public class RMAppAttemptEvent extends AbstractEvent<RMAppAttemptEventType> {
 
   private final ApplicationAttemptId appAttemptId;
+  private final String diagnosticMsg;
 
   public RMAppAttemptEvent(ApplicationAttemptId appAttemptId,
-      RMAppAttemptEventType type, TransactionState transactionState) {
-    super(type, transactionState);
+      RMAppAttemptEventType type) {
+    this(appAttemptId, type, "");
+  }
+
+  public RMAppAttemptEvent(ApplicationAttemptId appAttemptId,
+      RMAppAttemptEventType type, String diagnostics) {
+    super(type);
     this.appAttemptId = appAttemptId;
+    this.diagnosticMsg = diagnostics;
   }
 
   public ApplicationAttemptId getApplicationAttemptId() {
     return this.appAttemptId;
+  }
+
+  public String getDiagnosticMsg() {
+    return diagnosticMsg;
   }
 }

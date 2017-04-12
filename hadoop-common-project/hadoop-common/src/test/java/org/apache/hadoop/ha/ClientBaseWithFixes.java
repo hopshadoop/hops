@@ -66,7 +66,7 @@ public abstract class ClientBaseWithFixes extends ZKTestCase {
 
     public static int CONNECTION_TIMEOUT = 30000;
     static final File BASETEST =
-        new File(System.getProperty("build.test.dir", "build"));
+        new File(System.getProperty("test.build.data", "build"));
 
     protected final String hostPort = initHostPort();
     protected int maxCnxns = 0;
@@ -90,6 +90,14 @@ public abstract class ClientBaseWithFixes extends ZKTestCase {
         // XXX this doesn't need to be volatile! (Should probably be final)
         volatile CountDownLatch clientConnected;
         volatile boolean connected;
+        protected ZooKeeper client;
+
+        public void initializeWatchedClient(ZooKeeper zk) {
+            if (client != null) {
+                throw new RuntimeException("Watched Client was already set");
+            }
+            client = zk;
+        }
 
         public CountdownWatcher() {
             reset();
@@ -191,8 +199,7 @@ public abstract class ClientBaseWithFixes extends ZKTestCase {
                 zk.close();
             }
         }
-
-
+        watcher.initializeWatchedClient(zk);
         return zk;
     }
 

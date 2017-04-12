@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Timer;
@@ -53,8 +54,51 @@ abstract public class Shell {
     return IS_JAVA7_OR_ABOVE;
   }
 
-  /** a Unix command to get the current user's name */
-  public final static String USER_NAME_COMMAND = "whoami";
+  /**
+   * Maximum command line length in Windows
+   * KB830473 documents this as 8191
+   */
+  public static final int WINDOWS_MAX_SHELL_LENGHT = 8191;
+
+  /**
+   * Checks if a given command (String[]) fits in the Windows maximum command line length
+   * Note that the input is expected to already include space delimiters, no extra count
+   * will be added for delimiters.
+   *
+   * @param commands command parts, including any space delimiters
+   */
+  public static void checkWindowsCommandLineLength(String...commands)
+      throws IOException {
+    int len = 0;
+    for (String s: commands) {
+      len += s.length();
+    }
+    if (len > WINDOWS_MAX_SHELL_LENGHT) {
+      throw new IOException(String.format(
+          "The command line has a length of %d exceeds maximum allowed length of %d. " +
+          "Command starts with: %s",
+          len, WINDOWS_MAX_SHELL_LENGHT,
+          StringUtils.join("", commands).substring(0, 100)));
+    }
+  }
+
+  /**
+   * Quote the given arg so that bash will interpret it as a single value.
+   * Note that this quotes it for one level of bash, if you are passing it
+   * into a badly written shell script, you need to fix your shell script.
+   * @param arg the argument to quote
+   * @return the quoted string
+   */
+  static String bashQuote(String arg) {
+    StringBuilder buffer = new StringBuilder(arg.length() + 2);
+    buffer.append('\'');
+    buffer.append(arg.replace("'", "'\\''"));
+    buffer.append('\'');
+    return buffer.toString();
+  }
+
+  /** a Unix command to get the current user's name: {@value}. */
+  public static final String USER_NAME_COMMAND = "whoami";
 
   /** Windows CreateProcess synchronization object */
   public static final Object WindowsProcessLaunchLock = new Object();
@@ -98,24 +142,37 @@ abstract public class Shell {
   public static final boolean LINUX   = (osType == OSType.OS_TYPE_LINUX);
   public static final boolean OTHER   = (osType == OSType.OS_TYPE_OTHER);
 
+  public static final boolean PPC_64
+                = System.getProperties().getProperty("os.arch").contains("ppc64");
+
   /** a Unix command to get the current user's groups list */
   public static String[] getGroupsCommand() {
     return (WINDOWS)? new String[]{"cmd", "/c", "groups"}
-                    : new String[]{"bash", "-c", "groups"};
+                    : new String[]{"groups"};
   }
 
-  /** a Unix command to get a given user's groups list */
+  /**
+   * a Unix command to get a given user's groups list.
+   * If the OS is not WINDOWS, the command will get the user's primary group
+   * first and finally get the groups list which includes the primary group.
+   * i.e. the user's primary group will be included twice.
+   */
   public static String[] getGroupsForUserCommand(final String user) {
-    //'groups username' command return is non-consistent across different unixes
-    return (WINDOWS)? new String[] { WINUTILS, "groups", "-F", "\"" + user + "\""}
-                    : new String [] {"bash", "-c", "id -Gn " + user};
+    //'groups username' command return is inconsistent across different unixes
+    if (WINDOWS) {
+      return new String[]
+          {getWinUtilsPath(), "groups", "-F", "\"" + user + "\""};
+    } else {
+      String quotedUser = bashQuote(user);
+      return new String[] {"bash", "-c", "id -gn " + quotedUser +
+                            "; id -Gn " + quotedUser};
+    }
   }
 
   /** a Unix command to get a given netgroup's user list */
   public static String[] getUsersForNetgroupCommand(final String netgroup) {
     //'groups username' command return is non-consistent across different unixes
-    return (WINDOWS)? new String [] {"cmd", "/c", "getent netgroup " + netgroup}
-                    : new String [] {"bash", "-c", "getent netgroup " + netgroup};
+    return new String[] {"getent", "netgroup", netgroup};
   }
 
   /** Return a command to get permission information. */
@@ -221,8 +278,9 @@ abstract public class Shell {
    */
   public static String[] getRunScriptCommand(File script) {
     String absolutePath = script.getAbsolutePath();
-    return WINDOWS ? new String[] { "cmd", "/c", absolutePath } :
-      new String[] { "/bin/bash", absolutePath };
+    return WINDOWS ?
+      new String[] {"cmd", "/c", absolutePath }
+      : new String[] {"/bin/bash", bashQuote(absolutePath) };
   }
 
   /** a Unix command to set permission */
@@ -412,7 +470,7 @@ abstract public class Shell {
 
   /** check to see if a command needs to be executed and execute if needed */
   protected void run() throws IOException {
-    if (lastTime + interval > Time.now())
+    if (lastTime + interval > Time.monotonicNow())
       return;
     exitCode = 0; // reset for next run
     runCommand();
@@ -456,11 +514,11 @@ abstract public class Shell {
       timeOutTimer.schedule(timeoutTimerTask, timeOutInterval);
     }
     final BufferedReader errReader = 
-            new BufferedReader(new InputStreamReader(process
-                                                     .getErrorStream()));
+            new BufferedReader(new InputStreamReader(
+                process.getErrorStream(), Charset.defaultCharset()));
     BufferedReader inReader = 
-            new BufferedReader(new InputStreamReader(process
-                                                     .getInputStream()));
+            new BufferedReader(new InputStreamReader(
+                process.getInputStream(), Charset.defaultCharset()));
     final StringBuffer errMsg = new StringBuffer();
     
     // read error and input streams as this would free up the buffers
@@ -482,7 +540,13 @@ abstract public class Shell {
     };
     try {
       errThread.start();
-    } catch (IllegalStateException ise) { }
+    } catch (IllegalStateException ise) {
+    } catch (OutOfMemoryError oe) {
+      LOG.error("Caught " + oe + ". One possible reason is that ulimit"
+          + " setting of 'max user processes' is too low. If so, do"
+          + " 'ulimit -u <largerNum>' and try again.");
+      throw oe;
+    }
     try {
       parseExecResult(inReader); // parse the output
       // clear the input stream buffer
@@ -492,12 +556,8 @@ abstract public class Shell {
       }
       // wait for the process to finish and check the exit code
       exitCode  = process.waitFor();
-      try {
-        // make sure that the error thread exits
-        errThread.join();
-      } catch (InterruptedException ie) {
-        LOG.warn("Interrupted while reading the error stream", ie);
-      }
+      // make sure that the error thread exits
+      joinThread(errThread);
       completed.set(true);
       //the timeout thread handling
       //taken care in finally block
@@ -526,13 +586,9 @@ abstract public class Shell {
       } catch (IOException ioe) {
         LOG.warn("Error while closing the input stream", ioe);
       }
-      try {
-        if (!completed.get()) {
-          errThread.interrupt();
-          errThread.join();
-        }
-      } catch (InterruptedException ie) {
-        LOG.warn("Interrupted while joining errThread");
+      if (!completed.get()) {
+        errThread.interrupt();
+        joinThread(errThread);
       }
       try {
         InputStream stderr = process.getErrorStream();
@@ -543,7 +599,20 @@ abstract public class Shell {
         LOG.warn("Error while closing the error stream", ioe);
       }
       process.destroy();
-      lastTime = Time.now();
+      lastTime = Time.monotonicNow();
+    }
+  }
+
+  private static void joinThread(Thread t) {
+    while (t.isAlive()) {
+      try {
+        t.join();
+      } catch (InterruptedException ie) {
+        if (LOG.isWarnEnabled()) {
+          LOG.warn("Interrupted while joining on: " + t, ie);
+        }
+        t.interrupt(); // propagate interrupt
+      }
     }
   }
 
@@ -579,7 +648,7 @@ abstract public class Shell {
    * This is an IOException with exit code added.
    */
   public static class ExitCodeException extends IOException {
-    int exitCode;
+    private final int exitCode;
     
     public ExitCodeException(int exitCode, String message) {
       super(message);
@@ -589,6 +658,28 @@ abstract public class Shell {
     public int getExitCode() {
       return exitCode;
     }
+
+    @Override
+    public String toString() {
+      final StringBuilder sb =
+          new StringBuilder("ExitCodeException ");
+      sb.append("exitCode=").append(exitCode)
+        .append(": ");
+      sb.append(super.getMessage());
+      return sb.toString();
+    }
+  }
+  
+  public interface CommandExecutor {
+
+    void execute() throws IOException;
+
+    int getExitCode() throws IOException;
+
+    String getOutput() throws IOException;
+
+    void close();
+    
   }
   
   /**
@@ -599,7 +690,8 @@ abstract public class Shell {
    * directory and the environment remains unchanged. The output of the command 
    * is stored as-is and is expected to be small.
    */
-  public static class ShellCommandExecutor extends Shell {
+  public static class ShellCommandExecutor extends Shell 
+      implements CommandExecutor {
     
     private String[] command;
     private StringBuffer output;
@@ -647,7 +739,13 @@ abstract public class Shell {
 
     /** Execute the shell command. */
     public void execute() throws IOException {
-      this.run();    
+      for (String s : command) {
+        if (s == null) {
+          throw new IOException("(null) entry in command string: "
+              + StringUtils.join(" ", command));
+        }
+      }
+      this.run();
     }
 
     @Override
@@ -690,6 +788,10 @@ abstract public class Shell {
         builder.append(' ');
       }
       return builder.toString();
+    }
+
+    @Override
+    public void close() {
     }
   }
   

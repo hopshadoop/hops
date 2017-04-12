@@ -18,19 +18,26 @@
 
 package org.apache.hadoop.yarn.util.timeline;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.util.VersionInfo;
+import org.apache.hadoop.yarn.api.records.timeline.TimelineAbout;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.util.YarnVersionInfo;
+import org.apache.hadoop.yarn.webapp.YarnJacksonJaxbJsonProvider;
 import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.map.AnnotationIntrospector;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
-import org.codehaus.jackson.xc.JaxbAnnotationIntrospector;
-
-import java.io.IOException;
 
 /**
  * The helper class for the timeline module.
+ * 
  */
 @Public
 @Evolving
@@ -40,17 +47,14 @@ public class TimelineUtils {
 
   static {
     mapper = new ObjectMapper();
-    AnnotationIntrospector introspector = new JaxbAnnotationIntrospector();
-    mapper.setAnnotationIntrospector(introspector);
-    mapper.getSerializationConfig()
-        .setSerializationInclusion(Inclusion.NON_NULL);
+    YarnJacksonJaxbJsonProvider.configObjectMapper(mapper);
   }
 
   /**
    * Serialize a POJO object into a JSON string not in a pretty format
-   *
+   * 
    * @param o
-   *     an object to serialize
+   *          an object to serialize
    * @return a JSON string
    * @throws IOException
    * @throws JsonMappingException
@@ -63,11 +67,11 @@ public class TimelineUtils {
 
   /**
    * Serialize a POJO object into a JSON string
-   *
+   * 
    * @param o
-   *     an object to serialize
+   *          an object to serialize
    * @param pretty
-   *     whether in a pretty format or not
+   *          whether in a pretty format or not
    * @return a JSON string
    * @throws IOException
    * @throws JsonMappingException
@@ -76,10 +80,43 @@ public class TimelineUtils {
   public static String dumpTimelineRecordtoJSON(Object o, boolean pretty)
       throws JsonGenerationException, JsonMappingException, IOException {
     if (pretty) {
-      return mapper.defaultPrettyPrintingWriter().writeValueAsString(o);
+      return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(o);
     } else {
       return mapper.writeValueAsString(o);
     }
   }
 
+  public static TimelineAbout createTimelineAbout(String about) {
+    TimelineAbout tsInfo = new TimelineAbout(about);
+    tsInfo.setHadoopBuildVersion(VersionInfo.getBuildVersion());
+    tsInfo.setHadoopVersion(VersionInfo.getVersion());
+    tsInfo.setHadoopVersionBuiltOn(VersionInfo.getDate());
+    tsInfo.setTimelineServiceBuildVersion(YarnVersionInfo.getBuildVersion());
+    tsInfo.setTimelineServiceVersion(YarnVersionInfo.getVersion());
+    tsInfo.setTimelineServiceVersionBuiltOn(YarnVersionInfo.getDate());
+    return tsInfo;
+  }
+
+  public static InetSocketAddress getTimelineTokenServiceAddress(
+      Configuration conf) {
+    InetSocketAddress timelineServiceAddr = null;
+    if (YarnConfiguration.useHttps(conf)) {
+      timelineServiceAddr = conf.getSocketAddr(
+          YarnConfiguration.TIMELINE_SERVICE_WEBAPP_HTTPS_ADDRESS,
+          YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_HTTPS_ADDRESS,
+          YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_HTTPS_PORT);
+    } else {
+      timelineServiceAddr = conf.getSocketAddr(
+          YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS,
+          YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_ADDRESS,
+          YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_PORT);
+    }
+    return timelineServiceAddr;
+  }
+
+  public static Text buildTimelineTokenService(Configuration conf) {
+    InetSocketAddress timelineServiceAddr =
+        getTimelineTokenServiceAddress(conf);
+    return SecurityUtil.buildTokenService(timelineServiceAddr);
+  }
 }

@@ -18,18 +18,15 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.event.AbstractEventTransaction;
+import org.apache.hadoop.yarn.event.AbstractEvent;
 
-public class RMContainerEvent
-    extends AbstractEventTransaction<RMContainerEventType> {
+public class RMContainerEvent extends AbstractEvent<RMContainerEventType> {
 
   private final ContainerId containerId;
 
-  public RMContainerEvent(ContainerId containerId, RMContainerEventType type,
-      TransactionState transactionState) {
-    super(type, transactionState);
+  public RMContainerEvent(ContainerId containerId, RMContainerEventType type) {
+    super(type);
     this.containerId = containerId;
   }
 

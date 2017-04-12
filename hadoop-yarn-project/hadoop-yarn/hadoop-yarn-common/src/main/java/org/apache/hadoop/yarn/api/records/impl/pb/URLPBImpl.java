@@ -19,12 +19,13 @@
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.proto.YarnProtos.URLProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.URLProtoOrBuilder;
+
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
@@ -55,9 +56,8 @@ public class URLPBImpl extends URL {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -75,7 +75,7 @@ public class URLPBImpl extends URL {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public String getFile() {
@@ -89,13 +89,12 @@ public class URLPBImpl extends URL {
   @Override
   public void setFile(String file) {
     maybeInitBuilder();
-    if (file == null) {
+    if (file == null) { 
       builder.clearFile();
       return;
     }
     builder.setFile((file));
   }
-
   @Override
   public String getScheme() {
     URLProtoOrBuilder p = viaProto ? proto : builder;
@@ -108,13 +107,13 @@ public class URLPBImpl extends URL {
   @Override
   public void setScheme(String scheme) {
     maybeInitBuilder();
-    if (scheme == null) {
+    if (scheme == null) { 
       builder.clearScheme();
       return;
     }
     builder.setScheme((scheme));
   }
-
+ 
   @Override
   public String getUserInfo() {
     URLProtoOrBuilder p = viaProto ? proto : builder;
@@ -127,7 +126,7 @@ public class URLPBImpl extends URL {
   @Override
   public void setUserInfo(String userInfo) {
     maybeInitBuilder();
-    if (userInfo == null) {
+    if (userInfo == null) { 
       builder.clearUserInfo();
       return;
     }
@@ -146,13 +145,12 @@ public class URLPBImpl extends URL {
   @Override
   public void setHost(String host) {
     maybeInitBuilder();
-    if (host == null) {
+    if (host == null) { 
       builder.clearHost();
       return;
     }
     builder.setHost((host));
   }
-
   @Override
   public int getPort() {
     URLProtoOrBuilder p = viaProto ? proto : builder;
@@ -164,6 +162,7 @@ public class URLPBImpl extends URL {
     maybeInitBuilder();
     builder.setPort((port));
   }
+
 
 
 }  

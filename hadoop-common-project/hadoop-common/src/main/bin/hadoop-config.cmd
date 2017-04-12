@@ -65,7 +65,9 @@ if not exist %HADOOP_HOME%\share\hadoop\common\hadoop-common-*.jar (
     exit /b 1
 )
 
-set HADOOP_CONF_DIR=%HADOOP_HOME%\etc\hadoop
+if not defined HADOOP_CONF_DIR (
+  set HADOOP_CONF_DIR=%HADOOP_HOME%\etc\hadoop
+)
 
 @rem
 @rem Allow alternate conf dir location.
@@ -73,6 +75,16 @@ set HADOOP_CONF_DIR=%HADOOP_HOME%\etc\hadoop
 
 if "%1" == "--config" (
   set HADOOP_CONF_DIR=%2
+  shift
+  shift
+)
+
+@rem
+@rem Set log level. Default to INFO.
+@rem
+
+if "%1" == "--loglevel" (
+  set HADOOP_LOGLEVEL=%2
   shift
   shift
 )
@@ -157,8 +169,12 @@ if not defined HADOOP_LOGFILE (
   set HADOOP_LOGFILE=hadoop.log
 )
 
+if not defined HADOOP_LOGLEVEL (
+  set HADOOP_LOGLEVEL=INFO
+)
+
 if not defined HADOOP_ROOT_LOGGER (
-  set HADOOP_ROOT_LOGGER=INFO,console
+  set HADOOP_ROOT_LOGGER=%HADOOP_LOGLEVEL%,console
 )
 
 @rem
@@ -282,10 +298,12 @@ if not "%HADOOP_MAPRED_HOME%\%MAPRED_DIR%" == "%HADOOP_YARN_HOME%\%YARN_DIR%" (
 @rem
 
 if defined HADOOP_CLASSPATH (
-  if defined HADOOP_USER_CLASSPATH_FIRST (
-    set CLASSPATH=%HADOOP_CLASSPATH%;%CLASSPATH%;
-  ) else (
-    set CLASSPATH=%CLASSPATH%;%HADOOP_CLASSPATH%;
+  if not defined HADOOP_USE_CLIENT_CLASSLOADER (
+    if defined HADOOP_USER_CLASSPATH_FIRST (
+      set CLASSPATH=%HADOOP_CLASSPATH%;%CLASSPATH%;
+    ) else (
+      set CLASSPATH=%CLASSPATH%;%HADOOP_CLASSPATH%;
+    )
   )
 )
 

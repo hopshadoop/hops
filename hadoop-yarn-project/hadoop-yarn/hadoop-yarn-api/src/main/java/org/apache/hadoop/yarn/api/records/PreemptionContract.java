@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.yarn.api.records;
 
+import java.util.List;
+import java.util.Set;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
@@ -24,15 +27,11 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.util.List;
-import java.util.Set;
-
 /**
  * Description of resources requested back by the <code>ResourceManager</code>.
  * The <code>ApplicationMaster</code> (AM) can satisfy this request according
  * to its own priorities to prevent containers from being forcibly killed by
  * the platform.
- *
  * @see PreemptionMessage
  */
 @Public
@@ -42,8 +41,7 @@ public abstract class PreemptionContract {
   @Private
   @Unstable
   public static PreemptionContract newInstance(
-      List<PreemptionResourceRequest> req,
-      Set<PreemptionContainer> containers) {
+      List<PreemptionResourceRequest> req, Set<PreemptionContainer> containers) {
     PreemptionContract contract = Records.newRecord(PreemptionContract.class);
     contract.setResourceRequest(req);
     contract.setContainers(containers);
@@ -56,7 +54,6 @@ public abstract class PreemptionContract {
    * evicted from the cluster. Due to delays in propagating cluster state and
    * sending these messages, there are conditions where satisfied contracts may
    * not prevent the platform from killing containers.
-   *
    * @return List of {@link PreemptionResourceRequest} to update the
    * <code>ApplicationMaster</code> about resources requested back by the
    * <code>ResourceManager</code>.
@@ -76,7 +73,6 @@ public abstract class PreemptionContract {
    * <code>ResourceManager</code>. If the AM prefers a different set of
    * containers, then it may checkpoint or kill containers matching the
    * description in {@link #getResourceRequest}.
-   *
    * @return Set of containers at risk if the contract is not met.
    */
   @Public

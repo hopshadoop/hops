@@ -1,149 +1,203 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.yarn.server.resourcemanager.recovery.records;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.proto.YarnProtos;
+import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationAttemptStateDataProto;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
-
-import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.Set;
+import org.apache.hadoop.yarn.util.Records;
 
 /*
  * Contains the state data that needs to be persisted for an ApplicationAttempt
  */
 @Public
 @Unstable
-public interface ApplicationAttemptStateData {
+public abstract class ApplicationAttemptStateData {
+  public static ApplicationAttemptStateData newInstance(
+      ApplicationAttemptId attemptId, Container container,
+      Credentials attemptTokens, long startTime, RMAppAttemptState finalState,
+      String finalTrackingUrl, String diagnostics,
+      FinalApplicationStatus amUnregisteredFinalStatus, int exitStatus,
+      long finishTime, long memorySeconds, long vcoreSeconds,
+      String trackingUrl) {
+    ApplicationAttemptStateData attemptStateData =
+        Records.newRecord(ApplicationAttemptStateData.class);
+    attemptStateData.setAttemptId(attemptId);
+    attemptStateData.setMasterContainer(container);
+    attemptStateData.setAppAttemptTokens(attemptTokens);
+    attemptStateData.setState(finalState);
+    attemptStateData.setFinalTrackingUrl(finalTrackingUrl);
+    attemptStateData.setDiagnostics(diagnostics == null ? "" : diagnostics);
+    attemptStateData.setStartTime(startTime);
+    attemptStateData.setFinalApplicationStatus(amUnregisteredFinalStatus);
+    attemptStateData.setAMContainerExitStatus(exitStatus);
+    attemptStateData.setFinishTime(finishTime);
+    attemptStateData.setMemorySeconds(memorySeconds);
+    attemptStateData.setVcoreSeconds(vcoreSeconds);
+    attemptStateData.setTrackingUrl(trackingUrl);
+    return attemptStateData;
+  }
+
+  public static ApplicationAttemptStateData newInstance(
+      ApplicationAttemptId attemptId, Container masterContainer,
+      Credentials attemptTokens, long startTime, long memorySeconds,
+      long vcoreSeconds, String trackingUrl) {
+    return newInstance(attemptId, masterContainer, attemptTokens,
+        startTime, null, "N/A", "", null, ContainerExitStatus.INVALID, 0,
+        memorySeconds, vcoreSeconds, trackingUrl);
+    }
+
+
+  public abstract ApplicationAttemptStateDataProto getProto();
 
   /**
    * The ApplicationAttemptId for the application attempt
-   *
    * @return ApplicationAttemptId for the application attempt
    */
   @Public
   @Unstable
-  public ApplicationAttemptId getAttemptId();
-
-  public void setAttemptId(ApplicationAttemptId attemptId);
-
+  public abstract ApplicationAttemptId getAttemptId();
+  
+  public abstract void setAttemptId(ApplicationAttemptId attemptId);
+  
   /*
    * The master container running the application attempt
    * @return Container that hosts the attempt
    */
   @Public
   @Unstable
-  public Container getMasterContainer();
-
-  public void setMasterContainer(Container container);
+  public abstract Container getMasterContainer();
+  
+  public abstract void setMasterContainer(Container container);
 
   /**
    * The application attempt tokens that belong to this attempt
-   *
    * @return The application attempt tokens that belong to this attempt
    */
   @Public
   @Unstable
-  public ByteBuffer getAppAttemptTokens();
+  public abstract Credentials getAppAttemptTokens();
 
-  public void setAppAttemptTokens(ByteBuffer attemptTokens);
+  public abstract void setAppAttemptTokens(Credentials attemptTokens);
 
   /**
    * Get the final state of the application attempt.
-   *
    * @return the final state of the application attempt.
    */
-  public RMAppAttemptState getState();
+  public abstract RMAppAttemptState getState();
 
-  public void setState(RMAppAttemptState state);
+  public abstract void setState(RMAppAttemptState state);
 
   /**
    * Get the original not-proxied <em>final tracking url</em> for the
    * application. This is intended to only be used by the proxy itself.
-   *
+   * 
    * @return the original not-proxied <em>final tracking url</em> for the
-   * application
+   *         application
    */
-  public String getFinalTrackingUrl();
+  public abstract String getFinalTrackingUrl();
 
   /**
    * Set the final tracking Url of the AM.
-   *
    * @param url
    */
-  public void setFinalTrackingUrl(String url);
-
+  public abstract void setFinalTrackingUrl(String url);
+  
   /**
-   * Get the <em>diagnositic information</em> of the attempt
-   *
+   * Set the tracking Url of the AM.
+   * @param url
+   */
+  public abstract void setTrackingUrl(String url);
+  
+  /**
+   * Get the original not-proxied <em>tracking url</em> for the
+   * application. This is intended to only be used by the proxy itself.
+   * 
+   * @return the original not-proxied <em>tracking url</em> for the
+   *         application
+   */
+  public abstract String getTrackingUrl();
+  
+  /**
+   * Get the <em>diagnositic information</em> of the attempt 
    * @return <em>diagnositic information</em> of the attempt
    */
-  public String getDiagnostics();
+  public abstract String getDiagnostics();
 
-  public void setDiagnostics(String diagnostics);
+  public abstract void setDiagnostics(String diagnostics);
 
   /**
    * Get the <em>start time</em> of the application.
-   *
    * @return <em>start time</em> of the application
    */
-  public long getStartTime();
+  public abstract long getStartTime();
 
-  public void setStartTime(long startTime);
+  public abstract void setStartTime(long startTime);
 
   /**
    * Get the <em>final finish status</em> of the application.
-   *
    * @return <em>final finish status</em> of the application
    */
-  public FinalApplicationStatus getFinalApplicationStatus();
+  public abstract FinalApplicationStatus getFinalApplicationStatus();
 
-  public void setFinalApplicationStatus(FinalApplicationStatus finishState);
+  public abstract void setFinalApplicationStatus(
+      FinalApplicationStatus finishState);
+
+  public abstract int getAMContainerExitStatus();
+
+  public abstract void setAMContainerExitStatus(int exitStatus);
 
   /**
-   * Get the <em>Progress</em> of the application.
-   *
-   * @return <em>Progress</em> of the application
+   * Get the <em>finish time</em> of the application attempt.
+   * @return <em>finish time</em> of the application attempt
    */
-  public float getProgress();
+  public abstract long getFinishTime();
 
-  public void setProgress(float startTime);
+  public abstract void setFinishTime(long finishTime);
 
-  public String getHost();
+  /**
+  * Get the <em>memory seconds</em> (in MB seconds) of the application.
+   * @return <em>memory seconds</em> (in MB seconds) of the application
+   */
+  @Public
+  @Unstable
+  public abstract long getMemorySeconds();
 
-  public void setHost(String Host);
+  @Public
+  @Unstable
+  public abstract void setMemorySeconds(long memorySeconds);
 
-  public int getRpcPort();
+  /**
+   * Get the <em>vcore seconds</em> of the application.
+   * @return <em>vcore seconds</em> of the application
+   */
+  @Public
+  @Unstable
+  public abstract long getVcoreSeconds();
 
-  public void setRpcPort(int rpcPort);
-
-  public void addALLRanNodes(List<YarnProtos.NodeIdProto> ranNodes);
-
-  public Set<NodeId> getRanNodes();
-
-  public List<ContainerStatus> getJustFinishedContainers();
-
-  public void addAllJustFinishedContainers(
-      List<YarnProtos.ContainerStatusProto> justFinishedContainers);
+  @Public
+  @Unstable
+  public abstract void setVcoreSeconds(long vcoreSeconds);
 }

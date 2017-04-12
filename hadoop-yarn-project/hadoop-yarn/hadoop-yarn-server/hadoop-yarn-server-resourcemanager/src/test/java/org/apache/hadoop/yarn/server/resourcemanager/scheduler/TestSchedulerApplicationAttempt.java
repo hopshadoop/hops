@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
-import io.hops.exception.StorageInitializtionException;
-import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionStateImpl;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.YarnAPIStorageFactory;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.*;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -32,20 +35,9 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 public class TestSchedulerApplicationAttempt {
 
@@ -53,13 +45,6 @@ public class TestSchedulerApplicationAttempt {
 
   private Configuration conf = new Configuration();
   
-  @Before
-  public void setup() throws StorageInitializtionException, IOException {
-    conf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-  }
-
   @After
   public void tearDown() {
     QueueMetrics.clearQueueMetrics();
@@ -77,34 +62,34 @@ public class TestSchedulerApplicationAttempt {
     QueueMetrics newMetrics = newQueue.getMetrics();
 
     ApplicationAttemptId appAttId = createAppAttemptId(0, 0);
-    SchedulerApplicationAttempt app =
-        new SchedulerApplicationAttempt(appAttId, user, oldQueue,
-            oldQueue.getActiveUsersManager(), null, -1);
+    RMContext rmContext = mock(RMContext.class);
+    when(rmContext.getEpoch()).thenReturn(3L);
+    SchedulerApplicationAttempt app = new SchedulerApplicationAttempt(appAttId,
+        user, oldQueue, oldQueue.getActiveUsersManager(), rmContext);
     oldMetrics.submitApp(user);
+    
+    // confirm that containerId is calculated based on epoch.
+    assertEquals(0x30000000001L, app.getNewContainerId());
     
     // Resource request
     Resource requestedResource = Resource.newInstance(1536, 2);
     Priority requestedPriority = Priority.newInstance(2);
-    ResourceRequest request = ResourceRequest
-        .newInstance(requestedPriority, ResourceRequest.ANY, requestedResource,
-            3);
-    app.updateResourceRequests(Arrays.asList(request),
-        new TransactionStateImpl( TransactionState.TransactionType.RM));
+    ResourceRequest request = ResourceRequest.newInstance(requestedPriority,
+        ResourceRequest.ANY, requestedResource, 3);
+    app.updateResourceRequests(Arrays.asList(request));
 
     // Allocated container
     RMContainer container1 = createRMContainer(appAttId, 1, requestedResource);
     app.liveContainers.put(container1.getContainerId(), container1);
     SchedulerNode node = createNode();
-    app.appSchedulingInfo
-        .allocate(NodeType.OFF_SWITCH, node, requestedPriority, request,
-            container1.getContainer(), null);
+    app.appSchedulingInfo.allocate(NodeType.OFF_SWITCH, node, requestedPriority,
+        request, container1.getContainer());
     
     // Reserved container
     Priority prio1 = Priority.newInstance(1);
     Resource reservedResource = Resource.newInstance(2048, 3);
-    RMContainer container2 =
-        createReservedRMContainer(appAttId, 1, reservedResource,
-            node.getNodeID(), prio1);
+    RMContainer container2 = createReservedRMContainer(appAttId, 1, reservedResource,
+        node.getNodeID(), prio1);
     Map<NodeId, RMContainer> reservations = new HashMap<NodeId, RMContainer>();
     reservations.put(node.getNodeID(), container2);
     app.reservedContainers.put(prio1, reservations);
@@ -153,7 +138,7 @@ public class TestSchedulerApplicationAttempt {
   
   private RMContainer createRMContainer(ApplicationAttemptId appAttId, int id,
       Resource resource) {
-    ContainerId containerId = ContainerId.newInstance(appAttId, id);
+    ContainerId containerId = ContainerId.newContainerId(appAttId, id);
     RMContainer rmContainer = mock(RMContainer.class);
     Container container = mock(Container.class);
     when(container.getResource()).thenReturn(resource);
@@ -177,5 +162,27 @@ public class TestSchedulerApplicationAttempt {
     ApplicationAttemptId attId =
         ApplicationAttemptId.newInstance(appIdImpl, attemptId);
     return attId;
+  }
+
+  @Test
+  public void testSchedulingOpportunityOverflow() throws Exception {
+    ApplicationAttemptId attemptId = createAppAttemptId(0, 0);
+    Queue queue = createQueue("test", null);
+    RMContext rmContext = mock(RMContext.class);
+    when(rmContext.getEpoch()).thenReturn(3L);
+    SchedulerApplicationAttempt app = new SchedulerApplicationAttempt(
+        attemptId, "user", queue, queue.getActiveUsersManager(), rmContext);
+    Priority priority = Priority.newInstance(1);
+    assertEquals(0, app.getSchedulingOpportunities(priority));
+    app.addSchedulingOpportunity(priority);
+    assertEquals(1, app.getSchedulingOpportunities(priority));
+    // verify the count is capped at MAX_VALUE and does not overflow
+    app.setSchedulingOpportunities(priority, Integer.MAX_VALUE - 1);
+    assertEquals(Integer.MAX_VALUE - 1,
+        app.getSchedulingOpportunities(priority));
+    app.addSchedulingOpportunity(priority);
+    assertEquals(Integer.MAX_VALUE, app.getSchedulingOpportunities(priority));
+    app.addSchedulingOpportunity(priority);
+    assertEquals(Integer.MAX_VALUE, app.getSchedulingOpportunities(priority));
   }
 }

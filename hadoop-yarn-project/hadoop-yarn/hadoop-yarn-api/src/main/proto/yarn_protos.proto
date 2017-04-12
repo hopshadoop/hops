@@ -23,13 +23,9 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
-
 option java_outer_classname = "YarnProtos";
-
 option java_generic_services = true;
-
 option java_generate_equals_and_hash = true;
-
 package hadoop.yarn;
 
 import "Security.proto";
@@ -54,7 +50,7 @@ message ApplicationAttemptIdProto {
 message ContainerIdProto {
   optional ApplicationIdProto app_id = 1;
   optional ApplicationAttemptIdProto app_attempt_id = 2;
-  optional int32 id = 3;
+  optional int64 id = 3;
 }
 
 message ResourceProto {
@@ -96,12 +92,13 @@ message ContainerReportProto {
   optional ResourceProto resource = 2;
   optional NodeIdProto node_id = 3;
   optional PriorityProto priority = 4;
-  optional int64 start_time = 5;
+  optional int64 creation_time = 5;
   optional int64 finish_time = 6;
   optional string diagnostics_info = 7 [default = "N/A"];
   optional string log_url = 8;
   optional int32 container_exit_status = 9;
   optional ContainerStateProto container_state = 10;
+  optional string node_http_address = 11;
 }
 
 enum YarnApplicationStateProto {
@@ -163,6 +160,7 @@ message LocalResourceProto {
   optional LocalResourceTypeProto type = 4;
   optional LocalResourceVisibilityProto visibility = 5;
   optional string pattern = 6;
+  optional bool should_be_uploaded_to_shared_cache = 7;
 }
 
 message ApplicationResourceUsageReportProto {
@@ -171,6 +169,8 @@ message ApplicationResourceUsageReportProto {
   optional ResourceProto used_resources = 3;
   optional ResourceProto reserved_resources = 4;
   optional ResourceProto needed_resources = 5;
+  optional int64 memory_seconds = 6;
+  optional int64 vcore_seconds = 7;
 }
 
 message ApplicationReportProto {
@@ -204,13 +204,14 @@ message ApplicationAttemptReportProto {
   optional string diagnostics = 5 [default = "N/A"];
   optional YarnApplicationAttemptStateProto yarn_application_attempt_state = 6;
   optional ContainerIdProto am_container_id = 7;
+  optional string original_tracking_url = 8;
 }
 
 enum NodeStateProto {
-  NS_NEW = 1;
-  NS_RUNNING = 2;
+  NS_NEW = 1; 
+  NS_RUNNING = 2; 
   NS_UNHEALTHY = 3;
-  NS_DECOMMISSIONED = 4;
+  NS_DECOMMISSIONED = 4; 
   NS_LOST = 5;
   NS_REBOOTED = 6;
 }
@@ -230,8 +231,18 @@ message NodeReportProto {
   optional NodeStateProto node_state = 7;
   optional string health_report = 8;
   optional int64 last_health_report_time = 9;
+  repeated string node_labels = 10;
 }
 
+message NodeIdToLabelsProto {
+  optional NodeIdProto nodeId = 1;
+  repeated string nodeLabels = 2;
+}
+
+message LabelsToNodeIdsProto {
+  optional string nodeLabels = 1;
+  repeated NodeIdProto nodeId = 2;
+}
 
 ////////////////////////////////////////////////////////////////////////
 ////// From AM_RM_Protocol /////////////////////////////////////////////
@@ -242,6 +253,7 @@ message ResourceRequestProto {
   optional ResourceProto capability = 3;
   optional int32 num_containers = 4;
   optional bool relax_locality = 5 [default = true];
+  optional string node_label_expression = 6;
 }
 
 enum AMCommandProto {
@@ -272,8 +284,8 @@ message PreemptionResourceRequestProto {
 }
 
 message ResourceBlacklistRequestProto {
-  repeated string blacklist_additions = 1;
-  repeated string blacklist_removals = 2;
+  repeated string blacklist_additions = 1; 
+  repeated string blacklist_removals = 2; 
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -292,6 +304,18 @@ message ApplicationSubmissionContextProto {
   optional string applicationType = 10 [default = "YARN"];
   optional bool keep_containers_across_application_attempts = 11 [default = false];
   repeated string applicationTags = 12;
+  optional int64 attempt_failures_validity_interval = 13 [default = -1];
+  optional LogAggregationContextProto log_aggregation_context = 14;
+  optional ReservationIdProto reservation_id = 15;
+  optional string node_label_expression = 16;
+  optional ResourceRequestProto am_container_resource_request = 17;
+}
+
+message LogAggregationContextProto {
+ optional string include_pattern = 1 [default = ".*"];
+ optional string exclude_pattern = 2 [default = ""];
+ optional string rolled_logs_include_pattern = 3 [default = ""];
+ optional string rolled_logs_exclude_pattern = 4 [default = ".*"];
 }
 
 enum ApplicationAccessTypeProto {
@@ -321,6 +345,8 @@ message QueueInfoProto {
   optional QueueStateProto state = 5;
   repeated QueueInfoProto childQueues = 6;
   repeated ApplicationReportProto applications = 7;
+  repeated string accessibleNodeLabels = 8;
+  optional string defaultNodeLabelExpression = 9;
 }
 
 enum QueueACLProto {
@@ -332,6 +358,41 @@ message QueueUserACLInfoProto {
   optional string queueName = 1;
   repeated QueueACLProto userAcls = 2;
 }
+
+////////////////////////////////////////////////////////////////////////
+////// From reservation_protocol /////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+
+message ReservationIdProto {
+  optional int64 id = 1;
+  optional int64 cluster_timestamp = 2;
+}
+
+message ReservationRequestProto {
+  optional ResourceProto capability = 1;
+  optional int32 num_containers = 2 [default = 1];
+  optional int32 concurrency = 3 [default = 1];
+  optional int64 duration = 4 [default = -1];
+}
+
+message ReservationRequestsProto {
+  repeated ReservationRequestProto reservation_resources = 1;
+  optional ReservationRequestInterpreterProto interpreter = 2 [default = R_ALL];
+}
+
+message ReservationDefinitionProto {
+  optional ReservationRequestsProto reservation_requests = 1;
+  optional int64 arrival = 2;
+  optional int64 deadline = 3;
+  optional string reservation_name = 4;
+}
+
+enum ReservationRequestInterpreterProto {
+  R_ANY = 0;
+  R_ALL = 1;
+  R_ORDER = 2;
+  R_ORDER_NO_GAP = 3;
+ }
 
 ////////////////////////////////////////////////////////////////////////
 ////// From container_manager //////////////////////////////////////////
@@ -363,7 +424,7 @@ enum ContainerExitStatusProto {
 message ContainerResourceIncreaseRequestProto {
   optional ContainerIdProto container_id = 1;
   optional ResourceProto capability = 2;
-}
+} 
 
 message ContainerResourceIncreaseProto {
   optional ContainerIdProto container_id = 1;

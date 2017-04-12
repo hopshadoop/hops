@@ -1,22 +1,27 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.security;
+
+import java.security.SecureRandom;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -27,22 +32,18 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 
-import java.security.SecureRandom;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 /**
  * SecretManager for ContainerTokens. Extended by both RM and NM and hence is
  * present in yarn-server-common package.
+ * 
  */
-public class BaseContainerTokenSecretManager
-    extends SecretManager<ContainerTokenIdentifier> {
+public class BaseContainerTokenSecretManager extends
+    SecretManager<ContainerTokenIdentifier> {
 
-  private static Log LOG =
-      LogFactory.getLog(BaseContainerTokenSecretManager.class);
+  private static Log LOG = LogFactory
+    .getLog(BaseContainerTokenSecretManager.class);
 
-  private int serialNo = new SecureRandom().nextInt();
+  protected int serialNo = new SecureRandom().nextInt();
 
   protected final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
   protected final Lock readLock = readWriteLock.readLock();
@@ -60,7 +61,7 @@ public class BaseContainerTokenSecretManager
   public BaseContainerTokenSecretManager(Configuration conf) {
     this.containerTokenExpiryInterval =
         conf.getInt(YarnConfiguration.RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS,
-            YarnConfiguration.DEFAULT_RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS);
+          YarnConfiguration.DEFAULT_RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS);
   }
 
   // Need lock as we increment serialNo etc.
@@ -77,7 +78,7 @@ public class BaseContainerTokenSecretManager
   public MasterKey getCurrentKey() {
     this.readLock.lock();
     try {
-      return this.currentMasterKey.getMasterKey();
+    return this.currentMasterKey.getMasterKey();
     } finally {
       this.readLock.unlock();
     }
@@ -86,14 +87,14 @@ public class BaseContainerTokenSecretManager
   @Override
   public byte[] createPassword(ContainerTokenIdentifier identifier) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Creating password for " + identifier.getContainerID() +
-          " for user " + identifier.getUser() + " to be run on NM " +
-          identifier.getNmHostAddress());
+      LOG.debug("Creating password for " + identifier.getContainerID()
+          + " for user " + identifier.getUser() + " to be run on NM "
+          + identifier.getNmHostAddress());
     }
     this.readLock.lock();
     try {
       return createPassword(identifier.getBytes(),
-          this.currentMasterKey.getSecretKey());
+        this.currentMasterKey.getSecretKey());
     } finally {
       this.readLock.unlock();
     }
@@ -114,9 +115,9 @@ public class BaseContainerTokenSecretManager
       MasterKeyData masterKey)
       throws org.apache.hadoop.security.token.SecretManager.InvalidToken {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Retrieving password for " + identifier.getContainerID() +
-          " for user " + identifier.getUser() + " to be run on NM " +
-          identifier.getNmHostAddress());
+      LOG.debug("Retrieving password for " + identifier.getContainerID()
+          + " for user " + identifier.getUser() + " to be run on NM "
+          + identifier.getNmHostAddress());
     }
     return createPassword(identifier.getBytes(), masterKey.getSecretKey());
   }

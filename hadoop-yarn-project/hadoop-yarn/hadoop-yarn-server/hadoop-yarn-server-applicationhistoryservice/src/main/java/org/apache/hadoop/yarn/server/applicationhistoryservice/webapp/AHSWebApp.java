@@ -17,25 +17,34 @@
  */
 package org.apache.hadoop.yarn.server.applicationhistoryservice.webapp;
 
-import org.apache.hadoop.yarn.server.api.ApplicationContext;
-import org.apache.hadoop.yarn.server.applicationhistoryservice.ApplicationHistoryManager;
-import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
+import static org.apache.hadoop.yarn.util.StringHelper.pajoin;
+
+import org.apache.hadoop.yarn.api.ApplicationBaseProtocol;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.ApplicationHistoryClientService;
+import org.apache.hadoop.yarn.server.timeline.TimelineDataManager;
+import org.apache.hadoop.yarn.server.timeline.webapp.TimelineWebServices;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.YarnJacksonJaxbJsonProvider;
 import org.apache.hadoop.yarn.webapp.YarnWebParams;
 
-import static org.apache.hadoop.yarn.util.StringHelper.pajoin;
-
 public class AHSWebApp extends WebApp implements YarnWebParams {
 
-  private final ApplicationHistoryManager applicationHistoryManager;
-  private final TimelineStore timelineStore;
+  private final ApplicationHistoryClientService historyClientService;
+  private TimelineDataManager timelineDataManager;
 
-  public AHSWebApp(ApplicationHistoryManager applicationHistoryManager,
-      TimelineStore timelineStore) {
-    this.applicationHistoryManager = applicationHistoryManager;
-    this.timelineStore = timelineStore;
+  public AHSWebApp(TimelineDataManager timelineDataManager,
+      ApplicationHistoryClientService historyClientService) {
+    this.timelineDataManager = timelineDataManager;
+    this.historyClientService = historyClientService;
+  }
+
+  public ApplicationHistoryClientService getApplicationHistoryClientService() {
+    return historyClientService;
+  }
+
+  public TimelineDataManager getTimelineDataManager() {
+    return timelineDataManager;
   }
 
   @Override
@@ -44,15 +53,17 @@ public class AHSWebApp extends WebApp implements YarnWebParams {
     bind(AHSWebServices.class);
     bind(TimelineWebServices.class);
     bind(GenericExceptionHandler.class);
-    bind(ApplicationContext.class).toInstance(applicationHistoryManager);
-    bind(TimelineStore.class).toInstance(timelineStore);
+    bind(ApplicationBaseProtocol.class).toInstance(historyClientService);
+    bind(TimelineDataManager.class).toInstance(timelineDataManager);
     route("/", AHSController.class);
+    route("/about", AHSController.class, "about");
     route(pajoin("/apps", APP_STATE), AHSController.class);
     route(pajoin("/app", APPLICATION_ID), AHSController.class, "app");
     route(pajoin("/appattempt", APPLICATION_ATTEMPT_ID), AHSController.class,
-        "appattempt");
+      "appattempt");
     route(pajoin("/container", CONTAINER_ID), AHSController.class, "container");
-    route(pajoin("/logs", NM_NODENAME, CONTAINER_ID, ENTITY_STRING, APP_OWNER,
-            CONTAINER_LOG_TYPE), AHSController.class, "logs");
+    route(
+      pajoin("/logs", NM_NODENAME, CONTAINER_ID, ENTITY_STRING, APP_OWNER,
+        CONTAINER_LOG_TYPE), AHSController.class, "logs");
   }
 }

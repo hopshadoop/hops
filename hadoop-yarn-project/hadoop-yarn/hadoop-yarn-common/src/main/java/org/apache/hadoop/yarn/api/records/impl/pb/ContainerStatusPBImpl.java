@@ -28,18 +28,16 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStateProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProtoOrBuilder;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
 public class ContainerStatusPBImpl extends ContainerStatus {
-  private static final Log LOG = LogFactory.getLog(ContainerStatusPBImpl.class);
-  
   ContainerStatusProto proto = ContainerStatusProto.getDefaultInstance();
   ContainerStatusProto.Builder builder = null;
   boolean viaProto = false;
-    
+  
   private ContainerId containerId = null;
   
   
@@ -53,7 +51,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
   
   public synchronized ContainerStatusProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -66,9 +64,8 @@ public class ContainerStatusPBImpl extends ContainerStatus {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -93,22 +90,21 @@ public class ContainerStatusPBImpl extends ContainerStatus {
     }
   }
 
-  private void mergeLocalToProto() {
-    if (viaProto) {
+  private synchronized void mergeLocalToProto() {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
   }
 
-  private void maybeInitBuilder() {
+  private synchronized void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = ContainerStatusProto.newBuilder(proto);
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public synchronized ContainerState getState() {
@@ -120,7 +116,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
 
   @Override
-  public void setState(ContainerState state) {
+  public synchronized void setState(ContainerState state) {
     maybeInitBuilder();
     if (state == null) {
       builder.clearState();
@@ -128,7 +124,6 @@ public class ContainerStatusPBImpl extends ContainerStatus {
     }
     builder.setState(convertToProtoFormat(state));
   }
-
   @Override
   public synchronized ContainerId getContainerId() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
@@ -138,19 +133,17 @@ public class ContainerStatusPBImpl extends ContainerStatus {
     if (!p.hasContainerId()) {
       return null;
     }
-    this.containerId = convertFromProtoFormat(p.getContainerId());
+    this.containerId =  convertFromProtoFormat(p.getContainerId());
     return this.containerId;
   }
 
   @Override
-  public void setContainerId(ContainerId containerId) {
+  public synchronized void setContainerId(ContainerId containerId) {
     maybeInitBuilder();
-    if (containerId == null) {
+    if (containerId == null) 
       builder.clearContainerId();
-    }
     this.containerId = containerId;
   }
-
   @Override
   public synchronized int getExitStatus() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
@@ -158,7 +151,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
 
   @Override
-  public void setExitStatus(int exitStatus) {
+  public synchronized void setExitStatus(int exitStatus) {
     maybeInitBuilder();
     builder.setExitStatus(exitStatus);
   }
@@ -166,11 +159,11 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   @Override
   public synchronized String getDiagnostics() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
-    return (p.getDiagnostics());
+    return (p.getDiagnostics());    
   }
 
   @Override
-  public void setDiagnostics(String diagnostics) {
+  public synchronized void setDiagnostics(String diagnostics) {
     maybeInitBuilder();
     builder.setDiagnostics(diagnostics);
   }
@@ -188,8 +181,9 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
 
   private ContainerIdProto convertToProtoFormat(ContainerId t) {
-    return ((ContainerIdPBImpl) t).getProto();
+    return ((ContainerIdPBImpl)t).getProto();
   }
+
 
 
 }  

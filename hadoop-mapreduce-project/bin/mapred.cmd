@@ -36,6 +36,10 @@ if "%1" == "--config" (
   shift
   shift
 )
+if "%1" == "--loglevel" (
+  shift
+  shift
+)
 
 :main
   if exist %MAPRED_CONF_DIR%\mapred-env.cmd (
@@ -90,6 +94,14 @@ if "%1" == "--config" (
   @rem add modules to CLASSPATH
   set CLASSPATH=%CLASSPATH%;%HADOOP_MAPRED_HOME%\modules\*
 
+  if %mapred-command% == classpath (
+    if not defined mapred-command-arguments (
+      @rem No need to bother starting up a JVM for this simple case.
+      @echo %CLASSPATH%
+      exit /b
+    )
+  )
+
   call :%mapred-command% %mapred-command-arguments%
   set java_arguments=%JAVA_HEAP_MAX% %HADOOP_OPTS% -classpath %CLASSPATH% %CLASS% %mapred-command-arguments%
   call %JAVA% %java_arguments%
@@ -98,7 +110,7 @@ goto :eof
 
 
 :classpath
-  @echo %CLASSPATH%
+  set CLASS=org.apache.hadoop.util.Classpath 
   goto :eof
 
 :job
@@ -135,6 +147,10 @@ goto :eof
   set CLASSPATH=%CLASSPATH%;%TOO_PATH%
   set HADOOP_OPTS=%HADOOP_OPTS% %HADOOP_CLIENT_OPTS%
 
+:hsadmin
+  set CLASS=org.apache.hadoop.mapreduce.v2.hs.client.HSAdmin
+  set HADOOP_OPTS=%HADOOP_OPTS% %HADOOP_CLIENT_OPTS%
+
 :pipes
   goto not_supported
 
@@ -155,6 +171,10 @@ goto :eof
 :make_command_arguments
   if [%2] == [] goto :eof
   if "%1" == "--config" (
+    shift
+    shift
+  )
+  if "%1" == "--loglevel" (
     shift
     shift
   )
@@ -180,7 +200,7 @@ goto :eof
   goto print_usage
 
 :print_usage
-  @echo Usage: mapred [--config confdir] COMMAND
+  @echo Usage: mapred [--config confdir] [--loglevel loglevel] COMMAND
   @echo        where COMMAND is one of:
   @echo   job                  manipulate MapReduce jobs
   @echo   queue                get information regarding JobQueues
@@ -189,6 +209,7 @@ goto :eof
   @echo   historyserver        run job history servers as a standalone daemon
   @echo   distcp ^<srcurl^> ^<desturl^> copy file or directories recursively
   @echo   archive -archiveName NAME -p ^<parent path^> ^<src^>* ^<dest^> create a hadoop archive
+  @echo   hsadmin              job history server admin interface
   @echo 
   @echo Most commands print help when invoked w/o parameters.
 

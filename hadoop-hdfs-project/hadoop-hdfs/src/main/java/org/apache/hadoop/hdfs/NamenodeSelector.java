@@ -38,7 +38,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * asynchronously asks one of the current namenodes what is the latest
  * up-to-date list of active namenodes.
  */
-public class NamenodeSelector extends Thread {
+public class NamenodeSelector {
 
   /**
    * Policy for selection next namenode to be used by the client. Current
@@ -111,9 +111,8 @@ public class NamenodeSelector extends Thread {
   private NamenodeSelector.NamenodeHandle stickyHandle = null; //only used if
   // RANDOM_STICKY policy is used
   protected final Configuration conf;
-  private boolean periodicNNListUpdate = true;
-  private final Object wiatObjectForUpdate = new Object();
   private final int namenodeListUpdateTimePeriod;
+  private long lastUpdate=0;
   Random rand = new Random((UUID.randomUUID()).hashCode());
 
 
@@ -157,32 +156,11 @@ public class NamenodeSelector extends Thread {
 
     //get the list of Namenodes
     createNamenodeClientsFromConfiguration();
-
-    //start periodic Namenode list update thread.
-    start();
   }
 
-  @Override
-  public void run() {
-    while (periodicNNListUpdate) {
-      try {
-        //first sleep and then update
-        synchronized (wiatObjectForUpdate) {
-          wiatObjectForUpdate.wait(namenodeListUpdateTimePeriod);
-        }
-        if (periodicNNListUpdate) {
-          periodicNamenodeClientsUpdate();
-        }
-      } catch (Exception ex) {
-        LOG.warn(ex);
-      }
-    }
-    LOG.debug("Shuting down client");
-  }
-
-  private void asyncNNListUpdate() {
-    synchronized (wiatObjectForUpdate) {
-      wiatObjectForUpdate.notify();
+  private void updateNamenodesList() throws IOException{
+    if(namenodeListUpdateTimePeriod>0 && System.currentTimeMillis()-lastUpdate> namenodeListUpdateTimePeriod){
+      namenodeClientsUpdate();
     }
   }
 
@@ -190,7 +168,6 @@ public class NamenodeSelector extends Thread {
    * Stop the periodic update and close all the conncetions to the namenodes
    */
   public synchronized void close() {
-    stopPeriodicUpdates();
 
     //close all clients
     for (NamenodeSelector.NamenodeHandle namenode : nnList) {
@@ -200,13 +177,7 @@ public class NamenodeSelector extends Thread {
     }
   }
 
-  public void stopPeriodicUpdates() {
-    periodicNNListUpdate = false;
-    synchronized (wiatObjectForUpdate) {
-      wiatObjectForUpdate.notify();
-    }
-  }
-
+  
   /**
    * Get all namenodes in the cluster
    * @return list of all namenodes
@@ -214,8 +185,8 @@ public class NamenodeSelector extends Thread {
    */
   public List<NamenodeSelector.NamenodeHandle> getAllNameNode()
       throws IOException {
+    updateNamenodesList();
     if (nnList == null || nnList.isEmpty()) {
-      asyncNNListUpdate();
       throw new NoAliveNamenodeException();
     }
     return nnList;
@@ -227,6 +198,7 @@ public class NamenodeSelector extends Thread {
    * @throws IOException
    */
   public NamenodeHandle getLeadingNameNode() throws IOException {
+    updateNamenodesList();
     NamenodeHandle leaderHandle = null; // leader is one with the least id
     for(NamenodeHandle handle : getAllNameNode()){
       if(leaderHandle == null){
@@ -254,16 +226,14 @@ public class NamenodeSelector extends Thread {
    */
   public NamenodeSelector.NamenodeHandle getNextNamenode() throws IOException {
 
-
+    updateNamenodesList();
     if (nnList == null || nnList.isEmpty()) {
-      asyncNNListUpdate();
       throw new NoAliveNamenodeException("No NameNode is active");
     }
 
     NamenodeSelector.NamenodeHandle handle = getNextNNBasedOnPolicy();
     if (handle == null || handle.getRPCHandle() == null) {
       //update the list right now
-      asyncNNListUpdate();
       throw new NoAliveNamenodeException(
           " Started an asynchronous update of the namenode list. ");
     }
@@ -315,6 +285,11 @@ public class NamenodeSelector extends Thread {
   }
 
   String printNamenodes() {
+    try {
+      updateNamenodesList();
+    } catch (IOException ex) {
+      LOG.error(ex);
+    }
     String nns = "Client is connected to namenodes: ";
     for (NamenodeSelector.NamenodeHandle namenode : nnList) {
       nns += namenode + ", ";
@@ -328,6 +303,11 @@ public class NamenodeSelector extends Thread {
   }
 
   public int getTotalConnectedNamenodes() {
+    try {
+      updateNamenodesList();
+    } catch (IOException ex) {
+      LOG.error(ex);
+    }
     return nnList.size();
   }
 
@@ -375,7 +355,6 @@ public class NamenodeSelector extends Thread {
           }
         } catch (Exception e) {
           LOG.error(e);
-          e.printStackTrace();
           if (handle != null) {
             RPC.stopProxy(handle);
           }
@@ -396,7 +375,7 @@ public class NamenodeSelector extends Thread {
    * map fail then call the 'createDFSClientsForFirstTime' function. with will
    * try to connect to defaults namenode provided at the initialization phase.
    */
-  private synchronized void periodicNamenodeClientsUpdate() throws IOException {
+  private synchronized void namenodeClientsUpdate() throws IOException {
     SortedActiveNodeList anl = null;
     LOG.debug("Fetching new list of namenodes");
     if (!nnList.isEmpty()) {
@@ -408,7 +387,7 @@ public class NamenodeSelector extends Thread {
             anl = null;
             continue;
           } else {
-            // we got a fresh list of anl
+            // we get a fresh list of anl
             refreshNamenodeList(anl);
             return;
           }
@@ -536,10 +515,11 @@ public class NamenodeSelector extends Thread {
       stickyHandle = null;
     }
 
-    //if a bad namenode is detected then update the list of Namenodes in the system
-    synchronized (wiatObjectForUpdate) {
-      wiatObjectForUpdate.notify();
-    }
+  }
+
+  public int getNameNodesCount() throws IOException {
+//    periodicNamenodeClientsUpdate();
+    return nnList.size();
   }
 }
 

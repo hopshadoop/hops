@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.impl.pb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.yarn.factories.RecordFactory;
@@ -28,11 +33,6 @@ import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerAc
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerHeartbeatResponse;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerStatus;
 import org.junit.Test;
-
-import java.net.InetSocketAddress;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class TestPBLocalizerRPC {
 
@@ -46,7 +46,6 @@ public class TestPBLocalizerRPC {
   static class LocalizerService implements LocalizationProtocol {
     private final InetSocketAddress locAddr;
     private Server server;
-
     LocalizerService(InetSocketAddress locAddr) {
       this.locAddr = locAddr;
     }
@@ -54,9 +53,8 @@ public class TestPBLocalizerRPC {
     public void start() {
       Configuration conf = new Configuration();
       YarnRPC rpc = YarnRPC.create(conf);
-      server =
-          rpc.getServer(LocalizationProtocol.class, this, locAddr, conf, null,
-              1);
+      server = rpc.getServer(
+          LocalizationProtocol.class, this, locAddr, conf, null, 1);
       server.start();
     }
 
@@ -74,7 +72,7 @@ public class TestPBLocalizerRPC {
 
   static LocalizerHeartbeatResponse dieHBResponse() {
     LocalizerHeartbeatResponse response =
-        recordFactory.newRecordInstance(LocalizerHeartbeatResponse.class);
+      recordFactory.newRecordInstance(LocalizerHeartbeatResponse.class);
     response.setLocalizerAction(LocalizerAction.DIE);
     return response;
   }
@@ -87,10 +85,10 @@ public class TestPBLocalizerRPC {
       server.start();
       Configuration conf = new Configuration();
       YarnRPC rpc = YarnRPC.create(conf);
-      LocalizationProtocol client = (LocalizationProtocol) rpc
-          .getProxy(LocalizationProtocol.class, locAddr, conf);
+      LocalizationProtocol client = (LocalizationProtocol)
+        rpc.getProxy(LocalizationProtocol.class, locAddr, conf);
       LocalizerStatus status =
-          recordFactory.newRecordInstance(LocalizerStatus.class);
+        recordFactory.newRecordInstance(LocalizerStatus.class);
       status.setLocalizerId("localizer0");
       LocalizerHeartbeatResponse response = client.heartbeat(status);
       assertEquals(dieHBResponse(), response);

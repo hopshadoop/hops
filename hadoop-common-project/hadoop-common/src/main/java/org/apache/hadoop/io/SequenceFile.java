@@ -22,6 +22,8 @@ import java.io.*;
 import java.util.*;
 import java.rmi.server.UID;
 import java.security.MessageDigest;
+
+import org.apache.commons.io.Charsets;
 import org.apache.commons.logging.*;
 import org.apache.hadoop.util.Options;
 import org.apache.hadoop.fs.*;
@@ -53,8 +55,9 @@ import org.apache.hadoop.util.Time;
  * <code>SequenceFile</code>s are flat files consisting of binary key/value 
  * pairs.
  * 
- * <p><code>SequenceFile</code> provides {@link Writer}, {@link Reader} and
- * {@link Sorter} classes for writing, reading and sorting respectively.</p>
+ * <p><code>SequenceFile</code> provides {@link SequenceFile.Writer},
+ * {@link SequenceFile.Reader} and {@link Sorter} classes for writing,
+ * reading and sorting respectively.</p>
  * 
  * There are three <code>SequenceFile</code> <code>Writer</code>s based on the 
  * {@link CompressionType} used to compress key/value pairs:
@@ -79,8 +82,8 @@ import org.apache.hadoop.util.Time;
  * <p>The recommended way is to use the static <tt>createWriter</tt> methods
  * provided by the <code>SequenceFile</code> to chose the preferred format.</p>
  *
- * <p>The {@link Reader} acts as the bridge and can read any of the above 
- * <code>SequenceFile</code> formats.</p>
+ * <p>The {@link SequenceFile.Reader} acts as the bridge and can read any of the
+ * above <code>SequenceFile</code> formats.</p>
  *
  * <h4 id="Formats">SequenceFile Formats</h4>
  * 
@@ -834,7 +837,9 @@ public class SequenceFile {
     DataOutputStream deflateOut = null;
     Metadata metadata = null;
     Compressor compressor = null;
-    
+
+    private boolean appendMode = false;
+
     protected Serializer keySerializer;
     protected Serializer uncompressedValSerializer;
     protected Serializer compressedValSerializer;
@@ -848,7 +853,7 @@ public class SequenceFile {
       try {                                       
         MessageDigest digester = MessageDigest.getInstance("MD5");
         long time = Time.now();
-        digester.update((new UID()+"@"+time).getBytes());
+        digester.update((new UID()+"@"+time).getBytes(Charsets.UTF_8));
         sync = digester.digest();
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -906,6 +911,13 @@ public class SequenceFile {
       }
     }
 
+    static class AppendIfExistsOption extends Options.BooleanOption implements
+        Option {
+      AppendIfExistsOption(boolean value) {
+        super(value);
+      }
+    }
+
     static class KeyClassOption extends Options.ClassOption implements Option {
       KeyClassOption(Class<?> value) {
         super(value);
@@ -955,7 +967,7 @@ public class SequenceFile {
         return codec;
       }
     }
-    
+
     public static Option file(Path value) {
       return new FileOption(value);
     }
@@ -981,6 +993,10 @@ public class SequenceFile {
       return new ReplicationOption(value);
     }
     
+    public static Option appendIfExists(boolean value) {
+      return new AppendIfExistsOption(value);
+    }
+
     public static Option blockSize(long value) {
       return new BlockSizeOption(value);
     }
@@ -1027,6 +1043,8 @@ public class SequenceFile {
       ProgressableOption progressOption = 
         Options.getOption(ProgressableOption.class, opts);
       FileOption fileOption = Options.getOption(FileOption.class, opts);
+      AppendIfExistsOption appendIfExistsOption = Options.getOption(
+          AppendIfExistsOption.class, opts);
       FileSystemOption fsOption = Options.getOption(FileSystemOption.class, opts);
       StreamOption streamOption = Options.getOption(StreamOption.class, opts);
       KeyClassOption keyClassOption = 
@@ -1068,7 +1086,54 @@ public class SequenceFile {
           blockSizeOption.getValue();
         Progressable progress = progressOption == null ? null :
           progressOption.getValue();
-        out = fs.create(p, true, bufferSize, replication, blockSize, progress);
+
+        if (appendIfExistsOption != null && appendIfExistsOption.getValue()
+            && fs.exists(p)) {
+
+          // Read the file and verify header details
+          SequenceFile.Reader reader = new SequenceFile.Reader(conf,
+              SequenceFile.Reader.file(p), new Reader.OnlyHeaderOption());
+          try {
+
+            if (keyClassOption.getValue() != reader.getKeyClass()
+                || valueClassOption.getValue() != reader.getValueClass()) {
+              throw new IllegalArgumentException(
+                  "Key/value class provided does not match the file");
+            }
+
+            if (reader.getVersion() != VERSION[3]) {
+              throw new VersionMismatchException(VERSION[3],
+                  reader.getVersion());
+            }
+
+            if (metadataOption != null) {
+              LOG.info("MetaData Option is ignored during append");
+            }
+            metadataOption = (MetadataOption) SequenceFile.Writer
+                .metadata(reader.getMetadata());
+
+            CompressionOption readerCompressionOption = new CompressionOption(
+                reader.getCompressionType(), reader.getCompressionCodec());
+
+            if (readerCompressionOption.value != compressionTypeOption.value
+                || !readerCompressionOption.codec.getClass().getName()
+                    .equals(compressionTypeOption.codec.getClass().getName())) {
+              throw new IllegalArgumentException(
+                  "Compression option provided does not match the file");
+            }
+
+            sync = reader.getSync();
+
+          } finally {
+            reader.close();
+          }
+
+          out = fs.append(p, bufferSize, progress);
+          this.appendMode = true;
+        } else {
+          out = fs
+              .create(p, true, bufferSize, replication, blockSize, progress);
+        }
       } else {
         out = streamOption.getValue();
       }
@@ -1156,7 +1221,7 @@ public class SequenceFile {
       out.write(sync);                       // write the sync bytes
       out.flush();                           // flush header
     }
-    
+
     /** Initialize. */
     @SuppressWarnings("unchecked")
     void init(Configuration conf, FSDataOutputStream out, boolean ownStream,
@@ -1211,7 +1276,12 @@ public class SequenceFile {
         }
         this.compressedValSerializer.open(deflateOut);
       }
-      writeFileHeader();
+
+      if (appendMode) {
+        sync();
+      } else {
+        writeFileHeader();
+      }
     }
     
     /** Returns the class of keys in this file. */
@@ -2042,6 +2112,14 @@ public class SequenceFile {
     /** Returns the compression codec of data in this file. */
     public CompressionCodec getCompressionCodec() { return codec; }
     
+    private byte[] getSync() {
+      return sync;
+    }
+
+    private byte getVersion() {
+      return version;
+    }
+
     /**
      * Get the compression type for this file.
      * @return the compression type
@@ -2676,7 +2754,7 @@ public class SequenceFile {
     /** Sort and merge files containing the named classes. */
     public Sorter(FileSystem fs, Class<? extends WritableComparable> keyClass,
                   Class valClass, Configuration conf)  {
-      this(fs, WritableComparator.get(keyClass), keyClass, valClass, conf);
+      this(fs, WritableComparator.get(keyClass, conf), keyClass, valClass, conf);
     }
 
     /** Sort and merge using an arbitrary {@link RawComparator}. */

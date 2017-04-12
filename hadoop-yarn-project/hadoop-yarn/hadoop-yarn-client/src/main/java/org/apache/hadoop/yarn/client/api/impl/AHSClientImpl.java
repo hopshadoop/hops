@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -47,10 +51,6 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.List;
-
 @Private
 @Unstable
 public class AHSClientImpl extends AHSClient {
@@ -77,9 +77,8 @@ public class AHSClientImpl extends AHSClient {
   @Override
   protected void serviceStart() throws Exception {
     try {
-      ahsClient = AHSProxy
-          .createAHSProxy(getConfig(), ApplicationHistoryProtocol.class,
-              this.ahsAddress);
+      ahsClient = AHSProxy.createAHSProxy(getConfig(),
+          ApplicationHistoryProtocol.class, this.ahsAddress);
     } catch (IOException e) {
       throw new YarnRuntimeException(e);
     }
@@ -97,58 +96,58 @@ public class AHSClientImpl extends AHSClient {
   @Override
   public ApplicationReport getApplicationReport(ApplicationId appId)
       throws YarnException, IOException {
-    GetApplicationReportRequest request =
-        GetApplicationReportRequest.newInstance(appId);
-    GetApplicationReportResponse response =
-        ahsClient.getApplicationReport(request);
+    GetApplicationReportRequest request = GetApplicationReportRequest
+        .newInstance(appId);
+    GetApplicationReportResponse response = ahsClient
+        .getApplicationReport(request);
     return response.getApplicationReport();
   }
 
   @Override
-  public List<ApplicationReport> getApplications()
-      throws YarnException, IOException {
-    GetApplicationsRequest request =
-        GetApplicationsRequest.newInstance(null, null);
+  public List<ApplicationReport> getApplications() throws YarnException,
+      IOException {
+    GetApplicationsRequest request = GetApplicationsRequest.newInstance(null,
+        null);
     GetApplicationsResponse response = ahsClient.getApplications(request);
     return response.getApplicationList();
   }
 
   @Override
   public ApplicationAttemptReport getApplicationAttemptReport(
-      ApplicationAttemptId applicationAttemptId)
-      throws YarnException, IOException {
-    GetApplicationAttemptReportRequest request =
-        GetApplicationAttemptReportRequest.newInstance(applicationAttemptId);
-    GetApplicationAttemptReportResponse response =
-        ahsClient.getApplicationAttemptReport(request);
+      ApplicationAttemptId applicationAttemptId) throws YarnException,
+      IOException {
+    GetApplicationAttemptReportRequest request = GetApplicationAttemptReportRequest
+        .newInstance(applicationAttemptId);
+    GetApplicationAttemptReportResponse response = ahsClient
+        .getApplicationAttemptReport(request);
     return response.getApplicationAttemptReport();
   }
 
   @Override
   public List<ApplicationAttemptReport> getApplicationAttempts(
       ApplicationId appId) throws YarnException, IOException {
-    GetApplicationAttemptsRequest request =
-        GetApplicationAttemptsRequest.newInstance(appId);
-    GetApplicationAttemptsResponse response =
-        ahsClient.getApplicationAttempts(request);
+    GetApplicationAttemptsRequest request = GetApplicationAttemptsRequest
+        .newInstance(appId);
+    GetApplicationAttemptsResponse response = ahsClient
+        .getApplicationAttempts(request);
     return response.getApplicationAttemptList();
   }
 
   @Override
   public ContainerReport getContainerReport(ContainerId containerId)
       throws YarnException, IOException {
-    GetContainerReportRequest request =
-        GetContainerReportRequest.newInstance(containerId);
+    GetContainerReportRequest request = GetContainerReportRequest
+        .newInstance(containerId);
     GetContainerReportResponse response = ahsClient.getContainerReport(request);
     return response.getContainerReport();
   }
 
   @Override
   public List<ContainerReport> getContainers(
-      ApplicationAttemptId applicationAttemptId)
-      throws YarnException, IOException {
-    GetContainersRequest request =
-        GetContainersRequest.newInstance(applicationAttemptId);
+      ApplicationAttemptId applicationAttemptId) throws YarnException,
+      IOException {
+    GetContainersRequest request = GetContainersRequest
+        .newInstance(applicationAttemptId);
     GetContainersResponse response = ahsClient.getContainers(request);
     return response.getContainerList();
   }

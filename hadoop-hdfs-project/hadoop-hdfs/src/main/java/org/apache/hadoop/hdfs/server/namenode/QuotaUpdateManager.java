@@ -37,11 +37,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.util.Daemon;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -171,6 +167,7 @@ public class QuotaUpdateManager {
         };
 
     List<QuotaUpdate> quotaUpdates = (List<QuotaUpdate>) findHandler.handle();
+    LOG.debug("processUpdates for inode id="+id+" quotaUpdates ids are "+ Arrays.toString(quotaUpdates.toArray()));
     applyBatchedUpdate(quotaUpdates);
   }
 
@@ -231,11 +228,12 @@ public class QuotaUpdateManager {
       @Override
       public Object performTask() throws IOException {
         INodeDirectory dir = (INodeDirectory) EntityManager
-            .find(INode.Finder.ByINodeId, updates.get(0).getInodeId());
+            .find(INode.Finder.ByINodeIdFTIS, updates.get(0).getInodeId());
         if (dir != null && SubtreeLockHelper
             .isSubtreeLocked(dir.isSubtreeLocked(), dir.getSubtreeLockOwner(),
                 namesystem.getNameNode().getActiveNameNodes()
-                    .getActiveNodes())) {
+                    .getActiveNodes()) && dir.getSubtreeLockOwner() != namesystem.getNamenodeId()) {
+          LOG.warn("XXXXXXXXXXXXXXX ignoring updates as the subtree lock is set");
           /*
            * We cannot process updates to keep move operations consistent. Otherwise the calculated size of the subtree
            * could differ from the view of the parent if outstanding quota updates are applied after being considered

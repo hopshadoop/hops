@@ -19,29 +19,24 @@
 package org.apache.hadoop.yarn.util;
 
 import org.junit.Test;
-
 import static org.junit.Assert.assertTrue;
 
 public class TestWindowsResourceCalculatorPlugin {
   
   
-  class WindowsResourceCalculatorPluginTester
-      extends WindowsResourceCalculatorPlugin {
+  class WindowsResourceCalculatorPluginTester extends WindowsResourceCalculatorPlugin {
     private String infoStr = null;
-
     @Override
     String getSystemInfoInfoFromShell() {
       return infoStr;
-    }
+    }    
   }
 
-  @Test(timeout = 30000)
+  @Test (timeout = 30000)
   public void parseSystemInfoString() {
-    WindowsResourceCalculatorPluginTester tester =
-        new WindowsResourceCalculatorPluginTester();
+    WindowsResourceCalculatorPluginTester tester = new WindowsResourceCalculatorPluginTester();
     // info str derived from windows shell command has \r\n termination
-    tester.infoStr =
-        "17177038848,8589467648,15232745472,6400417792,1,2805000,6261812\r\n";
+    tester.infoStr = "17177038848,8589467648,15232745472,6400417792,1,2805000,6261812\r\n";
     // call a method to refresh values
     tester.getAvailablePhysicalMemorySize();
     // verify information has been refreshed
@@ -55,42 +50,37 @@ public class TestWindowsResourceCalculatorPlugin {
     assertTrue(tester.cpuUsage == -1);
   }
 
-  @Test(timeout = 20000)
+  @Test (timeout = 20000)
   public void refreshAndCpuUsage() throws InterruptedException {
-    WindowsResourceCalculatorPluginTester tester =
-        new WindowsResourceCalculatorPluginTester();
+    WindowsResourceCalculatorPluginTester tester = new WindowsResourceCalculatorPluginTester();
     // info str derived from windows shell command has \r\n termination
-    tester.infoStr =
-        "17177038848,8589467648,15232745472,6400417792,1,2805000,6261812\r\n";
+    tester.infoStr = "17177038848,8589467648,15232745472,6400417792,1,2805000,6261812\r\n";
     tester.getAvailablePhysicalMemorySize();
     // verify information has been refreshed
     assertTrue(tester.memAvailable == 6400417792L);
     assertTrue(tester.cpuUsage == -1);
     
-    tester.infoStr =
-        "17177038848,8589467648,15232745472,5400417792,1,2805000,6261812\r\n";
+    tester.infoStr = "17177038848,8589467648,15232745472,5400417792,1,2805000,6261812\r\n";
     tester.getAvailablePhysicalMemorySize();
     // verify information has not been refreshed
     assertTrue(tester.memAvailable == 6400417792L);
     assertTrue(tester.cpuUsage == -1);
     
     Thread.sleep(1500);
-    tester.infoStr =
-        "17177038848,8589467648,15232745472,5400417792,1,2805000,6286812\r\n";
+    tester.infoStr = "17177038848,8589467648,15232745472,5400417792,1,2805000,6286812\r\n";
     tester.getAvailablePhysicalMemorySize();
     // verify information has been refreshed
     assertTrue(tester.memAvailable == 5400417792L);
     assertTrue(tester.cpuUsage >= 0.1);
   }
 
-  @Test(timeout = 20000)
+  @Test (timeout = 20000)
   public void errorInGetSystemInfo() {
-    WindowsResourceCalculatorPluginTester tester =
-        new WindowsResourceCalculatorPluginTester();
+    WindowsResourceCalculatorPluginTester tester = new WindowsResourceCalculatorPluginTester();
     // info str derived from windows shell command has \r\n termination
     tester.infoStr = null;
     // call a method to refresh values
-    tester.getAvailablePhysicalMemorySize();
+    tester.getAvailablePhysicalMemorySize();    
   }
 
 }

@@ -17,16 +17,13 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.monitor;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.yarn.event.EventHandler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ContainerPreemptEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.PreemptableResourceScheduler;
 
 public interface SchedulingEditPolicy {
 
-  public void init(Configuration config,
-      EventHandler<ContainerPreemptEvent> dispatcher,
+  public void init(Configuration config, RMContext context,
       PreemptableResourceScheduler scheduler);
 
   /**
@@ -34,7 +31,7 @@ public interface SchedulingEditPolicy {
    * allowed to track containers and affect the scheduler. The "actions"
    * performed are passed back through an EventHandler.
    */
-  public void editSchedule(TransactionState transactionState);
+  public void editSchedule();
 
   public long getMonitoringInterval();
 

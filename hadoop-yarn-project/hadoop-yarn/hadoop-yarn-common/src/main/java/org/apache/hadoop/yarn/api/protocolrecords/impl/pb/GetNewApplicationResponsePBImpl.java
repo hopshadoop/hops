@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
@@ -32,11 +31,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNewApplicationResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNewApplicationResponseProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
 public class GetNewApplicationResponsePBImpl extends GetNewApplicationResponse {
-  GetNewApplicationResponseProto proto =
-      GetNewApplicationResponseProto.getDefaultInstance();
+  GetNewApplicationResponseProto proto = GetNewApplicationResponseProto.getDefaultInstance();
   GetNewApplicationResponseProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -53,7 +53,7 @@ public class GetNewApplicationResponsePBImpl extends GetNewApplicationResponse {
   }
   
   public GetNewApplicationResponseProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -66,9 +66,8 @@ public class GetNewApplicationResponsePBImpl extends GetNewApplicationResponse {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -85,15 +84,13 @@ public class GetNewApplicationResponsePBImpl extends GetNewApplicationResponse {
       builder.setApplicationId(convertToProtoFormat(this.applicationId));
     }
     if (maximumResourceCapability != null) {
-      builder.setMaximumCapability(
-          convertToProtoFormat(this.maximumResourceCapability));
+    	builder.setMaximumCapability(convertToProtoFormat(this.maximumResourceCapability));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -105,7 +102,7 @@ public class GetNewApplicationResponsePBImpl extends GetNewApplicationResponse {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public ApplicationId getApplicationId() {
@@ -125,9 +122,8 @@ public class GetNewApplicationResponsePBImpl extends GetNewApplicationResponse {
   @Override
   public void setApplicationId(ApplicationId applicationId) {
     maybeInitBuilder();
-    if (applicationId == null) {
+    if (applicationId == null) 
       builder.clearApplicationId();
-    }
     this.applicationId = applicationId;
   }
 
@@ -136,40 +132,39 @@ public class GetNewApplicationResponsePBImpl extends GetNewApplicationResponse {
     if (this.maximumResourceCapability != null) {
       return this.maximumResourceCapability;
     }
-
+ 
     GetNewApplicationResponseProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasMaximumCapability()) {
       return null;
     }
     
-    this.maximumResourceCapability =
-        convertFromProtoFormat(p.getMaximumCapability());
+    this.maximumResourceCapability = convertFromProtoFormat(p.getMaximumCapability());
     return this.maximumResourceCapability;
   }
 
   @Override
   public void setMaximumResourceCapability(Resource capability) {
     maybeInitBuilder();
-    if (maximumResourceCapability == null) {
+    if(maximumResourceCapability == null) {
       builder.clearMaximumCapability();
     }
     this.maximumResourceCapability = capability;
   }
-
+ 
   private ApplicationIdPBImpl convertFromProtoFormat(ApplicationIdProto p) {
     return new ApplicationIdPBImpl(p);
   }
 
   private ApplicationIdProto convertToProtoFormat(ApplicationId t) {
-    return ((ApplicationIdPBImpl) t).getProto();
+    return ((ApplicationIdPBImpl)t).getProto();
   }
   
   private Resource convertFromProtoFormat(ResourceProto resource) {
-    return new ResourcePBImpl(resource);
+	  return new ResourcePBImpl(resource);
   }
 
   private ResourceProto convertToProtoFormat(Resource resource) {
-    return ((ResourcePBImpl) resource).getProto();
+	  return ((ResourcePBImpl)resource).getProto();
   }
 
 }  

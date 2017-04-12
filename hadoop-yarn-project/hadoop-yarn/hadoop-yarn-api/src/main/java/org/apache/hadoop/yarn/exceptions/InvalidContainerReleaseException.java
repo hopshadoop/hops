@@ -38,7 +38,8 @@ public class InvalidContainerReleaseException extends YarnException {
     super(message);
   }
   
-  public InvalidContainerReleaseException(String message, Throwable cause) {
+  public InvalidContainerReleaseException(String message,
+      Throwable cause) {
     super(message, cause);
   }
 }

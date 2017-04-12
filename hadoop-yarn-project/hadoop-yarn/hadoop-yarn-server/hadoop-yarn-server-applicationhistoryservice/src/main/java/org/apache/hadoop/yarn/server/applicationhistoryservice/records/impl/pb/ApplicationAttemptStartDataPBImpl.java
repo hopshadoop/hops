@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationAttemptIdPBImpl;
@@ -29,11 +28,13 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationAttemptIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationAttemptStartData;
 
-public class ApplicationAttemptStartDataPBImpl
-    extends ApplicationAttemptStartData {
+import com.google.protobuf.TextFormat;
 
-  ApplicationAttemptStartDataProto proto =
-      ApplicationAttemptStartDataProto.getDefaultInstance();
+public class ApplicationAttemptStartDataPBImpl extends
+    ApplicationAttemptStartData {
+
+  ApplicationAttemptStartDataProto proto = ApplicationAttemptStartDataProto
+    .getDefaultInstance();
   ApplicationAttemptStartDataProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -65,8 +66,8 @@ public class ApplicationAttemptStartDataPBImpl
   }
 
   @Override
-  public void setApplicationAttemptId(
-      ApplicationAttemptId applicationAttemptId) {
+  public void
+      setApplicationAttemptId(ApplicationAttemptId applicationAttemptId) {
     maybeInitBuilder();
     if (applicationAttemptId == null) {
       builder.clearApplicationAttemptId();
@@ -141,9 +142,8 @@ public class ApplicationAttemptStartDataPBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -156,17 +156,17 @@ public class ApplicationAttemptStartDataPBImpl
   }
 
   private void mergeLocalToBuilder() {
-    if (this.applicationAttemptId != null &&
-        !((ApplicationAttemptIdPBImpl) this.applicationAttemptId).getProto()
-            .equals(builder.getApplicationAttemptId())) {
-      builder.setApplicationAttemptId(
-          convertToProtoFormat(this.applicationAttemptId));
-    }
-    if (this.masterContainerId != null &&
-        !((ContainerIdPBImpl) this.masterContainerId).getProto()
-            .equals(builder.getMasterContainerId())) {
+    if (this.applicationAttemptId != null
+        && !((ApplicationAttemptIdPBImpl) this.applicationAttemptId).getProto()
+          .equals(builder.getApplicationAttemptId())) {
       builder
-          .setMasterContainerId(convertToProtoFormat(this.masterContainerId));
+        .setApplicationAttemptId(convertToProtoFormat(this.applicationAttemptId));
+    }
+    if (this.masterContainerId != null
+        && !((ContainerIdPBImpl) this.masterContainerId).getProto().equals(
+          builder.getMasterContainerId())) {
+      builder
+        .setMasterContainerId(convertToProtoFormat(this.masterContainerId));
     }
   }
 
@@ -196,8 +196,8 @@ public class ApplicationAttemptStartDataPBImpl
     return ((ApplicationAttemptIdPBImpl) applicationAttemptId).getProto();
   }
 
-  private ContainerIdPBImpl convertFromProtoFormat(
-      ContainerIdProto containerId) {
+  private ContainerIdPBImpl
+      convertFromProtoFormat(ContainerIdProto containerId) {
     return new ContainerIdPBImpl(containerId);
   }
 

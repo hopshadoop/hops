@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.yarn.webapp;
 
-import com.google.inject.Singleton;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.ext.Provider;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.codehaus.jackson.jaxrs.JacksonJaxbJsonProvider;
@@ -27,8 +29,7 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
 import org.codehaus.jackson.xc.JaxbAnnotationIntrospector;
 
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.ext.Provider;
+import com.google.inject.Singleton;
 
 /**
  * YARN's implementation of JAX-RS abstractions based on
@@ -48,10 +49,14 @@ public class YarnJacksonJaxbJsonProvider extends JacksonJaxbJsonProvider {
   @Override
   public ObjectMapper locateMapper(Class<?> type, MediaType mediaType) {
     ObjectMapper mapper = super.locateMapper(type, mediaType);
-    AnnotationIntrospector introspector = new JaxbAnnotationIntrospector();
-    mapper.setAnnotationIntrospector(introspector);
-    mapper.getSerializationConfig()
-        .setSerializationInclusion(Inclusion.NON_NULL);
+    configObjectMapper(mapper);
     return mapper;
   }
+
+  public static void configObjectMapper(ObjectMapper mapper) {
+    AnnotationIntrospector introspector = new JaxbAnnotationIntrospector();
+    mapper.setAnnotationIntrospector(introspector);
+    mapper.setSerializationInclusion(Inclusion.NON_NULL);
+  }
+
 }

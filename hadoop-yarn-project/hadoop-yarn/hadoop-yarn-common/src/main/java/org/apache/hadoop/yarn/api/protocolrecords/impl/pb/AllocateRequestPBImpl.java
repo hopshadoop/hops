@@ -19,7 +19,10 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
@@ -38,9 +41,7 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ResourceRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.AllocateRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.AllocateRequestProtoOrBuilder;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
@@ -77,9 +78,8 @@ public class AllocateRequestPBImpl extends AllocateRequest {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -107,9 +107,8 @@ public class AllocateRequestPBImpl extends AllocateRequest {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -154,7 +153,7 @@ public class AllocateRequestPBImpl extends AllocateRequest {
   
   @Override
   public void setAskList(final List<ResourceRequest> resourceRequests) {
-    if (resourceRequests == null) {
+    if(resourceRequests == null) {
       return;
     }
     initAsks();
@@ -193,8 +192,7 @@ public class AllocateRequestPBImpl extends AllocateRequest {
   }
 
   @Override
-  public void setResourceBlacklistRequest(
-      ResourceBlacklistRequest blacklistRequest) {
+  public void setResourceBlacklistRequest(ResourceBlacklistRequest blacklistRequest) {
     maybeInitBuilder();
     if (blacklistRequest == null) {
       builder.clearBlacklistRequest();
@@ -218,36 +216,34 @@ public class AllocateRequestPBImpl extends AllocateRequest {
   private void addAsksToProto() {
     maybeInitBuilder();
     builder.clearAsk();
-    if (ask == null) {
+    if (ask == null)
       return;
-    }
-    Iterable<ResourceRequestProto> iterable =
-        new Iterable<ResourceRequestProto>() {
+    Iterable<ResourceRequestProto> iterable = new Iterable<ResourceRequestProto>() {
+      @Override
+      public Iterator<ResourceRequestProto> iterator() {
+        return new Iterator<ResourceRequestProto>() {
+
+          Iterator<ResourceRequest> iter = ask.iterator();
+
           @Override
-          public Iterator<ResourceRequestProto> iterator() {
-            return new Iterator<ResourceRequestProto>() {
+          public boolean hasNext() {
+            return iter.hasNext();
+          }
 
-              Iterator<ResourceRequest> iter = ask.iterator();
+          @Override
+          public ResourceRequestProto next() {
+            return convertToProtoFormat(iter.next());
+          }
 
-              @Override
-              public boolean hasNext() {
-                return iter.hasNext();
-              }
-
-              @Override
-              public ResourceRequestProto next() {
-                return convertToProtoFormat(iter.next());
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-
-              }
-            };
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
 
           }
         };
+
+      }
+    };
     builder.addAllAsk(iterable);
   }
   
@@ -306,10 +302,9 @@ public class AllocateRequestPBImpl extends AllocateRequest {
     initReleases();
     return this.release;
   }
-
   @Override
   public void setReleaseList(List<ContainerId> releaseContainers) {
-    if (releaseContainers == null) {
+    if(releaseContainers == null) {
       return;
     }
     initReleases();
@@ -333,9 +328,8 @@ public class AllocateRequestPBImpl extends AllocateRequest {
   private void addReleasesToProto() {
     maybeInitBuilder();
     builder.clearRelease();
-    if (release == null) {
+    if (release == null)
       return;
-    }
     Iterable<ContainerIdProto> iterable = new Iterable<ContainerIdProto>() {
       @Override
       public Iterator<ContainerIdProto> iterator() {
@@ -370,7 +364,7 @@ public class AllocateRequestPBImpl extends AllocateRequest {
   }
 
   private ResourceRequestProto convertToProtoFormat(ResourceRequest t) {
-    return ((ResourceRequestPBImpl) t).getProto();
+    return ((ResourceRequestPBImpl)t).getProto();
   }
   
   private ContainerResourceIncreaseRequestPBImpl convertFromProtoFormat(
@@ -388,16 +382,14 @@ public class AllocateRequestPBImpl extends AllocateRequest {
   }
 
   private ContainerIdProto convertToProtoFormat(ContainerId t) {
-    return ((ContainerIdPBImpl) t).getProto();
+    return ((ContainerIdPBImpl)t).getProto();
   }
   
-  private ResourceBlacklistRequestPBImpl convertFromProtoFormat(
-      ResourceBlacklistRequestProto p) {
+  private ResourceBlacklistRequestPBImpl convertFromProtoFormat(ResourceBlacklistRequestProto p) {
     return new ResourceBlacklistRequestPBImpl(p);
   }
 
-  private ResourceBlacklistRequestProto convertToProtoFormat(
-      ResourceBlacklistRequest t) {
-    return ((ResourceBlacklistRequestPBImpl) t).getProto();
+  private ResourceBlacklistRequestProto convertToProtoFormat(ResourceBlacklistRequest t) {
+    return ((ResourceBlacklistRequestPBImpl)t).getProto();
   }
 }  

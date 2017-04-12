@@ -75,6 +75,14 @@ public class JobSubmissionFiles {
   public static Path getJobDistCacheFiles(Path jobSubmitDir) {
     return new Path(jobSubmitDir, "files");
   }
+  
+  /**
+   * Get the job distributed cache path for log4j properties.
+   * @param jobSubmitDir
+   */
+  public static Path getJobLog4jFile(Path jobSubmitDir) {
+    return new Path(jobSubmitDir, "log4j");
+  }
   /**
    * Get the job distributed cache archives path.
    * @param jobSubmitDir 
@@ -92,7 +100,7 @@ public class JobSubmissionFiles {
 
   /**
    * Initializes the staging directory and returns the path. It also
-   * keeps track of all necessary ownership & permissions
+   * keeps track of all necessary ownership and permissions
    * @param cluster
    * @param conf
    */

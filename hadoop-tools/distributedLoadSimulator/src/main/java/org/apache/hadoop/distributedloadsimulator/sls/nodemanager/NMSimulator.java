@@ -89,12 +89,12 @@ public class NMSimulator extends TaskRunner.Task {
           throws IOException, YarnException, ClassNotFoundException {
     super.init(dispatchTime, dispatchTime + 1000000L * heartBeatInterval,
             heartBeatInterval);
-    conf.setClass(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
+    conf.setClass(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
             ConfiguredLeastLoadedRMFailoverHAProxyProvider.class,
             RMFailoverProxyProvider.class);
     Class<? extends RMFailoverProxyProvider> defaultProviderClass
             = (Class<? extends RMFailoverProxyProvider>) Class.forName(
-                    YarnConfiguration.DEFAULT_CLIENT_FAILOVER_PROXY_PROVIDER);
+                    YarnConfiguration.DEFAULT_LEADER_CLIENT_FAILOVER_PROXY_PROVIDER);
     this.resourceTracker = ServerRMProxy.createRMProxy(conf,
             ResourceTracker.class,
             conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
@@ -121,8 +121,10 @@ public class NMSimulator extends TaskRunner.Task {
     req.setNodeId(node.getNodeID());
     req.setResource(node.getTotalCapability());
     req.setHttpPort(80);
+    LOG.info("send registration request " + node.getNodeID());
     RegisterNodeManagerResponse response = resourceTracker.registerNodeManager(
             req);
+    LOG.info("registration done " + node.getNodeID());
     masterKey = response.getNMTokenMasterKey();
     containerMasterKey = response.getContainerTokenMasterKey();
   }
@@ -205,7 +207,7 @@ public class NMSimulator extends TaskRunner.Task {
 //      }
       
       if( interval >1500){
-        LOG.error("this hb was too slow: " + node.getNodeID() + " : " + RESPONSE_ID + " " + interval + " " + duration);
+        LOG.debug("this hb was too slow: " + node.getNodeID() + " : " + RESPONSE_ID + " " + interval + " " + duration);
       }
       last = System.currentTimeMillis();
       if (duration > 1000) {
@@ -219,7 +221,7 @@ public class NMSimulator extends TaskRunner.Task {
         nbTrueHb++;
       }
       float percentTrueHb= (float) nbTrueHb/theoric;
-      LOG.info("percent hb " + node.getNodeID() + " " + percentHb + ", truehb "  + percentTrueHb);
+      LOG.debug("percent hb " + node.getNodeID() + " " + percentHb + ", truehb "  + percentTrueHb);
       if (!beatResponse.getContainersToCleanup().isEmpty()) {
         // remove from queue
         synchronized (releasedContainerList) {

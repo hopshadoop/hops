@@ -17,14 +17,15 @@
  */
 package org.apache.hadoop.security;
 
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Hashtable;
 import java.util.List;
 
-import javax.naming.CommunicationException;
 import javax.naming.Context;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
@@ -34,6 +35,7 @@ import javax.naming.directory.InitialDirContext;
 import javax.naming.directory.SearchControls;
 import javax.naming.directory.SearchResult;
 
+import org.apache.commons.io.Charsets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -175,8 +177,8 @@ public class LdapGroupsMapping
   private String groupMemberAttr;
   private String groupNameAttr;
 
-  public static int RECONNECT_RETRY_COUNT = 3;
-  
+  public static final int RECONNECT_RETRY_COUNT = 3;
+
   /**
    * Returns list of groups for a user.
    * 
@@ -188,38 +190,26 @@ public class LdapGroupsMapping
    * @return list of groups for a given user
    */
   @Override
-  public synchronized List<String> getGroups(String user) throws IOException {
-    List<String> emptyResults = new ArrayList<String>();
+  public synchronized List<String> getGroups(String user) {
     /*
      * Normal garbage collection takes care of removing Context instances when they are no longer in use. 
      * Connections used by Context instances being garbage collected will be closed automatically.
      * So in case connection is closed and gets CommunicationException, retry some times with new new DirContext/connection. 
      */
-    try {
-      return doGetGroups(user);
-    } catch (CommunicationException e) {
-      LOG.warn("Connection is closed, will try to reconnect");
-    } catch (NamingException e) {
-      LOG.warn("Exception trying to get groups for user " + user, e);
-      return emptyResults;
-    }
-
-    int retryCount = 0;
-    while (retryCount ++ < RECONNECT_RETRY_COUNT) {
-      //reset ctx so that new DirContext can be created with new connection
-      this.ctx = null;
-      
+    for(int retry = 0; retry < RECONNECT_RETRY_COUNT; retry++) {
       try {
         return doGetGroups(user);
-      } catch (CommunicationException e) {
-        LOG.warn("Connection being closed, reconnecting failed, retryCount = " + retryCount);
       } catch (NamingException e) {
-        LOG.warn("Exception trying to get groups for user " + user, e);
-        return emptyResults;
+        LOG.warn("Failed to get groups for user " + user + " (retry=" + retry
+            + ") by " + e);
+        LOG.trace("TRACE", e);
       }
+      
+      //reset ctx so that new DirContext can be created with new connection
+      this.ctx = null;
     }
     
-    return emptyResults;
+    return Collections.emptyList();
   }
   
   List<String> doGetGroups(String user) throws NamingException {
@@ -247,7 +237,9 @@ public class LdapGroupsMapping
         groups.add(groupName.get().toString());
       }
     }
-
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("doGetGroups(" + user + ") return " + groups);
+    }
     return groups;
   }
 
@@ -309,15 +301,15 @@ public class LdapGroupsMapping
     useSsl = conf.getBoolean(LDAP_USE_SSL_KEY, LDAP_USE_SSL_DEFAULT);
     keystore = conf.get(LDAP_KEYSTORE_KEY, LDAP_KEYSTORE_DEFAULT);
     
-    keystorePass =
-        conf.get(LDAP_KEYSTORE_PASSWORD_KEY, LDAP_KEYSTORE_PASSWORD_DEFAULT);
+    keystorePass = getPassword(conf, LDAP_KEYSTORE_PASSWORD_KEY,
+        LDAP_KEYSTORE_PASSWORD_DEFAULT);
     if (keystorePass.isEmpty()) {
-      keystorePass = extractPassword(
-        conf.get(LDAP_KEYSTORE_PASSWORD_KEY, LDAP_KEYSTORE_PASSWORD_DEFAULT));
+      keystorePass = extractPassword(conf.get(LDAP_KEYSTORE_PASSWORD_FILE_KEY,
+          LDAP_KEYSTORE_PASSWORD_FILE_DEFAULT));
     }
     
     bindUser = conf.get(BIND_USER_KEY, BIND_USER_DEFAULT);
-    bindPassword = conf.get(BIND_PASSWORD_KEY, BIND_PASSWORD_DEFAULT);
+    bindPassword = getPassword(conf, BIND_PASSWORD_KEY, BIND_PASSWORD_DEFAULT);
     if (bindPassword.isEmpty()) {
       bindPassword = extractPassword(
           conf.get(BIND_PASSWORD_FILE_KEY, BIND_PASSWORD_FILE_DEFAULT));
@@ -335,26 +327,45 @@ public class LdapGroupsMapping
 
     int dirSearchTimeout = conf.getInt(DIRECTORY_SEARCH_TIMEOUT, DIRECTORY_SEARCH_TIMEOUT_DEFAULT);
     SEARCH_CONTROLS.setTimeLimit(dirSearchTimeout);
+    // Limit the attributes returned to only those required to speed up the search. See HADOOP-10626 for more details.
+    SEARCH_CONTROLS.setReturningAttributes(new String[] {groupNameAttr});
 
     this.conf = conf;
   }
-  
+
+  String getPassword(Configuration conf, String alias, String defaultPass) {
+    String password = null;
+    try {
+      char[] passchars = conf.getPassword(alias);
+      if (passchars != null) {
+        password = new String(passchars);
+      }
+      else {
+        password = defaultPass;
+      }
+    }
+    catch (IOException ioe) {
+      LOG.warn("Exception while trying to password for alias " + alias + ": "
+          + ioe.getMessage());
+    }
+    return password;
+  }
+
   String extractPassword(String pwFile) {
     if (pwFile.isEmpty()) {
       // If there is no password file defined, we'll assume that we should do
       // an anonymous bind
       return "";
     }
-    
-    try {
-      StringBuilder password = new StringBuilder();
-      Reader reader = new FileReader(pwFile);
+
+    StringBuilder password = new StringBuilder();
+    try (Reader reader = new InputStreamReader(
+        new FileInputStream(pwFile), Charsets.UTF_8)) {
       int c = reader.read();
       while (c > -1) {
         password.append((char)c);
         c = reader.read();
       }
-      reader.close();
       return password.toString().trim();
     } catch (IOException ioe) {
       throw new RuntimeException("Could not read password file: " + pwFile, ioe);

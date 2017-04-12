@@ -18,6 +18,13 @@
 
 package org.apache.hadoop.yarn.client;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -27,13 +34,6 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -52,7 +52,7 @@ public class ConfiguredRMFailoverProxyProvider<T>
 
   @Override
   public void init(Configuration configuration, RMProxy<T> rmProxy,
-      Class<T> protocol) {
+                    Class<T> protocol) {
     this.rmProxy = rmProxy;
     this.protocol = protocol;
     this.rmProxy.checkAllowedProtocols(this.protocol);
@@ -61,14 +61,13 @@ public class ConfiguredRMFailoverProxyProvider<T>
     this.rmServiceIds = rmIds.toArray(new String[rmIds.size()]);
     conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds[currentProxyIndex]);
 
-    conf.setInt(
-        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
+    conf.setInt(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
         conf.getInt(YarnConfiguration.CLIENT_FAILOVER_RETRIES,
             YarnConfiguration.DEFAULT_CLIENT_FAILOVER_RETRIES));
 
     conf.setInt(CommonConfigurationKeysPublic.
-            IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY, conf.getInt(
-            YarnConfiguration.CLIENT_FAILOVER_RETRIES_ON_SOCKET_TIMEOUTS,
+        IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY,
+        conf.getInt(YarnConfiguration.CLIENT_FAILOVER_RETRIES_ON_SOCKET_TIMEOUTS,
             YarnConfiguration.DEFAULT_CLIENT_FAILOVER_RETRIES_ON_SOCKET_TIMEOUTS));
   }
 
@@ -114,7 +113,7 @@ public class ConfiguredRMFailoverProxyProvider<T>
   public synchronized void close() throws IOException {
     for (T proxy : proxies.values()) {
       if (proxy instanceof Closeable) {
-        ((Closeable) proxy).close();
+        ((Closeable)proxy).close();
       } else {
         RPC.stopProxy(proxy);
       }

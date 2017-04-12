@@ -68,6 +68,10 @@ call :updatepath %HADOOP_BIN_PATH%
     shift
     shift
   )
+  if "%1" == "--loglevel" (
+    shift
+    shift
+  )
 
   set hadoop-command=%1
   if not defined hadoop-command (
@@ -115,11 +119,14 @@ call :updatepath %HADOOP_BIN_PATH%
   )
 
   if %hadoop-command% == classpath (
-    @echo %CLASSPATH%
-    goto :eof
+    if not defined hadoop-command-arguments (
+      @rem No need to bother starting up a JVM for this simple case.
+      @echo %CLASSPATH%
+      exit /b
+    )
   )
   
-  set corecommands=fs version jar checknative distcp daemonlog archive
+  set corecommands=fs version jar checknative distcp daemonlog archive classpath credential key
   for %%i in ( %corecommands% ) do (
     if %hadoop-command% == %%i set corecommand=true  
   )
@@ -154,6 +161,11 @@ call :updatepath %HADOOP_BIN_PATH%
   goto :eof
 
 :jar
+  if defined YARN_OPTS (
+    @echo WARNING: Use "yarn jar" to launch YARN applications. 1>&2
+  ) else if defined YARN_CLIENT_OPTS (
+    @echo WARNING: Use "yarn jar" to launch YARN applications. 1>&2
+  )
   set CLASS=org.apache.hadoop.util.RunJar
   goto :eof
 
@@ -173,6 +185,18 @@ call :updatepath %HADOOP_BIN_PATH%
 :archive
   set CLASS=org.apache.hadoop.tools.HadoopArchives
   set CLASSPATH=%CLASSPATH%;%TOOL_PATH%
+  goto :eof
+
+:classpath
+  set CLASS=org.apache.hadoop.util.Classpath
+  goto :eof
+
+:credential
+  set CLASS=org.apache.hadoop.security.alias.CredentialShell
+  goto :eof
+
+:key
+  set CLASS=org.apache.hadoop.crypto.key.KeyShell
   goto :eof
 
 :updatepath
@@ -203,6 +227,10 @@ call :updatepath %HADOOP_BIN_PATH%
     shift
     shift
   )
+  if "%1" == "--loglevel" (
+    shift
+    shift
+  )
   if [%2] == [] goto :eof
   shift
   set _arguments=
@@ -221,16 +249,20 @@ call :updatepath %HADOOP_BIN_PATH%
   goto :eof
 
 :print_usage
-  @echo Usage: hadoop [--config confdir] COMMAND
+  @echo Usage: hadoop [--config confdir] [--loglevel loglevel] COMMAND
   @echo where COMMAND is one of:
   @echo   fs                   run a generic filesystem user client
   @echo   version              print the version
   @echo   jar ^<jar^>            run a jar file
+  @echo                        note: please use "yarn jar" to launch
+  @echo                              YARN applications, not this command.
   @echo   checknative [-a^|-h]  check native hadoop and compression libraries availability
   @echo   distcp ^<srcurl^> ^<desturl^> copy file or directories recursively
   @echo   archive -archiveName NAME -p ^<parent path^> ^<src^>* ^<dest^> create a hadoop archive
   @echo   classpath            prints the class path needed to get the
   @echo                        Hadoop jar and the required libraries
+  @echo   credential           interact with credential providers
+  @echo   key                  manage keys via the KeyProvider
   @echo   daemonlog            get/set the log level for each daemon
   @echo  or
   @echo   CLASSNAME            run the class named CLASSNAME

@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
-import org.apache.hadoop.yarn.api.records.Resource;
-
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
+
+import org.apache.hadoop.yarn.api.records.Resource;
 
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -49,5 +49,13 @@ public class ResourceInfo {
   @Override
   public String toString() {
     return "<memory:" + memory + ", vCores:" + vCores + ">";
+  }
+
+  public void setMemory(int memory) {
+    this.memory = memory;
+  }
+
+  public void setvCores(int vCores) {
+    this.vCores = vCores;
   }
 }

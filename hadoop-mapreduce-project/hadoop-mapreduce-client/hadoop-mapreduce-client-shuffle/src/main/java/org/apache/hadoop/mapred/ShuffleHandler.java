@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapred;
 
+import static org.fusesource.leveldbjni.JniDBFactory.asString;
+import static org.fusesource.leveldbjni.JniDBFactory.bytes;
 import static org.jboss.netty.buffer.ChannelBuffers.wrappedBuffer;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
 import static org.jboss.netty.handler.codec.http.HttpMethod.GET;
@@ -47,6 +49,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 import javax.crypto.SecretKey;
@@ -60,6 +63,8 @@ import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.ReadaheadPool;
 import org.apache.hadoop.io.SecureIOUtils;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.proto.ShuffleHandlerRecoveryProtos.JobShuffleInfoProto;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
@@ -72,16 +77,27 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterInt;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.VersionProto;
 import org.apache.hadoop.yarn.server.api.ApplicationInitializationContext;
 import org.apache.hadoop.yarn.server.api.ApplicationTerminationContext;
 import org.apache.hadoop.yarn.server.api.AuxiliaryService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ContainerLocalizer;
+import org.apache.hadoop.yarn.server.records.Version;
+import org.apache.hadoop.yarn.server.records.impl.pb.VersionPBImpl;
+import org.apache.hadoop.yarn.server.utils.LeveldbIterator;
 import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.fusesource.leveldbjni.JniDBFactory;
+import org.fusesource.leveldbjni.internal.NativeDB;
+import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBException;
+import org.iq80.leveldb.Logger;
+import org.iq80.leveldb.Options;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
@@ -113,8 +129,10 @@ import org.jboss.netty.handler.stream.ChunkedWriteHandler;
 import org.jboss.netty.util.CharsetUtil;
 import org.mortbay.jetty.HttpHeaders;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.ByteString;
 
 public class ShuffleHandler extends AuxiliaryService {
 
@@ -132,6 +150,11 @@ public class ShuffleHandler extends AuxiliaryService {
       "^.*(?:connection.*reset|connection.*closed|broken.*pipe).*$",
       Pattern.CASE_INSENSITIVE);
 
+  private static final String STATE_DB_NAME = "mapreduce_shuffle_state";
+  private static final String STATE_DB_SCHEMA_VERSION_KEY = "shuffle-schema-version";
+  protected static final Version CURRENT_VERSION_INFO = 
+      Version.newInstance(1, 0);
+
   private int port;
   private ChannelFactory selector;
   private final ChannelGroup accepted = new DefaultChannelGroup();
@@ -147,15 +170,16 @@ public class ShuffleHandler extends AuxiliaryService {
   private int maxShuffleConnections;
   private int shuffleBufferSize;
   private boolean shuffleTransferToAllowed;
+  private int maxSessionOpenFiles;
   private ReadaheadPool readaheadPool = ReadaheadPool.getInstance();
+
+  private Map<String,String> userRsrc;
+  private JobTokenSecretManager secretManager;
+
+  private DB stateDb = null;
 
   public static final String MAPREDUCE_SHUFFLE_SERVICEID =
       "mapreduce_shuffle";
-
-  private static final Map<String,String> userRsrc =
-    new ConcurrentHashMap<String,String>();
-  private static final JobTokenSecretManager secretManager =
-    new JobTokenSecretManager();
 
   public static final String SHUFFLE_PORT_CONFIG_KEY = "mapreduce.shuffle.port";
   public static final int DEFAULT_SHUFFLE_PORT = 13562;
@@ -197,6 +221,13 @@ public class ShuffleHandler extends AuxiliaryService {
   public static final boolean WINDOWS_DEFAULT_SHUFFLE_TRANSFERTO_ALLOWED = 
       false;
 
+  /* the maximum number of files a single GET request can
+   open simultaneously during shuffle
+   */
+  public static final String SHUFFLE_MAX_SESSION_OPEN_FILES =
+      "mapreduce.shuffle.max.session-open-files";
+  public static final int DEFAULT_SHUFFLE_MAX_SESSION_OPEN_FILES = 3;
+
   boolean connectionKeepAliveEnabled = false;
   int connectionKeepAliveTimeOut;
   int mapOutputMetaInfoCacheSize;
@@ -224,6 +255,104 @@ public class ShuffleHandler extends AuxiliaryService {
   }
 
   final ShuffleMetrics metrics;
+
+  class ReduceMapFileCount implements ChannelFutureListener {
+
+    private ReduceContext reduceContext;
+
+    public ReduceMapFileCount(ReduceContext rc) {
+      this.reduceContext = rc;
+    }
+
+    @Override
+    public void operationComplete(ChannelFuture future) throws Exception {
+      if (!future.isSuccess()) {
+        future.getChannel().close();
+        return;
+      }
+      int waitCount = this.reduceContext.getMapsToWait().decrementAndGet();
+      if (waitCount == 0) {
+        metrics.operationComplete(future);
+        future.getChannel().close();
+      } else {
+        pipelineFact.getSHUFFLE().sendMap(reduceContext);
+      }
+    }
+  }
+
+  /**
+   * Maintain parameters per messageReceived() Netty context.
+   * Allows sendMapOutput calls from operationComplete()
+   */
+  private static class ReduceContext {
+
+    private List<String> mapIds;
+    private AtomicInteger mapsToWait;
+    private AtomicInteger mapsToSend;
+    private int reduceId;
+    private ChannelHandlerContext ctx;
+    private String user;
+    private Map<String, Shuffle.MapOutputInfo> infoMap;
+    private String outputBasePathStr;
+
+    public ReduceContext(List<String> mapIds, int rId,
+                         ChannelHandlerContext context, String usr,
+                         Map<String, Shuffle.MapOutputInfo> mapOutputInfoMap,
+                         String outputBasePath) {
+
+      this.mapIds = mapIds;
+      this.reduceId = rId;
+      /**
+      * Atomic count for tracking the no. of map outputs that are yet to
+      * complete. Multiple futureListeners' operationComplete() can decrement
+      * this value asynchronously. It is used to decide when the channel should
+      * be closed.
+      */
+      this.mapsToWait = new AtomicInteger(mapIds.size());
+      /**
+      * Atomic count for tracking the no. of map outputs that have been sent.
+      * Multiple sendMap() calls can increment this value
+      * asynchronously. Used to decide which mapId should be sent next.
+      */
+      this.mapsToSend = new AtomicInteger(0);
+      this.ctx = context;
+      this.user = usr;
+      this.infoMap = mapOutputInfoMap;
+      this.outputBasePathStr = outputBasePath;
+    }
+
+    public int getReduceId() {
+      return reduceId;
+    }
+
+    public ChannelHandlerContext getCtx() {
+      return ctx;
+    }
+
+    public String getUser() {
+      return user;
+    }
+
+    public Map<String, Shuffle.MapOutputInfo> getInfoMap() {
+      return infoMap;
+    }
+
+    public String getOutputBasePathStr() {
+      return outputBasePathStr;
+    }
+
+    public List<String> getMapIds() {
+      return mapIds;
+    }
+
+    public AtomicInteger getMapsToSend() {
+      return mapsToSend;
+    }
+
+    public AtomicInteger getMapsToWait() {
+      return mapsToWait;
+    }
+  }
 
   ShuffleHandler(MetricsSystem ms) {
     super("httpshuffle");
@@ -292,9 +421,7 @@ public class ShuffleHandler extends AuxiliaryService {
       Token<JobTokenIdentifier> jt = deserializeServiceData(secret);
        // TODO: Once SHuffle is out of NM, this can use MR APIs
       JobID jobId = new JobID(Long.toString(appId.getClusterTimestamp()), appId.getId());
-      userRsrc.put(jobId.toString(), user);
-      LOG.info("Added token for " + jobId.toString());
-      secretManager.addTokenForJob(jobId.toString(), jt);
+      recordJobShuffleInfo(jobId, user, jt);
     } catch (IOException e) {
       LOG.error("Error during initApp", e);
       // TODO add API to AuxiliaryServices to report failures
@@ -305,8 +432,12 @@ public class ShuffleHandler extends AuxiliaryService {
   public void stopApplication(ApplicationTerminationContext context) {
     ApplicationId appId = context.getApplicationId();
     JobID jobId = new JobID(Long.toString(appId.getClusterTimestamp()), appId.getId());
-    secretManager.removeTokenForJob(jobId.toString());
-    userRsrc.remove(jobId.toString());
+    try {
+      removeJobShuffleInfo(jobId);
+    } catch (IOException e) {
+      LOG.error("Error during stopApp", e);
+      // TODO add API to AuxiliaryServices to report failures
+    }
   }
 
   @Override
@@ -332,6 +463,9 @@ public class ShuffleHandler extends AuxiliaryService {
          (Shell.WINDOWS)?WINDOWS_DEFAULT_SHUFFLE_TRANSFERTO_ALLOWED:
                          DEFAULT_SHUFFLE_TRANSFERTO_ALLOWED);
 
+    maxSessionOpenFiles = conf.getInt(SHUFFLE_MAX_SESSION_OPEN_FILES,
+        DEFAULT_SHUFFLE_MAX_SESSION_OPEN_FILES);
+
     ThreadFactory bossFactory = new ThreadFactoryBuilder()
       .setNameFormat("ShuffleHandler Netty Boss #%d")
       .build();
@@ -350,12 +484,16 @@ public class ShuffleHandler extends AuxiliaryService {
   @Override
   protected void serviceStart() throws Exception {
     Configuration conf = getConfig();
+    userRsrc = new ConcurrentHashMap<String,String>();
+    secretManager = new JobTokenSecretManager();
+    recoverState(conf);
     ServerBootstrap bootstrap = new ServerBootstrap(selector);
     try {
       pipelineFact = new HttpPipelineFactory(conf);
     } catch (Exception ex) {
       throw new RuntimeException(ex);
     }
+    bootstrap.setOption("child.keepAlive", true);
     bootstrap.setPipelineFactory(pipelineFact);
     port = conf.getInt(SHUFFLE_PORT_CONFIG_KEY, DEFAULT_SHUFFLE_PORT);
     Channel ch = bootstrap.bind(new InetSocketAddress(port));
@@ -389,6 +527,9 @@ public class ShuffleHandler extends AuxiliaryService {
     if (pipelineFact != null) {
       pipelineFact.destroy();
     }
+    if (stateDb != null) {
+      stateDb.close();
+    }
     super.serviceStop();
   }
 
@@ -407,6 +548,191 @@ public class ShuffleHandler extends AuxiliaryService {
     return new Shuffle(conf);
   }
 
+  private void recoverState(Configuration conf) throws IOException {
+    Path recoveryRoot = getRecoveryPath();
+    if (recoveryRoot != null) {
+      startStore(recoveryRoot);
+      Pattern jobPattern = Pattern.compile(JobID.JOBID_REGEX);
+      LeveldbIterator iter = null;
+      try {
+        iter = new LeveldbIterator(stateDb);
+        iter.seek(bytes(JobID.JOB));
+        while (iter.hasNext()) {
+          Map.Entry<byte[],byte[]> entry = iter.next();
+          String key = asString(entry.getKey());
+          if (!jobPattern.matcher(key).matches()) {
+            break;
+          }
+          recoverJobShuffleInfo(key, entry.getValue());
+        }
+      } catch (DBException e) {
+        throw new IOException("Database error during recovery", e);
+      } finally {
+        if (iter != null) {
+          iter.close();
+        }
+      }
+    }
+  }
+
+  private void startStore(Path recoveryRoot) throws IOException {
+    Options options = new Options();
+    options.createIfMissing(false);
+    options.logger(new LevelDBLogger());
+    Path dbPath = new Path(recoveryRoot, STATE_DB_NAME);
+    LOG.info("Using state database at " + dbPath + " for recovery");
+    File dbfile = new File(dbPath.toString());
+    try {
+      stateDb = JniDBFactory.factory.open(dbfile, options);
+    } catch (NativeDB.DBException e) {
+      if (e.isNotFound() || e.getMessage().contains(" does not exist ")) {
+        LOG.info("Creating state database at " + dbfile);
+        options.createIfMissing(true);
+        try {
+          stateDb = JniDBFactory.factory.open(dbfile, options);
+          storeVersion();
+        } catch (DBException dbExc) {
+          throw new IOException("Unable to create state store", dbExc);
+        }
+      } else {
+        throw e;
+      }
+    }
+    checkVersion();
+  }
+  
+  @VisibleForTesting
+  Version loadVersion() throws IOException {
+    byte[] data = stateDb.get(bytes(STATE_DB_SCHEMA_VERSION_KEY));
+    // if version is not stored previously, treat it as CURRENT_VERSION_INFO.
+    if (data == null || data.length == 0) {
+      return getCurrentVersion();
+    }
+    Version version =
+        new VersionPBImpl(VersionProto.parseFrom(data));
+    return version;
+  }
+
+  private void storeSchemaVersion(Version version) throws IOException {
+    String key = STATE_DB_SCHEMA_VERSION_KEY;
+    byte[] data = 
+        ((VersionPBImpl) version).getProto().toByteArray();
+    try {
+      stateDb.put(bytes(key), data);
+    } catch (DBException e) {
+      throw new IOException(e.getMessage(), e);
+    }
+  }
+  
+  private void storeVersion() throws IOException {
+    storeSchemaVersion(CURRENT_VERSION_INFO);
+  }
+  
+  // Only used for test
+  @VisibleForTesting
+  void storeVersion(Version version) throws IOException {
+    storeSchemaVersion(version);
+  }
+
+  protected Version getCurrentVersion() {
+    return CURRENT_VERSION_INFO;
+  }
+  
+  /**
+   * 1) Versioning scheme: major.minor. For e.g. 1.0, 1.1, 1.2...1.25, 2.0 etc.
+   * 2) Any incompatible change of DB schema is a major upgrade, and any
+   *    compatible change of DB schema is a minor upgrade.
+   * 3) Within a minor upgrade, say 1.1 to 1.2:
+   *    overwrite the version info and proceed as normal.
+   * 4) Within a major upgrade, say 1.2 to 2.0:
+   *    throw exception and indicate user to use a separate upgrade tool to
+   *    upgrade shuffle info or remove incompatible old state.
+   */
+  private void checkVersion() throws IOException {
+    Version loadedVersion = loadVersion();
+    LOG.info("Loaded state DB schema version info " + loadedVersion);
+    if (loadedVersion.equals(getCurrentVersion())) {
+      return;
+    }
+    if (loadedVersion.isCompatibleTo(getCurrentVersion())) {
+      LOG.info("Storing state DB schedma version info " + getCurrentVersion());
+      storeVersion();
+    } else {
+      throw new IOException(
+        "Incompatible version for state DB schema: expecting DB schema version " 
+            + getCurrentVersion() + ", but loading version " + loadedVersion);
+    }
+  }
+
+  private void addJobToken(JobID jobId, String user,
+      Token<JobTokenIdentifier> jobToken) {
+    userRsrc.put(jobId.toString(), user);
+    secretManager.addTokenForJob(jobId.toString(), jobToken);
+    LOG.info("Added token for " + jobId.toString());
+  }
+
+  private void recoverJobShuffleInfo(String jobIdStr, byte[] data)
+      throws IOException {
+    JobID jobId;
+    try {
+      jobId = JobID.forName(jobIdStr);
+    } catch (IllegalArgumentException e) {
+      throw new IOException("Bad job ID " + jobIdStr + " in state store", e);
+    }
+
+    JobShuffleInfoProto proto = JobShuffleInfoProto.parseFrom(data);
+    String user = proto.getUser();
+    TokenProto tokenProto = proto.getJobToken();
+    Token<JobTokenIdentifier> jobToken = new Token<JobTokenIdentifier>(
+        tokenProto.getIdentifier().toByteArray(),
+        tokenProto.getPassword().toByteArray(),
+        new Text(tokenProto.getKind()), new Text(tokenProto.getService()));
+    addJobToken(jobId, user, jobToken);
+  }
+
+  private void recordJobShuffleInfo(JobID jobId, String user,
+      Token<JobTokenIdentifier> jobToken) throws IOException {
+    if (stateDb != null) {
+      TokenProto tokenProto = TokenProto.newBuilder()
+          .setIdentifier(ByteString.copyFrom(jobToken.getIdentifier()))
+          .setPassword(ByteString.copyFrom(jobToken.getPassword()))
+          .setKind(jobToken.getKind().toString())
+          .setService(jobToken.getService().toString())
+          .build();
+      JobShuffleInfoProto proto = JobShuffleInfoProto.newBuilder()
+          .setUser(user).setJobToken(tokenProto).build();
+      try {
+        stateDb.put(bytes(jobId.toString()), proto.toByteArray());
+      } catch (DBException e) {
+        throw new IOException("Error storing " + jobId, e);
+      }
+    }
+    addJobToken(jobId, user, jobToken);
+  }
+
+  private void removeJobShuffleInfo(JobID jobId) throws IOException {
+    String jobIdStr = jobId.toString();
+    secretManager.removeTokenForJob(jobIdStr);
+    userRsrc.remove(jobIdStr);
+    if (stateDb != null) {
+      try {
+        stateDb.delete(bytes(jobIdStr));
+      } catch (DBException e) {
+        throw new IOException("Unable to remove " + jobId
+            + " from state store", e);
+      }
+    }
+  }
+
+  private static class LevelDBLogger implements Logger {
+    private static final Log LOG = LogFactory.getLog(LevelDBLogger.class);
+
+    @Override
+    public void log(String message) {
+      LOG.info(message);
+    }
+  }
+
   class HttpPipelineFactory implements ChannelPipelineFactory {
 
     final Shuffle SHUFFLE;
@@ -420,6 +746,10 @@ public class ShuffleHandler extends AuxiliaryService {
         sslFactory = new SSLFactory(SSLFactory.Mode.SERVER, conf);
         sslFactory.init();
       }
+    }
+
+    public Shuffle getSHUFFLE() {
+      return SHUFFLE;
     }
 
     public void destroy() {
@@ -585,30 +915,62 @@ public class ShuffleHandler extends AuxiliaryService {
         return;
       }
       ch.write(response);
-      // TODO refactor the following into the pipeline
-      ChannelFuture lastMap = null;
-      for (String mapId : mapIds) {
-        try {
-          MapOutputInfo info = mapOutputInfoMap.get(mapId);
-          if (info == null) {
-            info = getMapOutputInfo(outputBasePathStr, mapId, reduceId, user);
-          }
-          lastMap =
-              sendMapOutput(ctx, ch, user, mapId,
-                reduceId, info);
-          if (null == lastMap) {
-            sendError(ctx, NOT_FOUND);
-            return;
-          }
-        } catch (IOException e) {
-          LOG.error("Shuffle error :", e);
-          String errorMessage = getErrorMessage(e);
-          sendError(ctx,errorMessage , INTERNAL_SERVER_ERROR);
+      //Initialize one ReduceContext object per messageReceived call
+      ReduceContext reduceContext = new ReduceContext(mapIds, reduceId, ctx,
+          user, mapOutputInfoMap, outputBasePathStr);
+      for (int i = 0; i < Math.min(maxSessionOpenFiles, mapIds.size()); i++) {
+        ChannelFuture nextMap = sendMap(reduceContext);
+        if(nextMap == null) {
           return;
         }
       }
-      lastMap.addListener(metrics);
-      lastMap.addListener(ChannelFutureListener.CLOSE);
+    }
+
+    /**
+     * Calls sendMapOutput for the mapId pointed by ReduceContext.mapsToSend
+     * and increments it. This method is first called by messageReceived()
+     * maxSessionOpenFiles times and then on the completion of every
+     * sendMapOutput operation. This limits the number of open files on a node,
+     * which can get really large(exhausting file descriptors on the NM) if all
+     * sendMapOutputs are called in one go, as was done previous to this change.
+     * @param reduceContext used to call sendMapOutput with correct params.
+     * @return the ChannelFuture of the sendMapOutput, can be null.
+     */
+    public ChannelFuture sendMap(ReduceContext reduceContext)
+        throws Exception {
+
+      ChannelFuture nextMap = null;
+      if (reduceContext.getMapsToSend().get() <
+          reduceContext.getMapIds().size()) {
+        int nextIndex = reduceContext.getMapsToSend().getAndIncrement();
+        String mapId = reduceContext.getMapIds().get(nextIndex);
+
+        try {
+          MapOutputInfo info = reduceContext.getInfoMap().get(mapId);
+          if (info == null) {
+            info = getMapOutputInfo(reduceContext.getOutputBasePathStr() +
+                       mapId, mapId, reduceContext.getReduceId(),
+                       reduceContext.getUser());
+          }
+          nextMap = sendMapOutput(
+              reduceContext.getCtx(),
+              reduceContext.getCtx().getChannel(),
+              reduceContext.getUser(), mapId,
+              reduceContext.getReduceId(), info);
+          if (null == nextMap) {
+            sendError(reduceContext.getCtx(), NOT_FOUND);
+            return null;
+          }
+          nextMap.addListener(new ReduceMapFileCount(reduceContext));
+        } catch (IOException e) {
+          LOG.error("Shuffle error :", e);
+          String errorMessage = getErrorMessage(e);
+          sendError(reduceContext.getCtx(), errorMessage,
+              INTERNAL_SERVER_ERROR);
+          return null;
+        }
+      }
+      return nextMap;
     }
 
     private String getErrorMessage(Throwable t) {

@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
@@ -28,15 +30,14 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerStatusesRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerStatusesRequestProtoOrBuilder;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
-public class GetContainerStatusesRequestPBImpl
-    extends GetContainerStatusesRequest {
-  GetContainerStatusesRequestProto proto =
-      GetContainerStatusesRequestProto.getDefaultInstance();
+public class GetContainerStatusesRequestPBImpl extends
+    GetContainerStatusesRequest {
+  GetContainerStatusesRequestProto proto = GetContainerStatusesRequestProto
+    .getDefaultInstance();
   GetContainerStatusesRequestProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -66,9 +67,8 @@ public class GetContainerStatusesRequestPBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -87,9 +87,8 @@ public class GetContainerStatusesRequestPBImpl
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -105,9 +104,8 @@ public class GetContainerStatusesRequestPBImpl
   private void addLocalContainerIdsToProto() {
     maybeInitBuilder();
     builder.clearContainerId();
-    if (this.containerIds == null) {
+    if (this.containerIds == null)
       return;
-    }
     List<ContainerIdProto> protoList = new ArrayList<ContainerIdProto>();
     for (ContainerId id : containerIds) {
       protoList.add(convertToProtoFormat(id));
@@ -136,9 +134,8 @@ public class GetContainerStatusesRequestPBImpl
   @Override
   public void setContainerIds(List<ContainerId> containerIds) {
     maybeInitBuilder();
-    if (containerIds == null) {
+    if (containerIds == null)
       builder.clearContainerId();
-    }
     this.containerIds = containerIds;
   }
 

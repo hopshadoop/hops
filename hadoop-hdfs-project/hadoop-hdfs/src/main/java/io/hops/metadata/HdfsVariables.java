@@ -15,6 +15,8 @@
  */
 package io.hops.metadata;
 
+import com.google.common.math.IntMath;
+import com.google.common.math.LongMath;
 import io.hops.common.CountersQueue;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -32,6 +34,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -44,6 +47,50 @@ import java.util.List;
 import java.util.Map;
 
 public class HdfsVariables {
+
+  private interface Handler{
+    Object handle(VariableDataAccess<Variable, Variable.Finder> vd) throws StorageException;
+  }
+
+  private static Object handleVariable(Handler handler, boolean
+      writeLock)
+      throws StorageException {
+    VariableDataAccess<Variable, Variable.Finder> vd = (VariableDataAccess)
+        HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+
+    boolean insideActiveTransaction = HdfsStorageFactory.getConnector()
+        .isTransactionActive();
+    if(!insideActiveTransaction){
+      HdfsStorageFactory.getConnector().beginTransaction();
+    }
+
+    if(writeLock) {
+      HdfsStorageFactory.getConnector().writeLock();
+    }else{
+      HdfsStorageFactory.getConnector().readLock();
+    }
+
+    try {
+      Object response = handler.handle(vd);
+      return response;
+    }finally {
+      if(!insideActiveTransaction){
+        HdfsStorageFactory.getConnector().commit();
+      }else{
+        HdfsStorageFactory.getConnector().readCommitted();
+      }
+    }
+  }
+
+  private static Object handleVariableWithReadLock(Handler handler)
+      throws StorageException {
+    return handleVariable(handler, false);
+  }
+
+  private static Object handleVariableWithWriteLock(Handler handler)
+      throws StorageException {
+    return handleVariable(handler, true);
+  }
 
   public static CountersQueue.Counter incrementBlockIdCounter(
       final int increment) throws IOException {
@@ -78,29 +125,33 @@ public class HdfsVariables {
     }.handle();
   }
 
-  private static CountersQueue.Counter incrementCounter(Variable.Finder
-      finder, int increment)
+  private static CountersQueue.Counter incrementCounter(final Variable.Finder
+      finder, final int increment)
       throws StorageException {
-    VariableDataAccess<Variable, Variable.Finder> vd = (VariableDataAccess)
-        HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
-    HdfsStorageFactory.getConnector().writeLock();
-    Variable variable =  vd.getVariable(finder);
-    if(variable instanceof IntVariable){
-      int oldValue = ((IntVariable) vd.getVariable(finder)).getValue();
-      int newValue = oldValue + increment;
-      vd.setVariable(new IntVariable(finder, newValue));
-      HdfsStorageFactory.getConnector().readCommitted();
-      return new CountersQueue.Counter(oldValue, newValue);
 
-    }else if(variable instanceof LongVariable){
-      long oldValue = ((LongVariable) variable).getValue();
-      long newValue = oldValue + increment;
-      vd.setVariable(new LongVariable(finder, newValue));
-      HdfsStorageFactory.getConnector().readCommitted();
-      return new CountersQueue.Counter(oldValue, newValue);
-    }
-    throw new IllegalStateException("Cannot increment Varaible of type " +
-        variable.getClass().getSimpleName());
+    return (CountersQueue.Counter) handleVariableWithWriteLock(new Handler() {
+      @Override
+      public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+          throws StorageException {
+        Variable variable =  vd.getVariable(finder);
+        if(variable instanceof IntVariable){
+          int oldValue = ((IntVariable) vd.getVariable(finder)).getValue();
+          int newValue = IntMath.checkedAdd(oldValue, increment);
+          vd.setVariable(new IntVariable(finder, newValue));
+          return new CountersQueue.Counter(oldValue, newValue);
+
+        }else if(variable instanceof LongVariable){
+          long oldValue = ((LongVariable) variable).getValue();
+          long newValue = LongMath.checkedAdd(oldValue, increment);
+          vd.setVariable(new LongVariable(finder, newValue));
+          return new CountersQueue.Counter(oldValue, newValue);
+        }
+
+
+        throw new IllegalStateException("Cannot increment Varaible of type " +
+            variable.getClass().getSimpleName());
+      }
+    });
   }
 
   public static void resetMisReplicatedIndex() throws IOException {
@@ -113,17 +164,21 @@ public class HdfsVariables {
         HDFSOperationType.INCREMENT_MIS_REPLICATED_FILES_INDEX) {
       @Override
       public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-            .getDataAccess(VariableDataAccess.class);
-        HdfsStorageFactory.getConnector().writeLock();
-        LongVariable var = (LongVariable) vd
-            .getVariable(Variable.Finder.MisReplicatedFilesIndex);
-        long oldValue = var == null ? 0 : var.getValue();
-        long newValue = increment == 0 ? 0 : oldValue + increment;
-        vd.setVariable(new LongVariable(Variable.Finder.MisReplicatedFilesIndex,
-            newValue));
-        HdfsStorageFactory.getConnector().readCommitted();
-        return newValue;
+
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            LongVariable var = (LongVariable) vd
+                .getVariable(Variable.Finder.MisReplicatedFilesIndex);
+            long oldValue = var == null ? 0 : var.getValue();
+            long newValue = increment == 0 ? 0 : LongMath.checkedAdd
+                (oldValue, increment);
+            vd.setVariable(new LongVariable(Variable.Finder.MisReplicatedFilesIndex,
+                newValue));
+            return newValue;
+          }
+        });
       }
     }.handle();
   }
@@ -132,12 +187,14 @@ public class HdfsVariables {
     new LightWeightRequestHandler(HDFSOperationType.ENTER_CLUSTER_SAFE_MODE) {
       @Override
       public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-            .getDataAccess(VariableDataAccess.class);
-        HdfsStorageFactory.getConnector().writeLock();
-        vd.setVariable(new IntVariable(Variable.Finder.ClusterInSafeMode, 1));
-        HdfsStorageFactory.getConnector().readCommitted();
-        return null;
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            vd.setVariable(new IntVariable(Variable.Finder.ClusterInSafeMode, 1));
+            return null;
+          }
+        });
       }
     }.handle();
   }
@@ -146,62 +203,69 @@ public class HdfsVariables {
     new LightWeightRequestHandler(HDFSOperationType.EXIT_CLUSTER_SAFE_MODE) {
       @Override
       public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-            .getDataAccess(VariableDataAccess.class);
-        HdfsStorageFactory.getConnector().writeLock();
-        vd.setVariable(new IntVariable(Variable.Finder.ClusterInSafeMode, 0));
-        HdfsStorageFactory.getConnector().readCommitted();
-        return null;
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            vd.setVariable(new IntVariable(Variable.Finder.ClusterInSafeMode, 0));
+            return null;
+          }
+        });
       }
     }.handle();
   }
 
   public static boolean isClusterInSafeMode() throws IOException {
-    Boolean safemode = (Boolean) new LightWeightRequestHandler(
+    return (Boolean) new LightWeightRequestHandler(
         HDFSOperationType.GET_CLUSTER_SAFE_MODE) {
       @Override
       public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-            .getDataAccess(VariableDataAccess.class);
-        HdfsStorageFactory.getConnector().readLock();
-        IntVariable var =
-            (IntVariable) vd.getVariable(Variable.Finder.ClusterInSafeMode);
-        HdfsStorageFactory.getConnector().readCommitted();
-        return var.getValue() == 1;
+        return handleVariableWithReadLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            IntVariable var =
+                (IntVariable) vd.getVariable(Variable.Finder.ClusterInSafeMode);
+            return var.getValue() == 1;
+          }
+        });
       }
     }.handle();
-    return safemode;
   }
 
   public static void setBrLbMasBlkPerMin(final long value) throws IOException {
-    new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_BLKS_PER_MIN) {
+    new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_BLKS_PER_TW) {
       @Override
       public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-                .getDataAccess(VariableDataAccess.class);
-        HdfsStorageFactory.getConnector().writeLock();
-        vd.setVariable(new LongVariable(Variable.Finder.BrLbMaxBlkPerTU, value));
-        HdfsStorageFactory.getConnector().readCommitted();
-        return null;
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            vd.setVariable(new LongVariable(Variable.Finder.BrLbMaxBlkPerTW, value));
+            LOG.debug("Set block report max blocks per time window is : "+ value);
+            return null;
+          }
+        });
       }
     }.handle();
   }
 
-  public static long getBrLbMasBlkPerMin() throws IOException {
-    Long value = (Long) new LightWeightRequestHandler(
-            HDFSOperationType.GET_BR_LB_MAX_BLKS_PER_TU) {
+  public static long getBrLbMaxBlkPerTW() throws IOException {
+    return (Long) new LightWeightRequestHandler(
+            HDFSOperationType.GET_BR_LB_MAX_BLKS_PER_TW) {
       @Override
       public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-                .getDataAccess(VariableDataAccess.class);
-        HdfsStorageFactory.getConnector().readLock();
-        LongVariable var =
-                (LongVariable) vd.getVariable(Variable.Finder.BrLbMaxBlkPerTU);
-        HdfsStorageFactory.getConnector().readCommitted();
-        return var.getValue();
+        return handleVariableWithReadLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            LongVariable var =
+                (LongVariable) vd.getVariable(Variable.Finder.BrLbMaxBlkPerTW);
+            return var.getValue();
+          }
+        });
       }
     }.handle();
-    return value;
   }
 
   public static void setReplicationIndex(List<Integer> indeces)
@@ -357,9 +421,9 @@ public class HdfsVariables {
         new IntVariable(1).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.QuotaUpdateID,
         new IntVariable(0).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxBlkPerTU,
+    Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxBlkPerTW,
             new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW,
-                    DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TU_DEFAULT)).getBytes());
+                    DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW_DEFAULT)).getBytes());
     VarsRegister.registerHdfsDefaultValues();
     // This is a workaround that is needed until HA-YARN has its own format command
     VarsRegister.registerYarnDefaultValues();

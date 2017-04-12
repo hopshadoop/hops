@@ -1,4 +1,4 @@
-# Hops
+# Hops Hadoop Distribution
 
 [![Join the chat at https://gitter.im/hopshadoop/hops](https://badges.gitter.im/hopshadoop/services.png)](https://gitter.im/hopshadoop/hops)
 [![Google Group](https://img.shields.io/badge/google-group-blue.svg)](https://groups.google.com/forum/#!forum/hopshadoop)
@@ -9,41 +9,97 @@
 
 
 # Online Documentation
-You can find the latest Hops documentation, including a programming guide, on the project [web page](http://www.hops.io). This README file only contains basic setup instructions.
+You can find the latest Hops documentation, including a programming guide, on the project [web page](http://www.hops.io). This README file only contains basic setup and compilation instructions.
 
 
+# How to Build
 
 
-## How to build
+#### Software Required
+For compiling the Hops Hadoop Distribution you will need the following software.
+- Java 1.7 or higher
+- Maven
+- cmake for compiling the native code 
+- [Google Protocol Buffer](https://github.com/google/protobuf) Version [2.5](https://github.com/google/protobuf/releases/download/v2.5.0/protobuf-2.5.0.tar.gz)
+- [MySQL Cluster NDB](https://dev.mysql.com/downloads/cluster/) native client library 
 
-Build the [hop-metadata-dal](https://github.com/hopshadoop/hops-metadata-dal) project first, then build the associated metadata-dal implementation driver which for now is [hop-metadata-dal-ndb-impl](https://github.com/hopshadoop/hops-metadata-dal-impl-ndb).
+We combine Apache and GPL licensed code, from Hops and MySQL Cluster, respectively, by providing a DAL API (similar to JDBC). We dynamically link our DAL implementation for MySQL Cluster with the Hops code. Both binaries are distributed separately.
 
-Building Hops Hadoop Distribution
+Perform the following steps in the following order to compile the Hops Hadoop Distribution.
+
+#### Database Abstraction Layer
+```sh
+git clone https://github.com/hopshadoop/hops-metadata-dal
 ```
-sudo aptitude install cmake libprotobuf-dev libprotobuf-c0-dev
+The `master` branch represents most stable version of Hops Hadoop and the `develop` branch contains all the newly developed features and bug fixes. If you choose to use `master` branch then also checkout the `master` branch in the other Hops Projects and vice versa.   
 
-mvn clean generate-sources
-
-cd hadoop-maven-plugins
-
-mvn install
-
-cd ..
-
-mvn package -Pdist -DskipTests -Dtar
-```
-
-For native deployment, you need to install these libraries first
-
-```
-sudo aptitude install zlib1g-dev libssl-dev
-
-cd ..
-
-mvn package -Pdist,native -DskipTests -Dtar
+```sh
+git checkout master
+mvn clean install -DskipTests
 ```
 
-##Hops Installation
+#### Database Abstraction Layer Implementation
+```sh
+git clone https://github.com/hopshadoop/hops-metadata-dal-impl-ndb
+git checkout master
+mvn clean install -DskipTests
+```
+This project also contains c++ code that requires NDB `libndbclient.so` library. Download the [MySQL Cluster Distribution](https://dev.mysql.com/downloads/cluster/) and extract the `libndbclient.so` library. Alternatively you can download a custom MySQL Cluster library from our servers. Our custom library supports binding I/O threads to CPU cores for better performance.		
+```sh
+cd tmp
+wget http://kompics.sics.se/maven/repository/com/mysql/ndb/clusterj-native/7.5.4/clusterj-native-7.5.4-natives-linux.jar
+unzip clusterj-native-7.5.4-natives-linux.jar
+cp libndbclient.so /usr/lib
+```
+
+See this [section](#connecting-the-driver-to-the-database) for specifying the database `URI` and `username/password`. 
+
+
+
+#### Building Hops Hadoop 
+```sh
+git clone https://github.com/hopshadoop/hops
+git checkout master
+```
+##### Building a Distribution
+```sh
+mvn package -Pdist,native,docs -DskipTests -Dtar
+```
+
+##### Compiling and Running Unit Tests Locally
+```sh
+mvn clean generate-sources install -Pndb -DskipTest
+mvn test-compile
+```
+For running tests use the `ndb` profile to add the the [database access layer](https://github.com/hopshadoop/hops-metadata-dal-impl-ndb) driver to the class path. The driver is loaded at run time. For example,
+
+```sh
+mvn test -Dtest=TestFileCreation -Pndb
+```
+
+Set the `ndb` profile in the IDE if you are running the unit test in an IDE. For example, in IntelliJ you can do this by
+
+```
+View --> Tool Windows --> Maven Projects
+Expand the "Profiles"
+Check the "ndb" profile
+```
+
+#### Connecting the Driver to the Database
+There are two way to configure the NDB data access layer driver 
+- **Hard Coding The Database Configuration Parameters: **
+While compiling the database access layer all the required configuration parameters can be written to the ```./hops-metadata-dal-impl-ndb/src/main/resources/ndb-config.properties``` file. When the diver is loaded it will try to connect to the database specified in the configuration file. 
+
+- **hdfs-site.xml: **
+Add `dfs.storage.driver.configfile` parameter to hdfs-site.xml to read the configuration file from a sepcified path. For example, to read the configuration file in the current directory add the following the hdfs-site.xml
+```xml
+<property>
+      <name>dfs.storage.driver.configfile</name>
+      <value>hops-ndb-config.properties</value>
+</property>  
+```
+
+# Hops Auto Installer
 The Hops stack includes a number of services also requires a number of third-party distributed services:
 <ul>
 <li>Java 1.7 (OpenJDK or Oracle JRE/JDK)</li>
@@ -54,7 +110,7 @@ The Hops stack includes a number of services also requires a number of third-par
 
 Due to the complexity of installing and configuring all Hops’ services, we recommend installing Hops using the automated installer [Karamel/Chef](http://www.karamel.io). Detailed documentation on the steps for installing and configuring all services in Hops is not discussed here. Instead, Chef cookbooks contain all the installation and configuration steps needed to install and configure Hops. The Chef cookbooks are available at: https://github.com/hopshadoop.
 
-###Installing on Cloud Platforms (AWS, GCE, OPenStack)
+#### Installing on Cloud Platforms (AWS, GCE, OPenStack)
 1. Download and install Karamel (http://www.karamel.io).
 2. Run Karamel.
 3. Click on the “Load Cluster Definition” menu item in Karamel. You are now prompted to select a cluster definition YAML file. Go to the examples/stable directory, and select a cluster definition file for your target cloud platform for one of the following cluster types:
@@ -65,7 +121,7 @@ Due to the complexity of installing and configuring all Hops’ services, we rec
 
 For more information on how to configure cloud-based installations,  go to help documentation at http://www.karamel.io. For on-premises installations, we provide some additional installation details and tips later in this section.
 
-###On-Premises (baremetal) Installation
+#### On-Premises (baremetal) Installation
 For on-premises (bare-metal) installations, you will need to prepare for installation by:
 
 1. Identifying a master host, from which you will run Karamel;
@@ -101,7 +157,7 @@ pssh -h hosts.txt -i USER -P PASSWORD cat /tmp/id_rsa.pub >> /home/USER/.ssh/aut
 
 Update your Karamel cluster definition file to include the IP addresses of the target machines and the USER account name. After you have clicked on the launch menu item, you will come to a ssh dialog. On the ssh dialog, you need to open the advanced section. Here, you will need to enter the password for the USER account on the target machines ( sudo password text input box). If your ssh keypair is password protected, you will also need to enter it again here in the keypair password text input box. 
 
-###Vagrant (Virtualbox)
+#### Vagrant (Virtualbox)
 You can install Hops on your laptop/desktop with Vagrant. You will need to have the following software packages installed:
 
 * chef-dk, version >0.5+ (but not >0.8+)

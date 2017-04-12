@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.nio.ByteBuffer;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -27,24 +32,20 @@ import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.NMToken;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.SchedulerResourceTypes;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.Map;
-
 /**
- * <p>The response sent by the <code>ResourceManager</code> to a new
- * <code>ApplicationMaster</code> on registration.</p>
- * <p/>
- * <p>The response contains critical details such as:
+ * The response sent by the {@code ResourceManager} to a new
+ * {@code ApplicationMaster} on registration.
+ * <p>
+ * The response contains critical details such as:
  * <ul>
- * <li>Maximum capability for allocated resources in the cluster.</li>
- * <li><code>ApplicationACL</code>s for the application.</li>
- * <li>ClientToAMToken master key.</li>
+ *   <li>Maximum capability for allocated resources in the cluster.</li>
+ *   <li>{@code ApplicationACL}s for the application.</li>
+ *   <li>ClientToAMToken master key.</li>
  * </ul>
- * </p>
- *
+ * 
  * @see ApplicationMasterProtocol#registerApplicationMaster(RegisterApplicationMasterRequest)
  */
 @Public
@@ -70,9 +71,8 @@ public abstract class RegisterApplicationMasterResponse {
   }
 
   /**
-   * Get the maximum capability for any {@link Resource} allocated by the
+   * Get the maximum capability for any {@link Resource} allocated by the 
    * <code>ResourceManager</code> in the cluster.
-   *
    * @return maximum capability of allocated resources in the cluster
    */
   @Public
@@ -84,8 +84,7 @@ public abstract class RegisterApplicationMasterResponse {
   public abstract void setMaximumResourceCapability(Resource capability);
 
   /**
-   * Get the <code>ApplicationACL</code>s for the application.
-   *
+   * Get the <code>ApplicationACL</code>s for the application. 
    * @return all the <code>ApplicationACL</code>s
    */
   @Public
@@ -93,14 +92,12 @@ public abstract class RegisterApplicationMasterResponse {
   public abstract Map<ApplicationAccessType, String> getApplicationACLs();
 
   /**
-   * Set the <code>ApplicationACL</code>s for the application.
-   *
+   * Set the <code>ApplicationACL</code>s for the application. 
    * @param acls
    */
   @Private
   @Unstable
-  public abstract void setApplicationACLs(
-      Map<ApplicationAccessType, String> acls);
+  public abstract void setApplicationACLs(Map<ApplicationAccessType, String> acls);
 
   /**
    * <p>Get ClientToAMToken master key.</p>
@@ -138,9 +135,9 @@ public abstract class RegisterApplicationMasterResponse {
    * Get the list of running containers as viewed by
    * <code>ResourceManager</code> from previous application attempts.
    * </p>
-   *
+   * 
    * @return the list of running containers as viewed by
-   * <code>ResourceManager</code> from previous application attempts
+   *         <code>ResourceManager</code> from previous application attempts
    * @see RegisterApplicationMasterResponse#getNMTokensFromPreviousAttempts()
    */
   @Public
@@ -150,10 +147,10 @@ public abstract class RegisterApplicationMasterResponse {
   /**
    * Set the list of running containers as viewed by
    * <code>ResourceManager</code> from previous application attempts.
-   *
+   * 
    * @param containersFromPreviousAttempt
-   *     the list of running containers as viewed by
-   *     <code>ResourceManager</code> from previous application attempts.
+   *          the list of running containers as viewed by
+   *          <code>ResourceManager</code> from previous application attempts.
    */
   @Private
   @Unstable
@@ -163,9 +160,10 @@ public abstract class RegisterApplicationMasterResponse {
   /**
    * Get the list of NMTokens for communicating with the NMs where the
    * containers of previous application attempts are running.
-   *
+   * 
    * @return the list of NMTokens for communicating with the NMs where the
-   * containers of previous application attempts are running.
+   *         containers of previous application attempts are running.
+   * 
    * @see RegisterApplicationMasterResponse#getContainersFromPreviousAttempts()
    */
   @Public
@@ -175,12 +173,33 @@ public abstract class RegisterApplicationMasterResponse {
   /**
    * Set the list of NMTokens for communicating with the NMs where the the
    * containers of previous application attempts are running.
-   *
+   * 
    * @param nmTokens
-   *     the list of NMTokens for communicating with the NMs where the
-   *     containers of previous application attempts are running.
+   *          the list of NMTokens for communicating with the NMs where the
+   *          containers of previous application attempts are running.
    */
   @Private
   @Unstable
   public abstract void setNMTokensFromPreviousAttempts(List<NMToken> nmTokens);
+
+  /**
+   * Get a set of the resource types considered by the scheduler.
+   *
+   * @return a Map of RM settings
+   */
+  @Public
+  @Unstable
+  public abstract EnumSet<SchedulerResourceTypes> getSchedulerResourceTypes();
+
+  /**
+   * Set the resource types used by the scheduler.
+   *
+   * @param types
+   *          a set of the resource types that the scheduler considers during
+   *          scheduling
+   */
+  @Private
+  @Unstable
+  public abstract void setSchedulerResourceTypes(
+      EnumSet<SchedulerResourceTypes> types);
 }

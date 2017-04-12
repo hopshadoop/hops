@@ -29,8 +29,11 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
+import org.apache.commons.io.Charsets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -74,15 +77,6 @@ public class Credentials implements Writable {
   }
   
   /**
-   * Returns the key bytes for the alias
-   * @param alias the alias for the key
-   * @return key for this alias
-   */
-  public byte[] getSecretKey(Text alias) {
-    return secretKeysMap.get(alias);
-  }
-  
-  /**
    * Returns the Token object for the alias
    * @param alias the alias for the Token
    * @return token for this alias
@@ -117,6 +111,15 @@ public class Credentials implements Writable {
   public int numberOfTokens() {
     return tokenMap.size();
   }
+
+  /**
+   * Returns the key bytes for the alias
+   * @param alias the alias for the key
+   * @return key for this alias
+   */
+  public byte[] getSecretKey(Text alias) {
+    return secretKeysMap.get(alias);
+  }
   
   /**
    * @return number of keys in the in-memory map
@@ -133,7 +136,25 @@ public class Credentials implements Writable {
   public void addSecretKey(Text alias, byte[] key) {
     secretKeysMap.put(alias, key);
   }
- 
+
+  /**
+   * Remove the key for a given alias.
+   * @param alias the alias for the key
+   */
+  public void removeSecretKey(Text alias) {
+    secretKeysMap.remove(alias);
+  }
+
+  /**
+   * Return all the secret key entries in the in-memory map
+   */
+  public List<Text> getAllSecretKeys() {
+    List<Text> list = new java.util.ArrayList<Text>();
+    list.addAll(secretKeysMap.keySet());
+
+    return list;
+  }
+
   /**
    * Convenience method for reading a token storage file, and loading the Tokens
    * therein in the passed UGI
@@ -198,7 +219,8 @@ public class Credentials implements Writable {
     readFields(in);
   }
   
-  private static final byte[] TOKEN_STORAGE_MAGIC = "HDTS".getBytes();
+  private static final byte[] TOKEN_STORAGE_MAGIC =
+      "HDTS".getBytes(Charsets.UTF_8);
   private static final byte TOKEN_STORAGE_VERSION = 0;
   
   public void writeTokenStorageToStream(DataOutputStream os)

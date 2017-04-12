@@ -17,6 +17,7 @@
  */
 
 package org.apache.hadoop.minikdc;
+import org.apache.commons.io.Charsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.text.StrSubstitutor;
@@ -35,6 +36,7 @@ import org.apache.directory.server.core.kerberos.KeyDerivationInterceptor;
 import org.apache.directory.server.core.partition.impl.btree.jdbm.JdbmIndex;
 import org.apache.directory.server.core.partition.impl.btree.jdbm.JdbmPartition;
 import org.apache.directory.server.core.partition.ldif.LdifPartition;
+import org.apache.directory.server.kerberos.KerberosConfig;
 import org.apache.directory.server.kerberos.kdc.KdcServer;
 import org.apache.directory.server.kerberos.shared.crypto.encryption.KerberosKeyFactory;
 import org.apache.directory.server.kerberos.shared.keytab.Keytab;
@@ -56,7 +58,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
@@ -69,6 +71,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -77,9 +80,9 @@ import java.util.UUID;
 /**
  * Mini KDC based on Apache Directory Server that can be embedded in testcases
  * or used from command line as a standalone KDC.
- * <p/>
+ * <p>
  * <b>From within testcases:</b>
- * <p/>
+ * <p>
  * MiniKdc sets 2 System properties when started and un-sets them when stopped:
  * <ul>
  *   <li>java.security.krb5.conf: set to the MiniKDC real/host/port</li>
@@ -90,7 +93,7 @@ import java.util.UUID;
  * For example, running testcases in parallel that start a KDC each. To
  * accomplish this a single MiniKdc should be used for all testcases running
  * in parallel.
- * <p/>
+ * <p>
  * MiniKdc default configuration values are:
  * <ul>
  *   <li>org.name=EXAMPLE (used to create the REALM)</li>
@@ -104,9 +107,13 @@ import java.util.UUID;
  *   <li>debug=false</li>
  * </ul>
  * The generated krb5.conf forces TCP connections.
- * <p/>
  */
 public class MiniKdc {
+
+  public static final String JAVA_SECURITY_KRB5_CONF =
+      "java.security.krb5.conf";
+  public static final String SUN_SECURITY_KRB5_DEBUG =
+      "sun.security.krb5.debug";
 
   public static void main(String[] args) throws  Exception {
     if (args.length < 4) {
@@ -126,9 +133,9 @@ public class MiniKdc {
               + file.getAbsolutePath());
     }
     Properties userConf = new Properties();
-    FileReader r = null;
+    InputStreamReader r = null;
     try {
-      r = new FileReader(file);
+      r = new InputStreamReader(new FileInputStream(file), Charsets.UTF_8);
       userConf.load(r);
     } finally {
       if (r != null) {
@@ -211,7 +218,7 @@ public class MiniKdc {
 
   /**
    * Convenience method that returns MiniKdc default configuration.
-   * <p/>
+   * <p>
    * The returned configuration is a copy, it can be customized before using
    * it to create a MiniKdc.
    * @return a MiniKdc default configuration.
@@ -265,7 +272,8 @@ public class MiniKdc {
     }
     String orgName= conf.getProperty(ORG_NAME);
     String orgDomain = conf.getProperty(ORG_DOMAIN);
-    realm = orgName.toUpperCase() + "." + orgDomain.toUpperCase();
+    realm = orgName.toUpperCase(Locale.ENGLISH) + "."
+            + orgDomain.toUpperCase(Locale.ENGLISH);
   }
 
   /**
@@ -354,8 +362,8 @@ public class MiniKdc {
     ds.addLast(new KeyDerivationInterceptor());
 
     // create one partition
-    String orgName= conf.getProperty(ORG_NAME).toLowerCase();
-    String orgDomain = conf.getProperty(ORG_DOMAIN).toLowerCase();
+    String orgName= conf.getProperty(ORG_NAME).toLowerCase(Locale.ENGLISH);
+    String orgDomain = conf.getProperty(ORG_DOMAIN).toLowerCase(Locale.ENGLISH);
 
     JdbmPartition partition = new JdbmPartition(ds.getSchemaManager());
     partition.setId(orgName);
@@ -386,28 +394,40 @@ public class MiniKdc {
     String orgDomain = conf.getProperty(ORG_DOMAIN);
     String bindAddress = conf.getProperty(KDC_BIND_ADDRESS);
     final Map<String, String> map = new HashMap<String, String>();
-    map.put("0", orgName.toLowerCase());
-    map.put("1", orgDomain.toLowerCase());
-    map.put("2", orgName.toUpperCase());
-    map.put("3", orgDomain.toUpperCase());
+    map.put("0", orgName.toLowerCase(Locale.ENGLISH));
+    map.put("1", orgDomain.toLowerCase(Locale.ENGLISH));
+    map.put("2", orgName.toUpperCase(Locale.ENGLISH));
+    map.put("3", orgDomain.toUpperCase(Locale.ENGLISH));
     map.put("4", bindAddress);
 
     ClassLoader cl = Thread.currentThread().getContextClassLoader();
-    InputStream is = cl.getResourceAsStream("minikdc.ldiff");
+    InputStream is1 = cl.getResourceAsStream("minikdc.ldiff");
 
     SchemaManager schemaManager = ds.getSchemaManager();
-    final String content = StrSubstitutor.replace(IOUtils.toString(is), map);
-    LdifReader reader = new LdifReader(new StringReader(content));
+    LdifReader reader = null;
+
     try {
+      final String content = StrSubstitutor.replace(IOUtils.toString(is1), map);
+      reader = new LdifReader(new StringReader(content));
+
       for (LdifEntry ldifEntry : reader) {
         ds.getAdminSession().add(new DefaultEntry(schemaManager,
                 ldifEntry.getEntry()));
       }
     } finally {
-      reader.close();
+      IOUtils.closeQuietly(reader);
+      IOUtils.closeQuietly(is1);
     }
 
-    kdc = new KdcServer();
+    KerberosConfig kerberosConfig = new KerberosConfig();
+    kerberosConfig.setMaximumRenewableLifetime(Long.parseLong(conf
+        .getProperty(MAX_RENEWABLE_LIFETIME)));
+    kerberosConfig.setMaximumTicketLifetime(Long.parseLong(conf
+        .getProperty(MAX_TICKET_LIFETIME)));
+    kerberosConfig.setSearchBaseDn(String.format("dc=%s,dc=%s", orgName,
+        orgDomain));
+    kerberosConfig.setPaEncTimestampRequired(false);
+    kdc = new KdcServer(kerberosConfig);
     kdc.setDirectoryService(ds);
 
     // transport
@@ -420,30 +440,33 @@ public class MiniKdc {
       throw new IllegalArgumentException("Invalid transport: " + transport);
     }
     kdc.setServiceName(conf.getProperty(INSTANCE));
-    kdc.getConfig().setMaximumRenewableLifetime(
-            Long.parseLong(conf.getProperty(MAX_RENEWABLE_LIFETIME)));
-    kdc.getConfig().setMaximumTicketLifetime(
-            Long.parseLong(conf.getProperty(MAX_TICKET_LIFETIME)));
-
-    kdc.getConfig().setPaEncTimestampRequired(false);
     kdc.start();
 
     StringBuilder sb = new StringBuilder();
-    is = cl.getResourceAsStream("minikdc-krb5.conf");
-    BufferedReader r = new BufferedReader(new InputStreamReader(is));
-    String line = r.readLine();
-    while (line != null) {
-      sb.append(line).append("{3}");
-      line = r.readLine();
+    InputStream is2 = cl.getResourceAsStream("minikdc-krb5.conf");
+
+    BufferedReader r = null;
+
+    try {
+      r = new BufferedReader(new InputStreamReader(is2, Charsets.UTF_8));
+      String line = r.readLine();
+
+      while (line != null) {
+        sb.append(line).append("{3}");
+        line = r.readLine();
+      }
+    } finally {
+      IOUtils.closeQuietly(r);
+      IOUtils.closeQuietly(is2);
     }
-    r.close();
+
     krb5conf = new File(workDir, "krb5.conf").getAbsoluteFile();
     FileUtils.writeStringToFile(krb5conf,
             MessageFormat.format(sb.toString(), getRealm(), getHost(),
                     Integer.toString(getPort()), System.getProperty("line.separator")));
-    System.setProperty("java.security.krb5.conf", krb5conf.getAbsolutePath());
+    System.setProperty(JAVA_SECURITY_KRB5_CONF, krb5conf.getAbsolutePath());
 
-    System.setProperty("sun.security.krb5.debug", conf.getProperty(DEBUG,
+    System.setProperty(SUN_SECURITY_KRB5_DEBUG, conf.getProperty(DEBUG,
             "false"));
 
     // refresh the config
@@ -463,12 +486,11 @@ public class MiniKdc {
 
   /**
    * Stops the MiniKdc
-   * @throws Exception
    */
   public synchronized void stop() {
     if (kdc != null) {
-      System.getProperties().remove("java.security.krb5.conf");
-      System.getProperties().remove("sun.security.krb5.debug");
+      System.getProperties().remove(JAVA_SECURITY_KRB5_CONF);
+      System.getProperties().remove(SUN_SECURITY_KRB5_DEBUG);
       kdc.stop();
       try {
         ds.shutdown();
@@ -506,8 +528,8 @@ public class MiniKdc {
           throws Exception {
     String orgName= conf.getProperty(ORG_NAME);
     String orgDomain = conf.getProperty(ORG_DOMAIN);
-    String baseDn = "ou=users,dc=" + orgName.toLowerCase() + ",dc=" +
-            orgDomain.toLowerCase();
+    String baseDn = "ou=users,dc=" + orgName.toLowerCase(Locale.ENGLISH)
+                    + ",dc=" + orgDomain.toLowerCase(Locale.ENGLISH);
     String content = "dn: uid=" + principal + "," + baseDn + "\n" +
             "objectClass: top\n" +
             "objectClass: person\n" +

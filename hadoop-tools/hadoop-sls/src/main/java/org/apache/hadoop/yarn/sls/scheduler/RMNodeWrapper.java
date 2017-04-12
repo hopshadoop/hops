@@ -18,25 +18,26 @@
 
 package org.apache.hadoop.yarn.sls.scheduler;
 
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode
         .UpdatedContainerInfo;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
-import io.hops.ha.common.TransactionState;
 import java.util.Set;
-import static org.apache.hadoop.yarn.sls.SLSRunner.LOG;
 
+@Private
+@Unstable
 public class RMNodeWrapper implements RMNode {
   private RMNode node;
   private List<UpdatedContainerInfo> updates;
@@ -44,7 +45,7 @@ public class RMNodeWrapper implements RMNode {
   
   public RMNodeWrapper(RMNode node) {
     this.node = node;
-    updates = node.pullContainerUpdates(null);
+    updates = node.pullContainerUpdates();
   }
   
   @Override
@@ -86,12 +87,7 @@ public class RMNodeWrapper implements RMNode {
   public long getLastHealthReportTime() {
     return node.getLastHealthReportTime();
   }
-  
-  @Override
-  public void setLastNodeHeartBeatResponseId(int id) {
-    node.setLastNodeHeartBeatResponseId(id);
-  }
-  
+
   @Override
   public Resource getTotalCapability() {
     return node.getTotalCapability();
@@ -124,8 +120,8 @@ public class RMNodeWrapper implements RMNode {
 
   @Override
   public void updateNodeHeartbeatResponseForCleanup(
-          NodeHeartbeatResponse nodeHeartbeatResponse, TransactionState ts) {
-    node.updateNodeHeartbeatResponseForCleanup(nodeHeartbeatResponse, ts);
+          NodeHeartbeatResponse nodeHeartbeatResponse) {
+    node.updateNodeHeartbeatResponseForCleanup(nodeHeartbeatResponse);
   }
 
   @Override
@@ -134,8 +130,13 @@ public class RMNodeWrapper implements RMNode {
   }
 
   @Override
+  public void resetLastNodeHeartBeatResponse() {
+    node.getLastNodeHeartBeatResponse().setResponseId(0);
+  }
+
+  @Override
   @SuppressWarnings("unchecked")
-  public List<UpdatedContainerInfo> pullContainerUpdates(TransactionState ts) {
+  public List<UpdatedContainerInfo> pullContainerUpdates() {
     List<UpdatedContainerInfo> list = Collections.EMPTY_LIST;
     if (! pulled) {
       list = updates;
@@ -154,30 +155,7 @@ public class RMNodeWrapper implements RMNode {
   }
 
   @Override
-  public void setResourceOption(ResourceOption resourceOption) {
-    node.setResourceOption(resourceOption);
+  public Set<String> getNodeLabels() {
+    return RMNodeLabelsManager.EMPTY_STRING_SET;
   }
-  
-  @Override
-  public ResourceOption getResourceOption() {
-    return node.getResourceOption();
-  }
-
-    @Override
-    public void recover(RMStateStore.RMState state) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setContainersToCleanUp(Set<ContainerId> newSet) {
-    }
-
-    @Override
-    public void setAppsToCleanup(List<ApplicationId> newList) {
-    }
-
-    @Override
-    public void setNextHeartBeat(boolean nextHeartbeat) {
-    }
-  
 }

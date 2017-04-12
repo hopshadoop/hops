@@ -177,7 +177,7 @@ public class DBInputFormat<T  extends DBWritable>
   /** {@inheritDoc} */
   public InputSplit[] getSplits(JobConf job, int chunks) throws IOException {
     List<org.apache.hadoop.mapreduce.InputSplit> newSplits = 
-      super.getSplits(new Job(job));
+      super.getSplits(Job.getInstance(job));
     InputSplit[] ret = new InputSplit[newSplits.size()];
     int i = 0;
     for (org.apache.hadoop.mapreduce.InputSplit s : newSplits) {
@@ -195,8 +195,8 @@ public class DBInputFormat<T  extends DBWritable>
    * @param inputClass the class object implementing DBWritable, which is the 
    * Java object holding tuple fields.
    * @param tableName The table to read data from
-   * @param conditions The condition which to select data with, eg. '(updated >
-   * 20070101 AND length > 0)'
+   * @param conditions The condition which to select data with, eg. '(updated &gt;
+   * 20070101 AND length &gt; 0)'
    * @param orderBy the fieldNames in the orderBy clause.
    * @param fieldNames The field names in the table
    * @see #setInput(JobConf, Class, String, String)

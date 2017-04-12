@@ -29,7 +29,7 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintStream;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -98,6 +98,7 @@ public class TestMRJobClient extends ClusterMapReduceTestCase {
   }
   
   public void testJobSubmissionSpecsAndFiles() throws Exception {
+    purgeOutputDir();
     Configuration conf = createJobConf();
     Job job = MapReduceTestUtil.createJob(conf, getInputDir(), getOutputDir(),
         1, 1);
@@ -127,34 +128,49 @@ public class TestMRJobClient extends ClusterMapReduceTestCase {
 
     String jobId = job.getJobID().toString();
     // test all jobs list
+    purgeOutputDir();
     testAllJobList(jobId, conf);
     // test only submitted jobs list
+    purgeOutputDir();
     testSubmittedJobList(conf);
     // test job counter
+    purgeOutputDir();
     testGetCounter(jobId, conf);
     // status
+    purgeOutputDir();
     testJobStatus(jobId, conf);
     // test list of events
+    purgeOutputDir();
     testJobEvents(jobId, conf);
     // test job history
+    purgeOutputDir();
     testJobHistory(conf);
     // test tracker list
+    purgeOutputDir();
     testListTrackers(conf);
     // attempts list
+    purgeOutputDir();
     testListAttemptIds(jobId, conf);
     // black list
+    purgeOutputDir();
     testListBlackList(conf);
     // test method main and help screen
+    purgeOutputDir();
     startStop();
     // test a change job priority .
+    purgeOutputDir();
     testChangingJobPriority(jobId, conf);
     // submit job from file
+    purgeOutputDir();
     testSubmit(conf);
     // kill a task
+    purgeOutputDir();
     testKillTask(conf);
     // fail a task
+    purgeOutputDir();
     testfailTask(conf);
     // kill job
+    purgeOutputDir();
     testKillJob(conf);
   }
 

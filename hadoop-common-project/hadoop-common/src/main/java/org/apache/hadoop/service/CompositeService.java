@@ -68,7 +68,7 @@ public class CompositeService extends AbstractService {
    * {@link CompositeService}
    * @param service the {@link Service} to be added
    */
-  public void addService(Service service) {
+  protected void addService(Service service) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Adding service " + service.getName());
     }
@@ -141,8 +141,7 @@ public class CompositeService extends AbstractService {
    * @throws RuntimeException the first exception raised during the
    * stop process -<i>after all services are stopped</i>
    */
-  private synchronized void stop(int numOfServicesStarted,
-                                 boolean stopOnlyStartedServices) {
+  private void stop(int numOfServicesStarted, boolean stopOnlyStartedServices) {
     // stop in reverse order of start
     Exception firstException = null;
     List<Service> services = getServices();

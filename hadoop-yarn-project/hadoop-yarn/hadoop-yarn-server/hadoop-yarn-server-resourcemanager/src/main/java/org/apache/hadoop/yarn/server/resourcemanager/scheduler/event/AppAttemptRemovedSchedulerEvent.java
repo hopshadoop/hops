@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 
@@ -30,9 +29,8 @@ public class AppAttemptRemovedSchedulerEvent extends SchedulerEvent {
 
   public AppAttemptRemovedSchedulerEvent(
       ApplicationAttemptId applicationAttemptId,
-      RMAppAttemptState finalAttemptState, boolean keepContainers,
-      TransactionState transactionState) {
-    super(SchedulerEventType.APP_ATTEMPT_REMOVED, transactionState);
+      RMAppAttemptState finalAttemptState, boolean keepContainers) {
+    super(SchedulerEventType.APP_ATTEMPT_REMOVED);
     this.applicationAttemptId = applicationAttemptId;
     this.finalAttemptState = finalAttemptState;
     this.keepContainersAcrossAppAttempts = keepContainers;

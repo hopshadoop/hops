@@ -18,20 +18,21 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceWeights;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
  * Dummy implementation of Schedulable for unit testing.
  */
-public class FakeSchedulable extends Schedulable {
+public class FakeSchedulable implements Schedulable {
   private Resource usage;
   private Resource minShare;
   private Resource maxShare;
+  private Resource fairShare;
   private ResourceWeights weights;
   private Priority priority;
   private long startTime;
@@ -56,24 +57,20 @@ public class FakeSchedulable extends Schedulable {
     this(minShare, maxShare, memoryWeight, 0, 0, 0);
   }
   
-  public FakeSchedulable(int minShare, int maxShare, double weight,
-      int fairShare, int usage, long startTime) {
-    this(Resources.createResource(minShare, 0),
-        Resources.createResource(maxShare, 0),
-        new ResourceWeights((float) weight),
-        Resources.createResource(fairShare, 0),
+  public FakeSchedulable(int minShare, int maxShare, double weight, int fairShare, int usage,
+      long startTime) {
+    this(Resources.createResource(minShare, 0), Resources.createResource(maxShare, 0),
+        new ResourceWeights((float)weight), Resources.createResource(fairShare, 0),
         Resources.createResource(usage, 0), startTime);
   }
   
   public FakeSchedulable(Resource minShare, ResourceWeights weights) {
-    this(minShare,
-        Resources.createResource(Integer.MAX_VALUE, Integer.MAX_VALUE), weights,
-        Resources.createResource(0, 0), Resources.createResource(0, 0), 0);
+    this(minShare, Resources.createResource(Integer.MAX_VALUE, Integer.MAX_VALUE),
+        weights, Resources.createResource(0, 0), Resources.createResource(0, 0), 0);
   }
   
   public FakeSchedulable(Resource minShare, Resource maxShare,
-      ResourceWeights weight, Resource fairShare, Resource usage,
-      long startTime) {
+      ResourceWeights weight, Resource fairShare, Resource usage, long startTime) {
     this.minShare = minShare;
     this.maxShare = maxShare;
     this.weights = weight;
@@ -84,9 +81,23 @@ public class FakeSchedulable extends Schedulable {
   }
   
   @Override
-  public Resource assignContainer(FSSchedulerNode node,
-      TransactionState transactionState) {
+  public Resource assignContainer(FSSchedulerNode node) {
     return null;
+  }
+
+  @Override
+  public RMContainer preemptContainer() {
+    return null;
+  }
+
+  @Override
+  public Resource getFairShare() {
+    return this.fairShare;
+  }
+
+  @Override
+  public void setFairShare(Resource fairShare) {
+    this.fairShare = fairShare;
   }
 
   @Override
@@ -130,6 +141,5 @@ public class FakeSchedulable extends Schedulable {
   }
 
   @Override
-  public void updateDemand() {
-  }
+  public void updateDemand() {}
 }

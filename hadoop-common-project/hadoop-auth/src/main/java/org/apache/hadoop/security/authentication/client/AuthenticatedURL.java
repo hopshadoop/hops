@@ -24,19 +24,18 @@ import java.util.Map;
 /**
  * The {@link AuthenticatedURL} class enables the use of the JDK {@link URL} class
  * against HTTP endpoints protected with the {@link AuthenticationFilter}.
- * <p/>
+ * <p>
  * The authentication mechanisms supported by default are Hadoop Simple  authentication
  * (also known as pseudo authentication) and Kerberos SPNEGO authentication.
- * <p/>
+ * <p>
  * Additional authentication mechanisms can be supported via {@link Authenticator} implementations.
- * <p/>
+ * <p>
  * The default {@link Authenticator} is the {@link KerberosAuthenticator} class which supports
  * automatic fallback from Kerberos SPNEGO to Hadoop Simple authentication.
- * <p/>
+ * <p>
  * <code>AuthenticatedURL</code> instances are not thread-safe.
- * <p/>
+ * <p>
  * The usage pattern of the {@link AuthenticatedURL} is:
- * <p/>
  * <pre>
  *
  * // establishing an initial connection
@@ -120,32 +119,6 @@ public class AuthenticatedURL {
       return token;
     }
 
-    /**
-     * Return the hashcode for the token.
-     *
-     * @return the hashcode for the token.
-     */
-    @Override
-    public int hashCode() {
-      return (token != null) ? token.hashCode() : 0;
-    }
-
-    /**
-     * Return if two token instances are equal.
-     *
-     * @param o the other token instance.
-     *
-     * @return if this instance and the other instance are equal.
-     */
-    @Override
-    public boolean equals(Object o) {
-      boolean eq = false;
-      if (o instanceof Token) {
-        Token other = (Token) o;
-        eq = (token == null && other.token == null) || (token != null && this.token.equals(other.token));
-      }
-      return eq;
-    }
   }
 
   private static Class<? extends Authenticator> DEFAULT_AUTHENTICATOR = KerberosAuthenticator.class;
@@ -209,6 +182,16 @@ public class AuthenticatedURL {
   }
 
   /**
+   * Returns the {@link Authenticator} instance used by the
+   * <code>AuthenticatedURL</code>.
+   *
+   * @return the {@link Authenticator} instance
+   */
+  protected Authenticator getAuthenticator() {
+    return authenticator;
+  }
+
+  /**
    * Returns an authenticated {@link HttpURLConnection}.
    *
    * @param url the URL to connect to. Only HTTP/S URLs are supported.
@@ -256,7 +239,7 @@ public class AuthenticatedURL {
 
   /**
    * Helper method that extracts an authentication token received from a connection.
-   * <p/>
+   * <p>
    * This method is used by {@link Authenticator} implementations.
    *
    * @param conn connection to extract the authentication token from.
@@ -266,7 +249,10 @@ public class AuthenticatedURL {
    * @throws AuthenticationException if an authentication exception occurred.
    */
   public static void extractToken(HttpURLConnection conn, Token token) throws IOException, AuthenticationException {
-    if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+    int respCode = conn.getResponseCode();
+    if (respCode == HttpURLConnection.HTTP_OK
+        || respCode == HttpURLConnection.HTTP_CREATED
+        || respCode == HttpURLConnection.HTTP_ACCEPTED) {
       Map<String, List<String>> headers = conn.getHeaderFields();
       List<String> cookies = headers.get("Set-Cookie");
       if (cookies != null) {

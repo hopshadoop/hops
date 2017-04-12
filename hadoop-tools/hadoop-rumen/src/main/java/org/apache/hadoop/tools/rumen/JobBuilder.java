@@ -26,6 +26,8 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.mapred.TaskStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -38,9 +40,11 @@ import org.apache.hadoop.mapreduce.jobhistory.JobInitedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobPriorityChangeEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobStatusChangedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobSubmittedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobQueueChangeEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobUnsuccessfulCompletionEvent;
 import org.apache.hadoop.mapreduce.jobhistory.MapAttemptFinished;
 import org.apache.hadoop.mapreduce.jobhistory.MapAttemptFinishedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.NormalizedResourceEvent;
 import org.apache.hadoop.mapreduce.jobhistory.ReduceAttemptFinished;
 import org.apache.hadoop.mapreduce.jobhistory.ReduceAttemptFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptFinished;
@@ -65,6 +69,8 @@ public class JobBuilder {
   private static final long BYTES_IN_MEG =
       StringUtils.TraditionalBinaryPrefix.string2long("1m");
 
+  static final private Log LOG = LogFactory.getLog(JobBuilder.class);
+  
   private String jobID;
 
   private boolean finalized = false;
@@ -136,6 +142,9 @@ public class JobBuilder {
       // ignore this event as Rumen currently doesnt need this event
       //TODO Enhance Rumen to process this event and capture restarts
       return;
+    } else if (event instanceof NormalizedResourceEvent) {
+      // Log an warn message as NormalizedResourceEvent shouldn't be written.
+      LOG.warn("NormalizedResourceEvent should be ignored in history server.");
     } else if (event instanceof JobFinishedEvent) {
       processJobFinishedEvent((JobFinishedEvent) event);
     } else if (event instanceof JobInfoChangeEvent) {
@@ -144,6 +153,8 @@ public class JobBuilder {
       processJobInitedEvent((JobInitedEvent) event);
     } else if (event instanceof JobPriorityChangeEvent) {
       processJobPriorityChangeEvent((JobPriorityChangeEvent) event);
+    } else if (event instanceof JobQueueChangeEvent) {
+      processJobQueueChangeEvent((JobQueueChangeEvent) event);
     } else if (event instanceof JobStatusChangedEvent) {
       processJobStatusChangedEvent((JobStatusChangedEvent) event);
     } else if (event instanceof JobSubmittedEvent) {
@@ -170,7 +181,8 @@ public class JobBuilder {
       processTaskUpdatedEvent((TaskUpdatedEvent) event);
     } else
       throw new IllegalArgumentException(
-          "JobBuilder.process(HistoryEvent): unknown event type");
+          "JobBuilder.process(HistoryEvent): unknown event type:"
+          + event.getEventType() + " for event:" + event);
   }
 
   static String extract(Properties conf, String[] names, String defaultValue) {
@@ -421,7 +433,7 @@ public class JobBuilder {
       return Values.SUCCESS;
     }
     
-    return Values.valueOf(name.toUpperCase());
+    return Values.valueOf(StringUtils.toUpperCase(name));
   }
 
   private void processTaskUpdatedEvent(TaskUpdatedEvent event) {
@@ -604,6 +616,14 @@ public class JobBuilder {
     result.putJobConfPath(event.getJobConfPath());
     result.putJobAcls(event.getJobAcls());
 
+    // set the queue name if existing
+    String queue = event.getJobQueueName();
+    if (queue != null) {
+      result.setQueue(queue);
+    }
+  }
+
+  private void processJobQueueChangeEvent(JobQueueChangeEvent event) {
     // set the queue name if existing
     String queue = event.getJobQueueName();
     if (queue != null) {

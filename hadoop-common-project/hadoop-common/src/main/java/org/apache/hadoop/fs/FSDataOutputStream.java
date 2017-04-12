@@ -67,7 +67,10 @@ public class FSDataOutputStream extends DataOutputStream
     }
     
     public void close() throws IOException {
-      out.close();
+      // ensure close works even if a null reference was passed in
+      if (out != null) {
+        out.close();
+      }
     }
   }
 
@@ -104,7 +107,7 @@ public class FSDataOutputStream extends DataOutputStream
   }
 
   /**
-   * Get a reference to the wrapped output stream. Used by unit tests.
+   * Get a reference to the wrapped output stream.
    *
    * @return the underlying output stream
    */

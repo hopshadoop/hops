@@ -30,7 +30,7 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.NMTokenProtoOrBuilder;
 
 @Private
 @Unstable
-public class NMTokenPBImpl extends NMToken {
+public class NMTokenPBImpl extends NMToken{
   
   NMTokenProto proto = NMTokenProto.getDefaultInstance();
   NMTokenProto.Builder builder = null;
@@ -57,7 +57,7 @@ public class NMTokenPBImpl extends NMToken {
     if (!p.hasNodeId()) {
       return null;
     }
-    this.nodeId = convertFromProtoFormat(p.getNodeId());
+    this.nodeId = convertFromProtoFormat(p.getNodeId()); 
     return nodeId;
   }
 
@@ -79,7 +79,7 @@ public class NMTokenPBImpl extends NMToken {
     if (!p.hasToken()) {
       return null;
     }
-    this.token = convertFromProtoFormat(p.getToken());
+    this.token = convertFromProtoFormat(p.getToken()); 
     return token;
   }
 
@@ -118,7 +118,7 @@ public class NMTokenPBImpl extends NMToken {
   }
   
   private synchronized void maybeInitBuilder() {
-    if (viaProto || builder == null) {
+    if(viaProto || builder == null) {
       builder = NMTokenProto.newBuilder(proto);
     }
     viaProto = false;
@@ -129,11 +129,11 @@ public class NMTokenPBImpl extends NMToken {
   }
   
   private synchronized NodeIdProto convertToProtoFormat(NodeId nodeId) {
-    return ((NodeIdPBImpl) nodeId).getProto();
+    return ((NodeIdPBImpl)nodeId).getProto();
   }
   
   private synchronized TokenProto convertToProtoFormat(Token token) {
-    return ((TokenPBImpl) token).getProto();
+    return ((TokenPBImpl)token).getProto();
   }
   
   private synchronized Token convertFromProtoFormat(TokenProto proto) {

@@ -181,7 +181,7 @@ public class BlockInfo extends Block {
     //if we call get block collection op of that copy then it should return null
 
     BlockCollection bc = (BlockCollection) EntityManager
-        .find(INodeFile.Finder.ByINodeId, inodeId);
+        .find(INodeFile.Finder.ByINodeIdFTIS, inodeId);
     this.bc = bc;
     if (bc == null) {
       this.inodeId = INode.NON_EXISTING_ID;
@@ -228,7 +228,9 @@ public class BlockInfo extends Block {
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicasNoCheck();
     getDatanodes(datanodeMgr, replicas);
-    Collections.sort(replicas, Replica.Order.ByStorageId);
+    //getReplicasNoCheck return a sorted list of replicas.
+    //There is no need to sort the list again after removing the dead replicas.
+    //Collections.sort(replicas, Replica.Order.ByStorageId);
     return replicas;
   }
 

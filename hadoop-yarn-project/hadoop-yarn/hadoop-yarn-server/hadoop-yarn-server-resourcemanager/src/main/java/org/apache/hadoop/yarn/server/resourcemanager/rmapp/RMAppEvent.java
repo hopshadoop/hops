@@ -18,21 +18,30 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.event.AbstractEventTransaction;
+import org.apache.hadoop.yarn.event.AbstractEvent;
 
-public class RMAppEvent extends AbstractEventTransaction<RMAppEventType> {
+public class RMAppEvent extends AbstractEvent<RMAppEventType>{
 
   private final ApplicationId appId;
+  private final String diagnosticMsg;
+
+  public RMAppEvent(ApplicationId appId, RMAppEventType type) {
+    this(appId, type, "");
+  }
 
   public RMAppEvent(ApplicationId appId, RMAppEventType type,
-      TransactionState transactionState) {
-    super(type, transactionState);
+      String diagnostic) {
+    super(type);
     this.appId = appId;
+    this.diagnosticMsg = diagnostic;
   }
 
   public ApplicationId getApplicationId() {
     return this.appId;
+  }
+
+  public String getDiagnosticMsg() {
+    return this.diagnosticMsg;
   }
 }

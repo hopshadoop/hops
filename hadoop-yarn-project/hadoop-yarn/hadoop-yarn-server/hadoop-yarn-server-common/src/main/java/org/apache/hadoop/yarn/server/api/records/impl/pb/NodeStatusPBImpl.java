@@ -19,6 +19,10 @@
 package org.apache.hadoop.yarn.server.api.records.impl.pb;
 
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -33,11 +37,7 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.NodeStatusProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.NodeStatusProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
-
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
+    
 
 public class NodeStatusPBImpl extends NodeStatus {
   NodeStatusProto proto = NodeStatusProto.getDefaultInstance();
@@ -81,9 +81,8 @@ public class NodeStatusPBImpl extends NodeStatus {
   }
 
   private synchronized void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     
@@ -96,73 +95,70 @@ public class NodeStatusPBImpl extends NodeStatus {
     }
     viaProto = false;
   }
-
+    
   private synchronized void addContainersToProto() {
     maybeInitBuilder();
     builder.clearContainersStatuses();
-    if (containers == null) {
+    if (containers == null)
       return;
-    }
-    Iterable<ContainerStatusProto> iterable =
-        new Iterable<ContainerStatusProto>() {
+    Iterable<ContainerStatusProto> iterable = new Iterable<ContainerStatusProto>() {
+      @Override
+      public Iterator<ContainerStatusProto> iterator() {
+        return new Iterator<ContainerStatusProto>() {
+  
+          Iterator<ContainerStatus> iter = containers.iterator();
+  
           @Override
-          public Iterator<ContainerStatusProto> iterator() {
-            return new Iterator<ContainerStatusProto>() {
-
-              Iterator<ContainerStatus> iter = containers.iterator();
-
-              @Override
-              public boolean hasNext() {
-                return iter.hasNext();
-              }
-
-              @Override
-              public ContainerStatusProto next() {
-                return convertToProtoFormat(iter.next());
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-
-              }
-            };
-
+          public boolean hasNext() {
+            return iter.hasNext();
+          }
+  
+          @Override
+          public ContainerStatusProto next() {
+            return convertToProtoFormat(iter.next());
+          }
+  
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
+  
           }
         };
+  
+      }
+    };
     builder.addAllContainersStatuses(iterable);
   }
   
   private synchronized void addKeepAliveApplicationsToProto() {
     maybeInitBuilder();
     builder.clearKeepAliveApplications();
-    if (keepAliveApplications == null) {
+    if (keepAliveApplications == null)
       return;
-    }
     Iterable<ApplicationIdProto> iterable = new Iterable<ApplicationIdProto>() {
       @Override
       public Iterator<ApplicationIdProto> iterator() {
         return new Iterator<ApplicationIdProto>() {
-
+  
           Iterator<ApplicationId> iter = keepAliveApplications.iterator();
-
+  
           @Override
           public boolean hasNext() {
             return iter.hasNext();
           }
-
+  
           @Override
           public ApplicationIdProto next() {
             return convertToProtoFormat(iter.next());
           }
-
+  
           @Override
           public void remove() {
             throw new UnsupportedOperationException();
-
+  
           }
         };
-
+  
       }
     };
     builder.addAllKeepAliveApplications(iterable);
@@ -175,9 +171,8 @@ public class NodeStatusPBImpl extends NodeStatus {
   
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -189,13 +184,11 @@ public class NodeStatusPBImpl extends NodeStatus {
     NodeStatusProtoOrBuilder p = viaProto ? proto : builder;
     return p.getResponseId();
   }
-
   @Override
   public synchronized void setResponseId(int responseId) {
     maybeInitBuilder();
     builder.setResponseId(responseId);
   }
-
   @Override
   public synchronized NodeId getNodeId() {
     NodeStatusProtoOrBuilder p = viaProto ? proto : builder;
@@ -213,9 +206,8 @@ public class NodeStatusPBImpl extends NodeStatus {
   @Override
   public synchronized void setNodeId(NodeId nodeId) {
     maybeInitBuilder();
-    if (nodeId == null) {
+    if (nodeId == null)
       builder.clearNodeId();
-    }
     this.nodeId = nodeId;
     
   }
@@ -242,8 +234,7 @@ public class NodeStatusPBImpl extends NodeStatus {
   }
   
   @Override
-  public synchronized void setKeepAliveApplications(
-      List<ApplicationId> appIds) {
+  public synchronized void setKeepAliveApplications(List<ApplicationId> appIds) {
     if (appIds == null) {
       builder.clearKeepAliveApplications();
     }
@@ -301,7 +292,7 @@ public class NodeStatusPBImpl extends NodeStatus {
   }
 
   private NodeIdProto convertToProtoFormat(NodeId nodeId) {
-    return ((NodeIdPBImpl) nodeId).getProto();
+    return ((NodeIdPBImpl)nodeId).getProto();
   }
   
   private NodeId convertFromProtoFormat(NodeIdProto proto) {
@@ -322,7 +313,7 @@ public class NodeStatusPBImpl extends NodeStatus {
   }
   
   private ContainerStatusProto convertToProtoFormat(ContainerStatus c) {
-    return ((ContainerStatusPBImpl) c).getProto();
+    return ((ContainerStatusPBImpl)c).getProto();
   }
   
   private ApplicationIdPBImpl convertFromProtoFormat(ApplicationIdProto c) {
@@ -330,6 +321,6 @@ public class NodeStatusPBImpl extends NodeStatus {
   }
   
   private ApplicationIdProto convertToProtoFormat(ApplicationId c) {
-    return ((ApplicationIdPBImpl) c).getProto();
+    return ((ApplicationIdPBImpl)c).getProto();
   }
 }

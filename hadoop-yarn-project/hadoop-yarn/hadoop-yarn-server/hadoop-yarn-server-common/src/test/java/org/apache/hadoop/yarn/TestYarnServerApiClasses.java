@@ -18,6 +18,13 @@
 
 package org.apache.hadoop.yarn;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -41,20 +48,13 @@ import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeStatusPBImpl;
 import org.junit.Test;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 /**
  * Simple test classes from org.apache.hadoop.yarn.server.api
  */
 public class TestYarnServerApiClasses {
 
-  private final static org.apache.hadoop.yarn.factories.RecordFactory
-      recordFactory = RecordFactoryProvider.getRecordFactory(null);
+  private final static org.apache.hadoop.yarn.factories.RecordFactory recordFactory = RecordFactoryProvider
+      .getRecordFactory(null);
 
   /**
    * Test RegisterNodeManagerResponsePBImpl. Test getters and setters. The
@@ -71,7 +71,8 @@ public class TestYarnServerApiClasses {
     original.setDiagnosticsMessage("testDiagnosticMessage");
 
     RegisterNodeManagerResponsePBImpl copy =
-        new RegisterNodeManagerResponsePBImpl(original.getProto());
+        new RegisterNodeManagerResponsePBImpl(
+            original.getProto());
     assertEquals(1, copy.getContainerTokenMasterKey().getKeyId());
     assertEquals(1, copy.getNMTokenMasterKey().getKeyId());
     assertEquals(NodeAction.NORMAL, copy.getNodeAction());
@@ -88,8 +89,8 @@ public class TestYarnServerApiClasses {
     original.setLastKnownContainerTokenMasterKey(getMasterKey());
     original.setLastKnownNMTokenMasterKey(getMasterKey());
     original.setNodeStatus(getNodeStatus());
-    NodeHeartbeatRequestPBImpl copy =
-        new NodeHeartbeatRequestPBImpl(original.getProto());
+    NodeHeartbeatRequestPBImpl copy = new NodeHeartbeatRequestPBImpl(
+        original.getProto());
     assertEquals(1, copy.getLastKnownContainerTokenMasterKey().getKeyId());
     assertEquals(1, copy.getLastKnownNMTokenMasterKey().getKeyId());
     assertEquals("localhost", copy.getNodeStatus().getNodeId().getHost());
@@ -110,8 +111,8 @@ public class TestYarnServerApiClasses {
     original.setNodeAction(NodeAction.NORMAL);
     original.setResponseId(100);
 
-    NodeHeartbeatResponsePBImpl copy =
-        new NodeHeartbeatResponsePBImpl(original.getProto());
+    NodeHeartbeatResponsePBImpl copy = new NodeHeartbeatResponsePBImpl(
+        original.getProto());
     assertEquals(100, copy.getResponseId());
     assertEquals(NodeAction.NORMAL, copy.getNodeAction());
     assertEquals(1000, copy.getNextHeartBeatInterval());
@@ -126,16 +127,15 @@ public class TestYarnServerApiClasses {
 
   @Test
   public void testRegisterNodeManagerRequestPBImpl() {
-    RegisterNodeManagerRequestPBImpl original =
-        new RegisterNodeManagerRequestPBImpl();
+    RegisterNodeManagerRequestPBImpl original = new RegisterNodeManagerRequestPBImpl();
     original.setHttpPort(8080);
     original.setNodeId(getNodeId());
     Resource resource = recordFactory.newRecordInstance(Resource.class);
     resource.setMemory(10000);
     resource.setVirtualCores(2);
     original.setResource(resource);
-    RegisterNodeManagerRequestPBImpl copy =
-        new RegisterNodeManagerRequestPBImpl(original.getProto());
+    RegisterNodeManagerRequestPBImpl copy = new RegisterNodeManagerRequestPBImpl(
+        original.getProto());
 
     assertEquals(8080, copy.getHttpPort());
     assertEquals(9090, copy.getNodeId().getPort());
@@ -168,8 +168,8 @@ public class TestYarnServerApiClasses {
   public void testSerializedExceptionPBImpl() {
     SerializedExceptionPBImpl original = new SerializedExceptionPBImpl();
     original.init("testMessage");
-    SerializedExceptionPBImpl copy =
-        new SerializedExceptionPBImpl(original.getProto());
+    SerializedExceptionPBImpl copy = new SerializedExceptionPBImpl(
+        original.getProto());
     assertEquals("testMessage", copy.getMessage());
 
     original = new SerializedExceptionPBImpl();
@@ -177,8 +177,8 @@ public class TestYarnServerApiClasses {
     copy = new SerializedExceptionPBImpl(original.getProto());
     assertEquals("testMessage", copy.getMessage());
     assertEquals("parent", copy.getCause().getMessage());
-    assertTrue(copy.getRemoteTrace()
-        .startsWith("java.lang.Throwable: java.lang.Throwable: parent"));
+    assertTrue( copy.getRemoteTrace().startsWith(
+        "java.lang.Throwable: java.lang.Throwable: parent"));
 
   }
 
@@ -190,17 +190,17 @@ public class TestYarnServerApiClasses {
   public void testNodeStatusPBImpl() {
     NodeStatusPBImpl original = new NodeStatusPBImpl();
 
-    original.setContainersStatuses(Arrays
-        .asList(getContainerStatus(1, 2, 1), getContainerStatus(2, 3, 1)));
-    original.setKeepAliveApplications(
-        Arrays.asList(getApplicationId(3), getApplicationId(4)));
+    original.setContainersStatuses(Arrays.asList(getContainerStatus(1, 2, 1),
+        getContainerStatus(2, 3, 1)));
+    original.setKeepAliveApplications(Arrays.asList(getApplicationId(3),
+        getApplicationId(4)));
     original.setNodeHealthStatus(getNodeHealthStatus());
     original.setNodeId(getNodeId());
     original.setResponseId(1);
 
     NodeStatusPBImpl copy = new NodeStatusPBImpl(original.getProto());
-    assertEquals(3,
-        copy.getContainersStatuses().get(1).getContainerId().getId());
+    assertEquals(3L, copy.getContainersStatuses().get(1).getContainerId()
+        .getContainerId());
     assertEquals(3, copy.getKeepAliveApplications().get(0).getId());
     assertEquals(1000, copy.getNodeHealthStatus().getLastHealthReportTime());
     assertEquals(9090, copy.getNodeId().getPort());
@@ -208,23 +208,23 @@ public class TestYarnServerApiClasses {
 
   }
 
-  private ContainerStatus getContainerStatus(int applicationId, int containerID,
-      int appAttemptId) {
-    ContainerStatus status =
-        recordFactory.newRecordInstance(ContainerStatus.class);
+  private ContainerStatus getContainerStatus(int applicationId,
+      int containerID, int appAttemptId) {
+    ContainerStatus status = recordFactory
+        .newRecordInstance(ContainerStatus.class);
     status.setContainerId(getContainerId(containerID, appAttemptId));
     return status;
   }
 
   private ApplicationAttemptId getApplicationAttemptId(int appAttemptId) {
-    ApplicationAttemptId result = ApplicationAttemptIdPBImpl
-        .newInstance(getApplicationId(appAttemptId), appAttemptId);
+    ApplicationAttemptId result = ApplicationAttemptIdPBImpl.newInstance(
+        getApplicationId(appAttemptId), appAttemptId);
     return result;
   }
 
   private ContainerId getContainerId(int containerID, int appAttemptId) {
-    ContainerId containerId = ContainerIdPBImpl
-        .newInstance(getApplicationAttemptId(appAttemptId), containerID);
+    ContainerId containerId = ContainerIdPBImpl.newContainerId(
+        getApplicationAttemptId(appAttemptId), containerID);
     return containerId;
   }
 
@@ -256,8 +256,8 @@ public class TestYarnServerApiClasses {
   }
 
   private NodeHealthStatus getNodeHealthStatus() {
-    NodeHealthStatus healStatus =
-        recordFactory.newRecordInstance(NodeHealthStatus.class);
+    NodeHealthStatus healStatus = recordFactory
+        .newRecordInstance(NodeHealthStatus.class);
     healStatus.setHealthReport("healthReport");
     healStatus.setIsNodeHealthy(true);
     healStatus.setLastHealthReportTime(1000);

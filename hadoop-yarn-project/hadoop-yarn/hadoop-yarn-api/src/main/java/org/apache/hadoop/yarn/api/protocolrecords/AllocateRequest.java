@@ -18,37 +18,36 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
 import org.apache.hadoop.yarn.api.records.ResourceBlacklistRequest;
+import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.util.List;
-
 /**
- * <p>The core request sent by the <code>ApplicationMaster</code> to the
- * <code>ResourceManager</code> to obtain resources in the cluster.</p>
- * <p/>
+ * <p>The core request sent by the <code>ApplicationMaster</code> to the 
+ * <code>ResourceManager</code> to obtain resources in the cluster.</p> 
+ *
  * <p>The request includes:
  * <ul>
- * <li>A response id to track duplicate responses.</li>
- * <li>Progress information.</li>
- * <li>
- * A list of {@link ResourceRequest} to inform the
- * <code>ResourceManager</code> about the application's
- * resource requirements.
- * </li>
- * <li>
- * A list of unused {@link Container} which are being returned.
- * </li>
+ *   <li>A response id to track duplicate responses.</li>
+ *   <li>Progress information.</li>
+ *   <li>
+ *     A list of {@link ResourceRequest} to inform the
+ *     <code>ResourceManager</code> about the application's
+ *     resource requirements.
+ *   </li>
+ *   <li>
+ *     A list of unused {@link Container} which are being returned.
+ *   </li>
  * </ul>
- * </p>
- *
+ * 
  * @see ApplicationMasterProtocol#allocate(AllocateRequest)
  */
 @Public
@@ -84,7 +83,6 @@ public abstract class AllocateRequest {
   
   /**
    * Get the <em>response id</em> used to track duplicate responses.
-   *
    * @return <em>response id</em>
    */
   @Public
@@ -93,17 +91,14 @@ public abstract class AllocateRequest {
 
   /**
    * Set the <em>response id</em> used to track duplicate responses.
-   *
-   * @param id
-   *     <em>response id</em>
+   * @param id <em>response id</em>
    */
   @Public
   @Stable
   public abstract void setResponseId(int id);
 
   /**
-   * Get the <em>current progress</em> of application.
-   *
+   * Get the <em>current progress</em> of application. 
    * @return <em>current progress</em> of application
    */
   @Public
@@ -112,19 +107,15 @@ public abstract class AllocateRequest {
   
   /**
    * Set the <em>current progress</em> of application
-   *
-   * @param progress
-   *     <em>current progress</em> of application
+   * @param progress <em>current progress</em> of application
    */
   @Public
   @Stable
   public abstract void setProgress(float progress);
 
   /**
-   * Get the list of <code>ResourceRequest</code> to update the
-   * <code>ResourceManager</code> about the application's resource
-   * requirements.
-   *
+   * Get the list of <code>ResourceRequest</code> to update the 
+   * <code>ResourceManager</code> about the application's resource requirements.
    * @return the list of <code>ResourceRequest</code>
    * @see ResourceRequest
    */
@@ -134,13 +125,10 @@ public abstract class AllocateRequest {
   
   /**
    * Set list of <code>ResourceRequest</code> to update the
-   * <code>ResourceManager</code> about the application's resource
-   * requirements.
-   *
-   * @param resourceRequests
-   *     list of <code>ResourceRequest</code> to update the
-   *     <code>ResourceManager</code> about the application's
-   *     resource requirements
+   * <code>ResourceManager</code> about the application's resource requirements.
+   * @param resourceRequests list of <code>ResourceRequest</code> to update the 
+   *                        <code>ResourceManager</code> about the application's 
+   *                        resource requirements
    * @see ResourceRequest
    */
   @Public
@@ -148,11 +136,10 @@ public abstract class AllocateRequest {
   public abstract void setAskList(List<ResourceRequest> resourceRequests);
 
   /**
-   * Get the list of <code>ContainerId</code> of containers being
+   * Get the list of <code>ContainerId</code> of containers being 
    * released by the <code>ApplicationMaster</code>.
-   *
-   * @return list of <code>ContainerId</code> of containers being
-   * released by the <code>ApplicationMaster</code>
+   * @return list of <code>ContainerId</code> of containers being 
+   *         released by the <code>ApplicationMaster</code> 
    */
   @Public
   @Stable
@@ -161,22 +148,19 @@ public abstract class AllocateRequest {
   /**
    * Set the list of <code>ContainerId</code> of containers being
    * released by the <code>ApplicationMaster</code>
-   *
-   * @param releaseContainers
-   *     list of <code>ContainerId</code> of
-   *     containers being released by the
-   *     <code>ApplicationMaster</code>
+   * @param releaseContainers list of <code>ContainerId</code> of 
+   *                          containers being released by the 
+   *                          <code>ApplicationMaster</code>
    */
   @Public
   @Stable
   public abstract void setReleaseList(List<ContainerId> releaseContainers);
   
   /**
-   * Get the <code>ResourceBlacklistRequest</code> being sent by the
+   * Get the <code>ResourceBlacklistRequest</code> being sent by the 
    * <code>ApplicationMaster</code>.
-   *
-   * @return the <code>ResourceBlacklistRequest</code> being sent by the
-   * <code>ApplicationMaster</code>
+   * @return the <code>ResourceBlacklistRequest</code> being sent by the 
+   *         <code>ApplicationMaster</code>
    * @see ResourceBlacklistRequest
    */
   @Public
@@ -184,15 +168,14 @@ public abstract class AllocateRequest {
   public abstract ResourceBlacklistRequest getResourceBlacklistRequest();
   
   /**
-   * Set the <code>ResourceBlacklistRequest</code> to inform the
+   * Set the <code>ResourceBlacklistRequest</code> to inform the 
    * <code>ResourceManager</code> about the blacklist additions and removals
    * per the <code>ApplicationMaster</code>.
-   *
-   * @param resourceBlacklistRequest
-   *     the <code>ResourceBlacklistRequest</code>
-   *     to inform the <code>ResourceManager</code> about
-   *     the blacklist additions and removals
-   *     per the <code>ApplicationMaster</code>
+   * 
+   * @param resourceBlacklistRequest the <code>ResourceBlacklistRequest</code>  
+   *                         to inform the <code>ResourceManager</code> about  
+   *                         the blacklist additions and removals
+   *                         per the <code>ApplicationMaster</code>
    * @see ResourceBlacklistRequest
    */
   @Public

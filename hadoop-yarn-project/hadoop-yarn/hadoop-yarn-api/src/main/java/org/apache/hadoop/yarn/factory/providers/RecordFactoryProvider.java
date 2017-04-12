@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.factory.providers;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -25,10 +28,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-
-@LimitedPrivate({"MapReduce", "YARN"})
+@LimitedPrivate({ "MapReduce", "YARN" })
 @Unstable
 public class RecordFactoryProvider {
   private static Configuration defaultConf;
@@ -46,9 +46,9 @@ public class RecordFactoryProvider {
       //Users can specify a particular factory by providing a configuration.
       conf = defaultConf;
     }
-    String recordFactoryClassName =
-        conf.get(YarnConfiguration.IPC_RECORD_FACTORY_CLASS,
-            YarnConfiguration.DEFAULT_IPC_RECORD_FACTORY_CLASS);
+    String recordFactoryClassName = conf.get(
+        YarnConfiguration.IPC_RECORD_FACTORY_CLASS,
+        YarnConfiguration.DEFAULT_IPC_RECORD_FACTORY_CLASS);
     return (RecordFactory) getFactoryClassInstance(recordFactoryClassName);
   }
   

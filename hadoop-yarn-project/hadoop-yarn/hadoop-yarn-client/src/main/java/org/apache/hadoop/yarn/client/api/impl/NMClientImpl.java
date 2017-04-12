@@ -18,6 +18,15 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -43,20 +52,11 @@ import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy.C
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * <p>
  * This class implements {@link NMClient}. All the APIs are blocking.
  * </p>
- * <p/>
+ *
  * <p>
  * By default, this client stops all the running containers that are started by
  * it when it stops. It can be disabled via
@@ -64,7 +64,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * continue to run even after this client is stopped and till the application
  * runs at which point ResourceManager will forcefully kill them.
  * </p>
- * <p/>
+ *
  * <p>
  * Note that the blocking APIs ensure the RPC calls to <code>NodeManager</code>
  * are executed immediately, and the responses are received before these APIs
@@ -88,8 +88,7 @@ public class NMClientImpl extends NMClient {
       new ConcurrentHashMap<ContainerId, StartedContainer>();
 
   //enabled by default
-  private final AtomicBoolean cleanupRunningContainers =
-      new AtomicBoolean(true);
+  private final AtomicBoolean cleanupRunningContainers = new AtomicBoolean(true);
   private ContainerManagementProtocolProxy cmProxy;
 
   public NMClientImpl() {
@@ -148,8 +147,7 @@ public class NMClientImpl extends NMClient {
     private ContainerState state;
     
     
-    public StartedContainer(ContainerId containerId, NodeId nodeId,
-        Token containerToken) {
+    public StartedContainer(ContainerId containerId, NodeId nodeId) {
       this.containerId = containerId;
       this.nodeId = nodeId;
       state = ContainerState.NEW;
@@ -166,60 +164,57 @@ public class NMClientImpl extends NMClient {
 
   private void addStartingContainer(StartedContainer startedContainer)
       throws YarnException {
-    if (startedContainers
-        .putIfAbsent(startedContainer.containerId, startedContainer) != null) {
-      throw RPCUtil.getRemoteException(
-          "Container " + startedContainer.containerId.toString() +
-              " is already started");
+    if (startedContainers.putIfAbsent(startedContainer.containerId,
+        startedContainer) != null) {
+      throw RPCUtil.getRemoteException("Container "
+          + startedContainer.containerId.toString() + " is already started");
     }
-    startedContainers.put(startedContainer.getContainerId(), startedContainer);
   }
 
   @Override
-  public Map<String, ByteBuffer> startContainer(Container container,
-      ContainerLaunchContext containerLaunchContext)
-      throws YarnException, IOException {
+  public Map<String, ByteBuffer> startContainer(
+      Container container, ContainerLaunchContext containerLaunchContext)
+          throws YarnException, IOException {
     // Do synchronization on StartedContainer to prevent race condition
     // between startContainer and stopContainer only when startContainer is
     // in progress for a given container.
-    StartedContainer startingContainer = createStartedContainer(container);
+    StartedContainer startingContainer =
+        new StartedContainer(container.getId(), container.getNodeId());
     synchronized (startingContainer) {
       addStartingContainer(startingContainer);
       
       Map<String, ByteBuffer> allServiceResponse;
       ContainerManagementProtocolProxyData proxy = null;
       try {
-        proxy = cmProxy
-            .getProxy(container.getNodeId().toString(), container.getId());
-        StartContainerRequest scRequest = StartContainerRequest
-            .newInstance(containerLaunchContext, container.getContainerToken());
-        List<StartContainerRequest> list =
-            new ArrayList<StartContainerRequest>();
+        proxy =
+            cmProxy.getProxy(container.getNodeId().toString(),
+                container.getId());
+        StartContainerRequest scRequest =
+            StartContainerRequest.newInstance(containerLaunchContext,
+              container.getContainerToken());
+        List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
         list.add(scRequest);
         StartContainersRequest allRequests =
             StartContainersRequest.newInstance(list);
         StartContainersResponse response =
-            proxy.getContainerManagementProtocol().startContainers(allRequests);
-        if (response.getFailedRequests() != null &&
-            response.getFailedRequests().containsKey(container.getId())) {
+            proxy
+                .getContainerManagementProtocol().startContainers(allRequests);
+        if (response.getFailedRequests() != null
+            && response.getFailedRequests().containsKey(container.getId())) {
           Throwable t =
               response.getFailedRequests().get(container.getId()).deSerialize();
           parseAndThrowException(t);
         }
         allServiceResponse = response.getAllServicesMetaData();
         startingContainer.state = ContainerState.RUNNING;
-      } catch (YarnException e) {
+      } catch (YarnException | IOException e) {
         startingContainer.state = ContainerState.COMPLETE;
         // Remove the started container if it failed to start
-        removeStartedContainer(startingContainer);
-        throw e;
-      } catch (IOException e) {
-        startingContainer.state = ContainerState.COMPLETE;
-        removeStartedContainer(startingContainer);
+        startedContainers.remove(startingContainer.containerId);
         throw e;
       } catch (Throwable t) {
         startingContainer.state = ContainerState.COMPLETE;
-        removeStartedContainer(startingContainer);
+        startedContainers.remove(startingContainer.containerId);
         throw RPCUtil.getRemoteException(t);
       } finally {
         if (proxy != null) {
@@ -233,7 +228,7 @@ public class NMClientImpl extends NMClient {
   @Override
   public void stopContainer(ContainerId containerId, NodeId nodeId)
       throws YarnException, IOException {
-    StartedContainer startedContainer = getStartedContainer(containerId);
+    StartedContainer startedContainer = startedContainers.get(containerId);
 
     // Only allow one request of stopping the container to move forward
     // When entering the block, check whether the precursor has already stopped
@@ -246,7 +241,7 @@ public class NMClientImpl extends NMClient {
         stopContainerInternal(containerId, nodeId);
         // Only after successful
         startedContainer.state = ContainerState.COMPLETE;
-        removeStartedContainer(startedContainer);
+        startedContainers.remove(startedContainer.containerId);
       }
     } else {
       stopContainerInternal(containerId, nodeId);
@@ -266,8 +261,8 @@ public class NMClientImpl extends NMClient {
       GetContainerStatusesResponse response =
           proxy.getContainerManagementProtocol().getContainerStatuses(
               GetContainerStatusesRequest.newInstance(containerIds));
-      if (response.getFailedRequests() != null &&
-          response.getFailedRequests().containsKey(containerId)) {
+      if (response.getFailedRequests() != null
+          && response.getFailedRequests().containsKey(containerId)) {
         Throwable t =
             response.getFailedRequests().get(containerId).deSerialize();
         parseAndThrowException(t);
@@ -288,12 +283,13 @@ public class NMClientImpl extends NMClient {
     containerIds.add(containerId);
     try {
       proxy = cmProxy.getProxy(nodeId.toString(), containerId);
-      StopContainersResponse response = proxy.getContainerManagementProtocol()
-          .stopContainers(StopContainersRequest.newInstance(containerIds));
-      if (response.getFailedRequests() != null &&
-          response.getFailedRequests().containsKey(containerId)) {
-        Throwable t =
-            response.getFailedRequests().get(containerId).deSerialize();
+      StopContainersResponse response =
+          proxy.getContainerManagementProtocol().stopContainers(
+            StopContainersRequest.newInstance(containerIds));
+      if (response.getFailedRequests() != null
+          && response.getFailedRequests().containsKey(containerId)) {
+        Throwable t = response.getFailedRequests().get(containerId)
+          .deSerialize();
         parseAndThrowException(t);
       }
     } finally {
@@ -302,31 +298,13 @@ public class NMClientImpl extends NMClient {
       }
     }
   }
-  
-  protected synchronized StartedContainer createStartedContainer(
-      Container container) throws YarnException, IOException {
-    StartedContainer startedContainer =
-        new StartedContainer(container.getId(), container.getNodeId(),
-            container.getContainerToken());
-    return startedContainer;
-  }
-
-  protected synchronized void removeStartedContainer(
-      StartedContainer container) {
-    startedContainers.remove(container.containerId);
-  }
-
-  protected synchronized StartedContainer getStartedContainer(
-      ContainerId containerId) {
-    return startedContainers.get(containerId);
-  }
 
   public AtomicBoolean getCleanupRunningContainers() {
     return cleanupRunningContainers;
   }
 
-  private void parseAndThrowException(Throwable t)
-      throws YarnException, IOException {
+  private void parseAndThrowException(Throwable t) throws YarnException,
+      IOException {
     if (t instanceof YarnException) {
       throw (YarnException) t;
     } else if (t instanceof InvalidToken) {

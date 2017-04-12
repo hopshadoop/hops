@@ -18,31 +18,35 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import io.hops.ha.common.TransactionState;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.util.resource.Resources;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
 
 @Private
 @Unstable
 public class FSParentQueue extends FSQueue {
-  private static final Log LOG =
-      LogFactory.getLog(FSParentQueue.class.getName());
+  private static final Log LOG = LogFactory.getLog(
+      FSParentQueue.class.getName());
 
-  private final List<FSQueue> childQueues = new ArrayList<FSQueue>();
+  private final List<FSQueue> childQueues = 
+      new ArrayList<FSQueue>();
   private Resource demand = Resources.createResource(0);
   private int runnableApps;
   
@@ -64,6 +68,25 @@ public class FSParentQueue extends FSQueue {
     }
   }
 
+  public void recomputeSteadyShares() {
+    policy.computeSteadyShares(childQueues, getSteadyFairShare());
+    for (FSQueue childQueue : childQueues) {
+      childQueue.getMetrics().setSteadyFairShare(childQueue.getSteadyFairShare());
+      if (childQueue instanceof FSParentQueue) {
+        ((FSParentQueue) childQueue).recomputeSteadyShares();
+      }
+    }
+  }
+
+  @Override
+  public void updatePreemptionVariables() {
+    super.updatePreemptionVariables();
+    // For child queues
+    for (FSQueue childQueue : childQueues) {
+      childQueue.updatePreemptionVariables();
+    }
+  }
+
   @Override
   public Resource getDemand() {
     return demand;
@@ -82,14 +105,14 @@ public class FSParentQueue extends FSQueue {
   public void updateDemand() {
     // Compute demand by iterating through apps in the queue
     // Limit demand to maxResources
-    Resource maxRes =
-        scheduler.getAllocationConfiguration().getMaxResources(getName());
+    Resource maxRes = scheduler.getAllocationConfiguration()
+        .getMaxResources(getName());
     demand = Resources.createResource(0);
     for (FSQueue childQueue : childQueues) {
       childQueue.updateDemand();
       Resource toAdd = childQueue.getDemand();
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Counting resource from " + childQueue.getName() + " " +
+        LOG.debug("Counting resource from " + childQueue.getName() + " " + 
             toAdd + "; Total resource consumption for " + getName() +
             " now " + demand);
       }
@@ -102,18 +125,18 @@ public class FSParentQueue extends FSQueue {
     if (LOG.isDebugEnabled()) {
       LOG.debug("The updated demand for " + getName() + " is " + demand +
           "; the max is " + maxRes);
-    }
+    }    
   }
   
   private synchronized QueueUserACLInfo getUserAclInfo(
       UserGroupInformation user) {
-    QueueUserACLInfo userAclInfo =
-        recordFactory.newRecordInstance(QueueUserACLInfo.class);
+    QueueUserACLInfo userAclInfo = 
+      recordFactory.newRecordInstance(QueueUserACLInfo.class);
     List<QueueACL> operations = new ArrayList<QueueACL>();
     for (QueueACL operation : QueueACL.values()) {
       if (hasAccess(operation, user)) {
         operations.add(operation);
-      }
+      } 
     }
 
     userAclInfo.setQueueName(getQueueName());
@@ -133,13 +156,12 @@ public class FSParentQueue extends FSQueue {
     for (FSQueue child : childQueues) {
       userAcls.addAll(child.getQueueUserAclInfo(user));
     }
-
+ 
     return userAcls;
   }
 
   @Override
-  public Resource assignContainer(FSSchedulerNode node,
-      TransactionState transactionState) {
+  public Resource assignContainer(FSSchedulerNode node) {
     Resource assigned = Resources.none();
 
     // If this queue is over its limit, reject
@@ -149,12 +171,33 @@ public class FSParentQueue extends FSQueue {
 
     Collections.sort(childQueues, policy.getComparator());
     for (FSQueue child : childQueues) {
-      assigned = child.assignContainer(node, transactionState);
+      assigned = child.assignContainer(node);
       if (!Resources.equals(assigned, Resources.none())) {
         break;
       }
     }
     return assigned;
+  }
+
+  @Override
+  public RMContainer preemptContainer() {
+    RMContainer toBePreempted = null;
+
+    // Find the childQueue which is most over fair share
+    FSQueue candidateQueue = null;
+    Comparator<Schedulable> comparator = policy.getComparator();
+    for (FSQueue queue : childQueues) {
+      if (candidateQueue == null ||
+          comparator.compare(queue, candidateQueue) > 0) {
+        candidateQueue = queue;
+      }
+    }
+
+    // Let the selected queue choose which of its container to preempt
+    if (candidateQueue != null) {
+      toBePreempted = candidateQueue.preemptContainer();
+    }
+    return toBePreempted;
   }
 
   @Override
@@ -165,9 +208,10 @@ public class FSParentQueue extends FSQueue {
   @Override
   public void setPolicy(SchedulingPolicy policy)
       throws AllocationConfigurationException {
-    boolean allowed = SchedulingPolicy.isApplicableTo(policy,
-        (parent == null) ? SchedulingPolicy.DEPTH_ROOT :
-            SchedulingPolicy.DEPTH_INTERMEDIATE);
+    boolean allowed =
+        SchedulingPolicy.isApplicableTo(policy, (parent == null)
+            ? SchedulingPolicy.DEPTH_ROOT
+            : SchedulingPolicy.DEPTH_INTERMEDIATE);
     if (!allowed) {
       throwPolicyDoesnotApplyException(policy);
     }
@@ -199,5 +243,20 @@ public class FSParentQueue extends FSQueue {
   public ActiveUsersManager getActiveUsersManager() {
     // Should never be called since all applications are submitted to LeafQueues
     return null;
+  }
+
+  @Override
+  public void recoverContainer(Resource clusterResource,
+      SchedulerApplicationAttempt schedulerAttempt, RMContainer rmContainer) {
+    // TODO Auto-generated method stub
+    
+  }
+  
+  @Override
+  public void activateApplication(ApplicationId app) {
+  }
+
+  @Override
+  public void deactivateApplication(ApplicationId app) {
   }
 }

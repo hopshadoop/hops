@@ -26,6 +26,8 @@ import java.net.UnknownHostException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileContext;
@@ -55,6 +57,8 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
  * Configures and starts the MR-specific components in the YARN cluster.
  *
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class MiniMRYarnCluster extends MiniYARNCluster {
 
   public static final String APPJAR = JarFinder.getJar(LocalContainerLauncher.class);
@@ -68,8 +72,16 @@ public class MiniMRYarnCluster extends MiniYARNCluster {
   }
 
   public MiniMRYarnCluster(String testName, int noOfNMs) {
-    super(testName, noOfNMs, 4, 4);
-    //TODO: add the history server
+    this(testName, noOfNMs, false, true);
+  }
+  
+  public MiniMRYarnCluster(String testName, int noOfNMs, boolean formatDB) {
+    this(testName, noOfNMs, false, formatDB);
+  }
+
+  public MiniMRYarnCluster(String testName, int noOfNMs, boolean enableAHS,
+          boolean formatDB) {
+    super(testName, 1, noOfNMs, 4, 4, enableAHS, formatDB);
     historyServerWrapper = new JobHistoryServerWrapper();
     addService(historyServerWrapper);
   }
@@ -183,6 +195,7 @@ public class MiniMRYarnCluster extends MiniYARNCluster {
     public JobHistoryServerWrapper() {
       super(JobHistoryServerWrapper.class.getName());
     }
+    private volatile boolean jhsStarted = false;
 
     @Override
     public synchronized void serviceStart() throws Exception {
@@ -204,9 +217,11 @@ public class MiniMRYarnCluster extends MiniYARNCluster {
         new Thread() {
           public void run() {
             historyServer.start();
+            jhsStarted = true;
           };
         }.start();
-        while (historyServer.getServiceState() == STATE.INITED) {
+
+        while (!jhsStarted) {
           LOG.info("Waiting for HistoryServer to start...");
           Thread.sleep(1500);
         }

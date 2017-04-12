@@ -1,21 +1,25 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 package org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.impl.pb;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerServiceProtos.LocalResourceStatusProto;
@@ -24,14 +28,11 @@ import org.apache.hadoop.yarn.proto.YarnServerNodemanagerServiceProtos.Localizer
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalResourceStatus;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerStatus;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+public class LocalizerStatusPBImpl
+    extends ProtoBase<LocalizerStatusProto> implements LocalizerStatus {
 
-public class LocalizerStatusPBImpl extends ProtoBase<LocalizerStatusProto>
-    implements LocalizerStatus {
-
-  LocalizerStatusProto proto = LocalizerStatusProto.getDefaultInstance();
+  LocalizerStatusProto proto =
+    LocalizerStatusProto.getDefaultInstance();
   LocalizerStatusProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -60,9 +61,8 @@ public class LocalizerStatusPBImpl extends ProtoBase<LocalizerStatusProto>
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -116,44 +116,42 @@ public class LocalizerStatusPBImpl extends ProtoBase<LocalizerStatusProto>
   private void addResourcesToProto() {
     maybeInitBuilder();
     builder.clearResources();
-    if (this.resources == null) {
+    if (this.resources == null) 
       return;
-    }
     Iterable<LocalResourceStatusProto> iterable =
         new Iterable<LocalResourceStatusProto>() {
+      @Override
+      public Iterator<LocalResourceStatusProto> iterator() {
+        return new Iterator<LocalResourceStatusProto>() {
+
+          Iterator<LocalResourceStatus> iter = resources.iterator();
+
           @Override
-          public Iterator<LocalResourceStatusProto> iterator() {
-            return new Iterator<LocalResourceStatusProto>() {
+          public boolean hasNext() {
+            return iter.hasNext();
+          }
 
-              Iterator<LocalResourceStatus> iter = resources.iterator();
+          @Override
+          public LocalResourceStatusProto next() {
+            return convertToProtoFormat(iter.next());
+          }
 
-              @Override
-              public boolean hasNext() {
-                return iter.hasNext();
-              }
-
-              @Override
-              public LocalResourceStatusProto next() {
-                return convertToProtoFormat(iter.next());
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-
-              }
-            };
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
 
           }
         };
+
+      }
+    };
     builder.addAllResources(iterable);
   }
 
   @Override
   public void addAllResources(List<LocalResourceStatus> resources) {
-    if (resources == null) {
+    if (resources == null)
       return;
-    }
     initResources();
     this.resources.addAll(resources);
   }
@@ -182,13 +180,13 @@ public class LocalizerStatusPBImpl extends ProtoBase<LocalizerStatusProto>
     this.resources.clear();
   }
 
-  private LocalResourceStatus convertFromProtoFormat(
-      LocalResourceStatusProto p) {
+  private LocalResourceStatus
+      convertFromProtoFormat(LocalResourceStatusProto p) {
     return new LocalResourceStatusPBImpl(p);
   }
 
   private LocalResourceStatusProto convertToProtoFormat(LocalResourceStatus s) {
-    return ((LocalResourceStatusPBImpl) s).getProto();
+    return ((LocalResourceStatusPBImpl)s).getProto();
   }
 
 }

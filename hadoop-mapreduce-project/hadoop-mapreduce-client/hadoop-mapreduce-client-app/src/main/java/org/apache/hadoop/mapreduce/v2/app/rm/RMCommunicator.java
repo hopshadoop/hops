@@ -21,6 +21,7 @@ package org.apache.hadoop.mapreduce.v2.app.rm;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,19 +53,21 @@ import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.event.EventHandler;
+import org.apache.hadoop.yarn.exceptions.ApplicationMasterNotRegisteredException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.SchedulerResourceTypes;
 
 /**
  * Registers/unregisters to RM and sends heartbeats to RM.
  */
 public abstract class RMCommunicator extends AbstractService
     implements RMHeartbeatHandler {
-  private static final Log LOG = LogFactory.getLog(RMContainerAllocator.class);
+  private static final Log LOG = LogFactory.getLog(RMCommunicator.class);
   private int rmPollInterval;//millis
   protected ApplicationId applicationId;
   private final AtomicBoolean stopped;
@@ -73,7 +76,6 @@ public abstract class RMCommunicator extends AbstractService
   protected EventHandler eventHandler;
   protected ApplicationMasterProtocol scheduler;
   private final ClientService clientService;
-  protected int lastResponseID;
   private Resource maxContainerCapability;
   protected Map<ApplicationAccessType, String> applicationACLs;
   private volatile long lastHeartbeatTime;
@@ -89,6 +91,8 @@ public abstract class RMCommunicator extends AbstractService
   private volatile boolean shouldUnregister = true;
   private boolean isApplicationMasterRegistered = false;
 
+  private EnumSet<SchedulerResourceTypes> schedulerResourceTypes;
+
   public RMCommunicator(ClientService clientService, AppContext context) {
     super("RMCommunicator");
     this.clientService = clientService;
@@ -97,6 +101,7 @@ public abstract class RMCommunicator extends AbstractService
     this.applicationId = context.getApplicationID();
     this.stopped = new AtomicBoolean(false);
     this.heartbeatCallbacks = new ConcurrentLinkedQueue<Runnable>();
+    this.schedulerResourceTypes = EnumSet.of(SchedulerResourceTypes.MEMORY);
   }
 
   @Override
@@ -162,10 +167,11 @@ public abstract class RMCommunicator extends AbstractService
         setClientToAMToken(response.getClientToAMTokenMasterKey());        
       }
       this.applicationACLs = response.getApplicationACLs();
-      LOG.info("maxContainerCapability: " + maxContainerCapability.getMemory());
+      LOG.info("maxContainerCapability: " + maxContainerCapability);
       String queue = response.getQueue();
       LOG.info("queue: " + queue);
       job.setQueueName(queue);
+      this.schedulerResourceTypes.addAll(response.getSchedulerResourceTypes());
     } catch (Exception are) {
       LOG.error("Exception while registering", are);
       throw new YarnRuntimeException(are);
@@ -185,7 +191,7 @@ public abstract class RMCommunicator extends AbstractService
       // if unregistration failed, isLastAMRetry needs to be recalculated
       // to see whether AM really has the chance to retry
       RunningAppContext raContext = (RunningAppContext) context;
-      raContext.computeIsLastAMRetry();
+      raContext.resetIsLastAMRetry();
     }
   }
 
@@ -216,20 +222,27 @@ public abstract class RMCommunicator extends AbstractService
     FinishApplicationMasterRequest request =
         FinishApplicationMasterRequest.newInstance(finishState,
           sb.toString(), historyUrl);
-    while (true) {
-      FinishApplicationMasterResponse response =
-          scheduler.finishApplicationMaster(request);
-      if (response.getIsUnregistered()) {
-        // When excepting ClientService, other services are already stopped,
-        // it is safe to let clients know the final states. ClientService
-        // should wait for some time so clients have enough time to know the
-        // final states.
-        RunningAppContext raContext = (RunningAppContext) context;
-        raContext.markSuccessfulUnregistration();
-        break;
+    try {
+      while (true) {
+        FinishApplicationMasterResponse response =
+            scheduler.finishApplicationMaster(request);
+        if (response.getIsUnregistered()) {
+          // When excepting ClientService, other services are already stopped,
+          // it is safe to let clients know the final states. ClientService
+          // should wait for some time so clients have enough time to know the
+          // final states.
+          RunningAppContext raContext = (RunningAppContext) context;
+          raContext.markSuccessfulUnregistration();
+          break;
+        }
+        LOG.info("Waiting for application to be successfully unregistered.");
+        Thread.sleep(rmPollInterval);
       }
-      LOG.info("Waiting for application to be successfully unregistered.");
-      Thread.sleep(rmPollInterval);
+    } catch (ApplicationMasterNotRegisteredException e) {
+      // RM might have restarted or failed over and so lost the fact that AM had
+      // registered before.
+      register();
+      doUnregistration();
     }
   }
 
@@ -257,35 +270,38 @@ public abstract class RMCommunicator extends AbstractService
     super.serviceStop();
   }
 
-  protected void startAllocatorThread() {
-    allocatorThread = new Thread(new Runnable() {
-      @Override
-      public void run() {
-        while (!stopped.get() && !Thread.currentThread().isInterrupted()) {
+  @VisibleForTesting
+  public class AllocatorRunnable implements Runnable {
+    @Override
+    public void run() {
+      while (!stopped.get() && !Thread.currentThread().isInterrupted()) {
+        try {
+          Thread.sleep(rmPollInterval);
           try {
-            Thread.sleep(rmPollInterval);
-            try {
-              heartbeat();
-            } catch (YarnRuntimeException e) {
-              LOG.error("Error communicating with RM: " + e.getMessage() , e);
-              return;
-            } catch (Exception e) {
-              LOG.error("ERROR IN CONTACTING RM. ", e);
-              continue;
-              // TODO: for other exceptions
-            }
-
-            lastHeartbeatTime = context.getClock().getTime();
-            executeHeartbeatCallbacks();
-          } catch (InterruptedException e) {
-            if (!stopped.get()) {
-              LOG.warn("Allocated thread interrupted. Returning.");
-            }
+            heartbeat();
+          } catch (RMContainerAllocationException e) {
+            LOG.error("Error communicating with RM: " + e.getMessage() , e);
             return;
+          } catch (Exception e) {
+            LOG.error("ERROR IN CONTACTING RM. ", e);
+            continue;
+            // TODO: for other exceptions
           }
+
+          lastHeartbeatTime = context.getClock().getTime();
+          executeHeartbeatCallbacks();
+        } catch (InterruptedException e) {
+          if (!stopped.get()) {
+            LOG.warn("Allocated thread interrupted. Returning.");
+          }
+          return;
         }
       }
-    });
+    }
+  }
+
+  protected void startAllocatorThread() {
+    allocatorThread = new Thread(new AllocatorRunnable());
     allocatorThread.setName("RMCommunicator Allocator");
     allocatorThread.start();
   }
@@ -294,7 +310,7 @@ public abstract class RMCommunicator extends AbstractService
     final Configuration conf = getConfig();
 
     try {
-      return ClientRMProxy.createRMProxy(conf, ApplicationMasterProtocol.class);
+      return ClientRMProxy.createRMProxy(conf, ApplicationMasterProtocol.class,true);
     } catch (IOException e) {
       throw new YarnRuntimeException(e);
     }
@@ -327,12 +343,16 @@ public abstract class RMCommunicator extends AbstractService
   
   public void setSignalled(boolean isSignalled) {
     this.isSignalled = isSignalled;
-    LOG.info("RMCommunicator notified that iSignalled is: " 
+    LOG.info("RMCommunicator notified that isSignalled is: " 
         + isSignalled);
   }
 
   @VisibleForTesting
   protected boolean isApplicationMasterRegistered() {
     return isApplicationMasterRegistered;
+  }
+
+  public EnumSet<SchedulerResourceTypes> getSchedulerResourceTypes() {
+    return schedulerResourceTypes;
   }
 }

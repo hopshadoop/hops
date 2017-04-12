@@ -23,12 +23,13 @@ import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
 
-import junit.framework.Assert;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.junit.Assert;
 
 import org.apache.avro.AvroRemoteException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.SleepJob;
+import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -51,7 +52,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestMRJobsWithHistoryService {
@@ -112,7 +112,6 @@ public class TestMRJobsWithHistoryService {
     }
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test (timeout = 90000)
   public void testJobHistoryData() throws IOException, InterruptedException,
       AvroRemoteException, ClassNotFoundException {
@@ -171,7 +170,7 @@ public class TestMRJobsWithHistoryService {
     Assert.assertEquals(1, amInfos.size());
     AMInfo amInfo = amInfos.get(0);
     ApplicationAttemptId appAttemptId = ApplicationAttemptId.newInstance(jobId.getAppId(), 1);
-    ContainerId amContainerId = ContainerId.newInstance(appAttemptId, 1);
+    ContainerId amContainerId = ContainerId.newContainerId(appAttemptId, 1);
     Assert.assertEquals(appAttemptId, amInfo.getAppAttemptId());
     Assert.assertEquals(amContainerId, amInfo.getContainerId());
     Assert.assertTrue(jobReport.getSubmitTime() > 0);

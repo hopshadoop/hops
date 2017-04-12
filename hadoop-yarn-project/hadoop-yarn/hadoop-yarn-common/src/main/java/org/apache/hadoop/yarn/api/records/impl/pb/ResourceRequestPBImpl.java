@@ -31,7 +31,7 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ResourceRequestProtoOrBuilder;
 
 @Private
 @Unstable
-public class ResourceRequestPBImpl extends ResourceRequest {
+public class ResourceRequestPBImpl extends  ResourceRequest {
   ResourceRequestProto proto = ResourceRequestProto.getDefaultInstance();
   ResourceRequestProto.Builder builder = null;
   boolean viaProto = false;
@@ -50,7 +50,7 @@ public class ResourceRequestPBImpl extends ResourceRequest {
   }
   
   public ResourceRequestProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -66,9 +66,8 @@ public class ResourceRequestPBImpl extends ResourceRequest {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -80,7 +79,7 @@ public class ResourceRequestPBImpl extends ResourceRequest {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public Priority getPriority() {
@@ -98,12 +97,10 @@ public class ResourceRequestPBImpl extends ResourceRequest {
   @Override
   public void setPriority(Priority priority) {
     maybeInitBuilder();
-    if (priority == null) {
+    if (priority == null) 
       builder.clearPriority();
-    }
     this.priority = priority;
   }
-
   @Override
   public String getResourceName() {
     ResourceRequestProtoOrBuilder p = viaProto ? proto : builder;
@@ -122,7 +119,6 @@ public class ResourceRequestPBImpl extends ResourceRequest {
     }
     builder.setResourceName((resourceName));
   }
-
   @Override
   public Resource getCapability() {
     ResourceRequestProtoOrBuilder p = viaProto ? proto : builder;
@@ -139,20 +135,18 @@ public class ResourceRequestPBImpl extends ResourceRequest {
   @Override
   public void setCapability(Resource capability) {
     maybeInitBuilder();
-    if (capability == null) {
+    if (capability == null) 
       builder.clearCapability();
-    }
     this.capability = capability;
   }
-
   @Override
-  public int getNumContainers() {
+  public synchronized int getNumContainers() {
     ResourceRequestProtoOrBuilder p = viaProto ? proto : builder;
     return (p.getNumContainers());
   }
 
   @Override
-  public void setNumContainers(int numContainers) {
+  public synchronized void setNumContainers(int numContainers) {
     maybeInitBuilder();
     builder.setNumContainers((numContainers));
   }
@@ -174,7 +168,7 @@ public class ResourceRequestPBImpl extends ResourceRequest {
   }
 
   private PriorityProto convertToProtoFormat(Priority t) {
-    return ((PriorityPBImpl) t).getProto();
+    return ((PriorityPBImpl)t).getProto();
   }
 
   private ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
@@ -182,13 +176,33 @@ public class ResourceRequestPBImpl extends ResourceRequest {
   }
 
   private ResourceProto convertToProtoFormat(Resource t) {
-    return ((ResourcePBImpl) t).getProto();
+    return ((ResourcePBImpl)t).getProto();
   }
   
   @Override
   public String toString() {
-    return "{Priority: " + getPriority() + ", Capability: " + getCapability() +
-        ", # Containers: " + getNumContainers() + ", Location: " +
-        getResourceName() + ", Relax Locality: " + getRelaxLocality() + "}";
+    return "{Priority: " + getPriority() + ", Capability: " + getCapability()
+        + ", # Containers: " + getNumContainers()
+        + ", Location: " + getResourceName()
+        + ", Relax Locality: " + getRelaxLocality() + "}";
+  }
+
+  @Override
+  public String getNodeLabelExpression() {
+    ResourceRequestProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasNodeLabelExpression()) {
+      return null;
+    }
+    return (p.getNodeLabelExpression().trim());
+  }
+
+  @Override
+  public void setNodeLabelExpression(String nodeLabelExpression) {
+    maybeInitBuilder();
+    if (nodeLabelExpression == null) {
+      builder.clearNodeLabelExpression();
+      return;
+    }
+    builder.setNodeLabelExpression(nodeLabelExpression);
   }
 }

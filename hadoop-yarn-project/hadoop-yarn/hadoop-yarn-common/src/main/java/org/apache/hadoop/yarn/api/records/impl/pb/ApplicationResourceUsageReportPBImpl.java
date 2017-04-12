@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
@@ -27,11 +26,13 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationResourceUsageReportPro
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationResourceUsageReportProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
-public class ApplicationResourceUsageReportPBImpl
-    extends ApplicationResourceUsageReport {
-  ApplicationResourceUsageReportProto proto =
+public class ApplicationResourceUsageReportPBImpl 
+extends ApplicationResourceUsageReport {
+  ApplicationResourceUsageReportProto proto = 
       ApplicationResourceUsageReportProto.getDefaultInstance();
   ApplicationResourceUsageReportProto.Builder builder = null;
   boolean viaProto = false;
@@ -64,9 +65,8 @@ public class ApplicationResourceUsageReportPBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -79,28 +79,27 @@ public class ApplicationResourceUsageReportPBImpl
   }
 
   private void mergeLocalToBuilder() {
-    if (this.usedResources != null &&
-        !((ResourcePBImpl) this.usedResources).getProto()
-            .equals(builder.getUsedResources())) {
+    if (this.usedResources != null
+        && !((ResourcePBImpl) this.usedResources).getProto().equals(
+            builder.getUsedResources())) {
       builder.setUsedResources(convertToProtoFormat(this.usedResources));
     }
-    if (this.reservedResources != null &&
-        !((ResourcePBImpl) this.reservedResources).getProto()
-            .equals(builder.getReservedResources())) {
-      builder
-          .setReservedResources(convertToProtoFormat(this.reservedResources));
+    if (this.reservedResources != null
+        && !((ResourcePBImpl) this.reservedResources).getProto().equals(
+            builder.getReservedResources())) {
+      builder.setReservedResources(
+          convertToProtoFormat(this.reservedResources));
     }
-    if (this.neededResources != null &&
-        !((ResourcePBImpl) this.neededResources).getProto()
-            .equals(builder.getNeededResources())) {
+    if (this.neededResources != null
+        && !((ResourcePBImpl) this.neededResources).getProto().equals(
+            builder.getNeededResources())) {
       builder.setNeededResources(convertToProtoFormat(this.neededResources));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -154,9 +153,8 @@ public class ApplicationResourceUsageReportPBImpl
   @Override
   public synchronized void setUsedResources(Resource resources) {
     maybeInitBuilder();
-    if (resources == null) {
+    if (resources == null)
       builder.clearUsedResources();
-    }
     this.usedResources = resources;
   }
 
@@ -164,7 +162,7 @@ public class ApplicationResourceUsageReportPBImpl
   public synchronized Resource getReservedResources() {
     ApplicationResourceUsageReportProtoOrBuilder p = viaProto ? proto : builder;
     if (this.reservedResources != null) {
-      return this.reservedResources;
+        return this.reservedResources;
     }
     if (!p.hasReservedResources()) {
       return null;
@@ -176,9 +174,8 @@ public class ApplicationResourceUsageReportPBImpl
   @Override
   public synchronized void setReservedResources(Resource reserved_resources) {
     maybeInitBuilder();
-    if (reserved_resources == null) {
+    if (reserved_resources == null)
       builder.clearReservedResources();
-    }
     this.reservedResources = reserved_resources;
   }
 
@@ -186,7 +183,7 @@ public class ApplicationResourceUsageReportPBImpl
   public synchronized Resource getNeededResources() {
     ApplicationResourceUsageReportProtoOrBuilder p = viaProto ? proto : builder;
     if (this.neededResources != null) {
-      return this.neededResources;
+        return this.neededResources;
     }
     if (!p.hasNeededResources()) {
       return null;
@@ -198,17 +195,40 @@ public class ApplicationResourceUsageReportPBImpl
   @Override
   public synchronized void setNeededResources(Resource reserved_resources) {
     maybeInitBuilder();
-    if (reserved_resources == null) {
+    if (reserved_resources == null)
       builder.clearNeededResources();
-    }
     this.neededResources = reserved_resources;
   }
 
+  @Override
+  public synchronized void setMemorySeconds(long memory_seconds) {
+    maybeInitBuilder();
+    builder.setMemorySeconds(memory_seconds);
+  }
+  
+  @Override
+  public synchronized long getMemorySeconds() {
+    ApplicationResourceUsageReportProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getMemorySeconds();
+  }
+
+  @Override
+  public synchronized void setVcoreSeconds(long vcore_seconds) {
+    maybeInitBuilder();
+    builder.setVcoreSeconds(vcore_seconds);
+  }
+
+  @Override
+  public synchronized long getVcoreSeconds() {
+    ApplicationResourceUsageReportProtoOrBuilder p = viaProto ? proto : builder;
+    return (p.getVcoreSeconds());
+  }
+  
   private ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
     return new ResourcePBImpl(p);
   }
 
   private ResourceProto convertToProtoFormat(Resource t) {
-    return ((ResourcePBImpl) t).getProto();
+    return ((ResourcePBImpl)t).getProto();
   }
 }

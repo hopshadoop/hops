@@ -17,15 +17,14 @@
  */
 package org.apache.hadoop.yarn.api.records;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
  * Specific container requested back by the <code>ResourceManager</code>.
- *
  * @see PreemptionContract
  * @see StrictPreemptionContract
  */
@@ -36,8 +35,7 @@ public abstract class PreemptionContainer {
   @Private
   @Unstable
   public static PreemptionContainer newInstance(ContainerId id) {
-    PreemptionContainer container =
-        Records.newRecord(PreemptionContainer.class);
+    PreemptionContainer container = Records.newRecord(PreemptionContainer.class);
     container.setId(id);
     return container;
   }

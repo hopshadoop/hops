@@ -19,6 +19,7 @@
 #include "configuration.h"
 #include "container-executor.h"
 
+#include <libgen.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <fts.h>
@@ -33,6 +34,7 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
+#include <sys/wait.h>
 
 static const int DEFAULT_MIN_USERID = 1000;
 
@@ -111,16 +113,16 @@ int check_executor_permissions(char *executable_file) {
     return -1;
   }
 
-  // check others do not have read/write/execute permissions
-  if ((filestat.st_mode & S_IROTH) == S_IROTH || (filestat.st_mode & S_IWOTH)
-      == S_IWOTH || (filestat.st_mode & S_IXOTH) == S_IXOTH) {
+  // check others do not have write/execute permissions
+  if ((filestat.st_mode & S_IWOTH) == S_IWOTH ||
+      (filestat.st_mode & S_IXOTH) == S_IXOTH) {
     fprintf(LOGFILE,
-            "The container-executor binary should not have read or write or"
-            " execute for others.\n");
+            "The container-executor binary should not have write or execute "
+            "for others.\n");
     return -1;
   }
 
-  // Binary should be setuid/setgid executable
+  // Binary should be setuid executable
   if ((filestat.st_mode & S_ISUID) == 0) {
     fprintf(LOGFILE, "The container-executor binary should be set setuid.\n");
     return -1;
@@ -245,6 +247,85 @@ static int write_pid_to_file_as_nm(const char* pid_file, pid_t pid) {
 }
 
 /**
+ * Write the exit code of the container into the exit code file
+ * exit_code_file: Path to exit code file where exit code needs to be written
+ */
+static int write_exit_code_file(const char* exit_code_file, int exit_code) {
+  char *tmp_ecode_file = concatenate("%s.tmp", "exit_code_path", 1,
+      exit_code_file);
+  if (tmp_ecode_file == NULL) {
+    return -1;
+  }
+
+  // create with 700
+  int ecode_fd = open(tmp_ecode_file, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
+  if (ecode_fd == -1) {
+    fprintf(LOGFILE, "Can't open file %s - %s\n", tmp_ecode_file,
+           strerror(errno));
+    free(tmp_ecode_file);
+    return -1;
+  }
+
+  char ecode_buf[21];
+  snprintf(ecode_buf, sizeof(ecode_buf), "%d", exit_code);
+  ssize_t written = write(ecode_fd, ecode_buf, strlen(ecode_buf));
+  close(ecode_fd);
+  if (written == -1) {
+    fprintf(LOGFILE, "Failed to write exit code to file %s - %s\n",
+       tmp_ecode_file, strerror(errno));
+    free(tmp_ecode_file);
+    return -1;
+  }
+
+  // rename temp file to actual exit code file
+  // use rename as atomic
+  if (rename(tmp_ecode_file, exit_code_file)) {
+    fprintf(LOGFILE, "Can't move exit code file from %s to %s - %s\n",
+        tmp_ecode_file, exit_code_file, strerror(errno));
+    unlink(tmp_ecode_file);
+    free(tmp_ecode_file);
+    return -1;
+  }
+
+  free(tmp_ecode_file);
+  return 0;
+}
+
+/**
+ * Wait for the container process to exit and write the exit code to
+ * the exit code file.
+ * Returns the exit code of the container process.
+ */
+static int wait_and_write_exit_code(pid_t pid, const char* exit_code_file) {
+  int child_status = -1;
+  int exit_code = -1;
+  int waitpid_result;
+
+  if (change_effective_user(nm_uid, nm_gid) != 0) {
+    return -1;
+  }
+  do {
+    waitpid_result = waitpid(pid, &child_status, 0);
+  } while (waitpid_result == -1 && errno == EINTR);
+  if (waitpid_result < 0) {
+    fprintf(LOGFILE, "Error waiting for container process %d - %s\n",
+        pid, strerror(errno));
+    return -1;
+  }
+  if (WIFEXITED(child_status)) {
+    exit_code = WEXITSTATUS(child_status);
+  } else if (WIFSIGNALED(child_status)) {
+    exit_code = 0x80 + WTERMSIG(child_status);
+  } else {
+    fprintf(LOGFILE, "Unable to determine exit status for pid %d\n", pid);
+  }
+  if (write_exit_code_file(exit_code_file, exit_code) < 0) {
+    return -1;
+  }
+  return exit_code;
+}
+
+/**
  * Change the real and effective user and group to abandon the super user
  * priviledges.
  */
@@ -337,6 +418,10 @@ char *get_container_work_directory(const char *nm_root, const char *user,
                      nm_root, user, app_id, container_id);
 }
 
+char *get_exit_code_file(const char* pid_file) {
+  return concatenate("%s.exitcode", "exit_code_file", 1, pid_file);
+}
+
 char *get_container_launcher_file(const char* work_dir) {
   return concatenate("%s/%s", "container launcher", 2, work_dir, CONTAINER_SCRIPT);
 }
@@ -370,30 +455,22 @@ int mkdirs(const char* path, mode_t perm) {
   char * npath;
   char * p;
   if (stat(path, &sb) == 0) {
-    if (S_ISDIR (sb.st_mode)) {
-      return 0;
-    } else {
-      fprintf(LOGFILE, "Path %s is file not dir\n", npath);
-      return -1;
-    }
+    return check_dir(path, sb.st_mode, perm, 1);
   }
   npath = strdup(path);
+  if (npath == NULL) {
+    fprintf(LOGFILE, "Not enough memory to copy path string");
+    return -1;
+  }
   /* Skip leading slashes. */
   p = npath;
-  while (*p == '/')
+  while (*p == '/') {
     p++;
+  }
 
   while (NULL != (p = strchr(p, '/'))) {
     *p = '\0';
-    if (stat(npath, &sb) != 0) {
-      if (mkdir(npath, perm) != 0) {
-        fprintf(LOGFILE, "Can't create directory %s in %s - %s\n", npath,
-                path, strerror(errno));
-        free(npath);
-        return -1;
-      }
-    } else if (!S_ISDIR (sb.st_mode)) {
-      fprintf(LOGFILE, "Path %s is file not dir\n", npath);
+    if (create_validate_dir(npath, perm, path, 0) == -1) {
       free(npath);
       return -1;
     }
@@ -403,9 +480,7 @@ int mkdirs(const char* path, mode_t perm) {
   }
 
   /* Create the final directory component. */
-  if (mkdir(npath, perm) != 0) {
-    fprintf(LOGFILE, "Can't create directory %s - %s\n", npath,
-            strerror(errno));
+  if (create_validate_dir(npath, perm, path, 1) == -1) {
     free(npath);
     return -1;
   }
@@ -413,6 +488,50 @@ int mkdirs(const char* path, mode_t perm) {
   return 0;
 }
 
+/*
+* Create the parent directory if they do not exist. Or check the permission if
+* the race condition happens.
+* Give 0 or 1 to represent whether this is the final component. If it is, we
+* need to check the permission.
+*/
+int create_validate_dir(char* npath, mode_t perm, char* path, int finalComponent) {
+  struct stat sb;
+  if (stat(npath, &sb) != 0) {
+    if (mkdir(npath, perm) != 0) {
+      if (errno != EEXIST || stat(npath, &sb) != 0) {
+        fprintf(LOGFILE, "Can't create directory %s - %s\n", npath,
+                strerror(errno));
+        return -1;
+      }
+      // The directory npath should exist.
+      if (check_dir(npath, sb.st_mode, perm, finalComponent) == -1) {
+        return -1;
+      }
+    }
+  } else {
+    if (check_dir(npath, sb.st_mode, perm, finalComponent) == -1) {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+// check whether the given path is a directory
+// also check the access permissions whether it is the same as desired permissions
+int check_dir(char* npath, mode_t st_mode, mode_t desired, int finalComponent) {
+  if (!S_ISDIR(st_mode)) {
+    fprintf(LOGFILE, "Path %s is file not dir\n", npath);
+    return -1;
+  } else if (finalComponent == 1) {
+    int filePermInt = st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+    int desiredInt = desired & (S_IRWXU | S_IRWXG | S_IRWXO);
+    if (filePermInt != desiredInt) {
+      fprintf(LOGFILE, "Path %s has permission %o but needs permission %o.\n", npath, filePermInt, desiredInt);
+      return -1;
+    }
+  }
+  return 0;
+}
 
 /**
  * Function to prepare the container directories.
@@ -565,8 +684,9 @@ struct passwd* check_user(const char *user) {
     return NULL;
   }
   char **banned_users = get_values(BANNED_USERS_KEY);
-  char **banned_user = (banned_users == NULL) ? 
+  banned_users = banned_users == NULL ?
     (char**) DEFAULT_BANNED_USERS : banned_users;
+  char **banned_user = banned_users;
   for(; *banned_user; ++banned_user) {
     if (strcmp(*banned_user, user) == 0) {
       free(user_info);
@@ -894,6 +1014,8 @@ int launch_container_as_user(const char *user, const char *app_id,
   int exit_code = -1;
   char *script_file_dest = NULL;
   char *cred_file_dest = NULL;
+  char *exit_code_file = NULL;
+
   script_file_dest = get_container_launcher_file(work_dir);
   if (script_file_dest == NULL) {
     exit_code = OUT_OF_MEMORY;
@@ -901,6 +1023,11 @@ int launch_container_as_user(const char *user, const char *app_id,
   }
   cred_file_dest = get_container_credentials_file(work_dir);
   if (NULL == cred_file_dest) {
+    exit_code = OUT_OF_MEMORY;
+    goto cleanup;
+  }
+  exit_code_file = get_exit_code_file(pid_file);
+  if (NULL == exit_code_file) {
     exit_code = OUT_OF_MEMORY;
     goto cleanup;
   }
@@ -914,6 +1041,13 @@ int launch_container_as_user(const char *user, const char *app_id,
   // open credentials
   int cred_file_source = open_file_as_nm(cred_file);
   if (cred_file_source == -1) {
+    goto cleanup;
+  }
+
+  pid_t child_pid = fork();
+  if (child_pid != 0) {
+    // parent
+    exit_code = wait_and_write_exit_code(child_pid, exit_code_file);
     goto cleanup;
   }
 
@@ -985,15 +1119,15 @@ int launch_container_as_user(const char *user, const char *app_id,
     goto cleanup;
   }
 
-#if defined(__MACH__)
+#if HAVE_FCLOSEALL
+  fcloseall();
+#else
   // only those fds are opened assuming no bug
   fclose(LOGFILE);
   fclose(ERRORFILE);
   fclose(stdin);
   fclose(stdout);
   fclose(stderr);
-#else
-  fcloseall();
 #endif
   umask(0027);
   if (chdir(work_dir) != 0) {
@@ -1010,6 +1144,7 @@ int launch_container_as_user(const char *user, const char *app_id,
   exit_code = 0;
 
  cleanup:
+  free(exit_code_file);
   free(script_file_dest);
   free(cred_file_dest);
   return exit_code;
@@ -1025,21 +1160,13 @@ int signal_container_as_user(const char *user, int pid, int sig) {
   }
 
   //Don't continue if the process-group is not alive anymore.
-  int has_group = 1;
   if (kill(-pid,0) < 0) {
-    if (kill(pid, 0) < 0) {
-      if (errno == ESRCH) {
-        return INVALID_CONTAINER_PID;
-      }
-      fprintf(LOGFILE, "Error signalling container %d with %d - %s\n",
-	      pid, sig, strerror(errno));
-      return -1;
-    } else {
-      has_group = 0;
-    }
+    fprintf(LOGFILE, "Error signalling not exist process group %d "
+            "with signal %d\n", pid, sig);
+    return INVALID_CONTAINER_PID;
   }
 
-  if (kill((has_group ? -1 : 1) * pid, sig) < 0) {
+  if (kill(-pid, sig) < 0) {
     if(errno != ESRCH) {
       fprintf(LOGFILE, 
               "Error signalling process group %d with signal %d - %s\n", 
@@ -1053,8 +1180,7 @@ int signal_container_as_user(const char *user, int pid, int sig) {
       return INVALID_CONTAINER_PID;
     }
   }
-  fprintf(LOGFILE, "Killing process %s%d with %d\n",
-	  (has_group ? "group " :""), pid, sig);
+  fprintf(LOGFILE, "Killing process group %d with %d\n", pid, sig);
   return 0;
 }
 
@@ -1106,6 +1232,7 @@ static int delete_path(const char *full_path,
     FTS* tree = fts_open(paths, FTS_PHYSICAL | FTS_XDEV, NULL);
     FTSENT* entry = NULL;
     int ret = 0;
+    int ret_errno = 0;
 
     if (tree == NULL) {
       fprintf(LOGFILE,
@@ -1123,7 +1250,13 @@ static int delete_path(const char *full_path,
           if (rmdir(entry->fts_accpath) != 0) {
             fprintf(LOGFILE, "Couldn't delete directory %s - %s\n", 
                     entry->fts_path, strerror(errno));
-            exit_code = -1;
+            if (errno == EROFS) {
+              exit_code = -1;
+            }
+            // record the first errno
+            if (errno != ENOENT && ret_errno == 0) {
+              ret_errno = errno;
+            }
           }
         }
         break;
@@ -1135,7 +1268,13 @@ static int delete_path(const char *full_path,
         if (unlink(entry->fts_accpath) != 0) {
           fprintf(LOGFILE, "Couldn't delete file %s - %s\n", entry->fts_path,
                   strerror(errno));
-          exit_code = -1;
+          if (errno == EROFS) {
+            exit_code = -1;
+          }
+          // record the first errno
+          if (errno != ENOENT && ret_errno == 0) {
+            ret_errno = errno;
+          }
         }
         break;
 
@@ -1178,6 +1317,9 @@ static int delete_path(const char *full_path,
       }
     }
     ret = fts_close(tree);
+    if (ret_errno != 0) {
+      exit_code = -1;
+    }
     if (exit_code == 0 && ret != 0) {
       fprintf(LOGFILE, "Error in fts_close while deleting %s\n", full_path);
       exit_code = -1;
@@ -1204,21 +1346,42 @@ int delete_as_user(const char *user,
                    const char *subdir,
                    char* const* baseDirs) {
   int ret = 0;
-
+  int subDirEmptyStr = (subdir == NULL || subdir[0] == 0);
+  int needs_tt_user = subDirEmptyStr;
   char** ptr;
 
   // TODO: No switching user? !!!!
   if (baseDirs == NULL || *baseDirs == NULL) {
-    return delete_path(subdir, strlen(subdir) == 0);
+    return delete_path(subdir, needs_tt_user);
   }
   // do the delete
   for(ptr = (char**)baseDirs; *ptr != NULL; ++ptr) {
-    char* full_path = concatenate("%s/%s", "user subdir", 2,
-                              *ptr, subdir);
+    char* full_path = NULL;
+    struct stat sb;
+    if (stat(*ptr, &sb) != 0) {
+      if (errno == ENOENT) {
+        // Ignore missing dir. Continue deleting other directories.
+        continue;
+      } else {
+        fprintf(LOGFILE, "Could not stat %s - %s\n", *ptr, strerror(errno));
+        return -1;
+      }
+    }
+    if (!S_ISDIR(sb.st_mode)) {
+      if (!subDirEmptyStr) {
+        fprintf(LOGFILE, "baseDir \"%s\" is a file and cannot contain subdir \"%s\".\n", *ptr, subdir);
+        return -1;
+      }
+      full_path = strdup(*ptr);
+      needs_tt_user = 0;
+    } else {
+      full_path = concatenate("%s/%s", "user subdir", 2, *ptr, subdir);
+    }
+
     if (full_path == NULL) {
       return -1;
     }
-    int this_ret = delete_path(full_path, strlen(subdir) == 0);
+    int this_ret = delete_path(full_path, needs_tt_user);
     free(full_path);
     // delete as much as we can, but remember the error
     if (this_ret != 0) {
@@ -1260,8 +1423,8 @@ void chown_dir_contents(const char *dir_path, uid_t uid, gid_t gid) {
  * hierarchy: the top directory of the hierarchy for the NM
  */
 int mount_cgroup(const char *pair, const char *hierarchy) {
-#if defined(__FreeBSD__) || defined(__MACH__)
-  fprintf(LOGFILE, "Failed to mount cgroup controller, not support\n");
+#ifndef __linux
+  fprintf(LOGFILE, "Failed to mount cgroup controller, not supported\n");
   return -1;
 #else
   char *controller = malloc(strlen(pair));

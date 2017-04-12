@@ -39,7 +39,7 @@ public class TestDbClasses {
    * test splitters from DataDrivenDBInputFormat. For different data types may
    * be different splitter
    */
-  @Test(timeout = 1000)
+  @Test(timeout = 10000)
   public void testDataDrivenDBInputFormatSplitter() {
     DataDrivenDBInputFormat<NullDBWritable> format = new DataDrivenDBInputFormat<NullDBWritable>();
     testCommonSplitterTypes(format);
@@ -49,7 +49,7 @@ public class TestDbClasses {
     assertEquals(DateSplitter.class, format.getSplitter(Types.TIME).getClass());
   }
 
-  @Test(timeout = 1000)
+  @Test(timeout = 10000)
   public void testDataDrivenDBInputFormat() throws Exception {
     JobContext jobContext = mock(JobContext.class);
     Configuration configuration = new Configuration();
@@ -79,7 +79,7 @@ public class TestDbClasses {
         configuration.get(DBConfiguration.INPUT_BOUNDING_QUERY));
   }
 
-  @Test(timeout = 1000)
+  @Test(timeout = 10000)
   public void testOracleDataDrivenDBInputFormat() throws Exception {
     OracleDataDrivenDBInputFormat<NullDBWritable> format = 
         new OracleDataDrivenDBInputFormatForTest();
@@ -96,7 +96,7 @@ public class TestDbClasses {
    * test generate sql script for OracleDBRecordReader.
    */
 
-  @Test(timeout = 2000)
+  @Test(timeout = 20000)
   public void testOracleDBRecordReader() throws Exception {
     DBInputSplit splitter = new DBInputSplit(1, 10);
     Configuration configuration = new Configuration();
@@ -110,7 +110,7 @@ public class TestDbClasses {
         splitter, NullDBWritable.class, configuration, connect,
         dbConfiguration, "condition", fields, "table");
     assertEquals(
-        "SELECT * FROM (SELECT a.*,ROWNUM dbif_rno FROM ( SELECT f1, f2 FROM table WHERE condition ORDER BY Order ) a WHERE rownum <= 1 + 9 ) WHERE dbif_rno >= 1",
+        "SELECT * FROM (SELECT a.*,ROWNUM dbif_rno FROM ( SELECT f1, f2 FROM table WHERE condition ORDER BY Order ) a WHERE rownum <= 10 ) WHERE dbif_rno > 1",
         recorder.getSelectQuery());
   }
 

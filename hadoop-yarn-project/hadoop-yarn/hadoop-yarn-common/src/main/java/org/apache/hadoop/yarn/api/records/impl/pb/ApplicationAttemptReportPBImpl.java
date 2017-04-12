@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptReport;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -29,9 +28,11 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationAttemptReportProtoOrBu
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.YarnApplicationAttemptStateProto;
 
+import com.google.protobuf.TextFormat;
+
 public class ApplicationAttemptReportPBImpl extends ApplicationAttemptReport {
-  ApplicationAttemptReportProto proto =
-      ApplicationAttemptReportProto.getDefaultInstance();
+  ApplicationAttemptReportProto proto = ApplicationAttemptReportProto
+    .getDefaultInstance();
   ApplicationAttemptReportProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -87,6 +88,15 @@ public class ApplicationAttemptReportPBImpl extends ApplicationAttemptReport {
   }
 
   @Override
+  public String getOriginalTrackingUrl() {
+    ApplicationAttemptReportProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasOriginalTrackingUrl()) {
+      return null;
+    }
+    return p.getOriginalTrackingUrl();
+  }
+
+  @Override
   public String getDiagnostics() {
     ApplicationAttemptReportProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasDiagnostics()) {
@@ -105,8 +115,7 @@ public class ApplicationAttemptReportPBImpl extends ApplicationAttemptReport {
   }
 
   @Override
-  public void setYarnApplicationAttemptState(
-      YarnApplicationAttemptState state) {
+  public void setYarnApplicationAttemptState(YarnApplicationAttemptState state) {
     maybeInitBuilder();
     if (state == null) {
       builder.clearYarnApplicationAttemptState();
@@ -126,12 +135,11 @@ public class ApplicationAttemptReportPBImpl extends ApplicationAttemptReport {
   }
 
   @Override
-  public void setApplicationAttemptId(
-      ApplicationAttemptId applicationAttemptId) {
+  public void
+      setApplicationAttemptId(ApplicationAttemptId applicationAttemptId) {
     maybeInitBuilder();
-    if (applicationAttemptId == null) {
+    if (applicationAttemptId == null)
       builder.clearApplicationAttemptId();
-    }
     this.ApplicationAttemptId = applicationAttemptId;
   }
 
@@ -162,6 +170,16 @@ public class ApplicationAttemptReportPBImpl extends ApplicationAttemptReport {
   }
 
   @Override
+  public void setOriginalTrackingUrl(String oUrl) {
+    maybeInitBuilder();
+    if (oUrl == null) {
+      builder.clearOriginalTrackingUrl();
+      return;
+    }
+    builder.setOriginalTrackingUrl(oUrl);
+  }
+
+  @Override
   public void setDiagnostics(String diagnostics) {
     maybeInitBuilder();
     if (diagnostics == null) {
@@ -185,9 +203,8 @@ public class ApplicationAttemptReportPBImpl extends ApplicationAttemptReport {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -207,25 +224,24 @@ public class ApplicationAttemptReportPBImpl extends ApplicationAttemptReport {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
   }
 
   private void mergeLocalToBuilder() {
-    if (this.ApplicationAttemptId != null &&
-        !((ApplicationAttemptIdPBImpl) this.ApplicationAttemptId).getProto()
-            .equals(builder.getApplicationAttemptId())) {
-      builder.setApplicationAttemptId(
-          convertToProtoFormat(this.ApplicationAttemptId));
+    if (this.ApplicationAttemptId != null
+        && !((ApplicationAttemptIdPBImpl) this.ApplicationAttemptId).getProto()
+          .equals(builder.getApplicationAttemptId())) {
+      builder
+        .setApplicationAttemptId(convertToProtoFormat(this.ApplicationAttemptId));
     }
 
-    if (this.amContainerId != null &&
-        !((ContainerIdPBImpl) this.amContainerId).getProto()
-            .equals(builder.getAmContainerId())) {
+    if (this.amContainerId != null
+        && !((ContainerIdPBImpl) this.amContainerId).getProto().equals(
+          builder.getAmContainerId())) {
       builder.setAmContainerId(convertToProtoFormat(this.amContainerId));
     }
   }
@@ -239,8 +255,8 @@ public class ApplicationAttemptReportPBImpl extends ApplicationAttemptReport {
     return new ContainerIdPBImpl(amContainerId);
   }
 
-  private ApplicationAttemptIdProto convertToProtoFormat(
-      ApplicationAttemptId t) {
+  private ApplicationAttemptIdProto
+      convertToProtoFormat(ApplicationAttemptId t) {
     return ((ApplicationAttemptIdPBImpl) t).getProto();
   }
 
@@ -266,9 +282,8 @@ public class ApplicationAttemptReportPBImpl extends ApplicationAttemptReport {
   @Override
   public void setAMContainerId(ContainerId amContainerId) {
     maybeInitBuilder();
-    if (amContainerId == null) {
+    if (amContainerId == null)
       builder.clearAmContainerId();
-    }
     this.amContainerId = amContainerId;
   }
 }

@@ -26,9 +26,9 @@ import org.apache.hadoop.yarn.util.Records;
 
 /**
  * <p><code>NodeId</code> is the unique identifier for a node.</p>
- * <p/>
- * <p>It includes the <em>hostname</em> and <em>port</em> to uniquely
- * identify the node. Thus, it is unique across restarts of any
+ * 
+ * <p>It includes the <em>hostname</em> and <em>port</em> to uniquely 
+ * identify the node. Thus, it is unique across restarts of any 
  * <code>NodeManager</code>.</p>
  */
 @Public
@@ -47,9 +47,8 @@ public abstract class NodeId implements Comparable<NodeId> {
 
   /**
    * Get the <em>hostname</em> of the node.
-   *
    * @return <em>hostname</em> of the node
-   */
+   */ 
   @Public
   @Stable
   public abstract String getHost();
@@ -60,7 +59,6 @@ public abstract class NodeId implements Comparable<NodeId> {
 
   /**
    * Get the <em>port</em> for communicating with the node.
-   *
    * @return <em>port</em> for communicating with the node
    */
   @Public
@@ -87,22 +85,17 @@ public abstract class NodeId implements Comparable<NodeId> {
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj) {
+    if (this == obj)
       return true;
-    }
-    if (obj == null) {
+    if (obj == null)
       return false;
-    }
-    if (getClass() != obj.getClass()) {
+    if (getClass() != obj.getClass())
       return false;
-    }
     NodeId other = (NodeId) obj;
-    if (!this.getHost().equals(other.getHost())) {
+    if (!this.getHost().equals(other.getHost()))
       return false;
-    }
-    if (this.getPort() != other.getPort()) {
+    if (this.getPort() != other.getPort())
       return false;
-    }
     return true;
   }
 

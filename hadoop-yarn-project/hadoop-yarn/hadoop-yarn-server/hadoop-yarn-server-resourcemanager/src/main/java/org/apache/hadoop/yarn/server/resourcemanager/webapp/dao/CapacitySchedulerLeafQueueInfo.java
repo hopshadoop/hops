@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.LeafQueue;
-
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
+
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.LeafQueue;
 
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -32,29 +32,35 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
   protected int numContainers;
   protected int maxApplications;
   protected int maxApplicationsPerUser;
-  protected int maxActiveApplications;
-  protected int maxActiveApplicationsPerUser;
   protected int userLimit;
   protected UsersInfo users; // To add another level in the XML
   protected float userLimitFactor;
+  protected ResourceInfo AMResourceLimit;
+  protected ResourceInfo usedAMResource;
+  protected ResourceInfo userAMResourceLimit;
+  protected boolean preemptionDisabled;
 
   CapacitySchedulerLeafQueueInfo() {
-  }
+  };
 
-  ;
-
-  CapacitySchedulerLeafQueueInfo(LeafQueue q) {
-    super(q);
+  /*
+   * @param q leaf queue
+   * @param nodeLabel node partition
+   */
+  CapacitySchedulerLeafQueueInfo(final LeafQueue q, final String nodeLabel) {
+    super(q, nodeLabel);
     numActiveApplications = q.getNumActiveApplications();
     numPendingApplications = q.getNumPendingApplications();
     numContainers = q.getNumContainers();
     maxApplications = q.getMaxApplications();
     maxApplicationsPerUser = q.getMaxApplicationsPerUser();
-    maxActiveApplications = q.getMaximumActiveApplications();
-    maxActiveApplicationsPerUser = q.getMaximumActiveApplicationsPerUser();
     userLimit = q.getUserLimit();
     users = new UsersInfo(q.getUsers());
     userLimitFactor = q.getUserLimitFactor();
+    AMResourceLimit = new ResourceInfo(q.getAMResourceLimit());
+    usedAMResource = new ResourceInfo(q.getQueueResourceUsage().getAMUsed());
+    userAMResourceLimit = new ResourceInfo(q.getUserAMResourceLimit());
+    preemptionDisabled = q.getPreemptionDisabled();
   }
 
   public int getNumActiveApplications() {
@@ -77,14 +83,6 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
     return maxApplicationsPerUser;
   }
 
-  public int getMaxActiveApplications() {
-    return maxActiveApplications;
-  }
-
-  public int getMaxActiveApplicationsPerUser() {
-    return maxActiveApplicationsPerUser;
-  }
-
   public int getUserLimit() {
     return userLimit;
   }
@@ -96,5 +94,21 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
 
   public float getUserLimitFactor() {
     return userLimitFactor;
+  }
+  
+  public ResourceInfo getAMResourceLimit() {
+    return AMResourceLimit;
+  }
+  
+  public ResourceInfo getUsedAMResource() {
+    return usedAMResource;
+  }
+
+  public ResourceInfo getUserAMResourceLimit() {
+    return userAMResourceLimit; 
+  }
+
+  public boolean getPreemptionDisabled() {
+    return preemptionDisabled;
   }
 }

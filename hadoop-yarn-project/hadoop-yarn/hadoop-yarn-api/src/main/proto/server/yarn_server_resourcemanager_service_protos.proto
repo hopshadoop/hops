@@ -23,52 +23,40 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
-
 option java_outer_classname = "YarnServerResourceManagerServiceProtos";
-
 option java_generic_services = true;
-
 option java_generate_equals_and_hash = true;
-
 package hadoop.yarn;
 
 import "yarn_protos.proto";
 
-import "yarn_service_protos.proto";
-
 message RefreshQueuesRequestProto {
 }
-
 message RefreshQueuesResponseProto {
 }
 
 message RefreshNodesRequestProto {
 }
-
 message RefreshNodesResponseProto {
 }
 
 message RefreshSuperUserGroupsConfigurationRequestProto {
 }
-
 message RefreshSuperUserGroupsConfigurationResponseProto {
 }
 
 message RefreshUserToGroupsMappingsRequestProto {
 }
-
 message RefreshUserToGroupsMappingsResponseProto {
 }
 
 message RefreshAdminAclsRequestProto {
 }
-
 message RefreshAdminAclsResponseProto {
 }
 
 message RefreshServiceAclsRequestProto {
 }
-
 message RefreshServiceAclsResponseProto {
 }
 
@@ -87,72 +75,26 @@ message UpdateNodeResourceRequestProto {
 message UpdateNodeResourceResponseProto {
 }
 
-////////////////////////////////////////////////////////////////////////
-////// RM recovery related records /////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-enum RMAppAttemptStateProto {
-  RMATTEMPT_NEW = 1;
-  RMATTEMPT_SUBMITTED = 2;
-  RMATTEMPT_SCHEDULED = 3;
-  RMATTEMPT_ALLOCATED = 4;
-  RMATTEMPT_LAUNCHED = 5;
-  RMATTEMPT_FAILED = 6;
-  RMATTEMPT_RUNNING = 7;
-  RMATTEMPT_FINISHING = 8;
-  RMATTEMPT_FINISHED = 9;
-  RMATTEMPT_KILLED = 10;
-  RMATTEMPT_ALLOCATED_SAVING = 11;
-  RMATTEMPT_LAUNCHED_UNMANAGED_SAVING = 12;
-  RMATTEMPT_RECOVERED = 13;
-  RMATTEMPT_FINAL_SAVING = 14;
+message AddToClusterNodeLabelsRequestProto {
+  repeated string nodeLabels = 1;
 }
 
-enum RMAppStateProto {
-  RMAPP_NEW = 1;
-  RMAPP_NEW_SAVING = 2;
-  RMAPP_SUBMITTED = 3;
-  RMAPP_ACCEPTED = 4;
-  RMAPP_RUNNING = 5;
-  RMAPP_FINAL_SAVING = 6;
-  RMAPP_FINISHING = 7;
-  RMAPP_FINISHED = 8;
-  RMAPP_FAILED = 9;
-  RMAPP_KILLED = 10;
-  RMAPP_KILLING = 11;
+message AddToClusterNodeLabelsResponseProto {
 }
 
-message ApplicationStateDataProto {
-  optional int64 submit_time = 1;
-  optional ApplicationSubmissionContextProto application_submission_context = 2;
-  optional string user = 3;
-  optional int64 start_time = 4;
-  optional RMAppStateProto application_state = 5;
-  optional string diagnostics = 6 [default = "N/A"];
-  optional int64 finish_time = 7;
-  optional RMAppStateProto application_state_before_killing = 8;
-  repeated NodeIdProto updated_nodes_id = 9;
+message RemoveFromClusterNodeLabelsRequestProto {
+  repeated string nodeLabels = 1;
 }
 
-message ApplicationAttemptStateDataProto {
-  optional ApplicationAttemptIdProto attemptId = 1;
-  optional ContainerProto master_container = 2;
-  optional bytes app_attempt_tokens = 3;
-  optional RMAppAttemptStateProto app_attempt_state = 4;
-  optional string final_tracking_url = 5;
-  optional string diagnostics = 6 [default = "N/A"];
-  optional int64 start_time = 7;
-  optional FinalApplicationStatusProto final_application_status = 8;
-  optional float progress = 9;
-  optional string host = 10;
-  optional int32 rpc_port = 11;
-  repeated NodeIdProto ran_nodes = 12;
-  repeated ContainerStatusProto just_finished_fontainers = 13;
-  optional AllocateResponseProto allocate_response = 14;
+message RemoveFromClusterNodeLabelsResponseProto {
 }
 
-message RMStateVersionProto {
-  optional int32 major_version = 1;
-  optional int32 minor_version = 2;
+message ReplaceLabelsOnNodeRequestProto {
+  repeated NodeIdToLabelsProto nodeToLabels = 1;
+}
+
+message ReplaceLabelsOnNodeResponseProto {
+  
 }
 
 //////////////////////////////////////////////////////////////////

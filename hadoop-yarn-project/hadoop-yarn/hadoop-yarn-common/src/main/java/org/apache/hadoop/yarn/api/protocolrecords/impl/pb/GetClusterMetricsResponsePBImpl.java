@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterMetricsResponse;
@@ -29,11 +28,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.YarnClusterMetricsProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetClusterMetricsResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetClusterMetricsResponseProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
 public class GetClusterMetricsResponsePBImpl extends GetClusterMetricsResponse {
-  GetClusterMetricsResponseProto proto =
-      GetClusterMetricsResponseProto.getDefaultInstance();
+  GetClusterMetricsResponseProto proto = GetClusterMetricsResponseProto.getDefaultInstance();
   GetClusterMetricsResponseProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -50,7 +50,7 @@ public class GetClusterMetricsResponsePBImpl extends GetClusterMetricsResponse {
   }
   
   public GetClusterMetricsResponseProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -63,9 +63,8 @@ public class GetClusterMetricsResponsePBImpl extends GetClusterMetricsResponse {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -84,9 +83,8 @@ public class GetClusterMetricsResponsePBImpl extends GetClusterMetricsResponse {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -98,7 +96,7 @@ public class GetClusterMetricsResponsePBImpl extends GetClusterMetricsResponse {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public YarnClusterMetrics getClusterMetrics() {
@@ -116,20 +114,19 @@ public class GetClusterMetricsResponsePBImpl extends GetClusterMetricsResponse {
   @Override
   public void setClusterMetrics(YarnClusterMetrics clusterMetrics) {
     maybeInitBuilder();
-    if (clusterMetrics == null) {
+    if (clusterMetrics == null) 
       builder.clearClusterMetrics();
-    }
     this.yarnClusterMetrics = clusterMetrics;
   }
 
-  private YarnClusterMetricsPBImpl convertFromProtoFormat(
-      YarnClusterMetricsProto p) {
+  private YarnClusterMetricsPBImpl convertFromProtoFormat(YarnClusterMetricsProto p) {
     return new YarnClusterMetricsPBImpl(p);
   }
 
   private YarnClusterMetricsProto convertToProtoFormat(YarnClusterMetrics t) {
-    return ((YarnClusterMetricsPBImpl) t).getProto();
+    return ((YarnClusterMetricsPBImpl)t).getProto();
   }
+
 
 
 }  

@@ -5,9 +5,9 @@
  * licenses this file to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -17,17 +17,18 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenResponseProto;
 import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenResponseProtoOrBuilder;
 import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenResponse;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
-public class RenewDelegationTokenResponsePBImpl
-    extends RenewDelegationTokenResponse {
+public class RenewDelegationTokenResponsePBImpl extends 
+    RenewDelegationTokenResponse {
 
   RenewDelegationTokenResponseProto proto =
       RenewDelegationTokenResponseProto.getDefaultInstance();
@@ -38,7 +39,7 @@ public class RenewDelegationTokenResponsePBImpl
     this.builder = RenewDelegationTokenResponseProto.newBuilder();
   }
 
-  public RenewDelegationTokenResponsePBImpl(
+  public RenewDelegationTokenResponsePBImpl (
       RenewDelegationTokenResponseProto proto) {
     this.proto = proto;
     this.viaProto = true;
@@ -57,9 +58,8 @@ public class RenewDelegationTokenResponsePBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }

@@ -17,6 +17,13 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager;
 
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
@@ -28,13 +35,6 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.nodemanager.NMAuditLogger.Keys;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-
-import static junit.framework.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests {@link NMAuditLogger}.
@@ -58,7 +58,7 @@ public class TestNMAuditLogger {
   /**
    * Test the AuditLog format with key-val pair.
    */
-  @Test
+  @Test  
   public void testKeyValLogFormat() throws Exception {
     StringBuilder actLog = new StringBuilder();
     StringBuilder expLog = new StringBuilder();
@@ -73,7 +73,7 @@ public class TestNMAuditLogger {
     assertEquals(expLog.toString(), actLog.toString());
 
     // append another k1=null pair and test
-    NMAuditLogger.add(Keys.APPID, (String) null, actLog);
+    NMAuditLogger.add(Keys.APPID, (String)null, actLog);
     expLog.append("\tAPPID=null");
     assertEquals(expLog.toString(), actLog.toString());
 
@@ -87,11 +87,11 @@ public class TestNMAuditLogger {
   /**
    * Test the AuditLog format for successful events.
    */
-  private void testSuccessLogFormatHelper(boolean checkIP, ApplicationId appId,
-      ContainerId containerId) {
+  private void testSuccessLogFormatHelper(boolean checkIP, 
+      ApplicationId appId, ContainerId containerId) {
     // check without the IP
-    String sLog = NMAuditLogger
-        .createSuccessLog(USER, OPERATION, TARGET, appId, containerId);
+    String sLog = NMAuditLogger.createSuccessLog(USER, OPERATION, TARGET,
+        appId, containerId);
     StringBuilder expLog = new StringBuilder();
     expLog.append("USER=test\t");
     if (checkIP) {
@@ -112,7 +112,8 @@ public class TestNMAuditLogger {
    * Test the AuditLog format for successful events passing nulls.
    */
   private void testSuccessLogNulls(boolean checkIP) {
-    String sLog = NMAuditLogger.createSuccessLog(null, null, null, null, null);
+    String sLog = NMAuditLogger.createSuccessLog(null, null, null,
+        null, null);
     StringBuilder expLog = new StringBuilder();
     expLog.append("USER=null\t");
     if (checkIP) {
@@ -141,8 +142,9 @@ public class TestNMAuditLogger {
    */
   private void testFailureLogFormatHelper(boolean checkIP, ApplicationId appId,
       ContainerId containerId) {
-    String fLog = NMAuditLogger
-        .createFailureLog(USER, OPERATION, TARGET, DESC, appId, containerId);
+    String fLog =
+      NMAuditLogger.createFailureLog(USER, OPERATION, TARGET, DESC, appId,
+      containerId);
     StringBuilder expLog = new StringBuilder();
     expLog.append("USER=test\t");
     if (checkIP) {
@@ -175,7 +177,7 @@ public class TestNMAuditLogger {
   /**
    * Test {@link NMAuditLogger} without IP set.
    */
-  @Test
+  @Test  
   public void testNMAuditLoggerWithoutIP() throws Exception {
     // test without ip
     testSuccessLogFormat(false);
@@ -183,7 +185,7 @@ public class TestNMAuditLogger {
   }
 
   /**
-   * A special extension of {@link TestImpl} RPC server with
+   * A special extension of {@link TestImpl} RPC server with 
    * {@link TestImpl#ping()} testing the audit logs.
    */
   private class MyTestRPCServer extends TestImpl {
@@ -198,21 +200,21 @@ public class TestNMAuditLogger {
   /**
    * Test {@link NMAuditLogger} with IP set.
    */
-  @Test
+  @Test  
   public void testNMAuditLoggerWithIP() throws Exception {
     Configuration conf = new Configuration();
     // start the IPC server
     Server server = new RPC.Builder(conf).setProtocol(TestProtocol.class)
-        .setInstance(new MyTestRPCServer()).setBindAddress("0.0.0.0").setPort(0)
-        .setNumHandlers(5).setVerbose(true).build();
+        .setInstance(new MyTestRPCServer()).setBindAddress("0.0.0.0")
+        .setPort(0).setNumHandlers(5).setVerbose(true).build();
 
     server.start();
 
     InetSocketAddress addr = NetUtils.getConnectAddress(server);
 
     // Make a client connection and test the audit log
-    TestProtocol proxy = (TestProtocol) RPC
-        .getProxy(TestProtocol.class, TestProtocol.versionID, addr, conf);
+    TestProtocol proxy = (TestProtocol)RPC.getProxy(TestProtocol.class,
+                           TestProtocol.versionID, addr, conf);
     // Start the testcase
     proxy.ping();
 

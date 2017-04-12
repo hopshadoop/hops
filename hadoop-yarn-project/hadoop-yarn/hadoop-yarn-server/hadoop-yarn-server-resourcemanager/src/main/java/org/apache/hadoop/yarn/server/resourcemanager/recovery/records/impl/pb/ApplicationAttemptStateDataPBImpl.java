@@ -1,60 +1,56 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.DataInputByteBuffer;
+import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationAttemptIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
-import org.apache.hadoop.yarn.factories.RecordFactory;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
-import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.proto.YarnProtos.FinalApplicationStatusProto;
-import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.ApplicationAttemptStateDataProto;
-import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.ApplicationAttemptStateDataProtoOrBuilder;
-import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.RMAppAttemptStateProto;
+import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationAttemptStateDataProto;
+import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationAttemptStateDataProtoOrBuilder;
+import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.RMAppAttemptStateProto;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationAttemptStateData;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import com.google.protobuf.TextFormat;
 
-public class ApplicationAttemptStateDataPBImpl
-    extends ProtoBase<ApplicationAttemptStateDataProto>
-    implements ApplicationAttemptStateData {
-
-  private static final RecordFactory recordFactory =
-      RecordFactoryProvider.getRecordFactory(null);
-
-  ApplicationAttemptStateDataProto proto =
+public class ApplicationAttemptStateDataPBImpl extends
+    ApplicationAttemptStateData {
+  private static Log LOG =
+      LogFactory.getLog(ApplicationAttemptStateDataPBImpl.class);
+  ApplicationAttemptStateDataProto proto = 
       ApplicationAttemptStateDataProto.getDefaultInstance();
   ApplicationAttemptStateDataProto.Builder builder = null;
   boolean viaProto = false;
-
+  
   private ApplicationAttemptId attemptId = null;
   private Container masterContainer = null;
   private ByteBuffer appAttemptTokens = null;
@@ -79,21 +75,20 @@ public class ApplicationAttemptStateDataPBImpl
 
   private void mergeLocalToBuilder() {
     if (this.attemptId != null) {
-      builder.setAttemptId(((ApplicationAttemptIdPBImpl) attemptId).getProto());
+      builder.setAttemptId(((ApplicationAttemptIdPBImpl)attemptId).getProto());
     }
-    if (this.masterContainer != null) {
-      builder
-          .setMasterContainer(((ContainerPBImpl) masterContainer).getProto());
+    if(this.masterContainer != null) {
+      builder.setMasterContainer(((ContainerPBImpl)masterContainer).getProto());
     }
-    if (this.appAttemptTokens != null) {
-      builder.setAppAttemptTokens(convertToProtoFormat(this.appAttemptTokens));
+    if(this.appAttemptTokens != null) {
+      builder.setAppAttemptTokens(ProtoUtils.convertToProtoFormat(
+          this.appAttemptTokens));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -109,7 +104,7 @@ public class ApplicationAttemptStateDataPBImpl
   @Override
   public ApplicationAttemptId getAttemptId() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    if (attemptId != null) {
+    if(attemptId != null) {
       return attemptId;
     }
     if (!p.hasAttemptId()) {
@@ -131,7 +126,7 @@ public class ApplicationAttemptStateDataPBImpl
   @Override
   public Container getMasterContainer() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    if (masterContainer != null) {
+    if(masterContainer != null) {
       return masterContainer;
     }
     if (!p.hasMasterContainer()) {
@@ -151,25 +146,27 @@ public class ApplicationAttemptStateDataPBImpl
   }
 
   @Override
-  public ByteBuffer getAppAttemptTokens() {
+  public Credentials getAppAttemptTokens() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    if (appAttemptTokens != null) {
-      return appAttemptTokens;
+    if(appAttemptTokens != null) {
+      return convertCredentialsFromByteBuffer(appAttemptTokens);
     }
-    if (!p.hasAppAttemptTokens()) {
+    if(!p.hasAppAttemptTokens()) {
       return null;
     }
-    this.appAttemptTokens = convertFromProtoFormat(p.getAppAttemptTokens());
-    return appAttemptTokens;
+    this.appAttemptTokens = ProtoUtils.convertFromProtoFormat(
+        p.getAppAttemptTokens());
+    return convertCredentialsFromByteBuffer(appAttemptTokens);
   }
 
   @Override
-  public void setAppAttemptTokens(ByteBuffer attemptTokens) {
+  public void setAppAttemptTokens(Credentials attemptTokens) {
     maybeInitBuilder();
-    if (attemptTokens == null) {
+    if(attemptTokens == null) {
       builder.clearAppAttemptTokens();
+      return;
     }
-    this.appAttemptTokens = attemptTokens;
+    this.appAttemptTokens = convertCredentialsToByteBuffer(attemptTokens);
   }
 
   @Override
@@ -210,6 +207,25 @@ public class ApplicationAttemptStateDataPBImpl
     builder.setFinalTrackingUrl(url);
   }
 
+   @Override
+  public String getTrackingUrl() {
+    ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasTrackingUrl()) {
+      return null;
+    }
+    return p.getTrackingUrl();
+  }
+
+  @Override
+  public void setTrackingUrl(String url) {
+    maybeInitBuilder();
+    if (url == null) {
+      builder.clearTrackingUrl();
+      return;
+    }
+    builder.setTrackingUrl(url);
+  }
+  
   @Override
   public String getDiagnostics() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
@@ -242,39 +258,27 @@ public class ApplicationAttemptStateDataPBImpl
   }
 
   @Override
-  public float getProgress() {
+  public long getMemorySeconds() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getProgress();
+    return p.getMemorySeconds();
   }
-
+ 
   @Override
-  public void setProgress(float progress) {
-    maybeInitBuilder();
-    builder.setProgress(progress);
-  }
-
-  @Override
-  public String getHost() {
+  public long getVcoreSeconds() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getHost();
+    return p.getVcoreSeconds();
   }
 
   @Override
-  public void setHost(String Host) {
+  public void setMemorySeconds(long memorySeconds) {
     maybeInitBuilder();
-    builder.setHost(Host);
+    builder.setMemorySeconds(memorySeconds);
   }
-
+ 
   @Override
-  public int getRpcPort() {
-    ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getRpcPort();
-  }
-
-  @Override
-  public void setRpcPort(int rpcPort) {
+  public void setVcoreSeconds(long vcoreSeconds) {
     maybeInitBuilder();
-    builder.setRpcPort(rpcPort);
+    builder.setVcoreSeconds(vcoreSeconds);
   }
 
   @Override
@@ -297,112 +301,102 @@ public class ApplicationAttemptStateDataPBImpl
   }
 
   @Override
-  public void addALLRanNodes(List<YarnProtos.NodeIdProto> ranNodes) {
-    maybeInitBuilder();
-    builder.addAllRanNodes(ranNodes);
+  public int hashCode() {
+    return getProto().hashCode();
   }
 
   @Override
-  public Set<NodeId> getRanNodes() {
+  public int getAMContainerExitStatus() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-
-    Set<NodeId> ranNodes = new HashSet<NodeId>();
-    for (YarnProtos.NodeIdProto nodeIdProto : p.getRanNodesList()) {
-      ranNodes.add(convertFromProtoFormat(nodeIdProto));
-    }
-    return ranNodes;
+    return p.getAmContainerExitStatus();
   }
 
   @Override
-  public List<ContainerStatus> getJustFinishedContainers() {
-    ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    List<ContainerStatus> justFinishedContainers =
-        new ArrayList<ContainerStatus>();
-    for (YarnProtos.ContainerStatusProto containerStatusProto : p.
-        getJustFinishedFontainersList()) {
-      justFinishedContainers.add(convertFromProtoFormat(containerStatusProto));
-    }
-    return justFinishedContainers;
-  }
-
-  @Override
-  public void addAllJustFinishedContainers(
-      List<YarnProtos.ContainerStatusProto> justFinishedContainers) {
+  public void setAMContainerExitStatus(int exitStatus) {
     maybeInitBuilder();
-    builder.addAllJustFinishedFontainers(justFinishedContainers);
+    builder.setAmContainerExitStatus(exitStatus);
   }
 
-  public static ApplicationAttemptStateData newApplicationAttemptStateData(
-      ApplicationAttemptId attemptId, Container container,
-      ByteBuffer attemptTokens, long startTime, RMAppAttemptState finalState,
-      String finalTrackingUrl, String diagnostics,
-      FinalApplicationStatus amUnregisteredFinalStatus, Set<NodeId> ranNodes,
-      List<ContainerStatus> justFinishedContainers, float progress, String host,
-      int rpcPort) {
-    ApplicationAttemptStateData attemptStateData =
-        recordFactory.newRecordInstance(ApplicationAttemptStateData.class);
-    attemptStateData.setAttemptId(attemptId);
-    attemptStateData.setMasterContainer(container);
-    attemptStateData.setAppAttemptTokens(attemptTokens);
-    attemptStateData.setState(finalState);
-    attemptStateData.setFinalTrackingUrl(finalTrackingUrl);
-    attemptStateData.setDiagnostics(diagnostics);
-    attemptStateData.setStartTime(startTime);
-    attemptStateData.setFinalApplicationStatus(amUnregisteredFinalStatus);
-    attemptStateData.setProgress(progress);
-    attemptStateData.setHost(host);
-    attemptStateData.setRpcPort(rpcPort);
 
-    List<YarnProtos.NodeIdProto> nodeIds =
-        new ArrayList<YarnProtos.NodeIdProto>();
-    for (NodeId nodeId : ranNodes) {
-      nodeIds.add(((NodeIdPBImpl) nodeId).getProto());
+  @Override
+  public boolean equals(Object other) {
+    if (other == null)
+      return false;
+    if (other.getClass().isAssignableFrom(this.getClass())) {
+      return this.getProto().equals(this.getClass().cast(other).getProto());
     }
-    attemptStateData.addALLRanNodes(nodeIds);
-
-    if (justFinishedContainers != null) {
-      List<YarnProtos.ContainerStatusProto> justFinishedContainersProto =
-          new ArrayList<YarnProtos.ContainerStatusProto>();
-      for (ContainerStatus containerStatus : justFinishedContainers) {
-        justFinishedContainersProto
-            .add(((ContainerStatusPBImpl) containerStatus).getProto());
-      }
-      attemptStateData
-          .addAllJustFinishedContainers(justFinishedContainersProto);
-    }
-    return attemptStateData;
+    return false;
   }
 
+  @Override
+  public String toString() {
+    return TextFormat.shortDebugString(getProto());
+  }
+  
   private static String RM_APP_ATTEMPT_PREFIX = "RMATTEMPT_";
-
-  public static RMAppAttemptStateProto convertToProtoFormat(
-      RMAppAttemptState e) {
+  public static RMAppAttemptStateProto convertToProtoFormat(RMAppAttemptState e) {
     return RMAppAttemptStateProto.valueOf(RM_APP_ATTEMPT_PREFIX + e.name());
   }
-
-  public static RMAppAttemptState convertFromProtoFormat(
-      RMAppAttemptStateProto e) {
-    return RMAppAttemptState.
-        valueOf(e.name().replace(RM_APP_ATTEMPT_PREFIX, ""));
+  public static RMAppAttemptState convertFromProtoFormat(RMAppAttemptStateProto e) {
+    return RMAppAttemptState.valueOf(e.name().replace(RM_APP_ATTEMPT_PREFIX, ""));
   }
 
-  public static NodeId convertFromProtoFormat(YarnProtos.NodeIdProto n) {
-    return ProtoUtils.convertFromProtoFormat(n);
-  }
-
-  public static ContainerStatus convertFromProtoFormat(
-      YarnProtos.ContainerStatusProto c) {
-    return new ContainerStatusPBImpl(c);
-  }
-
-  private FinalApplicationStatusProto convertToProtoFormat(
-      FinalApplicationStatus s) {
+  private FinalApplicationStatusProto convertToProtoFormat(FinalApplicationStatus s) {
     return ProtoUtils.convertToProtoFormat(s);
   }
-
-  private FinalApplicationStatus convertFromProtoFormat(
-      FinalApplicationStatusProto s) {
+  private FinalApplicationStatus convertFromProtoFormat(FinalApplicationStatusProto s) {
     return ProtoUtils.convertFromProtoFormat(s);
   }
 
+  @Override
+  public long getFinishTime() {
+    ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getFinishTime();
+  }
+
+  @Override
+  public void setFinishTime(long finishTime) {
+    maybeInitBuilder();
+    builder.setFinishTime(finishTime);
+  }
+
+  private static ByteBuffer convertCredentialsToByteBuffer(
+      Credentials credentials) {
+    ByteBuffer appAttemptTokens = null;
+    DataOutputBuffer dob = new DataOutputBuffer();
+    try {
+      if (credentials != null) {
+        credentials.writeTokenStorageToStream(dob);
+        appAttemptTokens = ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
+      }
+      return appAttemptTokens;
+    } catch (IOException e) {
+      LOG.error("Failed to convert Credentials to ByteBuffer.");
+      assert false;
+      return null;
+    } finally {
+      IOUtils.closeStream(dob);
+    }
+  }
+
+  private static Credentials convertCredentialsFromByteBuffer(
+      ByteBuffer appAttemptTokens) {
+    DataInputByteBuffer dibb = new DataInputByteBuffer();
+    try {
+      Credentials credentials = null;
+      if (appAttemptTokens != null) {
+        credentials = new Credentials();
+        appAttemptTokens.rewind();
+        dibb.reset(appAttemptTokens);
+        credentials.readTokenStorageStream(dibb);
+      }
+      return credentials;
+    } catch (IOException e) {
+      LOG.error("Failed to convert Credentials from ByteBuffer.");
+      assert false;
+      return null;
+    } finally {
+      IOUtils.closeStream(dibb);
+    }
+  }
 }

@@ -18,9 +18,11 @@
 package org.apache.hadoop.ipc;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.URI;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -40,13 +42,13 @@ import org.junit.Test;
 /**
  * This class checks that RPCs can use specialized socket factories.
  */
-@Ignore
 public class TestMRCJCSocketFactory {
 
   /**
    * Check that we can reach a NameNode or Resource Manager using a specific
    * socket factory
    */
+  @Ignore //this test is not compatible with our nn selection system
   @Test
   public void testSocketFactory() throws IOException {
     // Create a standard mini-cluster
@@ -75,7 +77,7 @@ public class TestMRCJCSocketFactory {
 
       Assert.assertFalse(directDfs.exists(filePath));
       Assert.assertFalse(dfs.exists(filePath));
-
+      
       directDfs.mkdirs(filePath);
       Assert.assertTrue(directDfs.exists(filePath));
       Assert.assertTrue(dfs.exists(filePath));
@@ -109,7 +111,7 @@ public class TestMRCJCSocketFactory {
 
   private MiniMRYarnCluster initAndStartMiniMRYarnCluster(JobConf jobConf) {
     MiniMRYarnCluster miniMRYarnCluster;
-    miniMRYarnCluster = new MiniMRYarnCluster(this.getClass().getName(), 1);
+    miniMRYarnCluster = new MiniMRYarnCluster(this.getClass().getName(), 1, false);
     miniMRYarnCluster.init(jobConf);
     miniMRYarnCluster.start();
     return miniMRYarnCluster;

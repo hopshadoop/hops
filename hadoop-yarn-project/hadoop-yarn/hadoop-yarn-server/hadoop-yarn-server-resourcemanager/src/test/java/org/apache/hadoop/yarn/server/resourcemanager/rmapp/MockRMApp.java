@@ -18,23 +18,26 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import io.hops.ha.common.TransactionState;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.ReservationId;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationSubmissionContextPBImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
-
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
 
 public class MockRMApp implements RMApp {
   static final int DT = 1000000; // ms
@@ -49,9 +52,11 @@ public class MockRMApp implements RMApp {
   int failCount = 0;
   ApplicationId id;
   String url = null;
+  String oUrl = null;
   StringBuilder diagnostics = new StringBuilder();
   RMAppAttempt attempt;
   int maxAppAttempts = 1;
+  ResourceRequest amReq;
 
   public MockRMApp(int newid, long time, RMAppState newState) {
     finish = time;
@@ -64,8 +69,7 @@ public class MockRMApp implements RMApp {
     user = userName;
   }
 
-  public MockRMApp(int newid, long time, RMAppState newState, String userName,
-      String diag) {
+  public MockRMApp(int newid, long time, RMAppState newState, String userName, String diag) {
     this(newid, time, newState, userName);
     this.diagnostics = new StringBuilder(diag);
   }
@@ -129,8 +133,8 @@ public class MockRMApp implements RMApp {
   @Override
   public Map<ApplicationAttemptId, RMAppAttempt> getAppAttempts() {
     Map<ApplicationAttemptId, RMAppAttempt> attempts =
-        new LinkedHashMap<ApplicationAttemptId, RMAppAttempt>();
-    if (attempt != null) {
+      new LinkedHashMap<ApplicationAttemptId, RMAppAttempt>();
+    if(attempt != null) {
       attempts.put(attempt.getAppAttemptId(), attempt);
     }
     return attempts;
@@ -146,8 +150,8 @@ public class MockRMApp implements RMApp {
   }
 
   @Override
-  public ApplicationReport createAndGetApplicationReport(String clientUserName,
-      boolean allowAccess) {
+  public ApplicationReport createAndGetApplicationReport(
+      String clientUserName, boolean allowAccess) {
     throw new UnsupportedOperationException("Not supported yet.");
   }
 
@@ -184,12 +188,21 @@ public class MockRMApp implements RMApp {
   }
 
   @Override
+  public String getOriginalTrackingUrl() {
+    return oUrl;
+  }
+
+  public void setOriginalTrackingUrl(String oUrl) {
+    this.oUrl = oUrl;
+  }
+
+  @Override
   public StringBuilder getDiagnostics() {
     return diagnostics;
   }
 
   public void setDiagnostics(String diag) {
-    this.diagnostics = new StringBuilder(diag);
+    this.diagnostics  = new StringBuilder(diag);
   }
 
   @Override
@@ -211,8 +224,7 @@ public class MockRMApp implements RMApp {
   }
 
   @Override
-  public int pullRMNodeUpdates(Collection<RMNode> updatedNodes,
-      TransactionState ts) {
+  public int pullRMNodeUpdates(Collection<RMNode> updatedNodes) {
     throw new UnsupportedOperationException("Not supported yet.");
   }
 
@@ -234,5 +246,29 @@ public class MockRMApp implements RMApp {
   @Override
   public YarnApplicationState createApplicationState() {
     return null;
+  }
+
+  @Override
+  public Set<NodeId> getRanNodes() {
+    return null;
+  }
+  
+  public Resource getResourcePreempted() {
+    throw new UnsupportedOperationException("Not supported yet.");
+  }
+
+  @Override
+  public RMAppMetrics getRMAppMetrics() {
+    throw new UnsupportedOperationException("Not supported yet.");
+  }
+
+  @Override
+  public ReservationId getReservationId() {
+    throw new UnsupportedOperationException("Not supported yet.");
+  }
+  
+  @Override
+  public ResourceRequest getAMResourceRequest() {
+    return this.amReq; 
   }
 }

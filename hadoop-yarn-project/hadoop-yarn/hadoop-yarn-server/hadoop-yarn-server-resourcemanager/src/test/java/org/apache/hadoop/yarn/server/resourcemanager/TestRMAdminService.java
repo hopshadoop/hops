@@ -1,13 +1,13 @@
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements. See the NOTICE file
+ * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership. The ASF licenses this file
+ * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- * with the License. You may obtain a copy of the License at
+ * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import static org.junit.Assert.fail;
+
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.security.AccessControlException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -52,30 +63,18 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-
-import static org.junit.Assert.fail;
 
 public class TestRMAdminService {
 
-  private static final Log LOG = LogFactory.getLog(TestRMAdminService.class);
-  private Configuration configuration;
-  ;
+  private Configuration configuration;;
   private MockRM rm = null;
   private FileSystem fs;
   private Path workingPath;
   private Path tmpDir;
 
   static {
-    YarnConfiguration
-        .addDefaultResource(YarnConfiguration.CS_CONFIGURATION_FILE);
+    YarnConfiguration.addDefaultResource(
+        YarnConfiguration.CS_CONFIGURATION_FILE);
   }
 
   @Before
@@ -84,22 +83,24 @@ public class TestRMAdminService {
     configuration.set(YarnConfiguration.RM_SCHEDULER,
         CapacityScheduler.class.getCanonicalName());
     fs = FileSystem.get(configuration);
-    workingPath = new Path(
-        new File("target", this.getClass().getSimpleName() + "-remoteDir")
-            .getAbsolutePath());
-    configuration
-        .set(YarnConfiguration.FS_BASED_RM_CONF_STORE, workingPath.toString());
-    tmpDir = new Path(
-        new File("target", this.getClass().getSimpleName() + "-tmpDir")
-            .getAbsolutePath());
+    workingPath =
+        new Path(new File("target", this.getClass().getSimpleName()
+            + "-remoteDir").getAbsolutePath());
+    configuration.set(YarnConfiguration.FS_BASED_RM_CONF_STORE,
+        workingPath.toString());
+    tmpDir = new Path(new File("target", this.getClass().getSimpleName()
+        + "-tmpDir").getAbsolutePath());
     fs.delete(workingPath, true);
     fs.delete(tmpDir, true);
     fs.mkdirs(workingPath);
     fs.mkdirs(tmpDir);
-    MockUnixGroupsMapping.init();
-    YarnAPIStorageFactory.setConfiguration(configuration);
+
     RMStorageFactory.setConfiguration(configuration);
-    RMUtilities.InitializeDB();
+    YarnAPIStorageFactory.setConfiguration(configuration);
+    DBUtility.InitializeDB();
+
+    // reset the groups to what it default test settings
+    MockUnixGroupsMapping.resetGroups();
   }
 
   @After
@@ -118,13 +119,14 @@ public class TestRMAdminService {
     rm.init(configuration);
     rm.start();
 
-    CapacityScheduler cs = (CapacityScheduler) rm.getRMContext().getScheduler();
+    CapacityScheduler cs =
+        (CapacityScheduler) rm.getRMContext().getScheduler();
     int maxAppsBefore = cs.getConfiguration().getMaximumSystemApplications();
 
     try {
       rm.adminService.refreshQueues(RefreshQueuesRequest.newInstance());
-      Assert.assertEquals(maxAppsBefore,
-          cs.getConfiguration().getMaximumSystemApplications());
+      Assert.assertEquals(maxAppsBefore, cs.getConfiguration()
+          .getMaximumSystemApplications());
     } catch (Exception ex) {
       fail("Using localConfigurationProvider. Should not get any exception.");
     }
@@ -143,11 +145,12 @@ public class TestRMAdminService {
       rm = new MockRM(configuration);
       rm.init(configuration);
       rm.start();
-    } catch (Exception ex) {
+    } catch(Exception ex) {
       fail("Should not get any exceptions");
     }
 
-    CapacityScheduler cs = (CapacityScheduler) rm.getRMContext().getScheduler();
+    CapacityScheduler cs =
+        (CapacityScheduler) rm.getRMContext().getScheduler();
     int maxAppsBefore = cs.getConfiguration().getMaximumSystemApplications();
 
     CapacitySchedulerConfiguration csConf =
@@ -188,12 +191,12 @@ public class TestRMAdminService {
       rm = new MockRM(configuration);
       rm.init(configuration);
       rm.start();
-    } catch (Exception ex) {
+    } catch(Exception ex) {
       fail("Should not get any exceptions");
     }
 
-    String aclStringBefore = rm.adminService.getAccessControlList().
-        getAclString().trim();
+    String aclStringBefore =
+        rm.adminService.getAccessControlList().getAclString().trim();
 
     YarnConfiguration yarnConf = new YarnConfiguration();
     yarnConf.set(YarnConfiguration.YARN_ADMIN_ACL, "world:anyone:rwcda");
@@ -201,26 +204,26 @@ public class TestRMAdminService {
 
     rm.adminService.refreshAdminAcls(RefreshAdminAclsRequest.newInstance());
 
-    String aclStringAfter = rm.adminService.getAccessControlList().
-        getAclString().trim();
+    String aclStringAfter =
+        rm.adminService.getAccessControlList().getAclString().trim();
 
     Assert.assertTrue(!aclStringAfter.equals(aclStringBefore));
-    Assert.assertEquals(aclStringAfter, "world:anyone:rwcda");
+    Assert.assertEquals(aclStringAfter, "world:anyone:rwcda,"
+        + UserGroupInformation.getCurrentUser().getShortUserName());
   }
 
   @Test
   public void testServiceAclsRefreshWithLocalConfigurationProvider() {
-    configuration
-        .setBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
-            true);
+    configuration.setBoolean(
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, true);
     ResourceManager resourceManager = null;
 
     try {
       resourceManager = new ResourceManager();
       resourceManager.init(configuration);
       resourceManager.start();
-      resourceManager.adminService
-          .refreshServiceAcls(RefreshServiceAclsRequest.newInstance());
+      resourceManager.adminService.refreshServiceAcls(RefreshServiceAclsRequest
+          .newInstance());
     } catch (Exception ex) {
       fail("Using localConfigurationProvider. Should not get any exception.");
     } finally {
@@ -233,9 +236,8 @@ public class TestRMAdminService {
   @Test
   public void testServiceAclsRefreshWithFileSystemBasedConfigurationProvider()
       throws IOException, YarnException {
-    configuration
-        .setBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
-            true);
+    configuration.setBoolean(
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, true);
     configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
         "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
     ResourceManager resourceManager = null;
@@ -260,8 +262,8 @@ public class TestRMAdminService {
       newConf.set("security.applicationclient.protocol.acl", aclsString);
       uploadConfiguration(newConf, "hadoop-policy.xml");
 
-      resourceManager.adminService
-          .refreshServiceAcls(RefreshServiceAclsRequest.newInstance());
+      resourceManager.adminService.refreshServiceAcls(RefreshServiceAclsRequest
+          .newInstance());
 
       // verify service Acls refresh for AdminService
       ServiceAuthorizationManager adminServiceServiceManager =
@@ -280,17 +282,17 @@ public class TestRMAdminService {
           aclsString);
 
       // verify service ACLs refresh for ApplicationMasterService
-      ServiceAuthorizationManager appMasterService = resourceManager.
-          getRMContext().getApplicationMasterService().getServer()
-          .getServiceAuthorizationManager();
+      ServiceAuthorizationManager appMasterService =
+          resourceManager.getRMContext().getApplicationMasterService()
+              .getServer().getServiceAuthorizationManager();
       verifyServiceACLsRefresh(appMasterService,
           org.apache.hadoop.yarn.api.ApplicationClientProtocolPB.class,
           aclsString);
 
       // verify service ACLs refresh for ResourceTrackerService
-      ServiceAuthorizationManager RTService = resourceManager.getRMContext().
-          getResourceTrackerService().getServer()
-          .getServiceAuthorizationManager();
+      ServiceAuthorizationManager RTService =
+          resourceManager.getRMContext().getResourceTrackerService()
+              .getServer().getServiceAuthorizationManager();
       verifyServiceACLsRefresh(RTService,
           org.apache.hadoop.yarn.api.ApplicationClientProtocolPB.class,
           aclsString);
@@ -304,9 +306,11 @@ public class TestRMAdminService {
   private void verifyServiceACLsRefresh(ServiceAuthorizationManager manager,
       Class<?> protocol, String aclString) {
     for (Class<?> protocolClass : manager.getProtocolsWithAcls()) {
-      AccessControlList accessList = manager.getProtocolsAcls(protocolClass);
+      AccessControlList accessList =
+          manager.getProtocolsAcls(protocolClass);
       if (protocolClass == protocol) {
-        Assert.assertEquals(accessList.getAclString(), aclString);
+        Assert.assertEquals(accessList.getAclString(),
+            aclString);
       } else {
         Assert.assertEquals(accessList.getAclString(), "*");
       }
@@ -314,7 +318,8 @@ public class TestRMAdminService {
   }
 
   @Test
-  public void testRefreshSuperUserGroupsWithLocalConfigurationProvider() {
+  public void
+      testRefreshSuperUserGroupsWithLocalConfigurationProvider() {
     rm = new MockRM(configuration);
     rm.init(configuration);
     rm.start();
@@ -328,7 +333,8 @@ public class TestRMAdminService {
   }
 
   @Test
-  public void testRefreshSuperUserGroupsWithFileSystemBasedConfigurationProvider()
+  public void
+      testRefreshSuperUserGroupsWithFileSystemBasedConfigurationProvider()
       throws IOException, YarnException {
     configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
         "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
@@ -340,7 +346,7 @@ public class TestRMAdminService {
       rm = new MockRM(configuration);
       rm.init(configuration);
       rm.start();
-    } catch (Exception ex) {
+    } catch(Exception ex) {
       fail("Should not get any exceptions");
     }
 
@@ -351,19 +357,33 @@ public class TestRMAdminService {
 
     rm.adminService.refreshSuperUserGroupsConfiguration(
         RefreshSuperUserGroupsConfigurationRequest.newInstance());
-    Assert.assertTrue(
-        ProxyUsers.getProxyGroups().get("hadoop.proxyuser.test.groups")
-            .size() == 1);
-    Assert.assertTrue(
-        ProxyUsers.getProxyGroups().get("hadoop.proxyuser.test.groups")
-            .contains("test_groups"));
+    Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyGroups()
+        .get("hadoop.proxyuser.test.groups").size() == 1);
+    Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyGroups()
+        .get("hadoop.proxyuser.test.groups").contains("test_groups"));
 
-    Assert.assertTrue(
-        ProxyUsers.getProxyHosts().get("hadoop.proxyuser.test.hosts").size() ==
-            1);
-    Assert.assertTrue(
-        ProxyUsers.getProxyHosts().get("hadoop.proxyuser.test.hosts")
-            .contains("test_hosts"));
+    Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyHosts()
+        .get("hadoop.proxyuser.test.hosts").size() == 1);
+    Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyHosts()
+        .get("hadoop.proxyuser.test.hosts").contains("test_hosts"));
+
+    Configuration yarnConf = new Configuration(false);
+    yarnConf.set("yarn.resourcemanager.proxyuser.test.groups", "test_groups_1");
+    yarnConf.set("yarn.resourcemanager.proxyuser.test.hosts", "test_hosts_1");
+    uploadConfiguration(yarnConf, "yarn-site.xml");
+
+    // RM specific configs will overwrite the common ones
+    rm.adminService.refreshSuperUserGroupsConfiguration(
+        RefreshSuperUserGroupsConfigurationRequest.newInstance());
+    Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyGroups()
+        .get("hadoop.proxyuser.test.groups").size() == 1);
+    Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyGroups()
+        .get("hadoop.proxyuser.test.groups").contains("test_groups_1"));
+
+    Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyHosts()
+        .get("hadoop.proxyuser.test.hosts").size() == 1);
+    Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyHosts()
+        .get("hadoop.proxyuser.test.hosts").contains("test_hosts_1"));
   }
 
   @Test
@@ -372,34 +392,37 @@ public class TestRMAdminService {
     rm.init(configuration);
     rm.start();
     try {
-      rm.adminService.refreshUserToGroupsMappings(
-          RefreshUserToGroupsMappingsRequest.newInstance());
+      rm.adminService
+          .refreshUserToGroupsMappings(RefreshUserToGroupsMappingsRequest
+              .newInstance());
     } catch (Exception ex) {
       fail("Using localConfigurationProvider. Should not get any exception.");
     }
   }
 
   @Test
-  public void testRefreshUserToGroupsMappingsWithFileSystemBasedConfigurationProvider()
-      throws IOException, YarnException {
+  public void
+      testRefreshUserToGroupsMappingsWithFileSystemBasedConfigurationProvider()
+          throws IOException, YarnException {
     configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
         "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
 
     String[] defaultTestUserGroups = {"dummy_group1", "dummy_group2"};
-    UserGroupInformation ugi = UserGroupInformation
-        .createUserForTesting("dummyUser", defaultTestUserGroups);
+    UserGroupInformation ugi = UserGroupInformation.createUserForTesting
+        ("dummyUser", defaultTestUserGroups);
 
     String user = ugi.getUserName();
     List<String> groupWithInit = new ArrayList<String>(2);
-    for (int i = 0; i < ugi.getGroupNames().length; i++) {
-      groupWithInit.add(ugi.getGroupNames()[i]);
-    }
+     for(int i = 0; i < ugi.getGroupNames().length; i++ ) {
+       groupWithInit.add(ugi.getGroupNames()[i]);
+     }
 
     // upload default configurations
     uploadDefaultConfiguration();
     Configuration conf = new Configuration();
     conf.setClass(CommonConfigurationKeys.HADOOP_SECURITY_GROUP_MAPPING,
-        MockUnixGroupsMapping.class, GroupMappingServiceProvider.class);
+        MockUnixGroupsMapping.class,
+        GroupMappingServiceProvider.class);
     uploadConfiguration(conf, "core-site.xml");
 
     try {
@@ -411,37 +434,30 @@ public class TestRMAdminService {
     }
 
     // Make sure RM will use the updated GroupMappingServiceProvider
-    List<String> groupBefore = new ArrayList<String>(Groups.
-        getUserToGroupsMappingService(configuration).getGroups(user));
-    if (groupBefore.size() == 0) {
-      LOG.info("groupe before empty");
-    } else {
-      for (String s : groupBefore) {
-        LOG.info("groupe before contains " + s);
-      }
-    }
-    Assert.assertTrue(groupBefore.contains("test_group_A"));
-    Assert.assertTrue(groupBefore.contains("test_group_B"));
-    Assert.assertTrue(groupBefore.contains("test_group_C"));
-    Assert.assertTrue("wrong groupBefore.size: " + groupBefore.size(),
-        groupBefore.size() == 3);
+    List<String> groupBefore =
+        new ArrayList<String>(Groups.getUserToGroupsMappingService(
+            configuration).getGroups(user));
+    Assert.assertTrue(groupBefore.contains("test_group_A")
+        && groupBefore.contains("test_group_B")
+        && groupBefore.contains("test_group_C") && groupBefore.size() == 3);
     Assert.assertTrue(groupWithInit.size() != groupBefore.size());
-    Assert.assertFalse(groupWithInit.contains("test_group_A") ||
-        groupWithInit.contains("test_group_B") ||
-        groupWithInit.contains("test_group_C"));
+    Assert.assertFalse(groupWithInit.contains("test_group_A")
+        || groupWithInit.contains("test_group_B")
+        || groupWithInit.contains("test_group_C"));
 
     // update the groups
     MockUnixGroupsMapping.updateGroups();
 
-    rm.adminService.refreshUserToGroupsMappings(
-        RefreshUserToGroupsMappingsRequest.newInstance());
-    List<String> groupAfter = Groups.
-        getUserToGroupsMappingService(configuration).getGroups(user);
+    rm.adminService
+        .refreshUserToGroupsMappings(RefreshUserToGroupsMappingsRequest
+            .newInstance());
+    List<String> groupAfter =
+        Groups.getUserToGroupsMappingService(configuration).getGroups(user);
 
     // should get the updated groups
-    Assert.assertTrue(groupAfter.contains("test_group_D") &&
-        groupAfter.contains("test_group_E") &&
-        groupAfter.contains("test_group_F") && groupAfter.size() == 3);
+    Assert.assertTrue(groupAfter.contains("test_group_D")
+        && groupAfter.contains("test_group_E")
+        && groupAfter.contains("test_group_F") && groupAfter.size() == 3);
 
   }
 
@@ -489,43 +505,45 @@ public class TestRMAdminService {
     uploadToRemoteFileSystem(new Path(excludeHostsFile.getAbsolutePath()));
 
     Configuration yarnConf = new YarnConfiguration();
-    yarnConf.set(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH,
-        this.workingPath + "/excludeHosts");
-    uploadConfiguration(yarnConf,
-        YarnConfiguration.YARN_SITE_CONFIGURATION_FILE);
+    yarnConf.set(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH, this.workingPath
+        + "/excludeHosts");
+    uploadConfiguration(yarnConf, YarnConfiguration.YARN_SITE_CONFIGURATION_FILE);
 
     rm.adminService.refreshNodes(RefreshNodesRequest.newInstance());
-    Set<String> excludeHosts = rm.getNodesListManager().getHostsReader().
-        getExcludedHosts();
+    Set<String> excludeHosts =
+        rm.getNodesListManager().getHostsReader().getExcludedHosts();
     Assert.assertTrue(excludeHosts.size() == 1);
     Assert.assertTrue(excludeHosts.contains("0.0.0.0:123"));
   }
 
   @Test
-  public void testRMHAWithFileSystemBasedConfiguration()
-      throws IOException, YarnException {
+  public void testRMHAWithFileSystemBasedConfiguration() throws IOException,
+      YarnException {
     StateChangeRequestInfo requestInfo = new StateChangeRequestInfo(
         HAServiceProtocol.RequestSource.REQUEST_BY_USER);
     configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
         "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
     configuration.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    configuration.set(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
-        "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     configuration.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2");
     int base = 100;
     for (String confKey : YarnConfiguration
         .getServiceAddressConfKeys(configuration)) {
-      configuration
-          .set(HAUtil.addSuffix(confKey, "rm1"), "0.0.0.0:" + (base + 20));
-      configuration
-          .set(HAUtil.addSuffix(confKey, "rm2"), "0.0.0.0:" + (base + 40));
+      configuration.set(HAUtil.addSuffix(confKey, "rm1"), "0.0.0.0:"
+          + (base + 20));
+      configuration.set(HAUtil.addSuffix(confKey, "rm2"), "0.0.0.0:"
+          + (base + 40));
       base = base * 2;
     }
     Configuration conf1 = new Configuration(configuration);
     conf1.set(YarnConfiguration.RM_HA_ID, "rm1");
+    conf1.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            "localhost:8034");
+
     Configuration conf2 = new Configuration(configuration);
     conf2.set(YarnConfiguration.RM_HA_ID, "rm2");
+    conf2.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            "localhost:8035");
 
     // upload default configurations
     uploadDefaultConfiguration();
@@ -536,18 +554,18 @@ public class TestRMAdminService {
       rm1 = new MockRM(conf1);
       rm1.init(conf1);
       rm1.start();
-      Assert.assertTrue(
-          rm1.getRMContext().getHAServiceState() == HAServiceState.STANDBY);
+      Assert.assertTrue(rm1.getRMContext().getHAServiceState()
+          == HAServiceState.STANDBY);
 
       rm2 = new MockRM(conf2);
       rm2.init(conf1);
       rm2.start();
-      Assert.assertTrue(
-          rm2.getRMContext().getHAServiceState() == HAServiceState.STANDBY);
+      Assert.assertTrue(rm2.getRMContext().getHAServiceState()
+          == HAServiceState.STANDBY);
 
       rm1.adminService.transitionToActive(requestInfo);
-      Assert.assertTrue(
-          rm1.getRMContext().getHAServiceState() == HAServiceState.ACTIVE);
+      Assert.assertTrue(rm1.getRMContext().getHAServiceState()
+          == HAServiceState.ACTIVE);
 
       CapacitySchedulerConfiguration csConf =
           new CapacitySchedulerConfiguration();
@@ -556,26 +574,29 @@ public class TestRMAdminService {
 
       rm1.adminService.refreshQueues(RefreshQueuesRequest.newInstance());
 
-      int maxApps = ((CapacityScheduler) rm1.getRMContext().getScheduler())
-          .getConfiguration().getMaximumSystemApplications();
+      int maxApps =
+          ((CapacityScheduler) rm1.getRMContext().getScheduler())
+              .getConfiguration().getMaximumSystemApplications();
       Assert.assertEquals(maxApps, 5000);
 
       // Before failover happens, the maxApps is
       // still the default value on the standby rm : rm2
-      int maxAppsBeforeFailOver = ((CapacityScheduler) rm2.getRMContext().
-          getScheduler()).getConfiguration().getMaximumSystemApplications();
+      int maxAppsBeforeFailOver =
+          ((CapacityScheduler) rm2.getRMContext().getScheduler())
+              .getConfiguration().getMaximumSystemApplications();
       Assert.assertEquals(maxAppsBeforeFailOver, 10000);
 
       // Do the failover
       rm1.adminService.transitionToStandby(requestInfo);
       rm2.adminService.transitionToActive(requestInfo);
-      Assert.assertTrue(
-          rm1.getRMContext().getHAServiceState() == HAServiceState.STANDBY);
-      Assert.assertTrue(
-          rm2.getRMContext().getHAServiceState() == HAServiceState.ACTIVE);
+      Assert.assertTrue(rm1.getRMContext().getHAServiceState()
+          == HAServiceState.STANDBY);
+      Assert.assertTrue(rm2.getRMContext().getHAServiceState()
+          == HAServiceState.ACTIVE);
 
-      int maxAppsAfter = ((CapacityScheduler) rm2.getRMContext().getScheduler())
-          .getConfiguration().getMaximumSystemApplications();
+      int maxAppsAfter =
+          ((CapacityScheduler) rm2.getRMContext().getScheduler())
+              .getConfiguration().getMaximumSystemApplications();
 
       Assert.assertEquals(maxAppsAfter, 5000);
     } finally {
@@ -630,8 +651,8 @@ public class TestRMAdminService {
 
     YarnConfiguration yarnConf = new YarnConfiguration();
     yarnConf.set(YarnConfiguration.YARN_ADMIN_ACL, "world:anyone:rwcda");
-    yarnConf.set(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH,
-        this.workingPath + "/excludeHosts");
+    yarnConf.set(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH, this.workingPath
+        + "/excludeHosts");
     uploadConfiguration(yarnConf, "yarn-site.xml");
 
     CapacitySchedulerConfiguration csConf =
@@ -645,12 +666,13 @@ public class TestRMAdminService {
     uploadConfiguration(newConf, "hadoop-policy.xml");
 
     Configuration conf = new Configuration();
-    conf.setBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
-        true);
+    conf.setBoolean(
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, true);
     conf.set("hadoop.proxyuser.test.groups", "test_groups");
     conf.set("hadoop.proxyuser.test.hosts", "test_hosts");
     conf.setClass(CommonConfigurationKeys.HADOOP_SECURITY_GROUP_MAPPING,
-        MockUnixGroupsMapping.class, GroupMappingServiceProvider.class);
+        MockUnixGroupsMapping.class,
+        GroupMappingServiceProvider.class);
     uploadConfiguration(conf, "core-site.xml");
 
     // update the groups
@@ -667,19 +689,22 @@ public class TestRMAdminService {
       }
 
       // validate values for excludeHosts
-      Set<String> excludeHosts = resourceManager.getRMContext().
-          getNodesListManager().getHostsReader().getExcludedHosts();
+      Set<String> excludeHosts =
+          resourceManager.getRMContext().getNodesListManager()
+              .getHostsReader().getExcludedHosts();
       Assert.assertTrue(excludeHosts.size() == 1);
       Assert.assertTrue(excludeHosts.contains("0.0.0.0:123"));
 
       // validate values for admin-acls
-      String aclStringAfter = resourceManager.adminService.
-          getAccessControlList().getAclString().trim();
-      Assert.assertEquals(aclStringAfter, "world:anyone:rwcda");
+      String aclStringAfter =
+          resourceManager.adminService.getAccessControlList()
+              .getAclString().trim();
+      Assert.assertEquals(aclStringAfter, "world:anyone:rwcda,"
+          + UserGroupInformation.getCurrentUser().getShortUserName());
 
       // validate values for queue configuration
-      CapacityScheduler cs = (CapacityScheduler) resourceManager.getRMContext().
-          getScheduler();
+      CapacityScheduler cs =
+          (CapacityScheduler) resourceManager.getRMContext().getScheduler();
       int maxAppsAfter = cs.getConfiguration().getMaximumSystemApplications();
       Assert.assertEquals(maxAppsAfter, 5000);
 
@@ -700,49 +725,87 @@ public class TestRMAdminService {
           aclsString);
 
       // verify service ACLs for ApplicationMasterService
-      ServiceAuthorizationManager appMasterService = resourceManager.
-          getRMContext().getApplicationMasterService().getServer()
-          .getServiceAuthorizationManager();
+      ServiceAuthorizationManager appMasterService =
+          resourceManager.getRMContext().getApplicationMasterService()
+              .getServer().getServiceAuthorizationManager();
       verifyServiceACLsRefresh(appMasterService,
           org.apache.hadoop.yarn.api.ApplicationClientProtocolPB.class,
           aclsString);
 
       // verify service ACLs for ResourceTrackerService
-      ServiceAuthorizationManager RTService = resourceManager.getRMContext().
-          getResourceTrackerService().getServer()
-          .getServiceAuthorizationManager();
+      ServiceAuthorizationManager RTService =
+          resourceManager.getRMContext().getResourceTrackerService()
+              .getServer().getServiceAuthorizationManager();
       verifyServiceACLsRefresh(RTService,
           org.apache.hadoop.yarn.api.ApplicationClientProtocolPB.class,
           aclsString);
 
       // verify ProxyUsers and ProxyHosts
-      Assert.assertTrue(
-          ProxyUsers.getProxyGroups().get("hadoop.proxyuser.test.groups")
-              .size() == 1);
-      Assert.assertTrue(
-          ProxyUsers.getProxyGroups().get("hadoop.proxyuser.test.groups")
-              .contains("test_groups"));
+      ProxyUsers.refreshSuperUserGroupsConfiguration(configuration);
+      Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyGroups()
+          .get("hadoop.proxyuser.test.groups").size() == 1);
+      Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyGroups()
+          .get("hadoop.proxyuser.test.groups").contains("test_groups"));
 
-      Assert.assertTrue(
-          ProxyUsers.getProxyHosts().get("hadoop.proxyuser.test.hosts")
-              .size() == 1);
-      Assert.assertTrue(
-          ProxyUsers.getProxyHosts().get("hadoop.proxyuser.test.hosts")
-              .contains("test_hosts"));
+      Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyHosts()
+          .get("hadoop.proxyuser.test.hosts").size() == 1);
+      Assert.assertTrue(ProxyUsers.getDefaultImpersonationProvider().getProxyHosts()
+          .get("hadoop.proxyuser.test.hosts").contains("test_hosts"));
 
       // verify UserToGroupsMappings
       List<String> groupAfter =
-          Groups.getUserToGroupsMappingService(configuration)
-              .getGroups(UserGroupInformation.getCurrentUser().getUserName());
-      Assert.assertTrue(groupAfter.contains("test_group_D") &&
-          groupAfter.contains("test_group_E") &&
-          groupAfter.contains("test_group_F") && groupAfter.size() == 3);
+          Groups.getUserToGroupsMappingService(configuration).getGroups(
+              UserGroupInformation.getCurrentUser().getUserName());
+      Assert.assertTrue(groupAfter.contains("test_group_D")
+          && groupAfter.contains("test_group_E")
+          && groupAfter.contains("test_group_F") && groupAfter.size() == 3);
     } finally {
       if (resourceManager != null) {
         resourceManager.stop();
       }
     }
   }
+
+  /* For verifying fix for YARN-3804 */
+  @Test
+  public void testRefreshAclWithDaemonUser() throws Exception {
+    String daemonUser =
+        UserGroupInformation.getCurrentUser().getShortUserName();
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
+
+    uploadDefaultConfiguration();
+    YarnConfiguration yarnConf = new YarnConfiguration();
+    yarnConf.set(YarnConfiguration.YARN_ADMIN_ACL, daemonUser + "xyz");
+    uploadConfiguration(yarnConf, "yarn-site.xml");
+
+    try {
+      rm = new MockRM(configuration);
+      rm.init(configuration);
+      rm.start();
+    } catch(Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    Assert.assertEquals(daemonUser + "xyz," + daemonUser,
+        rm.adminService.getAccessControlList().getAclString().trim());
+
+    yarnConf = new YarnConfiguration();
+    yarnConf.set(YarnConfiguration.YARN_ADMIN_ACL, daemonUser + "abc");
+    uploadConfiguration(yarnConf, "yarn-site.xml");
+    try {
+      rm.adminService.refreshAdminAcls(RefreshAdminAclsRequest.newInstance());
+    } catch (YarnException e) {
+      if (e.getCause() != null &&
+          e.getCause() instanceof AccessControlException) {
+        fail("Refresh should not have failed due to incorrect ACL");
+      }
+      throw e;
+    }
+
+    Assert.assertEquals(daemonUser + "abc," + daemonUser,
+        rm.adminService.getAccessControlList().getAclString().trim());
+  }  
 
   private String writeConfigurationXML(Configuration conf, String confXMLName)
       throws IOException {
@@ -755,7 +818,8 @@ public class TestRMAdminService {
       if (!confFile.createNewFile()) {
         Assert.fail("Can not create " + confXMLName);
       }
-      output = new DataOutputStream(new FileOutputStream(confFile));
+      output = new DataOutputStream(
+          new FileOutputStream(confFile));
       conf.writeXml(output);
       return confFile.getAbsolutePath();
     } finally {
@@ -765,7 +829,8 @@ public class TestRMAdminService {
     }
   }
 
-  private void uploadToRemoteFileSystem(Path filePath) throws IOException {
+  private void uploadToRemoteFileSystem(Path filePath)
+      throws IOException {
     fs.copyFromLocalFile(filePath, workingPath);
   }
 
@@ -795,11 +860,10 @@ public class TestRMAdminService {
     uploadConfiguration(hadoopPolicyConf, "hadoop-policy.xml");
   }
 
-  private static class MockUnixGroupsMapping
-      implements GroupMappingServiceProvider {
+  private static class MockUnixGroupsMapping implements
+      GroupMappingServiceProvider {
 
-    @SuppressWarnings("serial")
-    private static List<String> group;
+    private static List<String> group = new ArrayList<String>();
 
     @Override
     public List<String> getGroups(String user) throws IOException {
@@ -822,15 +886,12 @@ public class TestRMAdminService {
       group.add("test_group_E");
       group.add("test_group_F");
     }
-
-    public static void init() {
-      group = new ArrayList<String>() {
-        {
-          add("test_group_A");
-          add("test_group_B");
-          add("test_group_C");
-        }
-      };
+    
+    public static void resetGroups() {
+      group.clear();
+      group.add("test_group_A");
+      group.add("test_group_B");
+      group.add("test_group_C");
     }
   }
 

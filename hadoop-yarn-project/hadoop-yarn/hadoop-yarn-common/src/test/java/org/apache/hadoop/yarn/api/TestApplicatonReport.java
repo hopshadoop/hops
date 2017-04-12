@@ -32,9 +32,12 @@ public class TestApplicatonReport {
   @Test
   public void testApplicationReport() {
     long timestamp = System.currentTimeMillis();
-    ApplicationReport appReport1 = createApplicationReport(1, 1, timestamp);
-    ApplicationReport appReport2 = createApplicationReport(1, 1, timestamp);
-    ApplicationReport appReport3 = createApplicationReport(1, 1, timestamp);
+    ApplicationReport appReport1 =
+        createApplicationReport(1, 1, timestamp);
+    ApplicationReport appReport2 =
+        createApplicationReport(1, 1, timestamp);
+    ApplicationReport appReport3 =
+        createApplicationReport(1, 1, timestamp);
     Assert.assertEquals(appReport1, appReport2);
     Assert.assertEquals(appReport2, appReport3);
     appReport1.setApplicationId(null);
@@ -46,16 +49,16 @@ public class TestApplicatonReport {
     Assert.assertNull(appReport1.getAMRMToken());
   }
 
-  protected static ApplicationReport createApplicationReport(int appIdInt,
-      int appAttemptIdInt, long timestamp) {
+  protected static ApplicationReport createApplicationReport(
+      int appIdInt, int appAttemptIdInt, long timestamp) {
     ApplicationId appId = ApplicationId.newInstance(timestamp, appIdInt);
     ApplicationAttemptId appAttemptId =
         ApplicationAttemptId.newInstance(appId, appAttemptIdInt);
-    ApplicationReport appReport = ApplicationReport
-        .newInstance(appId, appAttemptId, "user", "queue", "appname", "host",
-            124, null, YarnApplicationState.FINISHED, "diagnostics", "url", 0,
-            0, FinalApplicationStatus.SUCCEEDED, null, "N/A", 0.53789f,
-            YarnConfiguration.DEFAULT_APPLICATION_TYPE, null);
+    ApplicationReport appReport =
+        ApplicationReport.newInstance(appId, appAttemptId, "user", "queue",
+          "appname", "host", 124, null, YarnApplicationState.FINISHED,
+          "diagnostics", "url", 0, 0, FinalApplicationStatus.SUCCEEDED, null,
+          "N/A", 0.53789f, YarnConfiguration.DEFAULT_APPLICATION_TYPE, null);
     return appReport;
   }
 

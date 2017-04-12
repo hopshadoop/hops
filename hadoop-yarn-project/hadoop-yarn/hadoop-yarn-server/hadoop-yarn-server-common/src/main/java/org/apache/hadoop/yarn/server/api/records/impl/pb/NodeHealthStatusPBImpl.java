@@ -18,17 +18,18 @@
 
 package org.apache.hadoop.yarn.server.api.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.NodeHealthStatusProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.NodeHealthStatusProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
+
+import com.google.protobuf.TextFormat;
 
 public class NodeHealthStatusPBImpl extends NodeHealthStatus {
 
   private NodeHealthStatusProto.Builder builder;
   private boolean viaProto = false;
-  private NodeHealthStatusProto proto =
-      NodeHealthStatusProto.getDefaultInstance();
+  private NodeHealthStatusProto proto = NodeHealthStatusProto
+      .getDefaultInstance();
 
   public NodeHealthStatusPBImpl() {
     this.builder = NodeHealthStatusProto.newBuilder();
@@ -53,9 +54,8 @@ public class NodeHealthStatusPBImpl extends NodeHealthStatus {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -68,9 +68,8 @@ public class NodeHealthStatusPBImpl extends NodeHealthStatus {
   }
 
   private void mergeLocalToProto() {
-    if (this.viaProto) {
+    if (this.viaProto)
       maybeInitBuilder();
-    }
     this.proto = this.builder.build();
 
     this.viaProto = true;

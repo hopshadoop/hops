@@ -32,6 +32,11 @@ import java.util.Iterator;
 import java.util.Random;
 import java.util.Arrays;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.tools.rumen.JobTraceReader;
 import org.apache.hadoop.tools.rumen.LoggedJob;
@@ -62,10 +67,9 @@ import org.apache.hadoop.yarn.sls.utils.SLSUtils;
 import org.apache.log4j.Logger;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.map.ObjectMapper;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
 
+@Private
+@Unstable
 public class SLSRunner {
   // RM, Runner
   private ResourceManager rm;
@@ -120,9 +124,6 @@ public class SLSRunner {
     
     // runner configuration
     conf = new Configuration(false);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-    RMUtilities.InitializeDB();
     conf.addResource("sls-runner.xml");
     // runner
     int poolSize = conf.getInt(SLSConfiguration.RUNNER_POOL_SIZE, 
@@ -165,6 +166,9 @@ public class SLSRunner {
     rmConf.set(YarnConfiguration.RM_SCHEDULER,
             ResourceSchedulerWrapper.class.getName());
     rmConf.set(SLSConfiguration.METRICS_OUTPUT_DIR, metricsOutputDir);
+    RMStorageFactory.setConfiguration(rmConf);
+    YarnAPIStorageFactory.setConfiguration(rmConf);
+    DBUtility.InitializeDB();
     rm = new ResourceManager();
     rm.init(rmConf);
     rm.start();
@@ -215,7 +219,7 @@ public class SLSRunner {
     long startTimeMS = System.currentTimeMillis();
     while (true) {
       int numRunningNodes = 0;
-      for (RMNode node : rm.getRMContext().getActiveRMNodes().values()) {
+      for (RMNode node : rm.getRMContext().getRMNodes().values()) {
         if (node.getState() == NodeState.RUNNING) {
           numRunningNodes ++;
         }

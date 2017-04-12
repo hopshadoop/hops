@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@InterfaceAudience.Public package org.apache.hadoop.yarn.security;
-
+@InterfaceAudience.Public
+package org.apache.hadoop.yarn.security;
 import org.apache.hadoop.classification.InterfaceAudience;
 

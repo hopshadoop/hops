@@ -64,7 +64,7 @@ public class TestSymLink
       dfs = new MiniDFSCluster.Builder(conf).build();
       FileSystem fileSys = dfs.getFileSystem();
       String namenode = fileSys.getUri().toString();
-      mr  = new MiniMRCluster(1, namenode, 3);
+      mr  = new MiniMRCluster(1, namenode, 3, false);
 
       List<String> args = new ArrayList<String>();
       for (Map.Entry<String, String> entry : mr.createJobConf()) {

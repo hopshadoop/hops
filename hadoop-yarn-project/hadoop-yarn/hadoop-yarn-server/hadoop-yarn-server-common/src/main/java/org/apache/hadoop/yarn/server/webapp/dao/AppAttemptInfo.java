@@ -18,13 +18,18 @@
 
 package org.apache.hadoop.yarn.server.webapp.dao;
 
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptReport;
-import org.apache.hadoop.yarn.api.records.YarnApplicationAttemptState;
-
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.classification.InterfaceStability.Evolving;
+
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptReport;
+import org.apache.hadoop.yarn.api.records.YarnApplicationAttemptState;
+
+@Public
+@Evolving
 @XmlRootElement(name = "appAttempt")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppAttemptInfo {
@@ -33,6 +38,7 @@ public class AppAttemptInfo {
   protected String host;
   protected int rpcPort;
   protected String trackingUrl;
+  protected String originalTrackingUrl;
   protected String diagnosticsInfo;
   protected YarnApplicationAttemptState appAttemptState;
   protected String amContainerId;
@@ -46,6 +52,7 @@ public class AppAttemptInfo {
     host = appAttempt.getHost();
     rpcPort = appAttempt.getRpcPort();
     trackingUrl = appAttempt.getTrackingUrl();
+    originalTrackingUrl = appAttempt.getOriginalTrackingUrl();
     diagnosticsInfo = appAttempt.getDiagnostics();
     appAttemptState = appAttempt.getYarnApplicationAttemptState();
     if (appAttempt.getAMContainerId() != null) {
@@ -67,6 +74,10 @@ public class AppAttemptInfo {
 
   public String getTrackingUrl() {
     return trackingUrl;
+  }
+
+  public String getOriginalTrackingUrl() {
+    return originalTrackingUrl;
   }
 
   public String getDiagnosticsInfo() {

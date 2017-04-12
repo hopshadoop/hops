@@ -1,24 +1,39 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import junit.framework.Assert;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.security.PrivilegedAction;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Assert;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
@@ -56,20 +71,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 public class TestNodeManagerShutdown {
   static final File basedir =
       new File("target", TestNodeManagerShutdown.class.getName());
@@ -77,11 +78,11 @@ public class TestNodeManagerShutdown {
   static final File logsDir = new File(basedir, "logs");
   static final File remoteLogsDir = new File(basedir, "remotelogs");
   static final File nmLocalDir = new File(basedir, "nm0");
-  static final File processStartFile =
-      new File(tmpDir, "start_file.txt").getAbsoluteFile();
+  static final File processStartFile = new File(tmpDir, "start_file.txt")
+    .getAbsoluteFile();
 
-  static final RecordFactory recordFactory =
-      RecordFactoryProvider.getRecordFactory(null);
+  static final RecordFactory recordFactory = RecordFactoryProvider
+      .getRecordFactory(null);
   static final String user = "nobody";
   private FileContext localFS;
   private ContainerId cId;
@@ -108,20 +109,49 @@ public class TestNodeManagerShutdown {
   }
   
   @Test
-  public void testKillContainersOnShutdown() throws IOException, YarnException {
+  public void testStateStoreRemovalOnDecommission() throws IOException {
+    final File recoveryDir = new File(basedir, "nm-recovery");
+    nm = new TestNodeManager();
+    YarnConfiguration conf = createNMConfig();
+    conf.setBoolean(YarnConfiguration.NM_RECOVERY_ENABLED, true);
+    conf.set(YarnConfiguration.NM_RECOVERY_DIR, recoveryDir.getAbsolutePath());
+
+    // verify state store is not removed on normal shutdown
+    nm.init(conf);
+    nm.start();
+    Assert.assertTrue(recoveryDir.exists());
+    Assert.assertTrue(recoveryDir.isDirectory());
+    nm.stop();
+    nm = null;
+    Assert.assertTrue(recoveryDir.exists());
+    Assert.assertTrue(recoveryDir.isDirectory());
+
+    // verify state store is removed on decommissioned shutdown
+    nm = new TestNodeManager();
+    nm.init(conf);
+    nm.start();
+    Assert.assertTrue(recoveryDir.exists());
+    Assert.assertTrue(recoveryDir.isDirectory());
+    nm.getNMContext().setDecommissioned(true);
+    nm.stop();
+    nm = null;
+    Assert.assertFalse(recoveryDir.exists());
+  }
+
+  @Test
+  public void testKillContainersOnShutdown() throws IOException,
+      YarnException {
     nm = new TestNodeManager();
     nm.init(createNMConfig());
     nm.start();
     startContainer(nm, cId, localFS, tmpDir, processStartFile);
     
-    final int MAX_TRIES = 20;
+    final int MAX_TRIES=20;
     int numTries = 0;
     while (!processStartFile.exists() && numTries < MAX_TRIES) {
       try {
         Thread.sleep(500);
-      } catch (InterruptedException ex) {
-        ex.printStackTrace();
-      }
+      } catch (InterruptedException ex) {ex.printStackTrace();}
       numTries++;
     }
     
@@ -134,7 +164,7 @@ public class TestNodeManagerShutdown {
     // verify that the job object with ID matching container ID no longer exists.
     if (Shell.WINDOWS) {
       Assert.assertFalse("Process is still alive!",
-          DefaultContainerExecutor.containerIsAlive(cId.toString()));
+        DefaultContainerExecutor.containerIsAlive(cId.toString()));
     } else {
       BufferedReader reader =
           new BufferedReader(new FileReader(processStartFile));
@@ -156,20 +186,20 @@ public class TestNodeManagerShutdown {
   }
 
   public static void startContainer(NodeManager nm, ContainerId cId,
-      FileContext localFS, File scriptFileDir, File processStartFile)
-      throws IOException, YarnException {
+      FileContext localFS, File scriptFileDir, File processStartFile) 
+          throws IOException, YarnException {
     File scriptFile =
         createUnhaltingScriptFile(cId, scriptFileDir, processStartFile);
     
     ContainerLaunchContext containerLaunchContext =
         recordFactory.newRecordInstance(ContainerLaunchContext.class);
 
-    NodeId nodeId = BuilderUtils
-        .newNodeId(InetAddress.getByName("localhost").getCanonicalHostName(),
-            12345);
-
-    URL localResourceUri = ConverterUtils.getYarnUrlFromPath(
-        localFS.makeQualified(new Path(scriptFile.getAbsolutePath())));
+    NodeId nodeId = BuilderUtils.newNodeId(InetAddress.getByName("localhost")
+        .getCanonicalHostName(), 12345);
+ 
+    URL localResourceUri =
+        ConverterUtils.getYarnUrlFromPath(localFS
+            .makeQualified(new Path(scriptFile.getAbsolutePath())));
     LocalResource localResource =
         recordFactory.newRecordInstance(LocalResource.class);
     localResource.setResource(localResourceUri);
@@ -178,22 +208,21 @@ public class TestNodeManagerShutdown {
     localResource.setType(LocalResourceType.FILE);
     localResource.setTimestamp(scriptFile.lastModified());
     String destinationFile = "dest_file";
-    Map<String, LocalResource> localResources =
+    Map<String, LocalResource> localResources = 
         new HashMap<String, LocalResource>();
     localResources.put(destinationFile, localResource);
     containerLaunchContext.setLocalResources(localResources);
-    List<String> commands =
-        Arrays.asList(Shell.getRunScriptCommand(scriptFile));
+    List<String> commands = Arrays.asList(Shell.getRunScriptCommand(scriptFile));
     containerLaunchContext.setCommands(commands);
     final InetSocketAddress containerManagerBindAddress =
         NetUtils.createSocketAddrForHost("127.0.0.1", 12345);
-    UserGroupInformation currentUser =
-        UserGroupInformation.createRemoteUser(cId.toString());
+    UserGroupInformation currentUser = UserGroupInformation
+        .createRemoteUser(cId.toString());
     org.apache.hadoop.security.token.Token<NMTokenIdentifier> nmToken =
         ConverterUtils.convertFromYarn(
-            nm.getNMContext().getNMTokenSecretManager()
-                .createNMToken(cId.getApplicationAttemptId(), nodeId, user),
-            containerManagerBindAddress);
+          nm.getNMContext().getNMTokenSecretManager()
+            .createNMToken(cId.getApplicationAttemptId(), nodeId, user),
+          containerManagerBindAddress);
     currentUser.addToken(nmToken);
 
     ContainerManagementProtocol containerManager =
@@ -204,15 +233,14 @@ public class TestNodeManagerShutdown {
             YarnRPC rpc = YarnRPC.create(conf);
             InetSocketAddress containerManagerBindAddress =
                 NetUtils.createSocketAddrForHost("127.0.0.1", 12345);
-            return (ContainerManagementProtocol) rpc
-                .getProxy(ContainerManagementProtocol.class,
-                    containerManagerBindAddress, conf);
+            return (ContainerManagementProtocol) rpc.getProxy(ContainerManagementProtocol.class,
+              containerManagerBindAddress, conf);
           }
         });
-    StartContainerRequest scRequest = StartContainerRequest
-        .newInstance(containerLaunchContext, TestContainerManager
-                .createContainerToken(cId, 0, nodeId, user,
-                    nm.getNMContext().getContainerTokenSecretManager()));
+    StartContainerRequest scRequest =
+        StartContainerRequest.newInstance(containerLaunchContext,
+          TestContainerManager.createContainerToken(cId, 0,
+            nodeId, user, nm.getNMContext().getContainerTokenSecretManager()));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -224,8 +252,7 @@ public class TestNodeManagerShutdown {
     GetContainerStatusesRequest request =
         GetContainerStatusesRequest.newInstance(containerIds);
     ContainerStatus containerStatus =
-        containerManager.getContainerStatuses(request).getContainerStatuses()
-            .get(0);
+        containerManager.getContainerStatuses(request).getContainerStatuses().get(0);
     Assert.assertEquals(ContainerState.RUNNING, containerStatus.getState());
   }
   
@@ -233,18 +260,17 @@ public class TestNodeManagerShutdown {
     ApplicationId appId = ApplicationId.newInstance(0, 0);
     ApplicationAttemptId appAttemptId =
         ApplicationAttemptId.newInstance(appId, 1);
-    ContainerId containerId = ContainerId.newInstance(appAttemptId, 0);
+    ContainerId containerId = ContainerId.newContainerId(appAttemptId, 0);
     return containerId;
   }
   
   private YarnConfiguration createNMConfig() {
     YarnConfiguration conf = new YarnConfiguration();
-    conf.setInt(YarnConfiguration.NM_PMEM_MB, 5 * 1024); // 5GB
+    conf.setInt(YarnConfiguration.NM_PMEM_MB, 5*1024); // 5GB
     conf.set(YarnConfiguration.NM_ADDRESS, "127.0.0.1:12345");
     conf.set(YarnConfiguration.NM_LOCALIZER_ADDRESS, "127.0.0.1:12346");
     conf.set(YarnConfiguration.NM_LOG_DIRS, logsDir.getAbsolutePath());
-    conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
-        remoteLogsDir.getAbsolutePath());
+    conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR, remoteLogsDir.getAbsolutePath());
     conf.set(YarnConfiguration.NM_LOCAL_DIRS, nmLocalDir.getAbsolutePath());
     conf.setLong(YarnConfiguration.NM_LOG_RETAIN_SECONDS, 1);
     return conf;
@@ -256,7 +282,7 @@ public class TestNodeManagerShutdown {
    */
   private static File createUnhaltingScriptFile(ContainerId cId,
       File scriptFileDir, File processStartFile) throws IOException {
-    File scriptFile = new File(scriptFileDir, "scriptFile.sh");
+    File scriptFile = Shell.appendScriptExtension(scriptFileDir, "scriptFile");
     PrintWriter fileWriter = new PrintWriter(scriptFile);
     if (Shell.WINDOWS) {
       fileWriter.println("@echo \"Running testscript for delayed kill\"");
@@ -269,7 +295,7 @@ public class TestNodeManagerShutdown {
       fileWriter.write("hello=\"Got SIGTERM\"\n");
       fileWriter.write("umask 0\n");
       fileWriter.write("trap \"echo $hello >> " + processStartFile +
-          "\" SIGTERM\n");
+        "\" SIGTERM\n");
       fileWriter.write("echo \"Writing pid to start file\"\n");
       fileWriter.write("echo $$ >> " + processStartFile + "\n");
       fileWriter.write("while true; do\ndate >> /dev/null;\n done\n");
@@ -285,8 +311,7 @@ public class TestNodeManagerShutdown {
     protected NodeStatusUpdater createNodeStatusUpdater(Context context,
         Dispatcher dispatcher, NodeHealthCheckerService healthChecker) {
       MockNodeStatusUpdater myNodeStatusUpdater =
-          new MockNodeStatusUpdater(context, dispatcher, healthChecker,
-              metrics);
+          new MockNodeStatusUpdater(context, dispatcher, healthChecker, metrics);
       return myNodeStatusUpdater;
     }
     

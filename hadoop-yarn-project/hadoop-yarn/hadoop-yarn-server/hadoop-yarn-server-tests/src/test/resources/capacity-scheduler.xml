@@ -25,7 +25,7 @@
     <name>yarn.scheduler.capacity.maximum-am-resource-percent</name>
     <value>0.1</value>
     <description>
-      Maximum percent of resources in the cluster which can be used to run
+      Maximum percent of resources in the cluster which can be used to run 
       application masters i.e. controls number of concurrent running
       applications.
     </description>
@@ -33,13 +33,12 @@
 
   <property>
     <name>yarn.scheduler.capacity.resource-calculator</name>
-    <value>org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator
-    </value>
+    <value>org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator</value>
     <description>
-      The ResourceCalculator implementation to be used to compare
+      The ResourceCalculator implementation to be used to compare 
       Resources in the scheduler.
       The default i.e. DefaultResourceCalculator only uses Memory while
-      DominantResourceCalculator uses dominant-resource to compare
+      DominantResourceCalculator uses dominant-resource to compare 
       multi-dimensional resources such as Memory, CPU etc.
     </description>
   </property>
@@ -70,7 +69,7 @@
     <name>yarn.scheduler.capacity.root.default.maximum-capacity</name>
     <value>100</value>
     <description>
-      The maximum capacity of the default queue.
+      The maximum capacity of the default queue. 
     </description>
   </property>
 
@@ -102,10 +101,9 @@
     <name>yarn.scheduler.capacity.node-locality-delay</name>
     <value>-1</value>
     <description>
-      Number of missed scheduling opportunities after which the
-      CapacityScheduler
-      attempts to schedule rack-local containers.
-      Typically this should be set to number of racks in the cluster, this
+      Number of missed scheduling opportunities after which the CapacityScheduler 
+      attempts to schedule rack-local containers. 
+      Typically this should be set to number of racks in the cluster, this 
       feature is disabled by default, set to -1.
     </description>
   </property>

@@ -5,9 +5,9 @@
  * licenses this file to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
@@ -27,11 +26,13 @@ import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenRequest;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.api.records.impl.pb.TokenPBImpl;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
-public class RenewDelegationTokenRequestPBImpl
-    extends RenewDelegationTokenRequest {
-  RenewDelegationTokenRequestProto proto =
+public class RenewDelegationTokenRequestPBImpl extends
+    RenewDelegationTokenRequest {
+  RenewDelegationTokenRequestProto proto = 
       RenewDelegationTokenRequestProto.getDefaultInstance();
   RenewDelegationTokenRequestProto.Builder builder = null;
   boolean viaProto = false;
@@ -40,7 +41,7 @@ public class RenewDelegationTokenRequestPBImpl
     builder = RenewDelegationTokenRequestProto.newBuilder();
   }
 
-  public RenewDelegationTokenRequestPBImpl(
+  public RenewDelegationTokenRequestPBImpl (
       RenewDelegationTokenRequestProto proto) {
     this.proto = proto;
     this.viaProto = true;
@@ -61,9 +62,8 @@ public class RenewDelegationTokenRequestPBImpl
   @Override
   public void setDelegationToken(Token token) {
     maybeInitBuilder();
-    if (token == null) {
+    if (token == null) 
       builder.clearToken();
-    }
     this.token = token;
   }
 
@@ -81,9 +81,8 @@ public class RenewDelegationTokenRequestPBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -102,9 +101,8 @@ public class RenewDelegationTokenRequestPBImpl
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -123,6 +121,6 @@ public class RenewDelegationTokenRequestPBImpl
   }
 
   private TokenProto convertToProtoFormat(Token t) {
-    return ((TokenPBImpl) t).getProto();
+    return ((TokenPBImpl)t).getProto();
   }
 }

@@ -17,17 +17,18 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
+import java.util.ArrayList;
+
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
-import java.util.ArrayList;
 
 @XmlRootElement(name = "appStatInfo")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ApplicationStatisticsInfo {
 
-  protected ArrayList<StatisticsItemInfo> statItem =
-      new ArrayList<StatisticsItemInfo>();
+  protected ArrayList<StatisticsItemInfo> statItem
+      = new ArrayList<StatisticsItemInfo>();
 
   public ApplicationStatisticsInfo() {
   } // JAXB needs this

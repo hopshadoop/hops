@@ -17,25 +17,21 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.yarn.event.AbstractEventTransaction;
+import org.apache.hadoop.yarn.event.AbstractEvent;
 
-public class RMFatalEvent extends AbstractEventTransaction<RMFatalEventType> {
+public class RMFatalEvent extends AbstractEvent<RMFatalEventType> {
   private String cause;
 
   public RMFatalEvent(RMFatalEventType rmFatalEventType, String cause) {
-    super(rmFatalEventType, null);
+    super(rmFatalEventType);
     this.cause = cause;
   }
 
-  public RMFatalEvent(RMFatalEventType rmFatalEventType, Exception cause,
-      TransactionState transactionState) {
-    super(rmFatalEventType, transactionState);
+  public RMFatalEvent(RMFatalEventType rmFatalEventType, Exception cause) {
+    super(rmFatalEventType);
     this.cause = StringUtils.stringifyException(cause);
   }
 
-  public String getCause() {
-    return this.cause;
-  }
+  public String getCause() {return this.cause;}
 }

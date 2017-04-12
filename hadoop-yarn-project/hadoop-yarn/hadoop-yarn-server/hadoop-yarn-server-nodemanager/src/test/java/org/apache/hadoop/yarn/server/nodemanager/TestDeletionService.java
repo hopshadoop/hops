@@ -1,22 +1,32 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.nodemanager;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
@@ -24,24 +34,14 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService.FileDeletionTask;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMMemoryStateStoreService;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
 public class TestDeletionService {
 
   private static final FileContext lfs = getLfs();
-
   private static final FileContext getLfs() {
     try {
       return FileContext.getLocalFSFileContext();
@@ -49,9 +49,8 @@ public class TestDeletionService {
       throw new RuntimeException(e);
     }
   }
-
-  private static final Path base = lfs.makeQualified(
-      new Path("target", TestDeletionService.class.getName()));
+  private static final Path base =
+    lfs.makeQualified(new Path("target", TestDeletionService.class.getName()));
 
   @AfterClass
   public static void removeBase() throws IOException {
@@ -109,8 +108,8 @@ public class TestDeletionService {
     del.start();
     try {
       for (Path p : dirs) {
-        del.delete((Long.parseLong(p.getName()) % 2) == 0 ? null : "dingo", p,
-            null);
+        del.delete((Long.parseLong(p.getName()) % 2) == 0 ? null : "dingo",
+            p, null);
       }
 
       int msecToWait = 20 * 1000;
@@ -139,14 +138,14 @@ public class TestDeletionService {
       createDirs(b, content);
     }
     DeletionService del =
-        new DeletionService(new FakeDefaultContainerExecutor());
+      new DeletionService(new FakeDefaultContainerExecutor());
     try {
       del.init(new Configuration());
       del.start();
       for (Path p : content) {
         assertTrue(lfs.util().exists(new Path(baseDirs.get(0), p)));
-        del.delete((Long.parseLong(p.getName()) % 2) == 0 ? null : "dingo", p,
-            baseDirs.toArray(new Path[4]));
+        del.delete((Long.parseLong(p.getName()) % 2) == 0 ? null : "dingo",
+            p, baseDirs.toArray(new Path[4]));
       }
 
       int msecToWait = 20 * 1000;
@@ -200,8 +199,7 @@ public class TestDeletionService {
 
   @Test
   public void testStopWithDelayedTasks() throws Exception {
-    DeletionService del =
-        new DeletionService(Mockito.mock(ContainerExecutor.class));
+    DeletionService del = new DeletionService(Mockito.mock(ContainerExecutor.class));
     Configuration conf = new YarnConfiguration();
     conf.setInt(YarnConfiguration.DEBUG_NM_DELETE_DELAY_SEC, 60);
     try {
@@ -214,7 +212,7 @@ public class TestDeletionService {
     assertTrue(del.isTerminated());
   }
   
-  @Test(timeout = 60000)
+  @Test (timeout=60000)
   public void testFileDeletionTaskDependency() throws Exception {
     FakeDefaultContainerExecutor exec = new FakeDefaultContainerExecutor();
     Configuration conf = new Configuration();
@@ -236,11 +234,11 @@ public class TestDeletionService {
       List<Path> subDirs = buildDirs(r, dirs.get(0), 2);
       
       FileDeletionTask dependentDeletionTask =
-          del.createFileDeletionTask(null, dirs.get(0), new Path[]{});
+          del.createFileDeletionTask(null, dirs.get(0), new Path[] {});
       List<FileDeletionTask> deletionTasks = new ArrayList<FileDeletionTask>();
       for (Path subDir : subDirs) {
         FileDeletionTask deletionTask =
-            del.createFileDeletionTask(null, null, new Path[]{subDir});
+            del.createFileDeletionTask(null, null, new Path[] { subDir });
         deletionTask.addFileDeletionTaskDependency(dependentDeletionTask);
         deletionTasks.add(deletionTask);
       }
@@ -262,11 +260,11 @@ public class TestDeletionService {
       subDirs.add(new Path(dirs.get(1), "absentFile"));
       
       dependentDeletionTask =
-          del.createFileDeletionTask(null, dirs.get(1), new Path[]{});
+          del.createFileDeletionTask(null, dirs.get(1), new Path[] {});
       deletionTasks = new ArrayList<FileDeletionTask>();
       for (Path subDir : subDirs) {
         FileDeletionTask deletionTask =
-            del.createFileDeletionTask(null, null, new Path[]{subDir});
+            del.createFileDeletionTask(null, null, new Path[] { subDir });
         deletionTask.addFileDeletionTaskDependency(dependentDeletionTask);
         deletionTasks.add(deletionTask);
       }
@@ -277,14 +275,69 @@ public class TestDeletionService {
       }
 
       msecToWait = 20 * 1000;
-      while (msecToWait > 0 && (lfs.util().exists(subDirs.get(0)) ||
-          lfs.util().exists(subDirs.get(1)))) {
+      while (msecToWait > 0
+          && (lfs.util().exists(subDirs.get(0)) || lfs.util().exists(
+            subDirs.get(1)))) {
         Thread.sleep(100);
         msecToWait -= 100;
       }
       assertTrue(lfs.util().exists(dirs.get(1)));
     } finally {
       del.stop();
+    }
+  }
+
+  @Test
+  public void testRecovery() throws Exception {
+    Random r = new Random();
+    long seed = r.nextLong();
+    r.setSeed(seed);
+    System.out.println("SEED: " + seed);
+    List<Path> baseDirs = buildDirs(r, base, 4);
+    createDirs(new Path("."), baseDirs);
+    List<Path> content = buildDirs(r, new Path("."), 10);
+    for (Path b : baseDirs) {
+      createDirs(b, content);
+    }
+    Configuration conf = new YarnConfiguration();
+    conf.setBoolean(YarnConfiguration.NM_RECOVERY_ENABLED, true);
+    conf.setInt(YarnConfiguration.DEBUG_NM_DELETE_DELAY_SEC, 1);
+    NMMemoryStateStoreService stateStore = new NMMemoryStateStoreService();
+    stateStore.init(conf);
+    stateStore.start();
+    DeletionService del =
+      new DeletionService(new FakeDefaultContainerExecutor(), stateStore);
+    try {
+      del.init(conf);
+      del.start();
+      for (Path p : content) {
+        assertTrue(lfs.util().exists(new Path(baseDirs.get(0), p)));
+        del.delete((Long.parseLong(p.getName()) % 2) == 0 ? null : "dingo",
+            p, baseDirs.toArray(new Path[4]));
+      }
+
+      // restart the deletion service
+      del.stop();
+      del = new DeletionService(new FakeDefaultContainerExecutor(),
+          stateStore);
+      del.init(conf);
+      del.start();
+
+      // verify paths are still eventually deleted
+      int msecToWait = 10 * 1000;
+      for (Path p : baseDirs) {
+        for (Path q : content) {
+          Path fp = new Path(p, q);
+          while (msecToWait > 0 && lfs.util().exists(fp)) {
+            Thread.sleep(100);
+            msecToWait -= 100;
+          }
+          assertFalse(lfs.util().exists(fp));
+        }
+      }
+    } finally {
+      del.close();
+      stateStore.close();
     }
   }
 }

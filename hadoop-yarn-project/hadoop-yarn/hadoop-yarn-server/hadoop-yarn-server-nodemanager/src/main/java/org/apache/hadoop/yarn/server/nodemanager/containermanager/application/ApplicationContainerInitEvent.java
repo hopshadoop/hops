@@ -24,22 +24,20 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 /**
  * Event sent from {@link ContainerManagerImpl} to {@link ApplicationImpl} to
  * request the initialization of a container. This is funneled through
- * the Application so that the application life-cycle can be checked, and
- * container
+ * the Application so that the application life-cycle can be checked, and container
  * launches can be delayed until the application is fully initialized.
- * <p/>
+ * 
  * Once the application is initialized,
- * {@link ApplicationImpl.InitContainerTransition} simply passes this event on
- * as a
+ * {@link ApplicationImpl.InitContainerTransition} simply passes this event on as a
  * {@link ContainerInitEvent}.
+ *  
  */
 public class ApplicationContainerInitEvent extends ApplicationEvent {
   final Container container;
   
   public ApplicationContainerInitEvent(Container container) {
-    super(
-        container.getContainerId().getApplicationAttemptId().getApplicationId(),
-        ApplicationEventType.INIT_CONTAINER);
+    super(container.getContainerId().getApplicationAttemptId()
+        .getApplicationId(), ApplicationEventType.INIT_CONTAINER);
     this.container = container;
   }
 

@@ -18,15 +18,17 @@
 
 package org.apache.hadoop.yarn.api.records.timeline;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-import java.util.HashMap;
-import java.util.Map;
+
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 /**
  * The class that contains the information of an event that is related to some
@@ -37,19 +39,19 @@ import java.util.Map;
 @XmlRootElement(name = "event")
 @XmlAccessorType(XmlAccessType.NONE)
 @Public
-@Unstable
+@Evolving
 public class TimelineEvent implements Comparable<TimelineEvent> {
 
   private long timestamp;
   private String eventType;
-  private Map<String, Object> eventInfo = new HashMap<String, Object>();
+  private HashMap<String, Object> eventInfo = new HashMap<String, Object>();
 
   public TimelineEvent() {
   }
 
   /**
    * Get the timestamp of the event
-   *
+   * 
    * @return the timestamp of the event
    */
   @XmlElement(name = "timestamp")
@@ -59,9 +61,9 @@ public class TimelineEvent implements Comparable<TimelineEvent> {
 
   /**
    * Set the timestamp of the event
-   *
+   * 
    * @param timestamp
-   *     the timestamp of the event
+   *          the timestamp of the event
    */
   public void setTimestamp(long timestamp) {
     this.timestamp = timestamp;
@@ -69,7 +71,7 @@ public class TimelineEvent implements Comparable<TimelineEvent> {
 
   /**
    * Get the event type
-   *
+   * 
    * @return the event type
    */
   @XmlElement(name = "eventtype")
@@ -79,9 +81,9 @@ public class TimelineEvent implements Comparable<TimelineEvent> {
 
   /**
    * Set the event type
-   *
+   * 
    * @param eventType
-   *     the event type
+   *          the event type
    */
   public void setEventType(String eventType) {
     this.eventType = eventType;
@@ -89,22 +91,28 @@ public class TimelineEvent implements Comparable<TimelineEvent> {
 
   /**
    * Set the information of the event
-   *
+   * 
    * @return the information of the event
    */
-  @XmlElement(name = "eventinfo")
   public Map<String, Object> getEventInfo() {
+    return eventInfo;
+  }
+
+  // Required by JAXB
+  @Private
+  @XmlElement(name = "eventinfo")
+  public HashMap<String, Object> getEventInfoJAXB() {
     return eventInfo;
   }
 
   /**
    * Add one piece of the information of the event to the existing information
    * map
-   *
+   * 
    * @param key
-   *     the information key
+   *          the information key
    * @param value
-   *     the information value
+   *          the information value
    */
   public void addEventInfo(String key, Object value) {
     this.eventInfo.put(key, value);
@@ -112,9 +120,9 @@ public class TimelineEvent implements Comparable<TimelineEvent> {
 
   /**
    * Add a map of the information of the event to the existing information map
-   *
+   * 
    * @param eventInfo
-   *     a map of of the information of the event
+   *          a map of of the information of the event
    */
   public void addEventInfo(Map<String, Object> eventInfo) {
     this.eventInfo.putAll(eventInfo);
@@ -122,12 +130,16 @@ public class TimelineEvent implements Comparable<TimelineEvent> {
 
   /**
    * Set the information map to the given map of the information of the event
-   *
+   * 
    * @param eventInfo
-   *     a map of of the information of the event
+   *          a map of of the information of the event
    */
   public void setEventInfo(Map<String, Object> eventInfo) {
-    this.eventInfo = eventInfo;
+    if (eventInfo != null && !(eventInfo instanceof HashMap)) {
+      this.eventInfo = new HashMap<String, Object>(eventInfo);
+    } else {
+      this.eventInfo = (HashMap<String, Object>) eventInfo;
+    }
   }
 
   @Override
@@ -143,25 +155,20 @@ public class TimelineEvent implements Comparable<TimelineEvent> {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) {
+    if (this == o)
       return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
+    if (o == null || getClass() != o.getClass())
       return false;
-    }
 
     TimelineEvent event = (TimelineEvent) o;
 
-    if (timestamp != event.timestamp) {
+    if (timestamp != event.timestamp)
       return false;
-    }
-    if (!eventType.equals(event.eventType)) {
+    if (!eventType.equals(event.eventType))
       return false;
-    }
     if (eventInfo != null ? !eventInfo.equals(event.eventInfo) :
-        event.eventInfo != null) {
+        event.eventInfo != null)
       return false;
-    }
 
     return true;
   }

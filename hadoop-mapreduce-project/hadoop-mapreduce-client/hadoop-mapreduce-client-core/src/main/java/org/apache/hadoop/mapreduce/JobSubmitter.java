@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,12 +40,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.QueueACL;
+
 import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
 
 import org.apache.hadoop.mapreduce.filecache.ClientDistributedCacheManager;
@@ -60,6 +59,7 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -82,230 +82,26 @@ class JobSubmitter {
     this.submitClient = submitClient;
     this.jtFs = submitFs;
   }
-  /*
-   * see if two file systems are the same or not.
-   */
-  private boolean compareFs(FileSystem srcFs, FileSystem destFs) {
-    URI srcUri = srcFs.getUri();
-    URI dstUri = destFs.getUri();
-    if (srcUri.getScheme() == null) {
-      return false;
-    }
-    if (!srcUri.getScheme().equals(dstUri.getScheme())) {
-      return false;
-    }
-    String srcHost = srcUri.getHost();    
-    String dstHost = dstUri.getHost();
-    if ((srcHost != null) && (dstHost != null)) {
-      try {
-        srcHost = InetAddress.getByName(srcHost).getCanonicalHostName();
-        dstHost = InetAddress.getByName(dstHost).getCanonicalHostName();
-      } catch(UnknownHostException ue) {
-        return false;
-      }
-      if (!srcHost.equals(dstHost)) {
-        return false;
-      }
-    } else if (srcHost == null && dstHost != null) {
-      return false;
-    } else if (srcHost != null && dstHost == null) {
-      return false;
-    }
-    //check for ports
-    if (srcUri.getPort() != dstUri.getPort()) {
-      return false;
-    }
-    return true;
-  }
-
-  // copies a file to the jobtracker filesystem and returns the path where it
-  // was copied to
-  private Path copyRemoteFiles(Path parentDir,
-      Path originalPath, Configuration conf, short replication) 
-      throws IOException {
-    //check if we do not need to copy the files
-    // is jt using the same file system.
-    // just checking for uri strings... doing no dns lookups 
-    // to see if the filesystems are the same. This is not optimal.
-    // but avoids name resolution.
-    
-    FileSystem remoteFs = null;
-    remoteFs = originalPath.getFileSystem(conf);
-    if (compareFs(remoteFs, jtFs)) {
-      return originalPath;
-    }
-    // this might have name collisions. copy will throw an exception
-    //parse the original path to create new path
-    Path newPath = new Path(parentDir, originalPath.getName());
-    FileUtil.copy(remoteFs, originalPath, jtFs, newPath, false, conf);
-    jtFs.setReplication(newPath, replication);
-    return newPath;
-  }
-
-  // configures -files, -libjars and -archives.
-  private void copyAndConfigureFiles(Job job, Path submitJobDir,
-      short replication) throws IOException {
-    Configuration conf = job.getConfiguration();
-    if (!(conf.getBoolean(Job.USED_GENERIC_PARSER, false))) {
-      LOG.warn("Hadoop command-line option parsing not performed. " +
-               "Implement the Tool interface and execute your application " +
-               "with ToolRunner to remedy this.");
-    }
-
-    // get all the command line arguments passed in by the user conf
-    String files = conf.get("tmpfiles");
-    String libjars = conf.get("tmpjars");
-    String archives = conf.get("tmparchives");
-    String jobJar = job.getJar();
-
-    //
-    // Figure out what fs the JobTracker is using.  Copy the
-    // job to it, under a temporary name.  This allows DFS to work,
-    // and under the local fs also provides UNIX-like object loading 
-    // semantics.  (that is, if the job file is deleted right after
-    // submission, we can still run the submission to completion)
-    //
-
-    // Create a number of filenames in the JobTracker's fs namespace
-    LOG.debug("default FileSystem: " + jtFs.getUri());
-    if (jtFs.exists(submitJobDir)) {
-      throw new IOException("Not submitting job. Job directory " + submitJobDir
-          +" already exists!! This is unexpected.Please check what's there in" +
-          " that directory");
-    }
-    submitJobDir = jtFs.makeQualified(submitJobDir);
-    submitJobDir = new Path(submitJobDir.toUri().getPath());
-    FsPermission mapredSysPerms = new FsPermission(JobSubmissionFiles.JOB_DIR_PERMISSION);
-    FileSystem.mkdirs(jtFs, submitJobDir, mapredSysPerms);
-    Path filesDir = JobSubmissionFiles.getJobDistCacheFiles(submitJobDir);
-    Path archivesDir = JobSubmissionFiles.getJobDistCacheArchives(submitJobDir);
-    Path libjarsDir = JobSubmissionFiles.getJobDistCacheLibjars(submitJobDir);
-    // add all the command line files/ jars and archive
-    // first copy them to jobtrackers filesystem 
-      
-    if (files != null) {
-      FileSystem.mkdirs(jtFs, filesDir, mapredSysPerms);
-      String[] fileArr = files.split(",");
-      for (String tmpFile: fileArr) {
-        URI tmpURI = null;
-        try {
-          tmpURI = new URI(tmpFile);
-        } catch (URISyntaxException e) {
-          throw new IllegalArgumentException(e);
-        }
-        Path tmp = new Path(tmpURI);
-        Path newPath = copyRemoteFiles(filesDir, tmp, conf, replication);
-        try {
-          URI pathURI = getPathURI(newPath, tmpURI.getFragment());
-          DistributedCache.addCacheFile(pathURI, conf);
-        } catch(URISyntaxException ue) {
-          //should not throw a uri exception 
-          throw new IOException("Failed to create uri for " + tmpFile, ue);
-        }
-      }
-    }
-      
-    if (libjars != null) {
-      FileSystem.mkdirs(jtFs, libjarsDir, mapredSysPerms);
-      String[] libjarsArr = libjars.split(",");
-      for (String tmpjars: libjarsArr) {
-        Path tmp = new Path(tmpjars);
-        Path newPath = copyRemoteFiles(libjarsDir, tmp, conf, replication);
-        DistributedCache.addFileToClassPath(
-            new Path(newPath.toUri().getPath()), conf);
-      }
-    }
-      
-    if (archives != null) {
-      FileSystem.mkdirs(jtFs, archivesDir, mapredSysPerms); 
-      String[] archivesArr = archives.split(",");
-      for (String tmpArchives: archivesArr) {
-        URI tmpURI;
-        try {
-          tmpURI = new URI(tmpArchives);
-        } catch (URISyntaxException e) {
-          throw new IllegalArgumentException(e);
-        }
-        Path tmp = new Path(tmpURI);
-        Path newPath = copyRemoteFiles(archivesDir, tmp, conf,
-          replication);
-        try {
-          URI pathURI = getPathURI(newPath, tmpURI.getFragment());
-          DistributedCache.addCacheArchive(pathURI, conf);
-        } catch(URISyntaxException ue) {
-          //should not throw an uri excpetion
-          throw new IOException("Failed to create uri for " + tmpArchives, ue);
-        }
-      }
-    }
-
-    if (jobJar != null) {   // copy jar to JobTracker's fs
-      // use jar name if job is not named. 
-      if ("".equals(job.getJobName())){
-        job.setJobName(new Path(jobJar).getName());
-      }
-      Path jobJarPath = new Path(jobJar);
-      URI jobJarURI = jobJarPath.toUri();
-      // If the job jar is already in fs, we don't need to copy it from local fs
-      if (jobJarURI.getScheme() == null || jobJarURI.getAuthority() == null
-              || !(jobJarURI.getScheme().equals(jtFs.getUri().getScheme()) 
-                  && jobJarURI.getAuthority().equals(
-                                            jtFs.getUri().getAuthority()))) {
-        copyJar(jobJarPath, JobSubmissionFiles.getJobJar(submitJobDir), 
-            replication);
-        job.setJar(JobSubmissionFiles.getJobJar(submitJobDir).toString());
-      }
-    } else {
-      LOG.warn("No job jar file set.  User classes may not be found. "+
-      "See Job or Job#setJar(String).");
-    }
-
-    //  set the timestamps of the archives and files
-    //  set the public/private visibility of the archives and files
-    ClientDistributedCacheManager.determineTimestampsAndCacheVisibilities(conf);
-    // get DelegationToken for each cached file
-    ClientDistributedCacheManager.getDelegationTokens(conf, job
-        .getCredentials());
-  }
-  
-  private URI getPathURI(Path destPath, String fragment) 
-      throws URISyntaxException {
-    URI pathURI = destPath.toUri();
-    if (pathURI.getFragment() == null) {
-      if (fragment == null) {
-        pathURI = new URI(pathURI.toString() + "#" + destPath.getName());
-      } else {
-        pathURI = new URI(pathURI.toString() + "#" + fragment);
-      }
-    }
-    return pathURI;
-  }
-  
-  private void copyJar(Path originalJarPath, Path submitJarFile,
-      short replication) throws IOException {
-    jtFs.copyFromLocalFile(originalJarPath, submitJarFile);
-    jtFs.setReplication(submitJarFile, replication);
-    jtFs.setPermission(submitJarFile, new FsPermission(JobSubmissionFiles.JOB_FILE_PERMISSION));
-  }
   
   /**
    * configure the jobconf of the user with the command line options of 
    * -libjars, -files, -archives.
-   * @param conf
+   * @param job
    * @throws IOException
    */
   private void copyAndConfigureFiles(Job job, Path jobSubmitDir) 
   throws IOException {
-    Configuration conf = job.getConfiguration();
-    short replication = (short)conf.getInt(Job.SUBMIT_REPLICATION, 10);
-    copyAndConfigureFiles(job, jobSubmitDir, replication);
+    JobResourceUploader rUploader = new JobResourceUploader(jtFs);
+    rUploader.uploadFiles(job, jobSubmitDir);
 
-    // Set the working directory
-    if (job.getWorkingDirectory() == null) {
-      job.setWorkingDirectory(jtFs.getWorkingDirectory());          
-    }
-
+    // Get the working directory. If not set, sets it to filesystem working dir
+    // This code has been added so that working directory reset before running
+    // the job. This is necessary for backward compatibility as other systems
+    // might use the public API JobConf#setWorkingDirectory to reset the working
+    // directory.
+    job.getWorkingDirectory();
   }
+
   /**
    * Internal method for submitting jobs to the system.
    * 
@@ -385,8 +181,14 @@ class JobSubmitter {
         TokenCache.setShuffleSecretKey(shuffleKey.getEncoded(),
             job.getCredentials());
       }
+      if (CryptoUtils.isEncryptedSpillEnabled(conf)) {
+        conf.setInt(MRJobConfig.MR_AM_MAX_ATTEMPTS, 1);
+        LOG.warn("Max job attempts set to 1 since encrypted intermediate" +
+                "data spill is enabled");
+      }
 
       copyAndConfigureFiles(job, submitJobDir);
+
       Path submitJobFile = JobSubmissionFiles.getJobConfPath(submitJobDir);
       
       // Create the splits for the job
@@ -420,6 +222,12 @@ class JobSubmitter {
         }
         conf.setStrings(MRJobConfig.JOB_TOKEN_TRACKING_IDS,
             trackingIds.toArray(new String[trackingIds.size()]));
+      }
+
+      // Set reservation info if it exists
+      ReservationId reservationId = job.getReservationId();
+      if (reservationId != null) {
+        conf.set(MRJobConfig.RESERVATION_ID, reservationId.toString());
       }
 
       // Write job file to submit dir
@@ -573,7 +381,9 @@ class JobSubmitter {
       conf.get("mapreduce.job.credentials.binary");
     if (binaryTokenFilename != null) {
       Credentials binary = Credentials.readTokenStorageFile(
-          new Path("file:///" + binaryTokenFilename), conf);
+          FileSystem.getLocal(conf).makeQualified(
+              new Path(binaryTokenFilename)),
+          conf);
       credentials.addAll(binary);
     }
     // add secret keys coming from a json file

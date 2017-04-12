@@ -29,8 +29,8 @@ public abstract class ContainerResourceDecrease {
   @Public
   public static ContainerResourceDecrease newInstance(
       ContainerId existingContainerId, Resource targetCapability) {
-    ContainerResourceDecrease context =
-        Records.newRecord(ContainerResourceDecrease.class);
+    ContainerResourceDecrease context = Records
+        .newRecord(ContainerResourceDecrease.class);
     context.setContainerId(existingContainerId);
     context.setCapability(targetCapability);
     return context;
@@ -56,7 +56,7 @@ public abstract class ContainerResourceDecrease {
   @Override
   public boolean equals(Object other) {
     if (other instanceof ContainerResourceDecrease) {
-      ContainerResourceDecrease ctx = (ContainerResourceDecrease) other;
+      ContainerResourceDecrease ctx = (ContainerResourceDecrease)other;
       
       if (getContainerId() == null && ctx.getContainerId() != null) {
         return false;

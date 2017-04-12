@@ -1,29 +1,36 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.api.client.config.DefaultClientConfig;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
-import junit.framework.Assert;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
+import javax.ws.rs.core.MediaType;
+
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -31,41 +38,43 @@ import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
 import org.apache.hadoop.ha.HealthCheckFailedException;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.event.DrainDispatcher;
+import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.StoreFencedException;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import javax.ws.rs.core.MediaType;
-import java.io.IOException;
-import java.net.InetSocketAddress;
+import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.api.client.config.DefaultClientConfig;
+import org.apache.hadoop.service.Service;
+import org.junit.After;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-//TODO 1 redo all tests to match with our new solution
 public class TestRMHA {
-
   private Log LOG = LogFactory.getLog(TestRMHA.class);
-  private final Configuration configuration = new YarnConfiguration();
+  private Configuration configuration;
   private MockRM rm = null;
   private RMApp app = null;
   private RMAppAttempt attempt = null;
@@ -83,10 +92,11 @@ public class TestRMHA {
 
   @Before
   public void setUp() throws Exception {
+    configuration = new Configuration();
+    UserGroupInformation.setConfiguration(configuration);
     configuration.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
-    configuration
-        .set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + "," + RM2_NODE_ID);
-    
+    configuration.set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + ","
+        + RM2_NODE_ID);
     for (String confKey : YarnConfiguration
         .getServiceAddressConfKeys(configuration)) {
       configuration.set(HAUtil.addSuffix(confKey, RM1_NODE_ID), RM1_ADDRESS);
@@ -97,15 +107,19 @@ public class TestRMHA {
     // Enable webapp to test web-services also
     configuration.setBoolean(MockRM.ENABLE_WEBAPP, true);
     configuration.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
-    
-    YarnAPIStorageFactory.setConfiguration(configuration);
-    RMStorageFactory.setConfiguration(configuration);
-    RMUtilities.InitializeDB();
-  }
 
+    RMStorageFactory.setConfiguration(configuration);
+    YarnAPIStorageFactory.setConfiguration(configuration);
+    DBUtility.InitializeDB();
+
+    ClusterMetrics.destroy();
+    QueueMetrics.clearQueueMetrics();
+    DefaultMetricsSystem.shutdown();
+  }
+  
   @After
-  public void teardown() {
-    if (rm != null) {
+  public void teardown(){
+    if(rm!=null && !rm.isInState(Service.STATE.STOPPED)){
       rm.stop();
     }
   }
@@ -123,7 +137,7 @@ public class TestRMHA {
     assertEquals(STATE_ERR, HAServiceState.STANDBY,
         rm.adminService.getServiceStatus().getState());
     assertFalse("Active RM services are started",
-        rm.areActiveServicesRunning());
+        rm.areSchedulerServicesRunning());
     assertTrue("RM is not ready to become active",
         rm.adminService.getServiceStatus().isReadyToBecomeActive());
   }
@@ -132,21 +146,19 @@ public class TestRMHA {
     assertEquals(STATE_ERR, HAServiceState.ACTIVE,
         rm.adminService.getServiceStatus().getState());
     assertTrue("Active RM services aren't started",
-        rm.areActiveServicesRunning());
+        rm.areSchedulerServicesRunning());
     assertTrue("RM is not ready to become active",
         rm.adminService.getServiceStatus().isReadyToBecomeActive());
 
     try {
       rm.getNewAppId();
-      LOG.debug("HOP :: Registering NM 127.0.0.1:0, 2048");
-      rm.registerNode("127.0.0.1:0", 2048);
-      
+      rm.registerNode("127.0.0.1:1", 2048);
       app = rm.submitApp(1024);
       attempt = app.getCurrentAppAttempt();
       rm.waitForState(attempt.getAppAttemptId(), RMAppAttemptState.SCHEDULED);
     } catch (Exception e) {
-      LOG.error("ActiveRM check failed", e);
       fail("Unable to perform Active RM functions");
+      LOG.error("ActiveRM check failed", e);
     }
 
     checkActiveRMWebServices();
@@ -166,8 +178,8 @@ public class TestRMHA {
 
     ClientResponse response =
         webResource.path("ws").path("v1").path("cluster").path("apps")
-            .path(path).accept(MediaType.APPLICATION_JSON)
-            .get(ClientResponse.class);
+          .path(path).accept(MediaType.APPLICATION_JSON)
+          .get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
 
@@ -178,21 +190,21 @@ public class TestRMHA {
   }
 
   /**
-   * Test to verify the following RM HA transitions to the following states. 1.
-   * Standby: Should be a no-op 2. Active: Active services should start 3.
-   * Active: Should be a no-op. While active, submit a couple of jobs 4.
-   * Standby: Active services should stop 5. Active: Active services should
-   * start 6. Stop the RM: All services should stop and RM should not be ready
-   * to become Active
+   * Test to verify the following RM HA transitions to the following states.
+   * 1. Standby: Should be a no-op
+   * 2. Active: Active services should start
+   * 3. Active: Should be a no-op.
+   *    While active, submit a couple of jobs
+   * 4. Standby: Active services should stop
+   * 5. Active: Active services should start
+   * 6. Stop the RM: All services should stop and RM should not be ready to
+   * become Active
    */
-  //HOPS_IGNORED: Transition to standby has changed, redesign to accomodate
-  //our solution
-  @Ignore
-  @Test(timeout = 300000)
+  @Test (timeout = 30000)
   public void testFailoverAndTransitions() throws Exception {
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    configuration.set(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
-        "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     Configuration conf = new YarnConfiguration(configuration);
 
     rm = new MockRM(conf);
@@ -205,38 +217,42 @@ public class TestRMHA {
     assertFalse("RM is ready to become active before being started",
         rm.adminService.getServiceStatus().isReadyToBecomeActive());
     checkMonitorHealth();
+
     rm.start();
     checkMonitorHealth();
     checkStandbyRMFunctionality();
     verifyClusterMetrics(0, 0, 0, 0, 0, 0);
+    
     // 1. Transition to Standby - must be a no-op
     rm.adminService.transitionToStandby(requestInfo);
-    Thread.sleep(2000);
     checkMonitorHealth();
     checkStandbyRMFunctionality();
     verifyClusterMetrics(0, 0, 0, 0, 0, 0);
+    
     // 2. Transition to active
     rm.adminService.transitionToActive(requestInfo);
     checkMonitorHealth();
     checkActiveRMFunctionality();
     verifyClusterMetrics(1, 1, 1, 1, 2048, 1);
+    
     // 3. Transition to active - no-op
     rm.adminService.transitionToActive(requestInfo);
     checkMonitorHealth();
     checkActiveRMFunctionality();
     verifyClusterMetrics(1, 2, 2, 2, 2048, 2);
+    
     // 4. Transition to standby
     rm.adminService.transitionToStandby(requestInfo);
     checkMonitorHealth();
     checkStandbyRMFunctionality();
     verifyClusterMetrics(0, 0, 0, 0, 0, 0);
+   
     // 5. Transition to active to check Active->Standby->Active works
     rm.adminService.transitionToActive(requestInfo);
-
     checkMonitorHealth();
     checkActiveRMFunctionality();
     verifyClusterMetrics(1, 1, 1, 1, 2048, 1);
-
+    
     // 6. Stop the RM. All services should stop and RM should not be ready to
     // become active
     rm.stop();
@@ -245,16 +261,14 @@ public class TestRMHA {
     assertFalse("RM is ready to become active even after it is stopped",
         rm.adminService.getServiceStatus().isReadyToBecomeActive());
     assertFalse("Active RM services are started",
-        rm.areActiveServicesRunning());
+        rm.areSchedulerServicesRunning());
     checkMonitorHealth();
   }
 
-  //deprecated with our solution
   @Test
-  @Ignore
   public void testTransitionsWhenAutomaticFailoverEnabled() throws Exception {
-    final String ERR_UNFORCED_REQUEST =
-        "User request succeeded even when " + "automatic failover is enabled";
+    final String ERR_UNFORCED_REQUEST = "User request succeeded even when " +
+        "automatic failover is enabled";
 
     Configuration conf = new YarnConfiguration(configuration);
 
@@ -283,6 +297,7 @@ public class TestRMHA {
     }
     checkMonitorHealth();
     checkStandbyRMFunctionality();
+
 
     final String ERR_FORCED_REQUEST = "Forced request by user should work " +
         "even if automatic failover is enabled";
@@ -315,8 +330,9 @@ public class TestRMHA {
         "Expect to get the same number of handlers";
     String errorMessageForService = "Expect to get the same number of services";
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    configuration.set(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
-        "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+
     Configuration conf = new YarnConfiguration(configuration);
     rm = new MockRM(conf) {
       @Override
@@ -346,32 +362,42 @@ public class TestRMHA {
     rm.adminService.transitionToStandby(requestInfo);
     rm.adminService.transitionToActive(requestInfo);
     rm.adminService.transitionToStandby(requestInfo);
+    
+    MyCountingDispatcher dispatcher =
+        (MyCountingDispatcher) rm.getRMContext().getDispatcher();
+    assertTrue(!dispatcher.isStopped());
 
     rm.adminService.transitionToActive(requestInfo);
     assertEquals(errorMessageForEventHandler, expectedEventHandlerCount,
         ((MyCountingDispatcher) rm.getRMContext().getDispatcher())
-            .getEventHandlerCount());
+        .getEventHandlerCount());
     assertEquals(errorMessageForService, expectedServiceCount,
         rm.getServices().size());
 
+    
+    // Keep the dispatcher reference before transitioning to standby
+    dispatcher = (MyCountingDispatcher) rm.getRMContext().getDispatcher();
+    
+    
     rm.adminService.transitionToStandby(requestInfo);
     assertEquals(errorMessageForEventHandler, expectedEventHandlerCount,
         ((MyCountingDispatcher) rm.getRMContext().getDispatcher())
-            .getEventHandlerCount());
+        .getEventHandlerCount());
     assertEquals(errorMessageForService, expectedServiceCount,
         rm.getServices().size());
+
+    assertTrue(dispatcher.isStopped());
+    
+    rm.stop();
   }
 
-  //deprecated, the HAID are now automaticaly provided by the leader election protocol
   @Test
-  @Ignore
   public void testHAIDLookup() {
     //test implicitly lookup HA-ID
     Configuration conf = new YarnConfiguration(configuration);
     rm = new MockRM(conf);
     rm.init(conf);
-    assertEquals(conf.get(YarnConfiguration.RM_HA_IDS),
-        RM1_NODE_ID + "," + RM2_NODE_ID);
+
     assertEquals(conf.get(YarnConfiguration.RM_HA_ID), RM2_NODE_ID);
 
     //test explicitly lookup HA-ID
@@ -382,8 +408,7 @@ public class TestRMHA {
     assertEquals(conf.get(YarnConfiguration.RM_HA_ID), RM1_NODE_ID);
 
     //test if RM_HA_ID can not be found
-    configuration
-        .set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + "," + RM3_NODE_ID);
+    configuration.set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID+ "," + RM3_NODE_ID);
     configuration.unset(YarnConfiguration.RM_HA_ID);
     conf = new YarnConfiguration(configuration);
     try {
@@ -391,37 +416,305 @@ public class TestRMHA {
       rm.init(conf);
       fail("Should get an exception here.");
     } catch (Exception ex) {
-      Assert.assertTrue(ex.getMessage()
-          .contains("Invalid configuration! Can not find valid RM_HA_ID."));
+      Assert.assertTrue(ex.getMessage().contains(
+          "Invalid configuration! Can not find valid RM_HA_ID."));
     }
+
+    rm.stop();
   }
 
-  //deprecated, the HAID are now automaticaly provided by the leader election protocol
+  @Test
+  public void testHAWithRMHostName() throws Exception {
+    innerTestHAWithRMHostName(false);
+    configuration.clear();
+    setUp();
+    innerTestHAWithRMHostName(true);
+  }
+
+  @Ignore //does not work with our current implementation of the leader election
+  @Test(timeout = 30000)
+  public void testFailoverWhenTransitionToActiveThrowException()
+      throws Exception {
+    configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+
+    Configuration conf = new YarnConfiguration(configuration);
+
+    MemoryRMStateStore memStore = new MemoryRMStateStore() {
+      int count = 0;
+
+      @Override
+      public synchronized void startInternal() throws Exception {
+        // first time throw exception
+        if (count++ == 0) {
+          throw new Exception("Session Expired");
+        }
+      }
+    };
+    // start RM
+    memStore.init(conf);
+
+    rm = new MockRM(conf, memStore);
+    rm.init(conf);
+    StateChangeRequestInfo requestInfo =
+        new StateChangeRequestInfo(
+            HAServiceProtocol.RequestSource.REQUEST_BY_USER);
+
+    assertEquals(STATE_ERR, HAServiceState.INITIALIZING, rm.adminService
+        .getServiceStatus().getState());
+    assertFalse("RM is ready to become active before being started",
+        rm.adminService.getServiceStatus().isReadyToBecomeActive());
+    checkMonitorHealth();
+
+    rm.start();
+    checkMonitorHealth();
+    checkStandbyRMFunctionality();
+
+    // 2. Try Transition to active, throw exception
+    try {
+      rm.adminService.transitionToActive(requestInfo);
+      Assert.fail("Transitioned to Active should throw exception.");
+    } catch (Exception e) {
+      assertTrue("Error when transitioning to Active mode".contains(e
+          .getMessage()));
+    }
+
+    // 3. Transition to active, success
+    rm.adminService.transitionToActive(requestInfo);
+    checkMonitorHealth();
+    checkActiveRMFunctionality();
+
+    rm.stop();
+  }
+
+  @Test(timeout = 130000)
+  public void testTransitionedToStandbyShouldNotHang() throws Exception {
+    configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+
+    Configuration conf = new YarnConfiguration(configuration);
+
+    MemoryRMStateStore memStore = new MemoryRMStateStore() {
+      @Override
+      public synchronized void updateApplicationState(
+          ApplicationStateData appState) {
+        notifyStoreOperationFailed(new StoreFencedException());
+      }
+    };
+    memStore.init(conf);
+    rm = new MockRM(conf, memStore) {
+      @Override
+      void stopSchedulerServices() throws Exception {
+        Thread.sleep(10000);
+        super.stopSchedulerServices();
+      }
+    };
+    rm.init(conf);
+    final StateChangeRequestInfo requestInfo =
+        new StateChangeRequestInfo(
+            HAServiceProtocol.RequestSource.REQUEST_BY_USER);
+
+    assertEquals(STATE_ERR, HAServiceState.INITIALIZING, rm.adminService
+        .getServiceStatus().getState());
+    assertFalse("RM is ready to become active before being started",
+        rm.adminService.getServiceStatus().isReadyToBecomeActive());
+    checkMonitorHealth();
+
+    rm.start();
+    checkMonitorHealth();
+    checkStandbyRMFunctionality();
+
+    // 2. Transition to Active.
+    rm.adminService.transitionToActive(requestInfo);
+
+    // 3. Try Transition to standby
+    Thread t = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          rm.transitionToStandby(true);
+        } catch (IOException e) {
+          e.printStackTrace();
+        } catch (Exception e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+      }
+    });
+    t.start();
+
+    t.join();
+    rm.getRMContext().getStateStore().updateApplicationState(null);
+    //t.join(); // wait for thread to finish
+
+    rm.adminService.transitionToStandby(requestInfo);
+    checkStandbyRMFunctionality();
+    rm.stop();
+  }
+
   @Test
   @Ignore
-  public void testHAWithRMHostName() {
+  public void testFailoverClearsRMContext() throws Exception {
+    configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+    configuration.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
+    Configuration conf = new YarnConfiguration(configuration);
+
+    MemoryRMStateStore memStore = new MemoryRMStateStore();
+    memStore.init(conf);
+
+    // 1. start RM
+    rm = new MockRM(conf, memStore);
+    rm.init(conf);
+    rm.start();
+
+    StateChangeRequestInfo requestInfo =
+        new StateChangeRequestInfo(
+            HAServiceProtocol.RequestSource.REQUEST_BY_USER);
+    checkMonitorHealth();
+    checkStandbyRMFunctionality();
+
+    // 2. Transition to active
+    rm.adminService.transitionToActive(requestInfo);
+    checkMonitorHealth();
+    checkActiveRMFunctionality();
+    LOG.error("Before checking first RM ClusterMetrics");
+    verifyClusterMetrics(1, 1, 1, 1, 2048, 1);
+    assertEquals(1, rm.getRMContext().getRMNodes().size());
+    assertEquals(1, rm.getRMContext().getRMApps().size());
+
+    LOG.error("Checks for the first RM are passed");
+
+    // 3. Create new RM
+    rm = new MockRM(conf, memStore) {
+      @Override
+      protected ResourceTrackerService createResourceTrackerService() {
+        return new ResourceTrackerService(this.rmContext,
+            this.nodesListManager, this.nmLivelinessMonitor,
+            this.rmContext.getContainerTokenSecretManager(),
+            this.rmContext.getNMTokenSecretManager()) {
+          @Override
+          protected void serviceStart() throws Exception {
+            throw new Exception("ResourceTracker service failed");
+          }
+        };
+      }
+    };
+    rm.init(conf);
+    rm.start();
+    checkMonitorHealth();
+    checkStandbyRMFunctionality();
+
+    // 4. Try Transition to active, throw exception
+    try {
+      rm.adminService.transitionToActive(requestInfo);
+      Assert.fail("Transitioned to Active should throw exception.");
+    } catch (Exception e) {
+      assertTrue("Error when transitioning to Active mode".contains(e
+          .getMessage()));
+    }
+    // 5. Clears the metrics
+    verifyClusterMetrics(0, 0, 0, 0, 0, 0);
+    assertEquals(0, rm.getRMContext().getRMNodes().size());
+    assertEquals(0, rm.getRMContext().getRMApps().size());
+
+    rm.stop();
+  }
+
+  @Test(timeout = 90000)
+  @Ignore
+  // In Hops we re-initialize the Scheduler services during transition to active
+  public void testTransitionedToActiveRefreshFail() throws Exception {
+    configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+
+    YarnConfiguration conf = new YarnConfiguration(configuration);
+    configuration = new CapacitySchedulerConfiguration(conf);
+    rm = new MockRM(configuration) {
+      @Override
+      protected AdminService createAdminService() {
+        return new AdminService(this, getRMContext()) {
+          @Override
+          protected void setConfig(Configuration conf) {
+            super.setConfig(configuration);
+          }
+        };
+      }
+
+      @Override
+      protected Dispatcher createDispatcher() {
+        return new FailFastDispatcher();
+      }
+    };
+
+    rm.init(configuration);
+    rm.start();
+    final StateChangeRequestInfo requestInfo =
+        new StateChangeRequestInfo(
+            HAServiceProtocol.RequestSource.REQUEST_BY_USER);
+
+    configuration.set("yarn.scheduler.capacity.root.default.capacity", "100");
+    rm.adminService.transitionToStandby(requestInfo);
+    assertEquals(HAServiceState.STANDBY, rm.getRMContext().getHAServiceState());
+    configuration.set("yarn.scheduler.capacity.root.default.capacity", "200");
+    try {
+      rm.adminService.transitionToActive(requestInfo);
+    } catch (Exception e) {
+      assertTrue("Error on refreshAll during transistion to Active".contains(e
+          .getMessage()));
+    }
+    FailFastDispatcher dispatcher =
+        ((FailFastDispatcher) rm.rmContext.getDispatcher());
+    dispatcher.await();
+    assertEquals(1, dispatcher.getEventCount());
+    // Making correct conf and check the state
+    configuration.set("yarn.scheduler.capacity.root.default.capacity", "100");
+    rm.adminService.transitionToActive(requestInfo);
+    assertEquals(HAServiceState.ACTIVE, rm.getRMContext().getHAServiceState());
+    rm.adminService.transitionToStandby(requestInfo);
+    assertEquals(HAServiceState.STANDBY, rm.getRMContext().getHAServiceState());
+
+    rm.stop();
+  }
+
+  public void innerTestHAWithRMHostName(boolean includeBindHost) {
+    //this is run two times, with and without a bind host configured
+    if (includeBindHost) {
+      configuration.set(YarnConfiguration.RM_BIND_HOST, "9.9.9.9");
+    }
+
     //test if both RM_HOSTBANE_{rm_id} and RM_RPCADDRESS_{rm_id} are set
     //We should only read rpc addresses from RM_RPCADDRESS_{rm_id} configuration
-    configuration
-        .set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME, RM1_NODE_ID),
-            "1.1.1.1");
-    configuration
-        .set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME, RM2_NODE_ID),
-            "0.0.0.0");
-    configuration
-        .set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME, RM3_NODE_ID),
-            "2.2.2.2");
+    configuration.set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME,
+        RM1_NODE_ID), "1.1.1.1");
+    configuration.set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME,
+        RM2_NODE_ID), "0.0.0.0");
+    configuration.set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME,
+        RM3_NODE_ID), "2.2.2.2");
     try {
       Configuration conf = new YarnConfiguration(configuration);
       rm = new MockRM(conf);
       rm.init(conf);
       for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
-        assertEquals("RPC address not set for " + confKey, RM1_ADDRESS,
-            conf.get(HAUtil.addSuffix(confKey, RM1_NODE_ID)));
-        assertEquals("RPC address not set for " + confKey, RM2_ADDRESS,
-            conf.get(HAUtil.addSuffix(confKey, RM2_NODE_ID)));
-        assertEquals("RPC address not set for " + confKey, RM3_ADDRESS,
-            conf.get(HAUtil.addSuffix(confKey, RM3_NODE_ID)));
+        assertEquals("RPC address not set for " + confKey,
+            RM1_ADDRESS, conf.get(HAUtil.addSuffix(confKey, RM1_NODE_ID)));
+        assertEquals("RPC address not set for " + confKey,
+            RM2_ADDRESS, conf.get(HAUtil.addSuffix(confKey, RM2_NODE_ID)));
+        assertEquals("RPC address not set for " + confKey,
+            RM3_ADDRESS, conf.get(HAUtil.addSuffix(confKey, RM3_NODE_ID)));
+        if (includeBindHost) {
+          assertEquals("Web address misconfigured WITH bind-host",
+                       rm.webAppAddress.substring(0, 7), "9.9.9.9");
+        } else {
+          //YarnConfiguration tries to figure out which rm host it's on by binding to it,
+          //which doesn't happen for any of these fake addresses, so we end up with 0.0.0.0
+          assertEquals("Web address misconfigured WITHOUT bind-host",
+                       rm.webAppAddress.substring(0, 7), "0.0.0.0");
+        }
       }
     } catch (YarnRuntimeException e) {
       fail("Should not throw any exceptions.");
@@ -430,63 +723,30 @@ public class TestRMHA {
     //test if only RM_HOSTBANE_{rm_id} is set
     configuration.clear();
     configuration.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
-    configuration
-        .set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + "," + RM2_NODE_ID);
-    configuration
-        .set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME, RM1_NODE_ID),
-            "1.1.1.1");
-    configuration
-        .set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME, RM2_NODE_ID),
-            "0.0.0.0");
+    configuration.set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + ","
+        + RM2_NODE_ID);
+    configuration.set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME,
+        RM1_NODE_ID), "1.1.1.1");
+    configuration.set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME,
+        RM2_NODE_ID), "0.0.0.0");
     try {
       Configuration conf = new YarnConfiguration(configuration);
       rm = new MockRM(conf);
       rm.init(conf);
       assertEquals("RPC address not set for " + YarnConfiguration.RM_ADDRESS,
-          "1.1.1.1:8032", conf.get(
-          HAUtil.addSuffix(YarnConfiguration.RM_ADDRESS, RM1_NODE_ID)));
+          "1.1.1.1:8032",
+          conf.get(HAUtil.addSuffix(YarnConfiguration.RM_ADDRESS, RM1_NODE_ID)));
       assertEquals("RPC address not set for " + YarnConfiguration.RM_ADDRESS,
-          "0.0.0.0:8032", conf.get(
-          HAUtil.addSuffix(YarnConfiguration.RM_ADDRESS, RM2_NODE_ID)));
+          "0.0.0.0:8032",
+          conf.get(HAUtil.addSuffix(YarnConfiguration.RM_ADDRESS, RM2_NODE_ID)));
 
     } catch (YarnRuntimeException e) {
       fail("Should not throw any exceptions.");
     }
+
+    rm.stop();
   }
-
-  @Test
-  public void TestLeaderElection() throws Exception {
-    //start two rm
-    configuration.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
-        ResourceScheduler.class);
-    configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, true);
-    configuration.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
-    rm = new MockRM(configuration);
-    rm.init(configuration);
-    rm.serviceStart();
-
-    configuration
-        .setStrings(YarnConfiguration.RM_WEBAPP_ADDRESS, "0.0.0.0:9909");
-    configuration
-        .setStrings(YarnConfiguration.RM_ADMIN_ADDRESS, "0.0.0.0:9033");
-    ResourceManager rm2 = new MockRM(configuration);
-    rm2.init(configuration);
-
-    rm2.serviceStart();
-
-    Thread.sleep(1000);
-
-    //only one should be runing
-    org.junit.Assert.assertTrue(
-        "RM1 Sate " + rm.getRMContext().getHAServiceState() + " RM2 State " +
-            rm2.getRMContext().getHAServiceState(),
-        (rm.getRMContext().getHAServiceState() ==
-            HAServiceProtocol.HAServiceState.STANDBY) ^
-            ((rm2.getRMContext().getHAServiceState() ==
-                HAServiceProtocol.HAServiceState.STANDBY)));
-
-  }
-
+  
   private void verifyClusterMetrics(int activeNodes, int appsSubmitted,
       int appsPending, int containersPending, int availableMB,
       int activeApplications) throws Exception {
@@ -498,8 +758,7 @@ public class TestRMHA {
     while (timeoutSecs++ < 5) {
       try {
         // verify queue metrics
-        assertMetric("appsSubmitted", appsSubmitted,
-            metrics.getAppsSubmitted());
+        assertMetric("appsSubmitted", appsSubmitted, metrics.getAppsSubmitted());
         assertMetric("appsPending", appsPending, metrics.getAppsPending());
         assertMetric("containersPending", containersPending,
             metrics.getPendingContainers());
@@ -529,6 +788,8 @@ public class TestRMHA {
 
     private int eventHandlerCount;
 
+    private volatile boolean stopped = false;
+
     public MyCountingDispatcher() {
       super("MyCountingDispatcher");
       this.eventHandlerCount = 0;
@@ -540,13 +801,40 @@ public class TestRMHA {
     }
 
     @Override
-    public void register(Class<? extends Enum> eventType,
-        EventHandler handler) {
-      this.eventHandlerCount++;
+    public void register(Class<? extends Enum> eventType, EventHandler handler) {
+      this.eventHandlerCount ++;
     }
 
     public int getEventHandlerCount() {
       return this.eventHandlerCount;
+    }
+
+    @Override
+    protected void serviceStop() throws Exception {
+      this.stopped = true;
+      super.serviceStop();
+    }
+
+    public boolean isStopped() {
+      return this.stopped;
+    }
+  }
+
+  class FailFastDispatcher extends DrainDispatcher {
+    int eventreceived = 0;
+
+    @SuppressWarnings("rawtypes")
+    @Override
+    protected void dispatch(Event event) {
+      if (event.getType() == RMFatalEventType.TRANSITION_TO_ACTIVE_FAILED) {
+        eventreceived++;
+      } else {
+        super.dispatch(event);
+      }
+    }
+
+    public int getEventCount() {
+      return eventreceived;
     }
   }
 }

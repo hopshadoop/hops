@@ -1,36 +1,35 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.webapp.view;
 
-import com.google.common.collect.Lists;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.yarn.webapp.SubView;
+import static org.apache.hadoop.yarn.util.StringHelper.join;
 
 import java.util.List;
 
-import static org.apache.hadoop.yarn.util.StringHelper.join;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.yarn.webapp.SubView;
+
+import com.google.common.collect.Lists;
 
 /**
  * A simpler two column layout implementation with a header, a navigation bar
- * on the left, content on the right, and a footer. Works with resizable
- * themes.
- *
+ * on the left, content on the right, and a footer. Works with resizable themes.
  * @see TwoColumnCssLayout
  */
 @InterfaceAudience.LimitedPrivate({"YARN", "MapReduce"})
@@ -40,53 +39,49 @@ public class TwoColumnLayout extends HtmlPage {
    * (non-Javadoc)
    * @see org.apache.hadoop.yarn.webapp.view.HtmlPage#render(org.apache.hadoop.yarn.webapp.hamlet.Hamlet.HTML)
    */
-  @Override
-  protected void render(Page.HTML<_> html) {
+  @Override protected void render(Page.HTML<_> html) {
     preHead(html);
     html.
-        title($(TITLE)).
-        link(root_url("static", "yarn.css")).
-        style("#layout { height: 100%; }", "#layout thead td { height: 3em; }",
+      title($(TITLE)).
+      link(root_url("static","yarn.css")).
+      style("#layout { height: 100%; }",
+            "#layout thead td { height: 3em; }",
             "#layout #navcell { width: 11em; padding: 0 1em; }",
             "#layout td.content { padding-top: 0 }",
             "#layout tbody { vertical-align: top; }",
             "#layout tfoot td { height: 4em; }").
-        _(JQueryUI.class);
+      _(JQueryUI.class);
     postHead(html);
     JQueryUI.jsnotice(html);
     html.
-        table("#layout.ui-widget-content").
+      table("#layout.ui-widget-content").
         thead().
-        tr().
-        td().$colspan(2).
-        _(header())._()._()._().
+          tr().
+            td().$colspan(2).
+              _(header())._()._()._().
         tfoot().
-        tr().
-        td().$colspan(2).
-        _(footer())._()._()._().
+          tr().
+            td().$colspan(2).
+              _(footer())._()._()._().
         tbody().
-        tr().
-        td().$id("navcell").
-        _(nav())._().
-        td().$class("content").
-        _(content())._()._()._()._()._();
+          tr().
+            td().$id("navcell").
+              _(nav())._().
+            td().$class("content").
+              _(content())._()._()._()._()._();
   }
 
   /**
    * Do what needs to be done before the header is rendered.  This usually
    * involves setting page variables for Javascript and CSS rendering.
-   *
-   * @param html
-   *     the html to use to render.
+   * @param html the html to use to render. 
    */
   protected void preHead(Page.HTML<_> html) {
   }
 
   /**
    * Do what needs to be done after the header is rendered.
-   *
-   * @param html
-   *     the html to use to render.
+   * @param html the html to use to render. 
    */
   protected void postHead(Page.HTML<_> html) {
   }
@@ -121,16 +116,12 @@ public class TwoColumnLayout extends HtmlPage {
 
   /**
    * Sets up a table to be a consistent style.
-   *
-   * @param html
-   *     the HTML to use to render.
-   * @param tableId
-   *     the ID of the table to set styles on.
-   * @param innerStyles
-   *     any other styles to add to the table.
+   * @param html the HTML to use to render.
+   * @param tableId the ID of the table to set styles on.
+   * @param innerStyles any other styles to add to the table.
    */
   protected void setTableStyles(Page.HTML<_> html, String tableId,
-      String... innerStyles) {
+                                String... innerStyles) {
     List<String> styles = Lists.newArrayList();
     styles.add(join('#', tableId, "_paginate span {font-weight:normal}"));
     styles.add(join('#', tableId, " .progress {width:8em}"));

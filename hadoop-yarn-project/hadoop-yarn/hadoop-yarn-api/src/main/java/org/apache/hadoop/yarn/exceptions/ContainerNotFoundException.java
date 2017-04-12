@@ -21,11 +21,11 @@ package org.apache.hadoop.yarn.exceptions;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.ApplicationHistoryProtocol;
+import org.apache.hadoop.yarn.api.protocolrecords.GetContainerReportRequest;
 
 /**
  * This exception is thrown on
- * {@link ApplicationHistoryProtocol#getContainerReport
- * (GetContainerReportRequest)}
+ * {@link ApplicationHistoryProtocol#getContainerReport (GetContainerReportRequest)}
  * API when the container doesn't exist in AHS
  */
 @Public

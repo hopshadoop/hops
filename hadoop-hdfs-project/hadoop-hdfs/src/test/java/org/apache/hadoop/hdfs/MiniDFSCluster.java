@@ -30,6 +30,7 @@ import io.hops.metadata.hdfs.dal.ExcessReplicaDataAccess;
 import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.PendingBlockDataAccess;
 import io.hops.metadata.hdfs.dal.UnderReplicatedBlockDataAccess;
+import io.hops.security.UsersGroups;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -642,10 +643,12 @@ public class MiniDFSCluster {
 
 
     // Setting the configuration for Storage
+    HdfsStorageFactory.resetDALInitialized();
     HdfsStorageFactory.setConfiguration(conf);
     if (format) {
       try {
         // this should be done before creating namenodes
+        LOG.debug("MiniDFSClustring Formatting the Cluster");
         assert (HdfsStorageFactory.formatStorage());
       } catch (StorageException ex) {
         throw new IOException(ex);
@@ -1389,7 +1392,7 @@ public class MiniDFSCluster {
 
 
     deleteReplicasTable();
-
+    UsersGroups.stop();
   }
   
   /**

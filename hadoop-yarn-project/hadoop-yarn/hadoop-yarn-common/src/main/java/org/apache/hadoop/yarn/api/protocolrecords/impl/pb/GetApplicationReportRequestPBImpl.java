@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
@@ -29,12 +28,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationIdProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationReportRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationReportRequestProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
-public class GetApplicationReportRequestPBImpl
-    extends GetApplicationReportRequest {
-  GetApplicationReportRequestProto proto =
-      GetApplicationReportRequestProto.getDefaultInstance();
+public class GetApplicationReportRequestPBImpl extends GetApplicationReportRequest {
+  GetApplicationReportRequestProto proto = GetApplicationReportRequestProto.getDefaultInstance();
   GetApplicationReportRequestProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -45,14 +44,13 @@ public class GetApplicationReportRequestPBImpl
     builder = GetApplicationReportRequestProto.newBuilder();
   }
 
-  public GetApplicationReportRequestPBImpl(
-      GetApplicationReportRequestProto proto) {
+  public GetApplicationReportRequestPBImpl(GetApplicationReportRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
   public GetApplicationReportRequestProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -65,9 +63,8 @@ public class GetApplicationReportRequestPBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -86,9 +83,8 @@ public class GetApplicationReportRequestPBImpl
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -100,7 +96,7 @@ public class GetApplicationReportRequestPBImpl
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public ApplicationId getApplicationId() {
@@ -118,9 +114,8 @@ public class GetApplicationReportRequestPBImpl
   @Override
   public void setApplicationId(ApplicationId applicationId) {
     maybeInitBuilder();
-    if (applicationId == null) {
+    if (applicationId == null) 
       builder.clearApplicationId();
-    }
     this.applicationId = applicationId;
   }
 
@@ -129,8 +124,9 @@ public class GetApplicationReportRequestPBImpl
   }
 
   private ApplicationIdProto convertToProtoFormat(ApplicationId t) {
-    return ((ApplicationIdPBImpl) t).getProto();
+    return ((ApplicationIdPBImpl)t).getProto();
   }
+
 
 
 }  

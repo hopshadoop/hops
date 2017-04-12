@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -27,16 +30,13 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.SerializedException;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.util.List;
-import java.util.Map;
-
 /**
  * <p>
  * The response sent by the <code>NodeManager</code> to the
  * <code>ApplicationMaster</code> when asked to <em>stop</em> allocated
  * containers.
  * </p>
- *
+ * 
  * @see ContainerManagementProtocol#stopContainers(StopContainersRequest)
  */
 @Public
@@ -56,7 +56,7 @@ public abstract class StopContainersResponse {
 
   /**
    * Get the list of containerIds of successfully stopped containers.
-   *
+   * 
    * @return the list of containerIds of successfully stopped containers.
    */
   @Public
@@ -72,8 +72,7 @@ public abstract class StopContainersResponse {
       List<ContainerId> succeededRequests);
 
   /**
-   * Get the containerId-to-exception map in which the exception indicates
-   * error
+   * Get the containerId-to-exception map in which the exception indicates error
    * from per container for failed requests
    */
   @Public
@@ -81,8 +80,7 @@ public abstract class StopContainersResponse {
   public abstract Map<ContainerId, SerializedException> getFailedRequests();
 
   /**
-   * Set the containerId-to-exception map in which the exception indicates
-   * error
+   * Set the containerId-to-exception map in which the exception indicates error
    * from per container for failed requests
    */
   @Private

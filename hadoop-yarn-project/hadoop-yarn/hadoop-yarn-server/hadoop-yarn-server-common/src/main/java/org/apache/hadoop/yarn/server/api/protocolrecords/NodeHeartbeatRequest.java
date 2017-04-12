@@ -38,14 +38,11 @@ public abstract class NodeHeartbeatRequest {
   }
 
   public abstract NodeStatus getNodeStatus();
-
   public abstract void setNodeStatus(NodeStatus status);
 
   public abstract MasterKey getLastKnownContainerTokenMasterKey();
-
   public abstract void setLastKnownContainerTokenMasterKey(MasterKey secretKey);
   
   public abstract MasterKey getLastKnownNMTokenMasterKey();
-
   public abstract void setLastKnownNMTokenMasterKey(MasterKey secretKey);
 }

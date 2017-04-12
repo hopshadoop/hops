@@ -18,11 +18,12 @@
 
 package org.apache.hadoop.yarn.server.security;
 
-import org.apache.hadoop.yarn.server.api.records.MasterKey;
-import org.apache.hadoop.yarn.util.Records;
+import java.nio.ByteBuffer;
 
 import javax.crypto.SecretKey;
-import java.nio.ByteBuffer;
+
+import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.util.Records;
 
 
 public class MasterKeyData {
@@ -36,8 +37,8 @@ public class MasterKeyData {
     this.masterKeyRecord = Records.newRecord(MasterKey.class);
     this.masterKeyRecord.setKeyId(serialNo);
     this.generatedSecretKey = secretKey;
-    this.masterKeyRecord
-        .setBytes(ByteBuffer.wrap(generatedSecretKey.getEncoded()));
+    this.masterKeyRecord.setBytes(ByteBuffer.wrap(generatedSecretKey
+      .getEncoded()));
   }
 
   public MasterKeyData(MasterKey masterKeyRecord, SecretKey secretKey) {

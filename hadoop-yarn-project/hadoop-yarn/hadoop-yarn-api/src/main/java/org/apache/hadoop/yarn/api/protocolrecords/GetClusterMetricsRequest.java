@@ -24,9 +24,9 @@ import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>The request sent by clients to get cluster metrics from the
+ * <p>The request sent by clients to get cluster metrics from the 
  * <code>ResourceManager</code>.</p>
- * <p/>
+ * 
  * <p>Currently, this is empty.</p>
  *
  * @see ApplicationClientProtocol#getClusterMetrics(GetClusterMetricsRequest)

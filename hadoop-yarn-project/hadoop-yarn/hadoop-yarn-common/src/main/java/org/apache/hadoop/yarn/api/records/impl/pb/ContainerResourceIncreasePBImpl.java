@@ -29,8 +29,8 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceIncreaseProtoOrB
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 
 public class ContainerResourceIncreasePBImpl extends ContainerResourceIncrease {
-  ContainerResourceIncreaseProto proto =
-      ContainerResourceIncreaseProto.getDefaultInstance();
+  ContainerResourceIncreaseProto proto = ContainerResourceIncreaseProto
+      .getDefaultInstance();
   ContainerResourceIncreaseProto.Builder builder = null;
   boolean viaProto = false;
 

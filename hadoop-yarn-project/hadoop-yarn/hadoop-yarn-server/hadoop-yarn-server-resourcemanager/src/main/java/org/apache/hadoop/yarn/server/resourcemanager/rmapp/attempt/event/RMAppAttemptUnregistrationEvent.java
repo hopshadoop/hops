@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
@@ -28,15 +27,13 @@ public class RMAppAttemptUnregistrationEvent extends RMAppAttemptEvent {
 
   private final String finalTrackingUrl;
   private final FinalApplicationStatus finalStatus;
-  private final String diagnostics;
 
   public RMAppAttemptUnregistrationEvent(ApplicationAttemptId appAttemptId,
       String trackingUrl, FinalApplicationStatus finalStatus,
-      String diagnostics, TransactionState transactionState) {
-    super(appAttemptId, RMAppAttemptEventType.UNREGISTERED, transactionState);
+      String diagnostics) {
+    super(appAttemptId, RMAppAttemptEventType.UNREGISTERED, diagnostics);
     this.finalTrackingUrl = trackingUrl;
     this.finalStatus = finalStatus;
-    this.diagnostics = diagnostics;
   }
 
   public String getFinalTrackingUrl() {
@@ -45,10 +42,6 @@ public class RMAppAttemptUnregistrationEvent extends RMAppAttemptEvent {
 
   public FinalApplicationStatus getFinalApplicationStatus() {
     return this.finalStatus;
-  }
-
-  public String getDiagnostics() {
-    return this.diagnostics;
   }
 
 }

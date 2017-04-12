@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.nfs.nfs3;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 
 import org.apache.hadoop.nfs.nfs3.FileHandle;
 import org.apache.hadoop.oncrpc.XDR;
@@ -34,6 +34,7 @@ public class TestFileHandle {
     // Deserialize it back 
     FileHandle handle2 = new FileHandle();
     handle2.deserialize(xdr.asReadOnlyWrap());
-    Assert.assertEquals(handle.getFileId(), 1024);
+    Assert.assertEquals("Failed: Assert 1024 is id ", 1024, 
+            handle.getFileId());
   }
 }

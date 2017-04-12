@@ -18,6 +18,7 @@
 package org.apache.hadoop.security;
 
 import java.net.InetAddress;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -65,7 +66,8 @@ public class SaslPropertiesResolver implements Configurable{
         CommonConfigurationKeysPublic.HADOOP_RPC_PROTECTION,
         QualityOfProtection.AUTHENTICATION.toString());
     for (int i=0; i < qop.length; i++) {
-      qop[i] = QualityOfProtection.valueOf(qop[i].toUpperCase()).getSaslQop();
+      qop[i] = QualityOfProtection.valueOf(
+          StringUtils.toUpperCase(qop[i])).getSaslQop();
     }
     properties.put(Sasl.QOP, StringUtils.join(",", qop));
     properties.put(Sasl.SERVER_AUTH, "true");
@@ -80,7 +82,7 @@ public class SaslPropertiesResolver implements Configurable{
    * The default Sasl Properties read from the configuration
    * @return sasl Properties
    */
-  protected Map<String,String> getDefaultProperties() {
+  public Map<String,String> getDefaultProperties() {
     return properties;
   }
 

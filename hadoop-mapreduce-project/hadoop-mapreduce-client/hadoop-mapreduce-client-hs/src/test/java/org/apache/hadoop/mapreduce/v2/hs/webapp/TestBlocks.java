@@ -133,7 +133,7 @@ public class TestBlocks {
     ApplicationId appId = ApplicationIdPBImpl.newInstance(0, 5);
     ApplicationAttemptId appAttemptId = ApplicationAttemptIdPBImpl.newInstance(appId, 1);
 
-    ContainerId containerId = ContainerIdPBImpl.newInstance(appAttemptId, 1);
+    ContainerId containerId = ContainerIdPBImpl.newContainerId(appAttemptId, 1);
     when(attempt.getAssignedContainerID()).thenReturn(containerId);
 
     when(attempt.getAssignedContainerMgrAddress()).thenReturn(
@@ -159,7 +159,7 @@ public class TestBlocks {
     when(taReport.getSortFinishTime()).thenReturn(taSortFinishTime);
     when(taReport.getContainerId()).thenReturn(containerId);
     when(taReport.getProgress()).thenReturn(1.0f);
-    when(taReport.getStateString()).thenReturn("Processed 128/128 records");
+    when(taReport.getStateString()).thenReturn("Processed 128/128 records <p> \n");
     when(taReport.getTaskAttemptState()).thenReturn(taState);
     when(taReport.getDiagnosticInfo()).thenReturn("");
 
@@ -182,8 +182,10 @@ public class TestBlocks {
     block.render(html);
     pWriter.flush();
     // should be printed information about attempts
-    assertTrue(data.toString().contains("0 attempt_0_0001_r_000000_0"));
+    assertTrue(data.toString().contains("attempt_0_0001_r_000000_0"));
     assertTrue(data.toString().contains("SUCCEEDED"));
+    assertFalse(data.toString().contains("Processed 128/128 records <p> \n"));
+    assertTrue(data.toString().contains("Processed 128\\/128 records &lt;p&gt; \\n"));
     assertTrue(data.toString().contains(
             "_0005_01_000001:attempt_0_0001_r_000000_0:User:"));
     assertTrue(data.toString().contains("100002"));

@@ -22,12 +22,12 @@ import org.apache.commons.logging.Log;
 
 public class FiCaSchedulerUtils {
 
-  public static boolean isBlacklisted(FiCaSchedulerApp application,
+  public static  boolean isBlacklisted(FiCaSchedulerApp application,
       FiCaSchedulerNode node, Log LOG) {
     if (application.isBlacklisted(node.getNodeName())) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Skipping 'host' " + node.getNodeName() +
-            " for " + application.getApplicationId() +
+        LOG.debug("Skipping 'host' " + node.getNodeName() + 
+            " for " + application.getApplicationId() + 
             " since it has been blacklisted");
       }
       return true;
@@ -35,8 +35,8 @@ public class FiCaSchedulerUtils {
 
     if (application.isBlacklisted(node.getRackName())) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Skipping 'rack' " + node.getRackName() +
-            " for " + application.getApplicationId() +
+        LOG.debug("Skipping 'rack' " + node.getRackName() + 
+            " for " + application.getApplicationId() + 
             " since it has been blacklisted");
       }
       return true;

@@ -94,7 +94,7 @@ public class FileNameIndexUtils {
     sb.append(DELIMITER);
     
     //QueueName
-    sb.append(escapeDelimiters(indexInfo.getQueueName()));
+    sb.append(escapeDelimiters(getQueueName(indexInfo)));
     sb.append(DELIMITER);
 
     //JobStartTime
@@ -168,10 +168,14 @@ public class FileNameIndexUtils {
           decodeJobHistoryFileName(jobDetails[QUEUE_NAME_INDEX]));
 
       try{
-        indexInfo.setJobStartTime(
-          Long.parseLong(decodeJobHistoryFileName(jobDetails[JOB_START_TIME_INDEX])));
+        if (jobDetails.length <= JOB_START_TIME_INDEX) {
+          indexInfo.setJobStartTime(indexInfo.getSubmitTime());
+        } else {
+          indexInfo.setJobStartTime(
+              Long.parseLong(decodeJobHistoryFileName(jobDetails[JOB_START_TIME_INDEX])));
+        }
       } catch (NumberFormatException e){
-        LOG.warn("Unable to parse launch time from job history file "
+        LOG.warn("Unable to parse start time from job history file "
             + jhFileName + " : " + e);
       }
     } catch (IndexOutOfBoundsException e) {
@@ -260,6 +264,10 @@ public class FileNameIndexUtils {
   
   private static String getJobName(JobIndexInfo indexInfo) {
     return getNonEmptyString(indexInfo.getJobName());
+  }
+
+  private static String getQueueName(JobIndexInfo indexInfo) {
+    return getNonEmptyString(indexInfo.getQueueName());
   }
 
   //TODO Maybe handle default values for longs and integers here?

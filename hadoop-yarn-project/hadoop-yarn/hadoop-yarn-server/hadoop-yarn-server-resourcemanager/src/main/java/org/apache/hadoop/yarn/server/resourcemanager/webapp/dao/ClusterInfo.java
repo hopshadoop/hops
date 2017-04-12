@@ -17,15 +17,16 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlRootElement;
+
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.service.Service.STATE;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
-
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -35,12 +36,14 @@ public class ClusterInfo {
   protected long startedOn;
   protected STATE state;
   protected HAServiceProtocol.HAServiceState haState;
+  protected String rmStateStoreName;
   protected String resourceManagerVersion;
   protected String resourceManagerBuildVersion;
   protected String resourceManagerVersionBuiltOn;
   protected String hadoopVersion;
   protected String hadoopBuildVersion;
   protected String hadoopVersionBuiltOn;
+  protected String haZooKeeperConnectionState;
 
   public ClusterInfo() {
   } // JAXB needs this
@@ -51,6 +54,8 @@ public class ClusterInfo {
     this.id = ts;
     this.state = rm.getServiceState();
     this.haState = rm.getRMContext().getHAServiceState();
+    this.rmStateStoreName = rm.getRMContext().getStateStore().getClass()
+        .getName();
     this.startedOn = ts;
     this.resourceManagerVersion = YarnVersionInfo.getVersion();
     this.resourceManagerBuildVersion = YarnVersionInfo.getBuildVersion();
@@ -58,6 +63,8 @@ public class ClusterInfo {
     this.hadoopVersion = VersionInfo.getVersion();
     this.hadoopBuildVersion = VersionInfo.getBuildVersion();
     this.hadoopVersionBuiltOn = VersionInfo.getDate();
+    this.haZooKeeperConnectionState =
+        rm.getRMContext().getRMAdminService().getHAZookeeperConnectionState();
   }
 
   public String getState() {
@@ -66,6 +73,10 @@ public class ClusterInfo {
 
   public String getHAState() {
     return this.haState.toString();
+  }
+
+  public String getRMStateStore() {
+    return this.rmStateStoreName;
   }
 
   public String getRMVersion() {
@@ -100,4 +111,7 @@ public class ClusterInfo {
     return this.startedOn;
   }
 
+  public String getHAZookeeperConnectionState() {
+    return this.haZooKeeperConnectionState;
+  }
 }

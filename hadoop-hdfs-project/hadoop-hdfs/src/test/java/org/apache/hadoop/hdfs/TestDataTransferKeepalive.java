@@ -30,6 +30,7 @@ import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
+import com.google.common.io.ByteStreams;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -45,7 +46,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.google.common.io.NullOutputStream;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 
 public class TestDataTransferKeepalive {
   Configuration conf = new HdfsConfiguration();
@@ -168,7 +170,7 @@ public class TestDataTransferKeepalive {
         stms[i] = fs.open(TEST_FILE);
       }
       for (InputStream stm : stms) {
-        IOUtils.copyBytes(stm, new NullOutputStream(), 1024);
+        IOUtils.copyBytes(stm, ByteStreams.nullOutputStream(), 1024);
       }
     } finally {
       IOUtils.cleanup(null, stms);
@@ -188,14 +190,17 @@ public class TestDataTransferKeepalive {
     DFSTestUtil.readFile(fs, TEST_FILE);
   }
 
-  private void assertXceiverCount(int expected) {
+  private void assertXceiverCount(int expected) throws UnsupportedEncodingException {
     // Subtract 1, since the DataXceiverServer
     // counts as one
     int count = dn.getXceiverCount() - 1;
     if (count != expected) {
-      ReflectionUtils.printThreadInfo(
-          new PrintWriter(System.err),
-          "Thread dumps");
+      try (PrintStream err = new PrintStream(
+              System.err, false, "UTF-8")) {
+        ReflectionUtils.printThreadInfo(
+                err,
+                "Thread dumps");
+      }
       fail("Expected " + expected + " xceivers, found " +
           count);
     }

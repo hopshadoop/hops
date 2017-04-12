@@ -20,12 +20,12 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>2.4.0</version>
+    <version>2.7.3</version>
     <relativePath>../hadoop-project</relativePath>
   </parent>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-project-dist</artifactId>
-  <version>2.4.0</version>
+  <version>2.7.3</version>
   <description>Apache Hadoop Project Dist POM</description>
   <name>Apache Hadoop Project Dist POM</name>
   <packaging>pom</packaging>
@@ -41,6 +41,8 @@
     <hadoop.component>UNDEF</hadoop.component>
     <bundle.snappy>false</bundle.snappy>
     <bundle.snappy.in.bin>false</bundle.snappy.in.bin>
+    <isal.lib></isal.lib>
+    <bundle.isal>false</bundle.isal>
   </properties>
   
   <dependencies>
@@ -74,6 +76,8 @@
               <includes>
                 <include>**/*.class</include>
                 <include>webapps/**</include>
+                <include>META-INF/LICENSE.txt</include>
+                <include>META-INF/NOTICE.txt</include>
               </includes>
             </configuration>
           </execution>
@@ -345,9 +349,17 @@
                         mkdir -p $${TARGET_DIR}
                         cd $${LIB_DIR}
                         $$TAR lib* | (cd $${TARGET_DIR}/; $$UNTAR)
-                        if [ "${bundle.snappy}" = "true" ] ; then
+                        if [ "X${bundle.snappy}" = "Xtrue" ] ; then
                           cd "${snappy.lib}"
                           $$TAR *snappy* | (cd $${TARGET_DIR}/; $$UNTAR)
+                        fi
+                        if [ "X${bundle.isal}" = "Xtrue" ] ; then
+                          if [ "X${isal.lib}" != "X" ]; then
+                            cd "${isal.lib}"
+                            $$TAR *isa* | (cd $${TARGET_DIR}/; $$UNTAR)
+                          else
+                            echo "The required option isal.lib isn't given, bundling ISA-L skipped"
+                          fi
                         fi
                       fi
                       BIN_DIR="${BUILD_DIR}/bin"

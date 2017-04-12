@@ -105,6 +105,7 @@ public class TestJMXGet {
     //jmx.init();
     //jmx = new JMXGet();
     jmx.init(); // default lists namenode mbeans only
+    Thread.sleep(25000);
 
     //get some data from different source
     assertEquals(numDatanodes,
@@ -137,6 +138,7 @@ public class TestJMXGet {
     //jmx = new JMXGet();
     jmx.setService("DataNode");
     jmx.init();
+    Thread.sleep(15000);
     assertEquals(fileSize, Integer.parseInt(jmx.getValue("BytesWritten")));
 
     cluster.shutdown();

@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsResponse;
@@ -28,16 +31,15 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationReportProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationsResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationsResponseProtoOrBuilder;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
-public class GetApplicationsResponsePBImpl extends GetApplicationsResponse {
+public class GetApplicationsResponsePBImpl
+extends GetApplicationsResponse {
 
   GetApplicationsResponseProto proto =
-      GetApplicationsResponseProto.getDefaultInstance();
+    GetApplicationsResponseProto.getDefaultInstance();
   GetApplicationsResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -61,9 +63,8 @@ public class GetApplicationsResponsePBImpl extends GetApplicationsResponse {
   @Override
   public void setApplicationList(List<ApplicationReport> applications) {
     maybeInitBuilder();
-    if (applications == null) {
+    if (applications == null)
       builder.clearApplications();
-    }
     this.applicationList = applications;
   }
 
@@ -81,9 +82,8 @@ public class GetApplicationsResponsePBImpl extends GetApplicationsResponse {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -102,9 +102,8 @@ public class GetApplicationsResponsePBImpl extends GetApplicationsResponse {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -135,46 +134,43 @@ public class GetApplicationsResponsePBImpl extends GetApplicationsResponse {
   private void addLocalApplicationsToProto() {
     maybeInitBuilder();
     builder.clearApplications();
-    if (applicationList == null) {
+    if (applicationList == null)
       return;
-    }
-    Iterable<ApplicationReportProto> iterable =
-        new Iterable<ApplicationReportProto>() {
+    Iterable<ApplicationReportProto> iterable = new Iterable<ApplicationReportProto>() {
+      @Override
+      public Iterator<ApplicationReportProto> iterator() {
+        return new Iterator<ApplicationReportProto>() {
+
+          Iterator<ApplicationReport> iter = applicationList.iterator();
+
           @Override
-          public Iterator<ApplicationReportProto> iterator() {
-            return new Iterator<ApplicationReportProto>() {
+          public boolean hasNext() {
+            return iter.hasNext();
+          }
 
-              Iterator<ApplicationReport> iter = applicationList.iterator();
+          @Override
+          public ApplicationReportProto next() {
+            return convertToProtoFormat(iter.next());
+          }
 
-              @Override
-              public boolean hasNext() {
-                return iter.hasNext();
-              }
-
-              @Override
-              public ApplicationReportProto next() {
-                return convertToProtoFormat(iter.next());
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-
-              }
-            };
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
 
           }
         };
+
+      }
+    };
     builder.addAllApplications(iterable);
   }
 
-  private ApplicationReportPBImpl convertFromProtoFormat(
-      ApplicationReportProto p) {
+  private ApplicationReportPBImpl convertFromProtoFormat(ApplicationReportProto p) {
     return new ApplicationReportPBImpl(p);
   }
 
   private ApplicationReportProto convertToProtoFormat(ApplicationReport t) {
-    return ((ApplicationReportPBImpl) t).getProto();
+    return ((ApplicationReportPBImpl)t).getProto();
   }
 
 }

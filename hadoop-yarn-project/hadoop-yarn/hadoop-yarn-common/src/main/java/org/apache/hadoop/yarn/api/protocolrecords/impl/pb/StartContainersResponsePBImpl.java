@@ -18,8 +18,13 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.TextFormat;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersResponse;
@@ -35,18 +40,14 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.ContainerExceptionMapProto
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StartContainersResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StartContainersResponseProtoOrBuilder;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
 public class StartContainersResponsePBImpl extends StartContainersResponse {
-  StartContainersResponseProto proto =
-      StartContainersResponseProto.getDefaultInstance();
+  StartContainersResponseProto proto = StartContainersResponseProto
+    .getDefaultInstance();
   StartContainersResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -77,9 +78,8 @@ public class StartContainersResponsePBImpl extends StartContainersResponse {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -169,17 +169,16 @@ public class StartContainersResponsePBImpl extends StartContainersResponse {
     this.servicesMetaData = new HashMap<String, ByteBuffer>();
 
     for (StringBytesMapProto c : list) {
-      this.servicesMetaData
-          .put(c.getKey(), convertFromProtoFormat(c.getValue()));
+      this.servicesMetaData.put(c.getKey(),
+        convertFromProtoFormat(c.getValue()));
     }
   }
 
   private void addServicesMetaDataToProto() {
     maybeInitBuilder();
     builder.clearServicesMetaData();
-    if (servicesMetaData == null) {
+    if (servicesMetaData == null)
       return;
-    }
     Iterable<StringBytesMapProto> iterable =
         new Iterable<StringBytesMapProto>() {
 
@@ -198,8 +197,8 @@ public class StartContainersResponsePBImpl extends StartContainersResponse {
               public StringBytesMapProto next() {
                 String key = keyIter.next();
                 return StringBytesMapProto.newBuilder().setKey(key)
-                    .setValue(convertToProtoFormat(servicesMetaData.get(key)))
-                    .build();
+                  .setValue(convertToProtoFormat(servicesMetaData.get(key)))
+                  .build();
               }
 
               @Override
@@ -215,17 +214,16 @@ public class StartContainersResponsePBImpl extends StartContainersResponse {
   private void addFailedContainersToProto() {
     maybeInitBuilder();
     builder.clearFailedRequests();
-    if (this.failedContainers == null) {
+    if (this.failedContainers == null)
       return;
-    }
     List<ContainerExceptionMapProto> protoList =
         new ArrayList<ContainerExceptionMapProto>();
 
     for (Map.Entry<ContainerId, SerializedException> entry : this.failedContainers
-        .entrySet()) {
+      .entrySet()) {
       protoList.add(ContainerExceptionMapProto.newBuilder()
-          .setContainerId(convertToProtoFormat(entry.getKey()))
-          .setException(convertToProtoFormat(entry.getValue())).build());
+        .setContainerId(convertToProtoFormat(entry.getKey()))
+        .setException(convertToProtoFormat(entry.getValue())).build());
     }
     builder.addAllFailedRequests(protoList);
   }
@@ -265,9 +263,8 @@ public class StartContainersResponsePBImpl extends StartContainersResponse {
   }
 
   private void initSucceededContainers() {
-    if (this.succeededContainers != null) {
+    if (this.succeededContainers != null)
       return;
-    }
     StartContainersResponseProtoOrBuilder p = viaProto ? proto : builder;
     List<ContainerIdProto> list = p.getSucceededRequestsList();
     this.succeededContainers = new ArrayList<ContainerId>();
@@ -301,7 +298,7 @@ public class StartContainersResponsePBImpl extends StartContainersResponse {
     this.failedContainers = new HashMap<ContainerId, SerializedException>();
     for (ContainerExceptionMapProto ce : protoList) {
       this.failedContainers.put(convertFromProtoFormat(ce.getContainerId()),
-          convertFromProtoFormat(ce.getException()));
+        convertFromProtoFormat(ce.getException()));
     }
   }
 
@@ -315,9 +312,8 @@ public class StartContainersResponsePBImpl extends StartContainersResponse {
   public void setFailedRequests(
       Map<ContainerId, SerializedException> failedContainers) {
     maybeInitBuilder();
-    if (failedContainers == null) {
+    if (failedContainers == null)
       builder.clearFailedRequests();
-    }
     this.failedContainers = failedContainers;
   }
 }

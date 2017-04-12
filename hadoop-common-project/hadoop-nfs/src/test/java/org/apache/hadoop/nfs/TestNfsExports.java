@@ -17,24 +17,21 @@
  */
 package org.apache.hadoop.nfs;
 
-import junit.framework.Assert;
-
-import org.apache.hadoop.nfs.AccessPrivilege;
-import org.apache.hadoop.nfs.NfsExports;
 import org.apache.hadoop.nfs.nfs3.Nfs3Constant;
+import org.junit.Assert;
 import org.junit.Test;
 
 public class TestNfsExports {
 
-  private final String address1 = "192.168.0.1";
-  private final String address2 = "10.0.0.1";
+  private final String address1 = "192.168.0.12";
+  private final String address2 = "10.0.0.12";
   private final String hostname1 = "a.b.com";
   private final String hostname2 = "a.b.org";
   
   private static final long ExpirationPeriod = 
-      Nfs3Constant.EXPORTS_CACHE_EXPIRYTIME_MILLIS_DEFAULT * 1000 * 1000;
+      Nfs3Constant.NFS_EXPORTS_CACHE_EXPIRYTIME_MILLIS_DEFAULT * 1000 * 1000;
   
-  private static final int CacheSize = Nfs3Constant.EXPORTS_CACHE_SIZE_DEFAULT;
+  private static final int CacheSize = Nfs3Constant.NFS_EXPORTS_CACHE_SIZE_DEFAULT;
   private static final long NanosPerMillis = 1000000;
 
   @Test
@@ -168,6 +165,24 @@ public class TestNfsExports {
   }
   
   @Test
+  public void testRegexGrouping() {
+    NfsExports matcher = new NfsExports(CacheSize, ExpirationPeriod,
+        "192.168.0.(12|34)");
+    Assert.assertEquals(AccessPrivilege.READ_ONLY,
+        matcher.getAccessPrivilege(address1, hostname1));
+    // address1 will hit the cache
+    Assert.assertEquals(AccessPrivilege.READ_ONLY,
+        matcher.getAccessPrivilege(address1, hostname2));
+
+    matcher = new NfsExports(CacheSize, ExpirationPeriod, "\\w*.a.b.com");
+    Assert.assertEquals(AccessPrivilege.READ_ONLY,
+        matcher.getAccessPrivilege("1.2.3.4", "web.a.b.com"));
+    // address "1.2.3.4" will hit the cache
+    Assert.assertEquals(AccessPrivilege.READ_ONLY,
+        matcher.getAccessPrivilege("1.2.3.4", "email.a.b.org"));
+  }
+  
+  @Test
   public void testMultiMatchers() throws Exception {
     long shortExpirationPeriod = 1 * 1000 * 1000 * 1000; // 1s
     NfsExports matcher = new NfsExports(CacheSize, shortExpirationPeriod, 
@@ -196,5 +211,17 @@ public class TestNfsExports {
       Thread.sleep(500);
     } while ((System.nanoTime() - startNanos) / NanosPerMillis < 5000);
     Assert.assertEquals(AccessPrivilege.NONE, ap);
+  }
+
+  @Test(expected=IllegalArgumentException.class)
+  public void testInvalidHost() {
+      NfsExports matcher = new NfsExports(CacheSize, ExpirationPeriod,
+        "foo#bar");
+  }
+
+  @Test(expected=IllegalArgumentException.class)
+  public void testInvalidSeparator() {
+      NfsExports matcher = new NfsExports(CacheSize, ExpirationPeriod,
+        "foo ro : bar rw");
   }
 }

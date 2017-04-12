@@ -1,28 +1,28 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.util;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-
 import java.util.regex.Pattern;
+
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 
 /**
  * Common string manipulation helpers
@@ -40,13 +40,11 @@ public final class StringHelper {
   public static final Splitter SSV_SPLITTER =
       Splitter.on(' ').omitEmptyStrings().trimResults();
   public static final Splitter _SPLITTER = Splitter.on('_').trimResults();
-  private static final Pattern ABS_URL_RE = Pattern.compile("^(?:\\w+:)?//");
+  private static final Pattern ABS_URL_RE =Pattern.compile("^(?:\\w+:)?//");
 
   /**
    * Join on space.
-   *
-   * @param args
-   *     to join
+   * @param args to join
    * @return args joined by space
    */
   public static String sjoin(Object... args) {
@@ -55,9 +53,7 @@ public final class StringHelper {
 
   /**
    * Join on comma.
-   *
-   * @param args
-   *     to join
+   * @param args to join
    * @return args joined by comma
    */
   public static String cjoin(Object... args) {
@@ -66,9 +62,7 @@ public final class StringHelper {
 
   /**
    * Join on dot
-   *
-   * @param args
-   *     to join
+   * @param args to join
    * @return args joined by dot
    */
   public static String djoin(Object... args) {
@@ -77,9 +71,7 @@ public final class StringHelper {
 
   /**
    * Join on underscore
-   *
-   * @param args
-   *     to join
+   * @param args to join
    * @return args joined underscore
    */
   public static String _join(Object... args) {
@@ -88,9 +80,7 @@ public final class StringHelper {
 
   /**
    * Join on slash
-   *
-   * @param args
-   *     to join
+   * @param args to join
    * @return args joined with slash
    */
   public static String pjoin(Object... args) {
@@ -98,10 +88,8 @@ public final class StringHelper {
   }
 
   /**
-   * Join on slash & colon (e.g., path args in routing spec)
-   *
-   * @param args
-   *     to join
+   * Join on slash and colon (e.g., path args in routing spec)
+   * @param args to join
    * @return args joined with /:
    */
   public static String pajoin(Object... args) {
@@ -110,7 +98,6 @@ public final class StringHelper {
 
   /**
    * Join without separator
-   *
    * @param args
    * @return joined args with no separator
    */
@@ -120,22 +107,17 @@ public final class StringHelper {
 
   /**
    * Join with a separator
-   *
-   * @param sep
-   *     the separator
-   * @param args
-   *     to join
+   * @param sep the separator
+   * @param args to join
    * @return args joined with a separator
    */
-  public static String joins(String sep, Object... args) {
+  public static String joins(String sep, Object...args) {
     return Joiner.on(sep).join(args);
   }
 
   /**
-   * Split on space & trim results.
-   *
-   * @param s
-   *     the string to split
+   * Split on space and trim results.
+   * @param s the string to split
    * @return an iterable of strings
    */
   public static Iterable<String> split(CharSequence s) {
@@ -143,10 +125,8 @@ public final class StringHelper {
   }
 
   /**
-   * Split on _ & trim results
-   *
-   * @param s
-   *     the string to split
+   * Split on _ and trim results
+   * @param s the string to split
    * @return an iterable of strings
    */
   public static Iterable<String> _split(CharSequence s) {
@@ -155,9 +135,7 @@ public final class StringHelper {
 
   /**
    * Check whether a url is absolute or note
-   *
-   * @param url
-   *     to check
+   * @param url to check
    * @return true if url starts with scheme:// or //
    */
   public static boolean isAbsUrl(CharSequence url) {
@@ -166,11 +144,8 @@ public final class StringHelper {
 
   /**
    * Join url components
-   *
-   * @param pathPrefix
-   *     for relative urls
-   * @param args
-   *     url components to join
+   * @param pathPrefix for relative urls
+   * @param args url components to join
    * @return an url string
    */
   public static String ujoin(String pathPrefix, String... args) {
@@ -193,8 +168,8 @@ public final class StringHelper {
   }
   
   private static void uappend(StringBuilder sb, String part) {
-    if ((sb.length() <= 0 || sb.charAt(sb.length() - 1) != '/') &&
-        !part.startsWith("/")) {
+    if((sb.length() <= 0 || sb.charAt(sb.length() - 1) != '/') 
+        && !part.startsWith("/")) {
       sb.append('/');
     }
     sb.append(part);

@@ -134,7 +134,7 @@ public class MD5MD5CRC32FileChecksum extends FileChecksum {
 
     try {
       // old versions don't support crcType.
-      if (crcType == null || crcType == "") {
+      if (crcType == null || crcType.equals("")) {
         finalCrcType = DataChecksum.Type.CRC32;
       } else {
         finalCrcType = DataChecksum.Type.valueOf(crcType);
@@ -143,13 +143,13 @@ public class MD5MD5CRC32FileChecksum extends FileChecksum {
       switch (finalCrcType) {
         case CRC32:
           return new MD5MD5CRC32GzipFileChecksum(
-              Integer.valueOf(bytesPerCRC),
-              Integer.valueOf(crcPerBlock),
+              Integer.parseInt(bytesPerCRC),
+              Integer.parseInt(crcPerBlock),
               new MD5Hash(md5));
         case CRC32C:
           return new MD5MD5CRC32CastagnoliFileChecksum(
-              Integer.valueOf(bytesPerCRC),
-              Integer.valueOf(crcPerBlock),
+              Integer.parseInt(bytesPerCRC),
+              Integer.parseInt(crcPerBlock),
               new MD5Hash(md5));
         default:
           // we should never get here since finalCrcType will

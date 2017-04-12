@@ -1,22 +1,26 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.nodemanager;
+
+import java.io.IOException;
+
+import java.nio.ByteBuffer;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,9 +39,6 @@ import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
 import org.apache.hadoop.yarn.server.utils.YarnServerBuilderUtils;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
 /**
  * This class allows a node manager to run without without communicating with a
  * real RM.
@@ -45,8 +46,8 @@ import java.nio.ByteBuffer;
 public class MockNodeStatusUpdater extends NodeStatusUpdaterImpl {
   static final Log LOG = LogFactory.getLog(MockNodeStatusUpdater.class);
   
-  private static final RecordFactory recordFactory =
-      RecordFactoryProvider.getRecordFactory(null);
+  private static final RecordFactory recordFactory = RecordFactoryProvider
+      .getRecordFactory(null);
 
   private ResourceTracker resourceTracker;
 
@@ -64,7 +65,6 @@ public class MockNodeStatusUpdater extends NodeStatusUpdaterImpl {
   protected ResourceTracker getRMClient() {
     return resourceTracker;
   }
-
   @Override
   protected void stopRMProxy() {
     return;
@@ -75,13 +75,14 @@ public class MockNodeStatusUpdater extends NodeStatusUpdaterImpl {
 
     @Override
     public RegisterNodeManagerResponse registerNodeManager(
-        RegisterNodeManagerRequest request) throws YarnException, IOException {
-      RegisterNodeManagerResponse response =
-          recordFactory.newRecordInstance(RegisterNodeManagerResponse.class);
+        RegisterNodeManagerRequest request) throws YarnException,
+        IOException {
+      RegisterNodeManagerResponse response = recordFactory
+          .newRecordInstance(RegisterNodeManagerResponse.class);
       MasterKey masterKey = new MasterKeyPBImpl();
       masterKey.setKeyId(123);
-      masterKey
-          .setBytes(ByteBuffer.wrap(new byte[]{new Integer(123).byteValue()}));
+      masterKey.setBytes(ByteBuffer.wrap(new byte[] { new Integer(123)
+        .byteValue() }));
       response.setContainerTokenMasterKey(masterKey);
       response.setNMTokenMasterKey(masterKey);
       return response;
@@ -95,10 +96,9 @@ public class MockNodeStatusUpdater extends NodeStatusUpdaterImpl {
       nodeStatus.setResponseId(heartBeatID++);
 
       NodeHeartbeatResponse nhResponse = YarnServerBuilderUtils
-          .newNodeHeartbeatResponse(heartBeatID, null, null, null, null, null,
-              1000L);
+          .newNodeHeartbeatResponse(heartBeatID, null, null,
+              null, null, null, 1000L);
       return nhResponse;
     }
-
   }
 }

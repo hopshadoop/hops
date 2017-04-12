@@ -22,12 +22,12 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>2.4.0</version>
+    <version>2.7.3</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-hdfs-httpfs</artifactId>
-  <version>2.4.0</version>
+  <version>2.7.3</version>
   <packaging>war</packaging>
 
   <name>Apache Hadoop HttpFS</name>
@@ -248,6 +248,12 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
       <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-auth</artifactId>
+      <scope>test</scope>
+      <type>test-jar</type>
     </dependency>
   </dependencies>
 

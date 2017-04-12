@@ -18,14 +18,13 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
 public class RMAppNodeUpdateEvent extends RMAppEvent {
 
   public enum RMAppNodeUpdateType {
-    NODE_USABLE,
+    NODE_USABLE, 
     NODE_UNUSABLE
   }
 
@@ -33,8 +32,8 @@ public class RMAppNodeUpdateEvent extends RMAppEvent {
   private final RMAppNodeUpdateType updateType;
 
   public RMAppNodeUpdateEvent(ApplicationId appId, RMNode node,
-      RMAppNodeUpdateType updateType, TransactionState transactionState) {
-    super(appId, RMAppEventType.NODE_UPDATE, transactionState);
+      RMAppNodeUpdateType updateType) {
+    super(appId, RMAppEventType.NODE_UPDATE);
     this.node = node;
     this.updateType = updateType;
   }

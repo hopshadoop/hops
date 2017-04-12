@@ -18,12 +18,14 @@
 package org.apache.hadoop.fs.shell;
 
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.File;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.LinkedList;
 import java.util.zip.GZIPInputStream;
 
+import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.FileReader;
 import org.apache.avro.generic.GenericDatumReader;
@@ -31,12 +33,14 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.io.JsonEncoder;
-import org.apache.avro.Schema;
+import org.apache.commons.io.Charsets;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.AvroFSInput;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsDirectoryException;
@@ -75,7 +79,7 @@ class Display extends FsCommand {
     public static final String NAME = "cat";
     public static final String USAGE = "[-ignoreCrc] <src> ...";
     public static final String DESCRIPTION =
-      "Fetch all files that match the file pattern <src> \n" +
+      "Fetch all files that match the file pattern <src> " +
       "and display their content on stdout.\n";
 
     private boolean verifyChecksum = true;
@@ -126,8 +130,17 @@ class Display extends FsCommand {
     protected InputStream getInputStream(PathData item) throws IOException {
       FSDataInputStream i = (FSDataInputStream)super.getInputStream(item);
 
+      // Handle 0 and 1-byte files
+      short leadBytes;
+      try {
+        leadBytes = i.readShort();
+      } catch (EOFException e) {
+        i.seek(0);
+        return i;
+      }
+
       // Check type of stream first
-      switch(i.readShort()) {
+      switch(leadBytes) {
         case 0x1f8b: { // RFC 1952
           // Must be gzip
           i.seek(0);
@@ -170,11 +183,11 @@ class Display extends FsCommand {
     public static final String NAME = "checksum";
     public static final String USAGE = "<src> ...";
     public static final String DESCRIPTION =
-      "Dump checksum information for files that match the file\n" +
-      "pattern <src> to stdout. Note that this requires a round-trip\n" +
-      "to a datanode storing each block of the file, and thus is not\n" +
-      "efficient to run on a large number of files. The checksum of a\n" +
-      "file depends on its content, block size and the checksum\n" +
+      "Dump checksum information for files that match the file " +
+      "pattern <src> to stdout. Note that this requires a round-trip " +
+      "to a datanode storing each block of the file, and thus is not " +
+      "efficient to run on a large number of files. The checksum of a " +
+      "file depends on its content, block size and the checksum " +
       "algorithm and parameters used for creating the file.";
 
     @Override
@@ -185,11 +198,11 @@ class Display extends FsCommand {
 
       FileChecksum checksum = item.fs.getFileChecksum(item.path);
       if (checksum == null) {
-        out.printf("%s\tNONE\t\n", item.toString());
+        out.printf("%s\tNONE\t%n", item.toString());
       } else {
         String checksumString = StringUtils.byteToHexString(
             checksum.getBytes(), 0, checksum.getLength());
-        out.printf("%s\t%s\t%s\n",
+        out.printf("%s\t%s\t%s%n",
             item.toString(), checksum.getAlgorithmName(),
             checksumString);
       }
@@ -224,10 +237,10 @@ class Display extends FsCommand {
         if (!r.next(key, val)) {
           return -1;
         }
-        byte[] tmp = key.toString().getBytes();
+        byte[] tmp = key.toString().getBytes(Charsets.UTF_8);
         outbuf.write(tmp, 0, tmp.length);
         outbuf.write('\t');
-        tmp = val.toString().getBytes();
+        tmp = val.toString().getBytes(Charsets.UTF_8);
         outbuf.write(tmp, 0, tmp.length);
         outbuf.write('\n');
         inbuf.reset(outbuf.getData(), outbuf.getLength());
@@ -252,7 +265,7 @@ class Display extends FsCommand {
     private int pos;
     private byte[] buffer;
     private ByteArrayOutputStream output;
-    private FileReader fileReader;
+    private FileReader<?> fileReader;
     private DatumWriter<Object> writer;
     private JsonEncoder encoder;
 
@@ -260,8 +273,9 @@ class Display extends FsCommand {
       pos = 0;
       buffer = new byte[0];
       GenericDatumReader<Object> reader = new GenericDatumReader<Object>();
+      FileContext fc = FileContext.getFileContext(new Configuration());
       fileReader =
-        DataFileReader.openReader(new File(status.getPath().toUri()), reader);
+        DataFileReader.openReader(new AvroFSInput(fc, status.getPath()),reader);
       Schema schema = fileReader.getSchema();
       writer = new GenericDatumWriter<Object>(schema);
       output = new ByteArrayOutputStream();
@@ -288,7 +302,8 @@ class Display extends FsCommand {
       encoder.flush();
       if (!fileReader.hasNext()) {
         // Write a new line after the last Avro record.
-        output.write(System.getProperty("line.separator").getBytes());
+        output.write(System.getProperty("line.separator")
+                         .getBytes(Charsets.UTF_8));
         output.flush();
       }
       pos = 0;

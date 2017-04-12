@@ -83,6 +83,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.webapp.WebApp;
@@ -119,6 +120,7 @@ public class HistoryClientService extends AbstractService {
     YarnRPC rpc = YarnRPC.create(conf);
     initializeWebApp(conf);
     InetSocketAddress address = conf.getSocketAddr(
+        JHAdminConfig.MR_HISTORY_BIND_HOST,
         JHAdminConfig.MR_HISTORY_ADDRESS,
         JHAdminConfig.DEFAULT_MR_HISTORY_ADDRESS,
         JHAdminConfig.DEFAULT_MR_HISTORY_PORT);
@@ -137,9 +139,11 @@ public class HistoryClientService extends AbstractService {
     }
     
     server.start();
-    this.bindAddress = conf.updateConnectAddr(JHAdminConfig.MR_HISTORY_ADDRESS,
+    this.bindAddress = conf.updateConnectAddr(JHAdminConfig.MR_HISTORY_BIND_HOST,
+                                              JHAdminConfig.MR_HISTORY_ADDRESS,
+                                              JHAdminConfig.DEFAULT_MR_HISTORY_ADDRESS,
                                               server.getListenerAddress());
-    LOG.info("Instantiated MRClientService at " + this.bindAddress);
+    LOG.info("Instantiated HistoryClientService at " + this.bindAddress);
 
     super.serviceStart();
   }
@@ -158,8 +162,9 @@ public class HistoryClientService extends AbstractService {
             JHAdminConfig.MR_WEBAPP_SPNEGO_USER_NAME_KEY)
         .at(NetUtils.getHostPortString(bindAddress)).start(webApp);
     
+    String connectHost = MRWebAppUtil.getJHSWebappURLWithoutScheme(conf).split(":")[0];
     MRWebAppUtil.setJHSWebappURLWithoutScheme(conf,
-        NetUtils.getHostPortString(webApp.getListenerAddress()));
+        connectHost + ":" + webApp.getListenerAddress().getPort());
   }
 
   @Override
@@ -191,7 +196,8 @@ public class HistoryClientService extends AbstractService {
       return getBindAddress();
     }
     
-    private Job verifyAndGetJob(final JobId jobID) throws IOException {
+    private Job verifyAndGetJob(final JobId jobID, boolean exceptionThrow)
+        throws IOException {
       UserGroupInformation loginUgi = null;
       Job job = null;
       try {
@@ -207,6 +213,11 @@ public class HistoryClientService extends AbstractService {
       } catch (InterruptedException e) {
         throw new IOException(e);
       }
+
+      if (job == null && exceptionThrow) {
+        throw new IOException("Unknown Job " + jobID);
+      }
+
       if (job != null) {
         JobACL operation = JobACL.VIEW_JOB;
         checkAccess(job, operation);
@@ -218,7 +229,7 @@ public class HistoryClientService extends AbstractService {
     public GetCountersResponse getCounters(GetCountersRequest request)
         throws IOException {
       JobId jobId = request.getJobId();
-      Job job = verifyAndGetJob(jobId);
+      Job job = verifyAndGetJob(jobId, true);
       GetCountersResponse response = recordFactory.newRecordInstance(GetCountersResponse.class);
       response.setCounters(TypeConverter.toYarn(job.getAllCounters()));
       return response;
@@ -228,7 +239,7 @@ public class HistoryClientService extends AbstractService {
     public GetJobReportResponse getJobReport(GetJobReportRequest request)
         throws IOException {
       JobId jobId = request.getJobId();
-      Job job = verifyAndGetJob(jobId);
+      Job job = verifyAndGetJob(jobId, false);
       GetJobReportResponse response = recordFactory.newRecordInstance(GetJobReportResponse.class);
       if (job != null) {
         response.setJobReport(job.getReport());
@@ -243,7 +254,7 @@ public class HistoryClientService extends AbstractService {
     public GetTaskAttemptReportResponse getTaskAttemptReport(
         GetTaskAttemptReportRequest request) throws IOException {
       TaskAttemptId taskAttemptId = request.getTaskAttemptId();
-      Job job = verifyAndGetJob(taskAttemptId.getTaskId().getJobId());
+      Job job = verifyAndGetJob(taskAttemptId.getTaskId().getJobId(), true);
       GetTaskAttemptReportResponse response = recordFactory.newRecordInstance(GetTaskAttemptReportResponse.class);
       response.setTaskAttemptReport(job.getTask(taskAttemptId.getTaskId()).getAttempt(taskAttemptId).getReport());
       return response;
@@ -253,7 +264,7 @@ public class HistoryClientService extends AbstractService {
     public GetTaskReportResponse getTaskReport(GetTaskReportRequest request)
         throws IOException {
       TaskId taskId = request.getTaskId();
-      Job job = verifyAndGetJob(taskId.getJobId());
+      Job job = verifyAndGetJob(taskId.getJobId(), true);
       GetTaskReportResponse response = recordFactory.newRecordInstance(GetTaskReportResponse.class);
       response.setTaskReport(job.getTask(taskId).getReport());
       return response;
@@ -267,7 +278,7 @@ public class HistoryClientService extends AbstractService {
       int fromEventId = request.getFromEventId();
       int maxEvents = request.getMaxEvents();
 
-      Job job = verifyAndGetJob(jobId);
+      Job job = verifyAndGetJob(jobId, true);
       GetTaskAttemptCompletionEventsResponse response = recordFactory.newRecordInstance(GetTaskAttemptCompletionEventsResponse.class);
       response.addAllCompletionEvents(Arrays.asList(job.getTaskAttemptCompletionEvents(fromEventId, maxEvents)));
       return response;
@@ -295,7 +306,7 @@ public class HistoryClientService extends AbstractService {
         throws IOException {
       TaskAttemptId taskAttemptId = request.getTaskAttemptId();
 
-      Job job = verifyAndGetJob(taskAttemptId.getTaskId().getJobId());
+      Job job = verifyAndGetJob(taskAttemptId.getTaskId().getJobId(), true);
 
       GetDiagnosticsResponse response = recordFactory.newRecordInstance(GetDiagnosticsResponse.class);
       response.addAllDiagnostics(job.getTask(taskAttemptId.getTaskId()).getAttempt(taskAttemptId).getDiagnostics());
@@ -315,7 +326,7 @@ public class HistoryClientService extends AbstractService {
       TaskType taskType = request.getTaskType();
 
       GetTaskReportsResponse response = recordFactory.newRecordInstance(GetTaskReportsResponse.class);
-      Job job = verifyAndGetJob(jobId);
+      Job job = verifyAndGetJob(jobId, true);
       Collection<Task> tasks = job.getTasks(taskType).values();
       for (Task task : tasks) {
         response.addTaskReport(task.getReport());
@@ -396,7 +407,7 @@ public class HistoryClientService extends AbstractService {
                     .array(), new Text(protoToken.getKind()), new Text(
                     protoToken.getService()));
 
-        String user = UserGroupInformation.getCurrentUser().getShortUserName();
+        String user = UserGroupInformation.getCurrentUser().getUserName();
         jhsDTSecretManager.cancelToken(token, user);
         return Records.newRecord(CancelDelegationTokenResponse.class);
     }

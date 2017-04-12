@@ -76,6 +76,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskRecoverEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskTAttemptEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.TaskTAttemptKilledEvent;
 import org.apache.hadoop.mapreduce.v2.app.metrics.MRAppMetrics;
 import org.apache.hadoop.mapreduce.v2.app.rm.ContainerFailedEvent;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
@@ -249,8 +250,16 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
                    TaskEventType.T_ATTEMPT_SUCCEEDED))
 
     // Transitions from KILLED state
+    // There could be a race condition where TaskImpl might receive
+    // T_ATTEMPT_SUCCEEDED followed by T_ATTEMPTED_KILLED for the same attempt.
+    // a. The task is in KILL_WAIT.
+    // b. Before TA transitions to SUCCEEDED state, Task sends TA_KILL event.
+    // c. TA transitions to SUCCEEDED state and thus send T_ATTEMPT_SUCCEEDED
+    //    to the task. The task transitions to KILLED state.
+    // d. TA processes TA_KILL event and sends T_ATTEMPT_KILLED to the task.
     .addTransition(TaskStateInternal.KILLED, TaskStateInternal.KILLED,
         EnumSet.of(TaskEventType.T_KILL,
+                   TaskEventType.T_ATTEMPT_KILLED,
                    TaskEventType.T_ADD_SPEC_ATTEMPT))
 
     // create the topology tables
@@ -586,10 +595,15 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
 
   // This is always called in the Write Lock
   private void addAndScheduleAttempt(Avataar avataar) {
+    addAndScheduleAttempt(avataar, false);
+  }
+
+  // This is always called in the Write Lock
+  private void addAndScheduleAttempt(Avataar avataar, boolean reschedule) {
     TaskAttempt attempt = addAttempt(avataar);
     inProgressAttempts.add(attempt.getID());
     //schedule the nextAttemptNumber
-    if (failedAttempts.size() > 0) {
+    if (failedAttempts.size() > 0 || reschedule) {
       eventHandler.handle(new TaskAttemptEvent(attempt.getID(),
           TaskAttemptEventType.TA_RESCHEDULE));
     } else {
@@ -960,7 +974,12 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
       task.finishedAttempts.add(taskAttemptId);
       task.inProgressAttempts.remove(taskAttemptId);
       if (task.successfulAttempt == null) {
-        task.addAndScheduleAttempt(Avataar.VIRGIN);
+        boolean rescheduleNewAttempt = false;
+        if (event instanceof TaskTAttemptKilledEvent) {
+          rescheduleNewAttempt =
+              ((TaskTAttemptKilledEvent)event).getRescheduleAttempt();
+        }
+        task.addAndScheduleAttempt(Avataar.VIRGIN, rescheduleNewAttempt);
       }
       if ((task.commitAttempt != null) && (task.commitAttempt == taskAttemptId)) {
     	task.commitAttempt = null;
@@ -1167,7 +1186,15 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
       // from the map splitInfo. So the bad node might be sent as a location
       // to the RM. But the RM would ignore that just like it would ignore
       // currently pending container requests affinitized to bad nodes.
-      task.addAndScheduleAttempt(Avataar.VIRGIN);
+      boolean rescheduleNextTaskAttempt = false;
+      if (event instanceof TaskTAttemptKilledEvent) {
+        // Decide whether to reschedule next task attempt. If true, this
+        // typically indicates that a successful map attempt was killed on an
+        // unusable node being reported.
+        rescheduleNextTaskAttempt =
+            ((TaskTAttemptKilledEvent)event).getRescheduleAttempt();
+      }
+      task.addAndScheduleAttempt(Avataar.VIRGIN, rescheduleNextTaskAttempt);
       return TaskStateInternal.SCHEDULED;
     }
   }

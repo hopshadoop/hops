@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationAttemptIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationIdProto;
+
+import com.google.common.base.Preconditions;
 
 @Private
 @Unstable
@@ -77,7 +78,7 @@ public class ApplicationAttemptIdPBImpl extends ApplicationAttemptId {
   }
 
   private ApplicationIdProto convertToProtoFormat(ApplicationId t) {
-    return ((ApplicationIdPBImpl) t).getProto();
+    return ((ApplicationIdPBImpl)t).getProto();
   }
 
   @Override

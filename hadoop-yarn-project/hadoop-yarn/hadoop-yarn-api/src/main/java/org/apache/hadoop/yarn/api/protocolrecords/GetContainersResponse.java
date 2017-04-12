@@ -18,25 +18,25 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.ApplicationHistoryProtocol;
 import org.apache.hadoop.yarn.api.records.ContainerReport;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.util.List;
-
 /**
  * <p>
  * The response sent by the <code>ResourceManager</code> to a client requesting
  * a list of {@link ContainerReport} for containers.
  * </p>
- * <p/>
+ * 
  * <p>
  * The <code>ContainerReport</code> for each container includes the container
  * details.
  * </p>
- *
+ * 
  * @see ContainerReport
  * @see ApplicationHistoryProtocol#getContainers(GetContainersRequest)
  */
@@ -57,9 +57,10 @@ public abstract class GetContainersResponse {
   /**
    * Get a list of <code>ContainerReport</code> for all the containers of an
    * application attempt.
-   *
+   * 
    * @return a list of <code>ContainerReport</code> for all the containers of an
-   * application attempt
+   *         application attempt
+   * 
    */
   @Public
   @Unstable
@@ -68,10 +69,11 @@ public abstract class GetContainersResponse {
   /**
    * Set a list of <code>ContainerReport</code> for all the containers of an
    * application attempt.
-   *
+   * 
    * @param containers
-   *     a list of <code>ContainerReport</code> for all the containers of
-   *     an application attempt
+   *          a list of <code>ContainerReport</code> for all the containers of
+   *          an application attempt
+   * 
    */
   @Public
   @Unstable

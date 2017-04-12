@@ -29,11 +29,11 @@ import org.apache.hadoop.yarn.util.Records;
 /**
  * <p>The response sent by the <code>ResourceManager</code> to a client
  * requesting an application report.</p>
- * <p/>
- * <p>The response includes an {@link ApplicationReport} which has details such
- * as user, queue, name, host on which the <code>ApplicationMaster</code> is
+ * 
+ * <p>The response includes an {@link ApplicationReport} which has details such 
+ * as user, queue, name, host on which the <code>ApplicationMaster</code> is 
  * running, RPC port, tracking URL, diagnostics, start time etc.</p>
- *
+ * 
  * @see ApplicationClientProtocol#getApplicationReport(GetApplicationReportRequest)
  */
 @Public
@@ -52,7 +52,6 @@ public abstract class GetApplicationReportResponse {
 
   /**
    * Get the <code>ApplicationReport</code> for the application.
-   *
    * @return <code>ApplicationReport</code> for the application
    */
   @Public
@@ -61,6 +60,5 @@ public abstract class GetApplicationReportResponse {
   
   @Private
   @Unstable
-  public abstract void setApplicationReport(
-      ApplicationReport ApplicationReport);
+  public abstract void setApplicationReport(ApplicationReport ApplicationReport);
 }

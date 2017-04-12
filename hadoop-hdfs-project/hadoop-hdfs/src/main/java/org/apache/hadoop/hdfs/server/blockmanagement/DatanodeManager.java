@@ -121,7 +121,7 @@ public class DatanodeManager {
   /**
    * Cluster network topology
    */
-  private final NetworkTopology networktopology = new NetworkTopology();
+  private final NetworkTopology networktopology;
 
   /**
    * Host names to datanode descriptors mapping.
@@ -185,6 +185,8 @@ public class DatanodeManager {
       final Configuration conf) throws IOException {
     this.namesystem = namesystem;
     this.blockManager = blockManager;
+
+    this.networktopology = NetworkTopology.getInstance(conf);
 
     this.heartbeatManager =
         new HeartbeatManager(namesystem, blockManager, conf);

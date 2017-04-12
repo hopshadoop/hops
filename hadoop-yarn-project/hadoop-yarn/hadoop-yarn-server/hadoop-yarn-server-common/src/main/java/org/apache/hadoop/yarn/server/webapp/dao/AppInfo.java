@@ -18,16 +18,22 @@
 
 package org.apache.hadoop.yarn.server.webapp.dao;
 
-import org.apache.hadoop.yarn.api.records.ApplicationReport;
-import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
-import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
-import org.apache.hadoop.yarn.api.records.YarnApplicationState;
-import org.apache.hadoop.yarn.util.Times;
+import static org.apache.hadoop.yarn.util.StringHelper.CSV_JOINER;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.classification.InterfaceStability.Evolving;
+
+import org.apache.hadoop.yarn.api.records.ApplicationReport;
+import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.YarnApplicationState;
+import org.apache.hadoop.yarn.util.Times;
+
+@Public
+@Evolving
 @XmlRootElement(name = "app")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppInfo {
@@ -50,8 +56,7 @@ public class AppInfo {
   protected long startedTime;
   protected long finishedTime;
   protected long elapsedTime;
-  protected int allocatedMB;
-  protected int allocatedVCores;
+  protected String applicationTags;
 
   public AppInfo() {
     // JAXB needs this
@@ -77,13 +82,10 @@ public class AppInfo {
     finishedTime = app.getFinishTime();
     elapsedTime = Times.elapsed(startedTime, finishedTime);
     finalAppStatus = app.getFinalApplicationStatus();
-    ApplicationResourceUsageReport usage =
-        app.getApplicationResourceUsageReport();
-    if (usage != null) {
-      allocatedMB = usage.getUsedResources().getMemory();
-      allocatedVCores = usage.getUsedResources().getVirtualCores();
+    progress = app.getProgress() * 100; // in percent
+    if (app.getApplicationTags() != null && !app.getApplicationTags().isEmpty()) {
+      this.applicationTags = CSV_JOINER.join(app.getApplicationTags());
     }
-    progress = app.getProgress();
   }
 
   public String getAppId() {
@@ -158,12 +160,7 @@ public class AppInfo {
     return elapsedTime;
   }
 
-  public int getAllocatedMB() {
-    return allocatedMB;
+  public String getApplicationTags() {
+    return applicationTags;
   }
-
-  public int getAllocatedVCores() {
-    return allocatedVCores;
-  }
-
 }

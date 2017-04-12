@@ -18,14 +18,15 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import com.google.protobuf.ByteString;
+import java.nio.ByteBuffer;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.proto.SecurityProtos.TokenProtoOrBuilder;
 import org.apache.hadoop.yarn.api.records.Token;
 
-import java.nio.ByteBuffer;
+import com.google.protobuf.ByteString;
 
 @Private
 @Unstable
@@ -60,9 +61,8 @@ public class TokenPBImpl extends Token {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -87,9 +87,8 @@ public class TokenPBImpl extends Token {
   }
 
   private synchronized void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -118,9 +117,8 @@ public class TokenPBImpl extends Token {
   @Override
   public synchronized void setIdentifier(ByteBuffer identifier) {
     maybeInitBuilder();
-    if (identifier == null) {
+    if (identifier == null) 
       builder.clearIdentifier();
-    }
     this.identifier = identifier;
   }
 
@@ -133,16 +131,15 @@ public class TokenPBImpl extends Token {
     if (!p.hasPassword()) {
       return null;
     }
-    this.password = convertFromProtoFormat(p.getPassword());
+    this.password =  convertFromProtoFormat(p.getPassword());
     return this.password;
   }
 
   @Override
   public synchronized void setPassword(ByteBuffer password) {
     maybeInitBuilder();
-    if (password == null) {
+    if (password == null) 
       builder.clearPassword();
-    }
     this.password = password;
   }
 

@@ -24,25 +24,22 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>
- * <code>ContainerReport</code> is a report of an container.
- * </p>
- * <p/>
+ * {@code ContainerReport} is a report of an container.
  * <p>
  * It includes details such as:
  * <ul>
- * <li>{@link ContainerId} of the container.</li>
- * <li>Allocated Resources to the container.</li>
- * <li>Assigned Node id.</li>
- * <li>Assigned Priority.</li>
- * <li>Start Time.</li>
- * <li>Finish Time.</li>
- * <li>Container Exit Status.</li>
- * <li>{@link ContainerState} of the container.</li>
- * <li>Diagnostic information in case of errors.</li>
- * <li>Log URL.</li>
+ *   <li>{@link ContainerId} of the container.</li>
+ *   <li>Allocated Resources to the container.</li>
+ *   <li>Assigned Node id.</li>
+ *   <li>Assigned Priority.</li>
+ *   <li>Creation Time.</li>
+ *   <li>Finish Time.</li>
+ *   <li>Container Exit Status.</li>
+ *   <li>{@link ContainerState} of the container.</li>
+ *   <li>Diagnostic information in case of errors.</li>
+ *   <li>Log URL.</li>
+ *   <li>nodeHttpAddress</li>
  * </ul>
- * </p>
  */
 
 @Public
@@ -52,25 +49,27 @@ public abstract class ContainerReport {
   @Unstable
   public static ContainerReport newInstance(ContainerId containerId,
       Resource allocatedResource, NodeId assignedNode, Priority priority,
-      long startTime, long finishTime, String diagnosticInfo, String logUrl,
-      int containerExitStatus, ContainerState containerState) {
+      long creationTime, long finishTime, String diagnosticInfo, String logUrl,
+      int containerExitStatus, ContainerState containerState,
+      String nodeHttpAddress) {
     ContainerReport report = Records.newRecord(ContainerReport.class);
     report.setContainerId(containerId);
     report.setAllocatedResource(allocatedResource);
     report.setAssignedNode(assignedNode);
     report.setPriority(priority);
-    report.setStartTime(startTime);
+    report.setCreationTime(creationTime);
     report.setFinishTime(finishTime);
     report.setDiagnosticsInfo(diagnosticInfo);
     report.setLogUrl(logUrl);
     report.setContainerExitStatus(containerExitStatus);
     report.setContainerState(containerState);
+    report.setNodeHttpAddress(nodeHttpAddress);
     return report;
   }
 
   /**
    * Get the <code>ContainerId</code> of the container.
-   *
+   * 
    * @return <code>ContainerId</code> of the container.
    */
   @Public
@@ -83,7 +82,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the allocated <code>Resource</code> of the container.
-   *
+   * 
    * @return allocated <code>Resource</code> of the container.
    */
   @Public
@@ -96,7 +95,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the allocated <code>NodeId</code> where container is running.
-   *
+   * 
    * @return allocated <code>NodeId</code> where container is running.
    */
   @Public
@@ -109,7 +108,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the allocated <code>Priority</code> of the container.
-   *
+   * 
    * @return allocated <code>Priority</code> of the container.
    */
   @Public
@@ -121,21 +120,21 @@ public abstract class ContainerReport {
   public abstract void setPriority(Priority priority);
 
   /**
-   * Get the Start time of the container.
-   *
-   * @return Start time of the container
+   * Get the creation time of the container.
+   * 
+   * @return creation time of the container
    */
   @Public
   @Unstable
-  public abstract long getStartTime();
+  public abstract long getCreationTime();
 
   @Public
   @Unstable
-  public abstract void setStartTime(long startTime);
+  public abstract void setCreationTime(long creationTime);
 
   /**
    * Get the Finish time of the container.
-   *
+   * 
    * @return Finish time of the container
    */
   @Public
@@ -148,7 +147,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the DiagnosticsInfo of the container.
-   *
+   * 
    * @return DiagnosticsInfo of the container
    */
   @Public
@@ -161,7 +160,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the LogURL of the container.
-   *
+   * 
    * @return LogURL of the container
    */
   @Public
@@ -174,7 +173,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the final <code>ContainerState</code> of the container.
-   *
+   * 
    * @return final <code>ContainerState</code> of the container.
    */
   @Public
@@ -187,7 +186,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the final <code>exit status</code> of the container.
-   *
+   * 
    * @return final <code>exit status</code> of the container.
    */
   @Public
@@ -198,4 +197,16 @@ public abstract class ContainerReport {
   @Unstable
   public abstract void setContainerExitStatus(int containerExitStatus);
 
+  /**
+   * Get the Node Http address of the container
+   * 
+   * @return the node http address of the container
+   */
+  @Public
+  @Unstable
+  public abstract String getNodeHttpAddress();
+
+  @Private
+  @Unstable
+  public abstract void setNodeHttpAddress(String nodeHttpAddress);
 }
