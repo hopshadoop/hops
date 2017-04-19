@@ -6,21 +6,18 @@ import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.handler.RequestHandler;
 import io.hops.util.DBUtility;
-import io.hops.util.RmStreamingProcessor;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.net.Node;
 import org.apache.hadoop.net.NodeBase;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
@@ -29,11 +26,8 @@ import org.junit.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by antonis on 8/24/16.
@@ -332,29 +326,29 @@ public class TestStreamingLibrary {
         }
 
         @Override
-        public Object performTask() throws IOException {
+        public Object performTask(StorageConnector connector) throws IOException {
             connector.beginTransaction();
             connector.writeLock();
             RMNodeDataAccess rmNodeDAO = (RMNodeDataAccess) RMStorageFactory
-                    .getDataAccess(RMNodeDataAccess.class);
+                    .getDataAccess(connector, RMNodeDataAccess.class);
             rmNodeDAO.add(toCommit.getRmNode());
 
             connector.flush();
 
             PendingEventDataAccess pendingEventDAO = (PendingEventDataAccess) RMStorageFactory
-                    .getDataAccess(PendingEventDataAccess.class);
+                    .getDataAccess(connector, PendingEventDataAccess.class);
             pendingEventDAO.add(toCommit.getPendingEvent());
 
             ResourceDataAccess resourceDAO = (ResourceDataAccess) RMStorageFactory
-                    .getDataAccess(ResourceDataAccess.class);
+                    .getDataAccess(connector, ResourceDataAccess.class);
             resourceDAO.add(toCommit.getResource());
 
             NextHeartbeatDataAccess nextHBDAO = (NextHeartbeatDataAccess) RMStorageFactory
-                    .getDataAccess(NextHeartbeatDataAccess.class);
+                    .getDataAccess(connector, NextHeartbeatDataAccess.class);
             nextHBDAO.update(toCommit.getNextHeartbeat());
 
             ContainerStatusDataAccess contStatDAO = (ContainerStatusDataAccess) RMStorageFactory
-                    .getDataAccess(ContainerStatusDataAccess.class);
+                    .getDataAccess(connector, ContainerStatusDataAccess.class);
             contStatDAO.addAll(toCommit.getContainerStatuses());
 
             connector.commit();

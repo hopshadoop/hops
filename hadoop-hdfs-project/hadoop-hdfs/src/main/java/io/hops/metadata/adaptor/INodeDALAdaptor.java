@@ -25,11 +25,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
-import org.apache.hadoop.hdfs.server.namenode.INodeFile;
-import org.apache.hadoop.hdfs.server.namenode.INodeFileUnderConstruction;
-import org.apache.hadoop.hdfs.server.namenode.INodeSymlink;
+import org.apache.hadoop.hdfs.server.namenode.*;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -65,20 +61,20 @@ public class INodeDALAdaptor
 
   @Override
   public List<org.apache.hadoop.hdfs.server.namenode.INode> findInodesByParentIdAndPartitionIdPPIS(
-          int parentId, int partitionId) throws StorageException {
+      int parentId, int partitionId) throws StorageException {
     List<org.apache.hadoop.hdfs.server.namenode.INode> list =
-            (List) convertDALtoHDFS(
-                    dataAccess.findInodesByParentIdAndPartitionIdPPIS(parentId, partitionId));
+        (List) convertDALtoHDFS(
+            dataAccess.findInodesByParentIdAndPartitionIdPPIS(parentId, partitionId));
     Collections
-            .sort(list, org.apache.hadoop.hdfs.server.namenode.INode.Order.ByName);
+        .sort(list, org.apache.hadoop.hdfs.server.namenode.INode.Order.ByName);
     return list;
   }
 
   @Override
   public List<ProjectedINode> findInodesForSubtreeOperationsWithWriteLockPPIS(
-          int parentId, int partitionId) throws StorageException {
+      int parentId, int partitionId) throws StorageException {
     List<ProjectedINode> list =
-            dataAccess.findInodesForSubtreeOperationsWithWriteLockPPIS(parentId, partitionId);
+        dataAccess.findInodesForSubtreeOperationsWithWriteLockPPIS(parentId, partitionId);
     Collections.sort(list);
     return list;
   }
@@ -112,8 +108,8 @@ public class INodeDALAdaptor
       Collection<org.apache.hadoop.hdfs.server.namenode.INode> newed,
       Collection<org.apache.hadoop.hdfs.server.namenode.INode> modified)
       throws StorageException {
-    dataAccess.prepare(convertHDFStoDAL(removed), convertHDFStoDAL(newed),
-        convertHDFStoDAL(modified));
+    dataAccess.prepare(convertHDFStoDAL(removed),
+        convertHDFStoDAL(newed), convertHDFStoDAL(modified));
   }
 
   @Override
@@ -127,18 +123,18 @@ public class INodeDALAdaptor
       throws StorageException {
     return dataAccess.getAllINodeFiles(startId, endId);
   }
-  
+
   @Override
   public boolean haveFilesWithIdsGreaterThan(long id) throws StorageException {
     return dataAccess.haveFilesWithIdsGreaterThan(id);
   }
-  
+
   @Override
   public boolean haveFilesWithIdsBetween(long startId, long endId)
       throws StorageException {
     return dataAccess.haveFilesWithIdsBetween(startId, endId);
   }
-  
+
   @Override
   public long getMinFileId() throws StorageException {
     return dataAccess.getMinFileId();
@@ -153,12 +149,12 @@ public class INodeDALAdaptor
   public int countAllFiles() throws StorageException {
     return dataAccess.countAllFiles();
   }
-  
+
   @Override
-  public boolean hasChildren(int parentId, boolean areChildrenRandomlyPartitioned ) throws StorageException {
+  public boolean hasChildren(int parentId, boolean areChildrenRandomlyPartitioned) throws StorageException {
     return dataAccess.hasChildren(parentId, areChildrenRandomlyPartitioned);
   }
-  
+
   //Only for testing
   @Override
   public List<org.apache.hadoop.hdfs.server.namenode.INode> allINodes() throws StorageException {
@@ -228,7 +224,7 @@ public class INodeDALAdaptor
   @Override
   public org.apache.hadoop.hdfs.server.namenode.INode convertDALtoHDFS(
       INode hopINode) throws StorageException {
-    try{
+    try {
       org.apache.hadoop.hdfs.server.namenode.INode inode = null;
       if (hopINode != null) {
         PermissionStatus ps = new PermissionStatus(null, null, new FsPermission
@@ -282,7 +278,7 @@ public class INodeDALAdaptor
         inode.setPartitionIdNoPersistance(hopINode.getPartitionId());
       }
       return inode;
-    }catch (IOException ex){
+    } catch (IOException ex) {
       throw new StorageException(ex);
     }
   }

@@ -15,6 +15,7 @@
  */
 package io.hops.common;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -34,17 +35,31 @@ public class INodeResolver {
   private int count = 0;
   private int depth = INodeDirectory.ROOT_DIR_DEPTH;
 
-  public INodeResolver(byte[][] components, INode baseINode,
-      boolean resolveLink, boolean transactional) {
+  private final StorageConnector connector;
+
+  public INodeResolver(
+      StorageConnector connector,
+      byte[][] components,
+      INode baseINode,
+      boolean resolveLink,
+      boolean transactional
+  ) {
+    this.connector = connector;
     this.components = components;
     currentInode = baseINode;
     this.resolveLink = resolveLink;
     this.transactional = transactional;
   }
 
-  public INodeResolver(byte[][] components, INode baseINode,
-      boolean resolveLink, boolean transactional, int initialCount) {
-    this(components, baseINode, resolveLink, transactional);
+  public INodeResolver(
+      StorageConnector connector,
+      byte[][] components,
+      INode baseINode,
+      boolean resolveLink,
+      boolean transactional,
+      int initialCount
+  ) {
+    this(connector, components, baseINode, resolveLink, transactional);
     this.count = initialCount;
     this.depth = INodeDirectory.ROOT_DIR_DEPTH + (initialCount);
   }
@@ -88,8 +103,7 @@ public class INodeResolver {
     count++;
     int partitionId = INode.calculatePartitionId(currentInode.getId(), DFSUtil.bytes2String(components[count]), (short) depth);
 
-    currentInode = INodeUtil
-        .getNode(components[count], currentInode.getId(), partitionId, transactional);
+    currentInode = INodeUtil.getNode(this.connector, components[count], currentInode.getId(), partitionId, transactional);
     return currentInode;
   }
 

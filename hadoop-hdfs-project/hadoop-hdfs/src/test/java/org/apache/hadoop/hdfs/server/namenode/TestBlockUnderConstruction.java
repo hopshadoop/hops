@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -104,7 +105,7 @@ public class TestBlockUnderConstruction {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             FSNamesystem ns = cluster.getNamesystem();
             final INodeFile inode =
                 INodeFile.valueOf(ns.dir.getINode(file), file);

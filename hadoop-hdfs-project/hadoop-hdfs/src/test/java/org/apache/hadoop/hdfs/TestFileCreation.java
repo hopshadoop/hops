@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.StorageConnector;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.transaction.EntityManager;
@@ -1533,8 +1534,8 @@ public class TestFileCreation {
           TransactionLockTypes.LockType lockType = null;
 
           @Override
-          public void setUp() throws IOException {
-            super.setUp();
+          public void setUp(StorageConnector connector) throws IOException {
+            super.setUp(connector);
             lockType = (TransactionLockTypes.LockType) getParams()[0];
           }
 
@@ -1545,7 +1546,7 @@ public class TestFileCreation {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
 
             Lease lease = EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
             if (lease != null) {

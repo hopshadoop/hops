@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.StorageConnector;
 import io.hops.TestUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -22,6 +23,7 @@ import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.OngoingSubTreeOpsDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.handler.RequestHandler;
@@ -162,9 +164,9 @@ public class TestSubtreeLock extends TestCase {
       dfs.create(file2).close();
       dfs.create(file3).close();
 
-      AbstractFileTree.FileTree fileTree = AbstractFileTree
-              .createFileTreeFromPath(cluster.getNamesystem(),
-              path0.toUri().getPath());
+      StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+      AbstractFileTree.FileTree fileTree = AbstractFileTree.createFileTreeFromPath(
+          connector, cluster.getNamesystem(), path0.toUri().getPath());
       fileTree.buildUp();
       assertEquals(path0.getName(), fileTree.getSubtreeRoot().getName());
       assertEquals(7, fileTree.getAll().size());
@@ -211,9 +213,9 @@ public class TestSubtreeLock extends TestCase {
       TestFileCreation.writeFile(stm, bytes1);
       stm.close();
 
-      AbstractFileTree.CountingFileTree fileTree = AbstractFileTree
-              .createCountingFileTreeFromPath(cluster.getNamesystem(),
-              path0.toUri().getPath());
+      StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+      AbstractFileTree.CountingFileTree fileTree = AbstractFileTree.createCountingFileTreeFromPath(
+          connector, cluster.getNamesystem(), path0.toUri().getPath());
       fileTree.buildUp();
       assertEquals(7, fileTree.getNamespaceCount());
       assertEquals(bytes0 + bytes1, fileTree.getDiskspaceCount());
@@ -693,14 +695,14 @@ public class TestSubtreeLock extends TestCase {
    * checks if all the sub tree locks are removed and no flags are set
    */
   public static boolean subTreeLocksExists() throws IOException {
-    LightWeightRequestHandler subTreeLockChecker =
-            new LightWeightRequestHandler(HDFSOperationType.TEST_SUBTREE_LOCK) {
+    LightWeightRequestHandler subTreeLockChecker = new LightWeightRequestHandler(HDFSOperationType.TEST_SUBTREE_LOCK) {
       @Override
-      public Object performTask() throws StorageException, IOException {
-        INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
+        INodeDataAccess ida = (INodeDataAccess)
+            HdfsStorageFactory.getDataAccess(connector, INodeDataAccess.class);
 
-        OngoingSubTreeOpsDataAccess oda = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory.getDataAccess(OngoingSubTreeOpsDataAccess.class);
+        OngoingSubTreeOpsDataAccess oda = (OngoingSubTreeOpsDataAccess)
+            HdfsStorageFactory.getDataAccess(connector, OngoingSubTreeOpsDataAccess.class);
 
         boolean subTreeLockExists = false;
         List<INode> inodes = ida.allINodes();
@@ -904,8 +906,8 @@ public class TestSubtreeLock extends TestCase {
 
     FileSystem superFS = cluster.getFileSystem();
 
-    List<UserGroupInformation> ugis = new ArrayList<UserGroupInformation>();
-    List<FileSystem> fss = new ArrayList<FileSystem>();
+    List<UserGroupInformation> ugis = new ArrayList<>();
+    List<FileSystem> fss = new ArrayList<>();
 
     for(int u=0; u<NumberOfFileSystems; u++) {
       UserGroupInformation ugi =

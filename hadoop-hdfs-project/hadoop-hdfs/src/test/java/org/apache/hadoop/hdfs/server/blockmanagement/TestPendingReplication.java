@@ -17,11 +17,13 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -61,7 +63,8 @@ public class TestPendingReplication {
   @Test
   public void testPendingReplication() throws IOException, StorageException {
     HdfsStorageFactory.setConfiguration(new HdfsConfiguration());
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
 
     PendingReplicationBlocks pendingReplications =
         new PendingReplicationBlocks(TIMEOUT * 1000);
@@ -250,8 +253,8 @@ public class TestPendingReplication {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -263,7 +266,7 @@ public class TestPendingReplication {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         BlockInfo blockInfo = EntityManager
             .find(BlockInfo.Finder.ByBlockIdAndINodeId, block.getBlockId());
         if (inc) {
@@ -283,8 +286,8 @@ public class TestPendingReplication {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -296,7 +299,7 @@ public class TestPendingReplication {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         BlockInfo blockInfo = EntityManager
             .find(BlockInfo.Finder.ByBlockIdAndINodeId, block.getBlockId());
         return pendingReplications.getNumReplicas(blockInfo);
@@ -403,7 +406,7 @@ public class TestPendingReplication {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         EntityManager.add(blockInfo);
         return null;
       }

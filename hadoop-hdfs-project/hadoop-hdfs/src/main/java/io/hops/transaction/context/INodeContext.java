@@ -49,11 +49,9 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
 
   private final INodeDataAccess<INode> dataAccess;
 
-  private final Map<String, INode> inodesNameParentIndex =
-      new HashMap<String, INode>();
-  private final Map<Integer, List<INode>> inodesParentIndex =
-      new HashMap<Integer, List<INode>>();
-  private final List<INode> renamedInodes = new ArrayList<INode>();
+  private final Map<String, INode> inodesNameParentIndex = new HashMap<>();
+  private final Map<Integer, List<INode>> inodesParentIndex = new HashMap<>();
+  private final List<INode> renamedInodes = new ArrayList<>();
 
   public INodeContext(INodeDataAccess dataAccess) {
     this.dataAccess = dataAccess;
@@ -127,7 +125,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
     // function is empty and in that case tlm will throw
     // null pointer exceptions
     Collection<INode> removed = getRemoved();
-    Collection<INode> added = new ArrayList<INode>(getAdded());
+    Collection<INode> added = new ArrayList<>(getAdded());
     added.addAll(renamedInodes);
     Collection<INode> modified = getModified();
 

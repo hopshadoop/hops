@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.StorageConnector;
 import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -90,7 +91,7 @@ public class TestLease {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         return NameNodeAdapter.getLeaseManager(cluster.getNamesystem())
             .getLeaseByPath(src.toString()) != null;
       }

@@ -20,6 +20,7 @@ import io.hops.metadata.yarn.dal.quota.PriceMultiplicatorDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.quota.PriceMultiplicator;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.handler.RequestHandler;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -142,13 +143,12 @@ public class TestPriceMultiplicationFactorService {
               = new LightWeightRequestHandler(
                       YARNOperationType.TEST) {
         @Override
-        public Object performTask() throws IOException {
+        public Object performTask(StorageConnector connector) throws IOException {
           connector.beginTransaction();
           connector.writeLock();
 
-          PriceMultiplicatorDataAccess pmDA
-                  = (PriceMultiplicatorDataAccess) RMStorageFactory.getDataAccess(
-                          PriceMultiplicatorDataAccess.class);
+          PriceMultiplicatorDataAccess pmDA = (PriceMultiplicatorDataAccess)
+              RMStorageFactory.getDataAccess(connector, PriceMultiplicatorDataAccess.class);
           Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> priceList = pmDA.getAll();
 
           connector.commit();

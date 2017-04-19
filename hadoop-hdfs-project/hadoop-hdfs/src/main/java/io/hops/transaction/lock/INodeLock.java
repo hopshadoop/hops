@@ -16,15 +16,14 @@
 package io.hops.transaction.lock;
 
 import com.google.common.base.Joiner;
+import io.hops.StorageConnector;
 import io.hops.common.INodeResolver;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.ActiveNode;
-import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.resolvingcache.Cache;
 import io.hops.resolvingcache.OptimalMemcache;
 import io.hops.resolvingcache.PathMemcache;
-import io.hops.security.Users;
 import io.hops.transaction.EntityManager;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.hadoop.fs.Path;
@@ -239,13 +238,12 @@ class INodeLock extends BaseINodeLock {
     }
 
     protected void resolveRestOfThePath(String path, List<INode> inodes)
-        throws StorageException, TransactionContextException,
-        UnresolvedPathException {
+        throws StorageException, TransactionContextException, UnresolvedPathException {
       byte[][] components = INode.getPathComponents(path);
       INode currentINode = inodes.get(inodes.size() - 1);
-      INodeResolver resolver =
-          new INodeResolver(components, currentINode, resolveLink, true,
-              inodes.size() - 1);
+      INodeResolver resolver = new INodeResolver(
+          EntityManager.transactionConnector(),
+          components, currentINode, resolveLink, true, inodes.size() - 1);
       while (resolver.hasNext()) {
         TransactionLockTypes.INodeLockType currentINodeLock =
             identifyLockType(resolver.getCount() + 1, components);
@@ -438,8 +436,10 @@ class INodeLock extends BaseINodeLock {
     }
     resolvedINodes.add(currentINode);
 
-    INodeResolver resolver =
-        new INodeResolver(components, currentINode, resolveLink, true);
+    INodeResolver resolver = new INodeResolver(
+        EntityManager.transactionConnector(),
+        components, currentINode, resolveLink, true
+    );
     while (resolver.hasNext()) {
       TransactionLockTypes.INodeLockType currentINodeLock =
           identifyLockType(resolver.getCount() + 1, components);
@@ -526,7 +526,7 @@ class INodeLock extends BaseINodeLock {
           addLockedINodes(inode, lockType);
           String existingPath = buildPath(path, resolvedINodes.size());
           List<INode> rest =
-              acquireLockOnRestOfPath(lockType, inode, path, existingPath,
+              acquireLockOnRestOfPath(EntityManager.transactionConnector(), lockType, inode, path, existingPath,
                   false);
           resolvedINodes.addAll(rest);
         }
@@ -535,16 +535,16 @@ class INodeLock extends BaseINodeLock {
   }
 
   private List<INode> acquireLockOnRestOfPath(
-      TransactionLockTypes.INodeLockType lock, INode baseInode, String fullPath,
-      String prefix, boolean resolveLink)
+      StorageConnector connector, TransactionLockTypes.INodeLockType lock,
+      INode baseInode, String fullPath, String prefix, boolean resolveLink)
       throws StorageException, UnresolvedPathException,
       TransactionContextException {
     List<INode> resolved = new ArrayList<INode>();
     byte[][] fullComps = INode.getPathComponents(fullPath);
     byte[][] prefixComps = INode.getPathComponents(prefix);
-    INodeResolver resolver =
-        new INodeResolver(fullComps, baseInode, resolveLink, true,
-            prefixComps.length - 1);
+    INodeResolver resolver = new INodeResolver(
+        EntityManager.transactionConnector(),
+        fullComps, baseInode, resolveLink, true, prefixComps.length - 1);
     while (resolver.hasNext()) {
       setINodeLockType(lock);
       INode current = resolver.next();

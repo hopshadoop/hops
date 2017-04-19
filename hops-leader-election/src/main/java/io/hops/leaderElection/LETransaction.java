@@ -15,6 +15,7 @@
  */
 package io.hops.leaderElection;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leaderElection.exception.LEWeakLocks;
@@ -33,11 +34,7 @@ import io.hops.transaction.lock.TransactionLocks;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.StringTokenizer;
+import java.util.*;
 
 public class LETransaction {
 
@@ -50,21 +47,24 @@ public class LETransaction {
   private void LETransaction() {
   }
 
-  protected LEContext doTransaction(final LeDescriptorFactory lef,
-      final LEContext currentContext, final boolean relinquishCurrentId,
-      final LeaderElection le) throws IOException {
+  protected LEContext doTransaction(
+      final LeDescriptorFactory lef,
+      final LEContext currentContext,
+      final boolean relinquishCurrentId,
+      final NDBLeaderElection le
+  ) throws IOException {
 
     LeaderTransactionalRequestHandler leaderElectionHandler =
         new LeaderTransactionalRequestHandler(
             LeaderOperationType.LEADER_ELECTION) {
           @Override
-          public void preTransactionSetup() throws IOException {
+          public void preTransactionSetup(StorageConnector connector) throws IOException {
             sortedList = null;
             leFactory = lef;
-            super.preTransactionSetup();
+            super.preTransactionSetup(connector);
             context = new LEContext(currentContext, lef);
             if (relinquishCurrentId) {
-              context.id = LeaderElection.LEADER_INITIALIZATION_ID;
+              context.id = NDBLeaderElection.LEADER_INITIALIZATION_ID;
             }
           }
 
@@ -72,7 +72,7 @@ public class LETransaction {
           public void acquireLock(TransactionLocks locks) throws IOException {
             LeLockFactory lockFactory = LeLockFactory.getInstance();
 
-            if (currentContext.id == LeaderElection.LEADER_INITIALIZATION_ID ||
+            if (currentContext.id == NDBLeaderElection.LEADER_INITIALIZATION_ID ||
                 currentContext.role == LeaderElectionRole.Role.LEADER ||
                 currentContext.nextTimeTakeStrongerLocks) {
               locks.add(lockFactory.getLeVarsLock(leFactory.getVarsFinder(),
@@ -92,7 +92,7 @@ public class LETransaction {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
 
             try {
               if (context.nextTimeTakeStrongerLocks) {
@@ -118,13 +118,13 @@ public class LETransaction {
                     "Aborting the transaction because the parent thread has stopped");
               }
 
-              return new Boolean(true);
+              return true;
             } finally {
             }
           }
         };
 
-    Boolean retVal = (Boolean) leaderElectionHandler.handle(null);
+    Boolean retVal = (Boolean) leaderElectionHandler.handle();
     if (retVal != null && retVal.equals(true)) {
       return context;
     } else {
@@ -176,7 +176,7 @@ public class LETransaction {
             .getNewDescriptor(context.id, 0/*counter*/, context.rpc_address,
                 context.http_address);
         EntityManager.add(newDescriptor);
-        if (oldId != LeaderElection.LEADER_INITIALIZATION_ID) {
+        if (oldId != NDBLeaderElection.LEADER_INITIALIZATION_ID) {
           LOG.warn(
               "LE Status: id " + context.id + " I was kicked out. Old Id was " +
                   oldId);
@@ -268,7 +268,7 @@ public class LETransaction {
     } else {
       LOG.debug("LE Status: id " + context.id +
           " No namenodes in the system. The first process will be the leader");
-      return LeaderElection.LEADER_INITIALIZATION_ID;
+      return NDBLeaderElection.LEADER_INITIALIZATION_ID;
     }
   }
 

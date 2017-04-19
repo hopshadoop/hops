@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
@@ -274,9 +275,8 @@ public class TestProcessCorruptBlocks {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier =
-            INodeUtil.resolveINodeFromBlock(block.getLocalBlock());
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block.getLocalBlock());
       }
 
       @Override
@@ -289,7 +289,7 @@ public class TestProcessCorruptBlocks {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         return namesystem.getBlockManager().countNodes(block.getLocalBlock());
       }
 

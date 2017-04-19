@@ -158,15 +158,15 @@ public class JMXGet {
           "service:jmx:rmi:///jndi/rmi://" + server + ":" + port + "/jmxrmi";
     } // else url stays null
 
-    // Create an RMI connector client and
-    // connect it to the RMI connector server
+    // Create an RMI zoneConnector client and
+    // connect it to the RMI zoneConnector server
 
     if (url_string == null) { // assume local vm (for example for Testing)
       mbsc = ManagementFactory.getPlatformMBeanServer();
     } else {
       JMXServiceURL url = new JMXServiceURL(url_string);
 
-      err("Create RMI connector and connect to the RMI connector server" + url);
+      err("Create RMI zoneConnector and connect to the RMI zoneConnector server" + url);
 
       JMXConnector jmxc = JMXConnectorFactory.connect(url, null);
       // Get an MBeanServerConnection
@@ -248,7 +248,7 @@ public class JMXGet {
         "if missing - it will try to connect to MBean Server in the same VM");
     Option jmx_port = OptionBuilder.create("port");
 
-    OptionBuilder.withArgName("VM's connector url");
+    OptionBuilder.withArgName("VM's zoneConnector url");
     OptionBuilder.hasArg();
     OptionBuilder.withDescription("connect to the VM on the same machine;" +
         "\n use:\n jstat -J-Djstat.showUnsupported=true -snap <vmpid> | " +

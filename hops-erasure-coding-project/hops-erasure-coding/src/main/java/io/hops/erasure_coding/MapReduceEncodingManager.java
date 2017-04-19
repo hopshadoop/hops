@@ -18,6 +18,7 @@
 
 package io.hops.erasure_coding;
 
+import io.hops.StorageConnector;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.EncodingJobsDataAccess;
 import io.hops.metadata.hdfs.entity.EncodingJob;
@@ -161,9 +162,9 @@ public class MapReduceEncodingManager extends BaseEncodingManager {
       final String jobDir) throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.PERSIST_ENCODING_JOB) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         EncodingJobsDataAccess da = (EncodingJobsDataAccess)
-            HdfsStorageFactory.getDataAccess(EncodingJobsDataAccess.class);
+            HdfsStorageFactory.getDataAccess(connector, EncodingJobsDataAccess.class);
           da.add(new EncodingJob(jobId.getJtIdentifier(),
               jobId.getId(), path, jobDir));
         return null;
@@ -174,9 +175,9 @@ public class MapReduceEncodingManager extends BaseEncodingManager {
   private void cleanRecovery() throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.DELETE_ENCODING_JOBS) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         EncodingJobsDataAccess da = (EncodingJobsDataAccess)
-            HdfsStorageFactory.getDataAccess(EncodingJobsDataAccess.class);
+            HdfsStorageFactory.getDataAccess(connector, EncodingJobsDataAccess.class);
         Iterator<MapReduceEncoder> it = completedJobs.iterator();
         while (it.hasNext()) {
           MapReduceEncoder job = it.next();
@@ -236,9 +237,9 @@ public class MapReduceEncodingManager extends BaseEncodingManager {
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
         HDFSOperationType.RECOVER_ENCODING_JOBS) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         EncodingJobsDataAccess da = (EncodingJobsDataAccess)
-            HdfsStorageFactory.getDataAccess(EncodingJobsDataAccess.class);
+            HdfsStorageFactory.getDataAccess(connector, EncodingJobsDataAccess.class);
         return da.findAll();
       }
     };

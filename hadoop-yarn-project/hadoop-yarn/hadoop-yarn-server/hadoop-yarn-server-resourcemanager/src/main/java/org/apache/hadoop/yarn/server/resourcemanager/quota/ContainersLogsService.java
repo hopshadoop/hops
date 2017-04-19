@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.quota;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.common.entity.LongVariable;
 import io.hops.metadata.common.entity.Variable;
@@ -26,7 +27,9 @@ import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.quota.ContainerLog;
 import io.hops.metadata.yarn.entity.quota.PriceMultiplicator;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.handler.RequestHandler;
 import io.hops.util.RMStorageFactory;
 
 import java.io.IOException;
@@ -43,7 +46,6 @@ import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
@@ -118,13 +120,15 @@ public class ContainersLogsService extends CompositeService {
 
     currentMultiplicator = 1;
 
+    StorageConnector connector = RMStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+
     // Initialize DataAccesses
-    containerStatusDA = (ContainerStatusDataAccess) RMStorageFactory.
-            getDataAccess(ContainerStatusDataAccess.class);
-    containersLogsDA = (ContainersLogsDataAccess) RMStorageFactory.
-            getDataAccess(ContainersLogsDataAccess.class);
-    variableDA = (VariableDataAccess) RMStorageFactory.getDataAccess(
-            VariableDataAccess.class);
+    containerStatusDA = (ContainerStatusDataAccess)
+        RMStorageFactory.getDataAccess(connector, ContainerStatusDataAccess.class);
+    containersLogsDA = (ContainersLogsDataAccess)
+        RMStorageFactory.getDataAccess(connector, ContainersLogsDataAccess.class);
+    variableDA = (VariableDataAccess)
+        RMStorageFactory.getDataAccess(connector, VariableDataAccess.class);
 
     // Creates separate thread for retrieving container statuses
     tickThread = new Thread(new TickThread());
@@ -290,7 +294,7 @@ public class ContainersLogsService extends CompositeService {
       LightWeightRequestHandler containersLogsHandler
               = new LightWeightRequestHandler(YARNOperationType.TEST) {
         @Override
-        public Object performTask() throws StorageException {
+        public Object performTask(StorageConnector connector) throws StorageException {
           connector.beginTransaction();
           connector.writeLock();
 
@@ -342,7 +346,7 @@ public class ContainersLogsService extends CompositeService {
       LightWeightRequestHandler allContainersHandler
               = new LightWeightRequestHandler(YARNOperationType.TEST) {
         @Override
-        public Object performTask() throws StorageException {
+        public Object performTask(StorageConnector connector) throws StorageException {
           connector.beginTransaction();
           connector.readCommitted();
 
@@ -354,9 +358,7 @@ public class ContainersLogsService extends CompositeService {
           return allContainersLogs;
         }
       };
-      allContainersLogs = (Map<String, ContainerLog>) allContainersHandler.
-              handle();
-
+      allContainersLogs = (Map<String, ContainerLog>) allContainersHandler.handle();
     } catch (IOException ex) {
       LOG.warn("Unable to retrieve containers logs table data", ex);
     }
@@ -378,15 +380,11 @@ public class ContainersLogsService extends CompositeService {
       LightWeightRequestHandler tickCounterHandler
               = new LightWeightRequestHandler(YARNOperationType.TEST) {
         @Override
-        public Object performTask() throws StorageException {
+        public Object performTask(StorageConnector connector) throws StorageException {
           connector.beginTransaction();
           connector.readCommitted();
-
-          Variable tickCounterVariable = (Variable) variableDA.getVariable(
-                  Variable.Finder.QuotaTicksCounter);
-
+          Variable tickCounterVariable = (Variable) variableDA.getVariable(Variable.Finder.QuotaTicksCounter);
           connector.commit();
-
           return tickCounterVariable;
         }
       };
@@ -404,27 +402,19 @@ public class ContainersLogsService extends CompositeService {
 
   private Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> getCurrentMultiplicator()
           throws IOException {
-    LightWeightRequestHandler currentPriceHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    LightWeightRequestHandler currentPriceHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.readCommitted();
-
-        PriceMultiplicatorDataAccess da
-                = (PriceMultiplicatorDataAccess) RMStorageFactory.getDataAccess(
-                        PriceMultiplicatorDataAccess.class);
-
-        Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> currentPrices
-                = da.getAll();
-
+        PriceMultiplicatorDataAccess da = (PriceMultiplicatorDataAccess)
+            RMStorageFactory.getDataAccess(connector, PriceMultiplicatorDataAccess.class);
+        Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> currentPrices = da.getAll();
         connector.commit();
-
         return currentPrices;
       }
     };
-    return (Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator>) currentPriceHandler.
-            handle();
+    return (Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator>) currentPriceHandler.handle();
   }
 
 //TODO optimisation

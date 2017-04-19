@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
@@ -124,9 +125,9 @@ public class TestOverReplicatedBlocks {
           INodeIdentifier inodeIdentifier;
 
           @Override
-          public void setUp() throws StorageException, IOException {
+          public void setUp(StorageConnector connector) throws StorageException, IOException {
             inodeIdentifier =
-                INodeUtil.resolveINodeFromBlock(block.getLocalBlock());
+                INodeUtil.resolveINodeFromBlock(connector, block.getLocalBlock());
           }
 
           @Override
@@ -138,7 +139,7 @@ public class TestOverReplicatedBlocks {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             // corrupt one won't be chosen to be excess one
             // without 4910 the number of live replicas would be 0: block gets lost
             assertEquals(1,
@@ -255,9 +256,9 @@ public class TestOverReplicatedBlocks {
         INodeIdentifier inodeIdentifier;
 
         @Override
-        public void setUp() throws StorageException, IOException {
+        public void setUp(StorageConnector connector) throws StorageException, IOException {
           inodeIdentifier =
-              INodeUtil.resolveINodeFromBlock(block.getLocalBlock());
+              INodeUtil.resolveINodeFromBlock(connector, block.getLocalBlock());
         }
 
         @Override
@@ -269,7 +270,7 @@ public class TestOverReplicatedBlocks {
         }
 
         @Override
-        public Object performTask() throws StorageException, IOException {
+        public Object performTask(StorageConnector connector) throws StorageException, IOException {
           assertEquals("Expected only one live replica for the block", 1,
               bm.countNodes(block.getLocalBlock()).liveReplicas());
           return null;

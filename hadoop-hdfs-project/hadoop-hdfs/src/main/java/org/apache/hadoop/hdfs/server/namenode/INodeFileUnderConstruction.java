@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -118,12 +119,12 @@ public class INodeFileUnderConstruction extends INodeFile
   // converts a INodeFileUnderConstruction into a INodeFile
   // use the modification time as the access time
   //
-  INodeFile convertToInodeFile()
+  INodeFile convertToInodeFile(StorageConnector connector)
       throws IOException {
     assert allBlocksComplete() : "Can't finalize inode " + this +
         " since it contains non-complete blocks! Blocks are " + getBlocks();
     INodeFile obj = new INodeFile(this);
-    obj.setAccessTime(getModificationTime());
+    obj.setAccessTime(connector, getModificationTime());
     return obj;
     
   }

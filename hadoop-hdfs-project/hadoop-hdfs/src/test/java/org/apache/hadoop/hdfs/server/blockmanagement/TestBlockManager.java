@@ -21,12 +21,14 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Lists;
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.security.Users;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -49,7 +51,6 @@ import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.net.NetworkTopology;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -61,8 +62,6 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -123,7 +122,8 @@ public class TestBlockManager {
   }
 
   private void formatStorage() throws IOException {
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
     Users.addUserToGroup(USER, GROUP);
   }
 
@@ -391,8 +391,8 @@ public class TestBlockManager {
           INodeIdentifier inodeIdentifier;
 
           @Override
-          public void setUp() throws StorageException {
-            inodeIdentifier = INodeUtil.resolveINodeFromBlock(blockInfo);
+          public void setUp(StorageConnector connector) throws StorageException {
+            inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, blockInfo);
           }
 
           @Override
@@ -407,7 +407,7 @@ public class TestBlockManager {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             DatanodeDescriptor dnd = (DatanodeDescriptor) getParams()[0];
             bm.addBlock(dnd, blockInfo, null);
             return null;
@@ -433,7 +433,7 @@ public class TestBlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         Block block = new Block(blkId);
         BlockInfo blockInfo = new BlockInfo(block, inode_id);
 
@@ -469,7 +469,7 @@ public class TestBlockManager {
     LightWeightRequestHandler handle =
         new LightWeightRequestHandler(HDFSOperationType.TEST) {
           @Override
-          public INodeFile performTask() throws IOException {
+          public INodeFile performTask(StorageConnector connector) throws IOException {
             INodeFile file = new INodeFile(new PermissionStatus(USER, GROUP,
                 new FsPermission((short) 0777)), null, (short) 3,
                 System.currentTimeMillis(), System.currentTimeMillis(), 1000l);
@@ -479,8 +479,8 @@ public class TestBlockManager {
             file.setIdNoPersistance(inode_id);
             List<INode> newed = new ArrayList<INode>();
             newed.add(file);
-            INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
+            INodeDataAccess da = (INodeDataAccess)
+                HdfsStorageFactory.getDataAccess(connector, INodeDataAccess.class);
             da.prepare(new ArrayList<INode>(), newed, new ArrayList<INode>());
             return file;
           }
@@ -494,7 +494,7 @@ public class TestBlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
         inodeIdentifier = INodeUtil.resolveINodeFromBlockID(blockId);
       }
 
@@ -505,7 +505,7 @@ public class TestBlockManager {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         bm.blocksMap.addBlockCollection(blockInfo, bc);
         return null;
       }
@@ -523,8 +523,8 @@ public class TestBlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -537,7 +537,7 @@ public class TestBlockManager {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         // list for priority 1
 
         list_p1.add(block);
@@ -561,8 +561,8 @@ public class TestBlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -575,7 +575,7 @@ public class TestBlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
 
         assertTrue("replication is pending after work is computed",
             bm.pendingReplications.getNumReplicas(block) > 0);
@@ -641,8 +641,8 @@ public class TestBlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(aBlock);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, aBlock);
       }
 
       @Override
@@ -656,7 +656,7 @@ public class TestBlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         assertNotNull("Chooses source node for a highest-priority replication" +
                 " even if all available source nodes have reached their replication" +
                 " limits below the hard limit.",

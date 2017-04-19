@@ -17,6 +17,7 @@ package io.hops.metadata;
 
 import io.hops.DalDriver;
 import io.hops.DalStorageFactory;
+import io.hops.MultiZoneStorageConnector;
 import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
@@ -55,11 +56,9 @@ public class LEStorageFactory {
 
   private static boolean isDALInitialized = false;
   private static DalStorageFactory dStorageFactory;
-  private static Map<Class, EntityDataAccess> dataAccessAdaptors =
-      new HashMap<Class, EntityDataAccess>();
-  
-  public static StorageConnector getConnector() {
-    return dStorageFactory.getConnector();
+
+  public static MultiZoneStorageConnector getMultiZoneConnector() {
+    return dStorageFactory.getMultiZoneConnector();
   }
 
   public static void setConfiguration(final String driver,
@@ -69,9 +68,7 @@ public class LEStorageFactory {
       VarsRegister.registerHdfsDefaultValues();
       addToClassPath(driver);
       dStorageFactory = DalDriver.load(driverClass);
-      dStorageFactory
-          .setConfiguration(getMetadataClusterConfiguration(driverConfigFile));
-      initDataAccessWrappers();
+      dStorageFactory.setConfiguration(getMetadataClusterConfiguration(driverConfigFile));
       EntityManager.addContextInitializer(getContextInitializer());
       isDALInitialized = true;
     }
@@ -113,60 +110,52 @@ public class LEStorageFactory {
     }
   }
   
-  private static void initDataAccessWrappers() {
-    dataAccessAdaptors.clear();
-  }
-
   private static ContextInitializer getContextInitializer() {
     return new ContextInitializer() {
       @Override
-      public Map<Class, EntityContext> createEntityContexts() {
-        Map<Class, EntityContext> entityContexts =
-            new HashMap<Class, EntityContext>();
+      public Map<Class, EntityContext> createEntityContexts(StorageConnector connector) {
+        Map<Class, EntityContext> entityContexts = new HashMap<>();
+
         VariableContext variableContext = new VariableContext(
-            (VariableDataAccess) getDataAccess(VariableDataAccess.class));
+            (VariableDataAccess) getDataAccess(connector, VariableDataAccess.class));
         entityContexts.put(Variable.class, variableContext);
         entityContexts.put(IntVariable.class, variableContext);
         entityContexts.put(LongVariable.class, variableContext);
         entityContexts.put(ByteArrayVariable.class, variableContext);
         entityContexts.put(StringVariable.class, variableContext);
         entityContexts.put(ArrayVariable.class, variableContext);
-        entityContexts.put(LeDescriptor.HdfsLeDescriptor.class,
-            new LeSnapshot.HdfsLESnapshot(
-                (LeDescriptorDataAccess) getDataAccess(
-                    HdfsLeDescriptorDataAccess.class)));
-        entityContexts.put(LeDescriptor.YarnLeDescriptor.class,
-            new LeSnapshot.YarnLESnapshot(
-                (LeDescriptorDataAccess) getDataAccess(
-                    YarnLeDescriptorDataAccess.class)));
+
+        entityContexts.put(LeDescriptor.HdfsLeDescriptor.class, new LeSnapshot.HdfsLESnapshot(
+            (LeDescriptorDataAccess) getDataAccess(connector, HdfsLeDescriptorDataAccess.class)));
+
+        entityContexts.put(LeDescriptor.YarnLeDescriptor.class, new LeSnapshot.YarnLESnapshot(
+                (LeDescriptorDataAccess) getDataAccess(connector, YarnLeDescriptorDataAccess.class)));
+
         return entityContexts;
       }
 
       @Override
-      public StorageConnector getConnector() {
-        return dStorageFactory.getConnector();
+      public MultiZoneStorageConnector getMultiZoneConnector() {
+        return dStorageFactory.getMultiZoneConnector();
       }
     };
   }
 
-  public static EntityDataAccess getDataAccess(Class type) {
-    if (dataAccessAdaptors.containsKey(type)) {
-      return dataAccessAdaptors.get(type);
-    }
-    return dStorageFactory.getDataAccess(type);
+  public static EntityDataAccess getDataAccess(StorageConnector connector, Class type) {
+    return dStorageFactory.getDataAccess(connector, type);
   }
   
-  public static boolean formatStorage() throws StorageException {
-    return dStorageFactory.getConnector().formatStorage();
+  public static boolean formatStorage(StorageConnector connector) throws StorageException {
+    return connector.formatStorage();
   }
   
-  public static boolean formatAllStorageNonTransactional()
+  public static boolean formatAllStorageNonTransactional(StorageConnector connector)
       throws StorageException {
-    return dStorageFactory.getConnector().formatAllStorageNonTransactional();
+    return connector.formatAllStorageNonTransactional();
   }
 
-  public static boolean formatStorage(Class<? extends EntityDataAccess>... das)
+  public static boolean formatStorage(StorageConnector connector, Class<? extends EntityDataAccess>... das)
       throws StorageException {
-    return dStorageFactory.getConnector().formatStorage(das);
+    return connector.formatStorage(das);
   }
 }

@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
-import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -41,7 +41,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 
 /**
  * This class extends the DatanodeInfo class with ephemeral information (eg
@@ -316,9 +315,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.COUNT_REPLICAS_ON_NODE) {
       @Override
-      public Object performTask() throws StorageException, IOException {
-        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-            .getDataAccess(ReplicaDataAccess.class);
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory.getDataAccess(connector, ReplicaDataAccess.class);
         return da.countAllReplicasForStorageId(getSId());
       }
     }.handle();
@@ -348,12 +346,12 @@ public class DatanodeDescriptor extends DatanodeInfo {
     LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_MACHINE_BLOCKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory
-            .getDataAccess(BlockInfoDataAccess.class);
-        HdfsStorageFactory.getConnector().beginTransaction();
+            .getDataAccess(connector, BlockInfoDataAccess.class);
+        connector.beginTransaction();
         List<BlockInfo> list = da.findBlockInfosByStorageId(getSId());
-        HdfsStorageFactory.getConnector().commit();
+        connector.commit();
         return list;
       }
     };
@@ -364,9 +362,9 @@ public class DatanodeDescriptor extends DatanodeInfo {
     LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-            .getDataAccess(ReplicaDataAccess.class);
+            .getDataAccess(connector, ReplicaDataAccess.class);
         return da.findBlockAndInodeIdsByStorageId(getSId());
       }
     };
@@ -377,9 +375,9 @@ public class DatanodeDescriptor extends DatanodeInfo {
     LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         InvalidateBlockDataAccess da = (InvalidateBlockDataAccess) HdfsStorageFactory
-            .getDataAccess(InvalidateBlockDataAccess.class);
+            .getDataAccess(connector, InvalidateBlockDataAccess.class);
         return da.findInvalidatedBlockAndGenStampByStorageId(getSId());
       }
     };
