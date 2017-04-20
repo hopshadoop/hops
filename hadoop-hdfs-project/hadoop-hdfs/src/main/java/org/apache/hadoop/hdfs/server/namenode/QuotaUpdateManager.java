@@ -18,6 +18,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.exception.TransientStorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
@@ -130,7 +131,10 @@ public class QuotaUpdateManager {
           break;
         } catch (StorageException e) {
           LOG.warn("QuotaUpdateMonitor thread received StorageException.", e);
-          break;
+          if( e instanceof TransientStorageException) {
+            continue; // do not quit thread on storage exception
+          }
+          terminate(1, e);
         } catch (Throwable t) {
           LOG.fatal("QuotaUpdateMonitor thread received Runtime exception. ",
               t);
