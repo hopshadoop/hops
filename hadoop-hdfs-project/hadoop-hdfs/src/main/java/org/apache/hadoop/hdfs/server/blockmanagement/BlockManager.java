@@ -25,6 +25,7 @@ import com.google.common.primitives.Longs;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.exception.TransientStorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.blockmanagement.ExcessReplicasMap;
@@ -3784,7 +3785,11 @@ public class BlockManager {
           break;
         } catch (StorageException e) {
           LOG.warn("ReplicationMonitor thread received StorageException.", e);
-          break;
+          if(e instanceof TransientStorageException){
+            continue;
+          }
+
+          terminate(1, e);
         } catch (Throwable t) {
           LOG.fatal("ReplicationMonitor thread received Runtime exception. ",
               t);

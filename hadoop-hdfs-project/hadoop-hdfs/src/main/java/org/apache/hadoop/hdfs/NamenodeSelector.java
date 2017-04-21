@@ -161,6 +161,7 @@ public class NamenodeSelector {
   private void updateNamenodesList() throws IOException{
     if(namenodeListUpdateTimePeriod>0 && System.currentTimeMillis()-lastUpdate> namenodeListUpdateTimePeriod){
       namenodeClientsUpdate();
+      lastUpdate = System.currentTimeMillis();
     }
   }
 
