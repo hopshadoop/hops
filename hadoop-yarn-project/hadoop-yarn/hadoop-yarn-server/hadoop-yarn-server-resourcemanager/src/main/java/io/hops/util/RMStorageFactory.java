@@ -15,10 +15,7 @@
  */
 package io.hops.util;
 
-import io.hops.DalDriver;
-import io.hops.DalNdbEventStreaming;
-import io.hops.DalStorageFactory;
-import io.hops.StorageConnector;
+import io.hops.*;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.common.EntityDataAccess;
 import io.hops.metadata.common.entity.ArrayVariable;
@@ -36,12 +33,11 @@ import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.context.ContextInitializer;
 import io.hops.transaction.context.EntityContext;
 import io.hops.transaction.context.LeSnapshot;
 import io.hops.transaction.context.VariableContext;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 
@@ -60,17 +56,14 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 public class RMStorageFactory {
 
-  private static final Log LOG = LogFactory.getLog(RMStorageFactory.class);
-
   private static boolean isInitialized = false;
   private static DalStorageFactory dStorageFactory;
-  private static Map<Class, EntityDataAccess> dataAccessAdaptors =
-      new HashMap<Class, EntityDataAccess>();
 
   private static DalNdbEventStreaming dNdbEventStreaming;
   private static boolean ndbStreaingRunning = false;
-  public static StorageConnector getConnector() {
-    return dStorageFactory.getConnector();
+
+  public static MultiZoneStorageConnector getConnector() {
+    return dStorageFactory.getMultiZoneConnector();
   }
 
   public static synchronized void kickTheNdbEventStreamingAPI(boolean isLeader,
@@ -78,8 +71,11 @@ public class RMStorageFactory {
           StorageInitializtionException {
     dNdbEventStreaming = DalDriver.loadHopsNdbEventStreamingLib(
             YarnAPIStorageFactory.NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
+
+    // TODO[rob]: it should be ok to use the primary connection settings here.
+    StorageConnector connector = dStorageFactory.getMultiZoneConnector().connectorFor(TransactionCluster.PRIMARY);
     
-    String connectionString = dStorageFactory.getConnector().getClusterConnectString() + ":" + 
+    String connectionString = connector.getClusterConnectString() + ":" +
             conf.getInt(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_DB_PORT, 
                     YarnConfiguration.DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT);
     
@@ -88,7 +84,7 @@ public class RMStorageFactory {
             YarnConfiguration.DEFAULT_EVENT_SHEDULER_CONFIG_PATH), conf.get(
                     YarnConfiguration.EVENT_RT_CONFIG_PATH,
                     YarnConfiguration.DEFAULT_EVENT_RT_CONFIG_PATH),
-            connectionString, dStorageFactory.getConnector().getDatabaseName()
+            connectionString, connector.getDatabaseName()
             );
     dNdbEventStreaming.startHopsNdbEvetAPISession(isLeader);
     ndbStreaingRunning = true;
@@ -112,18 +108,17 @@ public class RMStorageFactory {
         conf.get(YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CLASS,
             YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CLASS_DEFAULT));
     dStorageFactory.setConfiguration(getMetadataClusterConfiguration(conf));
-    initDataAccessWrappers();
     EntityManager.addContextInitializer(getContextInitializer());
-    if(conf.getBoolean(CommonConfigurationKeys.HOPS_GROUPS_ENABLE, CommonConfigurationKeys
-        .HOPS_GROUPS_ENABLE_DEFAULT)) {
-      UsersGroups.init((UserDataAccess) getDataAccess
-          (UserDataAccess.class), (UserGroupDataAccess) getDataAccess
-          (UserGroupDataAccess.class), (GroupDataAccess) getDataAccess
-          (GroupDataAccess.class), conf.getInt(CommonConfigurationKeys
-          .HOPS_GROUPS_UPDATER_ROUND, CommonConfigurationKeys
-          .HOPS_GROUPS_UPDATER_ROUND_DEFAULT), conf.getInt(CommonConfigurationKeys
-          .HOPS_USERS_LRU_THRESHOLD, CommonConfigurationKeys
-          .HOPS_USERS_LRU_THRESHOLD_DEFAULT));
+    // connector going to the primary cluster
+    // TODO[rob]: should be ok in YARN
+    StorageConnector connector = dStorageFactory.getMultiZoneConnector().connectorFor(TransactionCluster.PRIMARY);
+    if(conf.getBoolean(CommonConfigurationKeys.HOPS_GROUPS_ENABLE, CommonConfigurationKeys.HOPS_GROUPS_ENABLE_DEFAULT)) {
+      UsersGroups.init(
+          (UserDataAccess) getDataAccess(connector, UserDataAccess.class),
+          (UserGroupDataAccess) getDataAccess(connector, UserGroupDataAccess.class),
+          (GroupDataAccess) getDataAccess(connector, GroupDataAccess.class),
+          conf.getInt(CommonConfigurationKeys.HOPS_GROUPS_UPDATER_ROUND, CommonConfigurationKeys.HOPS_GROUPS_UPDATER_ROUND_DEFAULT),
+          conf.getInt(CommonConfigurationKeys.HOPS_USERS_LRU_THRESHOLD, CommonConfigurationKeys.HOPS_USERS_LRU_THRESHOLD_DEFAULT));
     }
     isInitialized = true;
   }
@@ -168,18 +163,12 @@ public class RMStorageFactory {
     }
   }
 
-  private static void initDataAccessWrappers() {
-    dataAccessAdaptors.clear();
-  }
-
   private static ContextInitializer getContextInitializer() {
     return new ContextInitializer() {
       @Override
-      public Map<Class, EntityContext> createEntityContexts() {
-        Map<Class, EntityContext> entityContexts =
-            new HashMap<Class, EntityContext>();
-        VariableContext variableContext = new VariableContext(
-            (VariableDataAccess) getDataAccess(VariableDataAccess.class));
+      public Map<Class, EntityContext> createEntityContexts(StorageConnector connector) {
+        Map<Class, EntityContext> entityContexts = new HashMap<>();
+        VariableContext variableContext = new VariableContext((VariableDataAccess) getDataAccess(connector, VariableDataAccess.class));
         entityContexts.put(IntVariable.class, variableContext);
         entityContexts.put(LongVariable.class, variableContext);
         entityContexts.put(ByteArrayVariable.class, variableContext);
@@ -188,21 +177,18 @@ public class RMStorageFactory {
         entityContexts.put(Variable.class, variableContext);
         entityContexts.put(LeDescriptor.YarnLeDescriptor.class,
             new LeSnapshot.YarnLESnapshot((LeDescriptorDataAccess)
-                getDataAccess(YarnLeDescriptorDataAccess.class)));
+                getDataAccess(connector, YarnLeDescriptorDataAccess.class)));
         return entityContexts;
       }
 
       @Override
-      public StorageConnector getConnector() {
-        return dStorageFactory.getConnector();
+      public MultiZoneStorageConnector getMultiZoneConnector() {
+        return dStorageFactory.getMultiZoneConnector();
       }
     };
   }
 
-  public static EntityDataAccess getDataAccess(Class type) {
-    if (dataAccessAdaptors.containsKey(type)) {
-      return dataAccessAdaptors.get(type);
-    }
-    return dStorageFactory.getDataAccess(type);
+  public static EntityDataAccess getDataAccess(StorageConnector connector, Class type) {
+    return dStorageFactory.getDataAccess(connector, type);
   }
 }

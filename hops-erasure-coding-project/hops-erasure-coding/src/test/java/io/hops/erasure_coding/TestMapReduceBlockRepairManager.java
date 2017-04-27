@@ -15,6 +15,7 @@
  */
 package io.hops.erasure_coding;
 
+import io.hops.StorageConnector;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
@@ -163,11 +164,10 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
         testFile);
     new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         BlockChecksumDataAccess da = (BlockChecksumDataAccess)
-            HdfsStorageFactory.getDataAccess(BlockChecksumDataAccess.class);
-        da.update(new BlockChecksum(inodeId,
-            (int) (lb.getStartOffset() / lb.getBlockSize()), 0));
+            HdfsStorageFactory.getDataAccess(connector, BlockChecksumDataAccess.class);
+        da.update(new BlockChecksum(inodeId, (int) (lb.getStartOffset() / lb.getBlockSize()), 0));
         return null;
       }
     }.handle();
@@ -259,9 +259,9 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
     status.setInodeId(io.hops.TestUtil.getINodeId(cluster.getNameNode(), src));
     new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         EncodingStatusDataAccess da = (EncodingStatusDataAccess)
-            HdfsStorageFactory.getDataAccess(EncodingStatusDataAccess.class);
+            HdfsStorageFactory.getDataAccess(connector, EncodingStatusDataAccess.class);
         da.add(status);
         return null;
       }

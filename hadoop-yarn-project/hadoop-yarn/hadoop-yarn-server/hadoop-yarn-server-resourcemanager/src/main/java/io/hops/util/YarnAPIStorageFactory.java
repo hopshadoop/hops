@@ -17,6 +17,7 @@ package io.hops.util;
 
 import io.hops.DalDriver;
 import io.hops.DalStorageFactory;
+import io.hops.MultiZoneStorageConnector;
 import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
@@ -27,6 +28,7 @@ import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.context.ContextInitializer;
 import io.hops.transaction.context.EntityContext;
 import org.apache.hadoop.conf.Configuration;
@@ -48,8 +50,6 @@ public class YarnAPIStorageFactory {
 
   private static boolean isInitialized = false;
   private static DalStorageFactory dStorageFactory;
-  private static Map<Class, EntityDataAccess> dataAccessAdaptors =
-      new HashMap<Class, EntityDataAccess>();
   public static final String DFS_STORAGE_DRIVER_JAR_FILE =
       "dfs.storage.driver.jarFile";
   public static final String DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT = "";
@@ -64,8 +64,8 @@ public class YarnAPIStorageFactory {
   public static final String NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE
           = "io.hops.metadata.ndb.JniNdbEventStreaming";
 
-  public static StorageConnector getConnector() {
-    return dStorageFactory.getConnector();
+  public static MultiZoneStorageConnector getConnector() {
+    return dStorageFactory.getMultiZoneConnector();
   }
 
   public static void setConfiguration(Configuration conf)
@@ -78,18 +78,17 @@ public class YarnAPIStorageFactory {
     dStorageFactory = DalDriver.load(
             conf.get(DFS_STORAGE_DRIVER_CLASS, DFS_STORAGE_DRIVER_CLASS_DEFAULT));
     dStorageFactory.setConfiguration(getMetadataClusterConfiguration(conf));
-    initDataAccessWrappers();
     EntityManager.addContextInitializer(getContextInitializer());
+    StorageConnector connector = dStorageFactory.getMultiZoneConnector().connectorFor(TransactionCluster.PRIMARY);
     if(conf.getBoolean(CommonConfigurationKeys.HOPS_GROUPS_ENABLE, CommonConfigurationKeys
         .HOPS_GROUPS_ENABLE_DEFAULT)) {
-      UsersGroups.init((UserDataAccess) getDataAccess
-          (UserDataAccess.class), (UserGroupDataAccess) getDataAccess
-          (UserGroupDataAccess.class), (GroupDataAccess) getDataAccess
-          (GroupDataAccess.class), conf.getInt(CommonConfigurationKeys
-          .HOPS_GROUPS_UPDATER_ROUND, CommonConfigurationKeys
-          .HOPS_GROUPS_UPDATER_ROUND_DEFAULT), conf.getInt(CommonConfigurationKeys
-          .HOPS_USERS_LRU_THRESHOLD, CommonConfigurationKeys
-          .HOPS_USERS_LRU_THRESHOLD_DEFAULT));
+      UsersGroups.init(
+          (UserDataAccess) getDataAccess(connector, UserDataAccess.class),
+          (UserGroupDataAccess) getDataAccess(connector, UserGroupDataAccess.class),
+          (GroupDataAccess) getDataAccess(connector, GroupDataAccess.class),
+          conf.getInt(CommonConfigurationKeys.HOPS_GROUPS_UPDATER_ROUND, CommonConfigurationKeys.HOPS_GROUPS_UPDATER_ROUND_DEFAULT),
+          conf.getInt(CommonConfigurationKeys.HOPS_USERS_LRU_THRESHOLD, CommonConfigurationKeys.HOPS_USERS_LRU_THRESHOLD_DEFAULT)
+      );
     }
     VarsRegister.registerYarnDefaultValues();
     isInitialized = true;
@@ -97,12 +96,9 @@ public class YarnAPIStorageFactory {
 
   public static Properties getMetadataClusterConfiguration(Configuration conf)
           throws IOException {
-    String configFile =
-        conf.get(YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE,
-                    YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT);
+    String configFile = conf.get(YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE, YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT);
     Properties clusterConf = new Properties();
-    InputStream inStream = StorageConnector.class.getClassLoader().
-            getResourceAsStream(configFile);
+    InputStream inStream = StorageConnector.class.getClassLoader().getResourceAsStream(configFile);
     clusterConf.load(inStream);
     return clusterConf;
   }
@@ -135,38 +131,31 @@ public class YarnAPIStorageFactory {
     }
   }
 
-  private static void initDataAccessWrappers() {
-    dataAccessAdaptors.clear();
-  }
-
   private static ContextInitializer getContextInitializer() {
     return new ContextInitializer() {
       @Override
-      public Map<Class, EntityContext> createEntityContexts() {
-        Map<Class, EntityContext> entityContexts = new HashMap<Class, EntityContext>();
+      public Map<Class, EntityContext> createEntityContexts(StorageConnector connector) {
+        Map<Class, EntityContext> entityContexts = new HashMap<>();
         return entityContexts;
       }
 
       @Override
-      public StorageConnector getConnector() {
-        return dStorageFactory.getConnector();
+      public MultiZoneStorageConnector getMultiZoneConnector() {
+        return dStorageFactory.getMultiZoneConnector();
       }
     };
   }
 
-  public static EntityDataAccess getDataAccess(Class type) {
-    if (dataAccessAdaptors.containsKey(type)) {
-      return dataAccessAdaptors.get(type);
-    }
-    return dStorageFactory.getDataAccess(type);
+  public static EntityDataAccess getDataAccess(StorageConnector connector, Class type) {
+    return dStorageFactory.getDataAccess(connector, type);
   }
   
-  public static boolean formatYarnStorageNonTransactional()
+  public static boolean formatYarnStorageNonTransactional(StorageConnector connector)
       throws StorageException {
-    return dStorageFactory.getConnector().formatYarnStorageNonTransactional();
+    return connector.formatYarnStorageNonTransactional();
   }
   
-  public static boolean formatYarnStorage() throws StorageException {
-    return dStorageFactory.getConnector().formatYarnStorage();
+  public static boolean formatYarnStorage(StorageConnector connector) throws StorageException {
+    return connector.formatYarnStorage();
   }
 }

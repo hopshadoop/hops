@@ -16,7 +16,9 @@
 package io.hops.metadata;
 
 import com.google.common.collect.Lists;
+import io.hops.StorageConnector;
 import io.hops.common.CountersQueue;
+import io.hops.transaction.TransactionCluster;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.junit.Test;
@@ -77,13 +79,12 @@ public class TestHdfsVariables {
       throws Exception{
     Configuration conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
 
-    ExecutorService executor = Executors.newFixedThreadPool
-        (NUM_CONCURRENT_THREADS);
+    ExecutorService executor = Executors.newFixedThreadPool(NUM_CONCURRENT_THREADS);
 
-    List<CounterIncrementer> tasks = Lists.newArrayListWithExpectedSize
-        (NUM_CONCURRENT_THREADS);
+    List<CounterIncrementer> tasks = Lists.newArrayListWithExpectedSize(NUM_CONCURRENT_THREADS);
 
     for(int i=0; i< NUM_CONCURRENT_THREADS; i++){
       tasks.add(new CounterIncrementer(counterType, increment));

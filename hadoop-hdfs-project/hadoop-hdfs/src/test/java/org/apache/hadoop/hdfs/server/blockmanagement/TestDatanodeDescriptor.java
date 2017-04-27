@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -71,7 +73,8 @@ public class TestDatanodeDescriptor {
   @Test
   public void testBlocksCounter() throws Exception {
     HdfsStorageFactory.setConfiguration(new HdfsConfiguration());
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
 
     BlocksMap blocksMap = new BlocksMap(null);
 
@@ -110,8 +113,8 @@ public class TestDatanodeDescriptor {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, blk);
       }
 
       @Override
@@ -122,7 +125,7 @@ public class TestDatanodeDescriptor {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         blocksMap.addBlockCollection(blk, new INodeFile(new PermissionStatus
             ("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1));
         return dn.addBlock(blk);
@@ -138,8 +141,8 @@ public class TestDatanodeDescriptor {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, blk);
       }
 
       @Override
@@ -150,7 +153,7 @@ public class TestDatanodeDescriptor {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         return dn.removeBlock(blk);
       }
 

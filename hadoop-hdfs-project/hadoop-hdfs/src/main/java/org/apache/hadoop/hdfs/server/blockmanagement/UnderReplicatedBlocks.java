@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -122,10 +123,10 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     new LightWeightRequestHandler(
         HDFSOperationType.DEL_ALL_UNDER_REPLICATED_BLKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         UnderReplicatedBlockDataAccess da =
             (UnderReplicatedBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+                .getDataAccess(connector, UnderReplicatedBlockDataAccess.class);
         da.removeAll();
         return null;
       }
@@ -140,10 +141,10 @@ class UnderReplicatedBlocks implements Iterable<Block> {
         HDFSOperationType.COUNT_ALL_UNDER_REPLICATED_BLKS) {
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         UnderReplicatedBlockDataAccess da =
             (UnderReplicatedBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+                .getDataAccess(connector, UnderReplicatedBlockDataAccess.class);
         return da.countAll();
       }
     }.handle();
@@ -156,10 +157,10 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.COUNT_UNDER_REPLICATED_BLKS_LESS_THAN_LVL4) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         UnderReplicatedBlockDataAccess da =
             (UnderReplicatedBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+                .getDataAccess(connector, UnderReplicatedBlockDataAccess.class);
         return da.countLessThanALevel(QUEUE_WITH_CORRUPT_BLOCKS);
       }
     }.handle();
@@ -428,7 +429,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
         }
 
         @Override
-        public Object performTask() throws StorageException, IOException {
+        public Object performTask(StorageConnector connector) throws StorageException, IOException {
           return new BlockIterator(fillPriorityQueues(level), level);
         }
       }.handle();
@@ -452,7 +453,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
         }
         
         @Override
-        public Object performTask() throws StorageException, IOException {
+        public Object performTask(StorageConnector connector) throws StorageException, IOException {
           return new BlockIterator(fillPriorityQueues());
         }
       }.handle();
@@ -580,7 +581,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         return chooseUnderReplicatedBlocksInt(blocksToProcess);
       }
     }.handle();
@@ -635,10 +636,10 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     return (List<UnderReplicatedBlock>) new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_UNDER_REPLICATED_BLKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         UnderReplicatedBlockDataAccess da =
             (UnderReplicatedBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+                .getDataAccess(connector, UnderReplicatedBlockDataAccess.class);
         if (level == -1) {
           return da.findAll();
         } else {
@@ -654,10 +655,10 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     return (List<UnderReplicatedBlock>) new LightWeightRequestHandler(
         HDFSOperationType.GET_UNDER_REPLICATED_BLKS_By_LEVEL_LIMITED) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         UnderReplicatedBlockDataAccess da =
             (UnderReplicatedBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+                .getDataAccess(connector, UnderReplicatedBlockDataAccess.class);
         return da.findByLevel(level, offset, count);
 
       }
@@ -683,9 +684,9 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     new LightWeightRequestHandler(HDFSOperationType.GET_BLOCKS) {
       
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         BlockInfoDataAccess bda = (BlockInfoDataAccess) HdfsStorageFactory
-            .getDataAccess(BlockInfoDataAccess.class);
+            .getDataAccess(connector, BlockInfoDataAccess.class);
         List<BlockInfo> blks = bda.findByIds(blockIds, inodeIds);
         for (BlockInfo blk : blks) {
           UnderReplicatedBlock urb = allUrbHashMap.remove(blk.getBlockId());
@@ -699,7 +700,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
         if (!toRemove.isEmpty()) {
           UnderReplicatedBlockDataAccess uda =
               (UnderReplicatedBlockDataAccess) HdfsStorageFactory
-                  .getDataAccess(UnderReplicatedBlockDataAccess.class);
+                  .getDataAccess(connector, UnderReplicatedBlockDataAccess.class);
           uda.prepare(toRemove, Collections.EMPTY_LIST, Collections.EMPTY_LIST);
         }
         return null;
@@ -711,10 +712,10 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.COUNT_UNDER_REPLICATED_BLKS_AT_LVL) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         UnderReplicatedBlockDataAccess da =
             (UnderReplicatedBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+                .getDataAccess(connector, UnderReplicatedBlockDataAccess.class);
         return da.countByLevel(level);
       }
     }.handle();

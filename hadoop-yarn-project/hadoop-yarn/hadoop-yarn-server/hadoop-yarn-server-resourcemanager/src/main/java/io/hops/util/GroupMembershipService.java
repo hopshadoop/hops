@@ -15,11 +15,12 @@
  */
 package io.hops.util;
 
-import io.hops.leaderElection.LeaderElection;
+import io.hops.leaderElection.NDBLeaderElection;
 import io.hops.leaderElection.YarnLeDescriptorFactory;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.yarn.entity.Load;
+import io.hops.services.LeaderElectionService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -68,7 +69,7 @@ public class GroupMembershipService extends CompositeService
   private AccessControlList adminAcl;
   private final RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);
-  private LeaderElection groupMembership;
+  private LeaderElectionService leaderElectionService;
   private boolean autoFailoverEnabled;
   private InetSocketAddress groupMembershipServiceAddress;
   boolean running = true;
@@ -135,11 +136,11 @@ public class GroupMembershipService extends CompositeService
       initLEandGM(conf);
     }
 
-    if (groupMembership != null) {
-      groupMembership.start();
+    if (leaderElectionService != null) {
+      leaderElectionService.start();
 
       try {
-        groupMembership.waitActive();
+        leaderElectionService.waitStarted();
       } catch (InterruptedException e) {
         LOG.warn("Group membership service was interrupted");
       }
@@ -161,8 +162,8 @@ public class GroupMembershipService extends CompositeService
   }
 
   protected synchronized void stopGroupMembership() throws Exception {
-    if (groupMembership != null && groupMembership.isRunning()) {
-      groupMembership.stopElectionThread();
+    if (leaderElectionService != null && leaderElectionService.isRunning()) {
+      leaderElectionService.stop();
     }
   }
 
@@ -199,29 +200,21 @@ public class GroupMembershipService extends CompositeService
   }
 
   public boolean isLeader() {
-    if (groupMembership != null && groupMembership.isRunning()) {
-      return groupMembership.isLeader();
+    if (leaderElectionService != null && leaderElectionService.isRunning()) {
+      return leaderElectionService.isLeader();
     } else {
       return false;
     }
   }
   
   public boolean isLeadingRT(){
-    if(groupMembership!=null && groupMembership.isRunning()){
-      return groupMembership.isSecond();
+    if(leaderElectionService !=null && leaderElectionService.isRunning()){
+      return leaderElectionService.isSecond();
     }else{
       return false;
     }
   }
 
-  public boolean isAlone(){
-    if(groupMembership.getActiveNamenodes().size()==1){
-      return true;
-    }else{
-      return false;
-    }
-  }
-  
   @Override
   public synchronized void monitorHealth() throws IOException {
     checkAccess("monitorHealth");
@@ -330,7 +323,7 @@ public class GroupMembershipService extends CompositeService
       LOG.error(ex);
       loads = new HashMap<String, Load>();
     }
-    SortedActiveNodeList nnList = groupMembership.getActiveNamenodes();
+    SortedActiveNodeList nnList = leaderElectionService.getActiveNamenodes();
     for (ActiveNode node : nnList.getSortedActiveNodes()) {
       if (loads.get(node.getHostname()) == null) {
         rmList.add(new ActiveRMPBImpl(node.getId(), node.getHostname(), node.
@@ -359,8 +352,8 @@ public class GroupMembershipService extends CompositeService
         conf.getInt(CommonConfigurationKeys.DFS_LEADER_TP_INCREMENT_KEY,
             CommonConfigurationKeys.DFS_LEADER_TP_INCREMENT_DEFAULT);
 
-    groupMembership =
-        new LeaderElection(new YarnLeDescriptorFactory(), leadercheckInterval,
+    leaderElectionService =
+        new NDBLeaderElection(new YarnLeDescriptorFactory(), leadercheckInterval,
             missedHeartBeatThreshold, leIncrement, rmId,
             groupMembershipServiceAddress.getAddress().getHostAddress() + ":"
 			   + groupMembershipServiceAddress.getPort());
@@ -374,7 +367,7 @@ public class GroupMembershipService extends CompositeService
     @Override
     public void run() {
       try {
-        while (groupMembership.isRunning()) {
+        while (leaderElectionService.isRunning()) {
           boolean currentLeaderRole = isLeader();
           if (previousLeaderRole == null ||
               currentLeaderRole != previousLeaderRole) {
@@ -392,10 +385,10 @@ public class GroupMembershipService extends CompositeService
     private void switchLeaderRole(boolean role) throws Exception {
       conf.set(YarnConfiguration.RM_HA_ID, rmId);
       if (role) {
-        LOG.info(groupMembership.getCurrentId() + " switching to active ");
+        LOG.info(leaderElectionService.getCurrentID() + " switching to active ");
         rm.transitionToActive();
       } else {
-        LOG.info(groupMembership.getCurrentId() + " switching to standby ");
+        LOG.info(leaderElectionService.getCurrentID() + " switching to standby ");
         rm.transitionToStandby(true);
       }
     }
@@ -403,8 +396,8 @@ public class GroupMembershipService extends CompositeService
   }
 
   public void relinquishId() throws InterruptedException {
-    if(groupMembership!=null){
-      groupMembership.relinquishCurrentIdInNextRound();
+    if(leaderElectionService !=null){
+      leaderElectionService.relinquishCurrentIdInNextRound();
     }
   }
 

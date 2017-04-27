@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.resolvingcache.Cache;
@@ -421,7 +422,7 @@ public class FSDirectory implements Closeable {
     }
   }
 
-  void renameTo(String src, String dst, long srcNsCount, long srcDsCount,
+  void renameTo(StorageConnector connector, String src, String dst, long srcNsCount, long srcDsCount,
       long dstNsCount, long dstDsCount, Options.Rename... options)
       throws FileAlreadyExistsException, FileNotFoundException,
       ParentNotDirectoryException, QuotaExceededException,
@@ -430,13 +431,13 @@ public class FSDirectory implements Closeable {
       NameNode.stateChangeLog
           .debug("DIR* FSDirectory.renameTo: " + src + " to " + dst);
     }
-    if (unprotectedRenameTo(src, dst, now(), srcNsCount, srcDsCount, dstNsCount,
+    if (unprotectedRenameTo(connector, src, dst, now(), srcNsCount, srcDsCount, dstNsCount,
         dstDsCount, options)) {
       incrDeletedFileCount(1);
     }
   }
 
-  boolean unprotectedRenameTo(String src, String dst, long timestamp,
+  boolean unprotectedRenameTo(StorageConnector connector, String src, String dst, long timestamp,
       long srcNsCount, long srcDsCount, long dstNsCount, long dstDsCount,
       Options.Rename... options)
       throws FileAlreadyExistsException, FileNotFoundException,
@@ -501,7 +502,7 @@ public class FSDirectory implements Closeable {
       if (dstInode.isDirectory()) {
         //[S] this a hack. handle this in the acquire lock phase
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
+                .getDataAccess(connector, INodeDataAccess.class);
 
         Short depth = dstInode.myDepth();
         boolean areChildrenRandomlyPartitioned = INode.isTreeLevelRandomPartitioned((short) (depth+1));
@@ -2472,9 +2473,9 @@ public class FSDirectory implements Closeable {
     LightWeightRequestHandler totalInodesHandler =
         new LightWeightRequestHandler(HDFSOperationType.TOTAL_FILES) {
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
+                .getDataAccess(connector, INodeDataAccess.class);
             return da.countAll();
           }
         };
@@ -2485,20 +2486,21 @@ public class FSDirectory implements Closeable {
    * Sets the access time on the file/directory. Logs it in the transaction
    * log.
    */
-  void setTimes(String src, INode inode, long mtime, long atime, boolean force)
+  void setTimes(StorageConnector connector, String src, INode inode, long mtime, long atime, boolean force)
       throws StorageException, TransactionContextException,
       AccessControlException {
-    unprotectedSetTimes(src, inode, mtime, atime, force);
+    unprotectedSetTimes(connector, src, inode, mtime, atime, force);
   }
 
-  boolean unprotectedSetTimes(String src, long mtime, long atime, boolean force)
+  boolean unprotectedSetTimes(
+      StorageConnector connector, String src, long mtime, long atime, boolean force)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException, AccessControlException {
     INode inode = getINode(src);
-    return unprotectedSetTimes(src, inode, mtime, atime, force);
+    return unprotectedSetTimes(connector, src, inode, mtime, atime, force);
   }
 
-  private boolean unprotectedSetTimes(String src, INode inode, long mtime,
+  private boolean unprotectedSetTimes(StorageConnector connector, String src, INode inode, long mtime,
       long atime, boolean force)
       throws StorageException, TransactionContextException,
       AccessControlException {
@@ -2516,7 +2518,7 @@ public class FSDirectory implements Closeable {
           !force) {
         status = false;
       } else {
-        inode.setAccessTime(atime);
+        inode.setAccessTime(connector, atime);
         status = true;
       }
     }
@@ -2694,13 +2696,12 @@ public class FSDirectory implements Closeable {
     LightWeightRequestHandler addRootINode =
         new LightWeightRequestHandler(HDFSOperationType.SET_ROOT) {
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             INodeDirectoryWithQuota newRootINode = null;
             INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
+                .getDataAccess(connector, INodeDataAccess.class);
             INodeDirectoryWithQuota rootInode = (INodeDirectoryWithQuota) da
-                .findInodeByNameParentIdAndPartitionIdPK(INodeDirectory.ROOT_NAME,
-                    INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey());
+                .findInodeByNameParentIdAndPartitionIdPK(INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey());
             if (rootInode == null || overwrite == true) {
               newRootINode = INodeDirectoryWithQuota.createRootDir(ps);
               List<INode> newINodes = new ArrayList();
@@ -2712,7 +2713,7 @@ public class FSDirectory implements Closeable {
                       FSDirectory.UNKNOWN_DISK_SPACE, 0L);
               INodeAttributesDataAccess ida =
                   (INodeAttributesDataAccess) HdfsStorageFactory
-                      .getDataAccess(INodeAttributesDataAccess.class);
+                      .getDataAccess(connector, INodeAttributesDataAccess.class);
               List<INodeAttributes> attrList = new ArrayList();
               attrList.add(inodeAttributes);
               ida.prepare(attrList, null);
@@ -2779,9 +2780,9 @@ public class FSDirectory implements Closeable {
     LightWeightRequestHandler hasChildrenHandler =
             new LightWeightRequestHandler(HDFSOperationType.HAS_CHILDREN) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
+                .getDataAccess(connector, INodeDataAccess.class);
         return ida.hasChildren(parentId, areChildrenRandomlyPartitioned);
       }
     };

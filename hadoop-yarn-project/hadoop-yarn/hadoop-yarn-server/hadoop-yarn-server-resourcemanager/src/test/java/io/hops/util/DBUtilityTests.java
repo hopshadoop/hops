@@ -15,6 +15,7 @@
  */
 package io.hops.util;
 
+import io.hops.StorageConnector;
 import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
 import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
@@ -28,6 +29,8 @@ import io.hops.metadata.yarn.entity.ContainerId;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.handler.RequestHandler;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -43,11 +46,11 @@ public class DBUtilityTests {
             YARNOperationType.TEST) {
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.readCommitted();
-        RMNodeDataAccess DA = (RMNodeDataAccess) YarnAPIStorageFactory.
-                getDataAccess(RMNodeDataAccess.class);
+        RMNodeDataAccess DA = (RMNodeDataAccess)
+            YarnAPIStorageFactory.getDataAccess(connector, RMNodeDataAccess.class);
         Map<String, io.hops.metadata.yarn.entity.RMNode> res = DA.getAll();
         connector.commit();
         return res;
@@ -61,11 +64,11 @@ public class DBUtilityTests {
             YARNOperationType.TEST) {
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.readCommitted();
-        ResourceDataAccess DA = (ResourceDataAccess) YarnAPIStorageFactory.
-                getDataAccess(ResourceDataAccess.class);
+        ResourceDataAccess DA = (ResourceDataAccess)
+            YarnAPIStorageFactory.getDataAccess(connector, ResourceDataAccess.class);
         Map<String, io.hops.metadata.yarn.entity.Resource> res = DA.getAll();
         connector.commit();
         return res;
@@ -79,11 +82,11 @@ public class DBUtilityTests {
             YARNOperationType.TEST) {
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.readCommitted();
-        PendingEventDataAccess DA = (PendingEventDataAccess) YarnAPIStorageFactory.
-                getDataAccess(PendingEventDataAccess.class);
+        PendingEventDataAccess DA = (PendingEventDataAccess)
+            YarnAPIStorageFactory.getDataAccess(connector, PendingEventDataAccess.class);
         List<PendingEvent> res = DA.getAll();
         connector.commit();
         return res;
@@ -98,18 +101,17 @@ public class DBUtilityTests {
             YARNOperationType.TEST) {
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.readCommitted();
-        UpdatedContainerInfoDataAccess DA = (UpdatedContainerInfoDataAccess) YarnAPIStorageFactory.
-                getDataAccess(UpdatedContainerInfoDataAccess.class);
+        UpdatedContainerInfoDataAccess DA = (UpdatedContainerInfoDataAccess)
+            YarnAPIStorageFactory.getDataAccess(connector, UpdatedContainerInfoDataAccess.class);
         Map<String, Map<Integer, List<UpdatedContainerInfo>>> res = DA.getAll();
         connector.commit();
         return res;
       }
     };
-    return (Map<String, Map<Integer, List<UpdatedContainerInfo>>>) getUCIHandler.
-            handle();
+    return (Map<String, Map<Integer, List<UpdatedContainerInfo>>>) getUCIHandler.handle();
   }
   
   public static Map<String, io.hops.metadata.yarn.entity.ContainerStatus> getAllContainerStatus()
@@ -118,11 +120,11 @@ public class DBUtilityTests {
             YARNOperationType.TEST) {
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.readCommitted();
-        ContainerStatusDataAccess DA = (ContainerStatusDataAccess) YarnAPIStorageFactory.
-                getDataAccess(ContainerStatusDataAccess.class);
+        ContainerStatusDataAccess DA = (ContainerStatusDataAccess)
+            YarnAPIStorageFactory.getDataAccess(connector, ContainerStatusDataAccess.class);
         Map<String,io.hops.metadata.yarn.entity.ContainerStatus> res = DA.getAll();
         connector.commit();
         return res;
@@ -138,11 +140,11 @@ public class DBUtilityTests {
             YARNOperationType.TEST) {
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.readCommitted();
-        NextHeartbeatDataAccess DA = (NextHeartbeatDataAccess) YarnAPIStorageFactory.
-                getDataAccess(NextHeartbeatDataAccess.class);
+        NextHeartbeatDataAccess DA = (NextHeartbeatDataAccess)
+            YarnAPIStorageFactory.getDataAccess(connector, NextHeartbeatDataAccess.class);
          Map<String, Boolean> res = DA.getAll();
         connector.commit();
         return res;
@@ -158,11 +160,11 @@ public class DBUtilityTests {
             YARNOperationType.TEST) {
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.readCommitted();
-        ContainerIdToCleanDataAccess DA = (ContainerIdToCleanDataAccess) YarnAPIStorageFactory.
-                getDataAccess(ContainerIdToCleanDataAccess.class);
+        ContainerIdToCleanDataAccess DA = (ContainerIdToCleanDataAccess)
+            YarnAPIStorageFactory.getDataAccess(connector, ContainerIdToCleanDataAccess.class);
          Map<String, Set<ContainerId>> res = DA.getAll();
         connector.commit();
         return res;
@@ -178,11 +180,11 @@ public class DBUtilityTests {
             YARNOperationType.TEST) {
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.readCommitted();
-        FinishedApplicationsDataAccess DA = (FinishedApplicationsDataAccess) YarnAPIStorageFactory.
-                getDataAccess(FinishedApplicationsDataAccess.class);
+        FinishedApplicationsDataAccess DA = (FinishedApplicationsDataAccess)
+            YarnAPIStorageFactory.getDataAccess(connector, FinishedApplicationsDataAccess.class);
          Map<String, List<ContainerId>> res = DA.getAll();
         connector.commit();
         return res;

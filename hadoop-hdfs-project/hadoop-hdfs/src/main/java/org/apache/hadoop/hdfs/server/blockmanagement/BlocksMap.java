@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -156,9 +157,9 @@ class BlocksMap {
     LightWeightRequestHandler getAllBlocksSizeHander =
         new LightWeightRequestHandler(HDFSOperationType.GET_ALL_BLOCKS_SIZE) {
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             BlockInfoDataAccess bida = (BlockInfoDataAccess) HdfsStorageFactory
-                .getDataAccess(BlockInfoDataAccess.class);
+                .getDataAccess(connector, BlockInfoDataAccess.class);
             return bida.countAll();
           }
         };
@@ -170,9 +171,9 @@ class BlocksMap {
         new LightWeightRequestHandler(
             HDFSOperationType.GET_COMPLETE_BLOCKS_TOTAL) {
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             BlockInfoDataAccess bida = (BlockInfoDataAccess) HdfsStorageFactory
-                .getDataAccess(BlockInfoDataAccess.class);
+                .getDataAccess(connector, BlockInfoDataAccess.class);
             return bida.countAllCompleteBlocks();
           }
         };
@@ -183,9 +184,9 @@ class BlocksMap {
     LightWeightRequestHandler getAllBlocksHander =
         new LightWeightRequestHandler(HDFSOperationType.GET_ALL_BLOCKS) {
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             BlockInfoDataAccess bida = (BlockInfoDataAccess) HdfsStorageFactory
-                .getDataAccess(BlockInfoDataAccess.class);
+                .getDataAccess(connector, BlockInfoDataAccess.class);
             return bida.findAllBlocks();
           }
         };
@@ -217,9 +218,9 @@ class BlocksMap {
     return (List<INodeIdentifier>) new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_INODES) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-            .getDataAccess(INodeDataAccess.class);
+            .getDataAccess(connector, INodeDataAccess.class);
         return ida.getAllINodeFiles(offset, count);
       }
     }.handle();
@@ -229,9 +230,9 @@ class BlocksMap {
     return (Boolean) new LightWeightRequestHandler(
         HDFSOperationType.HAVE_FILES_WITH_IDS_GREATER_THAN) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-            .getDataAccess(INodeDataAccess.class);
+            .getDataAccess(connector, INodeDataAccess.class);
         return ida.haveFilesWithIdsGreaterThan(id);
       }
     }.handle();
@@ -242,9 +243,9 @@ class BlocksMap {
     return (Boolean) new LightWeightRequestHandler(
         HDFSOperationType.HAVE_FILES_WITH_IDS_BETWEEN) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-            .getDataAccess(INodeDataAccess.class);
+            .getDataAccess(connector, INodeDataAccess.class);
         return ida.haveFilesWithIdsBetween(startId, endId);
       }
     }.handle();
@@ -254,9 +255,9 @@ class BlocksMap {
     return (Long) new LightWeightRequestHandler(
         HDFSOperationType.GET_MIN_FILE_ID) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-            .getDataAccess(INodeDataAccess.class);
+            .getDataAccess(connector, INodeDataAccess.class);
         return ida.getMinFileId();
       }
     }.handle();
@@ -266,9 +267,9 @@ class BlocksMap {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.COUNTALL_FILES) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-            .getDataAccess(INodeDataAccess.class);
+            .getDataAccess(connector, INodeDataAccess.class);
         return ida.countAllFiles();
       }
     }.handle();

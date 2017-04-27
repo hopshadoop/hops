@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
@@ -395,9 +396,9 @@ public class DFSTestUtil {
           INodeIdentifier inodeIdentifier;
 
           @Override
-          public void setUp() throws IOException {
+          public void setUp(StorageConnector connector) throws IOException {
             inodeIdentifier =
-                INodeUtil.resolveINodeFromBlock(b.getLocalBlock());
+                INodeUtil.resolveINodeFromBlock(connector, b.getLocalBlock());
           }
 
           @Override
@@ -409,7 +410,7 @@ public class DFSTestUtil {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             return ns.getBlockManager().numCorruptReplicas(b.getLocalBlock());
           }
         };

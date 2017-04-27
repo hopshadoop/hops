@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.StorageConnector;
 import io.hops.TestUtil;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.AccessTimeLogDataAccess;
@@ -24,7 +25,6 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
@@ -38,10 +38,9 @@ public class TestAccessTimeLog extends TestCase {
   private int getLogEntryCount(final int inodeId) throws IOException {
     return (Integer) new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
-        AccessTimeLogDataAccess<AccessTimeLogEntry> da =
-            (AccessTimeLogDataAccess) HdfsStorageFactory.getDataAccess(
-                AccessTimeLogDataAccess.class);
+      public Object performTask(StorageConnector connector) throws IOException {
+        AccessTimeLogDataAccess<AccessTimeLogEntry> da = (AccessTimeLogDataAccess)
+            HdfsStorageFactory.getDataAccess(connector, AccessTimeLogDataAccess.class);
         Collection<AccessTimeLogEntry> logEntries = da.find(inodeId);
         return logEntries.size();
       }

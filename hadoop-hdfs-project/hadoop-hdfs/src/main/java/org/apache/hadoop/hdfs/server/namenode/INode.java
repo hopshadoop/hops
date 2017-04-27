@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.primitives.SignedBytes;
+import io.hops.StorageConnector;
 import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -693,12 +694,12 @@ public abstract class INode implements Comparable<byte[]> {
     save();
   }
 
-  public void setAccessTime(long atime)
+  public void setAccessTime(StorageConnector connector, long atime)
       throws TransactionContextException, StorageException {
     setAccessTimeNoPersistance(atime);
     if (isPathMetaEnabled()) { // log the operation for epipe
       AccessTimeLogDataAccess da = (AccessTimeLogDataAccess)
-          HdfsStorageFactory.getDataAccess(AccessTimeLogDataAccess.class);
+          HdfsStorageFactory.getDataAccess(connector, AccessTimeLogDataAccess.class);
       int userId = -1; // TODO get userId
       da.add(new AccessTimeLogEntry(getId(), userId, atime));
     }
@@ -745,8 +746,7 @@ public abstract class INode implements Comparable<byte[]> {
   private void cleanParity(INode node)
       throws StorageException, TransactionContextException {
     if (ErasureCodingManager.isEnabled()) {
-      EncodingStatus status =
-          EntityManager.find(EncodingStatus.Finder.ByInodeId, node.getId());
+      EncodingStatus status = EntityManager.find(EncodingStatus.Finder.ByInodeId, node.getId());
       if (status != null) {
         status.setStatus(EncodingStatus.Status.DELETED);
         EntityManager.update(status);

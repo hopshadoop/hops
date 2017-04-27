@@ -15,12 +15,14 @@
  */
 package io.hops.metadata.lock;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
 import io.hops.metadata.hdfs.entity.Replica;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -47,7 +49,8 @@ public class TestNDBSizer {
   public void init() throws IOException {
     conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
 
 
   }
@@ -86,11 +89,11 @@ public class TestNDBSizer {
         final int j = i;
         new LightWeightRequestHandler(HDFSOperationType.TEST) {
           @Override
-          public Object performTask() throws StorageException, IOException {
-            INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
-            da.prepare(new LinkedList<INode>(), newFiles,
-                new LinkedList<INode>());
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
+            INodeDataAccess da = (INodeDataAccess)
+                HdfsStorageFactory.getDataAccess(connector, INodeDataAccess.class);
+            da.prepare(new LinkedList<INode>(),
+                newFiles, new LinkedList<INode>());
             newFiles.clear();
             showProgressBar("INodes", j, NUM_INODES);
             return null;
@@ -114,9 +117,9 @@ public class TestNDBSizer {
         final int j = i;
         new LightWeightRequestHandler(HDFSOperationType.TEST) {
           @Override
-          public Object performTask() throws StorageException, IOException {
-            BlockInfoDataAccess bda = (BlockInfoDataAccess) HdfsStorageFactory
-                .getDataAccess(BlockInfoDataAccess.class);
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
+            BlockInfoDataAccess bda = (BlockInfoDataAccess)
+                HdfsStorageFactory.getDataAccess(connector, BlockInfoDataAccess.class);
             bda.prepare(new LinkedList<BlockInfo>(), newBlocks,
                 new LinkedList<BlockInfo>());
             newBlocks.clear();
@@ -138,12 +141,11 @@ public class TestNDBSizer {
         final int j = i;
         new LightWeightRequestHandler(HDFSOperationType.TEST) {
           @Override
-          public Object performTask() throws StorageException, IOException {
-            ReplicaDataAccess rda = (ReplicaDataAccess) HdfsStorageFactory
-                .getDataAccess(ReplicaDataAccess.class);
-            rda.prepare(new LinkedList<Replica>(), replicas,
-                new LinkedList<Replica>());
-            //StorageFactory.getConnector().commit();
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
+            ReplicaDataAccess rda = (ReplicaDataAccess)
+                HdfsStorageFactory.getDataAccess(connector, ReplicaDataAccess.class);
+            rda.prepare(new LinkedList<Replica>(), replicas, new LinkedList<Replica>());
+            //StorageFactory.getMultiZoneConnector().commit();
             replicas.clear();
             showProgressBar("Replicas", j, NUM_REPLICAS);
             return null;

@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.StorageConnector;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -93,7 +94,7 @@ public class QuotaUpdateManager {
   }
 
   public void addUpdate(final int inodeId, final long namespaceDelta,
-      final long diskspaceDelta)
+                        final long diskspaceDelta)
       throws StorageException, TransactionContextException {
 
     QuotaUpdate update =
@@ -162,30 +163,28 @@ public class QuotaUpdateManager {
     LightWeightRequestHandler findHandler =
         new LightWeightRequestHandler(HDFSOperationType.GET_UPDATES_FOR_ID) {
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             QuotaUpdateDataAccess<QuotaUpdate> dataAccess =
                 (QuotaUpdateDataAccess) HdfsStorageFactory
-                    .getDataAccess(QuotaUpdateDataAccess.class);
+                    .getDataAccess(connector, QuotaUpdateDataAccess.class);
             return dataAccess.findByInodeId(id);
           }
         };
 
     List<QuotaUpdate> quotaUpdates = (List<QuotaUpdate>) findHandler.handle();
-    LOG.debug("processUpdates for inode id="+id+" quotaUpdates ids are "+ Arrays.toString(quotaUpdates.toArray()));
+    LOG.debug("processUpdates for inode id=" + id + " quotaUpdates ids are " + Arrays.toString(quotaUpdates.toArray()));
     applyBatchedUpdate(quotaUpdates);
   }
 
   private void processNextUpdateBatch() throws IOException {
-    LightWeightRequestHandler findHandler =
-        new LightWeightRequestHandler(HDFSOperationType.GET_NEXT_QUOTA_BATCH) {
-          @Override
-          public Object performTask() throws IOException {
-            QuotaUpdateDataAccess<QuotaUpdate> dataAccess =
-                (QuotaUpdateDataAccess) HdfsStorageFactory
-                    .getDataAccess(QuotaUpdateDataAccess.class);
-            return dataAccess.findLimited(updateLimit);
-          }
-        };
+    LightWeightRequestHandler findHandler = new LightWeightRequestHandler(HDFSOperationType.GET_NEXT_QUOTA_BATCH) {
+      @Override
+      public Object performTask(StorageConnector connector) throws IOException {
+        QuotaUpdateDataAccess<QuotaUpdate> dataAccess = (QuotaUpdateDataAccess)
+            HdfsStorageFactory.getDataAccess(connector, QuotaUpdateDataAccess.class);
+        return dataAccess.findLimited(updateLimit);
+      }
+    };
 
     List<QuotaUpdate> quotaUpdates = (List<QuotaUpdate>) findHandler.handle();
     Collections.sort(quotaUpdates, quotaUpdateComparator);
@@ -216,8 +215,8 @@ public class QuotaUpdateManager {
       INodeIdentifier iNodeIdentifier;
 
       @Override
-      public void setUp() throws IOException {
-        super.setUp();
+      public void setUp(StorageConnector connector) throws IOException {
+        super.setUp(connector);
         iNodeIdentifier = new INodeIdentifier(updates.get(0).getInodeId());
       }
 
@@ -230,7 +229,7 @@ public class QuotaUpdateManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         INodeDirectory dir = (INodeDirectory) EntityManager
             .find(INode.Finder.ByINodeIdFTIS, updates.get(0).getInodeId());
         if (dir != null && SubtreeLockHelper
@@ -292,8 +291,7 @@ public class QuotaUpdateManager {
    * their parents
    * in order to guarantee that updates are applied completely.
    *
-   * @param iterator
-   *     Ids to be updates sorted from the leaves to the root of the subtree
+   * @param iterator Ids to be updates sorted from the leaves to the root of the subtree
    */
   void addPrioritizedUpdates(Iterator<Integer> iterator) {
     prioritizedUpdates.add(iterator);

@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.fs;
 
+import io.hops.StorageConnector;
 import io.hops.erasure_coding.ClusterTest;
 import io.hops.erasure_coding.Codec;
 import io.hops.erasure_coding.TestLocalEncodingManagerImpl;
@@ -167,11 +168,10 @@ public class TestErasureCodingFileSystem extends ClusterTest {
         testFile);
     new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         BlockChecksumDataAccess da = (BlockChecksumDataAccess)
-            HdfsStorageFactory.getDataAccess(BlockChecksumDataAccess.class);
-        da.update(new BlockChecksum(inodeId,
-            (int) (lb.getStartOffset() / lb.getBlockSize()), 0));
+            HdfsStorageFactory.getDataAccess(connector, BlockChecksumDataAccess.class);
+        da.update(new BlockChecksum(inodeId, (int) (lb.getStartOffset() / lb.getBlockSize()), 0));
         return null;
       }
     }.handle();

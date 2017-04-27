@@ -15,10 +15,12 @@
  */
 package io.hops.leaderElection;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.leaderElection.experiments.LightWeightNameNode;
 import io.hops.metadata.LEStorageFactory;
+import io.hops.transaction.TransactionCluster;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.Level;
@@ -50,10 +52,10 @@ public class TestRelinquishRole {
   public void init()
       throws StorageInitializtionException, StorageException, IOException {
     LogManager.getRootLogger().setLevel(Level.ALL);
-    nnList = new ArrayList<LightWeightNameNode>();
-    LEStorageFactory.setConfiguration(DRIVER_JAR, DRIVER_CLASS,
-        DFS_STORAGE_DRIVER_CONFIG_FILE);
-    LEStorageFactory.formatStorage();
+    nnList = new ArrayList<>();
+    LEStorageFactory.setConfiguration(DRIVER_JAR, DRIVER_CLASS, DFS_STORAGE_DRIVER_CONFIG_FILE);
+    StorageConnector connector = LEStorageFactory.getMultiZoneConnector().connectorFor(TransactionCluster.PRIMARY);
+    LEStorageFactory.formatStorage(connector);
     VarsRegister.registerHdfsDefaultValues();
   }
 
@@ -85,8 +87,8 @@ public class TestRelinquishRole {
             TIME_PERIOD_INCREMENT, HTTP_ADDRESS, RPC_ADDRESS);
     nnList.add(hdfs2);
 
-    hdfs1.getLeaderElectionInstance().waitActive();
-    hdfs2.getLeaderElectionInstance().waitActive();
+    hdfs1.getLeaderElectionInstance().waitStarted();
+    hdfs2.getLeaderElectionInstance().waitStarted();
     long hdfs1Id = hdfs1.getLeCurrentId();
     long hdfs2Id = hdfs2.getLeCurrentId();
     assertTrue("Leader Check Failed ", hdfs1.isLeader() == true);

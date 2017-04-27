@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.collect.Sets;
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -764,7 +765,7 @@ public class TestFsck {
             }
 
             @Override
-            public Object performTask() throws StorageException, IOException {
+            public Object performTask(StorageConnector connector) throws StorageException, IOException {
               // intentionally corrupt NN data structure
               INodeFile node =
                   (INodeFile) clusterFinal.getNamesystem().dir.getRootDir()

@@ -15,6 +15,8 @@
  */
 package io.hops.transaction.handler;
 
+import io.hops.transaction.TransactionCluster;
+
 public enum EncodingStatusOperationType
     implements RequestHandler.OperationType {
   ADD,
@@ -34,5 +36,11 @@ public enum EncodingStatusOperationType
   FIND_REQUESTED_PARITY_REPAIRS,
   FIND_POTENTIALLY_FIXED_PARITIES,
   FIND_DELETED,
-  FIND_REVOKED
+  FIND_REVOKED;
+
+
+  @Override
+  public TransactionCluster getCluster() {
+    return TransactionCluster.PRIMARY;
+  }
 }

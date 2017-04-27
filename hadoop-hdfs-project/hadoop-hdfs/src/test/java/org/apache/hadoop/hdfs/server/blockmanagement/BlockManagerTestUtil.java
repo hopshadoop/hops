@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import com.google.common.base.Preconditions;
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -74,8 +75,8 @@ public class BlockManagerTestUtil {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, b);
       }
 
       @Override
@@ -86,7 +87,7 @@ public class BlockManagerTestUtil {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         return new int[]{getNumberOfRacks(bm, b),
             bm.countNodes(b).liveReplicas(),
             bm.neededReplications.contains(bm.getStoredBlock(b)) ? 1 : 0};

@@ -44,6 +44,7 @@ import io.hops.streaming.RMNodeEvent;
 import io.hops.streaming.ResourceEvent;
 import io.hops.streaming.UpdatedContainerInfoEvent;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.handler.RequestHandler;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -81,13 +82,13 @@ public class testStreaming {
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
 
         RMNodeDataAccess rmnDA
                 = (RMNodeDataAccess) RMStorageFactory
-                .getDataAccess(RMNodeDataAccess.class);
+                .getDataAccess(connector, RMNodeDataAccess.class);
         rmnDA.add(new RMNode("nodeid", "node name", 42, 43,
                 "tout vat bien", 1, "tiptop",
                 "version", 2));
@@ -105,13 +106,13 @@ public class testStreaming {
     handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
 
         PendingEventDataAccess DA
                 = (PendingEventDataAccess) RMStorageFactory
-                .getDataAccess(PendingEventDataAccess.class);
+                .getDataAccess(connector, PendingEventDataAccess.class);
         DA.add(new PendingEvent("nodeId", PendingEvent.Type.NODE_ADDED,
                 PendingEvent.Status.NEW, 0, 1));
 
@@ -128,13 +129,13 @@ public class testStreaming {
     handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
 
         ResourceDataAccess DA
                 = (ResourceDataAccess) RMStorageFactory
-                .getDataAccess(ResourceDataAccess.class);
+                .getDataAccess(connector, ResourceDataAccess.class);
         DA.add(new Resource("resource", 1, 2, 3));
 
         connector.commit();
@@ -150,13 +151,13 @@ public class testStreaming {
     handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
 
         UpdatedContainerInfoDataAccess DA
                 = (UpdatedContainerInfoDataAccess) RMStorageFactory
-                .getDataAccess(UpdatedContainerInfoDataAccess.class);
+                .getDataAccess(connector, UpdatedContainerInfoDataAccess.class);
         List<UpdatedContainerInfo> toAdd = new ArrayList<>();
         toAdd.add(new UpdatedContainerInfo("rmnodeid", "containerid", 1,
                 2));
@@ -175,13 +176,13 @@ public class testStreaming {
     handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
 
         ContainerStatusDataAccess DA
                 = (ContainerStatusDataAccess) RMStorageFactory
-                .getDataAccess(ContainerStatusDataAccess.class);
+                .getDataAccess(connector, ContainerStatusDataAccess.class);
         List<ContainerStatus> toAdd = new ArrayList<>();
         toAdd.add(new ContainerStatus("containerid", "state", "diagnostics",
                 0, "rmnodeid", 1, 2));
@@ -203,13 +204,13 @@ public class testStreaming {
     handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
 
         ContainerIdToCleanDataAccess DA
                 = (ContainerIdToCleanDataAccess) RMStorageFactory
-                .getDataAccess(ContainerIdToCleanDataAccess.class);
+                .getDataAccess(connector, ContainerIdToCleanDataAccess.class);
         DA.add(new ContainerId("rmnodeId", "containerId"));
 
         connector.commit();
@@ -225,13 +226,13 @@ public class testStreaming {
     handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
 
         NextHeartbeatDataAccess DA
                 = (NextHeartbeatDataAccess) RMStorageFactory
-                .getDataAccess(NextHeartbeatDataAccess.class);
+                .getDataAccess(connector, NextHeartbeatDataAccess.class);
         DA.update(new NextHeartbeat("nodeId", true));
 
         connector.commit();
@@ -247,13 +248,12 @@ public class testStreaming {
     handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
 
-        FinishedApplicationsDataAccess DA
-                = (FinishedApplicationsDataAccess) RMStorageFactory
-                .getDataAccess(FinishedApplicationsDataAccess.class);
+        FinishedApplicationsDataAccess DA = (FinishedApplicationsDataAccess)
+            RMStorageFactory.getDataAccess(connector, FinishedApplicationsDataAccess.class);
         DA.add(new FinishedApplications("rmnodeId", "applicationId"));
 
         connector.commit();

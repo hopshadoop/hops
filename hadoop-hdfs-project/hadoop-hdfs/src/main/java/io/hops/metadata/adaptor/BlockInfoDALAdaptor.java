@@ -47,7 +47,7 @@ public class BlockInfoDALAdaptor extends
   public int countAllCompleteBlocks() throws StorageException {
     return dataAccess.countAllCompleteBlocks();
   }
-  
+
   @Override
   public org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo findById(
       long blockId, int inodeId) throws StorageException {
@@ -61,14 +61,14 @@ public class BlockInfoDALAdaptor extends
         dataAccess.findByInodeId(id));
   }
 
-  
+
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findByInodeIds(
       int[] inodeIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
         dataAccess.findByInodeIds(inodeIds));
   }
-  
+
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findAllBlocks()
       throws StorageException {

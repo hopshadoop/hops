@@ -15,6 +15,7 @@
  */
 package io.hops.metadata.security.token.block;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.common.entity.Variable;
@@ -208,7 +209,7 @@ public class NameNodeBlockTokenSecretManager extends BlockTokenSecretManager {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         HdfsVariables.updateBlockTokenKeys(currentKey, nextKey);
         return null;
       }
@@ -255,7 +256,7 @@ public class NameNodeBlockTokenSecretManager extends BlockTokenSecretManager {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         Map<Integer, BlockKey> keys =
             HdfsVariables.getAllBlockTokenKeysByType();
         if (keys.isEmpty()) {

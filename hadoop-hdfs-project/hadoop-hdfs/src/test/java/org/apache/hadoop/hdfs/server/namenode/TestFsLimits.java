@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.security.Users;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -71,7 +73,8 @@ public class TestFsLimits {
   
   private void initFS() throws StorageException, IOException {
     HdfsStorageFactory.setConfiguration(conf);
-    assert (HdfsStorageFactory.formatStorage());
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    assert (HdfsStorageFactory.formatStorage(connector));
     Users.addUserToGroup(perms.getUserName(), perms.getGroupName());
     rootInode = FSDirectory.createRootInode(perms, true);
     inodes = new INode[]{rootInode, null};
@@ -184,7 +187,7 @@ public class TestFsLimits {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             // have to create after the caller has had a chance to set conf values
             if (fs == null) {
               fs = new TestFSDirectory();

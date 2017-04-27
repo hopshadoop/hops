@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -32,7 +33,6 @@ import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -61,10 +61,10 @@ class InvalidateBlocks {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.GET_NUM_INVALIDATED_BLKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(InvalidateBlockDataAccess.class);
+                .getDataAccess(connector, InvalidateBlockDataAccess.class);
         return da.countAll();
       }
     }.handle();
@@ -138,10 +138,10 @@ class InvalidateBlocks {
     LightWeightRequestHandler getAllInvBlocksHandler =
         new LightWeightRequestHandler(HDFSOperationType.GET_ALL_INV_BLKS) {
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             InvalidateBlockDataAccess da =
                 (InvalidateBlockDataAccess) HdfsStorageFactory
-                    .getDataAccess(InvalidateBlockDataAccess.class);
+                    .getDataAccess(connector, InvalidateBlockDataAccess.class);
             return da.findAllInvalidatedBlocks();
           }
         };
@@ -205,10 +205,10 @@ class InvalidateBlocks {
   void clear() throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.DEL_ALL_INV_BLKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(InvalidateBlockDataAccess.class);
+                .getDataAccess(connector, InvalidateBlockDataAccess.class);
         da.removeAll();
         return null;
       }
@@ -220,10 +220,10 @@ class InvalidateBlocks {
       throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.ADD_INV_BLOCKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(InvalidateBlockDataAccess.class);
+                .getDataAccess(connector, InvalidateBlockDataAccess.class);
         List<InvalidatedBlock> invblks = new ArrayList<InvalidatedBlock>();
         for (Block blk : blocks) {
           invblks.add(new InvalidatedBlock(dn.getSId(), blk.getBlockId(),
@@ -253,10 +253,10 @@ class InvalidateBlocks {
     return (List<InvalidatedBlock>) new LightWeightRequestHandler(
         HDFSOperationType.GET_INV_BLKS_BY_STORAGEID) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(InvalidateBlockDataAccess.class);
+                .getDataAccess(connector, InvalidateBlockDataAccess.class);
         return da.findInvalidatedBlockByStorageId(sid);
       }
     }.handle();
@@ -266,10 +266,10 @@ class InvalidateBlocks {
       throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.RM_INV_BLKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(InvalidateBlockDataAccess.class);
+                .getDataAccess(connector, InvalidateBlockDataAccess.class);
         da.prepare(blks, Collections.EMPTY_LIST, Collections.EMPTY_LIST);
         return null;
       }
@@ -279,10 +279,10 @@ class InvalidateBlocks {
   private void removeInvBlocks(final int storageId) throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.RM_INV_BLKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(InvalidateBlockDataAccess.class);
+                .getDataAccess(connector, InvalidateBlockDataAccess.class);
         da.removeAllByStorageId(storageId);
         return null;
       }

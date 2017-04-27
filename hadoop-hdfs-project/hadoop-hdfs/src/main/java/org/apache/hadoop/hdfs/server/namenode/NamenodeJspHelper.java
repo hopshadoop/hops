@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.net.InetAddresses;
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.leader_election.node.ActiveNode;
@@ -65,14 +66,11 @@ import java.net.URLEncoder;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -781,8 +779,8 @@ class NamenodeJspHelper {
           INodeIdentifier inodeIdentifier;
 
           @Override
-          public void setUp() throws StorageException {
-            inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+          public void setUp(StorageConnector connector) throws StorageException {
+            inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
           }
 
           @Override
@@ -794,7 +792,7 @@ class NamenodeJspHelper {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             return blockManager.getBlockCollection(block);
           }
         }.handle();

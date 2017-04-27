@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
@@ -67,9 +68,9 @@ public class TestUnderReplicatedBlocks {
             INodeIdentifier inodeIdentifier;
 
             @Override
-            public void setUp() throws StorageException {
+            public void setUp(StorageConnector connector) throws StorageException {
               Block blk = b.getLocalBlock();
-              inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+              inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, blk);
             }
 
             @Override
@@ -83,7 +84,7 @@ public class TestUnderReplicatedBlocks {
             }
 
             @Override
-            public Object performTask() throws StorageException, IOException {
+            public Object performTask(StorageConnector connector) throws StorageException, IOException {
               DatanodeDescriptor dn =
                   bm.blocksMap.nodeIterator(b.getLocalBlock()).next();
               bm.addToInvalidates(b.getLocalBlock(), dn);
@@ -107,9 +108,9 @@ public class TestUnderReplicatedBlocks {
             INodeIdentifier inodeIdentifier;
 
             @Override
-            public void setUp() throws StorageException {
+            public void setUp(StorageConnector connector) throws StorageException {
               Block blk = b.getLocalBlock();
-              inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+              inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, blk);
             }
 
             @Override
@@ -123,7 +124,7 @@ public class TestUnderReplicatedBlocks {
             }
 
             @Override
-            public Object performTask() throws StorageException, IOException {
+            public Object performTask(StorageConnector connector) throws StorageException, IOException {
               DatanodeDescriptor dn = (DatanodeDescriptor) getParams()[0];
               // Remove the record from blocksMap
               bm.blocksMap.removeNode(b.getLocalBlock(), dn);

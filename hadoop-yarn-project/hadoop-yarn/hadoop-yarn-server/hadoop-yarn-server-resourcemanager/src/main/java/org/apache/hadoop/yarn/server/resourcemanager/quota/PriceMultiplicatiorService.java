@@ -15,11 +15,14 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.quota;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.yarn.dal.quota.PriceMultiplicatorDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.quota.PriceMultiplicator;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.handler.RequestHandler;
 import io.hops.util.RMStorageFactory;
 import java.io.IOException;
 import java.util.Map;
@@ -67,9 +70,11 @@ public class PriceMultiplicatiorService extends AbstractService {
             YarnConfiguration.QUOTA_PRICE_MULTIPLICATOR_INTERVAL,
             YarnConfiguration.DEFAULT_QUOTA_PRICE_MULTIPLICATOR_INTERVAL);
 
+
+    StorageConnector connector = RMStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
     // Initialize DataAccesses
-    this.priceMultiplicatorDA = (PriceMultiplicatorDataAccess) RMStorageFactory.
-            getDataAccess(PriceMultiplicatorDataAccess.class);
+    this.priceMultiplicatorDA = (PriceMultiplicatorDataAccess)
+        RMStorageFactory.getDataAccess(connector, PriceMultiplicatorDataAccess.class);
     currentMultiplicator = 1;
     recover();
   }
@@ -89,12 +94,11 @@ public class PriceMultiplicatiorService extends AbstractService {
     LightWeightRequestHandler currentPriceHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.readCommitted();
 
-        Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> currentPrices
-                = priceMultiplicatorDA.getAll();
+        Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> currentPrices = priceMultiplicatorDA.getAll();
 
         connector.commit();
 
@@ -186,7 +190,7 @@ public class PriceMultiplicatiorService extends AbstractService {
     LightWeightRequestHandler prepareHandler;
     prepareHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.writeLock();
 

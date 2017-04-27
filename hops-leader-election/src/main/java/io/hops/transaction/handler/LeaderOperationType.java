@@ -15,9 +15,14 @@
  */
 package io.hops.transaction.handler;
 
+import io.hops.transaction.TransactionCluster;
+
 public enum LeaderOperationType implements RequestHandler.OperationType {
 
   // LeaderElection
-  LEADER_ELECTION
+  LEADER_ELECTION;
 
+  public TransactionCluster getCluster() {
+    return TransactionCluster.PRIMARY;
+  }
 }

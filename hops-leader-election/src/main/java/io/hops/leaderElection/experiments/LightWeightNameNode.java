@@ -15,7 +15,7 @@
  */
 package io.hops.leaderElection.experiments;
 
-import io.hops.leaderElection.LeaderElection;
+import io.hops.leaderElection.NDBLeaderElection;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.election.entity.LeDescriptorFactory;
 import org.apache.commons.logging.Log;
@@ -33,21 +33,21 @@ import java.util.regex.Pattern;
 public class LightWeightNameNode {
 
   private static final Log LOG = LogFactory.getLog(LightWeightNameNode.class);
-  protected LeaderElection leaderElection;
+  protected NDBLeaderElection leaderElection;
 
   public LightWeightNameNode(LeDescriptorFactory ldf, final long time_period,
       final int max_missed_hb_threshold, final long time_period_increment,
       final String http_address, final String rpc_address)
       throws IOException, CloneNotSupportedException {
     leaderElection =
-        new LeaderElection(ldf, time_period, max_missed_hb_threshold,
+        new NDBLeaderElection(ldf, time_period, max_missed_hb_threshold,
             time_period_increment, http_address, rpc_address);
     leaderElection.start();
     LOG.debug("NameNode has started");
   }
 
   public long getLeCurrentId() {
-    return leaderElection.getCurrentId();
+    return leaderElection.getCurrentID();
   }
 
   public boolean isLeader() {
@@ -60,7 +60,7 @@ public class LightWeightNameNode {
     }
   }
 
-  public LeaderElection getLeaderElectionInstance() {
+  public NDBLeaderElection getLeaderElectionInstance() {
     return leaderElection;
   }
 

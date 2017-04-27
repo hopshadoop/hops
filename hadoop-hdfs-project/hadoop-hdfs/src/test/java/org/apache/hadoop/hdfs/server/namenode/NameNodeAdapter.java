@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -134,7 +135,7 @@ public class NameNodeAdapter {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         Lease l = namenode.getNamesystem().leaseManager.getLeaseByPath(path);
         return l == null ? null : l.getHolder();
       }
@@ -158,7 +159,7 @@ public class NameNodeAdapter {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             LeaseManager lm = nn.getNamesystem().leaseManager;
             Lease l = lm.getLeaseByPath(path);
             if (l == null) {

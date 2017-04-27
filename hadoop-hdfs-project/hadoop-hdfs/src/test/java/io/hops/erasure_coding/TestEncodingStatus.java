@@ -17,6 +17,7 @@ package io.hops.erasure_coding;
 
 import io.hops.DalDriver;
 import io.hops.DalStorageFactory;
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -79,7 +80,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             EntityManager.add(statusToAdd);
             return null;
           }
@@ -98,7 +99,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             Integer id = (Integer) getParams()[0];
             return EntityManager.find(EncodingStatus.Finder.ByInodeId, id);
           }
@@ -125,7 +126,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             EntityManager.remove(statusToAdd);
             return null;
           }
@@ -152,7 +153,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             EntityManager.add(statusToAdd);
             return null;
           }
@@ -176,7 +177,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             Integer id = (Integer) getParams()[0];
             EntityManager.update(updatedStatus);
             return null;
@@ -197,7 +198,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             Integer id = (Integer) getParams()[0];
             return EntityManager.find(EncodingStatus.Finder.ByInodeId, id);
           }
@@ -224,7 +225,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             EntityManager.remove(statusToAdd);
             return null;
           }
@@ -262,7 +263,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             for (EncodingStatus status : statusToAdd) {
               EntityManager.add(status);
             }
@@ -280,7 +281,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             return EntityManager
                 .count(EncodingStatus.Counter.RequestedEncodings);
           }
@@ -298,7 +299,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             for (EncodingStatus status : statusToAdd) {
               EntityManager.remove(status);
             }
@@ -335,7 +336,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             for (EncodingStatus status : statusToAdd) {
               EntityManager.add(status);
             }
@@ -348,10 +349,9 @@ public class TestEncodingStatus extends TestCase {
         EncodingStatusOperationType.FIND_BY_INODE_ID) {
 
       @Override
-      public Object performTask() throws StorageException, IOException {
-        EncodingStatusDataAccess dataAccess =
-            (EncodingStatusDataAccess) HdfsStorageFactory
-                .getDataAccess(EncodingStatusDataAccess.class);
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
+        EncodingStatusDataAccess dataAccess = (EncodingStatusDataAccess)
+            HdfsStorageFactory.getDataAccess(connector, EncodingStatusDataAccess.class);
         Integer limit = (Integer) getParams()[0];
         return dataAccess.findRequestedEncodings(limit);
       }
@@ -378,7 +378,7 @@ public class TestEncodingStatus extends TestCase {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             for (EncodingStatus status : statusToAdd) {
               EntityManager.remove(status);
             }

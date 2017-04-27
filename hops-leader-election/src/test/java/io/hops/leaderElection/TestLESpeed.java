@@ -15,10 +15,12 @@
  */
 package io.hops.leaderElection;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.leaderElection.experiments.LightWeightNameNode;
 import io.hops.metadata.LEStorageFactory;
+import io.hops.transaction.TransactionCluster;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -51,15 +53,12 @@ public class TestLESpeed {
   private final long TIME_PERIOD_INCREMENT = 200;
 
   @Before
-  public void init()
-      throws StorageInitializtionException, StorageException, IOException,
-      ClassNotFoundException {
+  public void init() throws IOException, ClassNotFoundException {
     LogManager.getRootLogger().setLevel(Level.ALL);
-
-    nnList = new ArrayList<LightWeightNameNode>();
-    LEStorageFactory.setConfiguration(DRIVER_JAR, DRIVER_CLASS,
-        DFS_STORAGE_DRIVER_CONFIG_FILE);
-    LEStorageFactory.formatStorage();
+    nnList = new ArrayList<>();
+    LEStorageFactory.setConfiguration(DRIVER_JAR, DRIVER_CLASS, DFS_STORAGE_DRIVER_CONFIG_FILE);
+    StorageConnector connector = LEStorageFactory.getMultiZoneConnector().connectorFor(TransactionCluster.PRIMARY);
+    LEStorageFactory.formatStorage(connector);
     VarsRegister.registerHdfsDefaultValues();
   }
 

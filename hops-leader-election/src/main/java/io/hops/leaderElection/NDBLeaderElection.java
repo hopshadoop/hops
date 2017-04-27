@@ -21,21 +21,23 @@ import io.hops.leaderElection.exception.LeaderElectionForceAbort;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.election.entity.LeDescriptorFactory;
+import io.hops.services.LeaderElectionService;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.util.List;
 
-public class LeaderElection extends Thread {
+public class NDBLeaderElection extends Thread
+    implements LeaderElectionService {
 
-  private static final Logger LOG = Logger.getLogger(LeaderElection.class);
+  private static final Logger LOG = Logger.getLogger(NDBLeaderElection.class);
   public static final long DRIFT_CONSTANT = 100; //ms
   public static final long LEADER_INITIALIZATION_ID = -1;
   LEContext context;
   protected boolean running = true;
   protected boolean stopped = false;
   //for testing
-  private long pause_time = 0; // pause the thread for some time 
+  private long pause_time = 0; // pause the thread for some time
   private boolean pause_started = false;
   private boolean forceContantTP = false;
   private long forcedTimePerid = 0;
@@ -44,9 +46,9 @@ public class LeaderElection extends Thread {
   private boolean relinquishCurrentId = false;
   private final LeDescriptorFactory leFactory;
 
-  public LeaderElection(final LeDescriptorFactory leFactory,
-      final long time_period, final int max_missed_hb_threshold,
-      final long time_period_increment, String http_address, String host_name)
+  public NDBLeaderElection(final LeDescriptorFactory leFactory,
+                           final long time_period, final int max_missed_hb_threshold,
+                           final long time_period_increment, String http_address, String host_name)
       throws IOException {
     context = LEContext.initialContext();
     context.init_phase = true;
@@ -88,7 +90,7 @@ public class LeaderElection extends Thread {
         sucessfulTx++;
       } catch (TransientStorageException te) {
         LOG.error("LE Status: id " + context.id +
-            " LeaderElection thread received TransientStorageException. " +
+            " NDBLeaderElection thread received TransientStorageException. " +
             "sucessfulTx " + sucessfulTx + " failedTx " + failedtx +
             " time period " + context.time_period + " " + te.getMessage(), te);
         // transaction failed
@@ -97,7 +99,7 @@ public class LeaderElection extends Thread {
         failedtx++;
       } catch (LeaderElectionForceAbort fa) {
         LOG.error("LE Status: id " + context.id +
-            " LeaderElection thread received Forced Abort Exception." +
+            " NDBLeaderElection thread received Forced Abort Exception." +
             " sucessfulTx " + sucessfulTx + " failedTx " + failedtx +
             " time period " + context.time_period + " " + fa.getMessage(), fa);
         // transaction failed
@@ -106,7 +108,7 @@ public class LeaderElection extends Thread {
         failedtx++;
       } catch (Throwable t) {
         LOG.fatal("LE Status: id " + context.id +
-            " LeaderElection thread received non recoverable exception. " +
+            " NDBLeaderElection thread received non recoverable exception. " +
             t.getMessage(), t);
         running = false;
         txFailed = true;
@@ -123,11 +125,11 @@ public class LeaderElection extends Thread {
             !context.nextTimeTakeStrongerLocks) {
           // retry immediately if strong locks are requested
           sleepDuration = context.time_period;
-        } else { //retry immediately 
+        } else { //retry immediately
           sleepDuration = 0;
           if (txTotalTime > context.time_period) {
             LOG.error("LE Status: id " + context.id +
-                " LeaderElection: Update Tx took very long time to update: " +
+                " NDBLeaderElection: Update Tx took very long time to update: " +
                 txTotalTime + ", time_perid is " + context.time_period);
           }
         }
@@ -164,30 +166,30 @@ public class LeaderElection extends Thread {
   }
 
   public synchronized boolean isSecond() {
-    List<ActiveNode> activeNodes =context.memberShip.getSortedActiveNodes();
-    if (activeNodes.size()<2 ||
-            context.memberShip.getSortedActiveNodes().get(1).getId()==context.id) {
+    List<ActiveNode> activeNodes = context.memberShip.getSortedActiveNodes();
+    if (activeNodes.size() < 2 ||
+        context.memberShip.getSortedActiveNodes().get(1).getId() == context.id) {
       long elapsed_time = System.currentTimeMillis() - context.last_hb_time;
       if (elapsed_time <
           (context.time_period * context.max_missed_hb_threshold -
               DRIFT_CONSTANT)) {
         return true;
-      } 
+      }
     }
     return false;
   }
-  
+
   public void stopElectionThread() {
     running = false;
     this.interrupt();
   }
-  
+
   public boolean isStopped() {
     return stopped;
   }
 
   //for testing only
-  public void pauseFor(long pause) {
+  void pauseFor(long pause) {
     LOG.debug(
         "LE Status: id " + context.id + " setting pause flag. Time " + pause);
     if (pause_time != 0) {
@@ -198,7 +200,7 @@ public class LeaderElection extends Thread {
   }
 
   //for testing only
-  public void forceResume() {
+  void forceResume() {
     if (pause_started) {
       LOG.debug("LE Status: id " + context.id + " sending interrupt");
       this.interrupt();
@@ -208,8 +210,8 @@ public class LeaderElection extends Thread {
     }
   }
 
-  // only for testing 
-  public boolean isPaused() {
+  // only for testing
+  boolean isPaused() {
     if (pause_time > 0 ||
         pause_started) { // two separate condition as i am not synchronizing access to these variables
       return true;
@@ -254,7 +256,7 @@ public class LeaderElection extends Thread {
     }
   }
 
-  public synchronized long getCurrentId() {
+  public synchronized long getCurrentID() {
     return context.id;
   }
 
@@ -283,18 +285,22 @@ public class LeaderElection extends Thread {
       context.time_period = forcedTimePerid;
     }
   }
-  
+
+  /**
+   * Relinquishes the current id in the next round of elections.
+   * Blocks until it is done.
+   */
   public void relinquishCurrentIdInNextRound() throws InterruptedException {
     relinquishCurrentId = true;
     while (true) {
       Thread.sleep(50);
-      if (relinquishCurrentId == false) {
+      if (!relinquishCurrentId) {
         return;
       }
     }
   }
-  
-  public void waitActive() throws InterruptedException {
+
+  public void waitStarted() throws InterruptedException {
     while (true) {
       Thread.sleep(100);
       if (context.memberShip == null) {
@@ -304,6 +310,5 @@ public class LeaderElection extends Thread {
         return;
       }
     }
-    
   }
 }

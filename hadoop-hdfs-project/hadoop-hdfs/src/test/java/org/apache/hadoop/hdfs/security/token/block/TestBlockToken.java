@@ -21,9 +21,11 @@ package org.apache.hadoop.hdfs.security.token.block;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.security.token.block.NameNodeBlockTokenSecretManager;
+import io.hops.transaction.TransactionCluster;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -437,7 +439,8 @@ public class TestBlockToken {
   }
   
   private void resetStorage() throws StorageException {
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
   }
   
   class MyLeaderNameSystem implements Namesystem {

@@ -17,11 +17,13 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -855,7 +857,8 @@ public class TestReplicationPolicy {
    */
   @Test
   public void testChooseUnderReplicatedBlocks() throws Exception {
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
     int blockID = 0;
     UnderReplicatedBlocks underReplicatedBlocks = new UnderReplicatedBlocks();
 
@@ -1047,8 +1050,8 @@ public class TestReplicationPolicy {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -1060,7 +1063,7 @@ public class TestReplicationPolicy {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         EntityManager.add(new BlockInfo(block,
             inodeIdentifier != null ? inodeIdentifier.getInodeId() :
                 INode.NON_EXISTING_ID));
