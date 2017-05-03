@@ -21,6 +21,7 @@ import io.hops.metadata.common.CounterType;
 import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.transaction.EntityManager;
+import org.apache.hadoop.hdfs.protocol.Block;
 
 import java.util.Collection;
 import java.util.TreeSet;
@@ -196,4 +197,39 @@ public class Lease implements Comparable<Lease> {
   public static int getHolderId(String holder){
       return holder.hashCode();
   }
+
+
+  public void updateLastTwoBlocksInLeasePath(String path, Block
+      lastBlock, Block penultimateBlock)
+      throws TransactionContextException, StorageException {
+    updateLastTwoBlocksInLeasePath(path, lastBlock == null ? -1 : lastBlock
+        .getBlockId(), penultimateBlock == null ? -1 : penultimateBlock.getBlockId());
+  }
+
+  private void updateLastTwoBlocksInLeasePath(String path, long lastBlockId, long
+      penultimateBlockId)
+      throws TransactionContextException, StorageException {
+    Collection<LeasePath> lps = getPaths();
+    for(LeasePath lp : lps){
+      if(lp.getPath().equals(path)){
+        lp.setLastBlockId(lastBlockId);
+        lp.setPenultimateBlockId(penultimateBlockId);
+        EntityManager.update(lp);
+        break;
+      }
+    }
+  }
+
+  public LeasePath getLeasePath(String path)
+      throws TransactionContextException, StorageException {
+    Collection<LeasePath> lps = getPaths();
+    for(LeasePath lp : lps){
+      if(lp.getPath().equals(path)){
+        return lp;
+      }
+    }
+    return null;
+  }
+
+
 }

@@ -402,6 +402,9 @@ public class LockFactory {
     return list;
   }
 
+  public Lock getLastTwoBlocksLock(String src){
+    return new LastTwoBlocksLock(src);
+  }
 
   public void setConfiguration(Configuration conf) {
     BaseINodeLock.enableSetPartitionKey(

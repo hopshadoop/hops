@@ -115,7 +115,7 @@ public class ReplicaUnderConstructionContext
       aboutToAccessStorage(rFinder, params);
       result =
           dataAccess.findReplicaUnderConstructionByBlockId(blockId, inodeId);
-      gotFromDB(new BlockPK(blockId), result);
+      gotFromDB(new BlockPK(blockId, inodeId), result);
       miss(rFinder, result, "bid", blockId, "inodeid", inodeId);
     }
     return result;

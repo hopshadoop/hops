@@ -19,6 +19,8 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.hdfs.entity.LeasePath;
+import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -30,6 +32,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.MutableBlockCollection;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * I-node for file being written.
@@ -52,7 +55,10 @@ public class INodeFileUnderConstruction extends INodeFile
   private String clientName;         // lease holder
   private final String clientMachine;
   private final DatanodeID clientNode; // if client is a cluster node too.
-  
+
+  private long lastBlockId = -1;
+  private long penultimateBlockId = -1;
+
   public INodeFileUnderConstruction(PermissionStatus permissions,
       short replication, long preferredBlockSize, long modTime,
       String clientName, String clientMachine, DatanodeID clientNode)
@@ -210,4 +216,59 @@ public class INodeFileUnderConstruction extends INodeFile
     }
   }
 
+  void setLastBlockId(long lastBlockId){
+    this.lastBlockId = lastBlockId;
+  }
+
+  void setPenultimateBlockId(long penultimateBlockId){
+    this.penultimateBlockId = penultimateBlockId;
+  }
+
+  public void updateLastTwoBlocks(Lease lease)
+      throws TransactionContextException, StorageException {
+    updateLastTwoBlocks(lease, getFullPathName());
+  }
+
+  public void updateLastTwoBlocks(Lease lease, String src)
+      throws TransactionContextException, StorageException {
+    LeasePath lp = lease.getLeasePath(src);
+    setLastBlockId(lp.getLastBlockId());
+    setPenultimateBlockId(lp.getPenultimateBlockId());
+  }
+
+  @Override
+  public BlockInfo getLastBlock() throws IOException, StorageException {
+    if(lastBlockId < 0) {
+      return super.getLastBlock();
+    }
+    return EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+        lastBlockId, getId());
+  }
+
+  @Override
+  BlockInfo getPenultimateBlock()
+      throws StorageException, TransactionContextException {
+    if(penultimateBlockId < 0) {
+      return super.getPenultimateBlock();
+    }
+    return EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+        penultimateBlockId, getId());
+  }
+
+  @Override
+  public BlockInfo getBlock(int index)
+      throws TransactionContextException, StorageException {
+    List<BlockInfo> blocks = getBlocksOrderedByIndex();
+    if(blocks == null){
+      return null;
+    }
+
+    for(BlockInfo blk : blocks){
+      if(blk.getBlockIndex() == index){
+        return blk;
+      }
+    }
+
+    return null;
+  }
 }

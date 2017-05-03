@@ -43,6 +43,7 @@ import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.metadata.hdfs.entity.SizeLogEntry;
@@ -1852,8 +1853,12 @@ public class FSNamesystem
       throws IOException, StorageException {
     INodeFileUnderConstruction cons =
         file.convertToUnderConstruction(leaseHolder, clientMachine, clientNode);
-    leaseManager.addLease(cons.getClientName(), src);
+    Lease lease = leaseManager.addLease(cons.getClientName(), src);
     LocatedBlock ret = blockManager.convertLastBlockToUnderConstruction(cons);
+
+    lease.updateLastTwoBlocksInLeasePath(src, file.getLastBlock(), file
+        .getPenultimateBlock());
+
     return ret;
   }
 
@@ -2091,7 +2096,8 @@ public class FSNamesystem
             locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
                     INodeResolveType.PATH, src))
                 .add(lf.getLeaseLock(LockType.READ, clientName))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
+                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                .add(lf.getLastTwoBlocksLock(src))
                 .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC));
           }
 
@@ -2160,6 +2166,11 @@ public class FSNamesystem
 
             dir.persistBlocks(src, pendingFile2);
             offset = pendingFile2.computeFileSize(true);
+
+            Lease lease = leaseManager.getLease(clientName);
+            lease.updateLastTwoBlocksInLeasePath(src, newBlock,
+                ExtendedBlock.getLocalBlock(previous));
+
 
             // Return located block
             return makeLocatedBlock(newBlock, targets, offset);
@@ -2303,7 +2314,8 @@ public class FSNamesystem
             }
 
             //check lease
-            final INodeFileUnderConstruction file = checkLease(src, clientName);
+            final INodeFileUnderConstruction file = checkLease(src,
+                clientName, false);
             //clientnode = file.getClientNode(); HOP
             clientnode = getBlockManager().getDatanodeManager()
                 .getDatanode(file.getClientNode());
@@ -2346,7 +2358,9 @@ public class FSNamesystem
             LockFactory lf = getInstance();
             locks.add(lf.getINodeLock(nameNode,
                 INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH,
-                src)).add(lf.getLeaseLock(LockType.READ)).add(lf.getBlockLock())
+                src)).add(lf.getLeaseLock(LockType.READ))
+                .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src))
+                .add(lf.getBlockLock())
                 .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR));
           }
 
@@ -2363,8 +2377,11 @@ public class FSNamesystem
               throw new SafeModeException(
                   "Cannot abandon block " + b + " for fle" + src, safeMode);
             }
-            INodeFileUnderConstruction file = checkLease(src, holder);
+            INodeFileUnderConstruction file = checkLease(src, holder, false);
             dir.removeBlock(src, file, ExtendedBlock.getLocalBlock(b));
+            leaseManager.getLease(holder).updateLastTwoBlocksInLeasePath(src,
+                file.getLastBlock(), file.getPenultimateBlock());
+
             if (NameNode.stateChangeLog.isDebugEnabled()) {
               NameNode.stateChangeLog.debug(
                   "BLOCK* NameSystem.abandonBlock: " + b +
@@ -2382,11 +2399,24 @@ public class FSNamesystem
   private INodeFileUnderConstruction checkLease(String src, String holder)
       throws LeaseExpiredException, UnresolvedLinkException, StorageException,
       TransactionContextException {
-    return checkLease(src, holder, dir.getINode(src));
+    return checkLease(src, holder, true);
+  }
+  private INodeFileUnderConstruction checkLease(String src, String holder,
+      boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
+      UnresolvedLinkException, StorageException,
+      TransactionContextException {
+    return checkLease(src, holder, dir.getINode(src), updateLastTwoBlocksInFile);
   }
 
   private INodeFileUnderConstruction checkLease(String src, String holder,
       INode file) throws LeaseExpiredException, StorageException,
+      TransactionContextException {
+    return checkLease(src, holder, file, true);
+  }
+
+  private INodeFileUnderConstruction checkLease(String src, String holder,
+      INode file, boolean updateLastTwoBlocksInFile) throws
+      LeaseExpiredException, StorageException,
       TransactionContextException {
     if (file == null || !(file instanceof INodeFile)) {
       Lease lease = leaseManager.getLease(holder);
@@ -2407,6 +2437,10 @@ public class FSNamesystem
       throw new LeaseExpiredException(
           "Lease mismatch on " + src + " owned by " +
               pendingFile.getClientName() + " but is accessed by " + holder);
+    }
+
+    if(updateLastTwoBlocksInFile) {
+      pendingFile.updateLastTwoBlocks(leaseManager.getLease(holder), src);
     }
     return pendingFile;
   }
@@ -3098,7 +3132,8 @@ public class FSNamesystem
         LockFactory lf = getInstance();
         locks.add(
             lf.getINodeLock(nameNode, INodeLockType.WRITE, INodeResolveType.PATH,
-                src)).add(lf.getLeaseLock(LockType.READ))
+                src)).add(lf.getLeaseLock(LockType.READ, clientName))
+            .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
             .add(lf.getBlockLock());
       }
 
@@ -4860,7 +4895,7 @@ private void commitOrCompleteLastBlock(
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
             .add(lf.getLeaseLock(LockType.READ))
             .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
             .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
@@ -4896,6 +4931,9 @@ private void commitOrCompleteLastBlock(
     // check the vadility of the block and lease holder name
     final INodeFileUnderConstruction pendingFile =
         checkUCBlock(oldBlock, clientName);
+
+    pendingFile.updateLastTwoBlocks(leaseManager.getLease(clientName));
+
     final BlockInfoUnderConstruction blockinfo =
         (BlockInfoUnderConstruction) pendingFile.getLastBlock();
 
