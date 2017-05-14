@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.common.IDsMonitor;
@@ -26,7 +25,6 @@ import io.hops.common.INodeUtil;
 import io.hops.erasure_coding.Codec;
 import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.LockUpgradeException;
-import io.hops.exception.StorageCallPreventedException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.ActiveNode;
@@ -36,17 +34,13 @@ import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
-import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
 import io.hops.metadata.hdfs.dal.SafeBlocksDataAccess;
-import io.hops.metadata.hdfs.dal.SizeLogDataAccess;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
-import io.hops.metadata.hdfs.entity.SizeLogEntry;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.resolvingcache.Cache;
 import io.hops.security.Users;
@@ -146,17 +140,11 @@ import org.mortbay.util.ajax.JSON;
 import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
-import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -3325,17 +3313,6 @@ private void commitOrCompleteLastBlock(
       dir.updateSpaceConsumed(path, 0,
           -diff * fileINode.getBlockReplication());
       }
-    }
-    
-    try {
-      if (fileINode.isPathMetaEnabled()) {
-        SizeLogDataAccess da = (SizeLogDataAccess)
-            HdfsStorageFactory.getDataAccess(SizeLogDataAccess.class);
-        da.add(new SizeLogEntry(fileINode.getId(), fileINode.getSize()));
-      }
-    } catch (StorageCallPreventedException e) {
-      // Path is not available during block synchronization but it is OK
-      // for us if search results are off by one block
     }
   }
 

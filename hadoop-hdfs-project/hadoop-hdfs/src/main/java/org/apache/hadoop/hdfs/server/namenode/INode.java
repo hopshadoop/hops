@@ -21,10 +21,7 @@ import com.google.common.primitives.SignedBytes;
 import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.common.FinderType;
-import io.hops.metadata.hdfs.dal.AccessTimeLogDataAccess;
-import io.hops.metadata.hdfs.entity.AccessTimeLogEntry;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.security.UsersGroups;
@@ -696,12 +693,6 @@ public abstract class INode implements Comparable<byte[]> {
   public void setAccessTime(long atime)
       throws TransactionContextException, StorageException {
     setAccessTimeNoPersistance(atime);
-    if (isPathMetaEnabled()) { // log the operation for epipe
-      AccessTimeLogDataAccess da = (AccessTimeLogDataAccess)
-          HdfsStorageFactory.getDataAccess(AccessTimeLogDataAccess.class);
-      int userId = -1; // TODO get userId
-      da.add(new AccessTimeLogEntry(getId(), userId, atime));
-    }
     save();
   }
 
