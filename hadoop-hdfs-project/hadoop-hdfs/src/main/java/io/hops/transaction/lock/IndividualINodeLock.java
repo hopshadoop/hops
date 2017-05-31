@@ -80,6 +80,14 @@ final class IndividualINodeLock extends BaseINodeLock {
     acquireINodeAttributes();
   }
 
+  @Override
+  public String toString() {
+    if ( lockType != null && inodeIdentifier != null){
+      return "Individual InodeLock = { ID: "+inodeIdentifier.getInodeId()+" Name: "+inodeIdentifier.getName()+" Lock: "+lockType+" }";
+    }
+    return "Individual Inode Lock not set";
+  }
+
   private List<INode> readUpInodes(INode leaf)
       throws StorageException, TransactionContextException {
     LinkedList<INode> pathInodes = new LinkedList<INode>();

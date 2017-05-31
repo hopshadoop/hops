@@ -279,9 +279,11 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     Thread lockKeeper = null;
     try {
-      final long RETRY_WAIT = RequestHandler.BASE_WAIT_TIME;
-      final long RETRY_COUNT = RequestHandler.RETRY_COUNT;
       Configuration conf = new HdfsConfiguration();
+      final int RETRY_WAIT = conf.getInt(DFSConfigKeys.DFS_NAMENODE_TX_INITIAL_WAIT_TIME_BEFORE_RETRY_KEY,
+              DFSConfigKeys.DFS_NAMENODE_TX_INITIAL_WAIT_TIME_BEFORE_RETRY_DEFAULT);
+      final long RETRY_COUNT = conf.getInt(DFSConfigKeys.DFS_NAMENODE_TX_RETRY_COUNT_KEY,
+              DFSConfigKeys.DFS_NAMENODE_TX_RETRY_COUNT_DEFAULT);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 
