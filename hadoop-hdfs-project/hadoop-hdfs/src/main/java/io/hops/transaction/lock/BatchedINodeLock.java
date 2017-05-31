@@ -22,6 +22,7 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -58,5 +59,13 @@ public class BatchedINodeLock extends BaseINodeLock {
 
   int[] getINodeIds() {
     return inodeIds;
+  }
+
+  @Override
+  public String toString() {
+    if(inodeIdentifiers != null){
+      return "Batch INode Lock = { "+inodeIdentifiers.size()+" inodes locked "+" }";
+    }
+    return "No inodes selected for batch locking";
   }
 }

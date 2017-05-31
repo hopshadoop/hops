@@ -226,10 +226,21 @@ class DataXceiver extends Receiver implements Runnable {
         ++opsProcessed;
       } while (!s.isClosed() && dnConf.socketKeepaliveTimeout > 0);
     } catch (Throwable t) {
-      LOG.error(datanode.getDisplayName() + ":DataXceiver error processing " +
-          ((op == null) ? "unknown" : op.name()) + " operation " +
-          " src: " + remoteAddress +
-          " dest: " + localAddress, t);
+      String s = datanode.getDisplayName() + ":DataXceiver error processing "
+          + ((op == null) ? "unknown" : op.name()) + " operation "
+          + " src: " + remoteAddress + " dst: " + localAddress;
+      if (op == Op.WRITE_BLOCK && t instanceof ReplicaAlreadyExistsException) {
+        // For WRITE_BLOCK, it is okay if the replica already exists since
+        // client and replication may write the same block to the same datanode
+        // at the same time.
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(s, t);
+        } else {
+          LOG.info(s + "; " + t);
+        }
+      } else {
+        LOG.error(s, t);
+      }
     } finally {
       if (LOG.isDebugEnabled()) {
         LOG.debug(

@@ -287,4 +287,5 @@ public abstract class BaseINodeLock extends Lock {
   protected final Type getType() {
     return Type.INode;
   }
+
 }

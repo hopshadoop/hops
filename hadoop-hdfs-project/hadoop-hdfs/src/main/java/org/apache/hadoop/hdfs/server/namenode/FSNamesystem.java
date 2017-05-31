@@ -4722,11 +4722,15 @@ private void commitOrCompleteLastBlock(
   
 
   @Override // FSNamesystemMBean
+  @Metric({"LiveDataNodes",
+      "Number of datanodes marked as live"})
   public int getNumLiveDataNodes() {
     return getBlockManager().getDatanodeManager().getNumLiveDataNodes();
   }
 
   @Override // FSNamesystemMBean
+  @Metric({"DeadDataNodes",
+      "Number of datanodes marked dead due to delayed heartbeat"})
   public int getNumDeadDataNodes() {
     return getBlockManager().getDatanodeManager().getNumDeadDataNodes();
   }

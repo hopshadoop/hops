@@ -620,4 +620,23 @@ class INodeLock extends BaseINodeLock {
       throws StorageException, TransactionContextException {
     return find(lockType, name, parentId, partitionId);
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("INodeLock {");
+    if(paths != null && paths.length > 0){
+      sb.append("paths=");
+      sb.append(Arrays.toString(paths));
+      sb.append(", ");
+    }
+    if(lockType != null){
+      sb.append("lockType=");
+      sb.append(lockType);
+      sb.append(", ");
+    }
+
+    sb.append("}");
+    return sb.toString();
+  }
 }
