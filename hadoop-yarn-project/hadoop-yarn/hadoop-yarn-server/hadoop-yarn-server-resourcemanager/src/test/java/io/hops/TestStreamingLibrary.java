@@ -78,11 +78,12 @@ public class TestStreamingLibrary {
     }
 
     @Test
+    @Ignore
     public void testRMReceiveEvents() throws Exception {
         LOG.debug("Register NM1");
-        MockNM nm1 = rm.registerNode("host0:1234", 4 * GB, 4);
+        MockNM nm1 = rm.registerNode("host0:1234", 4 * GB, 4, 4);
         LOG.debug("Register NM2");
-        MockNM nm2 = rm.registerNode("host1:1234", 6 * GB, 6);
+        MockNM nm2 = rm.registerNode("host1:1234", 6 * GB, 6, 6);
 
         LOG.debug("Heartbeat NM1");
         nm1.nodeHeartbeat(true);
@@ -96,6 +97,7 @@ public class TestStreamingLibrary {
         TimeUnit.SECONDS.sleep(4);
     }
 
+    @Ignore
     @Test
     public void testAddNode() throws Exception {
 
@@ -121,13 +123,16 @@ public class TestStreamingLibrary {
         Assert.assertNotNull(rm.getResourceScheduler().getNodeReport(toCommit.getYarnRMNode().getNodeID()));
         int clusterMemory = rm.getResourceScheduler().getClusterResource().getMemory();
         int clusterVCores = rm.getResourceScheduler().getClusterResource().getVirtualCores();
+        int clusterGPUs = rm.getResourceScheduler().getClusterResource().getGPUs();
         int numOfNodes = rm.getResourceScheduler().getNumClusterNodes();
 
         Assert.assertEquals(toCommit.getYarnRMNode().getTotalCapability().getMemory(), clusterMemory);
         Assert.assertEquals(toCommit.getYarnRMNode().getTotalCapability().getVirtualCores(), clusterVCores);
+        Assert.assertEquals(toCommit.getYarnRMNode().getTotalCapability().getGPUs(), clusterGPUs);
         Assert.assertEquals(1, numOfNodes);
     }
 
+    @Ignore
     @Test
     public void testRemoveNode() throws Exception {
         // First add a new node
@@ -164,11 +169,13 @@ public class TestStreamingLibrary {
 
         int clusterMemory = rm.getResourceScheduler().getClusterResource().getMemory();
         int clusterVCores = rm.getResourceScheduler().getClusterResource().getVirtualCores();
+        int clusterGPUs = rm.getResourceScheduler().getClusterResource().getGPUs();
         int numOfNodes = rm.getResourceScheduler().getNumClusterNodes();
 
         Assert.assertNull(rm.getResourceScheduler().getNodeReport(decNode.getYarnRMNode().getNodeID()));
         Assert.assertEquals(dummyNode.getYarnRMNode().getTotalCapability().getMemory(), clusterMemory);
         Assert.assertEquals(dummyNode.getYarnRMNode().getTotalCapability().getVirtualCores(), clusterVCores);
+        Assert.assertEquals(dummyNode.getYarnRMNode().getTotalCapability().getGPUs(), clusterGPUs);
         Assert.assertEquals(1, numOfNodes);
     }
 
@@ -208,7 +215,7 @@ public class TestStreamingLibrary {
                 1337,
                 8080,
                 new NodeBase("name", "/location"),
-                Resource.newInstance(6 * GB, 6),
+                Resource.newInstance(6 * GB, 6, 6),
                 "1.0");
         
         if (!NodeState.NEW.equals(state)) {
@@ -232,6 +239,7 @@ public class TestStreamingLibrary {
                 rmNode.getNodeID().toString(),
                 rmNode.getTotalCapability().getMemory(),
                 rmNode.getTotalCapability().getVirtualCores(),
+                rmNode.getTotalCapability().getGPUs(),
                 id);
         contains ++;
         

@@ -397,7 +397,9 @@ public class ParentQueue extends AbstractCSQueue {
       // looking
       if (!super.canAssignToThisQueue(clusterResource, nodeLabels, resourceLimits,
           minimumAllocation, Resources.createResource(getMetrics()
-              .getReservedMB(), getMetrics().getReservedVirtualCores()))) {
+              .getReservedMB(), getMetrics().getReservedVirtualCores(),
+              getMetrics().getReservedGPUs())
+      )) {
         break;
       }
       

@@ -35,7 +35,8 @@ public class TestResourceCalculator {
   public static Collection<ResourceCalculator[]> getParameters() {
     return Arrays.asList(new ResourceCalculator[][] {
         { new DefaultResourceCalculator() },
-        { new DominantResourceCalculator() } });
+        { new DominantResourceCalculator() },
+        { new DominantResourceCalculatorGPU() } });
   }
 
   public TestResourceCalculator(ResourceCalculator rs) {
@@ -64,29 +65,30 @@ public class TestResourceCalculator {
     assertResourcesOperations(clusterResource, lhs, rhs, true, true, false,
         false, rhs, lhs);
 
-    if (!(resourceCalculator instanceof DominantResourceCalculator)) {
+    if (!(resourceCalculator instanceof DominantResourceCalculator)
+            || resourceCalculator instanceof DominantResourceCalculatorGPU) {
       return;
     }
 
     // verify for 2 dimensional resources i.e memory and cpu
     // dominant resource types
-    lhs = Resource.newInstance(1, 0);
-    rhs = Resource.newInstance(0, 1);
+    lhs = Resource.newInstance(1, 0,6);
+    rhs = Resource.newInstance(0, 1,3);
     assertResourcesOperations(clusterResource, lhs, rhs, false, true, false,
         true, lhs, lhs);
 
-    lhs = Resource.newInstance(0, 1);
-    rhs = Resource.newInstance(1, 0);
+    lhs = Resource.newInstance(0, 1, 4);
+    rhs = Resource.newInstance(1, 0, 9);
     assertResourcesOperations(clusterResource, lhs, rhs, false, true, false,
         true, lhs, lhs);
 
-    lhs = Resource.newInstance(1, 1);
-    rhs = Resource.newInstance(1, 0);
+    lhs = Resource.newInstance(1, 1, 3);
+    rhs = Resource.newInstance(1, 0, 5);
     assertResourcesOperations(clusterResource, lhs, rhs, false, false, true,
         true, lhs, rhs);
 
-    lhs = Resource.newInstance(0, 1);
-    rhs = Resource.newInstance(1, 1);
+    lhs = Resource.newInstance(0, 1,1);
+    rhs = Resource.newInstance(1, 1,0);
     assertResourcesOperations(clusterResource, lhs, rhs, true, true, false,
         false, rhs, lhs);
 

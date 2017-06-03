@@ -170,7 +170,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
   }
 
   @Override 
-  public void init() throws IOException {        
+  public void init() throws IOException {
     // Send command to executor which will just start up, 
     // verify configuration/permissions and exit
     List<String> command = new ArrayList<String>(
@@ -195,6 +195,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     resourcesHandler.init(this);
   }
   
+  
+  
   @Override
   public void startLocalizer(Path nmPrivateContainerTokensPath,
       InetSocketAddress nmAddr, String user, String appId, String locId,
@@ -214,8 +216,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
                    Integer.toString(Commands.INITIALIZE_CONTAINER.getValue()),
                    appId,
                    nmPrivateContainerTokensPath.toUri().getPath().toString(),
-                   StringUtils.join(",", localDirs),
-                   StringUtils.join(",", logDirs)));
+                           StringUtils.join("%", localDirs),
+                           StringUtils.join("%", logDirs)));
 
     File jvm =                                  // use same jvm as parent
       new File(new File(System.getProperty("java.home"), "bin"), "java");
@@ -246,7 +248,12 @@ public class LinuxContainerExecutor extends ContainerExecutor {
       		" (exitCode=" + exitCode + ") with output: " + shExec.getOutput(), e);
     }
   }
-
+  
+  @Override
+  public void recoverDeviceControlSystem(ContainerId containerId) {
+    resourcesHandler.recoverDeviceControlSystem(containerId);
+  }
+  
   @VisibleForTesting
   public void buildMainArgs(List<String> command, String user, String appId,
       String locId, InetSocketAddress nmAddr, List<String> localDirs) {
@@ -270,6 +277,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
             container.getResource());
     String resourcesOptions = resourcesHandler.getResourcesOption(
             containerId);
+    
+    LOG.info("The resourcesOptions " + resourcesOptions);
 
     ShellCommandExecutor shExec = null;
 
@@ -285,8 +294,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
             nmPrivateCotainerScriptPath.toUri().getPath().toString(),
             nmPrivateTokensPath.toUri().getPath().toString(),
             pidFilePath.toString(),
-            StringUtils.join(",", localDirs),
-            StringUtils.join(",", logDirs),
+                        StringUtils.join("%", localDirs),
+                        StringUtils.join("%", logDirs),
             resourcesOptions));
         String[] commandArray = command.toArray(new String[command.size()]);
         shExec = new ShellCommandExecutor(commandArray, null, // NM's cwd

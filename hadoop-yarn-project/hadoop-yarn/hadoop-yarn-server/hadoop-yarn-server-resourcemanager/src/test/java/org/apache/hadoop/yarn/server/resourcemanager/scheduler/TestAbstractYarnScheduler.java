@@ -69,11 +69,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSc
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -394,6 +396,7 @@ public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
     MockRM rm1 = new MockRM(conf);
     try {
       rm1.start();
+      Assume.assumeFalse(rm1.getResourceScheduler() instanceof FairScheduler);
       RMApp app1 =
           rm1.submitApp(200, "name", "user",
               new HashMap<ApplicationAccessType, String>(), false, "default",

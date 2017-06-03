@@ -464,30 +464,48 @@ public class MockRM extends ResourceManager {
 
     return rmApp;
   }
-
+  
   public MockNM registerNode(String nodeIdStr, int memory) throws Exception {
     MockNM nm = new MockNM(nodeIdStr, memory, getResourceTrackerService());
     nm.registerNode();
     return nm;
   }
-
+  
   public MockNM registerNode(String nodeIdStr, int memory, int vCores)
       throws Exception {
-    MockNM nm =
-        new MockNM(nodeIdStr, memory, vCores, getResourceTrackerService());
+    MockNM nm = new MockNM(nodeIdStr, memory, vCores, getResourceTrackerService());
     nm.registerNode();
     return nm;
   }
   
-  public MockNM registerNode(String nodeIdStr, int memory, int vCores,
-      List<ApplicationId> runningApplications) throws Exception {
+  public MockNM registerNode(String nodeIdStr, int memory, int vCores, int gpus)
+      throws Exception {
+    MockNM nm = new MockNM(nodeIdStr, memory, vCores, gpus,
+        getResourceTrackerService());
+    nm.registerNode();
+    return nm;
+  }
+  
+  public MockNM registerNode(String nodeIdStr, int memory, int vCores, int
+      gpus,List<ApplicationId> runningApplications) throws Exception {
     MockNM nm =
-        new MockNM(nodeIdStr, memory, vCores, getResourceTrackerService(),
+        new MockNM(nodeIdStr, memory, vCores, gpus,
+            getResourceTrackerService(),
             YarnVersionInfo.getVersion());
     nm.registerNode(runningApplications);
     return nm;
   }
-
+  
+  
+  public MockNM registerNode(String nodeIdStr, int memory, int vCores,
+      List<ApplicationId> runningApplications) throws Exception {
+    MockNM nm =
+        new MockNM(nodeIdStr, memory, vCores, 0, getResourceTrackerService(),
+            YarnVersionInfo.getVersion());
+    nm.registerNode(runningApplications);
+    return nm;
+  }
+  
   public void sendNodeStarted(MockNM nm) throws Exception {
     RMNodeImpl node = (RMNodeImpl) getRMContext().getRMNodes().get(
         nm.getNodeId());

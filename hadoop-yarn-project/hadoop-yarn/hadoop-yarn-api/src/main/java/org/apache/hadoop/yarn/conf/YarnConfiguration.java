@@ -173,6 +173,9 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES =
       YARN_PREFIX + "scheduler.minimum-allocation-vcores";
     public static final int DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES = 1;
+  public static final String RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS =
+      YARN_PREFIX + "scheduler.minimum-allocation-gpus";
+  public static final int DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS = 0;
 
   /** Maximum request grant-able by the RM scheduler. */
   public static final String RM_SCHEDULER_MAXIMUM_ALLOCATION_MB =
@@ -181,6 +184,9 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES =
       YARN_PREFIX + "scheduler.maximum-allocation-vcores";
   public static final int DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES = 4;
+  public static final String RM_SCHEDULER_MAXIMUM_ALLOCATION_GPUS =
+      YARN_PREFIX + "scheduler.maximum-allocation-gpus";
+  public static final int DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_GPUS = 8;
 
   /** Number of threads to handle scheduler interface.*/
   public static final String RM_SCHEDULER_CLIENT_THREAD_COUNT =
@@ -832,6 +838,11 @@ RM_PREFIX + "resource-tracker.port";
       + "vmem-check-enabled";
   public static final boolean DEFAULT_NM_VMEM_CHECK_ENABLED = true;
 
+  /** If GPUs should be offered as a resource */
+  public static final String NM_GPU_RESOURCE_ENABLED =
+      NM_PREFIX + "resource.gpus.enabled";
+  public static final boolean DEFAULT_NM_GPU_RESOURCE_ENABLED = false;
+
   /** Conversion ratio for physical memory to virtual memory. */
   public static final String NM_VMEM_PMEM_RATIO =
     NM_PREFIX + "vmem-pmem-ratio";
@@ -840,7 +851,11 @@ RM_PREFIX + "resource-tracker.port";
   /** Number of Virtual CPU Cores which can be allocated for containers.*/
   public static final String NM_VCORES = NM_PREFIX + "resource.cpu-vcores";
   public static final int DEFAULT_NM_VCORES = 8;
-
+  
+  /** Number of GPUs which can be allocated for containers */
+  public static final String NM_GPUS = NM_PREFIX + "resource.gpus";
+  public static final int DEFAULT_NM_GPUS = 0;
+  
   /** Percentage of overall CPU which can be allocated for containers. */
   public static final String NM_RESOURCE_PERCENTAGE_PHYSICAL_CPU_LIMIT =
       NM_PREFIX + "resource.percentage-physical-cpu-limit";

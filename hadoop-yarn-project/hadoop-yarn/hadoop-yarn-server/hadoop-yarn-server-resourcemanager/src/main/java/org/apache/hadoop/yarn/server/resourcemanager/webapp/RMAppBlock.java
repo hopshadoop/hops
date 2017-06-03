@@ -102,9 +102,10 @@ public class RMAppBlock extends AppBlock{
         ._("Number of Non-AM Containers Preempted from Current Attempt:",
           attemptNumNonAMContainerPreempted)
         ._("Aggregate Resource Allocation:",
-          String.format("%d MB-seconds, %d vcore-seconds",
-              appMetrics == null ? "N/A" : appMetrics.getMemorySeconds(),
-              appMetrics == null ? "N/A" : appMetrics.getVcoreSeconds()));
+            String.format("%d MB-seconds, %d vcore-seconds, %d gpu-seconds",
+                appMetrics == null ? "N/A" : appMetrics.getMemorySeconds(),
+                appMetrics == null ? "N/A" : appMetrics.getVcoreSeconds(),
+                appMetrics == null ? "N/A" : appMetrics.getGPUSeconds()));
     pdiv._();
   }
 

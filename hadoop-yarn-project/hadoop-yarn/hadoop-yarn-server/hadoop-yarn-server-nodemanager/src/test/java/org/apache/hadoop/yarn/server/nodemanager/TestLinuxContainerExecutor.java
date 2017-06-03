@@ -478,5 +478,10 @@ public class TestLinuxContainerExecutor {
     public String getResourcesOption(ContainerId containerId) {
       return null;
     }
+  
+    @Override
+    public void recoverDeviceControlSystem(ContainerId containerId) {
+    
+    }
   }
 }

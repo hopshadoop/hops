@@ -25,6 +25,9 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager
     .ParameterizedSchedulerTestBase;
 import static org.junit.Assert.fail;
+
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
+import org.junit.Assume;
 import org.junit.Before;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
@@ -215,6 +218,7 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
       protected void doSecureLogin() throws IOException {
       }
     };
+    Assume.assumeFalse(rm.getResourceScheduler() instanceof FairScheduler);
     rm.start();
 
     // Submit an app
@@ -459,6 +463,7 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
       protected void doSecureLogin() throws IOException {
       }
     };
+    Assume.assumeFalse(rm.getResourceScheduler() instanceof FairScheduler);
     rm.start();
 
     // Submit an app
