@@ -81,10 +81,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppRemovedS
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
-import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
-import org.apache.hadoop.yarn.util.resource.DominantResourceCalculator;
-import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
-import org.apache.hadoop.yarn.util.resource.Resources;
+import org.apache.hadoop.yarn.util.resource.*;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -162,7 +159,7 @@ public class TestSchedulerUtils {
   
   @Test (timeout = 30000)
   public void testNormalizeRequestWithDominantResourceCalculator() {
-    ResourceCalculator resourceCalculator = new DominantResourceCalculator();
+    ResourceCalculator resourceCalculator = new DominantResourceCalculatorGPU();
     
     Resource minResource = Resources.createResource(1024, 1);
     Resource maxResource = Resources.createResource(10240, 10);

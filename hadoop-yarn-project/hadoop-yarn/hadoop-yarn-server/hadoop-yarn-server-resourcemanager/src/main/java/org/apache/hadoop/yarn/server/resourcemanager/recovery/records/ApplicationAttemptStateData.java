@@ -41,7 +41,7 @@ public abstract class ApplicationAttemptStateData {
       String finalTrackingUrl, String diagnostics,
       FinalApplicationStatus amUnregisteredFinalStatus, int exitStatus,
       long finishTime, long memorySeconds, long vcoreSeconds,
-      String trackingUrl) {
+      long gpuSeconds, String trackingUrl) {
     ApplicationAttemptStateData attemptStateData =
         Records.newRecord(ApplicationAttemptStateData.class);
     attemptStateData.setAttemptId(attemptId);
@@ -56,6 +56,7 @@ public abstract class ApplicationAttemptStateData {
     attemptStateData.setFinishTime(finishTime);
     attemptStateData.setMemorySeconds(memorySeconds);
     attemptStateData.setVcoreSeconds(vcoreSeconds);
+    attemptStateData.setGPUSeconds(gpuSeconds);
     attemptStateData.setTrackingUrl(trackingUrl);
     return attemptStateData;
   }
@@ -63,10 +64,10 @@ public abstract class ApplicationAttemptStateData {
   public static ApplicationAttemptStateData newInstance(
       ApplicationAttemptId attemptId, Container masterContainer,
       Credentials attemptTokens, long startTime, long memorySeconds,
-      long vcoreSeconds, String trackingUrl) {
+      long vcoreSeconds, long gpuSeconds, String trackingUrl) {
     return newInstance(attemptId, masterContainer, attemptTokens,
         startTime, null, "N/A", "", null, ContainerExitStatus.INVALID, 0,
-        memorySeconds, vcoreSeconds, trackingUrl);
+        memorySeconds, vcoreSeconds, gpuSeconds, trackingUrl);
     }
 
 
@@ -200,4 +201,12 @@ public abstract class ApplicationAttemptStateData {
   @Public
   @Unstable
   public abstract void setVcoreSeconds(long vcoreSeconds);
+  
+  @Public
+  @Unstable
+  public abstract long getGPUSeconds();
+  
+  @Public
+  @Unstable
+  public abstract void setGPUSeconds(long gpuSeconds);
 }

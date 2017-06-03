@@ -21,9 +21,11 @@ package org.apache.hadoop.yarn.server.nodemanager.util;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.UnsupportedCodecException;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
 public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
 
@@ -60,6 +62,9 @@ public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
   public String getResourcesOption(ContainerId containerId) {
     return "cgroups=none";
   }
-
-
+  
+  @Override
+  public void recoverDeviceControlSystem(ContainerId containerId) {
+    LOG.warn("DefaultLCEResourcesHandler does not support device recovery");
+  }
 }

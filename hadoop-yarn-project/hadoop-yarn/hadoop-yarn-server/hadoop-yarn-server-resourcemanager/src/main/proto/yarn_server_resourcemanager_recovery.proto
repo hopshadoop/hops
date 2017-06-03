@@ -83,6 +83,7 @@ message ApplicationAttemptStateDataProto {
     optional int64 vcore_seconds = 11;
     optional int64 finish_time = 12;
     optional string tracking_url = 13;
+    optional int64 gpu_seconds = 14;
 }
 
 message EpochProto {

@@ -418,6 +418,12 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
     return sb.toString();
   }
+  
+  @Override
+  public void recoverDeviceControlSystem(ContainerId containerId) {
+    LOG.info("GPU recovery does not work using CgroupsLCEResourcesHandler, " +
+        " use CgroupsLCEResourcesHandlerGPU instead");
+  }
 
   /* We are looking for entries of the form:
    * none /cgroup/path/mem cgroup rw,memory 0 0

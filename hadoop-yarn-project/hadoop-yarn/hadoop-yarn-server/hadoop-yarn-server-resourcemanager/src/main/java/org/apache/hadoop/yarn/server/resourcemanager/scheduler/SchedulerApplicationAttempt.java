@@ -78,6 +78,7 @@ public class SchedulerApplicationAttempt {
   protected long lastMemoryAggregateAllocationUpdateTime = 0;
   private long lastMemorySeconds = 0;
   private long lastVcoreSeconds = 0;
+  private long lastGpuSeconds = 0;
 
   protected final AppSchedulingInfo appSchedulingInfo;
   protected ApplicationAttemptId attemptId;
@@ -539,6 +540,7 @@ public class SchedulerApplicationAttempt {
         > MEM_AGGREGATE_ALLOCATION_CACHE_MSECS) {
       long memorySeconds = 0;
       long vcoreSeconds = 0;
+      long gpuSeconds = 0;
       for (RMContainer rmContainer : this.liveContainers.values()) {
         long usedMillis = currentTimeMillis - rmContainer.getCreationTime();
         Resource resource = rmContainer.getContainer().getResource();
@@ -546,13 +548,17 @@ public class SchedulerApplicationAttempt {
             DateUtils.MILLIS_PER_SECOND;
         vcoreSeconds += resource.getVirtualCores() * usedMillis  
             / DateUtils.MILLIS_PER_SECOND;
+        gpuSeconds += resource.getGPUs() * usedMillis
+            / DateUtils.MILLIS_PER_SECOND;
       }
 
       lastMemoryAggregateAllocationUpdateTime = currentTimeMillis;
       lastMemorySeconds = memorySeconds;
       lastVcoreSeconds = vcoreSeconds;
+      lastGpuSeconds = gpuSeconds;
     }
-    return new AggregateAppResourceUsage(lastMemorySeconds, lastVcoreSeconds);
+    return new AggregateAppResourceUsage(lastMemorySeconds, lastVcoreSeconds,
+        lastGpuSeconds);
   }
 
   public synchronized ApplicationResourceUsageReport getResourceUsageReport() {
@@ -561,7 +567,8 @@ public class SchedulerApplicationAttempt {
                reservedContainers.size(), Resources.clone(currentConsumption),
                Resources.clone(currentReservation),
                Resources.add(currentConsumption, currentReservation),
-               resUsage.getMemorySeconds(), resUsage.getVcoreSeconds());
+               resUsage.getMemorySeconds(), resUsage.getVcoreSeconds(),
+               resUsage.getGPUSeconds());
   }
 
   public synchronized Map<ContainerId, RMContainer> getLiveContainersMap() {

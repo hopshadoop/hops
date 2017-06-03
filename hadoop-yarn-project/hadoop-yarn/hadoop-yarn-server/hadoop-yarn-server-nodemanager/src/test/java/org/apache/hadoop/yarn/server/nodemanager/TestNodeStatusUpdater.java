@@ -234,7 +234,7 @@ public class TestNodeStatusUpdater {
             ContainerId.newContainerId(appAttemptID, heartBeatID);
         ContainerLaunchContext launchContext = recordFactory
             .newRecordInstance(ContainerLaunchContext.class);
-        Resource resource = BuilderUtils.newResource(2, 1);
+        Resource resource = BuilderUtils.newResource(2, 1, 1);
         long currentTime = System.currentTimeMillis();
         String user = "testUser";
         ContainerTokenIdentifier containerToken = BuilderUtils
@@ -268,7 +268,7 @@ public class TestNodeStatusUpdater {
             .newRecordInstance(ContainerLaunchContext.class);
         long currentTime = System.currentTimeMillis();
         String user = "testUser";
-        Resource resource = BuilderUtils.newResource(3, 1);
+        Resource resource = BuilderUtils.newResource(3, 1, 2);
         ContainerTokenIdentifier containerToken = BuilderUtils
             .newContainerTokenIdentifier(BuilderUtils.newContainerToken(
                 secondContainerID, InetAddress.getByName("localhost")

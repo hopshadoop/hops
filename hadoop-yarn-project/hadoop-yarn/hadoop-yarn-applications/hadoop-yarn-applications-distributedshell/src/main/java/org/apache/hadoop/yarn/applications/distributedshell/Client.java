@@ -150,6 +150,9 @@ public class Client {
   private int containerMemory = 10; 
   // Amt. of virtual cores to request for container in which shell script will be executed
   private int containerVirtualCores = 1;
+  // Amt. of GPUs to request for container in which shell script will be executed
+  private int containerGPUs = 0;
+
   // No. of containers in which the shell script needs to be executed
   private int numContainers = 1;
   private String nodeLabelExpression = null;
@@ -258,6 +261,7 @@ public class Client {
     opts.addOption("shell_cmd_priority", true, "Priority for the shell command containers");
     opts.addOption("container_memory", true, "Amount of memory in MB to be requested to run the shell command");
     opts.addOption("container_vcores", true, "Amount of virtual cores to be requested to run the shell command");
+    opts.addOption("container_gpus", true, "Amount of GPUs to be requested to run the shell command");
     opts.addOption("num_containers", true, "No. of containers on which the shell command needs to be executed");
     opts.addOption("log_properties", true, "log4j.properties file");
     opts.addOption("keep_containers_across_application_attempts", false,
@@ -396,14 +400,16 @@ public class Client {
 
     containerMemory = Integer.parseInt(cliParser.getOptionValue("container_memory", "10"));
     containerVirtualCores = Integer.parseInt(cliParser.getOptionValue("container_vcores", "1"));
+    containerGPUs = Integer.parseInt(cliParser.getOptionValue("container_gpus", "0"));
     numContainers = Integer.parseInt(cliParser.getOptionValue("num_containers", "1"));
-    
 
-    if (containerMemory < 0 || containerVirtualCores < 0 || numContainers < 1) {
+
+    if (containerMemory < 0 || containerVirtualCores < 0 || containerGPUs < 0 || numContainers < 1) {
       throw new IllegalArgumentException("Invalid no. of containers or container memory/vcores specified,"
           + " exiting."
           + " Specified containerMemory=" + containerMemory
           + ", containerVirtualCores=" + containerVirtualCores
+          + ", containerGPUs=" + containerGPUs
           + ", numContainer=" + numContainers);
     }
     
@@ -507,7 +513,7 @@ public class Client {
           + ", max=" + maxVCores);
       amVCores = maxVCores;
     }
-    
+
     // set the application name
     ApplicationSubmissionContext appContext = app.getApplicationSubmissionContext();
     ApplicationId appId = appContext.getApplicationId();
@@ -625,6 +631,7 @@ public class Client {
     // Set params for Application Master
     vargs.add("--container_memory " + String.valueOf(containerMemory));
     vargs.add("--container_vcores " + String.valueOf(containerVirtualCores));
+    vargs.add("--container_gpus " + String.valueOf(containerGPUs));
     vargs.add("--num_containers " + String.valueOf(numContainers));
     if (null != nodeLabelExpression) {
       appContext.setNodeLabelExpression(nodeLabelExpression);

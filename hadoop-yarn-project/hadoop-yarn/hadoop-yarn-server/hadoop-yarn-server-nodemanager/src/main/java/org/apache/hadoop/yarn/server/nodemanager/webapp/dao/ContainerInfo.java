@@ -43,6 +43,7 @@ public class ContainerInfo {
   protected String user;
   protected long totalMemoryNeededMB;
   protected long totalVCoresNeeded;
+  protected long totalGPUsNeeded;
   protected String containerLogsLink;
   protected String nodeId;
   @XmlTransient
@@ -134,6 +135,10 @@ public class ContainerInfo {
 
   public long getVCoresNeeded() {
     return this.totalVCoresNeeded;
+  }
+  
+  public long getGPUsNeeded() {
+    return this.totalGPUsNeeded;
   }
 
 }
