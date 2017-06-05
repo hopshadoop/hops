@@ -121,8 +121,13 @@ public class TestNMWebServicesApps extends JerseyTestBase {
         public long getVCoresAllocatedForContainers() {
           return new Long("4000");
         }
-
-
+  
+        @Override
+        public long getGPUsAllocatedForContainers() {
+          return new Long("4000");
+        }
+  
+  
         @Override
         public boolean isVmemCheckEnabled() {
           return true;

@@ -36,7 +36,7 @@ public abstract class ApplicationResourceUsageReport {
   public static ApplicationResourceUsageReport newInstance(
       int numUsedContainers, int numReservedContainers, Resource usedResources,
       Resource reservedResources, Resource neededResources, long memorySeconds,
-      long vcoreSeconds) {
+      long vcoreSeconds, long gpuSeconds) {
     ApplicationResourceUsageReport report =
         Records.newRecord(ApplicationResourceUsageReport.class);
     report.setNumUsedContainers(numUsedContainers);
@@ -46,6 +46,7 @@ public abstract class ApplicationResourceUsageReport {
     report.setNeededResources(neededResources);
     report.setMemorySeconds(memorySeconds);
     report.setVcoreSeconds(vcoreSeconds);
+    report.setGPUSeconds(gpuSeconds);
     return report;
   }
 
@@ -152,4 +153,12 @@ public abstract class ApplicationResourceUsageReport {
   @Public
   @Unstable
   public abstract long getVcoreSeconds();
+  
+  @Private
+  @Unstable
+  public abstract void setGPUSeconds(long gpuSeconds);
+
+  @Public
+  @Unstable
+  public abstract long getGPUSeconds();
 }

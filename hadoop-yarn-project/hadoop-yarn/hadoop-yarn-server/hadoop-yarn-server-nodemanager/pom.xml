@@ -164,6 +164,22 @@
       <groupId>org.fusesource.leveldbjni</groupId>
       <artifactId>leveldbjni-all</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.hops.gpu</groupId>
+      <artifactId>hops-gpu-management</artifactId>
+      <version>1.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.hops.gpu</groupId>
+      <artifactId>hops-gpu-management-impl-nvidia</artifactId>
+      <version>1.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.hops.gpu</groupId>
+      <artifactId>libhopsnvml</artifactId>
+      <version>1.0</version>
+      <type>so</type>
+    </dependency>
   </dependencies>
 
   <profiles>
@@ -306,6 +322,32 @@
                 </includes>
               </source>
               <output>${project.build.directory}/generated-sources/java</output>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-dependency</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.hops.gpu</groupId>
+                  <artifactId>libhopsnvml</artifactId>
+                  <version>1.0</version>
+                  <type>so</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
+                  <!--<outputDirectory>target/native/lib</outputDirectory>-->
+                </artifactItem>
+              </artifactItems>
             </configuration>
           </execution>
         </executions>

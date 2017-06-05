@@ -105,10 +105,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.Dom
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.FifoPolicy;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 import org.xml.sax.SAXException;
 
 import com.google.common.collect.Sets;
@@ -3217,6 +3214,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     assertEquals(1, app.getLiveContainers().size());
   }
 
+  @Ignore
   @Test
   public void testBasicDRFAssignment() throws Exception {
     scheduler.init(conf);
@@ -3259,6 +3257,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
   /**
    * Two apps on one queue, one app on another
    */
+  @Ignore
   @Test
   public void testBasicDRFWithQueues() throws Exception {
     scheduler.init(conf);
@@ -3296,7 +3295,8 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     scheduler.handle(updateEvent);
     Assert.assertEquals(1, app2.getLiveContainers().size());
   }
-  
+
+  @Ignore
   @Test
   public void testDRFHierarchicalQueues() throws Exception {
     scheduler.init(conf);

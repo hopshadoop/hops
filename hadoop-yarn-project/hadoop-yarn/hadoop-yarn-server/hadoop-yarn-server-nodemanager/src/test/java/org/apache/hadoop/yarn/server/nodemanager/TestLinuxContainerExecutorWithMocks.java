@@ -137,8 +137,8 @@ public class TestLinuxContainerExecutorWithMocks {
     assertEquals(Arrays.asList(YarnConfiguration.DEFAULT_NM_NONSECURE_MODE_LOCAL_USER,
         appSubmitter, cmd, appId, containerId,
         workDir.toString(), "/bin/echo", "/dev/null", pidFile.toString(),
-        StringUtils.join(",", dirsHandler.getLocalDirs()),
-        StringUtils.join(",", dirsHandler.getLogDirs()), "cgroups=none"),
+        StringUtils.join("%", dirsHandler.getLocalDirs()),
+        StringUtils.join("%", dirsHandler.getLogDirs()), "cgroups=none"),
         readMockParams());
     
   }
@@ -283,8 +283,8 @@ public class TestLinuxContainerExecutorWithMocks {
     assertEquals(Arrays.asList(YarnConfiguration.DEFAULT_NM_NONSECURE_MODE_LOCAL_USER,
         appSubmitter, cmd, appId, containerId,
         workDir.toString(), "/bin/echo", "/dev/null", pidFile.toString(),
-        StringUtils.join(",", dirsHandler.getLocalDirs()),
-        StringUtils.join(",", dirsHandler.getLogDirs()),
+        StringUtils.join("%", dirsHandler.getLocalDirs()),
+        StringUtils.join("%", dirsHandler.getLogDirs()),
         "cgroups=none"), readMockParams());
 
   }

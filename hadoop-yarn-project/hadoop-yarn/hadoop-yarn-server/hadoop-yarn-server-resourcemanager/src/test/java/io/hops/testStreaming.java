@@ -135,7 +135,7 @@ public class testStreaming {
         ResourceDataAccess DA
                 = (ResourceDataAccess) RMStorageFactory
                 .getDataAccess(ResourceDataAccess.class);
-        DA.add(new Resource("resource", 1, 2, 3));
+        DA.add(new Resource("resource", 1, 2, 2, 3));
 
         connector.commit();
         return null;

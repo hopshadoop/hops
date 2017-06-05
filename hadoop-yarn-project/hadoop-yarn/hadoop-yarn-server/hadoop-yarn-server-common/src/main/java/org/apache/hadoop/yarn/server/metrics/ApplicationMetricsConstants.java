@@ -67,6 +67,9 @@ public class ApplicationMetricsConstants {
   public static final String APP_CPU_METRICS =
       "YARN_APPLICATION_CPU_METRIC";
   
+  public static final String APP_GPU_METRICS =
+      "YARN_APPLICATION_GPU_METRIC";
+  
   public static final String APP_MEM_METRICS =
       "YARN_APPLICATION_MEM_METRIC";
 

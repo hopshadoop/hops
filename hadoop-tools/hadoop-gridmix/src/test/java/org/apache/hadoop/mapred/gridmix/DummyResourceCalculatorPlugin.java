@@ -105,4 +105,7 @@ public class DummyResourceCalculatorPlugin extends ResourceCalculatorPlugin {
   public float getCpuUsage() {
     return getConf().getFloat(CPU_USAGE, -1);
   }
+  
+  @Override
+  public int getNumGPUs() { return 0; }
 }

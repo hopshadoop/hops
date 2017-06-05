@@ -426,6 +426,8 @@ public class TestContainerResourceUsage {
                           * usedMillis / DateUtils.MILLIS_PER_SECOND;
     long vcoreSeconds = resource.getVirtualCores()
                           * usedMillis / DateUtils.MILLIS_PER_SECOND;
-    return new AggregateAppResourceUsage(memorySeconds, vcoreSeconds);
+    long gpuSeconds = resource.getVirtualCores()
+                          * usedMillis / DateUtils.MILLIS_PER_SECOND;
+    return new AggregateAppResourceUsage(memorySeconds, vcoreSeconds, gpuSeconds);
   }
 }

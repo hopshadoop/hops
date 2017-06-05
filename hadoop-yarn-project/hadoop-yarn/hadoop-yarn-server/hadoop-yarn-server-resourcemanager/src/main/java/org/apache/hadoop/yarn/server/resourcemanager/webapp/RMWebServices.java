@@ -1306,6 +1306,12 @@ public class RMWebServices {
       String msg = "Requested more memory than configured max";
       throw new BadRequestException(msg);
     }
+    if (newApp.getResource().getGpus() > rm.getConfig().getInt(
+      YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_GPUS,
+      YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_GPUS)) {
+      String msg = "Requested more gpus than configured max";
+      throw new BadRequestException(msg);
+    }
     Resource r =
         Resource.newInstance(newApp.getResource().getMemory(), newApp
           .getResource().getvCores());
