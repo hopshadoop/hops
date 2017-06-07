@@ -125,6 +125,7 @@ class NamenodeJspHelper {
 
     long used = (totalMemory * 100) / commitedMemory;
     long usedNonHeap = (totalNonHeap * 100) / commitedNonHeap;
+    long directBuffer = sun.misc.SharedSecrets.getJavaNioAccess().getDirectBufferPool().getMemoryUsed();
 
     String str =
         "<div>" + inodes + " files and directories, " + blocks + " blocks = " +
@@ -144,6 +145,8 @@ class NamenodeJspHelper {
         " is" + " " + usedNonHeap + "% of " + " Commited Non Heap Memory " +
         StringUtils.byteDesc(commitedNonHeap) + ". Max Non Heap Memory is " +
         StringUtils.byteDesc(maxNonHeap) + ".</div>";
+
+    str += "<div>DirectBuffer Memeory used " + StringUtils.byteDesc(directBuffer)+".</div>";
     return str;
   }
 
@@ -151,6 +154,8 @@ class NamenodeJspHelper {
    * Return a table containing version information.
    */
   static String getVersionTable(FSNamesystem fsn, NameNode nn) {
+    String javaVersion = System.getProperty("java.version");
+    String javaVendor = System.getProperty("java.vendor");
     return "<div class='dfstable'><table>" +
         "\n  <tr><td class='col1'>Started:</td><td>" + fsn.getStartTime() +
         "</td></tr>\n" + "\n  <tr><td class='col1'>Version:</td><td>" +
@@ -164,10 +169,12 @@ class NamenodeJspHelper {
         fsn.getBlockPoolId() +
        // "</td></tr>\n  <tr><td class='col1'>Path Ancestor Lock Type:</td><td>" +
        // fsn.getFilePathAncestorLockType() +
+        "</td></tr>\n <tr><td class='col1'>Java Runtime Version :</td><td>" +javaVendor+" "+javaVersion+"</td></tr>"+
         "</td></tr>\n  <tr><td class='col1'>" + nn.getActiveNameNodes().size() +
         " NN(s):</td><td>" +
         getAllActiveNNs(nn.getActiveNameNodes()) +
-        "</td></tr>\n</table></div>";
+        "</td></tr>\n"+
+        "</table></div>";
   }
   
   class LexicographicComparator implements Comparator<ActiveNode> {
