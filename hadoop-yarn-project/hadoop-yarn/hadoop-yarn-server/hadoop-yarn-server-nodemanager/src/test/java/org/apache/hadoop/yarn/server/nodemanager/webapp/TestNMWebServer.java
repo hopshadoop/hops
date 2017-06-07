@@ -94,6 +94,12 @@ public class TestNMWebServer {
       public long getVCoresAllocatedForContainers() {
         return 0;
       }
+  
+      @Override
+      public long getGPUsAllocatedForContainers() {
+        return 0;
+      }
+  
       @Override
       public boolean isVmemCheckEnabled() {
         return true;
@@ -157,6 +163,12 @@ public class TestNMWebServer {
       public long getVCoresAllocatedForContainers() {
         return 0;
       }
+  
+      @Override
+      public long getGPUsAllocatedForContainers() {
+        return 0;
+      }
+  
       @Override
       public boolean isVmemCheckEnabled() {
         return true;

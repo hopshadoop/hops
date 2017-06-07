@@ -93,7 +93,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
   public void init() throws IOException {
     // nothing to do or verify here
   }
-
+  
   @Override
   public void startLocalizer(Path nmPrivateContainerTokensPath,
       InetSocketAddress nmAddr, String user, String appId, String locId,
@@ -129,7 +129,12 @@ public class DefaultContainerExecutor extends ContainerExecutor {
     // TODO: DO it over RPC for maintaining similarity?
     localizer.runLocalization(nmAddr);
   }
-
+  
+  @Override
+  public void recoverDeviceControlSystem(ContainerId containerId) {
+    LOG.info("Device recovery not working when Cgroups is disabled");
+  }
+  
   @Override
   public int launchContainer(Container container,
       Path nmPrivateContainerScriptPath, Path nmPrivateTokensPath,

@@ -99,7 +99,6 @@ public abstract class ContainerExecutor implements Configurable {
     return classPathJar;
   }
   
-  
   /**
    * Prepare the environment for containers in this application to execute.
    * <pre>
@@ -123,7 +122,8 @@ public abstract class ContainerExecutor implements Configurable {
       InetSocketAddress nmAddr, String user, String appId, String locId,
       LocalDirsHandlerService dirsHandler)
     throws IOException, InterruptedException;
-
+  
+  public abstract void recoverDeviceControlSystem(ContainerId containerId);
 
   /**
    * Launch the container on the node. This is a blocking call and returns only

@@ -194,6 +194,24 @@ public class CapacityScheduler extends
         + "=" + maxVcores + ", min and max should be greater than 0"
         + ", max should be no smaller than min.");
     }
+  
+    // validate scheduler GPU allocation setting
+    int minGPUs = conf.getInt(
+        YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS);
+    int maxGPUs = conf.getInt(
+        YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_GPUS,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_GPUS);
+    
+    if (minGPUs < 0 || minGPUs > maxGPUs) {
+      throw new YarnRuntimeException("Invalid resource scheduler GPUs"
+        + " allocation configuration"
+        + ", " + YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS
+        + "=" + minGPUs
+        + ", " + YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_GPUS
+        + "=" + maxGPUs + ", min and max should be greater than 0"
+        + ", max should be no smaller than min.");
+    }
   }
 
   @Override
@@ -1713,7 +1731,7 @@ public class CapacityScheduler extends
       return EnumSet.of(SchedulerResourceTypes.MEMORY);
     }
     return EnumSet
-      .of(SchedulerResourceTypes.MEMORY, SchedulerResourceTypes.CPU);
+      .of(SchedulerResourceTypes.MEMORY, SchedulerResourceTypes.CPU, SchedulerResourceTypes.GPU);
   }
   
   @Override

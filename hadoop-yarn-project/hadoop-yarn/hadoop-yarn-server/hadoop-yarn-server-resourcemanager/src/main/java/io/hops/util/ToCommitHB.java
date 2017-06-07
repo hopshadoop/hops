@@ -129,7 +129,7 @@ public class ToCommitHB {
     this.pendingEventContains++;
     rmNodeResource = new io.hops.metadata.yarn.entity.Resource(nodeId,
             totalCapability.getMemory(), totalCapability.getVirtualCores(),
-            pendingEventId);
+            totalCapability.getGPUs(), pendingEventId);
     this.pendingEventContains++;
   }
 

@@ -281,6 +281,16 @@ public class SchedulerUtils {
           + resReq.getCapability().getVirtualCores()
           + ", maxVirtualCores=" + maximumResource.getVirtualCores());
     }
+    if (resReq.getCapability().getGPUs() < 0 ||
+        +        resReq.getCapability().getGPUs() >
+            +            maximumResource.getGPUs()) {
+      throw new InvalidResourceRequestException("Invalid resource request"
+          + ", requested GPUs < 0"
+          + ", or requested GPUs > max configured"
+          + ", requestedGPUs="
+          + resReq.getCapability().getGPUs()
+          + ", maxGPUs=" + maximumResource.getGPUs());
+    }
     String labelExp = resReq.getNodeLabelExpression();
 
     // we don't allow specify label expression other than resourceName=ANY now

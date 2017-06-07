@@ -893,6 +893,16 @@ public class StringUtils {
     }
     return sb.toString();
   }
+  
+    public static String join(char separator, Iterable<?> strings) {
+        return join(separator + "", strings);
+      }
+      
+        public static String join(char separator, String[] strings) {
+        return join(separator + "", strings);
+      }
+
+
 
   /**
    * Convert SOME_STUFF to SomeStuff

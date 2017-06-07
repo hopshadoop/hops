@@ -82,13 +82,16 @@ public class AppInfo {
   protected String amHostHttpAddress;
   protected int allocatedMB;
   protected int allocatedVCores;
+  protected int allocatedGPUs;
   protected int runningContainers;
   protected long memorySeconds;
   protected long vcoreSeconds;
+  protected long gpuSeconds;
   
   // preemption info fields
   protected int preemptedResourceMB;
   protected int preemptedResourceVCores;
+  protected int preemptedResourceGPUs;
   protected int numNonAMContainerPreempted;
   protected int numAMContainerPreempted;
 
@@ -160,6 +163,7 @@ public class AppInfo {
             Resource usedResources = resourceReport.getUsedResources();
             allocatedMB = usedResources.getMemory();
             allocatedVCores = usedResources.getVirtualCores();
+            allocatedGPUs = usedResources.getGPUs();
             runningContainers = resourceReport.getNumUsedContainers();
           }
           resourceRequests =
@@ -178,8 +182,11 @@ public class AppInfo {
           appMetrics.getNumNonAMContainersPreempted();
       preemptedResourceVCores =
           appMetrics.getResourcePreempted().getVirtualCores();
+      preemptedResourceGPUs =
+          appMetrics.getResourcePreempted().getGPUs();
       memorySeconds = appMetrics.getMemorySeconds();
       vcoreSeconds = appMetrics.getVcoreSeconds();
+      gpuSeconds = appMetrics.getGPUSeconds();
     }
   }
 
@@ -287,12 +294,20 @@ public class AppInfo {
     return this.allocatedVCores;
   }
   
+  public int getAllocatedGPUs() {
+    return this.allocatedGPUs;
+  }
+  
   public int getPreemptedMB() {
     return preemptedResourceMB;
   }
 
   public int getPreemptedVCores() {
     return preemptedResourceVCores;
+  }
+  
+  public int getPreemptedGPUs() {
+    return preemptedResourceGPUs;
   }
 
   public int getNumNonAMContainersPreempted() {
@@ -309,6 +324,10 @@ public class AppInfo {
 
   public long getVcoreSeconds() {
     return vcoreSeconds;
+  }
+  
+  public long getGPUSeconds() {
+    return gpuSeconds;
   }
 
   public List<ResourceRequest> getResourceRequests() {

@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.util;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
@@ -28,10 +29,14 @@ import java.nio.charset.Charset;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import io.hops.GPUManagementLibrary;
+import io.hops.GPUManagementLibraryLoader;
+import io.hops.exceptions.GPUManagementLibraryException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.FileUtil;
 
 /**
  * Plugin to calculate resource information on Linux systems.
@@ -56,6 +61,10 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
   private static final String MEMFREE_STRING = "MemFree";
   private static final String SWAPFREE_STRING = "SwapFree";
   private static final String INACTIVE_STRING = "Inactive";
+  
+  private GPUManagementLibrary gpuManagementLibrary;
+  private static final String GPU_MANAGEMENT_LIBRARY_CLASSNAME = "io.hops" +
+      ".management.nvidia.NvidiaManagementLibrary";
 
   /**
    * Patterns for parsing /proc/cpuinfo
@@ -90,7 +99,6 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
 
   boolean readMemInfoFile = false;
   boolean readCpuInfoFile = false;
-
   /**
    * Get current time
    * @return Unix time stamp in millisecond
@@ -353,6 +361,31 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
     return overallCpuUsage;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public int getNumGPUs() {
+    try {
+      gpuManagementLibrary =
+          GPUManagementLibraryLoader.load(GPU_MANAGEMENT_LIBRARY_CLASSNAME);
+      if(gpuManagementLibrary == null) {
+        return 0;
+      }
+      if(!gpuManagementLibrary.initialize()) {
+        LOG.debug("Could not initialize GPU Management Library, offering 0 GPUs");
+        return 0;
+      }
+      int numGPUs = gpuManagementLibrary.getNumGPUs();
+      if(!gpuManagementLibrary.shutDown()) {
+        LOG.debug("Could not shutdown GPU Management Library");
+      }
+      return numGPUs;
+    } catch(GPUManagementLibraryException gpue) {
+      LOG.info("Could not load GPU management library, assuming no GPUs on " +
+          "this machine");
+    }
+    return 0;
+  }
+  
   /**
    * Test the {@link LinuxResourceCalculatorPlugin}
    *

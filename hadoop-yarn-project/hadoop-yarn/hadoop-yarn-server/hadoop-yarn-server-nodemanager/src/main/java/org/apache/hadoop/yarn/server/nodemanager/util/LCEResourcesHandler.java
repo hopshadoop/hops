@@ -46,4 +46,7 @@ public interface LCEResourcesHandler extends Configurable {
   void postExecute(ContainerId containerId);
   
   String getResourcesOption(ContainerId containerId);
+  
+  void recoverDeviceControlSystem(ContainerId containerId);
+  
 }
