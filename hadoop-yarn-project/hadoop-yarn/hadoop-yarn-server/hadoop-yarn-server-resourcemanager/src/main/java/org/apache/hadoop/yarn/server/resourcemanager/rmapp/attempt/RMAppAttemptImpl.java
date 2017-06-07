@@ -831,6 +831,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
           this.attemptMetrics.getAggregateAppResourceUsage();
       report.setMemorySeconds(resUsage.getMemorySeconds());
       report.setVcoreSeconds(resUsage.getVcoreSeconds());
+      report.setGPUSeconds(resUsage.getGPUSeconds());
       return report;
     } finally {
       this.readLock.unlock();
@@ -862,7 +863,8 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
     this.startTime = attemptState.getStartTime();
     this.finishTime = attemptState.getFinishTime();
     this.attemptMetrics.updateAggregateAppResourceUsage(
-        attemptState.getMemorySeconds(),attemptState.getVcoreSeconds());
+        attemptState.getMemorySeconds(),attemptState.getVcoreSeconds(),
+        attemptState.getGPUSeconds());
   }
 
   public void transferStateFromPreviousAttempt(RMAppAttempt attempt) {
@@ -1202,7 +1204,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
             startTime, stateToBeStored, finalTrackingUrl, diags,
             finalStatus, exitStatus,
           getFinishTime(), resUsage.getMemorySeconds(),
-          resUsage.getVcoreSeconds(),
+          resUsage.getVcoreSeconds(), resUsage.getGPUSeconds(),
           getTrackingUrl());
     LOG.info("Updating application attempt " + applicationAttemptId
         + " with final state: " + targetedFinalState + ", and exit status: "

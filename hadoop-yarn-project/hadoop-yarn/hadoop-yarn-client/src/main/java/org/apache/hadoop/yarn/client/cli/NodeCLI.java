@@ -211,6 +211,12 @@ public class NodeCLI extends YarnCLI {
           : (nodeReport.getUsed().getVirtualCores() + " vcores"));
       nodeReportStr.print("\tCPU-Capacity : ");
       nodeReportStr.println(nodeReport.getCapability().getVirtualCores() + " vcores");
+      nodeReportStr.print("\tGPU-Used : ");
+      nodeReportStr.println((nodeReport.getUsed() == null) ? "0 gpus"
+          : (nodeReport.getUsed().getGPUs() + " gpus"));
+      nodeReportStr.print("\tGPU-Capacity : ");
+      nodeReportStr.println(nodeReport.getCapability().getGPUs() + " " +
+                    "gpus");
       nodeReportStr.print("\tNode-Labels : ");
       
       // Create a List for node labels since we need it get sorted

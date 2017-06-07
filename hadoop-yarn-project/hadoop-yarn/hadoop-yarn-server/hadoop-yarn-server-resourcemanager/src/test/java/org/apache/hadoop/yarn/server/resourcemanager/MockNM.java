@@ -50,6 +50,7 @@ public class MockNM {
   private NodeId nodeId;
   private final int memory;
   private final int vCores;
+  private final int gpus;
   private ResourceTrackerService resourceTracker;
   private int httpPort = 2;
   private MasterKey currentContainerTokenMasterKey;
@@ -66,13 +67,19 @@ public class MockNM {
 
   public MockNM(String nodeIdStr, int memory, int vcores,
       ResourceTrackerService resourceTracker) {
-    this(nodeIdStr, memory, vcores, resourceTracker, YarnVersionInfo.getVersion());
+    this(nodeIdStr, memory, vcores, 0, resourceTracker, YarnVersionInfo
+        .getVersion());
+  }
+  
+  public MockNM(String nodeIdStr, int memory, int vcores, int gpus, ResourceTrackerService resourceTracker) {
+    this(nodeIdStr, memory, vcores, gpus, resourceTracker, YarnVersionInfo.getVersion());
   }
 
-  public MockNM(String nodeIdStr, int memory, int vcores,
+  public MockNM(String nodeIdStr, int memory, int vcores, int gpus,
       ResourceTrackerService resourceTracker, String version) {
     this.memory = memory;
     this.vCores = vcores;
+    this.gpus = gpus;
     this.resourceTracker = resourceTracker;
     this.version = version;
     String[] splits = nodeIdStr.split(":");
@@ -119,7 +126,7 @@ public class MockNM {
         RegisterNodeManagerRequest.class);
     req.setNodeId(nodeId);
     req.setHttpPort(httpPort);
-    Resource resource = BuilderUtils.newResource(memory, vCores);
+    Resource resource = BuilderUtils.newResource(memory, vCores, gpus);
     req.setResource(resource);
     req.setContainerStatuses(containerReports);
     req.setNMVersion(version);
@@ -201,5 +208,9 @@ public class MockNM {
 
   public int getvCores() {
     return vCores;
+  }
+  
+  public int getGpus() {
+    return gpus;
   }
 }

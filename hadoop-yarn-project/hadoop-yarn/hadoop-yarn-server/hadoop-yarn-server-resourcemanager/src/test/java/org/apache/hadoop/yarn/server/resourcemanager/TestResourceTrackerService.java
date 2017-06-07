@@ -348,7 +348,7 @@ public class TestResourceTrackerService {
     RegisterNodeManagerRequest req = Records.newRecord(
         RegisterNodeManagerRequest.class);
     NodeId nodeId = NodeId.newInstance("host2", 1234);
-    Resource capability = BuilderUtils.newResource(1024, 1);
+    Resource capability = BuilderUtils.newResource(1024, 1, 1);
     req.setResource(capability);
     req.setNodeId(nodeId);
     req.setHttpPort(1234);
@@ -373,6 +373,7 @@ public class TestResourceTrackerService {
     io.hops.metadata.yarn.entity.Resource resource = resourcesInDb.get(nodeId.toString());
     Assert.assertEquals(1024, resource.getMemory());
     Assert.assertEquals(1, resource.getVirtualCores());
+    Assert.assertEquals(1, resource.getGPUs());
     //pending event
     List<PendingEvent> pendingEventsInDb = DBUtilityTests.getAllPendingEvents();
     Assert.assertEquals(1, pendingEventsInDb.size());

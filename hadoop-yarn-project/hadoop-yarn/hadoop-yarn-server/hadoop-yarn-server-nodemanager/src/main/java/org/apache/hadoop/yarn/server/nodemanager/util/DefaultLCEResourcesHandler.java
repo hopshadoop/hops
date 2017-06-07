@@ -60,6 +60,9 @@ public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
   public String getResourcesOption(ContainerId containerId) {
     return "cgroups=none";
   }
-
-
+  
+  @Override
+  public void recoverDeviceControlSystem(ContainerId containerId) {
+    LOG.warn("DefaultLCEResourcesHandler does not support device recovery");
+  }
 }

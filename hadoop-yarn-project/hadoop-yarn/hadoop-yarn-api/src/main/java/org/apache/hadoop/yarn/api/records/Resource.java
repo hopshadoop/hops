@@ -53,10 +53,24 @@ public abstract class Resource implements Comparable<Resource> {
 
   @Public
   @Stable
+  /**
+   * Backwards compatibility without GPUs
+   */
   public static Resource newInstance(int memory, int vCores) {
     Resource resource = Records.newRecord(Resource.class);
     resource.setMemory(memory);
     resource.setVirtualCores(vCores);
+    resource.setGPUs(0);
+    return resource;
+  }
+  
+  @Public
+  @Stable
+  public static Resource newInstance(int memory, int vCores, int gpus) {
+    Resource resource = Records.newRecord(Resource.class);
+    resource.setMemory(memory);
+    resource.setVirtualCores(vCores);
+    resource.setGPUs(gpus);
     return resource;
   }
 
@@ -104,6 +118,16 @@ public abstract class Resource implements Comparable<Resource> {
   @Public
   @Evolving
   public abstract void setVirtualCores(int vCores);
+  
+  @Public
+  @Evolving
+  public abstract void setGPUs(int gpus);
+  
+  @Public
+  @Evolving
+  public abstract int getGPUs();
+  
+  
 
   @Override
   public int hashCode() {
@@ -111,6 +135,7 @@ public abstract class Resource implements Comparable<Resource> {
     int result = 3571;
     result = 939769357 + getMemory(); // prime * result = 939769357 initially
     result = prime * result + getVirtualCores();
+    result = prime * result + getGPUs();
     return result;
   }
 
@@ -123,8 +148,9 @@ public abstract class Resource implements Comparable<Resource> {
     if (!(obj instanceof Resource))
       return false;
     Resource other = (Resource) obj;
-    if (getMemory() != other.getMemory() || 
-        getVirtualCores() != other.getVirtualCores()) {
+    if (getMemory() != other.getMemory() ||
+        getVirtualCores() != other.getVirtualCores() ||
+        getGPUs() != other.getGPUs()) {
       return false;
     }
     return true;
@@ -132,6 +158,7 @@ public abstract class Resource implements Comparable<Resource> {
 
   @Override
   public String toString() {
-    return "<memory:" + getMemory() + ", vCores:" + getVirtualCores() + ">";
+    return "<memory:" + getMemory() + ", vCores:" + getVirtualCores() + ", " +
+        "gpus:" + getGPUs() + ">";
   }
 }

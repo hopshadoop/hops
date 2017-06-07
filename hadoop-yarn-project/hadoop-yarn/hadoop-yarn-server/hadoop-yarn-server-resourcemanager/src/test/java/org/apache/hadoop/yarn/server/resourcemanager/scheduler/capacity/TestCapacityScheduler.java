@@ -239,6 +239,20 @@ public class TestCapacityScheduler {
         e.getMessage().startsWith(
           "Invalid resource scheduler vcores"));
     }
+  
+    conf = new YarnConfiguration();
+    conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS, 2);
+    conf.setInt(YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_GPUS, 1);
+    try {
+      scheduler.reinitialize(conf, mockContext);
+      fail("Exception is expected because the min gpu allocation is" +
+          " larger than the max gpu allocation.");
+    } catch (YarnRuntimeException e) {
+      // Exception is expected.
+      assertTrue("The thrown exception is not the expected one.",
+          e.getMessage().startsWith(
+              "Invalid resource scheduler GPUs"));
+    }
   }
 
   private org.apache.hadoop.yarn.server.resourcemanager.NodeManager
@@ -270,7 +284,7 @@ public class TestCapacityScheduler {
     // Register node2
     String host_1 = "host_1";
     org.apache.hadoop.yarn.server.resourcemanager.NodeManager nm_1 = 
-      registerNode(host_1, 1234, 2345, NetworkTopology.DEFAULT_RACK, 
+      registerNode(host_1, 1234, 2345, NetworkTopology.DEFAULT_RACK,
           Resources.createResource(2 * GB, 1));
 
     // ResourceRequest priorities
@@ -375,7 +389,7 @@ public class TestCapacityScheduler {
 
     LOG.info("--- END: testCapacityScheduler ---");
   }
-
+  
   private void nodeUpdate(
       org.apache.hadoop.yarn.server.resourcemanager.NodeManager nm) {
     RMNode node = resourceManager.getRMContext().getRMNodes().get(nm.getNodeId());
@@ -550,6 +564,7 @@ public class TestCapacityScheduler {
     setupQueueConfiguration(csConf);
     CapacityScheduler cs = new CapacityScheduler();
     cs.setConf(new YarnConfiguration());
+
     cs.setRMContext(resourceManager.getRMContext());
     cs.init(csConf);
     cs.start();
@@ -2091,11 +2106,11 @@ public class TestCapacityScheduler {
     MockRM rm = new MockRM(conf);
     rm.start();
 
-    MockNM nm1 = rm.registerNode("127.0.0.1:1234", 10 * GB, 1);
+    MockNM nm1 = rm.registerNode("127.0.0.1:1234", 10 * GB, 1, 1);
 
     // register extra nodes to bump up cluster resource
-    MockNM nm2 = rm.registerNode("127.0.0.1:1235", 10 * GB, 4);
-    rm.registerNode("127.0.0.1:1236", 10 * GB, 4);
+    MockNM nm2 = rm.registerNode("127.0.0.1:1235", 10 * GB, 4, 4);
+    rm.registerNode("127.0.0.1:1236", 10 * GB, 4, 4);
 
     RMApp app1 = rm.submitApp(1024);
     // kick the scheduling

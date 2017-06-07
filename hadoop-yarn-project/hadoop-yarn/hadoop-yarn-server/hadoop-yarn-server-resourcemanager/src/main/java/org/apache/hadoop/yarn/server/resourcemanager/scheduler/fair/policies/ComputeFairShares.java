@@ -254,25 +254,30 @@ public class ComputeFairShares {
 
   private static int getResourceValue(Resource resource, ResourceType type) {
     switch (type) {
-    case MEMORY:
-      return resource.getMemory();
-    case CPU:
-      return resource.getVirtualCores();
-    default:
-      throw new IllegalArgumentException("Invalid resource");
+      case MEMORY:
+        return resource.getMemory();
+      case CPU:
+        return resource.getVirtualCores();
+      case GPU:
+        return resource.getGPUs();
+      default:
+        throw new IllegalArgumentException("Invalid resource");
     }
   }
   
   private static void setResourceValue(int val, Resource resource, ResourceType type) {
     switch (type) {
-    case MEMORY:
-      resource.setMemory(val);
-      break;
-    case CPU:
-      resource.setVirtualCores(val);
-      break;
-    default:
-      throw new IllegalArgumentException("Invalid resource");
+      case MEMORY:
+        resource.setMemory(val);
+        break;
+      case CPU:
+        resource.setVirtualCores(val);
+        break;
+      case GPU:
+        resource.setGPUs(0);
+        break;
+      default:
+        throw new IllegalArgumentException("Invalid resource");
     }
   }
 }

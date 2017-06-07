@@ -577,7 +577,9 @@ public class TestAppManager{
     when(app.getState()).thenReturn(RMAppState.RUNNING);
     when(app.getApplicationType()).thenReturn("MAPREDUCE");
     RMAppMetrics metrics =
-        new RMAppMetrics(Resource.newInstance(1234, 56), 10, 1, 16384, 64);
+        new RMAppMetrics(Resource.newInstance(1234, 56, 56), 10, 1,
+            16384,
+            64, 64);
     when(app.getRMAppMetrics()).thenReturn(metrics);
 
     RMAppManager.ApplicationSummary.SummaryBuilder summary =
@@ -595,7 +597,7 @@ public class TestAppManager{
     Assert.assertTrue(msg.contains("vcoreSeconds=64"));
     Assert.assertTrue(msg.contains("preemptedAMContainers=1"));
     Assert.assertTrue(msg.contains("preemptedNonAMContainers=10"));
-    Assert.assertTrue(msg.contains("preemptedResources=<memory:1234\\, vCores:56>"));
+    Assert.assertTrue(msg.contains("preemptedResources=<memory:1234\\, vCores:56\\, gpus:56>"));
     Assert.assertTrue(msg.contains("applicationType=MAPREDUCE"));
  }
 

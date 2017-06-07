@@ -24,9 +24,9 @@ public class ResourceEventReceiver {
   private static final Log LOG = LogFactory.getLog(ResourceEventReceiver.class);
 
   public void createAndAddToQueue(String id, int memory, int virtualcores,
-          int pendingEventId) {
+          int gpus, int pendingEventId) {
 
-    ResourceEvent event = new ResourceEvent(id, memory, virtualcores,
+    ResourceEvent event = new ResourceEvent(id, memory, virtualcores, gpus,
             pendingEventId);
     receivedEvents.add(event);
 

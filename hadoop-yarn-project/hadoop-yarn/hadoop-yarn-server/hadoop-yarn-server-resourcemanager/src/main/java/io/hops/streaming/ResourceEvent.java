@@ -24,9 +24,9 @@ public class ResourceEvent implements DBEvent {
   private static final Log LOG = LogFactory.getLog(ResourceEvent.class);
   private final Resource resource;
 
-  public ResourceEvent(String id, int memory, int virtualcores,
+  public ResourceEvent(String id, int memory, int virtualcores, int gpus,
           int pendingEventId) {
-    resource = new Resource(id, memory, virtualcores, pendingEventId);
+    resource = new Resource(id, memory, virtualcores, gpus, pendingEventId);
   }
 
   public Resource getResource() {
