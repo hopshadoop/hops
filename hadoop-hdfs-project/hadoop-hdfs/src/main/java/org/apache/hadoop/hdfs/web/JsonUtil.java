@@ -246,6 +246,7 @@ public class JsonUtil {
       m.put("symlink", status.getSymlink());
     }
 
+    m.put("fileId", status.getFileId());
     m.put("length", status.getLen());
     m.put("owner", status.getOwner());
     m.put("group", status.getGroup());
@@ -274,6 +275,7 @@ public class JsonUtil {
     final byte[] symlink = type != PathType.SYMLINK ? null :
         DFSUtil.string2Bytes((String) m.get("symlink"));
 
+    final long fileId = (Long) m.get("fileId");
     final long len = (Long) m.get("length");
     final String owner = (String) m.get("owner");
     final String group = (String) m.get("group");
@@ -283,7 +285,7 @@ public class JsonUtil {
     final long mTime = (Long) m.get("modificationTime");
     final long blockSize = (Long) m.get("blockSize");
     final short replication = (short) (long) (Long) m.get("replication");
-    return new HdfsFileStatus(len, type == PathType.DIRECTORY, replication,
+    return new HdfsFileStatus(fileId, len, type == PathType.DIRECTORY, replication,
         blockSize, mTime, aTime, permission, owner, group, symlink,
         DFSUtil.string2Bytes(localName));
   }
