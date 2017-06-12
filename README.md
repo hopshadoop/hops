@@ -68,7 +68,7 @@ mvn package -Pdist,native,docs -DskipTests -Dtar
 
 ##### Compiling and Running Unit Tests Locally
 ```sh
-mvn clean generate-sources install -Pndb -DskipTest
+mvn clean generate-sources install -Pndb -DskipTests
 mvn test-compile
 ```
 For running tests use the `ndb` profile to add the the [database access layer](https://github.com/hopshadoop/hops-metadata-dal-impl-ndb) driver to the class path. The driver is loaded at run time. For example,
