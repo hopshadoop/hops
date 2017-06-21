@@ -23,6 +23,7 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
@@ -944,5 +945,27 @@ public abstract class INode implements Comparable<byte[]> {
 
     INode parentInode = EntityManager.find(Finder.ByINodeIdFTIS, getParentId());
     return (short) (parentInode.myDepth()+1);
+  }
+
+  public boolean equalsIdentifier(INodeIdentifier iNodeIdentifier){
+    if(iNodeIdentifier == null)
+      return false;
+
+    if(getId() != iNodeIdentifier.getInodeId())
+      return false;
+
+    if(getParentId() != iNodeIdentifier.getPid())
+      return false;
+
+    if(iNodeIdentifier.getPartitionId() == null)
+      return false;
+
+    if(!getPartitionId().equals(iNodeIdentifier.getPartitionId()))
+      return false;
+
+    if(!getLocalName().equals(iNodeIdentifier.getName()))
+      return false;
+
+    return true;
   }
 }

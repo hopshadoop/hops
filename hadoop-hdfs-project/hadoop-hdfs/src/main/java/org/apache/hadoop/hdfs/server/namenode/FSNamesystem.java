@@ -6328,7 +6328,8 @@ public class FSNamesystem
 
         if (srcSubTreeRoot != null) {
           AbstractFileTree.QuotaCountingFileTree srcFileTree;
-          if (pathIsMetaEnabled(srcInodes) || pathIsMetaEnabled(dstInodes)) {
+          if (shouldLogSubtreeInodes(srcInfo, dstInfo, srcDataset,
+              dstDataset, srcSubTreeRoot)) {
             srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(this,
                     srcSubTreeRoot, srcDataset, dstDataset);
             srcFileTree.buildUp();
@@ -6563,7 +6564,8 @@ public class FSNamesystem
 
         if (srcSubTreeRoot != null) {
           AbstractFileTree.QuotaCountingFileTree srcFileTree;
-          if (pathIsMetaEnabled(srcInfo.pathInodes) || pathIsMetaEnabled(dstInfo.pathInodes)) {
+          if (shouldLogSubtreeInodes(srcInfo, dstInfo, srcDataset,
+              dstDataset, srcSubTreeRoot)) {
             srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(this,
                     srcSubTreeRoot, srcDataset, dstDataset);
             srcFileTree.buildUp();
@@ -6595,6 +6597,18 @@ public class FSNamesystem
         }
      }
     }
+  }
+
+  private boolean shouldLogSubtreeInodes(PathInformation srcInfo,
+      PathInformation dstInfo, INode srcDataset, INode dstDataset,
+      INodeIdentifier srcSubTreeRoot){
+    if(pathIsMetaEnabled(srcInfo.pathInodes) || pathIsMetaEnabled(dstInfo
+        .pathInodes)){
+      boolean isRenameLocalOrRenameDataset = dstDataset == null ? srcDataset
+          .equalsIdentifier(srcSubTreeRoot) : srcDataset.equals(dstDataset);
+      return !isRenameLocalOrRenameDataset;
+    }
+    return false;
   }
 
   /**

@@ -43,6 +43,7 @@ import org.apache.hadoop.security.AccessControlException;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
@@ -431,8 +432,8 @@ abstract class AbstractFileTree {
   }
 
   static class LoggingQuotaCountingFileTree extends QuotaCountingFileTree {
-    private LinkedList<MetadataLogEntry> metadataLogEntries =
-        new LinkedList<MetadataLogEntry>();
+    private ConcurrentLinkedQueue<MetadataLogEntry> metadataLogEntries =
+        new ConcurrentLinkedQueue<>();
     private final INode srcDataset;
     private final INode dstDataset;
     public LoggingQuotaCountingFileTree(
