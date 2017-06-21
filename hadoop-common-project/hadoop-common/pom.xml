@@ -291,6 +291,11 @@
       <version>1.0</version>
       <type>jar</type>
     </dependency>
+    <dependency>
+      <groupId>com.googlecode.concurrentlinkedhashmap</groupId>
+      <artifactId>concurrentlinkedhashmap-lru</artifactId>
+      <version>1.4.2</version>
+    </dependency>
   </dependencies>
 
   <build>

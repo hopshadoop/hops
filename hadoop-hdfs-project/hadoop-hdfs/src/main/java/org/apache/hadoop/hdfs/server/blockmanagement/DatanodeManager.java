@@ -72,15 +72,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NavigableMap;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
 import static org.apache.hadoop.util.Time.now;
@@ -1328,4 +1320,13 @@ public class DatanodeManager {
     storageIdMap.update(nodeDescr);
   }
 
+  Random rand = new Random(System.currentTimeMillis());
+  public DatanodeDescriptor getRandomDN(){
+    List<String> sids = new ArrayList<String>(storageIdMap.getStorageIds());
+    if(sids.size()>0) {
+      String sid = sids.get(rand.nextInt(sids.size()));
+      return getDatanode(sid);
+    }
+    return null;
+  }
 }

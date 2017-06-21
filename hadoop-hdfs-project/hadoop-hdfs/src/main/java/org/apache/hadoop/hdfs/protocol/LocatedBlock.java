@@ -22,6 +22,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
+import java.io.IOException;
 import java.util.Comparator;
 
 /**
@@ -43,6 +44,8 @@ public class LocatedBlock {
   private Token<BlockTokenIdentifier> blockToken =
       new Token<BlockTokenIdentifier>();
 
+  private byte[] data = null;
+
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs) {
     this(b, locs, -1, false); // startOffset is unknown
   }
@@ -61,7 +64,54 @@ public class LocatedBlock {
     } else {
       this.locs = locs;
     }
+    this.data = null;
   }
+
+  public void setData(byte[] data) {
+    String error = null;
+    if(locs != null){
+      if(isPhantomBlock()){
+        this.data = data;
+      }else{
+        error = "Can not set data. Not a phantom data block";
+      }
+    }else{
+      error = "Can not set data. No datanode found";
+    }
+    if(error != null){
+      throw new UnsupportedOperationException(error);
+    }
+  }
+
+  public boolean isPhantomBlock(){
+    if (locs != null && locs.length == 1) {
+      if (b.getBlockId() < 0) {
+        return true;
+      }
+    }
+    return  false;
+  }
+
+  public boolean isDataSet(){
+     if(isPhantomBlock() && data!= null && data.length > 0) {
+       return true;
+     }else{
+       return false;
+     }
+  }
+
+  public byte[] getData() {
+    String error = null;
+    if(isDataSet()) {
+      return data;
+    }else if(isPhantomBlock()) {
+      error = "The file data is not set";
+    }else {
+      error = "The file data is not stored in the database";
+    }
+    throw new UnsupportedOperationException(error);
+  }
+
 
   public Token<BlockTokenIdentifier> getBlockToken() {
     return blockToken;

@@ -23,7 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 abstract class BatchedBlocksRelatedLock extends Lock {
-
+/*
   private final FinderType finder;
   private final int storageId;
 
@@ -57,5 +57,5 @@ abstract class BatchedBlocksRelatedLock extends Lock {
     protected Type getType() {
       return Type.InvalidatedBlock;
     }
-  }
+  }*/
 }

@@ -307,7 +307,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
         <configuration>
-          <skipTests>false</skipTests>
+          <!--<skipTests>false</skipTests> error: element not allowed here-->
         </configuration>
         <executions>
           <execution>

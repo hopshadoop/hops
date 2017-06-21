@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ActiveNamenodeListRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ActiveNamenodeListResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockReceivedAndDeletedRequestProto;
@@ -335,6 +336,27 @@ public class DatanodeProtocolClientSideTranslatorPB
       return aNamenode;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  /**
+   * Read the small file data
+   *
+   * @param id
+   * @return data
+   * @throws IOException
+   */
+  @Override
+  public byte[] getSmallFileData(int id) throws IOException {
+    DatanodeProtocolProtos.GetSmallFileDataProto.Builder request =
+            DatanodeProtocolProtos.GetSmallFileDataProto.newBuilder();
+    request.setId(id);
+    try{
+     DatanodeProtocolProtos.SmallFileDataResponseProto response = rpcProxy.getSmallFileData(NULL_CONTROLLER, request.build());
+     return PBHelper.convert(response);
+
+    } catch (ServiceException e) {
+    throw ProtobufHelper.getRemoteException(e);
     }
   }
 

@@ -40,28 +40,32 @@ final class BlockRelatedLock extends LockWithType {
     Lock lock = locks.getLock(Type.Block);
     if (lock instanceof BaseIndividualBlockLock) {
       BaseIndividualBlockLock individualBlockLock =
-          (BaseIndividualBlockLock) lock;
+              (BaseIndividualBlockLock) lock;
       //get by blocksId
       for (BlockInfo blk : individualBlockLock.getBlocks()) {
         if (isList()) {
           acquireLockList(DEFAULT_LOCK_TYPE, getFinderType(true),
-              blk.getBlockId(), blk.getInodeId());
+                  blk.getBlockId(), blk.getInodeId());
         } else {
           acquireLock(DEFAULT_LOCK_TYPE, getFinderType(true), blk.getBlockId(),
-              blk.getInodeId());
+                  blk.getInodeId());
         }
       }
       if (lock instanceof BlockLock) {
         //get by inodeId
         BlockLock blockLock = (BlockLock) lock;
         for (INodeFile file : blockLock.getFiles()) {
-          acquireLockList(DEFAULT_LOCK_TYPE, getFinderType(false),
-              file.getId());
+          if(!file.isFileStoredInDB()) {
+            acquireLockList(DEFAULT_LOCK_TYPE, getFinderType(false),
+                    file.getId());
+          }else{
+            LOG.debug("Stuffed Inode:  BlockRelateLock. " + getType() + "'s lock skipped as the file(s) data is stored in the database. File Name: "+file.getLocalName());
+          }
         }
       }
     } else {
       throw new TransactionLocks.LockNotAddedException(
-          "Block Lock wasn't added");
+              "Block Lock wasn't added");
     }
   }
 
@@ -69,25 +73,25 @@ final class BlockRelatedLock extends LockWithType {
     switch (getType()) {
       case Replica:
         return byBlockID ? Replica.Finder.ByBlockIdAndINodeId :
-            Replica.Finder.ByINodeId;
+                Replica.Finder.ByINodeId;
       case CorruptReplica:
         return byBlockID ? CorruptReplica.Finder.ByBlockIdAndINodeId :
-            CorruptReplica.Finder.ByINodeId;
+                CorruptReplica.Finder.ByINodeId;
       case ExcessReplica:
         return byBlockID ? ExcessReplica.Finder.ByBlockIdAndINodeId :
-            ExcessReplica.Finder.ByINodeId;
+                ExcessReplica.Finder.ByINodeId;
       case ReplicaUnderConstruction:
         return byBlockID ? ReplicaUnderConstruction.Finder.ByBlockIdAndINodeId :
-            ReplicaUnderConstruction.Finder.ByINodeId;
+                ReplicaUnderConstruction.Finder.ByINodeId;
       case InvalidatedBlock:
         return byBlockID ? InvalidatedBlock.Finder.ByBlockIdAndINodeId :
-            InvalidatedBlock.Finder.ByINodeId;
+                InvalidatedBlock.Finder.ByINodeId;
       case UnderReplicatedBlock:
         return byBlockID ? UnderReplicatedBlock.Finder.ByBlockIdAndINodeId :
-            UnderReplicatedBlock.Finder.ByINodeId;
+                UnderReplicatedBlock.Finder.ByINodeId;
       case PendingBlock:
         return byBlockID ? PendingBlockInfo.Finder.ByBlockIdAndINodeId :
-            PendingBlockInfo.Finder.ByINodeId;
+                PendingBlockInfo.Finder.ByINodeId;
     }
     return null;
   }
@@ -101,5 +105,5 @@ final class BlockRelatedLock extends LockWithType {
         return true;
     }
   }
-  
+
 }

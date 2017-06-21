@@ -189,6 +189,7 @@ message CompleteRequestProto {
   required string src = 1;
   required string clientName = 2;
   optional ExtendedBlockProto last = 3;
+  optional bytes data = 4;
 }
 
 message CompleteResponseProto {

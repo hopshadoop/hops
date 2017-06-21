@@ -19,6 +19,9 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.*;
+import io.hops.metadata.hdfs.entity.FileInodeData;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -56,6 +59,7 @@ public class INodeFile extends INode implements BlockCollection {
 
   private int generationStamp = (int) GenerationStamp.FIRST_VALID_STAMP;
   private long size;
+  private boolean isFileStoredInDB = false;
   
 
   public INodeFile(PermissionStatus permissions, BlockInfo[] blklist,
@@ -64,12 +68,14 @@ public class INodeFile extends INode implements BlockCollection {
     super(permissions, modificationTime, atime);
     this.setReplicationNoPersistance(replication);
     this.setPreferredBlockSizeNoPersistance(preferredBlockSize);
+    this.setFileStoredInDBNoPersistence(false); // it is set when the data is stored in the database
   }
 
   public INodeFile(PermissionStatus permissions, long header,
-      long modificationTime, long atime) throws IOException {
+      long modificationTime, long atime, boolean isFileStoredInDB) throws IOException {
     super(permissions, modificationTime, atime);
     this.setHeaderNoPersistance(header);
+    this.isFileStoredInDB = isFileStoredInDB;
   }
 
   //HOP:
@@ -80,6 +86,7 @@ public class INodeFile extends INode implements BlockCollection {
     setPreferredBlockSizeNoPersistance(other.getPreferredBlockSize());
     setGenerationStampNoPersistence(other.getGenerationStamp());
     setSizeNoPersistence(other.getSize());
+    setFileStoredInDBNoPersistence(other.isFileStoredInDB());
     setHasBlocksNoPersistance(other.hasBlocks());
     setPartitionIdNoPersistance(other.getPartitionId());
     setHeaderNoPersistance(other.getHeader());
@@ -107,14 +114,97 @@ public class INodeFile extends INode implements BlockCollection {
   @Override
   public BlockInfo[] getBlocks()
       throws StorageException, TransactionContextException {
+
+    if(isFileStoredInDB()){
+      FSNamesystem.LOG.debug("Stuffed Inode:  getBlocks(). the file is stored in the database. Returning empty list of blocks");
+      return BlockInfo.EMPTY_ARRAY;
+    }
+
     List<BlockInfo> blocks = getBlocksOrderedByIndex();
     if(blocks == null){
       return BlockInfo.EMPTY_ARRAY;
     }
+
     BlockInfo[] blks = new BlockInfo[blocks.size()];
     return blocks.toArray(blks);
   }
 
+  public void storeFileDataInDB(byte[] data)
+      throws StorageException {
+
+    int len = data.length;
+    FileInodeData fid;
+    DBFileDataAccess fida = null;
+
+    if(len <= FSNamesystem.dbInMemorySmallFileMaxSize()){
+      fida = (InMemoryInodeDataAccess) HdfsStorageFactory.getDataAccess(InMemoryInodeDataAccess.class);
+      fid = new FileInodeData(getId(), data, FileInodeData.Type.InmemoryFile);
+    } else {
+      if( len <= FSNamesystem.dbOnDiskSmallFileMaxSize()){
+        fida = (SmallOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(SmallOnDiskInodeDataAccess.class);
+      }else if( len <= FSNamesystem.dbOnDiskMediumFileMaxSize()){
+        fida = (MediumOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(MediumOnDiskInodeDataAccess.class);
+      }else if( len <= FSNamesystem.dbOnDiskLargeFileMaxSize()){
+        fida = (LargeOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(LargeOnDiskInodeDataAccess.class);
+      }else{
+        StorageException up = new StorageException("The data is too large to be stored in the database. Requested data size is : "+len);
+        throw up;
+      }
+      fid = new FileInodeData(getId(), data, FileInodeData.Type.OnDiskFile);
+    }
+
+    fida.add(fid);
+    FSNamesystem.LOG.debug("Stuffed Inode:  the file has been stored in the database ");
+  }
+
+  public byte[] getFileDataInDB() throws StorageException {
+    HdfsStorageFactory.getConnector().readCommitted();
+
+    //depending on the file size read the file from appropriate table
+    FileInodeData fid = null;
+    DBFileDataAccess fida = null;
+    if(getSize() <= FSNamesystem.dbInMemorySmallFileMaxSize()){
+      fida = (InMemoryInodeDataAccess) HdfsStorageFactory.getDataAccess(InMemoryInodeDataAccess.class);
+    }else if (getSize() <= FSNamesystem.dbOnDiskSmallFileMaxSize()){
+      fida = (SmallOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(SmallOnDiskInodeDataAccess.class);
+    } else if (getSize() <= FSNamesystem.dbOnDiskMediumFileMaxSize()){
+      fida = (MediumOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(MediumOnDiskInodeDataAccess.class);
+    } else if (getSize() <= FSNamesystem.dbOnDiskLargeFileMaxSize()){
+      fida = (LargeOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(LargeOnDiskInodeDataAccess.class);
+    } else {
+      StorageException up = new StorageException("The data is too large to be stored in the database. Requested data size is : "+getSize());
+      throw up;
+    }
+
+    fid = (FileInodeData) fida.get(getId());
+    FSNamesystem.LOG.debug("Stuffed Inode:  Read file data from the database. Data length is :" + fid.getInodeData().length);
+    return fid.getInodeData();
+  }
+
+  public void deleteFileDataStoredInDB() throws StorageException {
+    //depending on the file size delete the file from appropriate table
+    FileInodeData fid = null;
+    DBFileDataAccess fida = null;
+    FileInodeData.Type fileType = null;
+    if(getSize() <= FSNamesystem.dbInMemorySmallFileMaxSize()){
+      fida = (InMemoryInodeDataAccess) HdfsStorageFactory.getDataAccess(InMemoryInodeDataAccess.class);
+      fileType = FileInodeData.Type.InmemoryFile;
+    }else if (getSize() <= FSNamesystem.dbOnDiskSmallFileMaxSize()){
+      fida = (SmallOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(SmallOnDiskInodeDataAccess.class);
+      fileType = FileInodeData.Type.OnDiskFile;
+    } else if (getSize() <= FSNamesystem.dbOnDiskMediumFileMaxSize()){
+      fida = (MediumOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(MediumOnDiskInodeDataAccess.class);
+      fileType = FileInodeData.Type.OnDiskFile;
+    } else if (getSize() <= FSNamesystem.dbOnDiskLargeFileMaxSize()){
+      fida = (LargeOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(LargeOnDiskInodeDataAccess.class);
+      fileType = FileInodeData.Type.OnDiskFile;
+    } else {
+      IllegalStateException up = new IllegalStateException("Can not delete file. It is not stored in the database");
+      throw up;
+    }
+    fida.delete(new FileInodeData(getId(),null, fileType));
+    FSNamesystem.LOG.debug("Stuffed Inode:  File data for Inode Id: "+getId()+" is deleted");
+  }
   /**
    * append array of blocks to this.blocks
    */
@@ -160,6 +250,11 @@ public class INodeFile extends INode implements BlockCollection {
         v.add(blk);
       }
     }
+
+    if(isFileStoredInDB()){
+      deleteFileDataStoredInDB();
+    }
+
     return 1;
   }
   
@@ -220,7 +315,8 @@ public class INodeFile extends INode implements BlockCollection {
 
   long diskspaceConsumed()
       throws StorageException, TransactionContextException {
-    return diskspaceConsumed(getBlocks());
+//    return diskspaceConsumed(getBlocks());
+    return getSize();
   }
   
   long diskspaceConsumed(Block[] blkArr) {
@@ -327,10 +423,27 @@ public class INodeFile extends INode implements BlockCollection {
     return size;
   }
 
+  public boolean isFileStoredInDB(){
+    return isFileStoredInDB;
+  }
+
+  public void setFileStoredInDB(boolean isFileStoredInDB) throws StorageException, TransactionContextException {
+    setFileStoredInDBNoPersistence(isFileStoredInDB);
+    save();
+  }
+
+  public void setFileStoredInDBNoPersistence(boolean isFileStoredInDB){
+     this.isFileStoredInDB = isFileStoredInDB;
+  }
+
   public void setSizeNoPersistence(long size) {
     this.size = size;
   }
-  
+
+  public void setSize(long size) throws TransactionContextException, StorageException {
+    setSizeNoPersistence(size);
+    save();
+  }
   public void recomputeFileSize() throws StorageException, TransactionContextException {
     setSizeNoPersistence(this.computeFileSize(true));
     save();
