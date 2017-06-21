@@ -403,7 +403,7 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
-  public boolean complete(String src, String clientName, ExtendedBlock last)
+  public boolean complete(String src, String clientName, ExtendedBlock last, final byte[] data)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
     CompleteRequestProto.Builder req =
@@ -411,6 +411,10 @@ public class ClientNamenodeProtocolTranslatorPB
     if (last != null) {
       req.setLast(PBHelper.convert(last));
     }
+    if(data!=null){
+      req.setData(ByteString.copyFrom(data));
+    }
+
     try {
       return rpcProxy.complete(null, req.build()).getResult();
     } catch (ServiceException e) {

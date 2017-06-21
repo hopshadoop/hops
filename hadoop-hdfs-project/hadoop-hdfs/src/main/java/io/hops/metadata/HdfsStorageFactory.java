@@ -115,6 +115,7 @@ import org.apache.hadoop.hdfs.server.namenode.INodeSymlink;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
@@ -190,6 +191,9 @@ public class HdfsStorageFactory {
     InputStream inStream =
         StorageConnector.class.getClassLoader().getResourceAsStream(configFile);
     clusterConf.load(inStream);
+    if(inStream == null){
+      throw new FileNotFoundException("Unable to load database configuration file");
+    }
     return clusterConf;
   }
   

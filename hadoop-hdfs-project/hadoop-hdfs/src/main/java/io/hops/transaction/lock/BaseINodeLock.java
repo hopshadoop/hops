@@ -23,11 +23,10 @@ import io.hops.resolvingcache.Cache;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.EntityManager;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
+import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,8 +37,6 @@ import java.util.Map;
 import java.util.Random;
 
 public abstract class BaseINodeLock extends Lock {
-  protected final static Log LOG = LogFactory.getLog(BaseINodeLock.class);
-
   private final Map<INode, TransactionLockTypes.INodeLockType>
       allLockedInodesInTx;
   private final ResolvedINodesMap resolvedINodesMap;
@@ -53,6 +50,7 @@ public abstract class BaseINodeLock extends Lock {
   protected static boolean setRandomParitionKeyEnabled = false;
 
   protected static Random rand = new Random(System.currentTimeMillis());
+
 
   public static void setDefaultLockType(
       TransactionLockTypes.INodeLockType defaultLockType) {
@@ -106,9 +104,38 @@ public abstract class BaseINodeLock extends Lock {
       individualInodes.add(iNode);
     }
 
+    private void putIndividualINodes(List<INode> iNodes) {
+      for(INode iNode: iNodes){
+        individualInodes.add(iNode);
+      }
+    }
+
     private List<INode> getPathINodes(String path) {
       PathRelatedINodes pri = pathToPathINodes.get(path);
       return pri.pathINodes;
+    }
+
+    private final int countResolvedFilesStoredInDB() {
+      return fileCount(true);
+    }
+
+    private final int countResolvedFilesStoredOnDataNodes() {
+      return fileCount(false);
+    }
+
+    private final int fileCount(boolean isStoredInDB) {
+      int count = 0;
+      for (INode inode : this.getAll()) {
+        if (inode instanceof INodeFile) {
+          INodeFile file = (INodeFile) inode;
+          if (isStoredInDB && file.isFileStoredInDB()) {
+            count++;
+          } else if (!isStoredInDB && !file.isFileStoredInDB()) {
+            count++;
+          }
+        }
+      }
+      return count;
     }
 
     private List<INode> getChildINodes(String path) {
@@ -164,6 +191,10 @@ public abstract class BaseINodeLock extends Lock {
 
   void addIndividualINode(INode iNode) {
     resolvedINodesMap.putIndividualINode(iNode);
+  }
+
+  void addIndividualINodes(List<INode> iNodes) {
+    resolvedINodesMap.putIndividualINodes(iNodes);
   }
 
   List<INode> getPathINodes(String path) {
@@ -288,4 +319,12 @@ public abstract class BaseINodeLock extends Lock {
     return Type.INode;
   }
 
+  protected static boolean isStoredInDB(INode inode){
+    if(inode instanceof  INodeFile){
+      INodeFile file = (INodeFile)inode;
+      return file.isFileStoredInDB();
+    }else{
+      return false;
+    }
+  }
 }

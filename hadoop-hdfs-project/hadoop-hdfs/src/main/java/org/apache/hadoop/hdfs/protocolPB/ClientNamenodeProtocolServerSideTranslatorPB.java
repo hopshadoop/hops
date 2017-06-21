@@ -468,7 +468,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       CompleteRequestProto req) throws ServiceException {
     try {
       boolean result = server.complete(req.getSrc(), req.getClientName(),
-          req.hasLast() ? PBHelper.convert(req.getLast()) : null);
+          req.hasLast() ? PBHelper.convert(req.getLast()) : null, req.hasData() ? req.getData().toByteArray() : null);
       return CompleteResponseProto.newBuilder().setResult(result).build();
     } catch (IOException e) {
       throw new ServiceException(e);

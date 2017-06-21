@@ -36,6 +36,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -44,6 +45,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -159,7 +161,7 @@ public class TestFileAppend4 {
       GenericTestUtils.DelayAnswer delayer =
           new GenericTestUtils.DelayAnswer(LOG);
       doAnswer(delayer).when(spyNN)
-          .complete(anyString(), anyString(), (ExtendedBlock) anyObject());
+          .complete(anyString(), anyString(), (ExtendedBlock) anyObject(), Mockito.<byte[]>any() );
 
       DFSClient client = new DFSClient(null, spyNN, conf, null);
       file1 = new Path("/testRecoverFinalized");
@@ -234,7 +236,7 @@ public class TestFileAppend4 {
       GenericTestUtils.DelayAnswer delayer =
           new GenericTestUtils.DelayAnswer(LOG);
       doAnswer(delayer).when(spyNN)
-          .complete(anyString(), anyString(), (ExtendedBlock) anyObject());
+          .complete(anyString(), anyString(), (ExtendedBlock) anyObject(), Mockito.<byte[]>any());
 
       DFSClient client = new DFSClient(null, spyNN, conf, null);
       file1 = new Path("/testCompleteOtherLease");
