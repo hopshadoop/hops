@@ -2585,7 +2585,7 @@ public class FSDirectory implements Closeable {
       blocksize = fileNode.getPreferredBlockSize();
     }
     // TODO Add encoding status
-    return new HdfsFileStatus(size, node.isDirectory(), replication, blocksize,
+    return new HdfsFileStatus(node.getId(), size, node.isDirectory(), replication, blocksize,
         node.getModificationTime(), node.getAccessTime(),
         node.getFsPermission(), node.getUserName(), node.getGroupName(),
         node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path);
@@ -2613,7 +2613,7 @@ public class FSDirectory implements Closeable {
         loc = new LocatedBlocks();
       }
     }
-    return new HdfsLocatedFileStatus(size, node.isDirectory(), replication,
+    return new HdfsLocatedFileStatus(node.getId(), size, node.isDirectory(), replication,
         blocksize, node.getModificationTime(), node.getAccessTime(),
         node.getFsPermission(), node.getUserName(), node.getGroupName(),
         node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path,

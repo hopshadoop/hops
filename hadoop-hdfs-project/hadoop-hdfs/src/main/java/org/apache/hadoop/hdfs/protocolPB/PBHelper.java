@@ -994,7 +994,7 @@ public class PBHelper {
     if (fs == null) {
       return null;
     }
-    return new HdfsLocatedFileStatus(fs.getLength(),
+    return new HdfsLocatedFileStatus(fs.getFileId(), fs.getLength(),
         fs.getFileType().equals(FileType.IS_DIR), fs.getBlockReplication(),
         fs.getBlocksize(), fs.getModificationTime(), fs.getAccessTime(),
         PBHelper.convert(fs.getPermission()), fs.getOwner(), fs.getGroup(),
@@ -1015,6 +1015,7 @@ public class PBHelper {
     }
 
     HdfsFileStatusProto.Builder builder = HdfsFileStatusProto.newBuilder().
+        setFileId(fs.getFileId()).
         setLength(fs.getLen()).
         setFileType(fType).
         setBlockReplication(fs.getReplication()).

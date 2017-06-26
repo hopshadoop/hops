@@ -41,12 +41,15 @@ public class HdfsFileStatus {
   private FsPermission permission;
   private String owner;
   private String group;
+  private final long fileId;
 
   public static final byte[] EMPTY_NAME = new byte[0];
 
   /**
    * Constructor
    *
+   * @param fileid
+   *    the inode id of the file
    * @param length
    *     the number of bytes the file has
    * @param isdir
@@ -68,10 +71,11 @@ public class HdfsFileStatus {
    * @param path
    *     the local name in java UTF8 encoding the same as that in-memory
    */
-  public HdfsFileStatus(long length, boolean isdir, int block_replication,
+  public HdfsFileStatus(long fileid, long length, boolean isdir, int block_replication,
       long blocksize, long modification_time, long access_time,
       FsPermission permission, String owner, String group, byte[] symlink,
       byte[] path) {
+    this.fileId = fileid;
     this.length = length;
     this.isdir = isdir;
     this.block_replication = (short) block_replication;
@@ -252,4 +256,6 @@ public class HdfsFileStatus {
   final public byte[] getSymlinkInBytes() {
     return symlink;
   }
+
+  final public long getFileId() { return fileId; }
 }
