@@ -30,12 +30,15 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
+import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.GenericOptionsParser;
@@ -91,6 +94,8 @@ public class NodeManager extends CompositeService
   private AtomicBoolean isStopping = new AtomicBoolean(false);
   private boolean rmWorkPreservingRestartEnabled;
   private boolean shouldExitOnShutdownEvent = false;
+  
+  private CertificateLocalizationService certificateLocalizationService;
 
   public NodeManager() {
     super(NodeManager.class.getName());
@@ -128,8 +133,11 @@ public class NodeManager extends CompositeService
       NMContainerTokenSecretManager containerTokenSecretManager,
       NMTokenSecretManagerInNM nmTokenSecretManager,
       NMStateStoreService stateStore) {
+    boolean isSSLEnabled = getConfig().getBoolean
+        (CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+            CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT);
     return new NMContext(containerTokenSecretManager, nmTokenSecretManager,
-        dirsHandler, aclsManager, stateStore);
+        dirsHandler, aclsManager, stateStore, isSSLEnabled);
   }
 
   protected void doSecureLogin() throws IOException {
@@ -253,6 +261,16 @@ public class NodeManager extends CompositeService
     
     DefaultMetricsSystem.initialize("NodeManager");
 
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      certificateLocalizationService = new CertificateLocalizationService
+          (false);
+      CertificateLocalizationCtx.getInstance().setCertificateLocalization
+          (certificateLocalizationService);
+      addService(certificateLocalizationService);
+      ((NMContext) context).setCertificateLocalizationService(certificateLocalizationService);
+    }
+    
     // StatusUpdater should be added last so that it get started last 
     // so that we make sure everything is up before registering with RM. 
     addService(nodeStatusUpdater);
@@ -355,12 +373,22 @@ public class NodeManager extends CompositeService
         .getRecordFactory(null).newRecordInstance(NodeHealthStatus.class);
     private final NMStateStoreService stateStore;
     private boolean isDecommissioned = false;
+    private final boolean isSSLEnabled;
     private NodeStatusUpdater nodeStatusUpdater;
-
+    private CertificateLocalizationService certificateLocalizationService;
+  
     public NMContext(NMContainerTokenSecretManager containerTokenSecretManager,
         NMTokenSecretManagerInNM nmTokenSecretManager,
         LocalDirsHandlerService dirsHandler, ApplicationACLsManager aclsManager,
         NMStateStoreService stateStore) {
+      this(containerTokenSecretManager, nmTokenSecretManager, dirsHandler,
+          aclsManager, stateStore, false);
+    }
+    
+    public NMContext(NMContainerTokenSecretManager containerTokenSecretManager,
+        NMTokenSecretManagerInNM nmTokenSecretManager,
+        LocalDirsHandlerService dirsHandler, ApplicationACLsManager aclsManager,
+        NMStateStoreService stateStore, boolean isSSLEnabled) {
       this.containerTokenSecretManager = containerTokenSecretManager;
       this.nmTokenSecretManager = nmTokenSecretManager;
       this.dirsHandler = dirsHandler;
@@ -369,8 +397,19 @@ public class NodeManager extends CompositeService
       this.nodeHealthStatus.setHealthReport("Healthy");
       this.nodeHealthStatus.setLastHealthReportTime(System.currentTimeMillis());
       this.stateStore = stateStore;
+      this.isSSLEnabled = isSSLEnabled;
     }
 
+    public void setCertificateLocalizationService
+        (CertificateLocalizationService certificateLocalizationService) {
+      this.certificateLocalizationService = certificateLocalizationService;
+    }
+    
+    @Override
+    public CertificateLocalizationService getCertificateLocalizationService() {
+      return certificateLocalizationService;
+    }
+    
     /**
      * Usable only after ContainerManager is started.
      */
@@ -467,6 +506,10 @@ public class NodeManager extends CompositeService
 
     public void setNodeStatusUpdater(NodeStatusUpdater nodeStatusUpdater) {
       this.nodeStatusUpdater = nodeStatusUpdater;
+    }
+    
+    public boolean isSSLEnabled() {
+      return isSSLEnabled;
     }
   }
 

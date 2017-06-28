@@ -25,7 +25,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc.RpcServerException;
+import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos;
 
+import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -323,15 +327,24 @@ public class NamenodeSelector {
     if (defaultUri != null) {
       try {
         NameNodeProxies.ProxyAndInfo<ClientProtocol> proxyInfo =
-            NameNodeProxies.createProxy(conf, defaultUri, ClientProtocol.class);
+                NameNodeProxies.createProxy(conf, defaultUri, ClientProtocol.class);
         handle = proxyInfo.getProxy();
         if (handle != null) {
           anl = handle.getActiveNamenodesForClient();
-          RPC.stopProxy(handle);
         }
+      } catch (SSLException e) {
+        LOG.error(e, e);
+        throw e;
       } catch (Exception e) {
+        // TODO: FATAL_UNAUTHORIZED might be thrown for another reason as well
+        if (e instanceof RemoteException
+                && ((RemoteException) e).getErrorCode().equals(
+                RpcHeaderProtos.RpcResponseHeaderProto.RpcErrorCodeProto.FATAL_UNAUTHORIZED)) {
+          throw new RpcServerException(e.getMessage());
+        }
         LOG.warn("Failed to get list of NN from default NN. Default NN was " +
             defaultUri);
+      } finally {
         RPC.stopProxy(handle);
       }
     }

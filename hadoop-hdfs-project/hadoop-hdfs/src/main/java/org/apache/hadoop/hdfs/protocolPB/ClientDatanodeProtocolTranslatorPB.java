@@ -139,9 +139,19 @@ public class ClientDatanodeProtocolTranslatorPB
     confWithNoIpcIdle.setInt(
         CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
 
-    UserGroupInformation ticket = UserGroupInformation
+    /*UserGroupInformation ticket = UserGroupInformation
         .createRemoteUser(locatedBlock.getBlock().getLocalBlock().toString());
+    ticket.addToken(locatedBlock.getBlockToken());*/
+    
+    
+    // START OF HOPS TLS
+    // Apache Hadoop creates a remote user to perform the RPC which is the
+    // block ID. This does not work with the RPC TLS support since the CN of
+    // the certificate will not match with the user who performed the RPC
+    UserGroupInformation ticket = UserGroupInformation.getCurrentUser();
     ticket.addToken(locatedBlock.getBlockToken());
+    // END OF HOPS TLS
+    
     return createClientDatanodeProtocolProxy(addr, ticket, confWithNoIpcIdle,
         NetUtils.getDefaultSocketFactory(conf), socketTimeout);
   }

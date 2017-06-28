@@ -59,6 +59,7 @@ import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.StandardSocketFactory;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Daemon;
@@ -66,6 +67,7 @@ import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.Time;
 
+import javax.net.SocketFactory;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -1425,7 +1427,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       DFSClient.LOG.debug("Connecting to datanode " + dnAddr);
     }
     final InetSocketAddress isa = NetUtils.createSocketAddr(dnAddr);
-    final Socket sock = client.socketFactory.createSocket();
+    //final Socket sock = client.socketFactory.createSocket();
+    
+    SocketFactory socketFactory = new StandardSocketFactory();
+    final Socket sock = socketFactory.createSocket();
+    
     final int timeout = client.getDatanodeReadTimeout(length);
     NetUtils.connect(sock, isa, client.getRandomLocalInterfaceAddr(), timeout);
     sock.setSoTimeout(timeout);

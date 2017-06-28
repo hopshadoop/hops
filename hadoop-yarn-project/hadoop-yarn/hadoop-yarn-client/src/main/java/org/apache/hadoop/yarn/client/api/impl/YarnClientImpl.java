@@ -18,8 +18,12 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -33,10 +37,12 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -239,6 +245,15 @@ public class YarnClientImpl extends YarnClient {
       throw new ApplicationIdNotProvidedException(
           "ApplicationId is not provided in ApplicationSubmissionContext");
     }
+    
+    if (getConfig().getBoolean(CommonConfigurationKeysPublic
+            .IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      ByteBuffer[] cryptoMaterial = getCryptoMaterial();
+      appContext.setKeyStore(cryptoMaterial[0]);
+      appContext.setTrustStore(cryptoMaterial[1]);
+    }
+    
     SubmitApplicationRequest request =
         Records.newRecord(SubmitApplicationRequest.class);
     request.setApplicationSubmissionContext(appContext);
@@ -251,7 +266,7 @@ public class YarnClientImpl extends YarnClient {
 
     //TODO: YARN-1763:Handle RM failovers during the submitApplication call.
     rmClient.submitApplication(request);
-
+    
     int pollCount = 0;
     long startTime = System.currentTimeMillis();
     EnumSet<YarnApplicationState> waitingStates = 
@@ -306,7 +321,30 @@ public class YarnClientImpl extends YarnClient {
 
     return applicationId;
   }
-
+  
+  private ByteBuffer[] getCryptoMaterial() throws IOException {
+    String username = UserGroupInformation.getCurrentUser().getUserName();
+    
+    String clientMaterializeDir = getConfig().get(HopsSSLSocketFactory
+        .CryptoKeys.CLIENT_MATERIALIZE_DIR.getValue(),
+        HopsSSLSocketFactory.CryptoKeys.CLIENT_MATERIALIZE_DIR
+            .getDefaultValue());
+    
+    ByteBuffer[] material = new ByteBuffer[2];
+    Path kStore = Paths.get(clientMaterializeDir, username + "__kstore.jks");
+    Path tStore = Paths.get(clientMaterializeDir, username + "__tstore.jks");
+    
+    if (!kStore.toFile().exists() || !tStore.toFile().exists()) {
+      throw new IOException("Crypto material for user " + username
+          + " could not be found in " + clientMaterializeDir);
+    }
+    
+    material[0] = ByteBuffer.wrap(Files.readAllBytes(kStore));
+    material[1] = ByteBuffer.wrap(Files.readAllBytes(tStore));
+    
+    return material;
+  }
+  
   private void addTimelineDelegationToken(
       ContainerLaunchContext clc) throws YarnException, IOException {
     Credentials credentials = new Credentials();

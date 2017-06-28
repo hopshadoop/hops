@@ -43,6 +43,8 @@ import org.apache.hadoop.yarn.ipc.YarnRPC;
 
 import com.google.common.base.Preconditions;
 
+import javax.net.ssl.SSLException;
+
 @Public
 @Unstable
 public class ServerProxy {
@@ -77,6 +79,8 @@ public class ServerProxy {
     exceptionToPolicyMap.put(ConnectTimeoutException.class, retryPolicy);
     exceptionToPolicyMap.put(RetriableException.class, retryPolicy);
     exceptionToPolicyMap.put(SocketException.class, retryPolicy);
+    // When client got an SSLException should not retry to connect
+    exceptionToPolicyMap.put(SSLException.class, RetryPolicies.TRY_ONCE_THEN_FAIL);
     exceptionToPolicyMap.put(NMNotYetReadyException.class, retryPolicy);
 
     return RetryPolicies.retryByException(RetryPolicies.TRY_ONCE_THEN_FAIL,

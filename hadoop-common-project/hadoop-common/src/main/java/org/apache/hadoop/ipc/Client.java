@@ -54,8 +54,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.net.SocketFactory;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLSocket;
 import javax.security.sasl.Sasl;
 
+import org.apache.commons.collections.functors.ExceptionClosure;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -79,6 +82,7 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcErrorCodeProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcStatusProto;
 import org.apache.hadoop.net.ConnectTimeoutException;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.SaslRpcClient;
@@ -597,12 +601,12 @@ public class Client {
            */
           UserGroupInformation ticket = remoteId.getTicket();
           if (ticket != null && ticket.hasKerberosCredentials()) {
-            KerberosInfo krbInfo = 
-              remoteId.getProtocol().getAnnotation(KerberosInfo.class);
+            KerberosInfo krbInfo =
+                    remoteId.getProtocol().getAnnotation(KerberosInfo.class);
             if (krbInfo != null && krbInfo.clientPrincipal() != null) {
-              String host = 
-                SecurityUtil.getHostFromPrincipal(remoteId.getTicket().getUserName());
-              
+              String host =
+                      SecurityUtil.getHostFromPrincipal(remoteId.getTicket().getUserName());
+
               // If host name is a valid local address then bind socket to it
               InetAddress localAddr = NetUtils.getLocalInetAddress(host);
               if (localAddr != null) {
@@ -610,7 +614,7 @@ public class Client {
               }
             }
           }
-          
+
           NetUtils.connect(this.socket, server, connectionTimeout);
           if (rpcTimeout > 0) {
             pingInterval = rpcTimeout;  // rpcTimeout overwrites pingInterval
@@ -712,7 +716,12 @@ public class Client {
           setupConnection();
           InputStream inStream = NetUtils.getInputStream(socket);
           OutputStream outStream = NetUtils.getOutputStream(socket);
-          writeConnectionHeader(outStream);
+
+          try {
+            writeConnectionHeader(outStream);
+          } catch (SSLException ex) {
+            throw new IOException(ex.getMessage()).initCause(ex);
+          }
           if (authProtocol == AuthProtocol.SASL) {
             final InputStream in2 = inStream;
             final OutputStream out2 = outStream;
@@ -788,7 +797,7 @@ public class Client {
         }
       } catch (Throwable t) {
         if (t instanceof IOException) {
-          markClosed((IOException)t);
+          markClosed((IOException) t);
         } else {
           markClosed(new IOException("Couldn't set up IO streams", t));
         }
@@ -885,7 +894,7 @@ public class Client {
      * +----------------------------------+
      */
     private void writeConnectionHeader(OutputStream outStream)
-        throws IOException {
+        throws IOException, SSLException {
       DataOutputStream out = new DataOutputStream(new BufferedOutputStream(outStream));
       // Write out the header, version and authentication method
       out.write(RpcConstants.HEADER.array());
@@ -1474,6 +1483,9 @@ public class Client {
         if (call.error instanceof RemoteException) {
           call.error.fillInStackTrace();
           throw call.error;
+        } else if (call.error.getCause() instanceof SSLException) {
+          LOG.error("Connection " + connection.getName() + " encountered TLS error", call.error.getCause());
+          throw new SSLException(call.error.getMessage());
         } else { // local exception
           InetSocketAddress address = connection.getRemoteAddress();
           throw NetUtils.wrapException(address.getHostName(),
@@ -1520,7 +1532,7 @@ public class Client {
         }
       }
     } while (!connection.addCall(call));
-    
+
     //we don't invoke the method below inside "synchronized (connections)"
     //block above. The reason for that is if the server happens to be slow,
     //it will take longer to establish a connection and that will slow the

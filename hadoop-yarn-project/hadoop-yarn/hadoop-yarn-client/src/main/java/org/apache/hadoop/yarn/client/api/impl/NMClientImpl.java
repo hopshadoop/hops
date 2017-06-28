@@ -20,6 +20,9 @@ package org.apache.hadoop.yarn.client.api.impl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +35,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
@@ -46,7 +51,6 @@ import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.client.api.NMClient;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy.ContainerManagementProtocolProxyData;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -196,6 +200,14 @@ public class NMClientImpl extends NMClient {
         list.add(scRequest);
         StartContainersRequest allRequests =
             StartContainersRequest.newInstance(list);
+        
+        if (getConfig().getBoolean(CommonConfigurationKeysPublic
+            .IPC_SERVER_SSL_ENABLED,
+            CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+          String user = UserGroupInformation.getCurrentUser().getUserName();
+          setupCryptoMaterial(allRequests, user);
+        }
+        
         StartContainersResponse response =
             proxy
                 .getContainerManagementProtocol().startContainers(allRequests);
@@ -224,7 +236,19 @@ public class NMClientImpl extends NMClient {
       return allServiceResponse;
     }
   }
-
+  
+  private void setupCryptoMaterial(StartContainersRequest request, String user)
+      throws IOException {
+    Path kStorePath = Paths.get("k_certificate");
+    Path tStorePath = Paths.get("t_certificate");
+    
+    ByteBuffer kStore = ByteBuffer.wrap(Files.readAllBytes(kStorePath));
+    ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
+    
+    request.setKeyStore(kStore);
+    request.setTrustStore(tStore);
+  }
+  
   @Override
   public void stopContainer(ContainerId containerId, NodeId nodeId)
       throws YarnException, IOException {

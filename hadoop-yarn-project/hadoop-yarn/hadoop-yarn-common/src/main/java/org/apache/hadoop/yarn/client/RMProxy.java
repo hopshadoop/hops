@@ -50,6 +50,8 @@ import org.apache.hadoop.yarn.ipc.YarnRPC;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import javax.net.ssl.SSLException;
+
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 @SuppressWarnings("unchecked")
@@ -276,6 +278,8 @@ public class RMProxy<T> {
     exceptionToPolicyMap.put(ConnectTimeoutException.class, retryPolicy);
     exceptionToPolicyMap.put(RetriableException.class, retryPolicy);
     exceptionToPolicyMap.put(SocketException.class, retryPolicy);
+    // When client got an SSLException should not retry to connect
+    exceptionToPolicyMap.put(SSLException.class, RetryPolicies.TRY_ONCE_THEN_FAIL);
     // YARN-4288: local IOException is also possible.
     exceptionToPolicyMap.put(IOException.class, retryPolicy);
     // Not retry on remote IO exception.

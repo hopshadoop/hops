@@ -104,8 +104,8 @@ public class ClientRMProxy<T> extends RMProxy<T>  {
           YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
     } else if (protocol == GroupMembership.class) {
       return conf.getSocketAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT);
+          YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT);
     } else {
       String message = "Unsupported protocol found when creating the proxy " +
           "connection to ResourceManager: " +

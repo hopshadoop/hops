@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -41,6 +42,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -1232,6 +1234,26 @@ public class RMAppImpl implements RMApp, Recoverable {
         app.rememberTargetTransitionsAndStoreState(event,
           new AttemptFailedFinalStateSavedTransition(), RMAppState.FAILED,
           RMAppState.FAILED);
+        
+        // Application has failed and no more attempts are allowed
+        // Cleanup the cryptographic material
+        // In case of successful completion, the cryptographic material will
+        // be cleaned by AMLauncher#cleanup
+        ByteBuffer kstore = app.getApplicationSubmissionContext().getKeyStore();
+        ByteBuffer tstore = app.getApplicationSubmissionContext()
+            .getTrustStore();
+        
+        // Basically if TLS is enabled for RPC
+        if (kstore != null && tstore != null
+            && kstore.capacity() > 0 && tstore.capacity() > 0) {
+          try {
+            CertificateLocalizationCtx.getInstance().getCertificateLocalization()
+                .removeMaterial(app.getUser());
+          } catch (InterruptedException | ExecutionException ex) {
+            LOG.error("Error while deleting cryptographic material for user " +
+                app.getUser(), ex);
+          }
+        }
         return RMAppState.FINAL_SAVING;
       }
     }

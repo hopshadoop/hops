@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
@@ -862,7 +863,8 @@ public class TestClientRMService {
     ClientRMService rmService =
         new ClientRMService(rmContext, yarnScheduler, appManager,
             mockAclsManager, mockQueueACLsManager, null);
-
+    rmService.serviceInit(conf);
+    
     // without name and queue
 
     SubmitApplicationRequest submitRequest1 = mockSubmitAppRequest(
@@ -925,7 +927,8 @@ public class TestClientRMService {
   }
 
   @Test
-  public void testGetApplications() throws IOException, YarnException {
+  public void testGetApplications() throws IOException, YarnException,
+      Exception {
     /**
      * 1. Submit 3 applications alternately in two queues
      * 2. Test each of the filters
@@ -950,6 +953,7 @@ public class TestClientRMService {
     ClientRMService rmService =
         new ClientRMService(rmContext, yarnScheduler, appManager,
             mockAclsManager, mockQueueACLsManager, null);
+    rmService.serviceInit(conf);
 
     // Initialize appnames and queues
     String[] queues = {QUEUE_1, QUEUE_2};
@@ -1067,7 +1071,7 @@ public class TestClientRMService {
   @Test(timeout=4000)
   public void testConcurrentAppSubmit()
       throws IOException, InterruptedException, BrokenBarrierException,
-      YarnException {
+      YarnException, Exception {
     YarnScheduler yarnScheduler = mockYarnScheduler();
     RMContext rmContext = mock(RMContext.class);
     mockRMContext(yarnScheduler, rmContext);
@@ -1111,7 +1115,8 @@ public class TestClientRMService {
     final ClientRMService rmService =
         new ClientRMService(rmContext, yarnScheduler, appManager, null, null,
             null);
-
+    rmService.serviceInit(conf);
+    
     // submit an app and wait for it to block while in app submission
     Thread t = new Thread() {
       @Override

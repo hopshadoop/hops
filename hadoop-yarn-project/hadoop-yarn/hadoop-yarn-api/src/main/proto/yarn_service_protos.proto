@@ -248,6 +248,8 @@ message GetContainerStatusResponseProto {
 //// bulk API records
 message StartContainersRequestProto {
   repeated StartContainerRequestProto start_container_request = 1;
+  optional bytes key_store = 2;
+  optional bytes trust_store = 3;
 }
 
 message ContainerExceptionMapProto {

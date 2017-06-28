@@ -21,7 +21,6 @@ package org.apache.hadoop.util;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
@@ -136,7 +135,7 @@ public class ReflectionUtils {
     setConf(result, conf);
     return result;
   }
-
+  
   static private ThreadMXBean threadBean = 
     ManagementFactory.getThreadMXBean();
     

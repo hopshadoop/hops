@@ -18,21 +18,27 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.amlauncher;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.CryptoMaterial;
+import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.util.StringUtils;
@@ -55,6 +61,8 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
@@ -77,6 +85,8 @@ public class AMLauncher implements Runnable {
   private final AMLauncherEventType eventType;
   private final RMContext rmContext;
   private final Container masterContainer;
+  private final EnumSet<RMAppState> appFinalStates = EnumSet.of(
+      RMAppState.FINISHED, RMAppState.KILLED);
   
   @SuppressWarnings("rawtypes")
   private final EventHandler handler;
@@ -114,7 +124,15 @@ public class AMLauncher implements Runnable {
     list.add(scRequest);
     StartContainersRequest allRequests =
         StartContainersRequest.newInstance(list);
-
+    
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      String user = rmContext.getRMApps().get(masterContainerID
+          .getApplicationAttemptId().getApplicationId()).getUser();
+      setupCryptoMaterial(allRequests, user, masterContainerID
+          .getApplicationAttemptId().getApplicationId().toString());
+    }
+    
     StartContainersResponse response =
         containerMgrProxy.startContainers(allRequests);
     if (response.getFailedRequests() != null
@@ -128,6 +146,23 @@ public class AMLauncher implements Runnable {
     }
   }
   
+  private void setupCryptoMaterial(StartContainersRequest request,
+      String user, String applicationId) throws FileNotFoundException,
+      YarnException {
+    try {
+      CryptoMaterial material = rmContext
+          .getCertificateLocalizationService().getMaterialLocation(user);
+      request.setKeyStore(material.getKeyStoreMem());
+      request.setTrustStore(material.getTrustStoreMem());
+    } catch (InterruptedException | ExecutionException e) {
+      throw new YarnException("Execution of CertificateMaterializer " +
+          "interrupted", e);
+    } catch (IOException e) {
+      throw new YarnException("RPC TLS is enabled but keystore or truststore " +
+          "could not be found", e);
+    }
+  }
+  
   private void cleanup() throws IOException, YarnException {
     connect();
     ContainerId containerId = masterContainer.getId();
@@ -137,13 +172,34 @@ public class AMLauncher implements Runnable {
         StopContainersRequest.newInstance(containerIds);
     StopContainersResponse response =
         containerMgrProxy.stopContainers(stopRequest);
+    
+    // The application is cleaned-up when completes successfully or killed
+    // If the application failed more times than allowed, the cryptograhic
+    // material is cleaned by RMAppImpl#AttemptFailedTransition
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      // Remove the cryptographic material only if the application is
+      // finished or killed
+      RMApp app = rmContext.getRMApps().get(application.getAppAttemptId()
+          .getApplicationId());
+      if (appFinalStates.contains(app.getState())) {
+        String user = rmContext.getRMApps().get(containerId
+            .getApplicationAttemptId().getApplicationId()).getUser();
+        try {
+          rmContext.getCertificateLocalizationService().removeMaterial(user);
+        } catch (InterruptedException | ExecutionException e) {
+          throw new IOException(e);
+        }
+      }
+    }
+    
     if (response.getFailedRequests() != null
         && response.getFailedRequests().containsKey(containerId)) {
       Throwable t = response.getFailedRequests().get(containerId).deSerialize();
       parseAndThrowException(t);
     }
   }
-
+  
   // Protected. For tests.
   protected ContainerManagementProtocol getContainerMgrProxy(
       final ContainerId containerId) {
@@ -153,23 +209,37 @@ public class AMLauncher implements Runnable {
         NetUtils.createSocketAddrForHost(node.getHost(), node.getPort());
 
     final YarnRPC rpc = getYarnRPC();
-
-    UserGroupInformation currentUser =
-        UserGroupInformation.createRemoteUser(containerId
-            .getApplicationAttemptId().toString());
-
+  
     String user =
         rmContext.getRMApps()
             .get(containerId.getApplicationAttemptId().getApplicationId())
             .getUser();
+    
+    // In Apache Hadoop they make the RPC as appattempt user
+    /*UserGroupInformation currentUser =
+        UserGroupInformation.createRemoteUser(containerId
+            .getApplicationAttemptId().toString());
+    
     org.apache.hadoop.yarn.api.records.Token token =
         rmContext.getNMTokenSecretManager().createNMToken(
             containerId.getApplicationAttemptId(), node, user);
     currentUser.addToken(ConverterUtils.convertFromYarn(token,
-        containerManagerConnectAddress));
+        containerManagerConnectAddress));*/
 
+    
+    // BEGIN OF Hops
+    // In Hops we don't, cause this affects RPC over TLS
+    UserGroupInformation realUser = UserGroupInformation.createRemoteUser
+        (user);
+    org.apache.hadoop.yarn.api.records.Token token =
+        rmContext.getNMTokenSecretManager().createNMToken(
+            containerId.getApplicationAttemptId(), node, user);
+    realUser.addToken(ConverterUtils.convertFromYarn(token,
+        containerManagerConnectAddress));
+    // END OF Hops
+    
     return NMProxy.createNMProxy(conf, ContainerManagementProtocol.class,
-        currentUser, rpc, containerManagerConnectAddress);
+        realUser, rpc, containerManagerConnectAddress);
   }
 
   @VisibleForTesting

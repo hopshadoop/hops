@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.util.StringUtils;
@@ -63,6 +65,8 @@ extends ApplicationSubmissionContext {
   private ResourceRequest amResourceRequest = null;
   private LogAggregationContext logAggregationContext = null;
   private ReservationId reservationId = null;
+  private ByteBuffer keyStore = null;
+  private ByteBuffer trustStore = null;
 
   public ApplicationSubmissionContextPBImpl() {
     builder = ApplicationSubmissionContextProto.newBuilder();
@@ -130,6 +134,12 @@ extends ApplicationSubmissionContext {
     }
     if (this.reservationId != null) {
       builder.setReservationId(convertToProtoFormat(this.reservationId));
+    }
+    if (this.keyStore != null) {
+      builder.setKeyStore(convertToProtoFormat(this.keyStore));
+    }
+    if (this.trustStore != null) {
+      builder.setTrustStore(convertToProtoFormat(this.trustStore));
     }
   }
 
@@ -412,7 +422,51 @@ extends ApplicationSubmissionContext {
     ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
     return p.getKeepContainersAcrossApplicationAttempts();
   }
+  
+  @Override
+  public ByteBuffer getKeyStore() {
+    ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
+    if (this.keyStore != null) {
+      return this.keyStore;
+    }
+    if (!p.hasKeyStore()) {
+      return null;
+    }
+    this.keyStore = convertFromProtoFormat(p.getKeyStore());
+    return this.keyStore;
+  }
+  
+  @Override
+  public void setKeyStore(ByteBuffer keyStore) {
+    maybeInitBuilder();
+    if (keyStore == null) {
+      builder.clearKeyStore();
+    }
+    this.keyStore = keyStore;
+  }
 
+  @Override
+  public ByteBuffer getTrustStore() {
+    ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
+    if (this.trustStore != null) {
+      return this.trustStore;
+    }
+    if (!p.hasTrustStore()) {
+      return null;
+    }
+    this.trustStore = convertFromProtoFormat(p.getTrustStore());
+    return this.trustStore;
+  }
+  
+  @Override
+  public void setTrustStore(ByteBuffer trustStore) {
+    maybeInitBuilder();
+    if (trustStore == null) {
+      builder.clearTrustStore();
+    }
+    this.trustStore = trustStore;
+  }
+  
   private PriorityPBImpl convertFromProtoFormat(PriorityProto p) {
     return new PriorityPBImpl(p);
   }
@@ -455,6 +509,14 @@ extends ApplicationSubmissionContext {
     return ((ResourcePBImpl)t).getProto();
   }
 
+  private ByteBuffer convertFromProtoFormat(ByteString byteString) {
+    return ProtoUtils.convertFromProtoFormat(byteString);
+  }
+  
+  private ByteString convertToProtoFormat(ByteBuffer byteBuffer) {
+    return ProtoUtils.convertToProtoFormat(byteBuffer);
+  }
+  
   @Override
   public String getNodeLabelExpression() {
     ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;

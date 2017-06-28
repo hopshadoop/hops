@@ -55,6 +55,7 @@ import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolClientSideTranslatorPB;
 import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolPB;
 
+import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.InetSocketAddress;
@@ -222,6 +223,8 @@ public class NameNodeProxies {
           RetryPolicies.exponentialBackoffRetry(5, 200, TimeUnit.MILLISECONDS);
       Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap =
           new HashMap<Class<? extends Exception>, RetryPolicy>();
+      exceptionToPolicyMap.put(SSLException.class, RetryPolicies.TRY_ONCE_THEN_FAIL);
+
       RetryPolicy methodPolicy =
           RetryPolicies.retryByException(timeoutPolicy, exceptionToPolicyMap);
       Map<String, RetryPolicy> methodNameToPolicyMap =
@@ -269,6 +272,8 @@ public class NameNodeProxies {
           new HashMap<Class<? extends Exception>, RetryPolicy>();
       exceptionToPolicyMap.put(RemoteException.class, RetryPolicies
           .retryByRemoteException(defaultPolicy, remoteExceptionToPolicyMap));
+      exceptionToPolicyMap.put(SSLException.class, RetryPolicies.TRY_ONCE_THEN_FAIL);
+
       RetryPolicy methodPolicy =
           RetryPolicies.retryByException(defaultPolicy, exceptionToPolicyMap);
       Map<String, RetryPolicy> methodNameToPolicyMap =

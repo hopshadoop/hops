@@ -36,9 +36,11 @@ import org.apache.hadoop.hdfs.server.datanode.ReplicaNotFoundException;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.StandardSocketFactory;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.Token;
 
+import javax.net.SocketFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -948,7 +950,9 @@ public class DFSInputStream extends FSInputStream
       if (sockAndStreams == null) {
         fromCache = false;
 
-        sock = dfsClient.socketFactory.createSocket();
+        //sock = dfsClient.socketFactory.createSocket();
+        SocketFactory socketFactory = new StandardSocketFactory();
+        sock = socketFactory.createSocket();
         
         // TCP_NODELAY is crucial here because of bad interactions between
         // Nagle's Algorithm and Delayed ACKs. With connection keepalive
