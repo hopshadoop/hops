@@ -315,8 +315,8 @@ public class INodeFile extends INode implements BlockCollection {
 
   long diskspaceConsumed()
       throws StorageException, TransactionContextException {
-//    return diskspaceConsumed(getBlocks());
-    return getSize();
+    return diskspaceConsumed(getBlocks());
+//    return getSize();
   }
   
   long diskspaceConsumed(Block[] blkArr) {

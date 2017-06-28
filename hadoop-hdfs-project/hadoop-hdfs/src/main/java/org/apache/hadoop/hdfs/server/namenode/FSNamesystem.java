@@ -1143,7 +1143,6 @@ public class FSNamesystem
     } else {
       ret = getBlockLocationsUpdateTimes(src, offset, length, doAccessTime, needBlockToken);
     }
-    logAuditEvent(true, "open", src);
 
     if (checkSafeMode && isInSafeMode()) {
       for (LocatedBlock b : ret.getLocatedBlocks()) {
@@ -5793,7 +5792,6 @@ public class FSNamesystem
         auditLog.info(sb);
       }
     }
-
   }
 
   public void hopSpecificInitialization(Configuration conf) throws IOException {

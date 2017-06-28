@@ -382,8 +382,8 @@ public class TestDFSClientRetries {
           // complete() may return false a few times before it returns
           // true. We want to wait until it returns true, and then
           // make it retry one more time after that.
-          LOG.info("Called complete(: " +
-              Joiner.on(",").join(invocation.getArguments()) + ")");
+//          LOG.info("Called complete(: " + Joiner.on(",").join(invocation.getArguments()) + ")");
+          LOG.info("Called complete(: " + Arrays.toString(invocation.getArguments()) + ")");
           if (!(Boolean) invocation.callRealMethod()) {
             LOG.info("Complete call returned false, not faking a retry RPC");
             return false;
