@@ -126,8 +126,10 @@ public class INodeFileUnderConstruction extends INodeFile
   //
   INodeFile convertToInodeFile()
       throws IOException {
+    if(!isFileStoredInDB()) {
     assert allBlocksComplete() : "Can't finalize inode " + this +
         " since it contains non-complete blocks! Blocks are " + getBlocks();
+    }
     INodeFile obj = new INodeFile(this);
     obj.setAccessTime(getModificationTime());
     return obj;

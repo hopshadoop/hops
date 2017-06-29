@@ -580,7 +580,7 @@ public interface ClientProtocol {
    *     If an I/O error occurred
    */
   @Idempotent
-  public boolean complete(String src, String clientName, ExtendedBlock last)
+  public boolean complete(String src, String clientName, ExtendedBlock last, final byte[] data)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException;
 

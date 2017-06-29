@@ -493,13 +493,14 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // ClientProtocol
-  public boolean complete(String src, String clientName, ExtendedBlock last)
+  public boolean complete(String src, String clientName, ExtendedBlock last, final byte[] data)
       throws IOException {
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog
           .debug("*DIR* NameNode.complete: " + src + " for " + clientName);
     }
-    return namesystem.completeFile(src, clientName, last);
+
+    return namesystem.completeFile(src, clientName, last, data);
   }
 
   /**
@@ -863,6 +864,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public NamespaceInfo versionRequest() throws IOException {
     namesystem.checkSuperuserPrivilege();
     return namesystem.getNamespaceInfo();
+  }
+
+  @Override
+  public byte[] getSmallFileData(int id) throws IOException {
+    return namesystem.getSmallFileData(id);
   }
 
   /**

@@ -31,15 +31,7 @@ import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.net.SocketOutputStream;
 import org.apache.hadoop.util.DataChecksum;
 
-import java.io.BufferedInputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
@@ -228,7 +220,12 @@ class BlockSender implements java.io.Closeable {
       final Replica replica;
       final long replicaVisibleLength;
       synchronized (datanode.data) {
-        replica = getReplica(block, datanode);
+        if(block.getBlockId()<0){
+          LOG.debug("Suffed Inode: Reading Phantom data block.");
+          replica = new FinalizedReplica(block.getBlockId(), block.getNumBytes(), block.getGenerationStamp(), null, null);
+        } else {
+          replica = getReplica(block, datanode);
+        }
         replicaVisibleLength = replica.getVisibleLength();
       }
       // if there is a write in progress
@@ -257,7 +254,8 @@ class BlockSender implements java.io.Closeable {
       this.transferToAllowed = datanode.getDnConf().transferToAllowed &&
           (!is32Bit || length <= Integer.MAX_VALUE);
 
-      /* 
+      /*
+       * Checksum are only supported for on disk blocks
        * (corruptChecksumOK, meta_file_exist): operation
        * True,   True: will verify checksum  
        * True,  False: No verify, e.g., need to read data from a corrupted file 
@@ -265,7 +263,7 @@ class BlockSender implements java.io.Closeable {
        * False, False: throws IOException file not found
        */
       DataChecksum csum = null;
-      if (verifyChecksum || sendChecksum) {
+      if (block.getBlockId() >= 0 && (verifyChecksum || sendChecksum)) {
         final InputStream metaIn = datanode.data.getMetaDataInputStream(block);
         if (!corruptChecksumOk || metaIn != null) {
           if (metaIn == null) {
@@ -289,7 +287,7 @@ class BlockSender implements java.io.Closeable {
           LOG.warn("Could not find metadata file for " + block);
         }
       }
-      if (csum == null) {
+      if (csum == null) { // for in database small files Checksum is not supported
         // The number of bytes per checksum here determines the alignment
         // of reads: we always start reading at a checksum chunk boundary,
         // even if the checksum type is NULL. So, choosing too big of a value
@@ -358,8 +356,15 @@ class BlockSender implements java.io.Closeable {
       if (DataNode.LOG.isDebugEnabled()) {
         DataNode.LOG.debug("replica=" + replica);
       }
-      blockIn =
-          datanode.data.getBlockInputStream(block, offset); // seek to offset
+
+      if(block.getBlockId()<0) {
+        LOG.debug("Stuffed Inode: getting small file  data from the namenode");
+        byte[] data = datanode.getSmallFileDataFromNN(block);
+        ByteArrayInputStream bis = new ByteArrayInputStream(data);
+        blockIn = bis;
+      }else{
+        blockIn = datanode.data.getBlockInputStream(block, offset); // seek to offset
+      }
       if (blockIn instanceof FileInputStream) {
         blockInFd = ((FileInputStream) blockIn).getFD();
       } else {

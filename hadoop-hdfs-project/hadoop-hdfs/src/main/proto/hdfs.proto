@@ -112,6 +112,16 @@ message FsPermissionProto {
 
 
 /**
+ * Types of recognized storage media.
+ */
+enum StorageTypeProto {
+  DISK = 1;
+  SSD = 2;
+  ARCHIVE = 3;
+  RAM_DISK = 4;
+}
+
+/**
  * A LocatedBlock gives information about a block and its location.
  */
 message LocatedBlockProto {
@@ -123,7 +133,10 @@ message LocatedBlockProto {
   // their locations are not part of this object
 
   required hadoop.common.TokenProto blockToken = 5;
-  optional uint64 checksum = 6;
+  repeated bool isCached = 6 [packed=true]; // if a location in locs is cached
+  repeated StorageTypeProto storageTypes = 7;
+  repeated string storageIDs = 8;
+  optional bytes data = 9;
 }
 
 message DataEncryptionKeyProto {
@@ -174,6 +187,7 @@ message HdfsFileStatusProto {
   optional uint32 block_replication = 10 [default = 0]; // only 16bits used
   optional uint64 blocksize = 11 [default = 0];
   optional LocatedBlocksProto locations = 12; // suppled only if asked by client
+  optional bool isFileStoredInDB = 13; // false if not supplied
 }
 
 /**

@@ -572,4 +572,11 @@ class BPServiceActor implements Runnable {
     }
   }
 
+  public byte[] getSmallFileDataFromNN(int id)throws IOException {
+    if (bpNamenode != null) {
+      return bpNamenode.getSmallFileData(id);
+    } else {
+      return null;
+    }
+  }
 }

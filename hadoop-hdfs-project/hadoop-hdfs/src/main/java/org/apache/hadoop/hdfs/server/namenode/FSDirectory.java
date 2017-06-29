@@ -580,6 +580,15 @@ public class FSDirectory implements Closeable {
           List<Block> collectedBlocks = new ArrayList<Block>();
           filesDeleted = 1; // rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
                             // [S] as the dst dir was empty it will always return 1
+                            // if the destination is file then we need to collect the blocks for it
+          if(rmdst instanceof  INodeFile && !((INodeFile)rmdst).isFileStoredInDB()){
+            Block [] blocks = ((INodeFile)rmdst).getBlocks();
+            for(Block blk : blocks){
+              collectedBlocks.add(blk);
+            }
+          }else if(rmdst instanceof  INodeFile && ((INodeFile)rmdst).isFileStoredInDB()){
+            ((INodeFile)rmdst).deleteFileDataStoredInDB();
+          }
           getFSNamesystem().removePathAndBlocks(src, collectedBlocks);
         }
 
@@ -1534,7 +1543,7 @@ public class FSDirectory implements Closeable {
    *     the delta change of diskspace
    * @throws QuotaExceededException
    *     if the new count violates any quota limit
-  */
+   */
   void updateSpaceConsumed(String path, long nsDelta, long dsDelta)
       throws QuotaExceededException, FileNotFoundException,
       UnresolvedLinkException, StorageException, TransactionContextException {
@@ -2567,6 +2576,7 @@ public class FSDirectory implements Closeable {
   private HdfsFileStatus createFileStatus(byte[] path, INode node)
       throws IOException {
     long size = 0;     // length is zero for directories
+
     if (node instanceof INodeFile) {
       INodeFile fileNode = (INodeFile) node;
       size = fileNode.getSize();//.computeFileSize(true);
@@ -2579,16 +2589,18 @@ public class FSDirectory implements Closeable {
       throws IOException {
     short replication = 0;
     long blocksize = 0;
+    boolean isStoredInDB = false;
     if (node instanceof INodeFile) {
       INodeFile fileNode = (INodeFile) node;
       replication = fileNode.getBlockReplication();
       blocksize = fileNode.getPreferredBlockSize();
+      isStoredInDB = fileNode.isFileStoredInDB();
     }
     // TODO Add encoding status
     return new HdfsFileStatus(size, node.isDirectory(), replication, blocksize,
         node.getModificationTime(), node.getAccessTime(),
         node.getFsPermission(), node.getUserName(), node.getGroupName(),
-        node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path);
+        node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path,isStoredInDB);
   }
 
   /**
@@ -2600,24 +2612,31 @@ public class FSDirectory implements Closeable {
     short replication = 0;
     long blocksize = 0;
     LocatedBlocks loc = null;
+    boolean isFileStoredInDB = false;
     if (node instanceof INodeFile) {
       INodeFile fileNode = (INodeFile) node;
       size = fileNode.computeFileSize(true);
       replication = fileNode.getBlockReplication();
       blocksize = fileNode.getPreferredBlockSize();
-      loc = getFSNamesystem().getBlockManager()
-          .createLocatedBlocks(fileNode.getBlocks(),
-              fileNode.computeFileSize(false), fileNode.isUnderConstruction(),
-              0L, size, false);
+      isFileStoredInDB = fileNode.isFileStoredInDB();
+      if(isFileStoredInDB){
+        loc = getFSNamesystem().getBlockManager().createPhantomLocatedBlocks(fileNode,null,fileNode.isUnderConstruction(),false);
+      }else {
+        loc = getFSNamesystem().getBlockManager()
+                .createLocatedBlocks(fileNode.getBlocks(),
+                        fileNode.computeFileSize(false), fileNode.isUnderConstruction(),
+                        0L, size, false);
+      }
       if (loc == null) {
         loc = new LocatedBlocks();
       }
+
     }
     return new HdfsLocatedFileStatus(size, node.isDirectory(), replication,
         blocksize, node.getModificationTime(), node.getAccessTime(),
         node.getFsPermission(), node.getUserName(), node.getGroupName(),
         node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path,
-        loc);
+        loc, isFileStoredInDB);
   }
 
 
@@ -2760,6 +2779,7 @@ public class FSDirectory implements Closeable {
           new INodeFileUnderConstruction(name, replication, modificationTime,
               preferredBlockSize, blocks, permissionStatus, clientName,
               clientMachineName, datanodeID, id, pid);
+      ((INodeFileUnderConstruction)clone).setFileStoredInDB(((INodeFileUnderConstruction)inode).isFileStoredInDB());
       ((INodeFileUnderConstruction)clone).setHasBlocksNoPersistance(((INodeFileUnderConstruction)inode).hasBlocks());
     } else if (inode instanceof INodeFile) {
       clone = new INodeFile((INodeFile) inode);

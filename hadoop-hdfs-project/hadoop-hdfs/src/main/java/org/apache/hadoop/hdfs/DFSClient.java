@@ -210,7 +210,7 @@ public class DFSClient implements java.io.Closeable {
   private Random r = new Random();
   private SocketAddress[] localInterfaceAddrs;
   private DataEncryptionKey encryptionKey;
-  
+
 
   /**
    * DFSClient configuration
@@ -244,9 +244,11 @@ public class DFSClient implements java.io.Closeable {
     final boolean getHdfsBlocksMetadataEnabled;
     final int getFileBlockStorageLocationsNumThreads;
     final int getFileBlockStorageLocationsTimeout;
-
+    final int dbFileMaxSize;
+    final boolean storeSmallFilesInDB;
     final int dfsClientInitialWaitOnRetry;
-
+    //only for testing
+    final boolean hdfsClientEmulationForSF;
 
     Conf(Configuration conf) {
       maxFailoverAttempts = conf.getInt(DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
@@ -315,6 +317,13 @@ public class DFSClient implements java.io.Closeable {
           conf.getInt(DFSConfigKeys.DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_KEY,
               DFSConfigKeys.DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_DEFAULT);
 
+      storeSmallFilesInDB = conf.getBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY,
+              DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_DEFAULT);
+
+      dbFileMaxSize = conf.getInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY,
+              DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_DEFAULT);
+
+      hdfsClientEmulationForSF = conf.getBoolean("hdfsClientEmulationForSF",false);
     }
 
     private DataChecksum.Type getChecksumType(Configuration conf) {
@@ -416,6 +425,7 @@ public class DFSClient implements java.io.Closeable {
       FileSystem.Statistics stats) throws IOException {
     // Copy only the required DFSClient configuration
     this.dfsClientConf = new Conf(conf);
+    checkSmallFilesSupportConf(conf);
     this.conf = conf;
     this.stats = stats;
     this.socketFactory = NetUtils.getSocketFactory(conf, ClientProtocol.class);
@@ -426,7 +436,13 @@ public class DFSClient implements java.io.Closeable {
     this.ugi = UserGroupInformation.getCurrentUser();
     
     this.authority = nameNodeUri == null ? "null" : nameNodeUri.getAuthority();
-    this.clientName = "DFSClient_" + dfsClientConf.taskId + "_" +
+    String clientNamePrefix = "";
+    if(dfsClientConf.hdfsClientEmulationForSF){
+      clientNamePrefix = "DFSClient";
+    }else{
+      clientNamePrefix = "HopsFS_DFSClient";
+    }
+    this.clientName = clientNamePrefix+ "_" + dfsClientConf.taskId + "_" +
         DFSUtil.getRandom().nextInt() + "_" + Thread.currentThread().getId();
     
     if (rpcNamenode != null) {
@@ -469,6 +485,13 @@ public class DFSClient implements java.io.Closeable {
 
   }
 
+  private void checkSmallFilesSupportConf(Configuration conf) throws IOException {
+    if(isStoreSmallFilesInDB()) {
+      if(getDBFileMaxSize() > getDefaultBlockSize()){
+        throw new IOException("The size of a file stored in the database should not more than the size of the default block size");
+      }
+    }
+  }
   /**
    * Return the socket addresses to use with each configured
    * local interface. Local interfaces may be specified by IP
@@ -769,6 +792,22 @@ public class DFSClient implements java.io.Closeable {
    */
   public long getDefaultBlockSize() {
     return dfsClientConf.defaultBlockSize;
+  }
+
+  /**
+   * Is storing small files in the database enabled?
+   * @return True/False
+     */
+  private boolean isStoreSmallFilesInDB(){
+    return dfsClientConf.storeSmallFilesInDB;
+  }
+
+  /**
+   * Get max size of a file that can be stored in the database.
+   * @return Max size of a file that can be stored in the database.
+   */
+  private int getDBFileMaxSize(){
+    return  dfsClientConf.dbFileMaxSize;
   }
 
   /**
@@ -1302,7 +1341,7 @@ public class DFSClient implements java.io.Closeable {
       throws IOException, UnresolvedLinkException {
     checkOpen();
     //    Get block info from namenode
-    return new DFSInputStream(this, src, buffersize, verifyChecksum);
+    return new DFSInputStream(this, src, buffersize, verifyChecksum, dfsClientConf.hdfsClientEmulationForSF);
   }
 
   /**
@@ -1488,7 +1527,7 @@ public class DFSClient implements java.io.Closeable {
     final DFSOutputStream result = DFSOutputStream
         .newStreamForCreate(this, src, masked, flag, createParent, replication,
             blockSize, progress, buffersize,
-            dfsClientConf.createChecksum(checksumOpt), policy);
+            dfsClientConf.createChecksum(checksumOpt), policy, isStoreSmallFilesInDB(), getDBFileMaxSize());
     beginFileLease(src, result);
     return result;
   }
@@ -1539,7 +1578,7 @@ public class DFSClient implements java.io.Closeable {
       DataChecksum checksum = dfsClientConf.createChecksum(checksumOpt);
       result = DFSOutputStream
           .newStreamForCreate(this, src, absPermission, flag, createParent,
-              replication, blockSize, progress, buffersize, checksum);
+              replication, blockSize, progress, buffersize, checksum, isStoreSmallFilesInDB(), getDBFileMaxSize());
     }
     beginFileLease(src, result);
     return result;
@@ -1615,9 +1654,24 @@ public class DFSClient implements java.io.Closeable {
           DSQuotaExceededException.class, UnsupportedOperationException.class,
           UnresolvedPathException.class);
     }
+
+    // HDFSClientEmulation
+    // get fresh file stat. When hdfs client tries to append to a small file then the namenode moves
+    // the files to the datanodes. Thus the status of the file changes.
+    //
+    if(dfsClientConf.hdfsClientEmulationForSF){
+      stat = getFileInfo(src);
+      if (stat == null) { // No file found
+        throw new FileNotFoundException(
+                "failed to append to non-existent file " + src + " on client " +
+                        clientName);
+      }
+
+    }
+
     return DFSOutputStream
         .newStreamForAppend(this, src, buffersize, progress, lastBlock, stat,
-            dfsClientConf.createChecksum());
+            dfsClientConf.createChecksum(), isStoreSmallFilesInDB(), getDBFileMaxSize());
   }
   
   /**
@@ -3014,14 +3068,14 @@ public class DFSClient implements java.io.Closeable {
   }
 
   public boolean complete(final String src, final String clientName,
-      final ExtendedBlock last)
+      final ExtendedBlock last, final byte[] data)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
     ClientActionHandler handler = new ClientActionHandler() {
       @Override
       public Object doAction(ClientProtocol namenode)
           throws RemoteException, IOException {
-        return namenode.complete(src, clientName, last);
+        return namenode.complete(src, clientName, last, data);
       }
     };
     return (Boolean) doClientActionWithRetry(handler, "complete");

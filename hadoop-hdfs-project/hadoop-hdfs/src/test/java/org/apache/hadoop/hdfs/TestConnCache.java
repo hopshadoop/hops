@@ -254,7 +254,7 @@ public class TestConnCache {
     Mockito.doAnswer(answer).when(in)
         .getBlockReader((InetSocketAddress) Matchers.anyObject(),
             (DatanodeInfo) Matchers.anyObject(), Matchers.anyString(),
-            (ExtendedBlock) Matchers.anyObject(),
+            (LocatedBlock) Matchers.anyObject(),
             (Token<BlockTokenIdentifier>) Matchers.anyObject(),
             Matchers.anyLong(), Matchers.anyLong(), Matchers.anyInt(),
             Matchers.anyBoolean(), Matchers.anyString());

@@ -78,6 +78,7 @@ public class DFSInputStream extends FSInputStream
   private LocatedBlock currentLocatedBlock = null;
   private long pos = 0;
   private long blockEnd = -1;
+  private boolean emulateHdfsClient = false;
 
   /**
    * This variable tracks the number of failures since the start of the
@@ -108,7 +109,7 @@ public class DFSInputStream extends FSInputStream
   }
   
   DFSInputStream(DFSClient dfsClient, String src, int buffersize,
-      boolean verifyChecksum) throws IOException, UnresolvedLinkException {
+      boolean verifyChecksum, boolean emulateHdfsClient) throws IOException, UnresolvedLinkException {
     this.dfsClient = dfsClient;
     this.verifyChecksum = verifyChecksum;
     this.buffersize = buffersize;
@@ -117,6 +118,7 @@ public class DFSInputStream extends FSInputStream
     prefetchSize = dfsClient.getConf().prefetchSize;
     timeWindow = dfsClient.getConf().timeWindow;
     nCachedConnRetry = dfsClient.getConf().nCachedConnRetry;
+    this.emulateHdfsClient = emulateHdfsClient;
     openInfo();
   }
 
@@ -463,7 +465,7 @@ public class DFSInputStream extends FSInputStream
         ExtendedBlock blk = targetBlock.getBlock();
         Token<BlockTokenIdentifier> accessToken = targetBlock.getBlockToken();
         blockReader =
-            getBlockReader(targetAddr, chosenNode, src, blk, accessToken,
+            getBlockReader(targetAddr, chosenNode, src, targetBlock, accessToken,
                 offsetIntoBlock, blk.getNumBytes() - offsetIntoBlock,
                 buffersize, verifyChecksum, dfsClient.clientName);
         if (connectFailedOnce) {
@@ -815,7 +817,7 @@ public class DFSInputStream extends FSInputStream
         Token<BlockTokenIdentifier> blockToken = block.getBlockToken();
 
         int len = (int) (end - start + 1);
-        reader = getBlockReader(targetAddr, chosenNode, src, block.getBlock(),
+        reader = getBlockReader(targetAddr, chosenNode, src, block,
             blockToken, start, len, buffersize, verifyChecksum,
             dfsClient.clientName);
         int nread = reader.readAll(buf, offset, len);
@@ -893,8 +895,8 @@ public class DFSInputStream extends FSInputStream
    *     Chosen datanode information
    * @param file
    *     File location
-   * @param block
-   *     The Block object
+   * @param locBlock
+   *     The LocatedBlock object
    * @param blockToken
    *     The access token for security
    * @param startOffset
@@ -910,16 +912,21 @@ public class DFSInputStream extends FSInputStream
    * @return New BlockReader instance
    */
   protected BlockReader getBlockReader(InetSocketAddress dnAddr,
-      DatanodeInfo chosenNode, String file, ExtendedBlock block,
+      DatanodeInfo chosenNode, String file, LocatedBlock locBlock,
       Token<BlockTokenIdentifier> blockToken, long startOffset, long len,
       int bufferSize, boolean verifyChecksum, String clientName)
       throws IOException {
-    
+
+    if(locBlock.isPhantomBlock() && !emulateHdfsClient){
+      DFSClient.LOG.debug("Stuffed Inode:  Found Phantom LocatedBlock. Initializing BlockReaderDB, Data Len: "+locBlock.getData().length);
+      return new BlockReaderDB(dnAddr, chosenNode, locBlock, locBlock.getData());
+    }
+
     // Can't local read a block under construction, see HDFS-2757
     if (dfsClient.shouldTryShortCircuitRead(dnAddr) &&
         !blockUnderConstruction()) {
       return DFSClient
-          .getLocalBlockReader(dfsClient.conf, src, block, blockToken,
+          .getLocalBlockReader(dfsClient.conf, src, locBlock.getBlock(), blockToken,
               chosenNode, dfsClient.hdfsTimeout, startOffset,
               dfsClient.connectToDnViaHostname());
     }
@@ -968,7 +975,7 @@ public class DFSInputStream extends FSInputStream
       try {
         // The OP_READ_BLOCK request is sent as we make the BlockReader
         BlockReader reader = BlockReaderFactory
-            .newBlockReader(dfsClient.getConf(), sock, file, block, blockToken,
+            .newBlockReader(dfsClient.getConf(), sock, file, locBlock.getBlock(), blockToken,
                 startOffset, len, bufferSize, verifyChecksum, clientName,
                 dfsClient.getDataEncryptionKey(),
                 sockAndStreams == null ? null : sockAndStreams.ioStreams);

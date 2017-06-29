@@ -190,4 +190,12 @@ public interface DatanodeProtocol {
    */
   public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks) throws IOException;
 
+  /**
+   * Read the small file data
+   * @param id
+   * @return data
+   * @throws IOException
+   */
+  public byte[] getSmallFileData(int id) throws IOException;
+
 }
