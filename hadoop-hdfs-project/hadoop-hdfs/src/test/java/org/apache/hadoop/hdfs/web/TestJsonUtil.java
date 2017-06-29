@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
@@ -43,7 +44,7 @@ public class TestJsonUtil {
     final long now = Time.now();
     final String parent = "/dir";
     final HdfsFileStatus status =
-        new HdfsFileStatus(1001L, false, 3, 1L << 26, now, now + 10,
+        new HdfsFileStatus(INode.NON_EXISTING_ID, 1001L, false, 3, 1L << 26, now, now + 10,
             new FsPermission((short) 0644), "user", "group",
             DFSUtil.string2Bytes("bar"), DFSUtil.string2Bytes("foo"));
     final FileStatus fstatus = toFileStatus(status, parent);

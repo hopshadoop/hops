@@ -33,6 +33,8 @@ public class HdfsLocatedFileStatus extends HdfsFileStatus {
   /**
    * Constructor
    *
+   * @param fileId
+   *     id of the file inode
    * @param length
    *     size
    * @param isdir
@@ -58,11 +60,11 @@ public class HdfsLocatedFileStatus extends HdfsFileStatus {
    * @param locations
    *     block locations
    */
-  public HdfsLocatedFileStatus(long length, boolean isdir,
+  public HdfsLocatedFileStatus(long fileId, long length, boolean isdir,
       int block_replication, long blocksize, long modification_time,
       long access_time, FsPermission permission, String owner, String group,
       byte[] symlink, byte[] path, LocatedBlocks locations) {
-    super(length, isdir, block_replication, blocksize, modification_time,
+    super(fileId, length, isdir, block_replication, blocksize, modification_time,
         access_time, permission, owner, group, symlink, path);
     this.locations = locations;
   }
