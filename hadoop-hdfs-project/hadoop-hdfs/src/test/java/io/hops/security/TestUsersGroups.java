@@ -30,12 +30,14 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.ipc.RemoteException;
+import org.hamcrest.Matchers;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertNotNull;
@@ -251,10 +253,10 @@ public class TestUsersGroups {
     int groupId = UsersGroups.getGroupID("group1");
     assertNotSame(0, groupId);
     assertEquals(UsersGroups.getGroup(groupId), "group1");
-
-    assertEquals(UsersGroups.getGroups("user"), Arrays.asList("group1",
-        "group2"));
-
+    
+    assertThat(UsersGroups.getGroups("user"), Matchers.containsInAnyOrder
+        ("group1", "group2"));
+    
     removeUser(userId);
 
     userId = UsersGroups.getUserID("user");
@@ -276,9 +278,10 @@ public class TestUsersGroups {
 
     userId = UsersGroups.getUserID("user");
     assertNotSame(0, userId);
-
-    assertEquals(Arrays.asList("group1", "group2"), UsersGroups.getGroups("user"));
-
+    
+    assertThat(UsersGroups.getGroups("user"), Matchers.containsInAnyOrder
+        ("group1", "group2"));
+    
     removeUser(userId);
 
     UsersGroups.addUserToGroupsTx("user", new String[]{"group3"});
@@ -291,10 +294,9 @@ public class TestUsersGroups {
 
     UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
         "group2"});
-
-    assertEquals(Arrays.asList("group3",
-        "group1", "group2"), UsersGroups.getGroups("user"));
-
+    
+    assertThat(UsersGroups.getGroups("user"), Matchers.containsInAnyOrder
+        ("group1", "group2", "group3"));
     UsersGroups.stop();
   }
 
@@ -316,10 +318,10 @@ public class TestUsersGroups {
     int groupId = UsersGroups.getGroupID("group1");
     assertNotSame(0, groupId);
     assertEquals(UsersGroups.getGroup(groupId), "group1");
-
-    assertEquals(UsersGroups.getGroups("user"), Arrays.asList("group1",
-        "group2"));
-
+  
+    assertThat(UsersGroups.getGroups("user"), Matchers.containsInAnyOrder
+        ("group1", "group2"));
+    
     removeUser(userId);
 
     userId = UsersGroups.getUserID("user");
@@ -336,8 +338,9 @@ public class TestUsersGroups {
 
     userId = UsersGroups.getUserID("user");
     assertNotSame(0, userId);
-
-    assertEquals(Arrays.asList("group1", "group2"), UsersGroups.getGroups("user"));
+  
+    assertThat(UsersGroups.getGroups("user"), Matchers.containsInAnyOrder
+        ("group1", "group2"));
 
     removeUser(userId);
 
@@ -351,9 +354,9 @@ public class TestUsersGroups {
 
     UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
         "group2"});
-
-    assertEquals(Arrays.asList("group3",
-        "group1", "group2"), UsersGroups.getGroups("user"));
+    
+    assertThat(UsersGroups.getGroups("user"), Matchers.containsInAnyOrder
+        ("group1", "group2", "group3"));
 
     cluster.shutdown();
   }
