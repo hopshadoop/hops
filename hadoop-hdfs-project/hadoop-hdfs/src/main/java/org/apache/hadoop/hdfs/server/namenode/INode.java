@@ -736,6 +736,11 @@ public abstract class INode implements Comparable<byte[]> {
   private void cleanParity(INode node)
       throws StorageException, TransactionContextException {
     if (ErasureCodingManager.isEnabled()) {
+      if(node instanceof INodeFile && ((INodeFile)node).isFileStoredInDB()){
+        // files stored in database are not erasure coded
+        return;
+      }
+
       EncodingStatus status =
           EntityManager.find(EncodingStatus.Finder.ByInodeId, node.getId());
       if (status != null) {

@@ -59,13 +59,15 @@ public class HdfsLocatedFileStatus extends HdfsFileStatus {
    *     local path name in java UTF8 format
    * @param locations
    *     block locations
+   * @param isStoredInDB
+   *     is the  data of the file stored in the database?
    */
   public HdfsLocatedFileStatus(long fileId, long length, boolean isdir,
       int block_replication, long blocksize, long modification_time,
       long access_time, FsPermission permission, String owner, String group,
-      byte[] symlink, byte[] path, LocatedBlocks locations) {
+      byte[] symlink, byte[] path, LocatedBlocks locations, boolean isStoredInDB) {
     super(fileId, length, isdir, block_replication, blocksize, modification_time,
-        access_time, permission, owner, group, symlink, path);
+        access_time, permission, owner, group, symlink, path, isStoredInDB);
     this.locations = locations;
   }
 

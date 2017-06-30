@@ -25,6 +25,7 @@ import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.leader_election.proto.ActiveNodeProtos;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ActiveNamenodeListRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ActiveNamenodeListResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockReceivedAndDeletedRequestProto;
@@ -279,6 +280,16 @@ public class DatanodeProtocolServerSideTranslatorPB
           PBHelper.convert(response);
       return responseProto;
     } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public DatanodeProtocolProtos.SmallFileDataResponseProto getSmallFileData(RpcController controller, DatanodeProtocolProtos.GetSmallFileDataProto request) throws ServiceException {
+    try{
+      byte[] data = impl.getSmallFileData(request.getId());
+      return  PBHelper.convert(data);
+    } catch (IOException e){
       throw new ServiceException(e);
     }
   }

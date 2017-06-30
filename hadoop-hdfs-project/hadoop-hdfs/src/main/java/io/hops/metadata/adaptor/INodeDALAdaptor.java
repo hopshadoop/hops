@@ -209,6 +209,7 @@ public class INodeDALAdaptor
         }
         hopINode.setGenerationStamp(((INodeFile) inode).getGenerationStamp());
         hopINode.setFileSize(((INodeFile) inode).getSize());
+        hopINode.setFileStoredInDB(((INodeFile)inode).isFileStoredInDB());
       }
       if (inode instanceof INodeSymlink) {
         hopINode.setUnderConstruction(false);
@@ -249,27 +250,28 @@ public class INodeDALAdaptor
         } else if (hopINode.getSymlink() != null) {
           inode = new INodeSymlink(hopINode.getSymlink(),
               hopINode.getModificationTime(), hopINode.getAccessTime(), ps);
-        } else {
-          if (hopINode.isUnderConstruction()) {
-            DatanodeID dnID = (hopINode.getClientNode() == null ||
-                hopINode.getClientNode().isEmpty()) ? null :
-                new DatanodeID(hopINode.getClientNode());
+      } else {
+        if (hopINode.isUnderConstruction()) {
+          DatanodeID dnID = (hopINode.getClientNode() == null ||
+              hopINode.getClientNode().isEmpty()) ? null :
+              new DatanodeID(hopINode.getClientNode());
 
-            inode = new INodeFileUnderConstruction(ps,
-                INodeFile.getBlockReplication(hopINode.getHeader()),
-                INodeFile.getPreferredBlockSize(hopINode.getHeader()),
-                hopINode.getModificationTime(), hopINode.getClientName(),
-                hopINode.getClientMachine(), dnID);
+          inode = new INodeFileUnderConstruction(ps,
+              INodeFile.getBlockReplication(hopINode.getHeader()),
+              INodeFile.getPreferredBlockSize(hopINode.getHeader()),
+              hopINode.getModificationTime(), hopINode.getClientName(),
+              hopINode.getClientMachine(), dnID);
 
             inode.setAccessTimeNoPersistance(hopINode.getAccessTime());
           } else {
             inode = new INodeFile(ps, hopINode.getHeader(),
-                hopINode.getModificationTime(), hopINode.getAccessTime());
+                hopINode.getModificationTime(), hopINode.getAccessTime(), hopINode.isFileStoredInDB());
           }
           ((INodeFile) inode).setGenerationStampNoPersistence(
               hopINode.getGenerationStamp());
           ((INodeFile) inode).setSizeNoPersistence(hopINode.getFileSize());
           ((INodeFile) inode).setHasBlocksNoPersistance(INodeFile.hasBlocks(hopINode.getHeader()));
+          ((INodeFile) inode).setFileStoredInDBNoPersistence(hopINode.isFileStoredInDB());
         }
         inode.setIdNoPersistance(hopINode.getId());
         inode.setLocalNameNoPersistance(hopINode.getName());
@@ -280,8 +282,8 @@ public class INodeDALAdaptor
         inode.setGroupIDNoPersistance(hopINode.getGroupID());
         inode.setHeaderNoPersistance(hopINode.getHeader());
         inode.setPartitionIdNoPersistance(hopINode.getPartitionId());
-      }
-      return inode;
+    }
+    return inode;
     }catch (IOException ex){
       throw new StorageException(ex);
     }

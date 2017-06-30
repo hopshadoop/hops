@@ -42,6 +42,7 @@ public class HdfsFileStatus {
   private String owner;
   private String group;
   private final long fileId;
+  private boolean isFileStoredInDB;
 
   public static final byte[] EMPTY_NAME = new byte[0];
 
@@ -74,7 +75,7 @@ public class HdfsFileStatus {
   public HdfsFileStatus(long fileid, long length, boolean isdir, int block_replication,
       long blocksize, long modification_time, long access_time,
       FsPermission permission, String owner, String group, byte[] symlink,
-      byte[] path) {
+      byte[] path, boolean isFileStoredInDB) {
     this.fileId = fileid;
     this.length = length;
     this.isdir = isdir;
@@ -89,6 +90,7 @@ public class HdfsFileStatus {
     this.group = (group == null) ? "" : group;
     this.symlink = symlink;
     this.path = path;
+    this.isFileStoredInDB = isFileStoredInDB;
   }
 
   /**
@@ -258,4 +260,6 @@ public class HdfsFileStatus {
   }
 
   final public long getFileId() { return fileId; }
+
+  final public boolean isFileStoredInDB(){ return isFileStoredInDB; }
 }

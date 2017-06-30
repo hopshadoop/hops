@@ -47,7 +47,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
   private long lastUpdate;
   private int xceiverCount;
   private String location = NetworkTopology.DEFAULT_RACK;
-  
+
   // Datanode administrative states
   public enum AdminStates {
     NORMAL("In Service"),
@@ -134,7 +134,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.location = networkLocation;
     this.adminState = adminState;
   }
-  
+
   /**
    * Network location name
    */

@@ -970,6 +970,15 @@ class BPOfferService implements Runnable {
     });
   }
 
+  public byte[] getSmallFileDataFromNN(final int id) throws IOException {
+    byte[] data = (byte[]) doActorActionWithRetry(new ActorActionHandler() {
+      @Override
+      public Object doAction(BPServiceActor actor) throws IOException {
+        return actor.getSmallFileDataFromNN(id);
+      }
+    });
+    return data;
+  }
 
   private interface ActorActionHandler {
 

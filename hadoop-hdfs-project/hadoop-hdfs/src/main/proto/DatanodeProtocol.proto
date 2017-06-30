@@ -336,6 +336,15 @@ message NameNodeAddressRequestForBlockReportingProto {
 required uint64 noOfBlks = 1;
 }
 
+
+message GetSmallFileDataProto {
+    required uint32 id = 1;
+}
+
+message SmallFileDataResponseProto{
+    required bytes data = 1;
+}
+
 /**
  * Protocol used from datanode to the namenode
  * See the request and response for details of rpc call.
@@ -396,4 +405,8 @@ service DatanodeProtocolService {
    */
   rpc getNextNamenodeToSendBlockReport (NameNodeAddressRequestForBlockReportingProto) returns (hadoop.common.ActiveNodeProto);
 
+  /**
+  * Ask a namenode to read the small file data
+  */
+  rpc getSmallFileData (GetSmallFileDataProto) returns (SmallFileDataResponseProto);
 }

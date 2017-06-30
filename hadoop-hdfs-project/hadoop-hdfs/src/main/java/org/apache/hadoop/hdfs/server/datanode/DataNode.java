@@ -2346,4 +2346,9 @@ public class DataNode extends Configured
   boolean shouldRun() {
     return shouldRun;
   }
+
+  byte[] getSmallFileDataFromNN(ExtendedBlock block) throws IOException {
+    BPOfferService bpos = getBPOSForBlock(block);
+    return bpos.getSmallFileDataFromNN((int)block.getBlockId());
+  }
 }

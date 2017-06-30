@@ -382,8 +382,8 @@ public class TestDFSClientRetries {
           // complete() may return false a few times before it returns
           // true. We want to wait until it returns true, and then
           // make it retry one more time after that.
-          LOG.info("Called complete(: " +
-              Joiner.on(",").join(invocation.getArguments()) + ")");
+//          LOG.info("Called complete(: " + Joiner.on(",").join(invocation.getArguments()) + ")");
+          LOG.info("Called complete(: " + Arrays.toString(invocation.getArguments()) + ")");
           if (!(Boolean) invocation.callRealMethod()) {
             LOG.info("Complete call returned false, not faking a retry RPC");
             return false;
@@ -400,7 +400,7 @@ public class TestDFSClientRetries {
           }
         }
       }).when(spyNN).complete(Mockito.anyString(), Mockito.anyString(),
-          Mockito.<ExtendedBlock>any());
+          Mockito.<ExtendedBlock>any(), Mockito.<byte[]>any());
       
       OutputStream stm = client.create(file.toString(), true);
       try {
@@ -417,7 +417,7 @@ public class TestDFSClientRetries {
               Mockito.<ExtendedBlock>any(), Mockito.<DatanodeInfo[]>any());
       Mockito.verify(spyNN, Mockito.atLeastOnce())
           .complete(Mockito.anyString(), Mockito.anyString(),
-              Mockito.<ExtendedBlock>any());
+              Mockito.<ExtendedBlock>any(),Mockito.<byte[]>any());
       
       AppendTestUtil.check(fs, file, 10000);
     } finally {

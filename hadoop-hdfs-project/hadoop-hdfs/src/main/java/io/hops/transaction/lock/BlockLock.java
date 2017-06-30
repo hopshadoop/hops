@@ -31,12 +31,12 @@ import java.util.List;
 final class BlockLock extends IndividualBlockLock {
 
   private final List<INodeFile> files;
-  
+
   BlockLock() {
     super();
     this.files = new ArrayList<INodeFile>();
   }
-  
+
   BlockLock(long blockId, INodeIdentifier inode) {
     super(blockId, inode);
     this.files = new ArrayList<INodeFile>();
@@ -48,6 +48,11 @@ final class BlockLock extends IndividualBlockLock {
     boolean individualBlockAlreadyRead = false;
     Iterable blks = Collections.EMPTY_LIST;
     for (INode inode : inodeLock.getAllResolvedINodes()) {
+      if(BaseINodeLock.isStoredInDB(inode)){
+        LOG.debug("Stuffed Inode:  BlockLock. Skipping acquring locks on the inode named: "+inode.getLocalName()+" as the file is stored in the database");
+        announceEmptyFile(inode.getId());
+        continue;
+      }
       if (inode instanceof INodeFile) {
         Collection<BlockInfo> inodeBlocks = Collections.EMPTY_LIST;
         if(((INodeFile) inode).hasBlocks()) {
@@ -56,24 +61,25 @@ final class BlockLock extends IndividualBlockLock {
                           inode.getId());
         }
 
-        if(!individualBlockAlreadyRead){
+        if (!individualBlockAlreadyRead) {
           individualBlockAlreadyRead = inode.getId() == inodeId;
         }
 
-        if(inodeBlocks == null || inodeBlocks.isEmpty()){
+        if (inodeBlocks == null || inodeBlocks.isEmpty()) {
           announceEmptyFile(inode.getId());
         }
-        
+
         blks = Iterables.concat(blks, inodeBlocks);
         files.add((INodeFile) inode);
       }
     }
 
-    if(!individualBlockAlreadyRead) {
+    if (!individualBlockAlreadyRead) {
       super.acquire(locks);
     }
+
   }
-  
+
   Collection<INodeFile> getFiles() {
     return files;
   }
