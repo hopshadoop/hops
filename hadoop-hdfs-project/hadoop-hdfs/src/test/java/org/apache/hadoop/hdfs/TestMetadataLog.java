@@ -36,18 +36,25 @@ import java.util.Collection;
 
 public class TestMetadataLog extends TestCase {
   private static final int ANY_DATASET = -1;
+  private static final String ANY_NAME = "-1";
 
   private boolean checkLog(int inodeId, MetadataLogEntry.Operation operation)
       throws IOException {
     return checkLog(ANY_DATASET, inodeId, operation);
   }
 
-  private boolean checkLog(int datasetId, int inodeId,
+  private boolean checkLog(int datasetId, int inodeId, MetadataLogEntry
+      .Operation operation) throws IOException {
+    return checkLog(datasetId, inodeId, ANY_NAME, operation);
+  }
+
+  private boolean checkLog(int datasetId, int inodeId, String inodeName,
       MetadataLogEntry.Operation operation) throws IOException {
     Collection<MetadataLogEntry> logEntries = getMetadataLogEntries(inodeId);
     for (MetadataLogEntry logEntry : logEntries) {
       if (logEntry.getOperation().equals(operation)) {
-        if (datasetId == ANY_DATASET || datasetId == logEntry.getDatasetId()) {
+        if ((datasetId == ANY_DATASET || datasetId == logEntry.getDatasetId())
+            && (inodeName.equals(ANY_NAME) || inodeName.equals(logEntry.getInodeName()))) {
           return true;
         }
       }
@@ -431,4 +438,237 @@ public class TestMetadataLog extends TestCase {
       }
     }
   }
+
+  @Test
+  public void testDeepOldRenameInTheSameDataset() throws Exception {
+   testDeepRenameInTheSameDataset(true);
+  }
+
+  @Test
+  public void testDeepRenameInTheSameDataset() throws Exception {
+    testDeepRenameInTheSameDataset(false);
+  }
+
+  @Test
+  public void testOldDeepRenameToNonMetaEnabledDir() throws Exception {
+    testDeepRenameToNonMetaEnabledDir(true);
+  }
+
+  @Test
+  public void testDeepRenameToNonMetaEnabledDir() throws Exception {
+    testDeepRenameToNonMetaEnabledDir(false);
+  }
+
+  @Test
+  public void testDeleteDatasetAfterOldRename() throws Exception {
+    testDeleteDatasetAfterRename(true);
+  }
+
+  @Test
+  public void testDeleteDatasetAfterRename() throws Exception {
+    testDeleteDatasetAfterRename(false);
+  }
+
+  private void testDeepRenameInTheSameDataset(boolean oldRename) throws
+      IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(2)
+        .build();
+    try {
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      Path projects = new Path("/projects");
+      Path project = new Path(projects, "project");
+      Path dataset = new Path(project, "dataset");
+      Path folder0 = new Path(dataset, "folder0");
+      Path folder1 = new Path(folder0, "folder1");
+      Path file = new Path(folder1, "file");
+
+      Path newFolder = new Path(dataset, "newFolder");
+
+      dfs.mkdirs(folder1, FsPermission.getDefault());
+
+      dfs.setMetaEnabled(dataset, true);
+
+      HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
+      out.close();
+
+      int inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
+      int folder0Id = TestUtil.getINodeId(cluster.getNameNode(), folder0);
+      int folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
+      int datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
+
+      assertTrue(checkLog(datasetId, folder0Id, MetadataLogEntry.Operation.ADD));
+      assertTrue(checkLog(datasetId, folder1Id, MetadataLogEntry.Operation
+          .ADD));
+      assertTrue(checkLog(inodeId, MetadataLogEntry.Operation.ADD));
+
+      if(oldRename){
+        dfs.rename(folder0, newFolder);
+      }else{
+        dfs.rename(folder0, newFolder, Options.Rename.NONE);
+      }
+
+      int newFolderId = TestUtil.getINodeId(cluster.getNameNode(), newFolder);
+      assertTrue(checkLog(datasetId, folder0Id, folder0.getName(),
+          MetadataLogEntry.Operation.DELETE));
+      assertTrue(checkLog(datasetId, newFolderId, newFolder.getName(),
+          MetadataLogEntry.Operation.ADD));
+      assertEquals("Subfolders and files shouldn't be logged during a rename " +
+          "in the same dataset", 1, getMetadataLogEntries(folder1Id).size());
+      assertEquals("Subfolders and files shouldn't be logged during a rename " +
+          "in the same dataset", 1, getMetadataLogEntries(inodeId).size());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  private void testDeepRenameToNonMetaEnabledDir(boolean oldRename) throws
+      IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(2)
+        .build();
+    try {
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      Path projects = new Path("/projects");
+      Path project = new Path(projects, "project");
+      Path dataset = new Path(project, "dataset");
+      Path folder0 = new Path(dataset, "folder0");
+      Path folder1 = new Path(folder0, "folder1");
+      Path file = new Path(folder1, "file");
+
+      Path newFolder = new Path(project, "newFolder");
+
+      dfs.mkdirs(folder1, FsPermission.getDefault());
+
+      dfs.setMetaEnabled(dataset, true);
+
+      HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
+      out.close();
+
+      int inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
+      int folder0Id = TestUtil.getINodeId(cluster.getNameNode(), folder0);
+      int folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
+      int datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
+
+      assertTrue(checkLog(datasetId, folder0Id, MetadataLogEntry.Operation.ADD));
+      assertTrue(checkLog(datasetId, folder1Id, MetadataLogEntry.Operation
+          .ADD));
+      assertTrue(checkLog(inodeId, MetadataLogEntry.Operation.ADD));
+
+      if(oldRename){
+        dfs.rename(folder0, newFolder);
+      }else{
+        dfs.rename(folder0, newFolder, Options.Rename.NONE);
+      }
+
+      int newFolderId = TestUtil.getINodeId(cluster.getNameNode(), newFolder);
+      assertTrue(checkLog(datasetId, folder0Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertTrue(checkLog(datasetId, folder1Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertTrue(checkLog(datasetId, inodeId,
+          MetadataLogEntry.Operation.DELETE));
+      assertFalse(checkLog(datasetId, newFolderId, newFolder.getName(),
+          MetadataLogEntry.Operation.ADD));
+      assertEquals("Subfolders and files shouldn't be logged for addition " +
+          "during a move to a non MetaEnabled directoy", 2,
+          getMetadataLogEntries(folder1Id).size());
+      assertEquals("Subfolders and files shouldn't be logged for addition " +
+              "during a move to a non MetaEnabled directoy", 2,
+          getMetadataLogEntries(inodeId).size());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  private void testDeleteDatasetAfterRename(boolean oldRename) throws
+      IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(2)
+        .build();
+    try {
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      Path dataset = new Path("/dataset");
+      Path folder1 = new Path(dataset, "folder1");
+      Path folder2 = new Path(folder1, "folder2");
+      Path folder3 = new Path(folder2, "folder3");
+
+      dfs.mkdirs(folder3, FsPermission.getDefault());
+      dfs.setMetaEnabled(dataset, true);
+
+      int datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
+      int folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
+      int folder2Id = TestUtil.getINodeId(cluster.getNameNode(), folder2);
+      int folder3Id = TestUtil.getINodeId(cluster.getNameNode(), folder3);
+
+      assertTrue(checkLog(datasetId, folder1Id,
+          MetadataLogEntry.Operation.ADD));
+      assertTrue(checkLog(datasetId, folder2Id,
+          MetadataLogEntry.Operation.ADD));
+      assertTrue(checkLog(datasetId, folder3Id,
+          MetadataLogEntry.Operation.ADD));
+
+      Path file1 = new Path(folder3, "file1");
+      TestFileCreation.create(dfs, file1, 1).close();
+
+      Path file2 = new Path(folder3, "file2");
+      TestFileCreation.create(dfs, file2, 1).close();
+
+      int file1Id = TestUtil.getINodeId(cluster.getNameNode(), file1);
+      int file2Id = TestUtil.getINodeId(cluster.getNameNode(), file2);
+
+      assertTrue(checkLog(datasetId, file1Id,
+          MetadataLogEntry.Operation.ADD));
+      assertTrue(checkLog(datasetId, file2Id,
+          MetadataLogEntry.Operation.ADD));
+
+      Path newDataset = new Path("/newDataset");
+
+      if(oldRename){
+        dfs.rename(dataset, newDataset);
+      }else{
+        dfs.rename(dataset, newDataset, Options.Rename.NONE);
+      }
+
+      int newDatasetId = TestUtil.getINodeId(cluster.getNameNode(), newDataset);
+      assertTrue(newDatasetId == datasetId);
+
+      assertFalse(checkLog(datasetId, folder1Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertFalse(checkLog(datasetId, folder2Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertFalse(checkLog(datasetId, folder3Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertFalse(checkLog(datasetId, file1Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertFalse(checkLog(datasetId, file2Id,
+          MetadataLogEntry.Operation.DELETE));
+
+      assertTrue(dfs.delete(newDataset, true));
+
+      assertTrue(checkLog(datasetId, folder1Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertTrue(checkLog(datasetId, folder2Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertTrue(checkLog(datasetId, folder3Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertTrue(checkLog(datasetId, file1Id,
+          MetadataLogEntry.Operation.DELETE));
+      assertTrue(checkLog(datasetId, file2Id,
+          MetadataLogEntry.Operation.DELETE));
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
 }

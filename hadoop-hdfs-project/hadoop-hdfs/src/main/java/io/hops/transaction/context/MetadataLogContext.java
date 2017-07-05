@@ -17,14 +17,9 @@ package io.hops.transaction.context;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.lock.TransactionLocks;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 
 public class MetadataLogContext
     extends BaseEntityContext<MetadataLogContext.Key, MetadataLogEntry> {
@@ -83,10 +78,9 @@ public class MetadataLogContext
       key.timestamp = logEntry.updateTimestamp();
     }
     super.add(logEntry);
-    log("metadata-log-added","baseDirId", logEntry.getDatasetId(), "inodeId",logEntry.getInodeId(),"name", logEntry.getInodeName(), "pid", logEntry.getInodeParentId(), "Operation", logEntry.getOperation());
-          for(int i = 0;i < Thread.currentThread().getStackTrace().length;i++){
-        System.out.println((Thread.currentThread().getStackTrace()[i]));
-      }
+    log("metadata-log-added","baseDirId", logEntry.getDatasetId(), "inodeId",
+        logEntry.getInodeId(),"name", logEntry.getInodeName(), "pid",
+        logEntry.getInodeParentId(), "Operation", logEntry.getOperation());
   }
 
   @Override
