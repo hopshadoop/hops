@@ -25,6 +25,7 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -37,6 +38,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNull;
@@ -412,4 +414,46 @@ public class TestUsersGroups {
     }.handle();
   }
 
+
+  @Test
+  public void testUserNameAndGroupNameCaseSensitivity() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .build();
+    cluster.waitActive();
+
+    DistributedFileSystem dfs = cluster.getFileSystem();
+
+    Path base = new Path("/projects/project1");
+    dfs.mkdirs(base);
+    Path child = new Path(base, "dataset");
+    dfs.mkdirs(child);
+
+    dfs.setOwner(base, "testUser", "testGroup");
+
+    FileStatus fileStatus = dfs.getFileStatus(base);
+    assertTrue(fileStatus.getOwner().equals("testUser"));
+    assertTrue(fileStatus.getGroup().equals("testGroup"));
+
+    dfs.setOwner(base, "testuser", "testgroup");
+    fileStatus = dfs.getFileStatus(base);
+    assertTrue(fileStatus.getOwner().equals("testuser"));
+    assertTrue(fileStatus.getGroup().equals("testgroup"));
+
+    cluster.getNameNode().getRpcServer().refreshUserToGroupsMappings();
+
+    assertTrue(UsersGroups.getUserID("testUser") != 0);
+    assertTrue(UsersGroups.getUserID("testuser") != 0);
+
+    assertNotEquals(UsersGroups.getUserID("testUser"), UsersGroups.getUserID
+        ("testuser"));
+
+    assertTrue(UsersGroups.getGroupID("testGroup") != 0);
+    assertTrue(UsersGroups.getGroupID("testgroup") != 0);
+    
+    assertNotEquals(UsersGroups.getGroupID("testGroup"), UsersGroups.getGroupID
+        ("testgroup"));
+
+    cluster.shutdown();
+  }
 }
