@@ -448,7 +448,7 @@ public class NameNode {
     String superGroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
         DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
 
-    Users.addUserToGroup(fsOwnerShortUserName, superGroup);
+    Users.addUserToGroupTx(fsOwnerShortUserName, superGroup);
 
     NameNode.initMetrics(conf, this.getRole());
     loadNamesystem(conf);
