@@ -24,6 +24,11 @@ public class Users {
     UsersGroups.addUserToGroups(user, new String[]{group});
   }
 
+  public static void addUserToGroupTx(String user, String group)
+      throws IOException {
+    UsersGroups.addUserToGroupsTx(user, new String[]{group});
+  }
+
   public static void flushCache(){
     flushCache(null, null);
   }

@@ -16,6 +16,7 @@
 package io.hops.security;
 
 import com.google.common.collect.Lists;
+import io.hops.exception.UniqueKeyConstraintViolationException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.GroupDataAccess;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
@@ -30,13 +31,19 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.ipc.RemoteException;
 import org.hamcrest.Matchers;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
@@ -45,6 +52,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.fail;
 
 public class TestUsersGroups {
 
@@ -455,5 +463,97 @@ public class TestUsersGroups {
         ("testgroup"));
 
     cluster.shutdown();
+  }
+
+  private class AddUser implements Callable<Integer>{
+    private final boolean useTransaction;
+    private final String userName;
+    AddUser(boolean useTransaction, String userName){
+      this.useTransaction = useTransaction;
+      this.userName = userName;
+    }
+    @Override
+    public Integer call() throws Exception {
+      if(useTransaction) {
+        UsersGroups.addUserToGroupsTx(userName, null);
+      }else {
+        UsersGroups.addUserToGroups(userName, null);
+      }
+      return UsersGroups.getUserID(userName);
+    }
+  }
+
+  @Test
+  public void testConcurrentAddUser() throws Exception {
+    Configuration conf = new Configuration();
+    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.setConfiguration(conf);
+    HdfsStorageFactory.formatStorage();
+
+    final String userName = "user1";
+    final int CONCURRENT_USERS = 100;
+    ExecutorService executorService = Executors.newFixedThreadPool(CONCURRENT_USERS);
+
+    List<Callable<Integer>> callables = new ArrayList<>();
+    for(int i=0; i< CONCURRENT_USERS; i++){
+      callables.add(new AddUser(false, userName));
+    }
+
+    List<Future<Integer>> futures = executorService.invokeAll(callables);
+    executorService.shutdown();
+    executorService.awaitTermination(1, TimeUnit.SECONDS);
+
+    UsersGroups.clearCache();
+    Integer userId = UsersGroups.getUserID(userName);
+
+    int success = 0;
+    int failure = 0;
+    for(Future<Integer> f : futures){
+      try {
+        Integer otherUserId = f.get();
+        assertNotEquals(otherUserId, Integer.valueOf(0));
+        assertEquals(otherUserId, userId);
+        success++;
+      }catch (ExecutionException ex){
+        if(ex.getCause() instanceof UniqueKeyConstraintViolationException){
+          failure++;
+        }else{
+          fail();
+        }
+      }
+    }
+
+    assertTrue(success >= 1);
+    assertTrue(failure == (CONCURRENT_USERS - success));
+  }
+
+  @Test
+  public void testConcurrentAddUserTx() throws Exception {
+    Configuration conf = new Configuration();
+    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.setConfiguration(conf);
+    HdfsStorageFactory.formatStorage();
+
+    final String userName = "user1";
+    final int CONCURRENT_USERS = 100;
+    ExecutorService executorService = Executors.newFixedThreadPool(CONCURRENT_USERS);
+
+    List<Callable<Integer>> callables = new ArrayList<>();
+    for(int i=0; i< CONCURRENT_USERS; i++){
+      callables.add(new AddUser(true, userName));
+    }
+
+    List<Future<Integer>> futures = executorService.invokeAll(callables);
+    executorService.shutdown();
+    executorService.awaitTermination(1, TimeUnit.SECONDS);
+
+    UsersGroups.clearCache();
+    Integer userId = UsersGroups.getUserID(userName);
+    for(Future<Integer> f : futures){
+      Integer otherUserId = f.get();
+      assertNotEquals(otherUserId, Integer.valueOf(0));
+      assertEquals(otherUserId, userId);
+    }
+
   }
 }
