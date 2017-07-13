@@ -32,13 +32,17 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -97,6 +101,7 @@ public class LogAggregationService extends AbstractService implements
   Path remoteRootLogDir;
   String remoteRootLogDirSuffix;
   private NodeId nodeId;
+  private Configuration sslConf;
 
   private final ConcurrentMap<ApplicationId, AppLogAggregator> appLogAggregators;
 
@@ -115,6 +120,7 @@ public class LogAggregationService extends AbstractService implements
         new ThreadFactoryBuilder()
           .setNameFormat("LogAggregationService #%d")
           .build());
+    sslConf = new Configuration(false);
   }
 
   protected void serviceInit(Configuration conf) throws Exception {
@@ -124,7 +130,15 @@ public class LogAggregationService extends AbstractService implements
     this.remoteRootLogDirSuffix =
         conf.get(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX,
             YarnConfiguration.DEFAULT_NM_REMOTE_APP_LOG_DIR_SUFFIX);
-
+    
+    if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY,
+          "ssl-server.xml"));
+    } else {
+      sslConf = null;
+    }
+    
     super.serviceInit(conf);
   }
 
@@ -176,6 +190,7 @@ public class LogAggregationService extends AbstractService implements
   }
 
   protected FileSystem getFileSystem(Configuration conf) throws IOException {
+    
     return FileSystem.get(conf);
   }
 
@@ -183,6 +198,35 @@ public class LogAggregationService extends AbstractService implements
     // Checking the existence of the TLD
     FileSystem remoteFS = null;
     try {
+      if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+            CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)
+          && sslConf != null) {
+        // Setting the keystore file path here is necessary to get the correct
+        // cached FileSystem object
+        String kstorePath = sslConf.get(
+            FileBasedKeyStoresFactory
+                .resolvePropertyName(SSLFactory.Mode.SERVER,
+                    FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY));
+        String kstorePass = sslConf.get(
+            FileBasedKeyStoresFactory
+                .resolvePropertyName(SSLFactory.Mode.SERVER,
+                    FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
+        String keyPass = sslConf.get(
+            FileBasedKeyStoresFactory
+                .resolvePropertyName(SSLFactory.Mode.SERVER,
+                    FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY));
+        String tstorePath = sslConf.get(
+            FileBasedKeyStoresFactory
+                .resolvePropertyName(SSLFactory.Mode.SERVER,
+                    FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
+        String tstorePass = sslConf.get(
+            FileBasedKeyStoresFactory
+                .resolvePropertyName(SSLFactory.Mode.SERVER,
+                    FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
+        HopsSSLSocketFactory.configureTlsClient(kstorePath, kstorePass,
+            keyPass, tstorePath, tstorePass, conf);
+      }
+      
       remoteFS = getFileSystem(conf);
     } catch (IOException e) {
       throw new YarnRuntimeException("Unable to get Remote FileSystem instance", e);
@@ -263,8 +307,19 @@ public class LogAggregationService extends AbstractService implements
         public Object run() throws Exception {
           try {
             // TODO: Reuse FS for user?
-            FileSystem remoteFS = getFileSystem(getConfig());
-
+            // Setting the keystore file path here is necessary to get the correct
+            // cached FileSystem object
+            Configuration conf = getConfig();
+            if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+                CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+              conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY
+                      .getValue(),
+                  context.getCertificateLocalizationService()
+                      .getMaterialLocation(user).getKeyStoreLocation());
+            }
+            
+            FileSystem remoteFS = getFileSystem(conf);
+            
             // Only creating directories if they are missing to avoid
             // unnecessary load on the filesystem from all of the nodes
             Path appDir = LogAggregationUtils.getRemoteAppLogDir(

@@ -473,7 +473,13 @@ RM_PREFIX + "resource-tracker.port";
 
   public static final String RM_HA_IDS = RM_HA_PREFIX + "rm-ids";
   public static final String RM_HA_ID = RM_HA_PREFIX + "id";
-
+  
+  public static final String RM_HA_CERT_LOC_ADDRESS = RM_HA_PREFIX + "cert" +
+      ".loc.address";
+  public static final int DEFAULT_CERTIFICATE_LOCALIZER_PORT = 8012;
+  public static final String DEFAULT_RM_HA_CERT_LOC_ADDRESS = "0.0.0.0:" +
+      DEFAULT_CERTIFICATE_LOCALIZER_PORT;
+  
   /** Store the related configuration files in File System */
   public static final String FS_BASED_RM_CONF_STORE = RM_PREFIX
       + "configuration.file-system-based-store";

@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
+import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.ConfigurationProvider;
@@ -137,4 +138,6 @@ public interface RMContext {
   boolean isDistributed();
   
   GroupMembershipService getGroupMembershipService();
+  
+  CertificateLocalizationService getCertificateLocalizationService();
 }

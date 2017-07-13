@@ -1,4 +1,5 @@
 /**
+/**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
 * distributed with this work for additional information
@@ -18,6 +19,7 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -97,7 +99,7 @@ public class ContainerManagementProtocolProxy {
   
   public synchronized ContainerManagementProtocolProxyData getProxy(
       String containerManagerBindAddr, ContainerId containerId)
-      throws InvalidToken {
+      throws InvalidToken, IOException {
     
     // This get call will update the map which is working as LRU cache.
     ContainerManagementProtocolProxyData proxy =
@@ -235,7 +237,7 @@ public class ContainerManagementProtocolProxy {
     @VisibleForTesting
     public ContainerManagementProtocolProxyData(YarnRPC rpc,
         String containerManagerBindAddr,
-        ContainerId containerId, Token token) throws InvalidToken {
+        ContainerId containerId, Token token) throws InvalidToken, IOException {
       this.containerManagerBindAddr = containerManagerBindAddr;
       ;
       this.activeCallers = 0;
@@ -248,7 +250,7 @@ public class ContainerManagementProtocolProxy {
     @VisibleForTesting
     protected ContainerManagementProtocol newProxy(final YarnRPC rpc,
         String containerManagerBindAddr, ContainerId containerId, Token token)
-        throws InvalidToken {
+        throws InvalidToken, IOException {
 
       if (token == null) {
         throw new InvalidToken("No NMToken sent for "
@@ -259,16 +261,23 @@ public class ContainerManagementProtocolProxy {
           NetUtils.createSocketAddr(containerManagerBindAddr);
       LOG.info("Opening proxy : " + containerManagerBindAddr);
       // the user in createRemoteUser in this context has to be ContainerID
-      UserGroupInformation user =
+      // This is Apache Hadoop way
+      /*UserGroupInformation user =
           UserGroupInformation.createRemoteUser(containerId
               .getApplicationAttemptId().toString());
 
       org.apache.hadoop.security.token.Token<NMTokenIdentifier> nmToken =
           ConverterUtils.convertFromYarn(token, cmAddr);
-      user.addToken(nmToken);
+      user.addToken(nmToken);*/
 
+      // In Hops we don't impersonate the call as the application ID
+      UserGroupInformation realUser = UserGroupInformation.getCurrentUser();
+      org.apache.hadoop.security.token.Token<NMTokenIdentifier> nmToken =
+          ConverterUtils.convertFromYarn(token, cmAddr);
+      realUser.addToken(nmToken);
+      
       return NMProxy.createNMProxy(conf, ContainerManagementProtocol.class,
-        user, rpc, cmAddr);
+        realUser, rpc, cmAddr);
     }
 
     public ContainerManagementProtocol getContainerManagementProtocol() {

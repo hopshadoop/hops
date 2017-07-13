@@ -18,11 +18,14 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
+import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StartContainerRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StartContainersRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StartContainersRequestProtoOrBuilder;
@@ -34,6 +37,8 @@ public class StartContainersRequestPBImpl extends StartContainersRequest {
   boolean viaProto = false;
 
   private List<StartContainerRequest> requests = null;
+  private ByteBuffer keyStore = null;
+  private ByteBuffer trustStore = null;
 
   public StartContainersRequestPBImpl() {
     builder = StartContainersRequestProto.newBuilder();
@@ -78,8 +83,13 @@ public class StartContainersRequestPBImpl extends StartContainersRequest {
     if (requests != null) {
       addLocalRequestsToProto();
     }
+    if (this.keyStore != null) {
+      builder.setKeyStore(convertToProtoFormat(this.keyStore));
+    }
+    if (this.trustStore != null) {
+      builder.setTrustStore(convertToProtoFormat(this.trustStore));
+    }
   }
-
 
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
@@ -127,6 +137,58 @@ public class StartContainersRequestPBImpl extends StartContainersRequest {
     return this.requests;
   }
 
+  @Override
+  public ByteBuffer getKeyStore() {
+    StartContainersRequestProtoOrBuilder p = viaProto ? proto : builder;
+    if(this.keyStore != null) {
+      return this.keyStore;
+    }
+    if (!p.hasKeyStore()) {
+      return null;
+    }
+    this.keyStore = convertFromProtoFormat(p.getKeyStore());
+    return this.keyStore;
+  }
+  
+  @Override
+  public void setKeyStore(ByteBuffer keyStore) {
+    maybeInitBuilder();
+    if (keyStore == null) {
+      builder.clearKeyStore();
+    }
+    this.keyStore = keyStore;
+  }
+  
+  @Override
+  public ByteBuffer getTrustStore() {
+    StartContainersRequestProtoOrBuilder p = viaProto ? proto : builder;
+    if (this.trustStore != null) {
+      return this.trustStore;
+    }
+    if (!p.hasTrustStore()) {
+      return null;
+    }
+    this.trustStore = convertFromProtoFormat(p.getTrustStore());
+    return this.trustStore;
+  }
+  
+  @Override
+  public void setTrustStore(ByteBuffer trustStore) {
+    maybeInitBuilder();
+    if (trustStore == null) {
+      builder.clearTrustStore();
+    }
+    this.trustStore = trustStore;
+  }
+  
+  private ByteBuffer convertFromProtoFormat(ByteString byteString) {
+    return ProtoUtils.convertFromProtoFormat(byteString);
+  }
+  
+  private ByteString convertToProtoFormat(ByteBuffer byteBuffer) {
+    return ProtoUtils.convertToProtoFormat(byteBuffer);
+  }
+  
   private StartContainerRequestPBImpl convertFromProtoFormat(
       StartContainerRequestProto p) {
     return new StartContainerRequestPBImpl(p);

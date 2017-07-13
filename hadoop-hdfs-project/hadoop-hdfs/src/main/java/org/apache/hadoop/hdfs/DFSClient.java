@@ -107,6 +107,7 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.Time;
 
 import javax.net.SocketFactory;
+import javax.net.ssl.SSLException;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -2051,6 +2052,7 @@ public class DFSClient implements java.io.Closeable {
       ClientProtocol namenode, SocketFactory socketFactory, int socketTimeout,
       DataEncryptionKey encryptionKey, boolean connectToDnViaHostname)
       throws IOException {
+    LOG.debug("SocketFactory is: " + socketFactory.getClass().getName());
     //get all block locations
     LocatedBlocks blockLocations =
         callGetBlockLocations(namenode, src, 0, Long.MAX_VALUE);

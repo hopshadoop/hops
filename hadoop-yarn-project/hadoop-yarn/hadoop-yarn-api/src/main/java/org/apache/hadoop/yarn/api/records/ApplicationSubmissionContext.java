@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.api.records;
 
+import java.nio.ByteBuffer;
 import java.util.Set;
 
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
@@ -535,4 +536,20 @@ public abstract class ApplicationSubmissionContext {
   @Public
   @Unstable
   public abstract void setReservationID(ReservationId reservationID);
+  
+  @Public
+  @Unstable
+  public abstract ByteBuffer getKeyStore();
+  
+  @Public
+  @Unstable
+  public abstract void setKeyStore(ByteBuffer keyStore);
+  
+  @Public
+  @Unstable
+  public abstract ByteBuffer getTrustStore();
+  
+  @Public
+  @Unstable
+  public abstract void setTrustStore(ByteBuffer trustStore);
 }

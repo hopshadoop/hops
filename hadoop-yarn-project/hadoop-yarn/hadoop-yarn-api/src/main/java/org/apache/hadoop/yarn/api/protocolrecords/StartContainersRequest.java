@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
@@ -73,4 +75,20 @@ public abstract class StartContainersRequest {
   @Stable
   public abstract void setStartContainerRequests(
       List<StartContainerRequest> request);
+  
+  @Public
+  @InterfaceStability.Unstable
+  public abstract ByteBuffer getKeyStore();
+  
+  @Public
+  @InterfaceStability.Unstable
+  public abstract void setKeyStore(ByteBuffer keyStore);
+  
+  @Public
+  @InterfaceStability.Unstable
+  public abstract ByteBuffer getTrustStore();
+  
+  @Public
+  @InterfaceStability.Unstable
+  public abstract void setTrustStore(ByteBuffer trustStore);
 }

@@ -20,6 +20,9 @@ package org.apache.hadoop.mapreduce.v2.app.launcher;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.mapred.ShuffleHandler;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
@@ -43,6 +47,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerLaunched
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptDiagnosticsUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
@@ -148,6 +153,14 @@ public class ContainerLauncherImpl extends AbstractService implements
         List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
         list.add(startRequest);
         StartContainersRequest requestList = StartContainersRequest.newInstance(list);
+  
+        if (getConfig().getBoolean(CommonConfigurationKeysPublic
+                .IPC_SERVER_SSL_ENABLED,
+            CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+          String user = UserGroupInformation.getCurrentUser().getUserName();
+          setupCryptoMaterial(requestList, user);
+        }
+        
         StartContainersResponse response =
             proxy.getContainerManagementProtocol().startContainers(requestList);
         if (response.getFailedRequests() != null
@@ -185,6 +198,18 @@ public class ContainerLauncherImpl extends AbstractService implements
           cmProxy.mayBeCloseProxy(proxy);
         }
       }
+    }
+  
+    private void setupCryptoMaterial(StartContainersRequest request, String user)
+        throws IOException {
+      Path kStorePath = Paths.get("k_certificate");
+      Path tStorePath = Paths.get("t_certificate");
+    
+      ByteBuffer kStore = ByteBuffer.wrap(Files.readAllBytes(kStorePath));
+      ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
+    
+      request.setKeyStore(kStore);
+      request.setTrustStore(tStore);
     }
     
     @SuppressWarnings("unchecked")

@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
+import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.LocalConfigurationProvider;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -76,6 +77,7 @@ public class RMContextImpl implements RMContext {
 
   private boolean isDistributed;
   private GroupMembershipService groupMembershipService;
+  private CertificateLocalizationService certificateLocalizationService;
   
   /**
    * Default constructor. To be used in conjunction with setter methods for
@@ -487,5 +489,15 @@ public class RMContextImpl implements RMContext {
   @Override
   public GroupMembershipService getGroupMembershipService() {
     return this.groupMembershipService;
+  }
+  
+  public void setCertificateLocalizationService
+      (CertificateLocalizationService certificateLocalizationService) {
+    this.certificateLocalizationService = certificateLocalizationService;
+  }
+  
+  @Override
+  public CertificateLocalizationService getCertificateLocalizationService() {
+    return certificateLocalizationService;
   }
 }
