@@ -76,7 +76,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * A BlockTargetPair queue.
    */
   private static class BlockQueue<E> {
-    private final Queue<E> blockq = new LinkedList<E>();
+    private final Queue<E> blockq = new LinkedList<>();
 
     /**
      * Size of the queue
@@ -100,7 +100,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
         return null;
       }
 
-      List<E> results = new ArrayList<E>();
+      List<E> results = new ArrayList<>();
       for (; !blockq.isEmpty() && numBlocks > 0; numBlocks--) {
         results.add(blockq.poll());
       }
@@ -154,18 +154,18 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * A queue of blocks to be replicated by this datanode
    */
   private BlockQueue<BlockTargetPair> replicateBlocks =
-      new BlockQueue<BlockTargetPair>();
+      new BlockQueue<>();
   /**
    * A queue of blocks to be recovered by this datanode
    */
   private BlockQueue<BlockInfoUnderConstruction> recoverBlocks =
-      new BlockQueue<BlockInfoUnderConstruction>();
+      new BlockQueue<>();
 
   /**
    * A set of blocks to be invalidated by this datanode
    */
-  private LightWeightHashSet<Block> invalidateBlocks =
-      new LightWeightHashSet<Block>();
+  private final LightWeightHashSet<Block> invalidateBlocks =
+      new LightWeightHashSet<>();
 
   /* Variables for maintaining number of blocks scheduled to be written to
    * this datanode. This count is approximate and might be slightly bigger

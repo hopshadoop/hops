@@ -241,7 +241,7 @@ public class NNThroughputBenchmark {
     }
 
     void benchmark() throws IOException {
-      daemons = new ArrayList<StatsDaemon>();
+      daemons = new ArrayList<>();
       long start = 0;
       try {
         numOpsExecuted = 0;
@@ -623,7 +623,7 @@ public class NNThroughputBenchmark {
       // dummyActionNoSynch(fileIdx);
       nameNodeProto
           .create(fileNames[daemonId][inputIdx], FsPermission.getDefault(),
-              clientName, new EnumSetWritable<CreateFlag>(
+              clientName, new EnumSetWritable<>(
                   EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)), true,
               replication, BLOCK_SIZE);
       long end = Time.now();
@@ -856,7 +856,7 @@ public class NNThroughputBenchmark {
 
     TinyDatanode(int dnIdx, int blockCapacity) throws IOException {
       this.dnIdx = dnIdx;
-      this.blocks = new ArrayList<Block>(
+      this.blocks = new ArrayList<>(
           Collections.nCopies(blockCapacity, (Block) null));
       this.nrBlocks = 0;
     }
@@ -977,8 +977,7 @@ public class NNThroughputBenchmark {
         throws IOException {
       for (int i = 0; i < blocks.length; i++) {
         DatanodeInfo blockTargets[] = xferTargets[i];
-        for (int t = 0; t < blockTargets.length; t++) {
-          DatanodeInfo dnInfo = blockTargets[t];
+        for (DatanodeInfo dnInfo : blockTargets) {
           DatanodeRegistration receivedDNReg;
           receivedDNReg = new DatanodeRegistration(dnInfo,
               new DataStorage(nsInfo, dnInfo.getStorageID()),
@@ -1096,7 +1095,7 @@ public class NNThroughputBenchmark {
       for (int idx = 0; idx < nrFiles; idx++) {
         String fileName = nameGenerator.getNextFileName("ThroughputBench");
         nameNodeProto.create(fileName, FsPermission.getDefault(), clientName,
-            new EnumSetWritable<CreateFlag>(
+            new EnumSetWritable<>(
                 EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)), true,
             replication, BLOCK_SIZE);
         ExtendedBlock lastBlock = addBlocks(fileName, clientName);
@@ -1380,7 +1379,7 @@ public class NNThroughputBenchmark {
     boolean runAll = OperationStatsBase.OP_ALL_NAME.equals(type);
 
     NNThroughputBenchmark bench = null;
-    List<OperationStatsBase> ops = new ArrayList<OperationStatsBase>();
+    List<OperationStatsBase> ops = new ArrayList<>();
     OperationStatsBase opStat = null;
     try {
       bench = new NNThroughputBenchmark(conf);
@@ -1443,6 +1442,6 @@ public class NNThroughputBenchmark {
   public static void main(String[] args) throws Exception {
     args = new String[]{"-op", "all", "namenode", "format"};
     runBenchmark(new HdfsConfiguration(),
-        new ArrayList<String>(Arrays.asList(args)));
+        new ArrayList<>(Arrays.asList(args)));
   }
 }

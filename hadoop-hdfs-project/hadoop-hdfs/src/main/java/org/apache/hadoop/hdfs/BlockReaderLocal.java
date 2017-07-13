@@ -123,7 +123,7 @@ class BlockReaderLocal implements BlockReader {
   // Multiple datanodes could be running on the local machine. Store proxies in
   // a map keyed by the ipc port of the datanode.
   private static Map<Integer, LocalDatanodeInfo> localDatanodeInfoMap =
-      new HashMap<Integer, LocalDatanodeInfo>();
+      new HashMap<>();
 
   private final FileInputStream dataIn; // reader for the data file
   private final FileInputStream checksumIn;   // reader for the checksum file

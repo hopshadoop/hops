@@ -142,8 +142,8 @@ public class Codec implements Serializable {
         return;
       }
       JSONArray jsonArray = new JSONArray(source);
-      List<Codec> localCodecs = new ArrayList<Codec>();
-      Map<String, Codec> localIdToCodec = new HashMap<String, Codec>();
+      List<Codec> localCodecs = new ArrayList<>();
+      Map<String, Codec> localIdToCodec = new HashMap<>();
       for (int i = 0; i < jsonArray.length(); ++i) {
         Codec codec = new Codec(jsonArray.getJSONObject(i));
         localIdToCodec.put(codec.id, codec);

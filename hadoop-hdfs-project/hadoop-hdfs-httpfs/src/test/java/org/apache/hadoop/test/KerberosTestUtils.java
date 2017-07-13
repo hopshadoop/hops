@@ -74,7 +74,7 @@ public class KerberosTestUtils {
 
     @Override
     public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
-      Map<String, String> options = new HashMap<String, String>();
+      Map<String, String> options = new HashMap<>();
       options.put("keyTab", KerberosTestUtils.getKeytabFile());
       options.put("principal", principal);
       options.put("useKeyTab", "true");
@@ -100,11 +100,11 @@ public class KerberosTestUtils {
       throws Exception {
     LoginContext loginContext = null;
     try {
-      Set<Principal> principals = new HashSet<Principal>();
+      Set<Principal> principals = new HashSet<>();
       principals
           .add(new KerberosPrincipal(KerberosTestUtils.getClientPrincipal()));
-      Subject subject = new Subject(false, principals, new HashSet<Object>(),
-          new HashSet<Object>());
+      Subject subject = new Subject(false, principals, new HashSet<>(),
+          new HashSet<>());
       loginContext = new LoginContext("", subject, null,
           new KerberosConfiguration(principal));
       loginContext.login();

@@ -50,10 +50,10 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
   private final INodeDataAccess<INode> dataAccess;
 
   private final Map<String, INode> inodesNameParentIndex =
-      new HashMap<String, INode>();
+      new HashMap<>();
   private final Map<Integer, List<INode>> inodesParentIndex =
-      new HashMap<Integer, List<INode>>();
-  private final List<INode> renamedInodes = new ArrayList<INode>();
+      new HashMap<>();
+  private final List<INode> renamedInodes = new ArrayList<>();
 
   public INodeContext(INodeDataAccess dataAccess) {
     this.dataAccess = dataAccess;
@@ -127,7 +127,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
     // function is empty and in that case tlm will throw
     // null pointer exceptions
     Collection<INode> removed = getRemoved();
-    Collection<INode> added = new ArrayList<INode>(getAdded());
+    Collection<INode> added = new ArrayList<>(getAdded());
     added.addAll(renamedInodes);
     Collection<INode> modified = getModified();
 
@@ -334,7 +334,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
     List<Integer> partitionIdsRest = Lists.newArrayList();
     List<Integer> unpopulatedIndeces = Lists.newArrayList();
 
-    List<INode> result = new ArrayList<INode>(Collections.<INode>nCopies(names
+    List<INode> result = new ArrayList<>(Collections.<INode>nCopies(names
         .length, null));
 
     for(int i=0; i<names.length; i++){
@@ -393,7 +393,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
   }
 
   private List<INode> syncInodeInstances(List<INode> newInodes) {
-    List<INode> finalList = new ArrayList<INode>(newInodes.size());
+    List<INode> finalList = new ArrayList<>(newInodes.size());
 
     for (INode inode : newInodes) {
       if (isRemoved(inode.getId())) {

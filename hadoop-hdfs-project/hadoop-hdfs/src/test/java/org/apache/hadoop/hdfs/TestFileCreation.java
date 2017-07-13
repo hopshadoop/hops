@@ -1139,7 +1139,7 @@ public class TestFileCreation {
           case DIRECT_NN_RPC:
             try {
               nnrpc.create(pathStr, new FsPermission((short) 0755), "client",
-                  new EnumSetWritable<CreateFlag>(
+                  new EnumSetWritable<>(
                       EnumSet.of(CreateFlag.CREATE)), true, (short) 1,
                   128 * 1024 * 1024L);
               fail("Should have thrown exception when creating '" + pathStr +
@@ -1395,18 +1395,20 @@ public class TestFileCreation {
 
 
             FileStatus[] status = dfs.listStatus(base);
-            for (int i = 0; i < status.length; i++) {
-                if (status[i].isFile()) {
-                    assertTrue("File size does not match ", status[i].getLen() == data.getBytes().length);
-                }
+          for (FileStatus statu1 : status) {
+            if (statu1.isFile()) {
+              assertTrue("File size does not match ",
+                  statu1.getLen() == data.getBytes().length);
             }
+          }
 
             status = dfs.listStatus(new Path(base, "test"));
-            for (int i = 0; i < status.length; i++) {
-                if (status[i].isFile()) {
-                    assertTrue("File size does not match ", status[i].getLen() == data.getBytes().length);
-                }
+          for (FileStatus statu : status) {
+            if (statu.isFile()) {
+              assertTrue("File size does not match ",
+                  statu.getLen() == data.getBytes().length);
             }
+          }
 
 
         dfs.listLocatedStatus(base);

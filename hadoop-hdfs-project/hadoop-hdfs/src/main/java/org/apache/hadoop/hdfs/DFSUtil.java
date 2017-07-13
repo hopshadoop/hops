@@ -611,7 +611,7 @@ public class DFSUtil {
 
   private static List<InetSocketAddress> getNameNodesRPCAddresses(
       Configuration conf, String listKey, String singleKey) {
-    List<InetSocketAddress> addresses = new ArrayList<InetSocketAddress>();
+    List<InetSocketAddress> addresses = new ArrayList<>();
     for (URI uri : getNameNodesRPCAddressesAsURIs(conf, listKey, singleKey)) {
       addresses.add(new InetSocketAddress(uri.getHost(), uri.getPort()));
     }
@@ -626,7 +626,7 @@ public class DFSUtil {
 
   private static List<URI> getNameNodesRPCAddressesAsURIs(Configuration conf,
       String listKey, String singleKey) {
-    List<URI> uris = new ArrayList<URI>();
+    List<URI> uris = new ArrayList<>();
     for (String nn : getNameNodesRPCAddressesInternal(conf, listKey,
         singleKey)) {
       uris.add(DFSUtil.createHDFSUri(nn));

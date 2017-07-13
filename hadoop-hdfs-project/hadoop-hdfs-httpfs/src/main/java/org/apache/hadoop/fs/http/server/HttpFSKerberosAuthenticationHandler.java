@@ -55,7 +55,7 @@ import java.util.Set;
 public class HttpFSKerberosAuthenticationHandler
     extends KerberosAuthenticationHandler {
 
-  static final Set<String> DELEGATION_TOKEN_OPS = new HashSet<String>();
+  static final Set<String> DELEGATION_TOKEN_OPS = new HashSet<>();
 
   static {
     DELEGATION_TOKEN_OPS
@@ -128,13 +128,13 @@ public class HttpFSKerberosAuthenticationHandler
                 } else {
                   if (dtOp == DelegationTokenOperation.CANCELDELEGATIONTOKEN) {
                     Token<DelegationTokenIdentifier> dt =
-                        new Token<DelegationTokenIdentifier>();
+                        new Token<>();
                     dt.decodeFromUrlString(tokenParam);
                     tokenManager.cancelToken(dt,
                         UserGroupInformation.getCurrentUser().getUserName());
                   } else {
                     Token<DelegationTokenIdentifier> dt =
-                        new Token<DelegationTokenIdentifier>();
+                        new Token<>();
                     dt.decodeFromUrlString(tokenParam);
                     long expirationTime =
                         tokenManager.renewToken(dt, token.getUserName());
@@ -208,7 +208,7 @@ public class HttpFSKerberosAuthenticationHandler
     if (delegationParam != null) {
       try {
         Token<DelegationTokenIdentifier> dt =
-            new Token<DelegationTokenIdentifier>();
+            new Token<>();
         dt.decodeFromUrlString(delegationParam);
         DelegationTokenManager tokenManager =
             HttpFSServerWebApp.get().get(DelegationTokenManager.class);

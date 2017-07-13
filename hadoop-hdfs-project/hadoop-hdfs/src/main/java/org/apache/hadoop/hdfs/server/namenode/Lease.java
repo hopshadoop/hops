@@ -112,7 +112,7 @@ public class Lease implements Comparable<Lease> {
   }
 
   public void addFirstPath(LeasePath lPath) {
-    this.paths = new TreeSet<LeasePath>();
+    this.paths = new TreeSet<>();
     this.paths.add(lPath);
   }
 

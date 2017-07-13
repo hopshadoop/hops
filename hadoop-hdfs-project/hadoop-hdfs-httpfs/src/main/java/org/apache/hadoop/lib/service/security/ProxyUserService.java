@@ -65,9 +65,9 @@ public class ProxyUserService extends BaseService implements ProxyUser {
   private static final String HOSTS = ".hosts";
 
   private Map<String, Set<String>> proxyUserHosts =
-      new HashMap<String, Set<String>>();
+      new HashMap<>();
   private Map<String, Set<String>> proxyUserGroups =
-      new HashMap<String, Set<String>>();
+      new HashMap<>();
 
   public ProxyUserService() {
     super(PREFIX);
@@ -97,7 +97,7 @@ public class ProxyUserService extends BaseService implements ProxyUser {
         LOG.info("Loading proxyuser settings [{}]=[{}]", key, value);
         Set<String> values = null;
         if (!value.equals("*")) {
-          values = new HashSet<String>(Arrays.asList(value.split(",")));
+          values = new HashSet<>(Arrays.asList(value.split(",")));
         }
         proxyUserGroups.put(proxyUser, values);
       }
@@ -123,7 +123,7 @@ public class ProxyUserService extends BaseService implements ProxyUser {
             LOG.info("  Hostname, original [{}], normalized [{}]", originalName,
                 hosts[i]);
           }
-          values = new HashSet<String>(Arrays.asList(hosts));
+          values = new HashSet<>(Arrays.asList(hosts));
         }
         proxyUserHosts.put(proxyUser, values);
       }

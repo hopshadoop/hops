@@ -46,7 +46,7 @@ public abstract class ServerWebApp extends Server
   private static final String HTTP_HOSTNAME = ".http.hostname";
   private static final String HTTP_PORT = ".http.port";
 
-  private static ThreadLocal<String> HOME_DIR_TL = new ThreadLocal<String>();
+  private static ThreadLocal<String> HOME_DIR_TL = new ThreadLocal<>();
 
   private InetSocketAddress authority;
 

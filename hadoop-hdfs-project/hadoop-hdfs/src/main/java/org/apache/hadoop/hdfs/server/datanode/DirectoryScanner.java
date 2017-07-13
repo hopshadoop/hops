@@ -64,7 +64,7 @@ public class DirectoryScanner implements Runnable {
   private boolean retainDiffs = false;
 
   ScanInfoPerBlockPool diffs = new ScanInfoPerBlockPool();
-  Map<String, Stats> stats = new HashMap<String, Stats>();
+  Map<String, Stats> stats = new HashMap<>();
   
   /**
    * Allow retaining diffs for unit test and analysis
@@ -146,7 +146,7 @@ public class DirectoryScanner implements Runnable {
      */
     public Map<String, ScanInfo[]> toSortedArrays() {
       Map<String, ScanInfo[]> result =
-          new HashMap<String, ScanInfo[]>(this.size());
+          new HashMap<>(this.size());
       
       for (Entry<String, LinkedList<ScanInfo>> entry : this.entrySet()) {
         String bpid = entry.getKey();
@@ -371,7 +371,7 @@ public class DirectoryScanner implements Runnable {
         
         Stats statsRecord = new Stats(bpid);
         stats.put(bpid, statsRecord);
-        LinkedList<ScanInfo> diffRecord = new LinkedList<ScanInfo>();
+        LinkedList<ScanInfo> diffRecord = new LinkedList<>();
         diffs.put(bpid, diffRecord);
         
         statsRecord.totalBlocks = blockpoolReport.length;
@@ -472,7 +472,7 @@ public class DirectoryScanner implements Runnable {
         new ScanInfoPerBlockPool[volumes.size()];
 
     Map<Integer, Future<ScanInfoPerBlockPool>> compilersInProgress =
-        new HashMap<Integer, Future<ScanInfoPerBlockPool>>();
+        new HashMap<>();
 
     for (int i = 0; i < volumes.size(); i++) {
       if (isValid(dataset, volumes.get(i))) {
@@ -524,7 +524,7 @@ public class DirectoryScanner implements Runnable {
       String[] bpList = volume.getBlockPoolList();
       ScanInfoPerBlockPool result = new ScanInfoPerBlockPool(bpList.length);
       for (String bpid : bpList) {
-        LinkedList<ScanInfo> report = new LinkedList<ScanInfo>();
+        LinkedList<ScanInfo> report = new LinkedList<>();
         File bpFinalizedDir = volume.getFinalizedDir(bpid);
         result.put(bpid, compileReport(volume, bpFinalizedDir, report));
       }
@@ -551,15 +551,15 @@ public class DirectoryScanner implements Runnable {
       List<File> blkFiles = new ArrayList();
       List<File> metaFiles = new ArrayList();
       List<File> subDirs = new ArrayList();
-      for (int i = 0; i < files.length; i++) {
-        if (!files[i].isDirectory()) {
-          if (isBlockMetaFile("blk_", files[i].getName())) {
-            metaFiles.add(files[i]);
-          } else if (Block.isBlockFilename(files[i])) {
-            blkFiles.add(files[i]);
+      for (File file : files) {
+        if (!file.isDirectory()) {
+          if (isBlockMetaFile("blk_", file.getName())) {
+            metaFiles.add(file);
+          } else if (Block.isBlockFilename(file)) {
+            blkFiles.add(file);
           }
         } else {
-          subDirs.add(files[i]);
+          subDirs.add(file);
         }
       }
 

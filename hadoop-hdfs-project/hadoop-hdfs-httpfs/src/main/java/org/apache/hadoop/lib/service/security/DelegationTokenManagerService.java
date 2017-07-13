@@ -126,7 +126,7 @@ public class DelegationTokenManagerService extends BaseService
     DelegationTokenIdentifier tokenIdentifier =
         new DelegationTokenIdentifier(owner, new Text(renewer), realUser);
     Token<DelegationTokenIdentifier> token =
-        new Token<DelegationTokenIdentifier>(tokenIdentifier, secretManager);
+        new Token<>(tokenIdentifier, secretManager);
     try {
       SecurityUtil
           .setTokenService(token, HttpFSServerWebApp.get().getAuthority());

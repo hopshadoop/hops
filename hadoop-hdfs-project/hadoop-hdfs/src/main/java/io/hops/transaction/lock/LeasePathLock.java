@@ -36,7 +36,7 @@ public final class LeasePathLock extends Lock {
   private LeasePathLock(TransactionLockTypes.LockType lockType, int expectedCount, 
           String src) {
     this.lockType = lockType;
-    this.leasePaths = new ArrayList<LeasePath>();
+    this.leasePaths = new ArrayList<>();
     this.expectedCount = expectedCount;
     this.src = src;
   }

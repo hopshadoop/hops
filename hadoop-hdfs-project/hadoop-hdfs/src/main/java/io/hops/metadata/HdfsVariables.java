@@ -282,7 +282,7 @@ public class HdfsVariables {
 
   public static void setStorageInfo(StorageInfo storageInfo)
       throws StorageException, TransactionContextException {
-    List<Object> vals = new ArrayList<Object>();
+    List<Object> vals = new ArrayList<>();
     vals.add(storageInfo.getLayoutVersion());
     vals.add(storageInfo.getNamespaceID());
     vals.add(storageInfo.getClusterID());
@@ -354,7 +354,7 @@ public class HdfsVariables {
     List<Variable> vars = (List<Variable>) (leightWeight ?
         getVariableLightWeight(Variable.Finder.BlockTokenKeys).getValue() :
         Variables.getVariable(Variable.Finder.BlockTokenKeys).getValue());
-    Map<Integer, BlockKey> keys = new HashMap<Integer, BlockKey>();
+    Map<Integer, BlockKey> keys = new HashMap<>();
     for (Variable var : vars) {
       BlockKey key = deserializeBlockKey((ByteArrayVariable) var);
       int mapKey = useKeyId ? key.getKeyId() : key.getKeyType().ordinal();

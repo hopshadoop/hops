@@ -98,7 +98,7 @@ public class ListPathsServlet extends DfsServlet {
     final boolean recur = request.getParameter("recursive") != null &&
         "yes".equals(request.getParameter("recursive"));
 
-    Map<String, String> root = new HashMap<String, String>();
+    Map<String, String> root = new HashMap<>();
     root.put("path", path);
     root.put("recursive", recur ? "yes" : "no");
     root.put("filter", filter);
@@ -163,7 +163,7 @@ public class ListPathsServlet extends DfsServlet {
             writeInfo(base.getFullPath(new Path(path)), base, doc);
           }
 
-          Stack<String> pathstack = new Stack<String>();
+          Stack<String> pathstack = new Stack<>();
           pathstack.push(path);
           while (!pathstack.empty()) {
             String p = pathstack.pop();

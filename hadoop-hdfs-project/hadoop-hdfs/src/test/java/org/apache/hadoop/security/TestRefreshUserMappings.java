@@ -63,7 +63,7 @@ public class TestRefreshUserMappings {
       System.out.println("Getting groups in MockUnixGroupsMapping");
       String g1 = user + (10 * i + 1);
       String g2 = user + (10 * i + 2);
-      List<String> l = new ArrayList<String>(2);
+      List<String> l = new ArrayList<>(2);
       l.add(g1);
       l.add(g2);
       i++;

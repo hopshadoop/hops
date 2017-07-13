@@ -635,7 +635,7 @@ public class DFSAdmin extends FsShell {
 
     // Build a map of rack -> nodes from the datanode report
     HashMap<String, TreeSet<String>> tree =
-        new HashMap<String, TreeSet<String>>();
+        new HashMap<>();
     for (DatanodeInfo dni : report) {
       String location = dni.getNetworkLocation();
       String name = dni.getName();
@@ -648,7 +648,7 @@ public class DFSAdmin extends FsShell {
     }
 
     // Sort the racks (and nodes) alphabetically, display in order
-    ArrayList<String> racks = new ArrayList<String>(tree.keySet());
+    ArrayList<String> racks = new ArrayList<>(tree.keySet());
     Collections.sort(racks);
 
     for (String r : racks) {

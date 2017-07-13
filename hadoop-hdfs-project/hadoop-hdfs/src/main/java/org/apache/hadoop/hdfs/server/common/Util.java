@@ -95,7 +95,7 @@ public final class Util {
    * @return collection of URIs
    */
   public static List<URI> stringCollectionAsURIs(Collection<String> names) {
-    List<URI> uris = new ArrayList<URI>(names.size());
+    List<URI> uris = new ArrayList<>(names.size());
     for (String name : names) {
       try {
         uris.add(stringAsURI(name));

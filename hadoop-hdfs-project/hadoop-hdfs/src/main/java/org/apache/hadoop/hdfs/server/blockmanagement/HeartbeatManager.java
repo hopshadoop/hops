@@ -47,7 +47,7 @@ class HeartbeatManager implements DatanodeStatistics {
    * It is synchronized by the heartbeat manager lock.
    */
   private final List<DatanodeDescriptor> datanodes =
-      new ArrayList<DatanodeDescriptor>();
+      new ArrayList<>();
 
   /**
    * Statistics, which are synchronized by the heartbeat manager lock.

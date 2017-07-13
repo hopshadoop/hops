@@ -121,7 +121,7 @@ public abstract class Storage extends StorageInfo {
   
   protected NodeType storageType;    // Type of the node using this storage 
   protected List<StorageDirectory> storageDirs =
-      new ArrayList<StorageDirectory>();
+      new ArrayList<>();
   
   private class DirIterator implements Iterator<StorageDirectory> {
     StorageDirType dirType;
@@ -182,7 +182,7 @@ public abstract class Storage extends StorageInfo {
    * regardless of whether it might exist.
    */
   public List<File> getFiles(StorageDirType dirType, String fileName) {
-    ArrayList<File> list = new ArrayList<File>();
+    ArrayList<File> list = new ArrayList<>();
     Iterator<StorageDirectory> it =
         (dirType == null) ? dirIterator() : dirIterator(dirType);
     for (; it.hasNext(); ) {
@@ -1053,9 +1053,8 @@ public abstract class Storage extends StorageInfo {
    */
   public void writeAll() throws IOException {
     this.layoutVersion = HdfsConstants.LAYOUT_VERSION;
-    for (Iterator<StorageDirectory> it = storageDirs.iterator();
-         it.hasNext(); ) {
-      writeProperties(it.next());
+    for (StorageDirectory storageDir : storageDirs) {
+      writeProperties(storageDir);
     }
   }
 
@@ -1065,9 +1064,8 @@ public abstract class Storage extends StorageInfo {
    * @throws IOException
    */
   public void unlockAll() throws IOException {
-    for (Iterator<StorageDirectory> it = storageDirs.iterator();
-         it.hasNext(); ) {
-      it.next().unlock();
+    for (StorageDirectory storageDir : storageDirs) {
+      storageDir.unlock();
     }
   }
 

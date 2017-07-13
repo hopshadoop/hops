@@ -43,7 +43,7 @@ public class TestGSet {
     {
       //test contains
       final LightWeightGSet<Integer, Integer> gset =
-          new LightWeightGSet<Integer, Integer>(16);
+          new LightWeightGSet<>(16);
       try {
         //test contains with a null element
         gset.contains(null);
@@ -56,7 +56,7 @@ public class TestGSet {
     {
       //test get
       final LightWeightGSet<Integer, Integer> gset =
-          new LightWeightGSet<Integer, Integer>(16);
+          new LightWeightGSet<>(16);
       try {
         //test get with a null element
         gset.get(null);
@@ -69,7 +69,7 @@ public class TestGSet {
     {
       //test put
       final LightWeightGSet<Integer, Integer> gset =
-          new LightWeightGSet<Integer, Integer>(16);
+          new LightWeightGSet<>(16);
       try {
         //test put with a null element
         gset.put(null);
@@ -153,7 +153,7 @@ public class TestGSet {
   private static GSet<IntElement, IntElement> createGSet(
       final IntElement[] data) {
     final GSet<IntElement, IntElement> gset =
-        new LightWeightGSet<IntElement, IntElement>(8);
+        new LightWeightGSet<>(8);
     for (int i = 1; i < data.length; i++) {
       gset.put(data[i]);
     }
@@ -256,7 +256,7 @@ public class TestGSet {
    */
   private static class GSetTestCase implements GSet<IntElement, IntElement> {
     final GSet<IntElement, IntElement> expected =
-        new GSetByHashMap<IntElement, IntElement>(1024, 0.75f);
+        new GSetByHashMap<>(1024, 0.75f);
     final GSet<IntElement, IntElement> gset;
     final IntData data;
 
@@ -277,7 +277,7 @@ public class TestGSet {
       println(info);
 
       data = new IntData(datasize, modulus);
-      gset = new LightWeightGSet<IntElement, IntElement>(tablelength);
+      gset = new LightWeightGSet<>(tablelength);
 
       Assert.assertEquals(0, gset.size());
     }

@@ -118,8 +118,7 @@ public class TestDecommission {
     FSDataOutputStream stm = localFileSys.create(name);
     
     if (nodes != null) {
-      for (Iterator<String> it = nodes.iterator(); it.hasNext(); ) {
-        String node = it.next();
+      for (String node : nodes) {
         stm.writeBytes(node);
         stm.writeBytes("\n");
       }
@@ -248,7 +247,7 @@ public class TestDecommission {
     LOG.info("Decommissioning node: " + nodename);
 
     // write nodename into the exclude file.
-    ArrayList<String> nodes = new ArrayList<String>();
+    ArrayList<String> nodes = new ArrayList<>();
     if (decommissionedNodes != null) {
       for (DatanodeInfo dn : decommissionedNodes) {
         nodes.add(dn.getName());
@@ -382,7 +381,7 @@ public class TestDecommission {
     startCluster(numNamenodes, numDatanodes, conf);
     
     ArrayList<ArrayList<DatanodeInfo>> namenodeDecomList =
-        new ArrayList<ArrayList<DatanodeInfo>>(numNamenodes);
+        new ArrayList<>(numNamenodes);
     for (int i = 0; i < numNamenodes; i++) {
       namenodeDecomList.add(i, new ArrayList<DatanodeInfo>(numDatanodes));
     }
@@ -426,7 +425,7 @@ public class TestDecommission {
     startCluster(numNamenodes, numDatanodes, conf);
 
     ArrayList<ArrayList<DatanodeInfo>> namenodeDecomList =
-        new ArrayList<ArrayList<DatanodeInfo>>(numNamenodes);
+        new ArrayList<>(numNamenodes);
     for (int i = 0; i < numNamenodes; i++) {
       namenodeDecomList.add(i, new ArrayList<DatanodeInfo>(numDatanodes));
     }
@@ -549,7 +548,7 @@ public class TestDecommission {
     
     // Now empty hosts file and ensure the datanode is disallowed
     // from talking to namenode, resulting in it's shutdown.
-    ArrayList<String> list = new ArrayList<String>();
+    ArrayList<String> list = new ArrayList<>();
     final String badHostname = "BOGUSHOST";
     list.add(badHostname);
     writeConfigFile(hostsFile, list);

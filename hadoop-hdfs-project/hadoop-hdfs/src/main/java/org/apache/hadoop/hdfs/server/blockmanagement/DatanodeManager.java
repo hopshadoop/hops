@@ -108,7 +108,7 @@ public class DatanodeManager {
    * Mapping: StorageID -> DatanodeDescriptor
    */
   private final NavigableMap<String, DatanodeDescriptor> datanodeMap =
-      new TreeMap<String, DatanodeDescriptor>();
+      new TreeMap<>();
 
   /**
    * Cluster network topology
@@ -195,7 +195,7 @@ public class DatanodeManager {
     // locations of those hosts in the include list and store the mapping
     // in the cache; so future calls to resolve will be fast.
     if (dnsToSwitchMapping instanceof CachedDNSToSwitchMapping) {
-      dnsToSwitchMapping.resolve(new ArrayList<String>(hostsReader.getHosts()));
+      dnsToSwitchMapping.resolve(new ArrayList<>(hostsReader.getHosts()));
     }
     
     final long heartbeatIntervalSeconds =
@@ -341,7 +341,7 @@ public class DatanodeManager {
   
   CyclicIteration<String, DatanodeDescriptor> getDatanodeCyclicIteration(
       final String firstkey) {
-    return new CyclicIteration<String, DatanodeDescriptor>(datanodeMap,
+    return new CyclicIteration<>(datanodeMap,
         firstkey);
   }
 
@@ -496,7 +496,7 @@ public class DatanodeManager {
 
   /* Resolve a node's network location */
   private void resolveNetworkLocation(DatanodeDescriptor node) {
-    List<String> names = new ArrayList<String>(1);
+    List<String> names = new ArrayList<>(1);
     if (dnsToSwitchMapping instanceof CachedDNSToSwitchMapping) {
       names.add(node.getIpAddr());
     } else {
@@ -880,7 +880,7 @@ public class DatanodeManager {
    */
   public List<DatanodeDescriptor> getDecommissioningNodes() {
     final List<DatanodeDescriptor> decommissioningNodes =
-        new ArrayList<DatanodeDescriptor>();
+        new ArrayList<>();
     final List<DatanodeDescriptor> results =
         getDatanodeListForReport(DatanodeReportType.LIVE);
     for (DatanodeDescriptor node : results) {
@@ -1060,7 +1060,7 @@ public class DatanodeManager {
     boolean listDeadNodes =
         type == DatanodeReportType.ALL || type == DatanodeReportType.DEAD;
 
-    HashMap<String, String> mustList = new HashMap<String, String>();
+    HashMap<String, String> mustList = new HashMap<>();
 
     if (listDeadNodes) {
       // Put all nodes referenced in the hosts files in the map
@@ -1077,11 +1077,9 @@ public class DatanodeManager {
     ArrayList<DatanodeDescriptor> nodes = null;
     
     synchronized (datanodeMap) {
-      nodes = new ArrayList<DatanodeDescriptor>(
+      nodes = new ArrayList<>(
           datanodeMap.size() + mustList.size());
-      Iterator<DatanodeDescriptor> it = datanodeMap.values().iterator();
-      while (it.hasNext()) {
-        DatanodeDescriptor dn = it.next();
+      for (DatanodeDescriptor dn : datanodeMap.values()) {
         final boolean isDead = isDatanodeDead(dn);
         if ((isDead && listDeadNodes) || (!isDead && listLiveNodes)) {
           nodes.add(dn);
@@ -1093,13 +1091,12 @@ public class DatanodeManager {
     }
     
     if (listDeadNodes) {
-      Iterator<String> it = mustList.keySet().iterator();
-      while (it.hasNext()) {
+      for (String s : mustList.keySet()) {
         // The remaining nodes are ones that are referenced by the hosts
         // files but that we do not know about, ie that we have never
         // head from. Eg. a host that is no longer part of the cluster
         // or a bogus entry was given in the hosts files
-        DatanodeID dnId = parseDNFromHostsEntry(it.next());
+        DatanodeID dnId = parseDNFromHostsEntry(s);
         DatanodeDescriptor dn = new DatanodeDescriptor(dnId);
         dn.setLastUpdate(0); // Consider this node dead for reporting
         nodes.add(dn);
@@ -1113,7 +1110,7 @@ public class DatanodeManager {
     String regHostName = node.getHostName();
     int xferPort = node.getXferPort();
     
-    List<String> names = new ArrayList<String>();
+    List<String> names = new ArrayList<>();
     names.add(ip);
     names.add(ip + ":" + xferPort);
     names.add(regHostName);
@@ -1191,7 +1188,7 @@ public class DatanodeManager {
           return new DatanodeCommand[]{brCommand};
         }
 
-        final List<DatanodeCommand> cmds = new ArrayList<DatanodeCommand>();
+        final List<DatanodeCommand> cmds = new ArrayList<>();
         //check pending replication
         List<BlockTargetPair> pendingList =
             nodeinfo.getReplicationCommand(maxTransfers);
@@ -1322,7 +1319,7 @@ public class DatanodeManager {
 
   Random rand = new Random(System.currentTimeMillis());
   public DatanodeDescriptor getRandomDN(){
-    List<String> sids = new ArrayList<String>(storageIdMap.getStorageIds());
+    List<String> sids = new ArrayList<>(storageIdMap.getStorageIds());
     if(sids.size()>0) {
       String sid = sids.get(rand.nextInt(sids.size()));
       return getDatanode(sid);

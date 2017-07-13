@@ -59,7 +59,7 @@ public class TestDecommissioningStatus {
   private static Configuration conf;
   private static Path dir;
 
-  ArrayList<String> decommissionedNodes = new ArrayList<String>(numDatanodes);
+  ArrayList<String> decommissionedNodes = new ArrayList<>(numDatanodes);
   
   @BeforeClass
   public static void setUp() throws Exception {
@@ -113,8 +113,7 @@ public class TestDecommissioningStatus {
     FSDataOutputStream stm = fs.create(name);
 
     if (nodes != null) {
-      for (Iterator<String> it = nodes.iterator(); it.hasNext(); ) {
-        String node = it.next();
+      for (String node : nodes) {
         stm.writeBytes(node);
         stm.writeBytes("\n");
       }
@@ -167,7 +166,7 @@ public class TestDecommissioningStatus {
     System.out.println("Decommissioning node: " + nodename);
 
     // write nodename into the exclude file.
-    ArrayList<String> nodes = new ArrayList<String>(decommissionedNodes);
+    ArrayList<String> nodes = new ArrayList<>(decommissionedNodes);
     nodes.add(nodename);
     writeConfigFile(localFileSys, excludeFile, nodes);
     return nodename;

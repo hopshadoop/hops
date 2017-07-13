@@ -90,7 +90,7 @@ public class TestHeartbeatHandling {
             ((BlockCommand) cmds[0]).getBlocks().length);
 
         ArrayList<Block> blockList =
-            new ArrayList<Block>(MAX_INVALIDATE_BLOCKS);
+            new ArrayList<>(MAX_INVALIDATE_BLOCKS);
         for (int i = 0; i < MAX_INVALIDATE_BLOCKS; i++) {
           blockList.add(new Block(i, 0, GenerationStamp.FIRST_VALID_STAMP));
         }

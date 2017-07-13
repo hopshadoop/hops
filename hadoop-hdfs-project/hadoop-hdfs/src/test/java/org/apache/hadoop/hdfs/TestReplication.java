@@ -97,10 +97,10 @@ public class TestReplication {
       DatanodeInfo[] datanodes = blk.getLocations();
       String[] topologyPaths = blockLocations[i].getTopologyPaths();
       assertTrue(topologyPaths.length == datanodes.length);
-      for (int j = 0; j < topologyPaths.length; j++) {
+      for (String topologyPath : topologyPaths) {
         boolean found = false;
-        for (int k = 0; k < racks.length; k++) {
-          if (topologyPaths[j].startsWith(racks[k])) {
+        for (String rack : racks) {
+          if (topologyPath.startsWith(rack)) {
             found = true;
             break;
           }
@@ -274,10 +274,8 @@ public class TestReplication {
       boolean replOk = true;
       LocatedBlocks blocks =
           namenode.getBlockLocations(filename, 0, Long.MAX_VALUE);
-      
-      for (Iterator<LocatedBlock> iter = blocks.getLocatedBlocks().iterator();
-           iter.hasNext(); ) {
-        LocatedBlock block = iter.next();
+  
+      for (LocatedBlock block : blocks.getLocatedBlocks()) {
         int actual = block.getLocations().length;
         if (actual < expected) {
           LOG.info("Not enough replicas for " + block.getBlock() +

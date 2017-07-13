@@ -77,7 +77,7 @@ public class TestNameNodeResourcePolicy {
       int numFailedRequiredResources, int minimumRedundantResources) {
     
     Collection<CheckableNameNodeResource> resources =
-        new ArrayList<CheckableNameNodeResource>();
+        new ArrayList<>();
     
     for (int i = 0; i < numRedundantResources; i++) {
       CheckableNameNodeResource r = mock(CheckableNameNodeResource.class);

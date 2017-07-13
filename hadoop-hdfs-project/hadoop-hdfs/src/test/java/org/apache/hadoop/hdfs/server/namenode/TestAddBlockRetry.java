@@ -133,7 +133,7 @@ public class TestAddBlockRetry {
 
     // create file
     nn.create(src, FsPermission.getFileDefault(), "clientName",
-        new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true,
+        new EnumSetWritable<>(EnumSet.of(CreateFlag.CREATE)), true,
         (short) 3, 1024);
 
     // start first addBlock()

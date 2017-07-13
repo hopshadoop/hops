@@ -112,12 +112,12 @@ public class ClientDatanodeProtocolServerSideTranslatorPB
     try {
       // Construct the Lists to make the actual call
       List<ExtendedBlock> blocks =
-          new ArrayList<ExtendedBlock>(request.getBlocksCount());
+          new ArrayList<>(request.getBlocksCount());
       for (ExtendedBlockProto b : request.getBlocksList()) {
         blocks.add(PBHelper.convert(b));
       }
       List<Token<BlockTokenIdentifier>> tokens =
-          new ArrayList<Token<BlockTokenIdentifier>>(request.getTokensCount());
+          new ArrayList<>(request.getTokensCount());
       for (TokenProto b : request.getTokensList()) {
         tokens.add(PBHelper.convert(b));
       }
@@ -127,7 +127,7 @@ public class ClientDatanodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
     List<ByteString> volumeIdsByteStrings =
-        new ArrayList<ByteString>(resp.getVolumeIds().size());
+        new ArrayList<>(resp.getVolumeIds().size());
     for (byte[] b : resp.getVolumeIds()) {
       volumeIdsByteStrings.add(ByteString.copyFrom(b));
     }

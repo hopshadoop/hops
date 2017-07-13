@@ -81,7 +81,7 @@ public class TestBlockReportLoadBalancing1 {
     HdfsStorageFactory.setConfiguration(conf);
     assert (HdfsStorageFactory.formatStorage());
 
-    List<ActiveNode> list = new ArrayList<ActiveNode>();
+    List<ActiveNode> list = new ArrayList<>();
     for (int i = 0; i < NN_COUNT; i++) {
       ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000");
       list.add(anode);
@@ -138,7 +138,7 @@ public class TestBlockReportLoadBalancing1 {
     HdfsStorageFactory.setConfiguration(conf);
     assert (HdfsStorageFactory.formatStorage());
 
-    List<ActiveNode> list = new ArrayList<ActiveNode>();
+    List<ActiveNode> list = new ArrayList<>();
     for (int i = 0; i < NN_COUNT; i++) {
       ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000");
       list.add(anode);
@@ -215,7 +215,7 @@ public class TestBlockReportLoadBalancing1 {
     HdfsStorageFactory.setConfiguration(conf);
     assert (HdfsStorageFactory.formatStorage());
 
-    List<ActiveNode> list = new ArrayList<ActiveNode>();
+    List<ActiveNode> list = new ArrayList<>();
     for (int i = 0; i < NN_COUNT; i++) {
       ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000");
       list.add(anode);

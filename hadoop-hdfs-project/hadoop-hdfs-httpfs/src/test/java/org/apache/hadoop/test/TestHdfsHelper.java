@@ -39,10 +39,10 @@ public class TestHdfsHelper extends TestDirHelper {
   public static final String HADOOP_MINI_HDFS = "test.hadoop.hdfs";
 
   private static ThreadLocal<Configuration> HDFS_CONF_TL =
-      new InheritableThreadLocal<Configuration>();
+      new InheritableThreadLocal<>();
 
   private static ThreadLocal<Path> HDFS_TEST_DIR_TL =
-      new InheritableThreadLocal<Path>();
+      new InheritableThreadLocal<>();
 
   @Override
   public Statement apply(Statement statement, FrameworkMethod frameworkMethod,

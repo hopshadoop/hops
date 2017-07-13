@@ -64,8 +64,8 @@ public class ReplicaUnderConstruction extends Replica {
       public int compare(ReplicaUnderConstruction o1,
           ReplicaUnderConstruction o2) {
         return Integer.valueOf(o1.getStorageId()).compareTo(
-            Integer.valueOf(o2.getStorageId
-                ()));
+            o2.getStorageId
+                ());
       }
     }
   }

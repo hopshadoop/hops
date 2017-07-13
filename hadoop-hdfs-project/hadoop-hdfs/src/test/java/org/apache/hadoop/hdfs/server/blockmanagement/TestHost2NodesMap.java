@@ -48,8 +48,8 @@ public class TestHost2NodesMap {
   public void testContains() throws Exception {
     DatanodeDescriptor nodeNotInMap =
         DFSTestUtil.getDatanodeDescriptor("3.3.3.3", "/d1/r4");
-    for (int i = 0; i < dataNodes.length; i++) {
-      assertTrue(map.contains(dataNodes[i]));
+    for (DatanodeDescriptor dataNode : dataNodes) {
+      assertTrue(map.contains(dataNode));
     }
     assertFalse(map.contains(null));
     assertFalse(map.contains(nodeNotInMap));

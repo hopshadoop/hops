@@ -61,7 +61,7 @@ public class BlockTokenSecretManager
   private static final int LOW_MASK = ~(1 << 31);
   
   public static final Token<BlockTokenIdentifier> DUMMY_TOKEN =
-      new Token<BlockTokenIdentifier>();
+      new Token<>();
 
   protected final boolean isMaster;
   private int nnIndex;
@@ -135,7 +135,7 @@ public class BlockTokenSecretManager
     this.isMaster = isMaster;
     this.keyUpdateInterval = keyUpdateInterval;
     this.tokenLifetime = tokenLifetime;
-    this.allKeys = new HashMap<Integer, BlockKey>();
+    this.allKeys = new HashMap<>();
     this.blockPoolId = blockPoolId;
     this.encryptionAlgorithm = encryptionAlgorithm;
     generateKeys();
@@ -216,11 +216,11 @@ public class BlockTokenSecretManager
     removeExpiredKeys();
     this.currentKey = exportedKeys.getCurrentKey();
     BlockKey[] receivedKeys = exportedKeys.getAllKeys();
-    for (int i = 0; i < receivedKeys.length; i++) {
-      if (receivedKeys[i] == null) {
+    for (BlockKey receivedKey : receivedKeys) {
+      if (receivedKey == null) {
         continue;
       }
-      this.allKeys.put(receivedKeys[i].getKeyId(), receivedKeys[i]);
+      this.allKeys.put(receivedKey.getKeyId(), receivedKey);
     }
   }
 
@@ -280,7 +280,7 @@ public class BlockTokenSecretManager
     BlockTokenIdentifier id =
         new BlockTokenIdentifier(userId, block.getBlockPoolId(),
             block.getBlockId(), modes);
-    return new Token<BlockTokenIdentifier>(id, this);
+    return new Token<>(id, this);
   }
 
   /**

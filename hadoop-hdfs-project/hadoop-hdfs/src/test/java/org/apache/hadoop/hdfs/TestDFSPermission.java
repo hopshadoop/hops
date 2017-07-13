@@ -90,7 +90,7 @@ public class TestDFSPermission {
       conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, true);
       
       // create fake mapping for the groups
-      Map<String, String[]> u2g_map = new HashMap<String, String[]>(3);
+      Map<String, String[]> u2g_map = new HashMap<>(3);
       u2g_map.put(USER1_NAME, new String[]{GROUP1_NAME, GROUP2_NAME});
       u2g_map.put(USER2_NAME, new String[]{GROUP2_NAME, GROUP3_NAME});
       u2g_map.put(USER3_NAME, new String[]{GROUP3_NAME, GROUP4_NAME});

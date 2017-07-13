@@ -758,7 +758,7 @@ public class WebHdfsFileSystem extends FileSystem
     statistics.incrementWriteOps(1);
     final HttpOpParam.Op op = PostOpParam.Op.CONCAT;
 
-    List<String> strPaths = new ArrayList<String>(psrcs.length);
+    List<String> strPaths = new ArrayList<>(psrcs.length);
     for (Path psrc : psrcs) {
       strPaths.add(psrc.toUri().getPath());
     }

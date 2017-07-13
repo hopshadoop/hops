@@ -111,7 +111,7 @@ public class DatanodeWebHdfsMethods {
     if (UserGroupInformation.isSecurityEnabled()) {
       //add a token for RPC.
       final Token<DelegationTokenIdentifier> token =
-          new Token<DelegationTokenIdentifier>();
+          new Token<>();
       token.decodeFromUrlString(delegation.getValue());
       SecurityUtil.setTokenService(token, nnRpcAddr);
       token.setKind(DelegationTokenIdentifier.HDFS_DELEGATION_KIND);

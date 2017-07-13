@@ -33,7 +33,7 @@ public class RenameOptionSetParam extends EnumSetParam<Options.Rename> {
   public static final String DEFAULT = "";
 
   private static final Domain<Options.Rename> DOMAIN =
-      new Domain<Options.Rename>(NAME, Options.Rename.class);
+      new Domain<>(NAME, Options.Rename.class);
 
   /**
    * Constructor.

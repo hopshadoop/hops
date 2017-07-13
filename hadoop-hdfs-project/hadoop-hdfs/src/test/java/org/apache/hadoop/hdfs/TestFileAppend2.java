@@ -76,7 +76,7 @@ public class TestFileAppend2 {
    * **
    */
   Workload[] workload = null;
-  final ArrayList<Path> testFiles = new ArrayList<Path>();
+  final ArrayList<Path> testFiles = new ArrayList<>();
   volatile static boolean globalStatus = true;
 
   /**

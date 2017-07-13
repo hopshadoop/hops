@@ -40,7 +40,7 @@ public class TestLightWeightHashSet {
 
   private static final Log LOG =
       LogFactory.getLog("org.apache.hadoop.hdfs.TestLightWeightHashSet");
-  private ArrayList<Integer> list = new ArrayList<Integer>();
+  private ArrayList<Integer> list = new ArrayList<>();
   private final int NUM = 100;
   private LightWeightHashSet<Integer> set;
   private Random rand;
@@ -55,7 +55,7 @@ public class TestLightWeightHashSet {
     for (int i = 0; i < NUM; i++) {
       list.add(rand.nextInt());
     }
-    set = new LightWeightHashSet<Integer>(initCapacity, maxF, minF);
+    set = new LightWeightHashSet<>(initCapacity, maxF, minF);
   }
 
   @Test
@@ -343,16 +343,16 @@ public class TestLightWeightHashSet {
     float minF = LightWeightHashSet.DEFAUT_MIN_LOAD_FACTOR;
 
     // capacity lower than min_capacity
-    set = new LightWeightHashSet<Integer>(1, maxF, minF);
+    set = new LightWeightHashSet<>(1, maxF, minF);
     assertEquals(LightWeightHashSet.MINIMUM_CAPACITY, set.getCapacity());
 
     // capacity not a power of two
-    set = new LightWeightHashSet<Integer>(30, maxF, minF);
+    set = new LightWeightHashSet<>(30, maxF, minF);
     assertEquals(Math.max(LightWeightHashSet.MINIMUM_CAPACITY, 32),
         set.getCapacity());
 
     // capacity valid
-    set = new LightWeightHashSet<Integer>(64, maxF, minF);
+    set = new LightWeightHashSet<>(64, maxF, minF);
     assertEquals(Math.max(LightWeightHashSet.MINIMUM_CAPACITY, 64),
         set.getCapacity());
 
@@ -387,7 +387,7 @@ public class TestLightWeightHashSet {
     assertTrue(set.isEmpty());
 
     // remove sublist
-    List<Integer> sub = new LinkedList<Integer>();
+    List<Integer> sub = new LinkedList<>();
     for (int i = 0; i < 10; i++) {
       sub.add(list.get(i));
     }
@@ -403,7 +403,7 @@ public class TestLightWeightHashSet {
     assertFalse(set.containsAll(sub));
 
     // the rest of the elements should be there
-    List<Integer> sub2 = new LinkedList<Integer>();
+    List<Integer> sub2 = new LinkedList<>();
     for (int i = 10; i < NUM; i++) {
       sub2.add(list.get(i));
     }
@@ -412,17 +412,17 @@ public class TestLightWeightHashSet {
     // to array
     Integer[] array = set.toArray(new Integer[0]);
     assertEquals(NUM - 10, array.length);
-    for (int i = 0; i < array.length; i++) {
-      assertTrue(sub2.contains(array[i]));
+    for (Integer anArray : array) {
+      assertTrue(sub2.contains(anArray));
     }
     assertEquals(NUM - 10, set.size());
 
     // to array
     Object[] array2 = set.toArray();
     assertEquals(NUM - 10, array2.length);
-
-    for (int i = 0; i < array2.length; i++) {
-      assertTrue(sub2.contains((Integer) array2[i]));
+  
+    for (Object anArray2 : array2) {
+      assertTrue(sub2.contains((Integer) anArray2));
     }
 
     LOG.info("Test other - DONE");
@@ -431,7 +431,7 @@ public class TestLightWeightHashSet {
   @Test
   public void testGetElement() {
     LightWeightHashSet<TestObject> objSet =
-        new LightWeightHashSet<TestObject>();
+        new LightWeightHashSet<>();
     TestObject objA = new TestObject("object A");
     TestObject equalToObjA = new TestObject("object A");
     TestObject objB = new TestObject("object B");

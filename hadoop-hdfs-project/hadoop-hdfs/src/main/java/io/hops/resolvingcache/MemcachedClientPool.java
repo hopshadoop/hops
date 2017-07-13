@@ -30,7 +30,7 @@ public class MemcachedClientPool {
 
   public MemcachedClientPool(int poolSize, String server) throws IOException {
     this.index = 0;
-    this.clients = new ArrayList<MemcachedClient>();
+    this.clients = new ArrayList<>();
     for (int i = 0; i < poolSize; i++) {
       this.clients.add(new MemcachedClient(new BinaryConnectionFactory(),
           AddrUtil.getAddresses(server.trim())));

@@ -101,8 +101,6 @@ public class RootINodeCache {
           }
         } catch (InterruptedException e) {
           e.printStackTrace();
-        } catch (StorageException e) {
-          e.printStackTrace();
         } catch (IOException e) {
           e.printStackTrace();
         }

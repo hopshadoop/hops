@@ -37,7 +37,7 @@ public class TestJettyHelper implements MethodRule {
   }
 
   private static ThreadLocal<Server> TEST_SERVLET_TL =
-      new InheritableThreadLocal<Server>();
+      new InheritableThreadLocal<>();
 
   @Override
   public Statement apply(final Statement statement,

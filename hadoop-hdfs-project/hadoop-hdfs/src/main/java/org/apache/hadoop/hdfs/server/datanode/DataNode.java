@@ -1290,8 +1290,8 @@ public class DataNode extends Configured
     if (numTargets > 0) {
       if (LOG.isInfoEnabled()) {
         StringBuilder xfersBuilder = new StringBuilder();
-        for (int i = 0; i < numTargets; i++) {
-          xfersBuilder.append(xferTargets[i]);
+        for (DatanodeInfo xferTarget : xferTargets) {
+          xfersBuilder.append(xferTarget);
           xfersBuilder.append(" ");
         }
         LOG.info(bpReg + " Starting thread to transfer " +
@@ -1693,7 +1693,7 @@ public class DataNode extends Configured
   // DataNode ctor expects AbstractList instead of List or Collection...
   static ArrayList<File> getDataDirsFromURIs(Collection<URI> dataDirs,
       LocalFileSystem localFS, FsPermission permission) throws IOException {
-    ArrayList<File> dirs = new ArrayList<File>();
+    ArrayList<File> dirs = new ArrayList<>();
     StringBuilder invalidDirs = new StringBuilder();
     for (URI dirURI : dataDirs) {
       if (!"file".equalsIgnoreCase(dirURI.getScheme())) {
@@ -1921,7 +1921,7 @@ public class DataNode extends Configured
     ExtendedBlock block = rBlock.getBlock();
     String blookPoolId = block.getBlockPoolId();
     DatanodeID[] datanodeids = rBlock.getLocations();
-    List<BlockRecord> syncList = new ArrayList<BlockRecord>(datanodeids.length);
+    List<BlockRecord> syncList = new ArrayList<>(datanodeids.length);
     int errorCount = 0;
 
     //check generation stamps
@@ -2030,7 +2030,7 @@ public class DataNode extends Configured
 
     // Calculate list of nodes that will participate in the recovery
     // and the new block size
-    List<BlockRecord> participatingList = new ArrayList<BlockRecord>();
+    List<BlockRecord> participatingList = new ArrayList<>();
     final ExtendedBlock newBlock =
         new ExtendedBlock(bpid, block.getBlockId(), -1, recoveryId);
     switch (bestState) {
@@ -2062,8 +2062,8 @@ public class DataNode extends Configured
         assert false : "bad replica state: " + bestState;
     }
 
-    List<DatanodeID> failedList = new ArrayList<DatanodeID>();
-    final List<BlockRecord> successList = new ArrayList<BlockRecord>();
+    List<DatanodeID> failedList = new ArrayList<>();
+    final List<BlockRecord> successList = new ArrayList<>();
     for (BlockRecord r : participatingList) {
       try {
         r.updateReplicaUnderRecovery(bpid, recoveryId, newBlock.getNumBytes());
@@ -2233,7 +2233,7 @@ public class DataNode extends Configured
    */
   @Override // DataNodeMXBean
   public String getNamenodeAddresses() {
-    final Map<String, String> info = new HashMap<String, String>();
+    final Map<String, String> info = new HashMap<>();
     for (BPOfferService bpos : blockPoolManager.getAllNamenodeThreads()) {
       if (bpos != null) {
         for (BPServiceActor actor : bpos.getBPServiceActors()) {

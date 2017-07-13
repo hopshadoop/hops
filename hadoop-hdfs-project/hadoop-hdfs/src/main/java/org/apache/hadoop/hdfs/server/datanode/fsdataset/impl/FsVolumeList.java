@@ -119,7 +119,7 @@ class FsVolumeList {
     ArrayList<FsVolumeImpl> removedVols = null;
     
     // Make a copy of volumes for performing modification 
-    final List<FsVolumeImpl> volumeList = new ArrayList<FsVolumeImpl>(volumes);
+    final List<FsVolumeImpl> volumeList = new ArrayList<>(volumes);
 
     for (Iterator<FsVolumeImpl> i = volumeList.iterator(); i.hasNext(); ) {
       final FsVolumeImpl fsv = i.next();
@@ -128,7 +128,7 @@ class FsVolumeList {
       } catch (DiskErrorException e) {
         FsDatasetImpl.LOG.warn("Removing failed volume " + fsv + ": ", e);
         if (removedVols == null) {
-          removedVols = new ArrayList<FsVolumeImpl>(1);
+          removedVols = new ArrayList<>(1);
         }
         removedVols.add(fsv);
         fsv.shutdown();

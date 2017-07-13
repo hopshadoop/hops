@@ -196,7 +196,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     }
 
     final List<FsVolumeImpl> volArray =
-        new ArrayList<FsVolumeImpl>(storage.getNumStorageDirs());
+        new ArrayList<>(storage.getNumStorageDirs());
     for (int idx = 0; idx < storage.getNumStorageDirs(); idx++) {
       final File dir = storage.getStorageDir(idx).getCurrentDir();
       volArray.add(new FsVolumeImpl(this, storage.getStorageID(), dir, conf));
@@ -975,8 +975,8 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   @Override // FsDatasetSpi
   public BlockListAsLongs getBlockReport(String bpid) {
     int size = volumeMap.size(bpid);
-    ArrayList<ReplicaInfo> finalized = new ArrayList<ReplicaInfo>(size);
-    ArrayList<ReplicaInfo> uc = new ArrayList<ReplicaInfo>();
+    ArrayList<ReplicaInfo> finalized = new ArrayList<>(size);
+    ArrayList<ReplicaInfo> uc = new ArrayList<>();
     if (size == 0) {
       return new BlockListAsLongs(finalized, uc);
     }
@@ -1010,7 +1010,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
    */
   @Override
   public synchronized List<Block> getFinalizedBlocks(String bpid) {
-    ArrayList<Block> finalized = new ArrayList<Block>(volumeMap.size(bpid));
+    ArrayList<Block> finalized = new ArrayList<>(volumeMap.size(bpid));
 
     if (volumeMap.replicas(bpid) != null) {
 
@@ -1108,40 +1108,40 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   @Override // FsDatasetSpi
   public void invalidate(String bpid, Block invalidBlks[]) throws IOException {
     boolean error = false;
-    for (int i = 0; i < invalidBlks.length; i++) {
+    for (Block invalidBlk : invalidBlks) {
       final File f;
       final FsVolumeImpl v;
       synchronized (this) {
-        f = getFile(bpid, invalidBlks[i].getBlockId());
-        ReplicaInfo info = volumeMap.get(bpid, invalidBlks[i]);
+        f = getFile(bpid, invalidBlk.getBlockId());
+        ReplicaInfo info = volumeMap.get(bpid, invalidBlk);
         if (info == null) {
-          LOG.warn("Failed to delete replica " + invalidBlks[i] +
+          LOG.warn("Failed to delete replica " + invalidBlk +
               ": ReplicaInfo not found.");
           error = true;
           continue;
         }
-        if (info.getGenerationStamp() != invalidBlks[i].getGenerationStamp()) {
-          LOG.warn("Failed to delete replica " + invalidBlks[i] +
+        if (info.getGenerationStamp() != invalidBlk.getGenerationStamp()) {
+          LOG.warn("Failed to delete replica " + invalidBlk +
               ": GenerationStamp not matched, info=" + info);
           error = true;
           continue;
         }
         v = (FsVolumeImpl) info.getVolume();
         if (f == null) {
-          LOG.warn("Failed to delete replica " + invalidBlks[i] +
+          LOG.warn("Failed to delete replica " + invalidBlk +
               ": File not found, volume=" + v);
           error = true;
           continue;
         }
         if (v == null) {
-          LOG.warn("Failed to delete replica " + invalidBlks[i] +
+          LOG.warn("Failed to delete replica " + invalidBlk +
               ". No volume for this replica, file=" + f + ".");
           error = true;
           continue;
         }
         File parent = f.getParentFile();
         if (parent == null) {
-          LOG.warn("Failed to delete replica " + invalidBlks[i] +
+          LOG.warn("Failed to delete replica " + invalidBlk +
               ". Parent not found for file " + f + ".");
           error = true;
           continue;
@@ -1153,13 +1153,13 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
                     ReplicaState.FINALIZED)) {
           v.clearPath(bpid, parent);
         }
-        volumeMap.remove(bpid, invalidBlks[i]);
+        volumeMap.remove(bpid, invalidBlk);
       }
-
+    
       // Delete the block asynchronously to make sure we can do it fast enough
       asyncDiskService.deleteAsync(v, f,
-          FsDatasetUtil.getMetaFile(f, invalidBlks[i].getGenerationStamp()),
-          new ExtendedBlock(bpid, invalidBlks[i]));
+          FsDatasetUtil.getMetaFile(f, invalidBlk.getGenerationStamp()),
+          new ExtendedBlock(bpid, invalidBlk));
     }
     if (error) {
       throw new IOException("Error in deleting blocks.");
@@ -1679,7 +1679,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   }
 
   private Collection<VolumeInfo> getVolumeInfo() {
-    Collection<VolumeInfo> info = new ArrayList<VolumeInfo>();
+    Collection<VolumeInfo> info = new ArrayList<>();
     for (FsVolumeImpl volume : volumes.volumes) {
       long used = 0;
       long free = 0;
@@ -1699,10 +1699,10 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
 
   @Override
   public Map<String, Object> getVolumeInfoMap() {
-    final Map<String, Object> info = new HashMap<String, Object>();
+    final Map<String, Object> info = new HashMap<>();
     Collection<VolumeInfo> volumes = getVolumeInfo();
     for (VolumeInfo v : volumes) {
-      final Map<String, Object> innerInfo = new HashMap<String, Object>();
+      final Map<String, Object> innerInfo = new HashMap<>();
       innerInfo.put("usedSpace", v.usedSpace);
       innerInfo.put("freeSpace", v.freeSpace);
       innerInfo.put("reservedSpace", v.reservedSpace);
@@ -1745,18 +1745,17 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       throws IOException {
     // List of VolumeIds, one per volume on the datanode
     List<byte[]> blocksVolumeIds =
-        new ArrayList<byte[]>(volumes.volumes.size());
+        new ArrayList<>(volumes.volumes.size());
     // List of indexes into the list of VolumeIds, pointing at the VolumeId of
     // the volume that the block is on
-    List<Integer> blocksVolumeIndexes = new ArrayList<Integer>(blocks.size());
+    List<Integer> blocksVolumeIndexes = new ArrayList<>(blocks.size());
     // Initialize the list of VolumeIds simply by enumerating the volumes
     for (int i = 0; i < volumes.volumes.size(); i++) {
       blocksVolumeIds.add(ByteBuffer.allocate(4).putInt(i).array());
     }
     // Determine the index of the VolumeId of each block's volume, by comparing 
     // the block's volume against the enumerated volumes
-    for (int i = 0; i < blocks.size(); i++) {
-      ExtendedBlock block = blocks.get(i);
+    for (ExtendedBlock block : blocks) {
       FsVolumeSpi blockVolume = getReplicaInfo(block).getVolume();
       boolean isValid = false;
       int volumeIndex = 0;

@@ -189,12 +189,12 @@ class NamenodeJspHelper {
     String leaderhost = getCanonicalHostName(activeNodeList.getLeader()
         .getIpAddress());
     
-    Map<String, ActiveNode> activeNodes = new HashMap<String, ActiveNode>();
+    Map<String, ActiveNode> activeNodes = new HashMap<>();
     for(ActiveNode node : list){
       activeNodes.put(getCanonicalHostName(node.getIpAddress()), node);
     }
     
-    SortedSet<String> keys = new TreeSet<String>(activeNodes.keySet());
+    SortedSet<String> keys = new TreeSet<>(activeNodes.keySet());
     StringBuilder sb = new StringBuilder("");
     int i = 0;
     for(String key : keys){
@@ -280,8 +280,8 @@ class NamenodeJspHelper {
         HttpServletRequest request) throws IOException {
       FSNamesystem fsn = nn.getNamesystem();
       final DatanodeManager dm = fsn.getBlockManager().getDatanodeManager();
-      final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
-      final List<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+      final List<DatanodeDescriptor> live = new ArrayList<>();
+      final List<DatanodeDescriptor> dead = new ArrayList<>();
       dm.fetchDatanodes(live, dead, true);
 
       int liveDecommissioned = 0;
@@ -621,8 +621,8 @@ class NamenodeJspHelper {
       final FSNamesystem ns = nn.getNamesystem();
       final DatanodeManager dm = ns.getBlockManager().getDatanodeManager();
 
-      final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
-      final List<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+      final List<DatanodeDescriptor> live = new ArrayList<>();
+      final List<DatanodeDescriptor> dead = new ArrayList<>();
       dm.fetchDatanodes(live, dead, true);
 
       InetSocketAddress nnSocketAddress = (InetSocketAddress) context
@@ -709,8 +709,8 @@ class NamenodeJspHelper {
                 nodeHeaderStr("volfails") + "> Failed Volumes\n");
 
             JspHelper.sortNodeList(live, sorterField, sorterOrder);
-            for (int i = 0; i < live.size(); i++) {
-              generateNodeData(out, live.get(i), port_suffix, true, nnHttpPort,
+            for (DatanodeDescriptor aLive : live) {
+              generateNodeData(out, aLive, port_suffix, true, nnHttpPort,
                   nnaddr);
             }
           }
@@ -727,8 +727,8 @@ class NamenodeJspHelper {
                     nodeHeaderStr("decommissioned") + "> Decommissioned\n");
 
             JspHelper.sortNodeList(dead, sorterField, sorterOrder);
-            for (int i = 0; i < dead.size(); i++) {
-              generateNodeData(out, dead.get(i), port_suffix, false, nnHttpPort,
+            for (DatanodeDescriptor aDead : dead) {
+              generateNodeData(out, aDead, port_suffix, false, nnHttpPort,
                   nnaddr);
             }
 
@@ -755,8 +755,8 @@ class NamenodeJspHelper {
                     "> Time Since Decommissioning Started");
 
             JspHelper.sortNodeList(decommissioning, "name", "ASC");
-            for (int i = 0; i < decommissioning.size(); i++) {
-              generateDecommissioningNodeData(out, decommissioning.get(i),
+            for (DatanodeDescriptor aDecommissioning : decommissioning) {
+              generateDecommissioningNodeData(out, aDecommissioning,
                   port_suffix, true, nnHttpPort, nnaddr);
             }
             out.print("</table>\n");

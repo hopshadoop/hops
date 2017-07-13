@@ -172,9 +172,9 @@ public class TestInjectionForSimulatedStorage {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes * 2)
           .format(false).build();
       cluster.waitActive();
-      Set<Block> uniqueBlocks = new HashSet<Block>();
-      for (int i = 0; i < blocksList.length; ++i) {
-        for (Block b : blocksList[i]) {
+      Set<Block> uniqueBlocks = new HashSet<>();
+      for (Iterable<Block> aBlocksList : blocksList) {
+        for (Block b : aBlocksList) {
           uniqueBlocks.add(new Block(b));
         }
       }

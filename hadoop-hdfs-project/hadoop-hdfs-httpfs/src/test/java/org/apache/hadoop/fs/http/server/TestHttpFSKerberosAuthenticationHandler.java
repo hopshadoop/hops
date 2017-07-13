@@ -153,7 +153,7 @@ public class TestHttpFSKerberosAuthenticationHandler extends HFSTestCase {
     tokenStr = (String) json
         .get(HttpFSKerberosAuthenticator.DELEGATION_TOKEN_URL_STRING_JSON);
     Token<DelegationTokenIdentifier> dt =
-        new Token<DelegationTokenIdentifier>();
+        new Token<>();
     dt.decodeFromUrlString(tokenStr);
     HttpFSServerWebApp.get().get(DelegationTokenManager.class).verifyToken(dt);
   }

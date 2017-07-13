@@ -78,7 +78,7 @@ public class TestDelegationTokenForProxyUser {
   
   private void configureSuperUserIPAddresses(Configuration conf,
       String superUserShortName) throws IOException {
-    ArrayList<String> ipList = new ArrayList<String>();
+    ArrayList<String> ipList = new ArrayList<>();
     Enumeration<NetworkInterface> netInterfaceList =
         NetworkInterface.getNetworkInterfaces();
     while (netInterfaceList.hasMoreElements()) {

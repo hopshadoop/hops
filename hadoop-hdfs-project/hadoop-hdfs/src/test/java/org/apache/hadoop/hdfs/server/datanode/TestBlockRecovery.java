@@ -131,7 +131,7 @@ public class TestBlockRecovery {
     conf.setInt(CommonConfigurationKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 0);
     FileSystem.setDefaultUri(conf,
         "hdfs://" + NN_ADDR.getHostName() + ":" + NN_ADDR.getPort());
-    ArrayList<File> dirs = new ArrayList<File>();
+    ArrayList<File> dirs = new ArrayList<>();
     File dataDir = new File(DATA_DIR);
     FileUtil.fullyDelete(dataDir);
     dataDir.mkdirs();
@@ -168,7 +168,7 @@ public class TestBlockRecovery {
 
       @Override
       public List<ActiveNode> getActiveNodes() {
-        return new ArrayList<ActiveNode>();
+        return new ArrayList<>();
       }
 
       @Override
@@ -246,7 +246,7 @@ public class TestBlockRecovery {
     DatanodeInfo[] locs =
         new DatanodeInfo[]{mock(DatanodeInfo.class), mock(DatanodeInfo.class)};
     RecoveringBlock rBlock = new RecoveringBlock(block, locs, RECOVERY_ID);
-    ArrayList<BlockRecord> syncList = new ArrayList<BlockRecord>(2);
+    ArrayList<BlockRecord> syncList = new ArrayList<>(2);
     BlockRecord record1 =
         new BlockRecord(DFSTestUtil.getDatanodeInfo("1.2.3.4", "bogus", 1234),
             dn1, replica1);
@@ -479,7 +479,7 @@ public class TestBlockRecovery {
 
   private Collection<RecoveringBlock> initRecoveringBlocks()
       throws IOException {
-    Collection<RecoveringBlock> blocks = new ArrayList<RecoveringBlock>(1);
+    Collection<RecoveringBlock> blocks = new ArrayList<>(1);
     DatanodeInfo mockOtherDN = DFSTestUtil.getLocalDatanodeInfo();
     DatanodeInfo[] locs = new DatanodeInfo[]{
         new DatanodeInfo(dn.getDNRegistrationForBP(block.getBlockPoolId())),
@@ -560,7 +560,7 @@ public class TestBlockRecovery {
 
   private List<BlockRecord> initBlockRecords(DataNode spyDN)
       throws IOException {
-    List<BlockRecord> blocks = new ArrayList<BlockRecord>(1);
+    List<BlockRecord> blocks = new ArrayList<>(1);
     DatanodeRegistration dnR =
         dn.getDNRegistrationForBP(block.getBlockPoolId());
     BlockRecord blockRecord = new BlockRecord(new DatanodeID(dnR), spyDN,

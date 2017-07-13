@@ -370,7 +370,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
   private List<List<Block>> chooseUnderReplicatedBlocksInt(int blocksToProcess)
       throws IOException {
     // initialize data structure for the return value
-    List<List<Block>> blocksToReplicate = new ArrayList<List<Block>>(LEVEL);
+    List<List<Block>> blocksToReplicate = new ArrayList<>(LEVEL);
     for (int i = 0; i < LEVEL; i++) {
       blocksToReplicate.add(new ArrayList<Block>());
     }
@@ -470,7 +470,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     private int level;
     private boolean isIteratorForLevel = false;
     private final List<Iterator<Block>> iterators =
-        new ArrayList<Iterator<Block>>();
+        new ArrayList<>();
     
     /**
      * Construct an iterator over all queues.
@@ -622,7 +622,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
   }
   
   private List<List<Block>> createPrioriryQueue() {
-    List<List<Block>> priorityQueuestmp = new ArrayList<List<Block>>();
+    List<List<Block>> priorityQueuestmp = new ArrayList<>();
     for (int i = 0; i < LEVEL; i++) {
       priorityQueuestmp.add(new ArrayList<Block>());
     }
@@ -670,7 +670,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     final long[] blockIds = new long[allUrb.size()];
     final int[] inodeIds = new int[allUrb.size()];
     final HashMap<Long, UnderReplicatedBlock> allUrbHashMap =
-        new HashMap<Long, UnderReplicatedBlock>();
+        new HashMap<>();
     for (int i = 0; i < allUrb.size(); i++) {
       UnderReplicatedBlock b = allUrb.get(i);
       blockIds[i] = b.getBlockId();

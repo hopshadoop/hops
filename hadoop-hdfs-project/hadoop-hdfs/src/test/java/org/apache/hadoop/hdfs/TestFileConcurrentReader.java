@@ -207,7 +207,7 @@ public class TestFileConcurrentReader {
     final int requiredSuccessfulOpens = 100;
     final Path file = new Path("/file1");
     final AtomicBoolean openerDone = new AtomicBoolean(false);
-    final AtomicReference<String> errorMessage = new AtomicReference<String>();
+    final AtomicReference<String> errorMessage = new AtomicReference<>();
     final FSDataOutputStream out = fileSystem.create(file);
     
     final Thread writer = new Thread(new Runnable() {

@@ -231,8 +231,8 @@ public class ClientDatanodeProtocolTranslatorPB
       List<Token<BlockTokenIdentifier>> tokens) throws IOException {
     // Convert to proto objects
     List<ExtendedBlockProto> blocksProtos =
-        new ArrayList<ExtendedBlockProto>(blocks.size());
-    List<TokenProto> tokensProtos = new ArrayList<TokenProto>(tokens.size());
+        new ArrayList<>(blocks.size());
+    List<TokenProto> tokensProtos = new ArrayList<>(tokens.size());
     for (ExtendedBlock b : blocks) {
       blocksProtos.add(PBHelper.convert(b));
     }
@@ -252,7 +252,7 @@ public class ClientDatanodeProtocolTranslatorPB
     }
     // List of volumes in the response
     List<ByteString> volumeIdsByteStrings = response.getVolumeIdsList();
-    List<byte[]> volumeIds = new ArrayList<byte[]>(volumeIdsByteStrings.size());
+    List<byte[]> volumeIds = new ArrayList<>(volumeIdsByteStrings.size());
     for (ByteString bs : volumeIdsByteStrings) {
       volumeIds.add(bs.toByteArray());
     }

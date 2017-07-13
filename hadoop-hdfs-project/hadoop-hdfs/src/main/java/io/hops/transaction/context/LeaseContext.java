@@ -32,7 +32,7 @@ import java.util.Map;
 public class LeaseContext extends BaseEntityContext<String, Lease> {
 
   private final LeaseDataAccess<Lease> dataAccess;
-  private final Map<Integer, Lease> idToLease = new HashMap<Integer, Lease>();
+  private final Map<Integer, Lease> idToLease = new HashMap<>();
 
   public LeaseContext(LeaseDataAccess<Lease> dataAccess) {
     this.dataAccess = dataAccess;

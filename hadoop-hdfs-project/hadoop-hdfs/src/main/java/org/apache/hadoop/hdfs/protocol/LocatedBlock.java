@@ -42,7 +42,7 @@ public class LocatedBlock {
   // their locations are not part of this object
   private boolean corrupt;
   private Token<BlockTokenIdentifier> blockToken =
-      new Token<BlockTokenIdentifier>();
+      new Token<>();
 
   private byte[] data = null;
 

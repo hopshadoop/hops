@@ -99,7 +99,7 @@ public class TestBlockReportLoadBalancing2 {
     DFSTestUtil.createFile(fs, filePath, FILE_SIZE, (short)1, 0);
     LOG.debug(METHOD_NAME+" Files are created");
 
-    final List<Long>  history = new ArrayList<Long>();
+    final List<Long>  history = new ArrayList<>();
     GenericTestUtils.DelayAnswer responder = new GenericTestUtils.DelayAnswer(LOG) {
       @Override
       protected Object passThrough(InvocationOnMock invocation)

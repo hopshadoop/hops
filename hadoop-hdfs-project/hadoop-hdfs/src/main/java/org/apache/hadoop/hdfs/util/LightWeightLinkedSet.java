@@ -98,7 +98,7 @@ public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
     size++;
 
     // update bucket linked list
-    DoubleLinkedElement<T> le = new DoubleLinkedElement<T>(element, hashCode);
+    DoubleLinkedElement<T> le = new DoubleLinkedElement<>(element, hashCode);
     le.next = entries[index];
     entries[index] = le;
 
@@ -172,7 +172,7 @@ public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
       // if we need to remove all elements then do fast polling
       return pollAll();
     }
-    List<T> retList = new ArrayList<T>(n);
+    List<T> retList = new ArrayList<>(n);
     while (n-- > 0 && head != null) {
       T curr = head.element;
       this.removeElem(curr);
@@ -189,7 +189,7 @@ public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
    */
   @Override
   public List<T> pollAll() {
-    List<T> retList = new ArrayList<T>(size);
+    List<T> retList = new ArrayList<>(size);
     while (head != null) {
       retList.add(head.element);
       head = head.after;

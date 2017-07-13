@@ -104,9 +104,9 @@ public class BlockPoolSliceStorage extends Storage {
 
     // 1. For each BP data directory analyze the state and
     // check whether all is consistent before transitioning.
-    this.storageDirs = new ArrayList<StorageDirectory>(dataDirs.size());
+    this.storageDirs = new ArrayList<>(dataDirs.size());
     ArrayList<StorageState> dataDirStates =
-        new ArrayList<StorageState>(dataDirs.size());
+        new ArrayList<>(dataDirs.size());
     for (Iterator<File> it = dataDirs.iterator(); it.hasNext(); ) {
       File dataDir = it.next();
       StorageDirectory sd = new StorageDirectory(dataDir, null, false);

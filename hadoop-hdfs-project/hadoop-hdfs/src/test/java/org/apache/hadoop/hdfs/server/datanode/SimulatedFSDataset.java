@@ -319,7 +319,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
    */
   private static class SimulatedStorage {
     private Map<String, SimulatedBPStorage> map =
-        new HashMap<String, SimulatedBPStorage>();
+        new HashMap<>();
     private long capacity;  // in bytes
     
     synchronized long getFree() {
@@ -384,7 +384,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   }
   
   private final Map<String, Map<Block, BInfo>> blockMap =
-      new HashMap<String, Map<Block, BInfo>>();
+      new HashMap<>();
   private final SimulatedStorage storage;
   private final String storageId;
   
@@ -416,7 +416,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
       }
       Map<Block, BInfo> map = blockMap.get(bpid);
       if (map == null) {
-        map = new HashMap<Block, BInfo>();
+        map = new HashMap<>();
         blockMap.put(bpid, map);
       }
       
@@ -457,7 +457,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
   @Override
   public synchronized BlockListAsLongs getBlockReport(String bpid) {
-    final List<Block> blocks = new ArrayList<Block>();
+    final List<Block> blocks = new ArrayList<>();
     final Map<Block, BInfo> map = blockMap.get(bpid);
     if (map != null) {
       for (BInfo b : map.values()) {
@@ -927,7 +927,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
   @Override // FsDatasetSpi
   public void addBlockPool(String bpid, Configuration conf) {
-    Map<Block, BInfo> map = new HashMap<Block, BInfo>();
+    Map<Block, BInfo> map = new HashMap<>();
     blockMap.put(bpid, map);
     storage.addBlockPool(bpid);
   }

@@ -32,7 +32,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
   // Test the Round-Robin block-volume choosing algorithm.
   @Test
   public void testRR() throws Exception {
-    final List<FsVolumeSpi> volumes = new ArrayList<FsVolumeSpi>();
+    final List<FsVolumeSpi> volumes = new ArrayList<>();
 
     // First volume, with 100 bytes of space.
     volumes.add(Mockito.mock(FsVolumeSpi.class));
@@ -69,7 +69,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
   // with volume and block sizes in exception message.
   @Test
   public void testRRPolicyExceptionMessage() throws Exception {
-    final List<FsVolumeSpi> volumes = new ArrayList<FsVolumeSpi>();
+    final List<FsVolumeSpi> volumes = new ArrayList<>();
 
     // First volume, with 500 bytes of space.
     volumes.add(Mockito.mock(FsVolumeSpi.class));
@@ -80,7 +80,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
     Mockito.when(volumes.get(1).getAvailable()).thenReturn(600L);
 
     final RoundRobinVolumeChoosingPolicy<FsVolumeSpi> policy =
-        new RoundRobinVolumeChoosingPolicy<FsVolumeSpi>();
+        new RoundRobinVolumeChoosingPolicy<>();
     int blockSize = 700;
     try {
       policy.chooseVolume(volumes, blockSize);

@@ -74,7 +74,7 @@ public class TestDataNodeVolumeFailure {
   }
 
   // block id to BlockLocs
-  Map<String, BlockLocs> block_map = new HashMap<String, BlockLocs>();
+  Map<String, BlockLocs> block_map = new HashMap<>();
 
   @Before
   public void setUp() throws Exception {

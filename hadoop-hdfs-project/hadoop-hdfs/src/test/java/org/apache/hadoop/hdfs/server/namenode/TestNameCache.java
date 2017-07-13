@@ -31,7 +31,7 @@ public class TestNameCache {
   @Test
   public void testDictionary() throws Exception {
     // Create dictionary with useThreshold 2
-    NameCache<String> cache = new NameCache<String>(2);
+    NameCache<String> cache = new NameCache<>(2);
     String[] matching = {"part1", "part10000000", "fileabc", "abc", "filepart"};
     String[] notMatching = {"spart1", "apart", "abcd", "def"};
 

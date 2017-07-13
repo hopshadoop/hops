@@ -55,12 +55,12 @@ public class TestHftpDelegationToken {
     UserGroupInformation.setConfiguration(conf);
     UserGroupInformation user = UserGroupInformation
         .createUserForTesting("oom", new String[]{"memory"});
-    Token<?> token = new Token<TokenIdentifier>(new byte[0], new byte[0],
+    Token<?> token = new Token<>(new byte[0], new byte[0],
         DelegationTokenIdentifier.HDFS_DELEGATION_KIND,
         new Text("127.0.0.1:8020"));
     user.addToken(token);
     Token<?> token2 =
-        new Token<TokenIdentifier>(null, null, new Text("other token"),
+        new Token<>(null, null, new Text("other token"),
             new Text("127.0.0.1:8021"));
     user.addToken(token2);
     assertEquals("wrong tokens in user", 2, user.getTokens().size());
@@ -201,7 +201,7 @@ public class TestHftpDelegationToken {
     SecurityUtilTestHelper.setTokenServiceUseIp(true);
 
     // test fallback to hdfs token
-    Token<?> hdfsToken = new Token<TokenIdentifier>(new byte[0], new byte[0],
+    Token<?> hdfsToken = new Token<>(new byte[0], new byte[0],
         DelegationTokenIdentifier.HDFS_DELEGATION_KIND,
         new Text("127.0.0.1:8020"));
     ugi.addToken(hdfsToken);
@@ -212,7 +212,7 @@ public class TestHftpDelegationToken {
     assertEquals(hdfsToken, token);
 
     // test hftp is favored over hdfs
-    Token<?> hftpToken = new Token<TokenIdentifier>(new byte[0], new byte[0],
+    Token<?> hftpToken = new Token<>(new byte[0], new byte[0],
         HftpFileSystem.TOKEN_KIND, new Text("127.0.0.1:" + port));
     ugi.addToken(hftpToken);
     token = fs.selectDelegationToken(ugi);
@@ -225,7 +225,7 @@ public class TestHftpDelegationToken {
     assertNull(token);
     
     // test fallback to hdfs token
-    hdfsToken = new Token<TokenIdentifier>(new byte[0], new byte[0],
+    hdfsToken = new Token<>(new byte[0], new byte[0],
         DelegationTokenIdentifier.HDFS_DELEGATION_KIND,
         new Text("localhost:8020"));
     ugi.addToken(hdfsToken);
@@ -234,7 +234,7 @@ public class TestHftpDelegationToken {
     assertEquals(hdfsToken, token);
 
     // test hftp is favored over hdfs
-    hftpToken = new Token<TokenIdentifier>(new byte[0], new byte[0],
+    hftpToken = new Token<>(new byte[0], new byte[0],
         HftpFileSystem.TOKEN_KIND, new Text("localhost:" + port));
     ugi.addToken(hftpToken);
     token = fs.selectDelegationToken(ugi);

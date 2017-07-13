@@ -101,7 +101,7 @@ public class BlockManagerTestUtil {
    */
   private static int getNumberOfRacks(final BlockManager blockManager,
       final Block b) throws StorageException, TransactionContextException {
-    final Set<String> rackSet = new HashSet<String>(0);
+    final Set<String> rackSet = new HashSet<>(0);
     final Collection<DatanodeDescriptor> corruptNodes =
         getCorruptReplicas(blockManager)
             .getNodes(blockManager.blocksMap.getStoredBlock(b));

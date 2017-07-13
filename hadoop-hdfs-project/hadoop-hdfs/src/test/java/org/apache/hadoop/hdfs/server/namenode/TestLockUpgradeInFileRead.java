@@ -54,10 +54,9 @@ public class TestLockUpgradeInFileRead {
                                   // while holding the read lock
         ns.getBlockLocationsWithLock("client", file.toString(), 0, 1024, TransactionLockTypes.INodeLockType.READ);
         fail("The operation was expected to fail");
-      }catch(LockUpgradeException e){
-      }catch (InterruptedException e){
+      }catch(LockUpgradeException | InterruptedException e){
       }
-
+  
       try{
         // should succeed while holding the appropriate write lock
         ns.getBlockLocationsWithLock("client", file.toString(), 0, 1024, TransactionLockTypes.INodeLockType.WRITE);

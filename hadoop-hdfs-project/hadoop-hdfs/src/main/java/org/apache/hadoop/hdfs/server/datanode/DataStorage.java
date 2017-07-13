@@ -152,9 +152,9 @@ public class DataStorage extends Storage {
     // 1. For each data directory calculate its state and 
     // check whether all is consistent before transitioning.
     // Format and recover.
-    this.storageDirs = new ArrayList<StorageDirectory>(dataDirs.size());
+    this.storageDirs = new ArrayList<>(dataDirs.size());
     ArrayList<StorageState> dataDirStates =
-        new ArrayList<StorageState>(dataDirs.size());
+        new ArrayList<>(dataDirs.size());
     for (Iterator<File> it = dataDirs.iterator(); it.hasNext(); ) {
       File dataDir = it.next();
       StorageDirectory sd = new StorageDirectory(dataDir);
@@ -241,9 +241,8 @@ public class DataStorage extends Storage {
     recoverTransitionRead(datanode, nsInfo, dataDirs, startOpt);
     
     // Create list of storage directories for the block pool
-    Collection<File> bpDataDirs = new ArrayList<File>();
-    for (Iterator<File> it = dataDirs.iterator(); it.hasNext(); ) {
-      File dnRoot = it.next();
+    Collection<File> bpDataDirs = new ArrayList<>();
+    for (File dnRoot : dataDirs) {
       File bpRoot = BlockPoolSliceStorage
           .getBpRoot(bpID, new File(dnRoot, STORAGE_DIR_CURRENT));
       bpDataDirs.add(bpRoot);
@@ -766,8 +765,8 @@ public class DataStorage extends Storage {
             name.startsWith(COPY_FILE_PREFIX);
       }
     });
-    for (int i = 0; i < otherNames.length; i++) {
-      linkBlocks(new File(from, otherNames[i]), new File(to, otherNames[i]),
+    for (String otherName : otherNames) {
+      linkBlocks(new File(from, otherName), new File(to, otherName),
           oldLV, hl);
     }
   }
