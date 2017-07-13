@@ -157,7 +157,7 @@ public class TestBlockReplacement {
       
       assertTrue(newNode != null);
       DatanodeInfo source = null;
-      ArrayList<DatanodeInfo> proxies = new ArrayList<DatanodeInfo>(2);
+      ArrayList<DatanodeInfo> proxies = new ArrayList<>(2);
       for (DatanodeInfo node : datanodes) {
         if (node != newNode) {
           if (node.getNetworkLocation().equals(newNode.getNetworkLocation())) {

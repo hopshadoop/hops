@@ -73,7 +73,7 @@ public class TestNDBSizer {
       filename += "-";
     }
 
-    final List<INode> newFiles = new LinkedList<INode>();
+    final List<INode> newFiles = new LinkedList<>();
     for (int i = 0; i < NUM_INODES; i++) {
       INodeDirectory dir = new INodeDirectoryWithQuota("",
           new PermissionStatus("salman", "usr",
@@ -104,7 +104,7 @@ public class TestNDBSizer {
     System.out.println();
 
 
-    final List<BlockInfo> newBlocks = new LinkedList<BlockInfo>();
+    final List<BlockInfo> newBlocks = new LinkedList<>();
     for (int i = 0; i < NUM_BLOCKS; i++) {
       BlockInfo block = new BlockInfo();
       block.setINodeIdNoPersistance(i);
@@ -131,7 +131,7 @@ public class TestNDBSizer {
 
     System.out.println();
     
-    final List<Replica> replicas = new LinkedList<Replica>();
+    final List<Replica> replicas = new LinkedList<>();
     for (int i = 0; i < NUM_REPLICAS; i++) {
       replicas.add(new Replica(i, i, i));
       if (replicas.size() >= BATCH_SIZE) {

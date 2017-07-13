@@ -67,8 +67,8 @@ public class TestNamenodeCapacityReport {
           cluster.getNamesystem().getBlockManager().getDatanodeManager();
       
       // Ensure the data reported for each data node is right
-      final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
-      final List<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+      final List<DatanodeDescriptor> live = new ArrayList<>();
+      final List<DatanodeDescriptor> dead = new ArrayList<>();
       dm.fetchDatanodes(live, dead, false);
       
       assertTrue(live.size() == 1);

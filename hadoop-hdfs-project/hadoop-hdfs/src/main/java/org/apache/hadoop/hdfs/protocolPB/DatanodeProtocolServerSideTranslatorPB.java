@@ -124,9 +124,9 @@ public class DatanodeProtocolServerSideTranslatorPB
         HeartbeatResponseProto.newBuilder();
     DatanodeCommand[] cmds = response.getCommands();
     if (cmds != null) {
-      for (int i = 0; i < cmds.length; i++) {
-        if (cmds[i] != null) {
-          builder.addCmds(PBHelper.convert(cmds[i]));
+      for (DatanodeCommand cmd : cmds) {
+        if (cmd != null) {
+          builder.addCmds(PBHelper.convert(cmd));
         }
       }
     }

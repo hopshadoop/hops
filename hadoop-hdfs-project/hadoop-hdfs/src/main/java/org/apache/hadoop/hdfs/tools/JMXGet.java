@@ -195,10 +195,10 @@ public class JMXGet {
 
     // Query MBean names for specific domain "hadoop" and service
     ObjectName query = new ObjectName("Hadoop:service=" + service + ",*");
-    hadoopObjectNames = new ArrayList<ObjectName>(5);
+    hadoopObjectNames = new ArrayList<>(5);
     err("\nQuery MBeanServer MBeans:");
     Set<ObjectName> names =
-        new TreeSet<ObjectName>(mbsc.queryNames(query, null));
+        new TreeSet<>(mbsc.queryNames(query, null));
 
     for (ObjectName name : names) {
       hadoopObjectNames.add(name);

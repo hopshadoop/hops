@@ -827,12 +827,12 @@ public class TestFsck {
           if (blocks == null) {
             continue;
           }
-
-          for (int idx = 0; idx < blocks.length; idx++) {
-            if (!blocks[idx].getName().startsWith("blk_")) {
+  
+          for (File block : blocks) {
+            if (!block.getName().startsWith("blk_")) {
               continue;
             }
-            assertTrue("Cannot remove file.", blocks[idx].delete());
+            assertTrue("Cannot remove file.", block.delete());
           }
         }
       }
@@ -949,7 +949,7 @@ public class TestFsck {
       NetworkTopology nettop =
           cluster.getNamesystem().getBlockManager().getDatanodeManager()
               .getNetworkTopology();
-      Map<String, String[]> pmap = new HashMap<String, String[]>();
+      Map<String, String[]> pmap = new HashMap<>();
       Writer result = new StringWriter();
       PrintWriter out = new PrintWriter(result, true);
       InetAddress remoteAddress = InetAddress.getLocalHost();

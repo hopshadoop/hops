@@ -487,9 +487,7 @@ public class TestSafeMode {
     FileStatus stat = fs.getFileStatus(fileName);
     try {
       fs.getFileBlockLocations(stat, 0, 1000);
-    } catch (SafeModeException e) {
-      assertTrue("Should have not got safemode exception", false);
-    } catch (RemoteException re) {
+    } catch (SafeModeException | RemoteException e) {
       assertTrue("Should have not got safemode exception", false);
     }
   }

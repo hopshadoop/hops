@@ -39,8 +39,8 @@ public class LeasePathContext extends BaseEntityContext
 
   private final LeasePathDataAccess<LeasePath> dataAccess;
   private final Map<Integer, Set<LeasePath>> hIdToLPsMap =
-      new HashMap<Integer, Set<LeasePath>>();
-  private final List<String> nullLPs = new ArrayList<String>();
+      new HashMap<>();
+  private final List<String> nullLPs = new ArrayList<>();
 
   public LeasePathContext(LeasePathDataAccess<LeasePath> dataAccess) {
     this.dataAccess = dataAccess;
@@ -137,7 +137,7 @@ public class LeasePathContext extends BaseEntityContext
     final int holderId = (Integer) params[0];
     Collection<LeasePath> result = null;
     if (hIdToLPsMap.containsKey(holderId)) {
-      result = new ArrayList<LeasePath>(hIdToLPsMap.get(holderId));
+      result = new ArrayList<>(hIdToLPsMap.get(holderId));
       hit(lFinder, result, "hid", holderId);
     } else {
       aboutToAccessStorage(lFinder, params);
@@ -208,7 +208,7 @@ public class LeasePathContext extends BaseEntityContext
   private Set<LeasePath> getPathList(int holderId) {
     Set<LeasePath> hopLeasePaths = hIdToLPsMap.get(holderId);
     if (hopLeasePaths == null) {
-      hopLeasePaths = new HashSet<LeasePath>();
+      hopLeasePaths = new HashSet<>();
       hIdToLPsMap.put(holderId, hopLeasePaths);
     }
     return hopLeasePaths;

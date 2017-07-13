@@ -229,10 +229,8 @@ class BlockReceiver implements Closeable {
       if (isCreate) {
         BlockMetadataHeader.writeHeader(checksumOut, diskChecksum);
       }
-    } catch (ReplicaAlreadyExistsException bae) {
+    } catch (ReplicaAlreadyExistsException | ReplicaNotFoundException bae) {
       throw bae;
-    } catch (ReplicaNotFoundException bne) {
-      throw bne;
     } catch (IOException ioe) {
       IOUtils.closeStream(this);
       cleanupBlock();
@@ -812,7 +810,7 @@ class BlockReceiver implements Closeable {
     /**
      * queue for packets waiting for ack
      */
-    private final LinkedList<Packet> ackQueue = new LinkedList<Packet>();
+    private final LinkedList<Packet> ackQueue = new LinkedList<>();
     /**
      * the thread that spawns this responder
      */

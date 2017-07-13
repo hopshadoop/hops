@@ -59,7 +59,7 @@ class FsDatasetAsyncDiskService {
   
   private final DataNode datanode;
   private Map<File, ThreadPoolExecutor> executors =
-      new HashMap<File, ThreadPoolExecutor>();
+      new HashMap<>();
   
   /**
    * Create a AsyncDiskServices with a set of volumes (specified by their
@@ -76,11 +76,10 @@ class FsDatasetAsyncDiskService {
 
     final ThreadGroup threadGroup = new ThreadGroup(getClass().getSimpleName());
     // Create one ThreadPool per volume
-    for (int v = 0; v < volumes.length; v++) {
-      final File vol = volumes[v];
+    for (final File vol : volumes) {
       ThreadFactory threadFactory = new ThreadFactory() {
         int counter = 0;
-
+      
         @Override
         public Thread newThread(Runnable r) {
           int thisIndex;
@@ -93,13 +92,13 @@ class FsDatasetAsyncDiskService {
           return t;
         }
       };
-
+    
       ThreadPoolExecutor executor =
           new ThreadPoolExecutor(CORE_THREADS_PER_VOLUME,
               MAXIMUM_THREADS_PER_VOLUME, THREADS_KEEP_ALIVE_SECONDS,
               TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(),
               threadFactory);
-
+    
       // This can reduce the number of running threads
       executor.allowCoreThreadTimeOut(true);
       executors.put(vol, executor);

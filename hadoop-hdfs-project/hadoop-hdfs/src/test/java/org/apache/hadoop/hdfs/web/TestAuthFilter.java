@@ -64,7 +64,7 @@ public class TestAuthFilter {
   @Test
   public void testGetConfiguration() throws ServletException {
     AuthFilter filter = new AuthFilter();
-    Map<String, String> m = new HashMap<String, String>();
+    Map<String, String> m = new HashMap<>();
     m.put(DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY,
         "xyz/thehost@REALM");
     m.put(DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY,

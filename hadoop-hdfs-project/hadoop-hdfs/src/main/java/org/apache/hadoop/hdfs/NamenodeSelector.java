@@ -106,9 +106,9 @@ public class NamenodeSelector {
   
   /* List of name nodes */
   private List<NamenodeSelector.NamenodeHandle> nnList =
-      new CopyOnWriteArrayList<NamenodeSelector.NamenodeHandle>();
+      new CopyOnWriteArrayList<>();
   private List<NamenodeSelector.NamenodeHandle> blackListedNamenodes =
-      new CopyOnWriteArrayList<NamenodeSelector.NamenodeHandle>();
+      new CopyOnWriteArrayList<>();
   private static Log LOG = LogFactory.getLog(NamenodeSelector.class);
   private final URI defaultUri;
   private final NamenodeSelector.NNSelectionPolicy policy;

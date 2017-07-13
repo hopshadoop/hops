@@ -120,12 +120,12 @@ public class DatanodeProtocolClientSideTranslatorPB
             HdfsConstants.LEASE_SOFTLIMIT_PERIOD, TimeUnit.MILLISECONDS);
 
     Map<Class<? extends Exception>, RetryPolicy> remoteExceptionToPolicyMap =
-        new HashMap<Class<? extends Exception>, RetryPolicy>();
+        new HashMap<>();
     remoteExceptionToPolicyMap
         .put(AlreadyBeingCreatedException.class, createPolicy);
 
     Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap =
-        new HashMap<Class<? extends Exception>, RetryPolicy>();
+        new HashMap<>();
     exceptionToPolicyMap.put(RemoteException.class, RetryPolicies
         .retryByRemoteException(RetryPolicies.TRY_ONCE_THEN_FAIL,
             remoteExceptionToPolicyMap));
@@ -133,7 +133,7 @@ public class DatanodeProtocolClientSideTranslatorPB
         .retryByException(RetryPolicies.TRY_ONCE_THEN_FAIL,
             exceptionToPolicyMap);
     Map<String, RetryPolicy> methodNameToPolicyMap =
-        new HashMap<String, RetryPolicy>();
+        new HashMap<>();
 
     methodNameToPolicyMap.put("create", methodPolicy);
 
@@ -201,8 +201,8 @@ public class DatanodeProtocolClientSideTranslatorPB
           StorageBlockReportProto.newBuilder()
               .setStorage(PBHelper.convert(r.getStorage()));
       long[] blocks = r.getBlocks();
-      for (int i = 0; i < blocks.length; i++) {
-        reportBuilder.addBlocks(blocks[i]);
+      for (long block : blocks) {
+        reportBuilder.addBlocks(block);
       }
       builder.addReports(reportBuilder.build());
     }

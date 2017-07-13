@@ -250,10 +250,7 @@ public class DelegationTokenSecretManager
   private synchronized void saveCurrentTokens(DataOutputStream out)
       throws IOException {
     out.writeInt(currentTokens.size());
-    Iterator<DelegationTokenIdentifier> iter =
-        currentTokens.keySet().iterator();
-    while (iter.hasNext()) {
-      DelegationTokenIdentifier id = iter.next();
+    for (DelegationTokenIdentifier id : currentTokens.keySet()) {
       id.write(out);
       DelegationTokenInformation info = currentTokens.get(id);
       out.writeLong(info.getRenewDate());
@@ -266,9 +263,7 @@ public class DelegationTokenSecretManager
   private synchronized void saveAllKeys(DataOutputStream out)
       throws IOException {
     out.writeInt(allKeys.size());
-    Iterator<Integer> iter = allKeys.keySet().iterator();
-    while (iter.hasNext()) {
-      Integer key = iter.next();
+    for (Integer key : allKeys.keySet()) {
       allKeys.get(key).write(out);
     }
   }

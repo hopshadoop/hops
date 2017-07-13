@@ -90,7 +90,7 @@ final class IndividualINodeLock extends BaseINodeLock {
 
   private List<INode> readUpInodes(INode leaf)
       throws StorageException, TransactionContextException {
-    LinkedList<INode> pathInodes = new LinkedList<INode>();
+    LinkedList<INode> pathInodes = new LinkedList<>();
     pathInodes.add(leaf);
     INode curr = leaf;
     while (curr.getParentId() != INodeDirectory.ROOT_PARENT_ID) {

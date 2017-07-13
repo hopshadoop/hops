@@ -182,14 +182,14 @@ public class DatanodeJspHelper {
         String cols[] = new String[headings.length];
         do {
           HdfsFileStatus[] files = thisListing.getPartialListing();
-          for (int i = 0; i < files.length; i++) {
-            String localFileName = files[i].getLocalName();
+          for (HdfsFileStatus file : files) {
+            String localFileName = file.getLocalName();
             // Get the location of the first block of the file
-            if (!files[i].isDir()) {
+            if (!file.isDir()) {
               cols[1] = "file";
-              cols[2] = StringUtils.byteDesc(files[i].getLen());
-              cols[3] = Short.toString(files[i].getReplication());
-              cols[4] = StringUtils.byteDesc(files[i].getBlockSize());
+              cols[2] = StringUtils.byteDesc(file.getLen());
+              cols[3] = Short.toString(file.getReplication());
+              cols[4] = StringUtils.byteDesc(file.getBlockSize());
             } else {
               cols[1] = "dir";
               cols[2] = "";
@@ -197,17 +197,17 @@ public class DatanodeJspHelper {
               cols[4] = "";
             }
             String datanodeUrl = req.getRequestURL() + "?dir=" +
-                URLEncoder.encode(files[i].getFullName(target), "UTF-8") +
+                URLEncoder.encode(file.getFullName(target), "UTF-8") +
                 "&namenodeInfoPort=" + namenodeInfoPort +
                 JspHelper.getDelegationTokenUrlParam(tokenString) +
                 JspHelper.getUrlParam(JspHelper.NAMENODE_ADDRESS, nnAddr);
             cols[0] = "<a href=\"" + datanodeUrl + "\">" +
                 HtmlQuoting.quoteHtmlChars(localFileName) + "</a>";
             cols[5] = new SimpleDateFormat("yyyy-MM-dd HH:mm")
-                .format(new Date((files[i].getModificationTime())));
-            cols[6] = files[i].getPermission().toString();
-            cols[7] = files[i].getOwner();
-            cols[8] = files[i].getGroup();
+                .format(new Date((file.getModificationTime())));
+            cols[6] = file.getPermission().toString();
+            cols[7] = file.getOwner();
+            cols[8] = file.getGroup();
             JspHelper.addTableRow(out, cols, row++);
           }
           if (!thisListing.hasMore()) {
@@ -366,12 +366,12 @@ public class DatanodeJspHelper {
       blockSize = cur.getBlock().getNumBytes();
       out.print("<td>" + blockidstring + ":</td>");
       DatanodeInfo[] locs = cur.getLocations();
-      for (int j = 0; j < locs.length; j++) {
-        String datanodeAddr = locs[j].getXferAddr();
-        datanodePort = locs[j].getXferPort();
-        fqdn = canonicalize(locs[j].getIpAddr());
+      for (DatanodeInfo loc : locs) {
+        String datanodeAddr = loc.getXferAddr();
+        datanodePort = loc.getXferPort();
+        fqdn = canonicalize(loc.getIpAddr());
         String blockUrl =
-            HttpConfig2.getSchemePrefix() + fqdn + ":" + locs[j].getInfoPort() +
+            HttpConfig2.getSchemePrefix() + fqdn + ":" + loc.getInfoPort() +
                 "/browseBlock.jsp?blockId=" + blockidstring + "&blockSize=" +
                 blockSize + "&filename=" +
                 URLEncoder.encode(filename, "UTF-8") + "&datanodePort=" +
@@ -380,7 +380,7 @@ public class DatanodeJspHelper {
                 namenodeInfoPort + "&chunkSizeToView=" + chunkSizeToView +
                 JspHelper.getDelegationTokenUrlParam(tokenString) +
                 JspHelper.getUrlParam(JspHelper.NAMENODE_ADDRESS, nnAddr);
-
+    
         String blockInfoUrl =
             HttpConfig2.getSchemePrefix() + nnCanonicalName + ":" +
                 namenodeInfoPort + "/block_info_xml.jsp?blockId=" +
@@ -450,12 +450,12 @@ public class DatanodeJspHelper {
     boolean needBlockToken =
         conf.getBoolean(DFSConfigKeys.DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY,
             DFSConfigKeys.DFS_BLOCK_ACCESS_TOKEN_ENABLE_DEFAULT);
-
-    for (int i = 0; i < blks.size(); i++) {
-      if (blks.get(i).getBlock().getBlockId() == blockId) {
-        bpid = blks.get(i).getBlock().getBlockPoolId();
+  
+    for (LocatedBlock blk : blks) {
+      if (blk.getBlock().getBlockId() == blockId) {
+        bpid = blk.getBlock().getBlockPoolId();
         if (needBlockToken) {
-          blockToken = blks.get(i).getBlockToken();
+          blockToken = blk.getBlockToken();
         }
         break;
       }

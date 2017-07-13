@@ -274,7 +274,7 @@ public class LightWeightHashSet<T> implements Collection<T> {
     size++;
 
     // update bucket linked list
-    LinkedElement<T> le = new LinkedElement<T>(element, hashCode);
+    LinkedElement<T> le = new LinkedElement<>(element, hashCode);
     le.next = entries[index];
     entries[index] = le;
     return true;
@@ -348,7 +348,7 @@ public class LightWeightHashSet<T> implements Collection<T> {
     if (n >= size) {
       return pollAll();
     }
-    List<T> retList = new ArrayList<T>(n);
+    List<T> retList = new ArrayList<>(n);
     if (n == 0) {
       return retList;
     }
@@ -378,9 +378,9 @@ public class LightWeightHashSet<T> implements Collection<T> {
    * Remove all elements from the set and return them. Clear the entries.
    */
   public List<T> pollAll() {
-    List<T> retList = new ArrayList<T>(size);
-    for (int i = 0; i < entries.length; i++) {
-      LinkedElement<T> current = entries[i];
+    List<T> retList = new ArrayList<>(size);
+    for (LinkedElement<T> entry : entries) {
+      LinkedElement<T> current = entry;
       while (current != null) {
         retList.add(current.element);
         current = current.next;
@@ -407,8 +407,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
     }
     // do fast polling if the entire set needs to be fetched
     if (array.length == size) {
-      for (int i = 0; i < entries.length; i++) {
-        current = entries[i];
+      for (LinkedElement<T> entry : entries) {
+        current = entry;
         while (current != null) {
           array[currentIndex++] = current.element;
           current = current.next;
@@ -475,8 +475,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
     this.hash_mask = capacity - 1;
     LinkedElement<T>[] temp = entries;
     entries = new LinkedElement[capacity];
-    for (int i = 0; i < temp.length; i++) {
-      LinkedElement<T> curr = temp[i];
+    for (LinkedElement<T> aTemp : temp) {
+      LinkedElement<T> curr = aTemp;
       while (curr != null) {
         LinkedElement<T> next = curr.next;
         int index = getIndex(curr.hashCode);
@@ -619,8 +619,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
           .newInstance(a.getClass().getComponentType(), size);
     }
     int currentIndex = 0;
-    for (int i = 0; i < entries.length; i++) {
-      LinkedElement<T> current = entries[i];
+    for (LinkedElement<T> entry : entries) {
+      LinkedElement<T> current = entry;
       while (current != null) {
         a[currentIndex++] = (U) current.element;
         current = current.next;
@@ -631,9 +631,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
 
   @Override
   public boolean containsAll(Collection<?> c) {
-    Iterator<?> iter = c.iterator();
-    while (iter.hasNext()) {
-      if (!contains(iter.next())) {
+    for (Object aC : c) {
+      if (!contains(aC)) {
         return false;
       }
     }
@@ -643,9 +642,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
   @Override
   public boolean removeAll(Collection<?> c) {
     boolean changed = false;
-    Iterator<?> iter = c.iterator();
-    while (iter.hasNext()) {
-      changed |= remove(iter.next());
+    for (Object aC : c) {
+      changed |= remove(aC);
     }
     return changed;
   }

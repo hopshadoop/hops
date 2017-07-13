@@ -49,7 +49,7 @@ final class BatchedBlockLock extends BaseIndividualBlockLock {
   }
   
   Pair<int[], long[]> getINodeBlockIds() {
-    return new Pair<int[], long[]>(inodeIds, blockIds);
+    return new Pair<>(inodeIds, blockIds);
   }
   
 }

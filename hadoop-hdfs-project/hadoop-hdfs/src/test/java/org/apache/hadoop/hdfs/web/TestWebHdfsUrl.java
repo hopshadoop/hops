@@ -248,7 +248,7 @@ public class TestWebHdfsUrl {
               86400000, namesystem);
       dtSecretManager.startThreads();
       Token<DelegationTokenIdentifier> token =
-          new Token<DelegationTokenIdentifier>(dtId, dtSecretManager);
+          new Token<>(dtId, dtSecretManager);
       SecurityUtil.setTokenService(token,
           NetUtils.createSocketAddr(uri.getAuthority()));
       token.setKind(WebHdfsFileSystem.TOKEN_KIND);
@@ -293,7 +293,7 @@ public class TestWebHdfsUrl {
     SecurityUtilTestHelper.setTokenServiceUseIp(true);
 
     // test fallback to hdfs token
-    Token<?> hdfsToken = new Token<TokenIdentifier>(new byte[0], new byte[0],
+    Token<?> hdfsToken = new Token<>(new byte[0], new byte[0],
         DelegationTokenIdentifier.HDFS_DELEGATION_KIND,
         new Text("127.0.0.1:8020"));
     ugi.addToken(hdfsToken);
@@ -304,7 +304,7 @@ public class TestWebHdfsUrl {
     assertEquals(hdfsToken, token);
 
     // test webhdfs is favored over hdfs
-    Token<?> webHdfsToken = new Token<TokenIdentifier>(new byte[0], new byte[0],
+    Token<?> webHdfsToken = new Token<>(new byte[0], new byte[0],
         WebHdfsFileSystem.TOKEN_KIND, new Text("127.0.0.1:" + port));
     ugi.addToken(webHdfsToken);
     token = fs.selectDelegationToken(ugi);
@@ -317,7 +317,7 @@ public class TestWebHdfsUrl {
     assertNull(token);
     
     // test fallback to hdfs token
-    hdfsToken = new Token<TokenIdentifier>(new byte[0], new byte[0],
+    hdfsToken = new Token<>(new byte[0], new byte[0],
         DelegationTokenIdentifier.HDFS_DELEGATION_KIND,
         new Text("localhost:8020"));
     ugi.addToken(hdfsToken);
@@ -326,7 +326,7 @@ public class TestWebHdfsUrl {
     assertEquals(hdfsToken, token);
 
     // test webhdfs is favored over hdfs
-    webHdfsToken = new Token<TokenIdentifier>(new byte[0], new byte[0],
+    webHdfsToken = new Token<>(new byte[0], new byte[0],
         WebHdfsFileSystem.TOKEN_KIND, new Text("localhost:" + port));
     ugi.addToken(webHdfsToken);
     token = fs.selectDelegationToken(ugi);

@@ -37,7 +37,7 @@ public class BlockPoolTokenSecretManager
     extends SecretManager<BlockTokenIdentifier> {
   
   private final Map<String, BlockTokenSecretManager> map =
-      new HashMap<String, BlockTokenSecretManager>();
+      new HashMap<>();
 
   /**
    * Add a block pool Id and corresponding {@link BlockTokenSecretManager} to

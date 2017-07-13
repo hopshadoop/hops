@@ -132,7 +132,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     }
 
     if (excludedNodes == null) {
-      excludedNodes = new HashMap<Node, Node>();
+      excludedNodes = new HashMap<>();
     }
 
     int clusterSize = clusterMap.getNumOfLeaves();
@@ -146,7 +146,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
         (totalNumOfReplicas - 1) / clusterMap.getNumOfRacks() + 2;
 
     List<DatanodeDescriptor> results =
-        new ArrayList<DatanodeDescriptor>(chosenNodes);
+        new ArrayList<>(chosenNodes);
     for (Node node : chosenNodes) {
       excludedNodes.put(node, node);
     }
@@ -187,7 +187,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
 
     // Keep a copy of original excludedNodes
     final HashMap<Node, Node> oldExcludedNodes =
-        avoidStaleNodes ? new HashMap<Node, Node>(excludedNodes) : null;
+        avoidStaleNodes ? new HashMap<>(excludedNodes) : null;
     try {
       if (numOfResults == 0) {
         writer =
@@ -299,9 +299,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     } catch (NotEnoughReplicasException e1) {
       // find the second replica
       DatanodeDescriptor newLocal = null;
-      for (Iterator<DatanodeDescriptor> iter = results.iterator();
-           iter.hasNext(); ) {
-        DatanodeDescriptor nextNode = iter.next();
+      for (DatanodeDescriptor nextNode : results) {
         if (nextNode != localMachine) {
           newLocal = nextNode;
           break;
@@ -528,9 +526,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     // check if the target rack has chosen too many nodes
     String rackname = node.getNetworkLocation();
     int counter = 1;
-    for (Iterator<DatanodeDescriptor> iter = results.iterator();
-         iter.hasNext(); ) {
-      Node result = iter.next();
+    for (DatanodeDescriptor result : results) {
       if (rackname.equals(result.getNetworkLocation())) {
         counter++;
       }
@@ -601,7 +597,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     minRacks = Math.min(minRacks, numRacks);
     // 1. Check that all locations are different.
     // 2. Count locations on different racks.
-    Set<String> racks = new TreeSet<String>();
+    Set<String> racks = new TreeSet<>();
     for (DatanodeInfo dn : locs) {
       racks.add(dn.getNetworkLocation());
     }

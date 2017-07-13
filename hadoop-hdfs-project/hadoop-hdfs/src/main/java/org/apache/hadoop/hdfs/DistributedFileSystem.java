@@ -599,7 +599,7 @@ public class DistributedFileSystem extends FileSystem {
     // estimate the total number of entries in the directory
     int totalNumEntries =
         partialListing.length + thisListing.getRemainingEntries();
-    ArrayList<FileStatus> listing = new ArrayList<FileStatus>(totalNumEntries);
+    ArrayList<FileStatus> listing = new ArrayList<>(totalNumEntries);
     // add the first batch of entries to the array list
     for (HdfsFileStatus fileStatus : partialListing) {
       listing.add(makeQualified(fileStatus, p));

@@ -143,8 +143,8 @@ public class TestPendingReplication {
     assertEquals("Size of pendingReplications ", 0, pendingReplications.size());
     long[] timedOut = pendingReplications.getTimedOutBlocks();
     assertTrue(timedOut != null && timedOut.length == 15);
-    for (int i = 0; i < timedOut.length; i++) {
-      assertTrue(timedOut[i] < 15);
+    for (long aTimedOut2 : timedOut) {
+      assertTrue(aTimedOut2 < 15);
     }
     
     //
@@ -152,16 +152,16 @@ public class TestPendingReplication {
     //
     timedOut = pendingReplications.getTimedOutBlocks();
     assertTrue(timedOut != null && timedOut.length == 15);
-    for (int i = 0; i < timedOut.length; i++) {
-      assertTrue(timedOut[i] < 15);
+    for (long aTimedOut1 : timedOut) {
+      assertTrue(aTimedOut1 < 15);
     }
     //
     // Verify that the blocks have not been removed from the pending database
     //
     timedOut = pendingReplications.getTimedOutBlocks();
     assertTrue(timedOut != null && timedOut.length == 15);
-    for (int i = 0; i < timedOut.length; i++) {
-      assertTrue(timedOut[i] < 15);
+    for (long aTimedOut : timedOut) {
+      assertTrue(aTimedOut < 15);
     }
     
     pendingReplications.stop();

@@ -77,7 +77,7 @@ public class PutOpParam extends HttpOpParam<PutOpParam.Op> {
     }
   }
 
-  private static final Domain<Op> DOMAIN = new Domain<Op>(NAME, Op.class);
+  private static final Domain<Op> DOMAIN = new Domain<>(NAME, Op.class);
 
   /**
    * Constructor.

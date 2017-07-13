@@ -249,36 +249,36 @@ public class DFSck extends Configured implements Tool {
     url.append("/fsck?ugi=").append(ugi.getShortUserName());
     String dir = null;
     boolean doListCorruptFileBlocks = false;
-    for (int idx = 0; idx < args.length; idx++) {
-      if (args[idx].equals("-move")) {
+    for (String arg : args) {
+      if (arg.equals("-move")) {
         url.append("&move=1");
-      } else if (args[idx].equals("-delete")) {
+      } else if (arg.equals("-delete")) {
         url.append("&delete=1");
-      } else if (args[idx].equals("-files")) {
+      } else if (arg.equals("-files")) {
         url.append("&files=1");
-      } else if (args[idx].equals("-openforwrite")) {
+      } else if (arg.equals("-openforwrite")) {
         url.append("&openforwrite=1");
-      } else if (args[idx].equals("-blocks")) {
+      } else if (arg.equals("-blocks")) {
         url.append("&blocks=1");
-      } else if (args[idx].equals("-locations")) {
+      } else if (arg.equals("-locations")) {
         url.append("&locations=1");
-      } else if (args[idx].equals("-racks")) {
+      } else if (arg.equals("-racks")) {
         url.append("&racks=1");
-      } else if (args[idx].equals("-list-corruptfileblocks")) {
+      } else if (arg.equals("-list-corruptfileblocks")) {
         url.append("&listcorruptfileblocks=1");
         doListCorruptFileBlocks = true;
-      } else if (!args[idx].startsWith("-")) {
+      } else if (!arg.startsWith("-")) {
         if (null == dir) {
-          dir = args[idx];
+          dir = arg;
         } else {
           System.err.println(
-              "fsck: can only operate on one path at a time '" + args[idx] +
+              "fsck: can only operate on one path at a time '" + arg +
                   "'");
           printUsage(System.err);
           return -1;
         }
       } else {
-        System.err.println("fsck: Illegal option '" + args[idx] + "'");
+        System.err.println("fsck: Illegal option '" + arg + "'");
         printUsage(System.err);
         return -1;
       }

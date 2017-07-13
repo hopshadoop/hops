@@ -62,7 +62,7 @@ class FSPermissionChecker {
     } catch (IOException e) {
       throw new AccessControlException(e);
     }
-    HashSet<String> s = new HashSet<String>(Arrays.asList(ugi.getGroupNames()));
+    HashSet<String> s = new HashSet<>(Arrays.asList(ugi.getGroupNames()));
     groups = Collections.unmodifiableSet(s);
     user = ugi.getShortUserName();
     isSuper = user.equals(fsOwner) || groups.contains(supergroup);
@@ -203,7 +203,7 @@ class FSPermissionChecker {
       return;
     }
 
-    Stack<INodeDirectory> directories = new Stack<INodeDirectory>();
+    Stack<INodeDirectory> directories = new Stack<>();
     for (directories.push((INodeDirectory) inode); !directories.isEmpty(); ) {
       INodeDirectory d = directories.pop();
       check(d, access);

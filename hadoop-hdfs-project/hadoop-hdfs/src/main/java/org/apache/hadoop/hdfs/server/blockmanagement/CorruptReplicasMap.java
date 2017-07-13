@@ -152,11 +152,11 @@ public class CorruptReplicasMap {
 
     //HOPS datanodeMgr is null in some tests
     if (datanodeMgr == null) {
-      return new ArrayList<DatanodeDescriptor>();
+      return new ArrayList<>();
     }
     
     Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
-    Collection<DatanodeDescriptor> dnds = new TreeSet<DatanodeDescriptor>();
+    Collection<DatanodeDescriptor> dnds = new TreeSet<>();
     if (corruptReplicas != null) {
       for (CorruptReplica cr : corruptReplicas) {
         DatanodeDescriptor dn = datanodeMgr.getDatanode(cr.getStorageId());
@@ -223,7 +223,7 @@ public class CorruptReplicasMap {
       return null;
     }
     
-    List<Long> sortedIds = new ArrayList<Long>();
+    List<Long> sortedIds = new ArrayList<>();
     
     Collection<CorruptReplica> corruptReplicas = getAllCorruptReplicas();
     if (corruptReplicas != null) {
@@ -252,7 +252,7 @@ public class CorruptReplicasMap {
       }
     }
 
-    ArrayList<Long> corruptReplicaBlockIds = new ArrayList<Long>();
+    ArrayList<Long> corruptReplicaBlockIds = new ArrayList<>();
 
     // append up to numExpectedBlocks blockIds to our list
     for (int i = 0; i < numExpectedBlocks && blockIt.hasNext(); i++) {

@@ -34,7 +34,7 @@ public class BlockChecksumContext
 
   private final BlockChecksumDataAccess<BlockChecksum> dataAccess;
   private final Map<Integer, Collection<BlockChecksum>> inodeToBlockChecksums =
-      new HashMap<Integer, Collection<BlockChecksum>>();
+      new HashMap<>();
 
   public BlockChecksumContext(
       BlockChecksumDataAccess<BlockChecksum> dataAccess) {

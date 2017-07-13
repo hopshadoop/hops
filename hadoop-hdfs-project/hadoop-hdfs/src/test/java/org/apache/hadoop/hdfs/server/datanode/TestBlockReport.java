@@ -198,8 +198,8 @@ public class TestBlockReport {
     File dataDir = new File(cluster.getDataDirectory());
     assertTrue(dataDir.isDirectory());
 
-    List<ExtendedBlock> blocks2Remove = new ArrayList<ExtendedBlock>();
-    List<Integer> removedIndex = new ArrayList<Integer>();
+    List<ExtendedBlock> blocks2Remove = new ArrayList<>();
+    List<Integer> removedIndex = new ArrayList<>();
     List<LocatedBlock> lBlocks = cluster.getNameNodeRpc()
         .getBlockLocations(filePath.toString(), FILE_START, FILE_SIZE)
         .getLocatedBlocks();
@@ -737,7 +737,7 @@ public class TestBlockReport {
 
   private ArrayList<Block> locatedToBlocks(final List<LocatedBlock> locatedBlks,
       List<Integer> positionsToRemove) {
-    ArrayList<Block> newList = new ArrayList<Block>();
+    ArrayList<Block> newList = new ArrayList<>();
     for (int i = 0; i < locatedBlks.size(); i++) {
       if (positionsToRemove != null && positionsToRemove.contains(i)) {
         if (LOG.isDebugEnabled()) {
@@ -762,7 +762,7 @@ public class TestBlockReport {
     if (top == null) {
       return null;
     }
-    ArrayList<File> ret = new ArrayList<File>();
+    ArrayList<File> ret = new ArrayList<>();
     for (File f : top.listFiles()) {
       if (f.isDirectory()) {
         ret.addAll(findAllFiles(f, mask));
@@ -882,7 +882,7 @@ public class TestBlockReport {
     final String METHOD_NAME = GenericTestUtils.getMethodName();
     
 
-    ArrayList<Block> blocks = new ArrayList<Block>();
+    ArrayList<Block> blocks = new ArrayList<>();
     
     for(int i = 0 ; i < 3; i++){
       Path filePath = new Path("/" + METHOD_NAME +i+ ".dat");

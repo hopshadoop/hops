@@ -993,9 +993,9 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
     ClientNamenodeProtocolProtos.ActiveNamenodeListResponseProto.Builder
         anlrpb = ClientNamenodeProtocolProtos.ActiveNamenodeListResponseProto
         .newBuilder();
-    for (int i = 0; i < anl.size(); i++) {
+    for (ActiveNode anAnl : anl) {
       ActiveNodeProtos.ActiveNodeProto anp =
-          convertANToResponseProto(anl.get(i));
+          convertANToResponseProto(anAnl);
       anlrpb.addNamenodes(anp);
     }
     return anlrpb.build();

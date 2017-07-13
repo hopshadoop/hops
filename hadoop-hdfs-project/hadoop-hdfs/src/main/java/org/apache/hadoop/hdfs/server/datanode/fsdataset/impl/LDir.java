@@ -52,11 +52,11 @@ class LDir {
       }
     } else {
       File[] files = FileUtil.listFiles(dir);
-      List<LDir> dirList = new ArrayList<LDir>();
-      for (int idx = 0; idx < files.length; idx++) {
-        if (files[idx].isDirectory()) {
-          dirList.add(new LDir(files[idx], maxBlocksPerDir));
-        } else if (Block.isBlockFilename(files[idx])) {
+      List<LDir> dirList = new ArrayList<>();
+      for (File file : files) {
+        if (file.isDirectory()) {
+          dirList.add(new LDir(file, maxBlocksPerDir));
+        } else if (Block.isBlockFilename(file)) {
           numBlocks++;
         }
       }
@@ -118,8 +118,8 @@ class LDir {
   void getVolumeMap(String bpid, ReplicaMap volumeMap, FsVolumeImpl volume)
       throws IOException {
     if (children != null) {
-      for (int i = 0; i < children.length; i++) {
-        children[i].getVolumeMap(bpid, volumeMap, volume);
+      for (LDir aChildren : children) {
+        aChildren.getVolumeMap(bpid, volumeMap, volume);
       }
     }
 
@@ -161,8 +161,8 @@ class LDir {
     DiskChecker.checkDir(dir);
 
     if (children != null) {
-      for (int i = 0; i < children.length; i++) {
-        children[i].checkDirTree();
+      for (LDir aChildren : children) {
+        aChildren.checkDirTree();
       }
     }
   }
@@ -212,8 +212,8 @@ class LDir {
 
     //guesses failed. back to blind iteration.
     if (children != null) {
-      for (int i = 0; i < children.length; i++) {
-        if (children[i].clearPath(f, null, -1)) {
+      for (LDir aChildren : children) {
+        if (aChildren.clearPath(f, null, -1)) {
           return true;
         }
       }

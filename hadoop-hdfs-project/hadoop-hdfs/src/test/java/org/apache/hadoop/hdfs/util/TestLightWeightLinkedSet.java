@@ -37,7 +37,7 @@ public class TestLightWeightLinkedSet {
 
   private static final Log LOG =
       LogFactory.getLog("org.apache.hadoop.hdfs.TestLightWeightLinkedSet");
-  private ArrayList<Integer> list = new ArrayList<Integer>();
+  private ArrayList<Integer> list = new ArrayList<>();
   private final int NUM = 100;
   private LightWeightLinkedSet<Integer> set;
   private Random rand;
@@ -52,7 +52,7 @@ public class TestLightWeightLinkedSet {
     for (int i = 0; i < NUM; i++) {
       list.add(rand.nextInt());
     }
-    set = new LightWeightLinkedSet<Integer>(initCapacity, maxF, minF);
+    set = new LightWeightLinkedSet<>(initCapacity, maxF, minF);
   }
 
   @Test
@@ -351,16 +351,16 @@ public class TestLightWeightLinkedSet {
     // to array
     Integer[] array = set.toArray(new Integer[0]);
     assertEquals(NUM, array.length);
-    for (int i = 0; i < array.length; i++) {
-      assertTrue(list.contains(array[i]));
+    for (Integer anArray : array) {
+      assertTrue(list.contains(anArray));
     }
     assertEquals(NUM, set.size());
 
     // to array
     Object[] array2 = set.toArray();
     assertEquals(NUM, array2.length);
-    for (int i = 0; i < array2.length; i++) {
-      assertTrue(list.contains((Integer) array2[i]));
+    for (Object anArray2 : array2) {
+      assertTrue(list.contains((Integer) anArray2));
     }
     LOG.info("Test capacity - DONE");
   }

@@ -52,7 +52,7 @@ public class TestBlocksScheduledCounter {
     // flush to make sure a block is allocated.
     out.hflush();
     
-    ArrayList<DatanodeDescriptor> dnList = new ArrayList<DatanodeDescriptor>();
+    ArrayList<DatanodeDescriptor> dnList = new ArrayList<>();
     final DatanodeManager dm =
         cluster.getNamesystem().getBlockManager().getDatanodeManager();
     dm.fetchDatanodes(dnList, dnList, false);

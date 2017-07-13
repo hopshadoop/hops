@@ -202,9 +202,9 @@ public class TestReplicationPolicy {
     HashMap<Node, Node> excludedNodes;
     DatanodeDescriptor[] targets;
     BlockPlacementPolicyDefault repl = (BlockPlacementPolicyDefault) replicator;
-    List<DatanodeDescriptor> chosenNodes = new ArrayList<DatanodeDescriptor>();
+    List<DatanodeDescriptor> chosenNodes = new ArrayList<>();
     
-    excludedNodes = new HashMap<Node, Node>();
+    excludedNodes = new HashMap<>();
     excludedNodes.put(dataNodes[1], dataNodes[1]);
     targets = chooseTarget(repl, 0, dataNodes[0], chosenNodes, excludedNodes,
         BLOCK_SIZE);
@@ -475,7 +475,7 @@ public class TestReplicationPolicy {
   }
   
   class TestAppender extends AppenderSkeleton {
-    private final List<LoggingEvent> log = new ArrayList<LoggingEvent>();
+    private final List<LoggingEvent> log = new ArrayList<>();
 
     @Override
     public boolean requiresLayout() {
@@ -492,7 +492,7 @@ public class TestReplicationPolicy {
     }
 
     public List<LoggingEvent> getLog() {
-      return new ArrayList<LoggingEvent>(log);
+      return new ArrayList<>(log);
     }
   }
 
@@ -524,9 +524,9 @@ public class TestReplicationPolicy {
     assertEquals(targets.length, 1);
     assertEquals(targets[0], dataNodes[1]);
 
-    HashMap<Node, Node> excludedNodes = new HashMap<Node, Node>();
+    HashMap<Node, Node> excludedNodes = new HashMap<>();
     excludedNodes.put(dataNodes[1], dataNodes[1]);
-    List<DatanodeDescriptor> chosenNodes = new ArrayList<DatanodeDescriptor>();
+    List<DatanodeDescriptor> chosenNodes = new ArrayList<>();
     BlockPlacementPolicyDefault repl = (BlockPlacementPolicyDefault) replicator;
     targets = chooseTarget(repl, 1, dataNodes[0], chosenNodes, excludedNodes,
         BLOCK_SIZE);
@@ -587,9 +587,9 @@ public class TestReplicationPolicy {
     assertTrue(containsWithinRange(dataNodes[3], targets, 0, 3));
     assertTrue(containsWithinRange(dataNodes[4], targets, 0, 3));
     assertTrue(containsWithinRange(dataNodes[5], targets, 0, 3));
-
-    for (int i = 0; i < dataNodes.length; i++) {
-      dataNodes[i].setLastUpdate(Time.now());
+  
+    for (DatanodeDescriptor dataNode : dataNodes) {
+      dataNode.setLastUpdate(Time.now());
     }
     namenode.getNamesystem().getBlockManager().getDatanodeManager()
         .getHeartbeatManager().heartbeatCheck();
@@ -708,7 +708,7 @@ public class TestReplicationPolicy {
    */
   @Test
   public void testRereplicate1() throws Exception {
-    List<DatanodeDescriptor> chosenNodes = new ArrayList<DatanodeDescriptor>();
+    List<DatanodeDescriptor> chosenNodes = new ArrayList<>();
     chosenNodes.add(dataNodes[0]);
     DatanodeDescriptor[] targets;
     
@@ -744,7 +744,7 @@ public class TestReplicationPolicy {
    */
   @Test
   public void testRereplicate2() throws Exception {
-    List<DatanodeDescriptor> chosenNodes = new ArrayList<DatanodeDescriptor>();
+    List<DatanodeDescriptor> chosenNodes = new ArrayList<>();
     chosenNodes.add(dataNodes[0]);
     chosenNodes.add(dataNodes[1]);
 
@@ -775,7 +775,7 @@ public class TestReplicationPolicy {
    */
   @Test
   public void testRereplicate3() throws Exception {
-    List<DatanodeDescriptor> chosenNodes = new ArrayList<DatanodeDescriptor>();
+    List<DatanodeDescriptor> chosenNodes = new ArrayList<>();
     chosenNodes.add(dataNodes[0]);
     chosenNodes.add(dataNodes[2]);
     

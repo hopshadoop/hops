@@ -60,7 +60,7 @@ public class CountersQueue {
   private Queue<Counter> queue;
 
   public CountersQueue() {
-    queue = new ArrayDeque<CountersQueue.Counter>();
+    queue = new ArrayDeque<>();
     available = 0;
   }
 

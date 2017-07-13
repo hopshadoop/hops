@@ -906,8 +906,8 @@ public class TestSubtreeLock extends TestCase {
 
     FileSystem superFS = cluster.getFileSystem();
 
-    List<UserGroupInformation> ugis = new ArrayList<UserGroupInformation>();
-    List<FileSystem> fss = new ArrayList<FileSystem>();
+    List<UserGroupInformation> ugis = new ArrayList<>();
+    List<FileSystem> fss = new ArrayList<>();
 
     for(int u=0; u<NumberOfFileSystems; u++) {
       UserGroupInformation ugi =

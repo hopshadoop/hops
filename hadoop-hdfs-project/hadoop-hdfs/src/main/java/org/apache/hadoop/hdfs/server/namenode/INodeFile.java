@@ -210,7 +210,7 @@ public class INodeFile extends INode implements BlockCollection {
    */
   List<BlockInfo> appendBlocks(INodeFile[] inodes, int totalAddedBlocks /*HOP not used*/)
       throws StorageException, TransactionContextException {
-    List<BlockInfo> oldBlks = new ArrayList<BlockInfo>();
+    List<BlockInfo> oldBlks = new ArrayList<>();
     for (INodeFile srcInode : inodes) {
       for (BlockInfo block : srcInode.getBlocks()) {
         BlockInfo copy = BlockInfo.cloneBlock(block);

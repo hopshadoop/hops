@@ -61,7 +61,7 @@ public class QuotaUpdateManager {
   private final Daemon updateThread = new Daemon(new QuotaUpdateMonitor());
 
   private final ConcurrentLinkedQueue<Iterator<Integer>> prioritizedUpdates =
-      new ConcurrentLinkedQueue<Iterator<Integer>>();
+      new ConcurrentLinkedQueue<>();
 
   public QuotaUpdateManager(FSNamesystem namesystem, Configuration conf) {
     this.namesystem = namesystem;
@@ -190,14 +190,14 @@ public class QuotaUpdateManager {
     List<QuotaUpdate> quotaUpdates = (List<QuotaUpdate>) findHandler.handle();
     Collections.sort(quotaUpdates, quotaUpdateComparator);
 
-    ArrayList<QuotaUpdate> batch = new ArrayList<QuotaUpdate>();
+    ArrayList<QuotaUpdate> batch = new ArrayList<>();
     for (QuotaUpdate update : quotaUpdates) {
       if (batch.size() == 0 ||
           batch.get(0).getInodeId() == update.getInodeId()) {
         batch.add(update);
       } else {
         applyBatchedUpdate(batch);
-        batch = new ArrayList<QuotaUpdate>();
+        batch = new ArrayList<>();
         batch.add(update);
       }
     }

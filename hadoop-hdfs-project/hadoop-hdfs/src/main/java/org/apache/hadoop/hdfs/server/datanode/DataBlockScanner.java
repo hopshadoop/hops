@@ -56,7 +56,7 @@ public class DataBlockScanner implements Runnable {
    * when a BPOfferService becomes alive or dies.
    */
   private final TreeMap<String, BlockPoolSliceScanner> blockPoolScannerMap =
-      new TreeMap<String, BlockPoolSliceScanner>();
+      new TreeMap<>();
   Thread blockScannerThread = null;
   
   DataBlockScanner(DataNode datanode,

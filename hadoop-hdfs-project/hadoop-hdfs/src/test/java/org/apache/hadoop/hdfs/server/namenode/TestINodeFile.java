@@ -187,8 +187,8 @@ public class TestINodeFile {
   private int getTotalBlocks(INodeFile[] files)
       throws StorageException, TransactionContextException {
     int nBlocks = 0;
-    for (int i = 0; i < files.length; i++) {
-      nBlocks += files[i].numBlocks();
+    for (INodeFile file : files) {
+      nBlocks += file.numBlocks();
     }
     return nBlocks;
   }

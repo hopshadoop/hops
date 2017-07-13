@@ -94,26 +94,26 @@ public class TestCrcCorruption {
       assertTrue("Blocks do not exist in data-dir",
           (blocks != null) && (blocks.length > 0));
       int num = 0;
-      for (int idx = 0; idx < blocks.length; idx++) {
-        if (blocks[idx].getName().startsWith("blk_") &&
-            blocks[idx].getName().endsWith(".meta")) {
+      for (File block1 : blocks) {
+        if (block1.getName().startsWith("blk_") &&
+            block1.getName().endsWith(".meta")) {
           num++;
           if (num % 3 == 0) {
             //
             // remove .meta file
             //
             System.out
-                .println("Deliberately removing file " + blocks[idx].getName());
-            assertTrue("Cannot remove file.", blocks[idx].delete());
+                .println("Deliberately removing file " + block1.getName());
+            assertTrue("Cannot remove file.", block1.delete());
           } else if (num % 3 == 1) {
             //
             // shorten .meta file
             //
-            RandomAccessFile file = new RandomAccessFile(blocks[idx], "rw");
+            RandomAccessFile file = new RandomAccessFile(block1, "rw");
             FileChannel channel = file.getChannel();
             int newsize = random.nextInt((int) channel.size() / 2);
             System.out.println("Deliberately truncating file " +
-                blocks[idx].getName() +
+                block1.getName() +
                 " to size " + newsize + " bytes.");
             channel.truncate(newsize);
             file.close();
@@ -121,7 +121,7 @@ public class TestCrcCorruption {
             //
             // corrupt a few bytes of the metafile
             //
-            RandomAccessFile file = new RandomAccessFile(blocks[idx], "rw");
+            RandomAccessFile file = new RandomAccessFile(block1, "rw");
             FileChannel channel = file.getChannel();
             long position = 0;
             //
@@ -135,7 +135,7 @@ public class TestCrcCorruption {
             random.nextBytes(buffer);
             channel.write(ByteBuffer.wrap(buffer), position);
             System.out.println("Deliberately corrupting file " +
-                blocks[idx].getName() +
+                block1.getName() +
                 " at offset " + position +
                 " length " + length);
             file.close();
@@ -156,24 +156,24 @@ public class TestCrcCorruption {
 
       int count = 0;
       File previous = null;
-      for (int idx = 0; idx < blocks.length; idx++) {
-        if (blocks[idx].getName().startsWith("blk_") &&
-            blocks[idx].getName().endsWith(".meta")) {
+      for (File block : blocks) {
+        if (block.getName().startsWith("blk_") &&
+            block.getName().endsWith(".meta")) {
           //
           // Move the previous metafile into the current one.
           //
           count++;
           if (count % 2 == 0) {
             System.out.println("Deliberately insertimg bad crc into files " +
-                blocks[idx].getName() + " " + previous.getName());
-            assertTrue("Cannot remove file.", blocks[idx].delete());
+                block.getName() + " " + previous.getName());
+            assertTrue("Cannot remove file.", block.delete());
             assertTrue("Cannot corrupt meta file.",
-                previous.renameTo(blocks[idx]));
+                previous.renameTo(block));
             assertTrue("Cannot recreate empty meta file.",
                 previous.createNewFile());
             previous = null;
           } else {
-            previous = blocks[idx];
+            previous = block;
           }
         }
       }

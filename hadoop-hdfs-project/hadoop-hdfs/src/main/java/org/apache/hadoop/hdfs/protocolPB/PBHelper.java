@@ -546,7 +546,7 @@ public class PBHelper {
   }
 
   public static Token<BlockTokenIdentifier> convert(TokenProto blockToken) {
-    return new Token<BlockTokenIdentifier>(
+    return new Token<>(
         blockToken.getIdentifier().toByteArray(),
         blockToken.getPassword().toByteArray(), new Text(blockToken.getKind()),
         new Text(blockToken.getService()));
@@ -555,7 +555,7 @@ public class PBHelper {
 
   public static Token<DelegationTokenIdentifier> convertDelegationToken(
       TokenProto blockToken) {
-    return new Token<DelegationTokenIdentifier>(
+    return new Token<>(
         blockToken.getIdentifier().toByteArray(),
         blockToken.getPassword().toByteArray(), new Text(blockToken.getKind()),
         new Text(blockToken.getService()));
@@ -669,8 +669,8 @@ public class PBHelper {
         throw new AssertionError("Invalid action");
     }
     Block[] blocks = cmd.getBlocks();
-    for (int i = 0; i < blocks.length; i++) {
-      builder.addBlocks(PBHelper.convert(blocks[i]));
+    for (Block block : blocks) {
+      builder.addBlocks(PBHelper.convert(block));
     }
     builder.addAllTargets(PBHelper.convert(cmd.getTargets()));
     return builder.build();
@@ -741,7 +741,7 @@ public class PBHelper {
       BlockRecoveryCommandProto recoveryCmd) {
     List<RecoveringBlockProto> list = recoveryCmd.getBlocksList();
     List<RecoveringBlock> recoveringBlocks =
-        new ArrayList<RecoveringBlock>(list.size());
+        new ArrayList<>(list.size());
 
     for (RecoveringBlockProto rbp : list) {
       recoveringBlocks.add(PBHelper.convert(rbp));
@@ -867,9 +867,9 @@ public class PBHelper {
       return null;
     }
     final int len = lb.size();
-    List<LocatedBlock> result = new ArrayList<LocatedBlock>(len);
-    for (int i = 0; i < len; ++i) {
-      result.add(PBHelper.convert(lb.get(i)));
+    List<LocatedBlock> result = new ArrayList<>(len);
+    for (LocatedBlockProto aLb : lb) {
+      result.add(PBHelper.convert(aLb));
     }
     return result;
   }
@@ -880,9 +880,9 @@ public class PBHelper {
       return null;
     }
     final int len = lb.size();
-    List<LocatedBlockProto> result = new ArrayList<LocatedBlockProto>(len);
-    for (int i = 0; i < len; ++i) {
-      result.add(PBHelper.convert(lb.get(i)));
+    List<LocatedBlockProto> result = new ArrayList<>(len);
+    for (LocatedBlock aLb : lb) {
+      result.add(PBHelper.convert(aLb));
     }
     return result;
   }
@@ -1001,7 +1001,7 @@ public class PBHelper {
         CreateFlagProto.OVERWRITE_VALUE) {
       result.add(CreateFlag.OVERWRITE);
     }
-    return new EnumSetWritable<CreateFlag>(result);
+    return new EnumSetWritable<>(result);
   }
 
 
@@ -1302,10 +1302,10 @@ public class PBHelper {
   //HOP_CODE_START
   public static SortedActiveNodeList convert(
       ActiveNamenodeListResponseProto p) {
-    List<ActiveNode> anl = new ArrayList<ActiveNode>();
+    List<ActiveNode> anl = new ArrayList<>();
     List<ActiveNodeProto> anlp = p.getNamenodesList();
-    for (int i = 0; i < anlp.size(); i++) {
-      ActiveNode an = PBHelper.convert(anlp.get(i));
+    for (ActiveNodeProto anAnlp : anlp) {
+      ActiveNode an = PBHelper.convert(anAnlp);
       anl.add(an);
     }
     return new SortedActiveNodeListPBImpl(anl);
@@ -1334,8 +1334,8 @@ public class PBHelper {
     List<ActiveNode> anl = anlWrapper.getActiveNodes();
     ActiveNamenodeListResponseProto.Builder anlrpb =
         ActiveNamenodeListResponseProto.newBuilder();
-    for (int i = 0; i < anl.size(); i++) {
-      ActiveNodeProto anp = PBHelper.convert(anl.get(i));
+    for (ActiveNode anAnl : anl) {
+      ActiveNodeProto anp = PBHelper.convert(anAnl);
       anlrpb.addNamenodes(anp);
     }
     return anlrpb.build();

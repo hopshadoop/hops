@@ -116,7 +116,7 @@ public class NamenodeWebHdfsMethods {
   private static final UriFsPathParam ROOT = new UriFsPathParam("");
   
   private static final ThreadLocal<String> REMOTE_ADDRESS =
-      new ThreadLocal<String>();
+      new ThreadLocal<>();
 
   /**
    * @return the remote client address.
@@ -494,7 +494,7 @@ public class NamenodeWebHdfsMethods {
       }
       case RENEWDELEGATIONTOKEN: {
         final Token<DelegationTokenIdentifier> token =
-            new Token<DelegationTokenIdentifier>();
+            new Token<>();
         token.decodeFromUrlString(delegationTokenArgument.getValue());
         final long expiryTime = np.renewDelegationToken(token);
         final String js = JsonUtil.toJsonString("long", expiryTime);
@@ -502,7 +502,7 @@ public class NamenodeWebHdfsMethods {
       }
       case CANCELDELEGATIONTOKEN: {
         final Token<DelegationTokenIdentifier> token =
-            new Token<DelegationTokenIdentifier>();
+            new Token<>();
         token.decodeFromUrlString(delegationTokenArgument.getValue());
         np.cancelDelegationToken(token);
         return Response.ok().type(MediaType.APPLICATION_OCTET_STREAM).build();

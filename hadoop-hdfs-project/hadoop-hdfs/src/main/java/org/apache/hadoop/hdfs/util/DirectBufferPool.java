@@ -44,7 +44,7 @@ public class DirectBufferPool {
 
   // Essentially implement a multimap with weak values.
   ConcurrentMap<Integer, Queue<WeakReference<ByteBuffer>>> buffersBySize =
-      new ConcurrentHashMap<Integer, Queue<WeakReference<ByteBuffer>>>();
+      new ConcurrentHashMap<>();
 
   /**
    * Allocate a direct buffer of the specified size, in bytes.
@@ -82,7 +82,7 @@ public class DirectBufferPool {
     int size = buf.capacity();
     Queue<WeakReference<ByteBuffer>> list = buffersBySize.get(size);
     if (list == null) {
-      list = new ConcurrentLinkedQueue<WeakReference<ByteBuffer>>();
+      list = new ConcurrentLinkedQueue<>();
       Queue<WeakReference<ByteBuffer>> prev =
           buffersBySize.putIfAbsent(size, list);
       // someone else put a queue in the map before we did
@@ -90,7 +90,7 @@ public class DirectBufferPool {
         list = prev;
       }
     }
-    list.add(new WeakReference<ByteBuffer>(buf));
+    list.add(new WeakReference<>(buf));
   }
   
   /**

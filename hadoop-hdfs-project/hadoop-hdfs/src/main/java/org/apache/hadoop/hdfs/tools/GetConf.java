@@ -74,7 +74,7 @@ public class GetConf extends Configured implements Tool {
     private static Map<String, CommandHandler> map;
 
     static {
-      map = new HashMap<String, CommandHandler>();
+      map = new HashMap<>();
       map.put(NAMENODE.getName().toLowerCase(), new NameNodesCommandHandler());
       map.put(INCLUDE_FILE.getName().toLowerCase(),
           new CommandHandler("DFSConfigKeys.DFS_HOSTS"));

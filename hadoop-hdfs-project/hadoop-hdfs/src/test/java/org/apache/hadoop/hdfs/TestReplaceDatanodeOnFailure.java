@@ -77,32 +77,32 @@ public class TestReplaceDatanodeOnFailure {
       for (int nExistings = 0; nExistings < datanodes.length; nExistings++) {
         final DatanodeInfo[] existings = datanodes[nExistings];
         Assert.assertEquals(nExistings, existings.length);
-
-        for (int i = 0; i < isAppend.length; i++) {
-          for (int j = 0; j < isHflushed.length; j++) {
+  
+        for (boolean anIsAppend : isAppend) {
+          for (boolean anIsHflushed : isHflushed) {
             final int half = replication / 2;
             final boolean enoughReplica = replication <= nExistings;
             final boolean noReplica = nExistings == 0;
             final boolean replicationL3 = replication < 3;
             final boolean existingsLEhalf = nExistings <= half;
-            final boolean isAH = isAppend[i] || isHflushed[j];
-
+            final boolean isAH = anIsAppend || anIsHflushed;
+      
             final boolean expected;
             if (enoughReplica || noReplica || replicationL3) {
               expected = false;
             } else {
               expected = isAH || existingsLEhalf;
             }
-            
+      
             final boolean computed =
-                p.satisfy(replication, existings, isAppend[i], isHflushed[j]);
+                p.satisfy(replication, existings, anIsAppend, anIsHflushed);
             try {
               Assert.assertEquals(expected, computed);
             } catch (AssertionError e) {
               final String s =
                   "replication=" + replication + "\nnExistings =" + nExistings +
-                      "\nisAppend   =" + isAppend[i] + "\nisHflushed =" +
-                      isHflushed[j];
+                      "\nisAppend   =" + anIsAppend + "\nisHflushed =" +
+                      anIsHflushed;
               throw new RuntimeException(s, e);
             }
           }
@@ -169,12 +169,12 @@ public class TestReplaceDatanodeOnFailure {
 
       //Verify the file
       LOG.info("Verify the file");
-      for (int i = 0; i < slowwriters.length; i++) {
-        LOG.info(slowwriters[i].filepath + ": length=" +
-            fs.getFileStatus(slowwriters[i].filepath).getLen());
+      for (SlowWriter slowwriter : slowwriters) {
+        LOG.info(slowwriter.filepath + ": length=" +
+            fs.getFileStatus(slowwriter.filepath).getLen());
         FSDataInputStream in = null;
         try {
-          in = fs.open(slowwriters[i].filepath);
+          in = fs.open(slowwriter.filepath);
           for (int j = 0, x; (x = in.read()) != -1; j++) {
             Assert.assertEquals(j, x);
           }

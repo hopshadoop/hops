@@ -45,8 +45,8 @@ public class TestNetworkTopology {
         DFSTestUtil.getDatanodeDescriptor("5.5.5.5", "/d1/r2"),
         DFSTestUtil.getDatanodeDescriptor("6.6.6.6", "/d2/r3"),
         DFSTestUtil.getDatanodeDescriptor("7.7.7.7", "/d2/r3")};
-    for (int i = 0; i < dataNodes.length; i++) {
-      cluster.add(dataNodes[i]);
+    for (DatanodeDescriptor dataNode : dataNodes) {
+      cluster.add(dataNode);
     }
   }
   
@@ -54,8 +54,8 @@ public class TestNetworkTopology {
   public void testContains() throws Exception {
     DatanodeDescriptor nodeNotInMap =
         DFSTestUtil.getDatanodeDescriptor("8.8.8.8", "/d2/r4");
-    for (int i = 0; i < dataNodes.length; i++) {
-      assertTrue(cluster.contains(dataNodes[i]));
+    for (DatanodeDescriptor dataNode : dataNodes) {
+      assertTrue(cluster.contains(dataNode));
     }
     assertFalse(cluster.contains(nodeNotInMap));
   }
@@ -147,15 +147,15 @@ public class TestNetworkTopology {
   
   @Test
   public void testRemove() throws Exception {
-    for (int i = 0; i < dataNodes.length; i++) {
-      cluster.remove(dataNodes[i]);
+    for (DatanodeDescriptor dataNode2 : dataNodes) {
+      cluster.remove(dataNode2);
     }
-    for (int i = 0; i < dataNodes.length; i++) {
-      assertFalse(cluster.contains(dataNodes[i]));
+    for (DatanodeDescriptor dataNode1 : dataNodes) {
+      assertFalse(cluster.contains(dataNode1));
     }
     assertEquals(0, cluster.getNumOfLeaves());
-    for (int i = 0; i < dataNodes.length; i++) {
-      cluster.add(dataNodes[i]);
+    for (DatanodeDescriptor dataNode : dataNodes) {
+      cluster.add(dataNode);
     }
   }
   
@@ -170,7 +170,7 @@ public class TestNetworkTopology {
    */
   private Map<Node, Integer> pickNodesAtRandom(int numNodes,
       String excludedScope) {
-    Map<Node, Integer> frequency = new HashMap<Node, Integer>();
+    Map<Node, Integer> frequency = new HashMap<>();
     for (DatanodeDescriptor dnd : dataNodes) {
       frequency.put(dnd, 0);
     }
@@ -203,9 +203,9 @@ public class TestNetworkTopology {
   public void testChooseRandomExcludedRack() {
     Map<Node, Integer> frequency = pickNodesAtRandom(100, "~" + "/d2");
     // all the nodes on the second rack should be zero
-    for (int j = 0; j < dataNodes.length; j++) {
-      int freq = frequency.get(dataNodes[j]);
-      if (dataNodes[j].getNetworkLocation().startsWith("/d2")) {
+    for (DatanodeDescriptor dataNode : dataNodes) {
+      int freq = frequency.get(dataNode);
+      if (dataNode.getNetworkLocation().startsWith("/d2")) {
         assertEquals(0, freq);
       } else {
         assertTrue(freq > 0);

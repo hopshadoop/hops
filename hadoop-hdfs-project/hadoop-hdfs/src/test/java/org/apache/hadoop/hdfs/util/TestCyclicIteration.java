@@ -38,7 +38,7 @@ public class TestCyclicIteration {
 
   private static void checkCyclicIteration(int numOfElements) {
     //create a tree map
-    final NavigableMap<Integer, Integer> map = new TreeMap<Integer, Integer>();
+    final NavigableMap<Integer, Integer> map = new TreeMap<>();
     final Integer[] integers = new Integer[numOfElements];
     for (int i = 0; i < integers.length; i++) {
       integers[i] = 2 * i;
@@ -50,8 +50,8 @@ public class TestCyclicIteration {
     //try starting everywhere
     for (int start = -1; start <= 2 * integers.length - 1; start++) {
       //get a cyclic iteration
-      final List<Integer> iteration = new ArrayList<Integer>();
-      for (Map.Entry<Integer, Integer> e : new CyclicIteration<Integer, Integer>(
+      final List<Integer> iteration = new ArrayList<>();
+      for (Map.Entry<Integer, Integer> e : new CyclicIteration<>(
           map, start)) {
         iteration.add(e.getKey());
       }

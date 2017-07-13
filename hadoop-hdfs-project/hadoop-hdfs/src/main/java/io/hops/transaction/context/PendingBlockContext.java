@@ -146,7 +146,7 @@ public class PendingBlockContext
       throws StorageCallPreventedException, StorageException {
     List<PendingBlockInfo> result = null;
     if (allPendingRead) {
-      result = new ArrayList<PendingBlockInfo>(getAll());
+      result = new ArrayList<>(getAll());
       hit(pFinder, result);
     } else {
       aboutToAccessStorage(pFinder);

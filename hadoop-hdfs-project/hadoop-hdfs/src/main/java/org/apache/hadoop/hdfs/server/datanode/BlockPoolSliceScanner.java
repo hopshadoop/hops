@@ -80,9 +80,9 @@ class BlockPoolSliceScanner {
   private final FsDatasetSpi<? extends FsVolumeSpi> dataset;
   
   private final SortedSet<BlockScanInfo> blockInfoSet =
-      new TreeSet<BlockScanInfo>();
+      new TreeSet<>();
   private final Map<Block, BlockScanInfo> blockMap =
-      new HashMap<Block, BlockScanInfo>();
+      new HashMap<>();
   
   // processedBlocks keeps track of which blocks are scanned
   // since the last run.
@@ -604,7 +604,7 @@ class BlockPoolSliceScanner {
     }
 
     // Create a new processedBlocks structure
-    processedBlocks = new HashMap<Long, Integer>();
+    processedBlocks = new HashMap<>();
     if (!assignInitialVerificationTimes()) {
       return;
     }
@@ -697,13 +697,11 @@ class BlockPoolSliceScanner {
     long now = Time.now();
     
     Date date = new Date();
-    
-    for (Iterator<BlockScanInfo> it = blockInfoSet.iterator(); it.hasNext(); ) {
-      BlockScanInfo info = it.next();
-      
+  
+    for (BlockScanInfo info : blockInfoSet) {
       long scanTime = info.getLastScanTime();
       long diff = now - scanTime;
-
+    
       if (diff <= oneHour) {
         inOneHour++;
       }
@@ -722,7 +720,7 @@ class BlockPoolSliceScanner {
       if (scanTime <= 0) {
         neverScanned++;
       }
-      
+    
       if (!summaryOnly) {
         date.setTime(scanTime);
         String scanType =

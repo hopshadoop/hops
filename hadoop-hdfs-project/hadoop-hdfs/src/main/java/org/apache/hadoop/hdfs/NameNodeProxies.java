@@ -182,7 +182,7 @@ public class NameNodeProxies {
       LOG.error(message);
       throw new IllegalStateException(message);
     }
-    return new ProxyAndInfo<T>(proxy, dtService);
+    return new ProxyAndInfo<>(proxy, dtService);
   }
 
   private static RefreshAuthorizationPolicyProtocol createNNProxyWithRefreshAuthorizationPolicyProtocol(
@@ -228,7 +228,7 @@ public class NameNodeProxies {
       RetryPolicy methodPolicy =
           RetryPolicies.retryByException(timeoutPolicy, exceptionToPolicyMap);
       Map<String, RetryPolicy> methodNameToPolicyMap =
-          new HashMap<String, RetryPolicy>();
+          new HashMap<>();
       methodNameToPolicyMap.put("getBlocks", methodPolicy);
       methodNameToPolicyMap.put("getAccessKeys", methodPolicy);
       proxy = (NamenodeProtocolPB) RetryProxy
@@ -264,12 +264,12 @@ public class NameNodeProxies {
               HdfsConstants.LEASE_SOFTLIMIT_PERIOD, TimeUnit.MILLISECONDS);
 
       Map<Class<? extends Exception>, RetryPolicy> remoteExceptionToPolicyMap =
-          new HashMap<Class<? extends Exception>, RetryPolicy>();
+          new HashMap<>();
       remoteExceptionToPolicyMap
           .put(AlreadyBeingCreatedException.class, createPolicy);
 
       Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap =
-          new HashMap<Class<? extends Exception>, RetryPolicy>();
+          new HashMap<>();
       exceptionToPolicyMap.put(RemoteException.class, RetryPolicies
           .retryByRemoteException(defaultPolicy, remoteExceptionToPolicyMap));
       exceptionToPolicyMap.put(SSLException.class, RetryPolicies.TRY_ONCE_THEN_FAIL);
@@ -277,13 +277,13 @@ public class NameNodeProxies {
       RetryPolicy methodPolicy =
           RetryPolicies.retryByException(defaultPolicy, exceptionToPolicyMap);
       Map<String, RetryPolicy> methodNameToPolicyMap =
-          new HashMap<String, RetryPolicy>();
+          new HashMap<>();
 
       methodNameToPolicyMap.put("create", methodPolicy);
 
       proxy = (ClientNamenodeProtocolPB) RetryProxy
           .create(ClientNamenodeProtocolPB.class,
-              new DefaultFailoverProxyProvider<ClientNamenodeProtocolPB>(
+              new DefaultFailoverProxyProvider<>(
                   ClientNamenodeProtocolPB.class, proxy), methodNameToPolicyMap,
               defaultPolicy);
     }

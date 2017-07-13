@@ -494,9 +494,9 @@ public class BlockManager {
   private void dumpBlockMeta(Block block, PrintWriter out)
       throws StorageException, TransactionContextException {
     List<DatanodeDescriptor> containingNodes =
-        new ArrayList<DatanodeDescriptor>();
+        new ArrayList<>();
     List<DatanodeDescriptor> containingLiveReplicasNodes =
-        new ArrayList<DatanodeDescriptor>();
+        new ArrayList<>();
 
     NumberReplicas numReplicas = new NumberReplicas();
     // source node returned is not used
@@ -751,7 +751,7 @@ public class BlockManager {
   private List<String> getValidLocations(BlockInfo block)
       throws StorageException, TransactionContextException {
     ArrayList<String> machineSet =
-        new ArrayList<String>(blocksMap.numNodes(block));
+        new ArrayList<>(blocksMap.numNodes(block));
     for (Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(block);
          it.hasNext(); ) {
       String storageID = it.next().getStorageID();
@@ -784,7 +784,7 @@ public class BlockManager {
     }
 
     long endOff = offset + length;
-    List<LocatedBlock> results = new ArrayList<LocatedBlock>(blocks.length);
+    List<LocatedBlock> results = new ArrayList<>(blocks.length);
     do {
       results.add(createLocatedBlock(blocks[curBlk], curPos, mode));
       curPos += blocks[curBlk].getNumBytes();
@@ -796,7 +796,7 @@ public class BlockManager {
 
   private List<LocatedBlock> createPhantomLocatedBlockList(INodeFile file, final byte[] data,
       final AccessMode mode) throws IOException, StorageException {
-    List<LocatedBlock> results = new ArrayList<LocatedBlock>(1);
+    List<LocatedBlock> results = new ArrayList<>(1);
     BlockInfo fakeBlk = new BlockInfo();
     fakeBlk.setBlockIdNoPersistance(-file.getId());
     fakeBlk.setINodeIdNoPersistance(-file.getId());
@@ -1053,7 +1053,7 @@ public class BlockManager {
     for (int i = 0; i < startBlock; i++) {
       iter.next();
     }
-    List<BlockWithLocations> results = new ArrayList<BlockWithLocations>();
+    List<BlockWithLocations> results = new ArrayList<>();
     long totalSize = 0;
     BlockInfo curBlock;
     while (totalSize < size && iter.hasNext()) {
@@ -1364,7 +1364,7 @@ public class BlockManager {
     int additionalReplRequired;
 
     int scheduledWork = 0;
-    List<ReplicationWork> work = new LinkedList<ReplicationWork>();
+    List<ReplicationWork> work = new LinkedList<>();
 
     synchronized (neededReplications) {
       // block should belong to a file
@@ -1380,8 +1380,8 @@ public class BlockManager {
       requiredReplication = bc.getBlockReplication();
 
       // get a source data-node
-      containingNodes = new ArrayList<DatanodeDescriptor>();
-      liveReplicaNodes = new ArrayList<DatanodeDescriptor>();
+      containingNodes = new ArrayList<>();
+      liveReplicaNodes = new ArrayList<>();
       NumberReplicas numReplicas = new NumberReplicas();
       srcNode = chooseSourceDatanode(blk, containingNodes, liveReplicaNodes,
           numReplicas, priority1);
@@ -1415,7 +1415,7 @@ public class BlockManager {
       work.add(new ReplicationWork(blk, bc, srcNode, containingNodes,
           liveReplicaNodes, additionalReplRequired, priority1));
     }
-    HashMap<Node, Node> excludedNodes = new HashMap<Node, Node>();
+    HashMap<Node, Node> excludedNodes = new HashMap<>();
     for (ReplicationWork rw : work) {
       // Exclude all of the containing nodes from being targets.
       // This list includes decommissioning or corrupt nodes.
@@ -1514,9 +1514,9 @@ public class BlockManager {
         DatanodeDescriptor[] targets = rw.targets;
         if (targets != null && targets.length != 0) {
           StringBuilder targetList = new StringBuilder("datanode(s)");
-          for (int k = 0; k < targets.length; k++) {
+          for (DatanodeDescriptor target : targets) {
             targetList.append(' ');
-            targetList.append(targets[k]);
+            targetList.append(target);
           }
           blockLog.info(
               "BLOCK* ask " + rw.srcNode + " to replicate " + rw.block +
@@ -1679,8 +1679,8 @@ public class BlockManager {
   void processPendingReplications() throws IOException {
     long[] timedOutItems = pendingReplications.getTimedOutBlocks();
     if (timedOutItems != null) {
-      for (int i = 0; i < timedOutItems.length; i++) {
-        processTimedOutPendingBlock(timedOutItems[i]);
+      for (long timedOutItem : timedOutItems) {
+        processTimedOutPendingBlock(timedOutItem);
       }
       /* If we know the target datanodes where the replication timedout,
        * we could invoke decBlocksScheduled() on it. Its ok for now.
@@ -1858,10 +1858,10 @@ public class BlockManager {
           }
         };
 
-    final Set<Block> toRemove = new HashSet<Block>();
-    for (Iterator<Block> it = postponedMisreplicatedBlocks.iterator();
-         it.hasNext(); ) {
-      rescanPostponedMisreplicatedBlocksHandler.setParams(it.next(), toRemove);
+    final Set<Block> toRemove = new HashSet<>();
+    for (Block postponedMisreplicatedBlock : postponedMisreplicatedBlocks) {
+      rescanPostponedMisreplicatedBlocksHandler
+          .setParams(postponedMisreplicatedBlock, toRemove);
       rescanPostponedMisreplicatedBlocksHandler.handle(namesystem);
     }
     postponedMisreplicatedBlocks.removeAll(toRemove);
@@ -1873,12 +1873,12 @@ public class BlockManager {
     // Modify the (block-->datanode) map, according to the difference
     // between the old and new block report.
     //
-    Collection<BlockInfo> toAdd = new HashSet<BlockInfo>();
-    Collection<Long> toRemove = new HashSet<Long>();
-    Collection<Block> toInvalidate = new HashSet<Block>();
+    Collection<BlockInfo> toAdd = new HashSet<>();
+    Collection<Long> toRemove = new HashSet<>();
+    Collection<Block> toInvalidate = new HashSet<>();
     Collection<BlockToMarkCorrupt> toCorrupt =
-        new HashSet<BlockToMarkCorrupt>();
-    Collection<StatefulBlockInfo> toUC = new HashSet<StatefulBlockInfo>();
+        new HashSet<>();
+    Collection<StatefulBlockInfo> toUC = new HashSet<>();
 
     final boolean firstBlockReport =
         namesystem.isInStartupSafeMode() && node.isFirstBlockReport();
@@ -2028,10 +2028,10 @@ public class BlockManager {
       return;
     }
     final Map<Long,Integer> blkAndInodeIdMap = dn.getAllMachineReplicas();
-    final Set<Long> allMachineBlocks = new HashSet<Long>(blkAndInodeIdMap.keySet());
+    final Set<Long> allMachineBlocks = new HashSet<>(blkAndInodeIdMap.keySet());
     final Map<Long,Long> invalidatedReplicas = dn.getAllMachineInvalidatedReplicasWithGenStamp();
 
-    final Set<Long> safeBlocks = new HashSet<Long>(allMachineBlocks);
+    final Set<Long> safeBlocks = new HashSet<>(allMachineBlocks);
 
     try {
       final int numOfReportedBlks = newReport.getNumberOfBlocks();
@@ -2057,17 +2057,18 @@ public class BlockManager {
                         public void acquireLock(TransactionLocks locks) throws IOException {
                           LockFactory lf = LockFactory.getInstance();
                           long[] partOfreportedBlks = (long[]) getParams()[0];
-                          List<Long> resovedBlkIds = new ArrayList<Long>();
-                          List<Integer> inodeIds = new ArrayList<Integer>();
-                          List<Long> unResovedBlkIds = new ArrayList<Long>();
-
-                          for(int i =0 ;i < partOfreportedBlks.length; i++){
-                            Integer inodeId = blkAndInodeIdMap.get(partOfreportedBlks[i]);
-                            if(inodeId  != null){
-                              resovedBlkIds.add(partOfreportedBlks[i]);
+                          List<Long> resovedBlkIds = new ArrayList<>();
+                          List<Integer> inodeIds = new ArrayList<>();
+                          List<Long> unResovedBlkIds = new ArrayList<>();
+  
+                          for (long partOfreportedBlk : partOfreportedBlks) {
+                            Integer inodeId =
+                                blkAndInodeIdMap.get(partOfreportedBlk);
+                            if (inodeId != null) {
+                              resovedBlkIds.add(partOfreportedBlk);
                               inodeIds.add(inodeId);
-                            }else{
-                              unResovedBlkIds.add(partOfreportedBlks[i]);
+                            } else {
+                              unResovedBlkIds.add(partOfreportedBlk);
                             }
                           }
 
@@ -2905,7 +2906,7 @@ public class BlockManager {
       delNodeHint = null;
     }
     Collection<DatanodeDescriptor> nonExcess =
-        new ArrayList<DatanodeDescriptor>();
+        new ArrayList<>();
     Collection<DatanodeDescriptor> corruptNodes =
         corruptReplicas.getNodes(getBlockInfo(block));
     for (Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(block);
@@ -2958,14 +2959,12 @@ public class BlockManager {
     // first form a rack to datanodes map and
     BlockCollection bc = getBlockCollection(b);
     final Map<String, List<DatanodeDescriptor>> rackMap =
-        new HashMap<String, List<DatanodeDescriptor>>();
-    for (final Iterator<DatanodeDescriptor> iter = nonExcess.iterator();
-         iter.hasNext(); ) {
-      final DatanodeDescriptor node = iter.next();
+        new HashMap<>();
+    for (final DatanodeDescriptor node : nonExcess) {
       final String rackName = node.getNetworkLocation();
       List<DatanodeDescriptor> datanodeList = rackMap.get(rackName);
       if (datanodeList == null) {
-        datanodeList = new ArrayList<DatanodeDescriptor>();
+        datanodeList = new ArrayList<>();
         rackMap.put(rackName, datanodeList);
       }
       datanodeList.add(node);
@@ -2974,9 +2973,9 @@ public class BlockManager {
     // split nodes into two sets
     // priSet contains nodes on rack with more than one replica
     // remains contains the remaining nodes
-    final List<DatanodeDescriptor> priSet = new ArrayList<DatanodeDescriptor>();
+    final List<DatanodeDescriptor> priSet = new ArrayList<>();
     final List<DatanodeDescriptor> remains =
-        new ArrayList<DatanodeDescriptor>();
+        new ArrayList<>();
     for (List<DatanodeDescriptor> datanodeList : rackMap.values()) {
       if (datanodeList.size() == 1) {
         remains.add(datanodeList.get(0));
@@ -3147,7 +3146,7 @@ public class BlockManager {
   private long addBlock(final Block block, List<BlockWithLocations> results)
       throws IOException {
 
-    final List<String> machineSet = new ArrayList<String>();
+    final List<String> machineSet = new ArrayList<>();
 
     new HopsTransactionalRequestHandler(HDFSOperationType.GET_VALID_BLK_LOCS) {
       INodeIdentifier inodeIdentifier;
@@ -3215,11 +3214,11 @@ public class BlockManager {
       Block block, ReplicaState reportedState, DatanodeDescriptor delHintNode)
       throws IOException {
     // blockReceived reports a finalized block
-    Collection<BlockInfo> toAdd = new LinkedList<BlockInfo>();
-    Collection<Block> toInvalidate = new LinkedList<Block>();
+    Collection<BlockInfo> toAdd = new LinkedList<>();
+    Collection<Block> toInvalidate = new LinkedList<>();
     Collection<BlockToMarkCorrupt> toCorrupt =
-        new LinkedList<BlockToMarkCorrupt>();
-    Collection<StatefulBlockInfo> toUC = new LinkedList<StatefulBlockInfo>();
+        new LinkedList<>();
+    Collection<StatefulBlockInfo> toUC = new LinkedList<>();
     processReportedBlock(node, block, reportedState, toAdd, toInvalidate,
         toCorrupt, toUC);
     // the block is only in one of the to-do lists

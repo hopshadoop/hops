@@ -119,7 +119,7 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
       InetSocketAddress httpFSAddr, AuthenticatedURL.Token token,
       String renewer) throws IOException {
     DelegationTokenOperation op = DelegationTokenOperation.GETDELEGATIONTOKEN;
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, op.toString());
     params.put(RENEWER_PARAM, renewer);
     URL url = HttpFSUtils.createHttpURL(new Path(fsURI), params);
@@ -133,7 +133,7 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
           .get(DELEGATION_TOKEN_JSON);
       String tokenStr = (String) json.get(DELEGATION_TOKEN_URL_STRING_JSON);
       Token<AbstractDelegationTokenIdentifier> dToken =
-          new Token<AbstractDelegationTokenIdentifier>();
+          new Token<>();
       dToken.decodeFromUrlString(tokenStr);
       SecurityUtil.setTokenService(dToken, httpFSAddr);
       return dToken;
@@ -144,7 +144,7 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
 
   public static long renewDelegationToken(URI fsURI,
       AuthenticatedURL.Token token, Token<?> dToken) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM,
         DelegationTokenOperation.RENEWDELEGATIONTOKEN.toString());
     params.put(TOKEN_PARAM, dToken.encodeToUrlString());
@@ -166,7 +166,7 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
 
   public static void cancelDelegationToken(URI fsURI,
       AuthenticatedURL.Token token, Token<?> dToken) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM,
         DelegationTokenOperation.CANCELDELEGATIONTOKEN.toString());
     params.put(TOKEN_PARAM, dToken.encodeToUrlString());

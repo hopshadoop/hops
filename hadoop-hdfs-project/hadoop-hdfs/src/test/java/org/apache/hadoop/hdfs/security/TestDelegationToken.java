@@ -96,7 +96,7 @@ public class TestDelegationToken {
       String renewer) {
     DelegationTokenIdentifier dtId =
         new DelegationTokenIdentifier(new Text(owner), new Text(renewer), null);
-    return new Token<DelegationTokenIdentifier>(dtId, dtSecretManager);
+    return new Token<>(dtId, dtSecretManager);
   }
   
   @Test

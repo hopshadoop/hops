@@ -34,12 +34,12 @@ final class BlockLock extends IndividualBlockLock {
 
   BlockLock() {
     super();
-    this.files = new ArrayList<INodeFile>();
+    this.files = new ArrayList<>();
   }
 
   BlockLock(long blockId, INodeIdentifier inode) {
     super(blockId, inode);
-    this.files = new ArrayList<INodeFile>();
+    this.files = new ArrayList<>();
   }
 
   @Override

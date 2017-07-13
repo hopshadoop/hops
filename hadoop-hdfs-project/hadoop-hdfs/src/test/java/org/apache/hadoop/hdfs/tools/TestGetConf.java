@@ -133,7 +133,7 @@ public class TestGetConf {
   private void getAddressListFromTool(TestType type, HdfsConfiguration conf,
       boolean checkPort, List<InetSocketAddress> expected) throws Exception {
     String out = getAddressListFromTool(type, conf, expected.size() != 0);
-    List<String> values = new ArrayList<String>();
+    List<String> values = new ArrayList<>();
     
     // Convert list of addresses returned to an array of string
     StringTokenizer tokenizer = new StringTokenizer(out);

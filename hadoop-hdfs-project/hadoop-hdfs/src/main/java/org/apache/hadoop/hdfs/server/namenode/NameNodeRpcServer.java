@@ -439,7 +439,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }
     HashMap<Node, Node> excludedNodesSet = null;
     if (excludedNodes != null) {
-      excludedNodesSet = new HashMap<Node, Node>(excludedNodes.length);
+      excludedNodesSet = new HashMap<>(excludedNodes.length);
       for (Node node : excludedNodes) {
         excludedNodesSet.put(node, node);
       }
@@ -468,7 +468,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
     HashMap<Node, Node> excludeSet = null;
     if (excludes != null) {
-      excludeSet = new HashMap<Node, Node>(excludes.length);
+      excludeSet = new HashMap<>(excludes.length);
       for (Node node : excludes) {
         excludeSet.put(node, node);
       }

@@ -324,7 +324,7 @@ public class TestLeaseRecovery2 {
    */
   @Test
   public void testSoftLeaseRecovery() throws Exception {
-    Map<String, String[]> u2g_map = new HashMap<String, String[]>(1);
+    Map<String, String[]> u2g_map = new HashMap<>(1);
     u2g_map.put(fakeUsername, new String[]{fakeGroup});
     DFSTestUtil.updateConfWithFakeGroupMapping(conf, u2g_map);
 

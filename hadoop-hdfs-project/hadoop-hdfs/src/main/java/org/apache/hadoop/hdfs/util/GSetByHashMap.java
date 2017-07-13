@@ -30,7 +30,7 @@ public class GSetByHashMap<K, E extends K> implements GSet<K, E> {
   private final HashMap<K, E> m;
 
   public GSetByHashMap(int initialCapacity, float loadFactor) {
-    m = new HashMap<K, E>(initialCapacity, loadFactor);
+    m = new HashMap<>(initialCapacity, loadFactor);
   }
 
   @Override

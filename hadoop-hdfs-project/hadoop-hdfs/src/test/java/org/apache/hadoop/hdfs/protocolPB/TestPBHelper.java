@@ -282,7 +282,7 @@ public class TestPBHelper {
     assertEquals(b.getBlock(), b1.getBlock());
     DatanodeInfo[] dnInfo1 = b1.getLocations();
     assertEquals(dnInfo.length, dnInfo1.length);
-    for (int i = 0; i < dnInfo.length; i++) {
+    for (DatanodeInfo aDnInfo : dnInfo) {
       compare(dnInfo[0], dnInfo1[0]);
     }
   }
@@ -323,7 +323,7 @@ public class TestPBHelper {
   @Test
   public void testConvertBlockToken() {
     Token<BlockTokenIdentifier> token =
-        new Token<BlockTokenIdentifier>("identifier".getBytes(),
+        new Token<>("identifier".getBytes(),
             "password".getBytes(), new Text("kind"), new Text("service"));
     TokenProto tokenProto = PBHelper.convert(token);
     Token<BlockTokenIdentifier> token2 = PBHelper.convert(tokenProto);
@@ -393,15 +393,15 @@ public class TestPBHelper {
 
   @Test
   public void testConvertLocatedBlockList() {
-    ArrayList<LocatedBlock> lbl = new ArrayList<LocatedBlock>();
+    ArrayList<LocatedBlock> lbl = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
       lbl.add(createLocatedBlock());
     }
     List<LocatedBlockProto> lbpl = PBHelper.convertLocatedBlock2(lbl);
     List<LocatedBlock> lbl2 = PBHelper.convertLocatedBlock(lbpl);
     assertEquals(lbl.size(), lbl2.size());
-    for (int i = 0; i < lbl.size(); i++) {
-      compare(lbl.get(i), lbl2.get(2));
+    for (LocatedBlock aLbl : lbl) {
+      compare(aLbl, lbl2.get(2));
     }
   }
   

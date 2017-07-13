@@ -55,7 +55,7 @@ abstract class AbstractFileTree {
   private final FSNamesystem namesystem;
   private final FSPermissionChecker fsPermissionChecker;
   private final INodeIdentifier subtreeRootId;
-  private final List<Future> activeCollectors = new ArrayList<Future>();
+  private final List<Future> activeCollectors = new ArrayList<>();
   private final FsAction subAccess;
   private volatile IOException exception;
 
@@ -291,7 +291,7 @@ abstract class AbstractFileTree {
   static CountingFileTree createCountingFileTreeFromPath(FSNamesystem namesystem,
       String path) throws StorageException, UnresolvedPathException,
       TransactionContextException, AccessControlException {
-    LinkedList<INode> nodes = new LinkedList<INode>();
+    LinkedList<INode> nodes = new LinkedList<>();
     boolean[] fullyResovled = new boolean[1];
     INodeUtil.resolvePathWithNoTransaction(path, false, nodes, fullyResovled);
     INodeIdentifier rootId = new INodeIdentifier(
@@ -482,7 +482,7 @@ abstract class AbstractFileTree {
     private final SetMultimap<Integer, ProjectedINode> inodesByLevel;
     private final SetMultimap<Integer, ProjectedINode> dirsByLevel;
     private final ConcurrentHashMap<Integer, ProjectedINode> inodesById =
-        new ConcurrentHashMap<Integer, ProjectedINode>();
+        new ConcurrentHashMap<>();
 
     public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
         throws AccessControlException {
@@ -577,7 +577,7 @@ abstract class AbstractFileTree {
   }
 
   static class IdCollectingCountingFileTree extends CountingFileTree {
-    private LinkedList<Integer> ids = new LinkedList<Integer>();
+    private LinkedList<Integer> ids = new LinkedList<>();
     private List<Integer> synchronizedList = Collections.synchronizedList(ids);
 
     public IdCollectingCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
@@ -624,7 +624,7 @@ abstract class AbstractFileTree {
   static FileTree createFileTreeFromPath(FSNamesystem namesystem, String path)
       throws StorageException, UnresolvedPathException,
       TransactionContextException, AccessControlException {
-    LinkedList<INode> nodes = new LinkedList<INode>();
+    LinkedList<INode> nodes = new LinkedList<>();
     boolean[] fullyResovled = new boolean[1];
     INodeUtil.resolvePathWithNoTransaction(path, false, nodes, fullyResovled);
     INodeIdentifier rootId = new INodeIdentifier(

@@ -212,7 +212,7 @@ public class XMLUtils {
     private String value;
     
     public Stanza() {
-      subtrees = new TreeMap<String, LinkedList<Stanza>>();
+      subtrees = new TreeMap<>();
       value = "";
     }
     
@@ -281,7 +281,7 @@ public class XMLUtils {
       if (subtrees.containsKey(name)) {
         l = subtrees.get(name);
       } else {
-        l = new LinkedList<Stanza>();
+        l = new LinkedList<>();
         subtrees.put(name, l);
       }
       l.add(child);

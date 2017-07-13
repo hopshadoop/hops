@@ -520,14 +520,10 @@ public class FSNamesystem
       this.auditLoggers = initAuditLoggers(conf);
       this.isDefaultAuditLogger = auditLoggers.size() == 1 &&
           auditLoggers.get(0) instanceof DefaultAuditLogger;
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
       close();
       throw e;
-    } catch (RuntimeException re) {
-      LOG.error(getClass().getSimpleName() + " initialization failed.", re);
-      close();
-      throw re;
     }
   }
 
@@ -1038,7 +1034,7 @@ public class FSNamesystem
               LocatedBlock lastBlock = blocks.getLastLocatedBlock();
               if (lastBlock != null) {
                 ArrayList<LocatedBlock> lastBlockList =
-                    new ArrayList<LocatedBlock>();
+                    new ArrayList<>();
                 lastBlockList.add(lastBlock);
                 blockManager.getDatanodeManager()
                     .sortLocatedBlocks(clientMachine, lastBlockList);
@@ -1313,7 +1309,7 @@ public class FSNamesystem
     }
 
     // to make sure no two files are the same
-    Set<INode> si = new HashSet<INode>();
+    Set<INode> si = new HashSet<>();
 
     // we put the following prerequisite for the operation
     // replication and blocks sizes should be the same for ALL the blocks
@@ -2114,10 +2110,8 @@ public class FSNamesystem
 
   private Configuration copyConfiguration(Configuration conf){
     Configuration newConf = new HdfsConfiguration();
-
-    Iterator<Map.Entry<String,String>> itr = conf.iterator();
-    while(itr.hasNext()){
-      Map.Entry<String,String> entry = itr.next();
+  
+    for (Map.Entry<String, String> entry : conf) {
       newConf.set(entry.getKey(), entry.getValue());
     }
     return newConf;
@@ -2467,7 +2461,7 @@ public class FSNamesystem
             preferredblocksize = file.getPreferredBlockSize();
 
             //find datanode descriptors
-            chosen = new ArrayList<DatanodeDescriptor>();
+            chosen = new ArrayList<>();
             for (DatanodeInfo d : existings) {
               final DatanodeDescriptor descriptor =
                   blockManager.getDatanodeManager().getDatanode(d);
@@ -3045,7 +3039,7 @@ public class FSNamesystem
       boolean enforcePermission)
       throws AccessControlException, SafeModeException, UnresolvedLinkException,
       IOException, StorageException {
-    ArrayList<Block> collectedBlocks = new ArrayList<Block>();
+    ArrayList<Block> collectedBlocks = new ArrayList<>();
     FSPermissionChecker pc = getPermissionChecker();
     if (isInSafeMode()) {
       throw new SafeModeException("Cannot delete " + src, safeMode);
@@ -3638,8 +3632,8 @@ public class FSNamesystem
             // the file is getting closed. Insert block locations into blockManager.
             // Otherwise fsck will report these blocks as MISSING, especially if the
             // blocksReceived from Datanodes take a long time to arrive.
-            for (int i = 0; i < descriptors.length; i++) {
-              descriptors[i].addBlock(storedBlock);
+            for (DatanodeDescriptor descriptor : descriptors) {
+              descriptor.addBlock(storedBlock);
             }
           }
           // add pipeline locations into the INodeUnderConstruction
@@ -4074,7 +4068,7 @@ public class FSNamesystem
     private boolean resourcesLow = false;
 
     public ThreadLocal<Boolean> safeModePendingOperation =
-        new ThreadLocal<Boolean>();
+        new ThreadLocal<>();
 
     /**
      * Creates SafeModeInfo when the name node enters
@@ -4541,7 +4535,7 @@ public class FSNamesystem
 
     private void performSafeModePendingOperation() throws IOException {
       if (safeModePendingOperation.get() != null) {
-        if (safeModePendingOperation.get().booleanValue() == true) {
+        if (safeModePendingOperation.get() == true) {
           LOG.debug("SafeMode about to perform pending safemode operation");
           safeModePendingOperation.set(false);
           checkMode();
@@ -5002,11 +4996,10 @@ public class FSNamesystem
    */
   void reportBadBlocks(LocatedBlock[] blocks) throws IOException {
     NameNode.stateChangeLog.info("*DIR* reportBadBlocks");
-    for (int i = 0; i < blocks.length; i++) {
-      ExtendedBlock blk = blocks[i].getBlock();
-      DatanodeInfo[] nodes = blocks[i].getLocations();
-      for (int j = 0; j < nodes.length; j++) {
-        DatanodeInfo dn = nodes[j];
+    for (LocatedBlock block : blocks) {
+      ExtendedBlock blk = block.getBlock();
+      DatanodeInfo[] nodes = block.getLocations();
+      for (DatanodeInfo dn : nodes) {
         blockManager
             .findAndMarkBlockAsCorrupt(blk, dn, "client machine reported it");
       }
@@ -5208,7 +5201,7 @@ public class FSNamesystem
     // print a limited # of corrupt files per call
     final int[] count = {0};
     final ArrayList<CorruptFileBlockInfo> corruptFiles =
-        new ArrayList<CorruptFileBlockInfo>();
+        new ArrayList<>();
 
     final Iterator<Block> blkIterator =
         blockManager.getCorruptReplicaBlockIterator();
@@ -5356,7 +5349,7 @@ public class FSNamesystem
             }
             DelegationTokenIdentifier dtId =
                 new DelegationTokenIdentifier(owner, renewer, realUser);
-            token = new Token<DelegationTokenIdentifier>(dtId, dtSecretManager);
+            token = new Token<>(dtId, dtSecretManager);
             long expiryTime = dtSecretManager.getTokenExpiryTime(dtId);
             return token;
           }
@@ -5631,11 +5624,11 @@ public class FSNamesystem
   @Override // NameNodeMXBean
   public String getLiveNodes() throws IOException {
     final Map<String, Map<String, Object>> info =
-        new HashMap<String, Map<String, Object>>();
-    final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
+        new HashMap<>();
+    final List<DatanodeDescriptor> live = new ArrayList<>();
     blockManager.getDatanodeManager().fetchDatanodes(live, null, true);
     for (DatanodeDescriptor node : live) {
-      final Map<String, Object> innerinfo = new HashMap<String, Object>();
+      final Map<String, Object> innerinfo = new HashMap<>();
       innerinfo.put("lastContact", getLastContact(node));
       innerinfo.put("usedSpace", getDfsUsed(node));
       innerinfo.put("adminState", node.getAdminState().toString());
@@ -5654,11 +5647,11 @@ public class FSNamesystem
   @Override // NameNodeMXBean
   public String getDeadNodes() {
     final Map<String, Map<String, Object>> info =
-        new HashMap<String, Map<String, Object>>();
-    final List<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+        new HashMap<>();
+    final List<DatanodeDescriptor> dead = new ArrayList<>();
     blockManager.getDatanodeManager().fetchDatanodes(null, dead, true);
     for (DatanodeDescriptor node : dead) {
-      final Map<String, Object> innerinfo = new HashMap<String, Object>();
+      final Map<String, Object> innerinfo = new HashMap<>();
       innerinfo.put("lastContact", getLastContact(node));
       innerinfo.put("decommissioned", node.isDecommissioned());
       info.put(node.getHostName(), innerinfo);
@@ -5673,11 +5666,11 @@ public class FSNamesystem
   @Override // NameNodeMXBean
   public String getDecomNodes() {
     final Map<String, Map<String, Object>> info =
-        new HashMap<String, Map<String, Object>>();
+        new HashMap<>();
     final List<DatanodeDescriptor> decomNodeList =
         blockManager.getDatanodeManager().getDecommissioningNodes();
     for (DatanodeDescriptor node : decomNodeList) {
-      final Map<String, Object> innerinfo = new HashMap<String, Object>();
+      final Map<String, Object> innerinfo = new HashMap<>();
       innerinfo.put("underReplicatedBlocks",
           node.decommissioningStatus.getUnderReplicatedBlocks());
       innerinfo.put("decommissionOnlyReplicas",
@@ -5910,7 +5903,7 @@ public class FSNamesystem
    * @throws IOException
    */
   private void addSafeBlock(final Long safeBlock) throws IOException {
-    Set<Long> safeBlocks = new HashSet<Long>();
+    Set<Long> safeBlocks = new HashSet<>();
     safeBlocks.add(safeBlock);
     addSafeBlocks(safeBlocks);
   }
@@ -6781,7 +6774,7 @@ public class FSNamesystem
 
   private boolean deleteTreeLevel(final String subtreeRootPath,
       final AbstractFileTree.FileTree fileTree, int level) {
-    ArrayList<Future> barrier = new ArrayList<Future>();
+    ArrayList<Future> barrier = new ArrayList<>();
 
      for (final ProjectedINode dir : fileTree.getDirsByLevel(level)) {
        if (fileTree.countChildren(dir.getId()) <= BIGGEST_DELETEABLE_DIR) {
@@ -6989,7 +6982,7 @@ public class FSNamesystem
     List<SubTreeOperation> ops = (List<SubTreeOperation>)
         EntityManager.findList(SubTreeOperation.Finder.ByPathPrefix,
             path);  // THIS RETURNS ONLY ONE SUBTREE OP IN THE CHILD TREE. INCREASE THE LIMIT IN IMPL LAYER IF NEEDED
-    Set<Long> activeNameNodeIds = new HashSet<Long>();
+    Set<Long> activeNameNodeIds = new HashSet<>();
     for(ActiveNode node:nameNode.getActiveNameNodes().getActiveNodes()){
       activeNameNodeIds.add(node.getId());
     }
@@ -7130,7 +7123,7 @@ public class FSNamesystem
    * @throws IOException
    */
   public String getPath(int id) throws IOException {
-    LinkedList<INode> resolvedInodes = new LinkedList<INode>();
+    LinkedList<INode> resolvedInodes = new LinkedList<>();
     boolean resovled[] = new boolean[1];
     INodeUtil.findPathINodesById(id, resolvedInodes, resovled);
 
@@ -7510,7 +7503,7 @@ public class FSNamesystem
             Long.MAX_VALUE).getLocatedBlocks());
     Collections.sort(parityLocations, LocatedBlock.blockIdComparator);
 
-    HashMap<Node, Node> excluded = new HashMap<Node, Node>();
+    HashMap<Node, Node> excluded = new HashMap<>();
     int stripe =
         isParity ? getStripe(block, parityLocations, codec.getParityLength()) :
             getStripe(block, sourceLocations, codec.getStripeLength());
@@ -7538,7 +7531,7 @@ public class FSNamesystem
 
     BlockPlacementPolicyDefault placementPolicy = (BlockPlacementPolicyDefault)
         getBlockManager().getBlockPlacementPolicy();
-    List<DatanodeDescriptor> chosenNodes = new LinkedList<DatanodeDescriptor>();
+    List<DatanodeDescriptor> chosenNodes = new LinkedList<>();
     DatanodeDescriptor[] descriptors = placementPolicy
         .chooseTarget(isParity ? parityPath : sourcePath,
             isParity ? 1 : status.getEncodingPolicy().getTargetReplication(),

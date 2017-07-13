@@ -364,7 +364,7 @@ public class MiniDFSCluster {
   private NameNodeInfo[] nameNodes;
   private int numDataNodes;
   private ArrayList<DataNodeProperties> dataNodes =
-      new ArrayList<DataNodeProperties>();
+      new ArrayList<>();
   private File base_dir;
   private File data_dir;
   private boolean waitSafeMode = true;
@@ -1320,9 +1320,9 @@ public class MiniDFSCluster {
    * Gets a list of the started DataNodes.  May be empty.
    */
   public ArrayList<DataNode> getDataNodes() {
-    ArrayList<DataNode> list = new ArrayList<DataNode>();
-    for (int i = 0; i < dataNodes.size(); i++) {
-      DataNode node = dataNodes.get(i).datanode;
+    ArrayList<DataNode> list = new ArrayList<>();
+    for (DataNodeProperties dataNode : dataNodes) {
+      DataNode node = dataNode.datanode;
       list.add(node);
     }
     return list;
@@ -2217,7 +2217,7 @@ public class MiniDFSCluster {
     if (dataNodes.size() == 0) {
       return new File[0];
     }
-    ArrayList<File> list = new ArrayList<File>();
+    ArrayList<File> list = new ArrayList<>();
     for (int i = 0; i < dataNodes.size(); i++) {
       File blockFile = getBlockFile(i, block);
       if (blockFile != null) {
@@ -2305,8 +2305,8 @@ public class MiniDFSCluster {
 
     //count number of active NN
     int activeNameNodes = 0;
-    for (int i = 0; i < nameNodes.length; i++) {
-      if (nameNodes[i] == null || nameNodes[i].nameNode == null) {
+    for (NameNodeInfo nameNode : nameNodes) {
+      if (nameNode == null || nameNode.nameNode == null) {
         continue;
       } else {
         activeNameNodes++;

@@ -481,7 +481,7 @@ public class DFSTestUtil {
    * Return the total capacity of all live DNs.
    */
   public static long getLiveDatanodeCapacity(DatanodeManager dm) {
-    final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
+    final List<DatanodeDescriptor> live = new ArrayList<>();
     dm.fetchDatanodes(live, null, false);
     long capacity = 0;
     for (final DatanodeDescriptor dn : live) {
@@ -494,7 +494,7 @@ public class DFSTestUtil {
    * Return the capacity of the given live DN.
    */
   public static long getDatanodeCapacity(DatanodeManager dm, int index) {
-    final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
+    final List<DatanodeDescriptor> live = new ArrayList<>();
     dm.fetchDatanodes(live, null, false);
     return live.get(index).getCapacity();
   }
@@ -505,8 +505,8 @@ public class DFSTestUtil {
   public static void waitForDatanodeStatus(DatanodeManager dm, int expectedLive,
       int expectedDead, long expectedVolFails, long expectedTotalCapacity,
       long timeout) throws InterruptedException, TimeoutException {
-    final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
-    final List<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+    final List<DatanodeDescriptor> live = new ArrayList<>();
+    final List<DatanodeDescriptor> dead = new ArrayList<>();
     final int ATTEMPTS = 10;
     int count = 0;
     long currTotalCapacity = 0;
@@ -752,9 +752,9 @@ public class DFSTestUtil {
     private static final List<String> defaultGroups;
 
     static {
-      defaultGroups = new ArrayList<String>(1);
+      defaultGroups = new ArrayList<>(1);
       defaultGroups.add("supergroup");
-      fakeUser2GroupsMap = new HashMap<String, String[]>();
+      fakeUser2GroupsMap = new HashMap<>();
     }
 
     @Override
@@ -762,7 +762,7 @@ public class DFSTestUtil {
       boolean found = false;
       
       // check to see if this is one of fake users
-      List<String> l = new ArrayList<String>();
+      List<String> l = new ArrayList<>();
       for (String u : fakeUser2GroupsMap.keySet()) {
         if (user.equals(u)) {
           found = true;

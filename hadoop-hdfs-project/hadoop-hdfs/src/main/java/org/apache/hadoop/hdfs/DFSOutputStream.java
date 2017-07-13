@@ -131,8 +131,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   private final long blockSize;
   private final DataChecksum checksum;
   // both dataQueue and ackQueue are protected by dataQueue lock
-  private final LinkedList<Packet> dataQueue = new LinkedList<Packet>();
-  private final LinkedList<Packet> ackQueue = new LinkedList<Packet>();
+  private final LinkedList<Packet> dataQueue = new LinkedList<>();
+  private final LinkedList<Packet> ackQueue = new LinkedList<>();
   private Packet currentPacket = null;
   private DataStreamer streamer;
   private long currentSeqno = 0;
@@ -156,17 +156,17 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
 
   private boolean erasureCodingSourceStream = false;
   private boolean erasureCodingParityStream = false;
-  private HashSet<DatanodeInfo> usedNodes = new HashSet<DatanodeInfo>();
+  private HashSet<DatanodeInfo> usedNodes = new HashSet<>();
   private int currentBlockIndex = 0;
   private int stripeLength;
   private int parityLength;
   private List<LocatedBlock> sourceBlocks = Collections.emptyList();
-  private List<DatanodeInfo> stripeNodes = new LinkedList<DatanodeInfo>();
-  private List<DatanodeInfo> parityStripeNodes = new LinkedList<DatanodeInfo>();
+  private List<DatanodeInfo> stripeNodes = new LinkedList<>();
+  private List<DatanodeInfo> parityStripeNodes = new LinkedList<>();
 
   //this queue holds data for small files that are stored in the database.
   //when the file is closed the data is send to a NameNode in the close RPC
-  private final LinkedList<Packet> smallFileDataQueue = new LinkedList<Packet>();
+  private final LinkedList<Packet> smallFileDataQueue = new LinkedList<>();
   private boolean saveSmallFilesInDB;
   private boolean isThisFileStoredInDB = false;
   private final int dbFileMaxSize;
@@ -348,7 +348,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     private volatile DatanodeInfo[] nodes = null;
     // list of targets for current block
     private ArrayList<DatanodeInfo> excludedNodes =
-            new ArrayList<DatanodeInfo>();
+        new ArrayList<>();
     volatile boolean hasError = false;
     volatile int errorIndex = -1;
     private BlockConstructionStage stage;  // block construction stage
@@ -357,7 +357,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     /**
      * Nodes have been used in the pipeline before and have failed.
      */
-    private final List<DatanodeInfo> failed = new ArrayList<DatanodeInfo>();
+    private final List<DatanodeInfo> failed = new ArrayList<>();
     /**
      * Has the current block been hflushed?
      */
@@ -1234,8 +1234,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       Status pipelineStatus = SUCCESS;
       String firstBadLink = "";
       if (DFSClient.LOG.isDebugEnabled()) {
-        for (int i = 0; i < nodes.length; i++) {
-          DFSClient.LOG.debug("pipeline = " + nodes[i]);
+        for (DatanodeInfo node : nodes) {
+          DFSClient.LOG.debug("pipeline = " + node);
         }
       }
 
@@ -1525,7 +1525,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
 
     try {
       dfsClient.create(src, masked, dfsClient.clientName,
-              new EnumSetWritable<CreateFlag>(flag), createParent, replication,
+          new EnumSetWritable<>(flag), createParent, replication,
               blockSize, policy);
     } catch (RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,

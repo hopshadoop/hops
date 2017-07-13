@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MockEncodingManager extends EncodingManager {
-  private static final List<Report> EMPTY_REPORT = new ArrayList<Report>(0);
+  private static final List<Report> EMPTY_REPORT = new ArrayList<>(0);
 
   public MockEncodingManager(Configuration conf) throws IOException {
     super(conf);

@@ -93,13 +93,13 @@ public class TestListCorruptFileBlocks {
       File[] blocks = data_dir.listFiles();
       assertTrue("Blocks do not exist in data-dir",
           (blocks != null) && (blocks.length > 0));
-      for (int idx = 0; idx < blocks.length; idx++) {
-        if (blocks[idx].getName().startsWith("blk_") &&
-            blocks[idx].getName().endsWith(".meta")) {
+      for (File block : blocks) {
+        if (block.getName().startsWith("blk_") &&
+            block.getName().endsWith(".meta")) {
           //
           // shorten .meta file
           //
-          RandomAccessFile file = new RandomAccessFile(blocks[idx], "rw");
+          RandomAccessFile file = new RandomAccessFile(block, "rw");
           FileChannel channel = file.getChannel();
           long position = channel.size() - 2;
           int length = 2;
@@ -107,9 +107,9 @@ public class TestListCorruptFileBlocks {
           random.nextBytes(buffer);
           channel.write(ByteBuffer.wrap(buffer), position);
           file.close();
-          LOG.info("Deliberately corrupting file " + blocks[idx].getName() +
+          LOG.info("Deliberately corrupting file " + block.getName() +
               " at offset " + position + " length " + length);
-
+      
           // read all files to trigger detection of corrupted replica
           try {
             util.checkFiles(fs, "/srcdat10");
@@ -185,13 +185,13 @@ public class TestListCorruptFileBlocks {
       File[] blocks = data_dir.listFiles();
       assertTrue("Blocks do not exist in data-dir",
           (blocks != null) && (blocks.length > 0));
-      for (int idx = 0; idx < blocks.length; idx++) {
-        if (blocks[idx].getName().startsWith("blk_") &&
-            blocks[idx].getName().endsWith(".meta")) {
+      for (File block : blocks) {
+        if (block.getName().startsWith("blk_") &&
+            block.getName().endsWith(".meta")) {
           //
           // shorten .meta file
           //
-          RandomAccessFile file = new RandomAccessFile(blocks[idx], "rw");
+          RandomAccessFile file = new RandomAccessFile(block, "rw");
           FileChannel channel = file.getChannel();
           long position = channel.size() - 2;
           int length = 2;
@@ -199,9 +199,9 @@ public class TestListCorruptFileBlocks {
           random.nextBytes(buffer);
           channel.write(ByteBuffer.wrap(buffer), position);
           file.close();
-          LOG.info("Deliberately corrupting file " + blocks[idx].getName() +
+          LOG.info("Deliberately corrupting file " + block.getName() +
               " at offset " + position + " length " + length);
-
+      
           // read all files to trigger detection of corrupted replica
           try {
             util.checkFiles(fs, "/srcdat10");
@@ -308,12 +308,12 @@ public class TestListCorruptFileBlocks {
           if (blocks == null) {
             continue;
           }
-          for (int idx = 0; idx < blocks.length; idx++) {
-            if (!blocks[idx].getName().startsWith("blk_")) {
+          for (File block : blocks) {
+            if (!block.getName().startsWith("blk_")) {
               continue;
             }
-            LOG.info("Deliberately removing file " + blocks[idx].getName());
-            assertTrue("Cannot remove file.", blocks[idx].delete());
+            LOG.info("Deliberately removing file " + block.getName());
+            assertTrue("Cannot remove file.", block.delete());
           }
         }
       }
@@ -417,12 +417,12 @@ public class TestListCorruptFileBlocks {
         if (blocks == null) {
           continue;
         }
-        for (int idx = 0; idx < blocks.length; idx++) {
-          if (!blocks[idx].getName().startsWith("blk_")) {
+        for (File block : blocks) {
+          if (!block.getName().startsWith("blk_")) {
             continue;
           }
-          LOG.info("Deliberately removing file " + blocks[idx].getName());
-          assertTrue("Cannot remove file.", blocks[idx].delete());
+          LOG.info("Deliberately removing file " + block.getName());
+          assertTrue("Cannot remove file.", block.delete());
         }
       }
 
@@ -498,12 +498,12 @@ public class TestListCorruptFileBlocks {
           if (blocks == null) {
             continue;
           }
-
-          for (int idx = 0; idx < blocks.length; idx++) {
-            if (!blocks[idx].getName().startsWith("blk_")) {
+  
+          for (File block : blocks) {
+            if (!block.getName().startsWith("blk_")) {
               continue;
             }
-            assertTrue("Cannot remove file.", blocks[idx].delete());
+            assertTrue("Cannot remove file.", block.delete());
           }
         }
       }

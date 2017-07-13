@@ -376,20 +376,19 @@ class INodeLock extends BaseINodeLock {
                     TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY)) {
       throw new IllegalArgumentException("Unknown type " + resolveType.name());
     }
-
-    for (int i = 0; i < paths.length; i++) {
-      String path = paths[i];
+  
+    for (String path : paths) {
       List<INode> resolvedINodes = resolveUsingMemcache(path);
       if (resolvedINodes == null) {
         // path not found in the cache
         // set random partition key if enabled
-        if(setRandomParitionKeyEnabled){
+        if (setRandomParitionKeyEnabled) {
           setPartitioningKey(rand.nextInt());
         }
         resolvedINodes = acquireINodeLockByPath(path);
         addPathINodesAndUpdateResolvingCache(path, resolvedINodes);
       }
-
+    
       if (resolvedINodes.size() > 0) {
         INode lastINode = resolvedINodes.get(resolvedINodes.size() - 1);
         if (resolveType ==
@@ -422,7 +421,7 @@ class INodeLock extends BaseINodeLock {
   private List<INode> acquireINodeLockByPath(String path)
       throws UnresolvedPathException, StorageException, SubtreeLockedException,
       TransactionContextException {
-    List<INode> resolvedINodes = new ArrayList<INode>();
+    List<INode> resolvedINodes = new ArrayList<>();
     byte[][] components = INode.getPathComponents(path);
 
     INode currentINode;
@@ -538,7 +537,7 @@ class INodeLock extends BaseINodeLock {
       String prefix, boolean resolveLink)
       throws StorageException, UnresolvedPathException,
       TransactionContextException {
-    List<INode> resolved = new ArrayList<INode>();
+    List<INode> resolved = new ArrayList<>();
     byte[][] fullComps = INode.getPathComponents(fullPath);
     byte[][] prefixComps = INode.getPathComponents(prefix);
     INodeResolver resolver =
@@ -557,7 +556,7 @@ class INodeLock extends BaseINodeLock {
 
   private List<INode> findImmediateChildren(INode lastINode)
       throws StorageException, TransactionContextException {
-    List<INode> children = new ArrayList<INode>();
+    List<INode> children = new ArrayList<>();
     if (lastINode != null) {
       if (lastINode instanceof INodeDirectory) {
         setINodeLockType(TransactionLockTypes.INodeLockType.READ_COMMITTED); //if the parent is locked then taking lock on all children is not necessary
@@ -569,8 +568,8 @@ class INodeLock extends BaseINodeLock {
 
   private List<INode> findChildrenRecursively(INode lastINode)
       throws StorageException, TransactionContextException {
-    LinkedList<INode> children = new LinkedList<INode>();
-    LinkedList<INode> unCheckedDirs = new LinkedList<INode>();
+    LinkedList<INode> children = new LinkedList<>();
+    LinkedList<INode> unCheckedDirs = new LinkedList<>();
     if (lastINode != null) {
       if (lastINode instanceof INodeDirectory) {
         unCheckedDirs.add(lastINode);

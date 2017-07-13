@@ -72,16 +72,16 @@ class BlockStorageLocationUtil {
       int timeout, boolean connectToDnViaHostname) {
     // Construct the callables, one per datanode
     List<VolumeBlockLocationCallable> callables =
-        new ArrayList<VolumeBlockLocationCallable>();
+        new ArrayList<>();
     for (Map.Entry<DatanodeInfo, List<LocatedBlock>> entry : datanodeBlocks
         .entrySet()) {
       // Construct RPC parameters
       DatanodeInfo datanode = entry.getKey();
       List<LocatedBlock> locatedBlocks = entry.getValue();
       List<ExtendedBlock> extendedBlocks =
-          new ArrayList<ExtendedBlock>(locatedBlocks.size());
+          new ArrayList<>(locatedBlocks.size());
       List<Token<BlockTokenIdentifier>> dnTokens =
-          new ArrayList<Token<BlockTokenIdentifier>>(locatedBlocks.size());
+          new ArrayList<>(locatedBlocks.size());
       for (LocatedBlock b : locatedBlocks) {
         extendedBlocks.add(b.getBlock());
         dnTokens.add(b.getBlockToken());
@@ -117,7 +117,7 @@ class BlockStorageLocationUtil {
     
     // Use a thread pool to execute the Callables in parallel
     List<Future<HdfsBlocksMetadata>> futures =
-        new ArrayList<Future<HdfsBlocksMetadata>>();
+        new ArrayList<>();
     ExecutorService executor = new ScheduledThreadPoolExecutor(poolsize);
     try {
       futures = executor.invokeAll(callables, timeout, TimeUnit.SECONDS);
@@ -128,7 +128,7 @@ class BlockStorageLocationUtil {
     
     // Initialize metadatas list with nulls
     // This is used to later indicate if we didn't get a response from a DN
-    List<HdfsBlocksMetadata> metadatas = new ArrayList<HdfsBlocksMetadata>();
+    List<HdfsBlocksMetadata> metadatas = new ArrayList<>();
     for (int i = 0; i < futures.size(); i++) {
       metadatas.add(null);
     }
@@ -190,7 +190,7 @@ class BlockStorageLocationUtil {
     // Initialize mapping of ExtendedBlock to LocatedBlock. 
     // Used to associate results from DN RPCs to the parent LocatedBlock
     Map<ExtendedBlock, LocatedBlock> extBlockToLocBlock =
-        new HashMap<ExtendedBlock, LocatedBlock>();
+        new HashMap<>();
     for (LocatedBlock b : blocks) {
       extBlockToLocBlock.put(b.getBlock(), b);
     }
@@ -198,9 +198,9 @@ class BlockStorageLocationUtil {
     // Initialize the mapping of blocks -> list of VolumeIds, one per replica
     // This is filled out with real values from the DN RPCs
     Map<LocatedBlock, List<VolumeId>> blockVolumeIds =
-        new HashMap<LocatedBlock, List<VolumeId>>();
+        new HashMap<>();
     for (LocatedBlock b : blocks) {
-      ArrayList<VolumeId> l = new ArrayList<VolumeId>(b.getLocations().length);
+      ArrayList<VolumeId> l = new ArrayList<>(b.getLocations().length);
       // Start off all IDs as invalid, fill it in later with results from RPCs
       for (int i = 0; i < b.getLocations().length; i++) {
         l.add(VolumeId.INVALID_VOLUME_ID);
@@ -276,7 +276,7 @@ class BlockStorageLocationUtil {
     // Construct the final return value of VolumeBlockLocation[]
     BlockLocation[] locations = DFSUtil.locatedBlocks2Locations(blocks);
     List<BlockStorageLocation> volumeBlockLocs =
-        new ArrayList<BlockStorageLocation>(locations.length);
+        new ArrayList<>(locations.length);
     for (int i = 0; i < locations.length; i++) {
       LocatedBlock locBlock = blocks.get(i);
       List<VolumeId> volumeIds = blockVolumeIds.get(locBlock);

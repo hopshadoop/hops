@@ -1400,7 +1400,7 @@ public class TestDFSShell {
   }
 
   static List<File> getBlockFiles(MiniDFSCluster cluster) throws IOException {
-    List<File> files = new ArrayList<File>();
+    List<File> files = new ArrayList<>();
     List<DataNode> datanodes = cluster.getDataNodes();
     String poolId = cluster.getNamesystem().getBlockPoolId();
     Iterable<Block>[] blocks = cluster.getAllBlockReports(poolId);

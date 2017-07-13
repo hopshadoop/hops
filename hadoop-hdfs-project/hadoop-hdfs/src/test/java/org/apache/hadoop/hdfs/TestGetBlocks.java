@@ -289,7 +289,7 @@ public class TestGetBlocks {
 
   @Test
   public void testBlockKey() {
-    Map<Block, Long> map = new HashMap<Block, Long>();
+    Map<Block, Long> map = new HashMap<>();
     final Random RAN = new Random();
     final long seed = RAN.nextLong();
     System.out.println("seed=" + seed);
@@ -301,13 +301,13 @@ public class TestGetBlocks {
       map.put(new Block(blkids[i], 0, blkids[i]), blkids[i]);
     }
     System.out.println("map=" + map.toString().replace(",", "\n  "));
-
-    for (int i = 0; i < blkids.length; i++) {
+  
+    for (long blkid : blkids) {
       Block b =
-          new Block(blkids[i], 0, GenerationStamp.GRANDFATHER_GENERATION_STAMP);
+          new Block(blkid, 0, GenerationStamp.GRANDFATHER_GENERATION_STAMP);
       Long v = map.get(b);
       System.out.println(b + " => " + v);
-      assertEquals(blkids[i], v.longValue());
+      assertEquals(blkid, v.longValue());
     }
   }
 

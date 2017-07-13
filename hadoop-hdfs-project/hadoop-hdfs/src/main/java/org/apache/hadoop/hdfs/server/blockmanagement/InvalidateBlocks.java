@@ -147,14 +147,14 @@ class InvalidateBlocks {
         };
     List<InvalidatedBlock> invBlocks =
         (List<InvalidatedBlock>) getAllInvBlocksHandler.handle();
-    HashSet<String> storageIds = new HashSet<String>();
+    HashSet<String> storageIds = new HashSet<>();
     if (invBlocks != null) {
       for (InvalidatedBlock ib : invBlocks) {
         storageIds
             .add(datanodeManager.getDatanode(ib.getStorageId()).getStorageID());
       }
     }
-    return new ArrayList<String>(storageIds);
+    return new ArrayList<>(storageIds);
   }
 
   /**
@@ -188,8 +188,8 @@ class InvalidateBlocks {
     }
     // # blocks that can be sent in one message is limited
     final int limit = datanodeManager.blockInvalidateLimit;
-    final List<Block> toInvalidate = new ArrayList<Block>(limit);
-    final List<InvalidatedBlock> toInvblks = new ArrayList<InvalidatedBlock>();
+    final List<Block> toInvalidate = new ArrayList<>(limit);
+    final List<InvalidatedBlock> toInvblks = new ArrayList<>();
     final Iterator<InvalidatedBlock> it = invBlocks.iterator();
     for (int count = 0; count < limit && it.hasNext(); count++) {
       InvalidatedBlock invBlock = it.next();
@@ -224,7 +224,7 @@ class InvalidateBlocks {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
                 .getDataAccess(InvalidateBlockDataAccess.class);
-        List<InvalidatedBlock> invblks = new ArrayList<InvalidatedBlock>();
+        List<InvalidatedBlock> invblks = new ArrayList<>();
         for (Block blk : blocks) {
           invblks.add(new InvalidatedBlock(dn.getSId(), blk.getBlockId(),
               blk.getGenerationStamp(), blk.getNumBytes(),

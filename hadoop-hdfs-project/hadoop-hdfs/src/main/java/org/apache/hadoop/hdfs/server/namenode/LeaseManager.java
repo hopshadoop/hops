@@ -118,7 +118,7 @@ public class LeaseManager {
             return da.findAll();
           }
         };
-    return new TreeSet<Lease>(
+    return new TreeSet<>(
         (Collection<? extends Lease>) getSortedLeasesHandler
             .handle(fsnamesystem));
   }
@@ -347,8 +347,8 @@ public class LeaseManager {
 
     final int len = src.length();
     Collection <LeasePath> paths = findLeasePathsWithPrefix(src);
-    Collection <LeasePath> newLPs = new ArrayList<LeasePath>(paths.size());
-    Collection <LeasePath> deletedLPs = new ArrayList<LeasePath>(paths.size());
+    Collection <LeasePath> newLPs = new ArrayList<>(paths.size());
+    Collection <LeasePath> deletedLPs = new ArrayList<>(paths.size());
     for (final LeasePath oldPath : paths) {
       final int holderId = oldPath.getHolderId();
       final LeasePath newpath =
@@ -392,7 +392,7 @@ public class LeaseManager {
 
     Collection<LeasePath> leasePathSet =
         EntityManager.findList(LeasePath.Finder.ByPrefix, prefix);
-    final Map<LeasePath, Lease> entries = new HashMap<LeasePath, Lease>();
+    final Map<LeasePath, Lease> entries = new HashMap<>();
     final int srclen = prefix.length();
 
     for (LeasePath lPath : leasePathSet) {
@@ -548,7 +548,7 @@ public class LeaseManager {
 
     LOG.info("Lease " + oldest + " has expired hard limit");
 
-    final List<LeasePath> removing = new ArrayList<LeasePath>();
+    final List<LeasePath> removing = new ArrayList<>();
     // need to create a copy of the oldest lease paths, becuase 
     // internalReleaseLease() removes paths corresponding to empty files,
     // i.e. it needs to modify the collection being iterated over

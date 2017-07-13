@@ -83,12 +83,12 @@ class NameCache<K> {
   /**
    * Cached names
    */
-  final HashMap<K, K> cache = new HashMap<K, K>();
+  final HashMap<K, K> cache = new HashMap<>();
 
   /**
    * Names and with number of occurrences tracked during initialization
    */
-  Map<K, UseCount> transientMap = new HashMap<K, UseCount>();
+  Map<K, UseCount> transientMap = new HashMap<>();
 
   /**
    * Constructor
@@ -175,7 +175,7 @@ class NameCache<K> {
     initialized = false;
     cache.clear();
     if (transientMap == null) {
-      transientMap = new HashMap<K, UseCount>();
+      transientMap = new HashMap<>();
     } else {
       transientMap.clear();
     }

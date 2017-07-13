@@ -139,8 +139,6 @@ class BPServiceActor implements Runnable {
         nsInfo = bpNamenode.versionRequest();
         LOG.debug(this + " received versionRequest response: " + nsInfo);
         break;
-      } catch (SocketTimeoutException e) {  // namenode is busy
-        LOG.warn("Problem connecting to server: " + nnAddr);
       } catch (IOException e) {  // namenode is not available
         LOG.warn("Problem connecting to server: " + nnAddr);
       }
