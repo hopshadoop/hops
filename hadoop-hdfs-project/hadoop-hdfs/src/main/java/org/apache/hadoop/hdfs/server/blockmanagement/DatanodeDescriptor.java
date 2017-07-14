@@ -279,11 +279,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   public boolean removeBlock(BlockInfo b)
       throws StorageException, TransactionContextException {
-    if (b.removeReplica(this) != null) {
-      return true;
-    } else {
-      return false;
-    }
+    return b.removeReplica(this) != null;
   }
 
   public void setSId(int sid) {

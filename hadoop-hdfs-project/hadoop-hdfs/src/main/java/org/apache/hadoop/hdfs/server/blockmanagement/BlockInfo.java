@@ -272,17 +272,6 @@ public class BlockInfo extends Block {
     return replica;
   }
   
-  int findDatanode(DatanodeDescriptor dn)
-      throws StorageException, TransactionContextException {
-    Replica replica = EntityManager
-        .find(Replica.Finder.ByBlockIdAndStorageId, getBlockId(),
-            dn.getSId());
-    if (replica == null) {
-      return -1;
-    }
-    return 1;
-  }
-
   boolean hasReplicaIn(DatanodeDescriptor dn)
       throws StorageException, TransactionContextException {
     return EntityManager
