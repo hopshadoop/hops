@@ -78,7 +78,7 @@ public class TestPipeApplication {
    *
    * @throws Exception
    */
-  @Test
+  @Test(timeout = 60000)
   public void testRunner() throws Exception {
 
     // clean old password files
@@ -150,7 +150,7 @@ public class TestPipeApplication {
    * @throws Throwable
    */
 
-  @Test
+  @Test(timeout = 60000)
   public void testApplication() throws Throwable {
     JobConf conf = new JobConf();
 
@@ -241,7 +241,7 @@ public class TestPipeApplication {
    *
    * @throws Exception
    */
-  @Test
+  @Test(timeout = 60000)
   public void testSubmitter() throws Exception {
 
     JobConf conf = new JobConf();
@@ -385,7 +385,7 @@ public class TestPipeApplication {
    *
    * @throws Exception
    */
-  @Test
+  @Test(timeout = 60000)
   public void testPipesReduser() throws Exception {
 
     File[] psw = cleanTokenPasswordFile();
@@ -439,7 +439,7 @@ public class TestPipeApplication {
    * test PipesPartitioner
    * test set and get data from  PipesPartitioner
    */
-  @Test
+  @Test(timeout = 60000)
   public void testPipesPartitioner() {
 
     PipesPartitioner<IntWritable, Text> partitioner = new PipesPartitioner<IntWritable, Text>();

@@ -27,7 +27,7 @@ public class TestErasureCodingApi extends BasicClusterTestCase {
 
   private final Path testFile = new Path("/test_file");
 
-  @Test
+  @Test(timeout = 60000)
   public void testCreateEncodedFile() throws IOException {
     FSDataOutputStream out = getDfs().create(testFile);
     out.close();
@@ -35,7 +35,7 @@ public class TestErasureCodingApi extends BasicClusterTestCase {
     assertNotNull(getDfs().getEncodingStatus(testFile.toUri().getPath()));
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testGetEncodingStatusIfRequested() throws IOException {
     Codec codec = Codec.getCodec("src");
     EncodingPolicy policy = new EncodingPolicy(codec.getId(), (short) 1);
@@ -57,7 +57,7 @@ public class TestErasureCodingApi extends BasicClusterTestCase {
     }
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testGetEncodingStatusIfNotRequested() throws IOException {
     FSDataOutputStream out = getDfs().create(testFile);
     out.close();

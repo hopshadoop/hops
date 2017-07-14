@@ -64,7 +64,7 @@ public class TestBlockReportLoadBalancing2 {
   public void shutDownCluster() throws IOException {
   }
 
-  @Test
+  @Test(timeout = 120000)
   public void TestClusterWithDataNodes()
           throws Exception {
     final int NN_COUNT = 2;

@@ -141,7 +141,7 @@ public class ViewFileSystemBaseTest {
         new Path(targetTestRoot, "aFile").toUri());
   }
   
-  @Test
+  @Test(timeout = 60000)
   public void testGetMountPoints() {
     ViewFileSystem viewfs = (ViewFileSystem) fsView;
     MountPoint[] mountPoints = viewfs.getMountPoints();
@@ -157,7 +157,7 @@ public class ViewFileSystemBaseTest {
    * into file systems, such as LocalFs that do no have delegation tokens.
    * It should be overridden for when mount points into hdfs.
    */
-  @Test
+  @Test(timeout = 60000)
   public void testGetDelegationTokens() throws IOException {
     Token<?>[] delTokens = 
         fsView.addDelegationTokens("sanjay", new Credentials());
@@ -168,7 +168,7 @@ public class ViewFileSystemBaseTest {
     return 0;
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testGetDelegationTokensWithCredentials() throws IOException {
     Credentials credentials = new Credentials();
     List<Token<?>> delTokens =
@@ -192,7 +192,7 @@ public class ViewFileSystemBaseTest {
     return 0;
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testBasicPaths() {
     Assert.assertEquals(FsConstants.VIEWFS_URI,
         fsView.getUri());
@@ -207,12 +207,12 @@ public class ViewFileSystemBaseTest {
         fsView.makeQualified(new Path("/foo/bar")));
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testLocatedOperationsThroughMountLinks() throws IOException {
     testOperationsThroughMountLinksInternal(true);
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testOperationsThroughMountLinks() throws IOException {
     testOperationsThroughMountLinksInternal(false);
   }
@@ -351,7 +351,7 @@ public class ViewFileSystemBaseTest {
   }
   
   // rename across mount points that point to same target also fail 
-  @Test(expected=IOException.class) 
+  @Test(timeout = 60000, expected=IOException.class) 
   public void testRenameAcrossMounts1() throws IOException {
     fileSystemTestHelper.createFile(fsView, "/user/foo");
     fsView.rename(new Path("/user/foo"), new Path("/user2/fooBarBar"));
@@ -367,7 +367,7 @@ public class ViewFileSystemBaseTest {
   // rename across mount points fail if the mount link targets are different
   // even if the targets are part of the same target FS
 
-  @Test(expected=IOException.class) 
+  @Test(timeout = 60000, expected=IOException.class) 
   public void testRenameAcrossMounts2() throws IOException {
     fileSystemTestHelper.createFile(fsView, "/user/foo");
     fsView.rename(new Path("/user/foo"), new Path("/data/fooBar"));
@@ -375,7 +375,7 @@ public class ViewFileSystemBaseTest {
   
   static protected boolean SupportsBlocks = false; //  local fs use 1 block
                                                    // override for HDFS
-  @Test
+  @Test(timeout = 60000)
   public void testGetBlockLocations() throws IOException {
     Path targetFilePath = new Path(targetTestRoot,"data/largeFile");
     FileSystemTestHelper.createFile(fsTarget, 
@@ -408,7 +408,7 @@ public class ViewFileSystemBaseTest {
     } 
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testLocatedListOnInternalDirsOfMountTable() throws IOException {
     testListOnInternalDirsOfMountTableInternal(true);
   }
@@ -421,7 +421,7 @@ public class ViewFileSystemBaseTest {
    */
   
   // test list on internal dirs of mount table 
-  @Test
+  @Test(timeout = 60000)
   public void testListOnInternalDirsOfMountTable() throws IOException {
     testListOnInternalDirsOfMountTableInternal(false);
   }
@@ -472,12 +472,12 @@ public class ViewFileSystemBaseTest {
     return 7;
   }
   
-  @Test
+  @Test(timeout = 60000)
   public void testListOnMountTargetDirs() throws IOException {
     testListOnMountTargetDirsInternal(false);
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testLocatedListOnMountTargetDirs() throws IOException {
     testListOnMountTargetDirsInternal(true);
   }
@@ -528,7 +528,7 @@ public class ViewFileSystemBaseTest {
     return dirPaths;
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testFileStatusOnMountLink() throws IOException {
     Assert.assertTrue(fsView.getFileStatus(new Path("/")).isDirectory());
     checkFileStatus(fsView, "/", fileType.isDir);
@@ -541,12 +541,12 @@ public class ViewFileSystemBaseTest {
     checkFileStatus(fsView, "/linkToAFile", fileType.isFile);
   }
   
-  @Test(expected=FileNotFoundException.class) 
+  @Test(timeout = 60000, expected=FileNotFoundException.class) 
   public void testgetFSonDanglingLink() throws IOException {
     fsView.getFileStatus(new Path("/danglingLink"));
   }
   
-  @Test(expected=FileNotFoundException.class) 
+  @Test(timeout = 60000, expected=FileNotFoundException.class) 
   public void testgetFSonNonExistingInternalDir() throws IOException {
     fsView.getFileStatus(new Path("/internalDir/nonExisting"));
   }
@@ -555,13 +555,13 @@ public class ViewFileSystemBaseTest {
    * Test resolvePath(p) 
    */
   
-  @Test
+  @Test(timeout = 60000)
   public void testResolvePathInternalPaths() throws IOException {
     Assert.assertEquals(new Path("/"), fsView.resolvePath(new Path("/")));
     Assert.assertEquals(new Path("/internalDir"),
         fsView.resolvePath(new Path("/internalDir")));
   }
-  @Test
+  @Test(timeout = 60000)
   public void testResolvePathMountPoints() throws IOException {
     Assert.assertEquals(new Path(targetTestRoot,"user"),
         fsView.resolvePath(new Path("/user")));
@@ -574,7 +574,7 @@ public class ViewFileSystemBaseTest {
 
   }
   
-  @Test
+  @Test(timeout = 60000)
   public void testResolvePathThroughMountPoints() throws IOException {
     fileSystemTestHelper.createFile(fsView, "/user/foo");
     Assert.assertEquals(new Path(targetTestRoot,"user/foo"),
@@ -592,18 +592,18 @@ public class ViewFileSystemBaseTest {
         fsView.resolvePath(new Path("/user/dirX/dirY")));
   }
 
-  @Test(expected=FileNotFoundException.class) 
+  @Test(timeout = 60000, expected=FileNotFoundException.class) 
   public void testResolvePathDanglingLink() throws IOException {
     fsView.resolvePath(new Path("/danglingLink"));
   }
   
-  @Test(expected=FileNotFoundException.class) 
+  @Test(timeout = 60000, expected=FileNotFoundException.class) 
   public void testResolvePathMissingThroughMountPoints() throws IOException {
     fsView.resolvePath(new Path("/user/nonExisting"));
   }
   
 
-  @Test(expected=FileNotFoundException.class) 
+  @Test(timeout = 60000, expected=FileNotFoundException.class) 
   public void testResolvePathMissingThroughMountPoints2() throws IOException {
     fsView.mkdirs(
         fileSystemTestHelper.getTestRootPath(fsView, "/user/dirX"));
@@ -620,7 +620,7 @@ public class ViewFileSystemBaseTest {
  
  
   // Mkdir on existing internal mount table succeed except for /
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalMkdirSlash() throws IOException {
     fsView.mkdirs(fileSystemTestHelper.getTestRootPath(fsView, "/"));
   }
@@ -638,65 +638,65 @@ public class ViewFileSystemBaseTest {
   }
   
   // Mkdir for new internal mount table should fail
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalMkdirNew() throws IOException {
     fsView.mkdirs(fileSystemTestHelper.getTestRootPath(fsView, "/dirNew"));
   }
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalMkdirNew2() throws IOException {
     fsView.mkdirs(fileSystemTestHelper.getTestRootPath(fsView, "/internalDir/dirNew"));
   }
   
   // Create File on internal mount table should fail
   
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalCreate1() throws IOException {
     fileSystemTestHelper.createFile(fsView, "/foo"); // 1 component
   }
   
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalCreate2() throws IOException {  // 2 component
     fileSystemTestHelper.createFile(fsView, "/internalDir/foo");
   }
   
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalCreateMissingDir() throws IOException {
     fileSystemTestHelper.createFile(fsView, "/missingDir/foo");
   }
   
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalCreateMissingDir2() throws IOException {
     fileSystemTestHelper.createFile(fsView, "/missingDir/miss2/foo");
   }
   
   
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalCreateMissingDir3() throws IOException {
     fileSystemTestHelper.createFile(fsView, "/internalDir/miss2/foo");
   }
   
   // Delete on internal mount table should fail
   
-  @Test(expected=FileNotFoundException.class) 
+  @Test(timeout = 60000, expected=FileNotFoundException.class) 
   public void testInternalDeleteNonExisting() throws IOException {
     fsView.delete(new Path("/NonExisting"), false);
   }
-  @Test(expected=FileNotFoundException.class) 
+  @Test(timeout = 60000, expected=FileNotFoundException.class) 
   public void testInternalDeleteNonExisting2() throws IOException {
     fsView.delete(new Path("/internalDir/NonExisting"), false);
   }
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalDeleteExisting() throws IOException {
     fsView.delete(new Path("/internalDir"), false);
   }
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalDeleteExisting2() throws IOException {
     fsView.getFileStatus(
             new Path("/internalDir/linkToDir2")).isDirectory();
     fsView.delete(new Path("/internalDir/linkToDir2"), false);
   } 
   
-  @Test
+  @Test(timeout = 60000)
   public void testMkdirOfMountLink() throws IOException {
     // data exists - mkdirs returns true even though no permission in internal
     // mount table
@@ -707,35 +707,35 @@ public class ViewFileSystemBaseTest {
   
   // Rename on internal mount table should fail
   
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalRename1() throws IOException {
     fsView.rename(new Path("/internalDir"), new Path("/newDir"));
   }
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalRename2() throws IOException {
     fsView.getFileStatus(new Path("/internalDir/linkToDir2")).isDirectory();
     fsView.rename(new Path("/internalDir/linkToDir2"),
         new Path("/internalDir/dir1"));
   }
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalRename3() throws IOException {
     fsView.rename(new Path("/user"), new Path("/internalDir/linkToDir2"));
   }
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalRenameToSlash() throws IOException {
     fsView.rename(new Path("/internalDir/linkToDir2/foo"), new Path("/"));
   }
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalRenameFromSlash() throws IOException {
     fsView.rename(new Path("/"), new Path("/bar"));
   }
   
-  @Test(expected=AccessControlException.class) 
+  @Test(timeout = 60000, expected=AccessControlException.class) 
   public void testInternalSetOwner() throws IOException {
     fsView.setOwner(new Path("/internalDir"), "foo", "bar");
   }
   
-  @Test
+  @Test(timeout = 60000)
   public void testCreateNonRecursive() throws IOException {
     Path path = fileSystemTestHelper.getTestRootPath(fsView, "/user/foo");
     fsView.createNonRecursive(path, false, 1024, (short)1, 1024L, null);
@@ -746,12 +746,12 @@ public class ViewFileSystemBaseTest {
         fsTarget.isFile(new Path(targetTestRoot, "user/foo")));
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testRootReadableExecutable() throws IOException {
     testRootReadableExecutableInternal(false);
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testLocatedRootReadableExecutable() throws IOException {
     testRootReadableExecutableInternal(true);
   }
@@ -796,34 +796,34 @@ public class ViewFileSystemBaseTest {
    * any mount table entry.
    */
 
-  @Test(expected=AccessControlException.class)
+  @Test(timeout = 60000, expected=AccessControlException.class)
   public void testInternalModifyAclEntries() throws IOException {
     fsView.modifyAclEntries(new Path("/internalDir"),
         new ArrayList<AclEntry>());
   }
 
-  @Test(expected=AccessControlException.class)
+  @Test(timeout = 60000, expected=AccessControlException.class)
   public void testInternalRemoveAclEntries() throws IOException {
     fsView.removeAclEntries(new Path("/internalDir"),
         new ArrayList<AclEntry>());
   }
 
-  @Test(expected=AccessControlException.class)
+  @Test(timeout = 60000, expected=AccessControlException.class)
   public void testInternalRemoveDefaultAcl() throws IOException {
     fsView.removeDefaultAcl(new Path("/internalDir"));
   }
 
-  @Test(expected=AccessControlException.class)
+  @Test(timeout = 60000, expected=AccessControlException.class)
   public void testInternalRemoveAcl() throws IOException {
     fsView.removeAcl(new Path("/internalDir"));
   }
 
-  @Test(expected=AccessControlException.class)
+  @Test(timeout = 60000, expected=AccessControlException.class)
   public void testInternalSetAcl() throws IOException {
     fsView.setAcl(new Path("/internalDir"), new ArrayList<AclEntry>());
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testInternalGetAclStatus() throws IOException {
     final UserGroupInformation currentUser =
         UserGroupInformation.getCurrentUser();
@@ -835,32 +835,32 @@ public class ViewFileSystemBaseTest {
     assertFalse(aclStatus.isStickyBit());
   }
 
-  @Test(expected=AccessControlException.class)
+  @Test(timeout = 60000, expected=AccessControlException.class)
   public void testInternalSetXAttr() throws IOException {
     fsView.setXAttr(new Path("/internalDir"), "xattrName", null);
   }
 
-  @Test(expected=NotInMountpointException.class)
+  @Test(timeout = 60000, expected=NotInMountpointException.class)
   public void testInternalGetXAttr() throws IOException {
     fsView.getXAttr(new Path("/internalDir"), "xattrName");
   }
 
-  @Test(expected=NotInMountpointException.class)
+  @Test(timeout = 60000, expected=NotInMountpointException.class)
   public void testInternalGetXAttrs() throws IOException {
     fsView.getXAttrs(new Path("/internalDir"));
   }
 
-  @Test(expected=NotInMountpointException.class)
+  @Test(timeout = 60000, expected=NotInMountpointException.class)
   public void testInternalGetXAttrsWithNames() throws IOException {
     fsView.getXAttrs(new Path("/internalDir"), new ArrayList<String>());
   }
 
-  @Test(expected=NotInMountpointException.class)
+  @Test(timeout = 60000, expected=NotInMountpointException.class)
   public void testInternalListXAttr() throws IOException {
     fsView.listXAttrs(new Path("/internalDir"));
   }
 
-  @Test(expected=AccessControlException.class)
+  @Test(timeout = 60000, expected=AccessControlException.class)
   public void testInternalRemoveXAttr() throws IOException {
     fsView.removeXAttr(new Path("/internalDir"), "xattrName");
   }
