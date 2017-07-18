@@ -34,7 +34,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @InterfaceStability.Evolving
 class Host2NodesMap {
   private HashMap<String, DatanodeDescriptor[]> map =
-      new HashMap<String, DatanodeDescriptor[]>();
+      new HashMap<>();
   private ReadWriteLock hostmapLock = new ReentrantReadWriteLock();
 
   /**

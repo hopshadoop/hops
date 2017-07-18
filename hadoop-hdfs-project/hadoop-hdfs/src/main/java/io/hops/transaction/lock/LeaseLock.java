@@ -36,7 +36,7 @@ public final class LeaseLock extends Lock {
   LeaseLock(TransactionLockTypes.LockType lockType, String leaseHolder) {
     this.lockType = lockType;
     this.leaseHolder = leaseHolder;
-    this.leases = new ArrayList<Lease>();
+    this.leases = new ArrayList<>();
   }
 
   LeaseLock(TransactionLockTypes.LockType lockType) {
@@ -45,7 +45,7 @@ public final class LeaseLock extends Lock {
 
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
-    Set<String> hldrs = new HashSet<String>();
+    Set<String> hldrs = new HashSet<>();
     if (leaseHolder != null) {
       hldrs.add(leaseHolder);
     }
@@ -61,7 +61,7 @@ public final class LeaseLock extends Lock {
     }
 
     setLockMode(lockType);
-    List<String> holders = new ArrayList<String>(hldrs);
+    List<String> holders = new ArrayList<>(hldrs);
     Collections.sort(holders);
     for (String h : holders) {
       Lease lease = acquireLock(lockType, Lease.Finder.ByHolder, h, Lease.getHolderId(h));

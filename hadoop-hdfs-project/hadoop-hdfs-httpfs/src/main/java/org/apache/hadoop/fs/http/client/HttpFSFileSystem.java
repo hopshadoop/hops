@@ -421,7 +421,7 @@ public class HttpFSFileSystem extends FileSystem
    */
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.OPEN.toString());
     HttpURLConnection conn =
         getConnection(Operation.OPEN.getMethod(), params, f, true);
@@ -544,7 +544,7 @@ public class HttpFSFileSystem extends FileSystem
   public FSDataOutputStream create(Path f, FsPermission permission,
       boolean overwrite, int bufferSize, short replication, long blockSize,
       Progressable progress) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.CREATE.toString());
     params.put(OVERWRITE_PARAM, Boolean.toString(overwrite));
     params.put(REPLICATION_PARAM, Short.toString(replication));
@@ -571,7 +571,7 @@ public class HttpFSFileSystem extends FileSystem
   @Override
   public FSDataOutputStream append(Path f, int bufferSize,
       Progressable progress) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.APPEND.toString());
     return uploadData(Operation.APPEND.getMethod(), f, params, bufferSize,
         HttpURLConnection.HTTP_OK);
@@ -588,13 +588,13 @@ public class HttpFSFileSystem extends FileSystem
    */
   @Override
   public void concat(Path f, Path[] psrcs) throws IOException {
-    List<String> strPaths = new ArrayList<String>(psrcs.length);
+    List<String> strPaths = new ArrayList<>(psrcs.length);
     for (Path psrc : psrcs) {
       strPaths.add(psrc.toUri().getPath());
     }
     String srcs = StringUtils.join(",", strPaths);
 
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.CONCAT.toString());
     params.put(SOURCES_PARAM, srcs);
     HttpURLConnection conn =
@@ -608,7 +608,7 @@ public class HttpFSFileSystem extends FileSystem
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.RENAME.toString());
     params.put(DESTINATION_PARAM, dst.toString());
     HttpURLConnection conn =
@@ -644,7 +644,7 @@ public class HttpFSFileSystem extends FileSystem
    */
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.DELETE.toString());
     params.put(RECURSIVE_PARAM, Boolean.toString(recursive));
     HttpURLConnection conn =
@@ -666,7 +666,7 @@ public class HttpFSFileSystem extends FileSystem
    */
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.LISTSTATUS.toString());
     HttpURLConnection conn =
         getConnection(Operation.LISTSTATUS.getMethod(), params, f, true);
@@ -714,7 +714,7 @@ public class HttpFSFileSystem extends FileSystem
    */
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.MKDIRS.toString());
     params.put(PERMISSION_PARAM, permissionToString(permission));
     HttpURLConnection conn =
@@ -736,7 +736,7 @@ public class HttpFSFileSystem extends FileSystem
    */
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.GETFILESTATUS.toString());
     HttpURLConnection conn =
         getConnection(Operation.GETFILESTATUS.getMethod(), params, f, true);
@@ -753,7 +753,7 @@ public class HttpFSFileSystem extends FileSystem
    */
   @Override
   public Path getHomeDirectory() {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.GETHOMEDIRECTORY.toString());
     try {
       HttpURLConnection conn =
@@ -781,7 +781,7 @@ public class HttpFSFileSystem extends FileSystem
   @Override
   public void setOwner(Path p, String username, String groupname)
       throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.SETOWNER.toString());
     params.put(OWNER_PARAM, username);
     params.put(GROUP_PARAM, groupname);
@@ -801,7 +801,7 @@ public class HttpFSFileSystem extends FileSystem
   @Override
   public void setPermission(Path p, FsPermission permission)
       throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.SETPERMISSION.toString());
     params.put(PERMISSION_PARAM, permissionToString(permission));
     HttpURLConnection conn =
@@ -825,7 +825,7 @@ public class HttpFSFileSystem extends FileSystem
    */
   @Override
   public void setTimes(Path p, long mtime, long atime) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.SETTIMES.toString());
     params.put(MODIFICATION_TIME_PARAM, Long.toString(mtime));
     params.put(ACCESS_TIME_PARAM, Long.toString(atime));
@@ -848,7 +848,7 @@ public class HttpFSFileSystem extends FileSystem
   @Override
   public boolean setReplication(Path src, short replication)
       throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.SETREPLICATION.toString());
     params.put(REPLICATION_PARAM, Short.toString(replication));
     HttpURLConnection conn =
@@ -891,7 +891,7 @@ public class HttpFSFileSystem extends FileSystem
 
   @Override
   public ContentSummary getContentSummary(Path f) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.GETCONTENTSUMMARY.toString());
     HttpURLConnection conn =
         getConnection(Operation.GETCONTENTSUMMARY.getMethod(), params, f, true);
@@ -908,7 +908,7 @@ public class HttpFSFileSystem extends FileSystem
 
   @Override
   public FileChecksum getFileChecksum(Path f) throws IOException {
-    Map<String, String> params = new HashMap<String, String>();
+    Map<String, String> params = new HashMap<>();
     params.put(OP_PARAM, Operation.GETFILECHECKSUM.toString());
     HttpURLConnection conn =
         getConnection(Operation.GETFILECHECKSUM.getMethod(), params, f, true);

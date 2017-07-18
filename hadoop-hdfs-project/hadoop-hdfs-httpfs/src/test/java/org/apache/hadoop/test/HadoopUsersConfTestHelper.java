@@ -133,7 +133,7 @@ public class HadoopUsersConfTestHelper {
    * @return the FileSystemAccess users used for testing.
    */
   public static String[] getHadoopUsers() {
-    List<String> users = new ArrayList<String>();
+    List<String> users = new ArrayList<>();
     for (String name : System.getProperties().stringPropertyNames()) {
       if (name.startsWith(HADOOP_USER_PREFIX)) {
         users.add(name.substring(HADOOP_USER_PREFIX.length()));

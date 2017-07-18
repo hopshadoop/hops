@@ -477,7 +477,7 @@ public class TestBlockManager {
             file.setParentIdNoPersistance(INodeDirectory.ROOT_ID);
             file.setPartitionIdNoPersistance(INodeDirectory.ROOT_ID);
             file.setIdNoPersistance(inode_id);
-            List<INode> newed = new ArrayList<INode>();
+            List<INode> newed = new ArrayList<>();
             newed.add(file);
             INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
                 .getDataAccess(INodeDataAccess.class);
@@ -516,8 +516,8 @@ public class TestBlockManager {
 
   private DatanodeDescriptor[] scheduleSingleReplication(final BlockInfo block)
       throws IOException {
-    final List<Block> list_p1 = new ArrayList<Block>();
-    final List<List<Block>> list_all = new ArrayList<List<Block>>();
+    final List<Block> list_p1 = new ArrayList<>();
+    final List<List<Block>> list_all = new ArrayList<>();
     new HopsTransactionalRequestHandler(
         HDFSOperationType.SCHEDULE_SINGLE_REPLICATION) {
       INodeIdentifier inodeIdentifier;
@@ -632,9 +632,9 @@ public class TestBlockManager {
     addBlockOnNodes(blockId, origNodes.subList(0, 1));
 
     final List<DatanodeDescriptor> cntNodes =
-        new LinkedList<DatanodeDescriptor>();
+        new LinkedList<>();
     final List<DatanodeDescriptor> liveNodes =
-        new LinkedList<DatanodeDescriptor>();
+        new LinkedList<>();
     
     
     new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {

@@ -96,12 +96,12 @@ public class AuthFilter extends AuthenticationFilter {
       return request;
     }
 
-    final Map<String, List<String>> m = new HashMap<String, List<String>>();
+    final Map<String, List<String>> m = new HashMap<>();
     for (Map.Entry<String, String[]> entry : original.entrySet()) {
       final String key = entry.getKey().toLowerCase();
       List<String> strings = m.get(key);
       if (strings == null) {
-        strings = new ArrayList<String>();
+        strings = new ArrayList<>();
         m.put(key, strings);
       }
       for (String v : entry.getValue()) {
@@ -115,7 +115,7 @@ public class AuthFilter extends AuthenticationFilter {
       @Override
       public Map<String, String[]> getParameterMap() {
         if (parameters == null) {
-          parameters = new HashMap<String, String[]>();
+          parameters = new HashMap<>();
           for (Map.Entry<String, List<String>> entry : m.entrySet()) {
             final List<String> a = entry.getValue();
             parameters.put(entry.getKey(), a.toArray(new String[a.size()]));

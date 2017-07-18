@@ -44,7 +44,7 @@ class FsVolumeImpl implements FsVolumeSpi {
   private final FsDatasetImpl dataset;
   private final String storageID;
   private final Map<String, BlockPoolSlice> bpSlices =
-      new HashMap<String, BlockPoolSlice>();
+      new HashMap<>();
   private final File currentDir;    // <StorageDirectory>/current
   private final DF usage;
   private final long reserved;

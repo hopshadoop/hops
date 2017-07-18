@@ -951,10 +951,10 @@ public class ClientNamenodeProtocolTranslatorPB
 
   private SortedActiveNodeList convertProtoANListToANList(
       ClientNamenodeProtocolProtos.ActiveNamenodeListResponseProto p) {
-    List<ActiveNode> anl = new ArrayList<ActiveNode>();
+    List<ActiveNode> anl = new ArrayList<>();
     List<ActiveNodeProtos.ActiveNodeProto> anlp = p.getNamenodesList();
-    for (int i = 0; i < anlp.size(); i++) {
-      ActiveNode an = convertProtoANToAN(anlp.get(i));
+    for (ActiveNodeProtos.ActiveNodeProto anAnlp : anlp) {
+      ActiveNode an = convertProtoANToAN(anAnlp);
       anl.add(an);
     }
     return new SortedActiveNodeListPBImpl(anl);

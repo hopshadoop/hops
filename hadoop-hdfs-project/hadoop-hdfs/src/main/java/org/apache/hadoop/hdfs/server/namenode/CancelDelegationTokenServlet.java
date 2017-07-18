@@ -62,7 +62,7 @@ public class CancelDelegationTokenServlet extends DfsServlet {
           "Token to renew not specified");
     }
     final Token<DelegationTokenIdentifier> token =
-        new Token<DelegationTokenIdentifier>();
+        new Token<>();
     token.decodeFromUrlString(tokenString);
     
     try {

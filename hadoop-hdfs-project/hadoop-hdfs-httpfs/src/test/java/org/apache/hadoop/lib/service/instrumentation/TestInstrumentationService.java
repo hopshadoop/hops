@@ -290,7 +290,7 @@ public class TestInstrumentationService extends HTestCase {
   @Test
   public void variableHolder() throws Exception {
     InstrumentationService.VariableHolder<String> variableHolder =
-        new InstrumentationService.VariableHolder<String>();
+        new InstrumentationService.VariableHolder<>();
 
     variableHolder.var = new Instrumentation.Variable<String>() {
       @Override

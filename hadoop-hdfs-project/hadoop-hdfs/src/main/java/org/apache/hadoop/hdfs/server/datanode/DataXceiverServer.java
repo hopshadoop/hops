@@ -198,8 +198,7 @@ class DataXceiverServer implements Runnable {
 
     // close all the sockets that were accepted earlier
     synchronized (childSockets) {
-      for (Iterator<Socket> it = childSockets.iterator(); it.hasNext(); ) {
-        Socket thissock = it.next();
+      for (Socket thissock : childSockets) {
         try {
           thissock.close();
         } catch (IOException e) {

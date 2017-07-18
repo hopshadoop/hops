@@ -115,9 +115,7 @@ public abstract class ConfigurationUtils {
       DocumentBuilder builder = docBuilderFactory.newDocumentBuilder();
       Document doc = builder.parse(is);
       parseDocument(conf, doc);
-    } catch (SAXException e) {
-      throw new IOException(e);
-    } catch (ParserConfigurationException e) {
+    } catch (SAXException | ParserConfigurationException e) {
       throw new IOException(e);
     }
   }

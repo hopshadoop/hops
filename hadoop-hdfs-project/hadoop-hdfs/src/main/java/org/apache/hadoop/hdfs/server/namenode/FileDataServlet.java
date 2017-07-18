@@ -143,9 +143,7 @@ public class FileDataServlet extends DfsServlet {
           return null;
         }
       });
-    } catch (IOException e) {
-      response.sendError(400, e.getMessage());
-    } catch (InterruptedException e) {
+    } catch (IOException | InterruptedException e) {
       response.sendError(400, e.getMessage());
     }
   }

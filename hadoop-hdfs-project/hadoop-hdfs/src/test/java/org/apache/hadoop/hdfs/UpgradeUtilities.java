@@ -276,17 +276,17 @@ public class UpgradeUtilities {
     File[] list = dir.listFiles();
     Arrays.sort(list);
     CRC32 checksum = new CRC32();
-    for (int i = 0; i < list.length; i++) {
-      if (!list[i].isFile()) {
+    for (File aList : list) {
+      if (!aList.isFile()) {
         continue;
       }
       // skip VERSION file for DataNodes
-      if (nodeType == DATA_NODE && list[i].getName().equals("VERSION")) {
+      if (nodeType == DATA_NODE && aList.getName().equals("VERSION")) {
         continue;
       }
       FileInputStream fis = null;
       try {
-        fis = new FileInputStream(list[i]);
+        fis = new FileInputStream(aList);
         byte[] buffer = new byte[1024];
         int bytesRead;
         while ((bytesRead = fis.read(buffer)) != -1) {

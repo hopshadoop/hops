@@ -97,7 +97,7 @@ public class TestClientProtocolWithDelegationToken {
     DelegationTokenIdentifier dtId =
         new DelegationTokenIdentifier(owner, owner, null);
     Token<DelegationTokenIdentifier> token =
-        new Token<DelegationTokenIdentifier>(dtId, sm);
+        new Token<>(dtId, sm);
     SecurityUtil.setTokenService(token, addr);
     LOG.info("Service for token is " + token.getService());
     current.addToken(token);

@@ -41,8 +41,8 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   private final static int DEFAULT_NUM_BLOCKS_PER_INODE = 10;
 
   private final Map<Integer, List<BlockInfo>> inodeBlocks =
-      new HashMap<Integer, List<BlockInfo>>();
-  private final List<BlockInfo> concatRemovedBlks = new ArrayList<BlockInfo>();
+      new HashMap<>();
+  private final List<BlockInfo> concatRemovedBlks = new ArrayList<>();
 
   private final BlockInfoDataAccess<BlockInfo> dataAccess;
 
@@ -82,7 +82,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   @Override
   public void prepare(TransactionLocks tlm)
       throws TransactionContextException, StorageException {
-    Collection<BlockInfo> removed = new ArrayList<BlockInfo>(getRemoved());
+    Collection<BlockInfo> removed = new ArrayList<>(getRemoved());
     removed.addAll(concatRemovedBlks);
     dataAccess.prepare(removed, getAdded(), getModified());
   }
@@ -255,7 +255,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
 
   private List<BlockInfo> syncBlockInfoInstances(List<BlockInfo> newBlocks,
       boolean syncInodeBlocks) {
-    List<BlockInfo> finalList = new ArrayList<BlockInfo>();
+    List<BlockInfo> finalList = new ArrayList<>();
 
     for (BlockInfo blockInfo : newBlocks) {
       if (isRemoved(blockInfo.getBlockId())) {
@@ -268,7 +268,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       if (syncInodeBlocks) {
         List<BlockInfo> blockList = inodeBlocks.get(blockInfo.getInodeId());
         if (blockList == null) {
-          blockList = new ArrayList<BlockInfo>();
+          blockList = new ArrayList<>();
           inodeBlocks.put(blockInfo.getInodeId(), blockList);
         }
         blockList.add(blockInfo);
@@ -293,7 +293,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       }
     } else {
       List<BlockInfo> list =
-          new ArrayList<BlockInfo>(DEFAULT_NUM_BLOCKS_PER_INODE);
+          new ArrayList<>(DEFAULT_NUM_BLOCKS_PER_INODE);
       list.add(newBlock);
       inodeBlocks.put(newBlock.getInodeId(), list);
     }

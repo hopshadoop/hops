@@ -97,7 +97,7 @@ class BPOfferService implements Runnable {
    * their active or standby states.
    */
   private List<BPServiceActor> bpServices =
-      new CopyOnWriteArrayList<BPServiceActor>();
+      new CopyOnWriteArrayList<>();
   /**
    * Each time we receive a heartbeat from a NN claiming to be ACTIVE, we
    * record
@@ -118,9 +118,9 @@ class BPOfferService implements Runnable {
   private volatile long lastBlockReport = 0;
   private boolean resetBlockReportTime = true;
   private BPServiceActor blkReportHander = null;
-  private List<ActiveNode> nnList = new CopyOnWriteArrayList<ActiveNode>();
+  private List<ActiveNode> nnList = new CopyOnWriteArrayList<>();
   private List<InetSocketAddress> blackListNN =
-      new CopyOnWriteArrayList<InetSocketAddress>();
+      new CopyOnWriteArrayList<>();
   private Object nnListSync = new Object();
   private volatile int rpcRoundRobinIndex = 0;
       // you have bunch of NNs, which one to send the incremental block report
@@ -876,7 +876,7 @@ class BPOfferService implements Runnable {
 
   void updateNNList(SortedActiveNodeList list) throws IOException {
     ArrayList<InetSocketAddress> nnAddresses =
-        new ArrayList<InetSocketAddress>();
+        new ArrayList<>();
     for (ActiveNode ann : list.getActiveNodes()) {
       InetSocketAddress socketAddress =
           new InetSocketAddress(ann.getIpAddress(), ann.getPort());

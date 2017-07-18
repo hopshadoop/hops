@@ -48,16 +48,12 @@ public class TestEncodingStatus extends TestCase {
       Properties conf = new Properties();
       conf.load(ClassLoader.getSystemResourceAsStream("ndb-config.properties"));
       sf.setConfiguration(conf);
-    } catch (StorageInitializtionException e) {
-      e.printStackTrace();
     } catch (IOException e) {
       e.printStackTrace();
     }
 
     try {
       HdfsStorageFactory.setConfiguration(new Configuration());
-    } catch (StorageInitializtionException e) {
-      e.printStackTrace();
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -239,7 +235,7 @@ public class TestEncodingStatus extends TestCase {
   public void testCountEncodingRequested() throws IOException {
     final EncodingPolicy policy = new EncodingPolicy("codec", (short) 1);
     final ArrayList<EncodingStatus> statusToAdd =
-        new ArrayList<EncodingStatus>();
+        new ArrayList<>();
     statusToAdd.add(
         new EncodingStatus(1, EncodingStatus.Status.ENCODING_REQUESTED, policy,
             1L));
@@ -312,7 +308,7 @@ public class TestEncodingStatus extends TestCase {
   public void testFindEncodingRequested() throws IOException {
     final EncodingPolicy policy = new EncodingPolicy("codec", (short) 1);
     final ArrayList<EncodingStatus> statusToAdd =
-        new ArrayList<EncodingStatus>();
+        new ArrayList<>();
     statusToAdd.add(
         new EncodingStatus(1, EncodingStatus.Status.ENCODING_REQUESTED, policy,
             1L));

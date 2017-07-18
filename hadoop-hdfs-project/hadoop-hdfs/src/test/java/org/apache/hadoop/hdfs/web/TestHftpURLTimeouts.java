@@ -108,7 +108,7 @@ public class TestHftpURLTimeouts {
   private boolean checkConnectTimeout(HftpFileSystem fs, boolean ignoreReadTimeout)
       throws IOException {
     boolean timedout = false;
-    List<HttpURLConnection> conns = new LinkedList<HttpURLConnection>();
+    List<HttpURLConnection> conns = new LinkedList<>();
     try {
       // with a listen backlog of 1, should only have to make one connection
       // to trigger a connection timeout.  however... linux doesn't honor the

@@ -92,7 +92,7 @@ public class TestJspHelper {
     DelegationTokenIdentifier dtId =
         new DelegationTokenIdentifier(userText, userText, null);
     Token<DelegationTokenIdentifier> token =
-        new Token<DelegationTokenIdentifier>(dtId,
+        new Token<>(dtId,
             new DummySecretManager(0, 0, 0, 0));
     String tokenString = token.encodeToUrlString();
     when(request.getParameter(JspHelper.DELEGATION_PARAMETER_NAME))
@@ -171,7 +171,7 @@ public class TestJspHelper {
     DelegationTokenIdentifier dtId =
         new DelegationTokenIdentifier(ownerText, ownerText, new Text(realUser));
     Token<DelegationTokenIdentifier> token =
-        new Token<DelegationTokenIdentifier>(dtId,
+        new Token<>(dtId,
             new DummySecretManager(0, 0, 0, 0));
     String tokenString = token.encodeToUrlString();
     

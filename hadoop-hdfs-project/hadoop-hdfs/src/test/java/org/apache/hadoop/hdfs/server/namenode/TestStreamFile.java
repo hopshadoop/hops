@@ -142,7 +142,7 @@ public class TestStreamFile {
   @SuppressWarnings("unchecked")
   private List<InclusiveByteRange> strToRanges(String s, int contentLength) {
     List<String> l = Arrays.asList(new String[]{"bytes=" + s});
-    Enumeration<?> e = (new Vector<String>(l)).elements();
+    Enumeration<?> e = (new Vector<>(l)).elements();
     return InclusiveByteRange.satisfiableRanges(e, contentLength);
   }
   
@@ -246,7 +246,7 @@ public class TestStreamFile {
 
       Mockito.doReturn(fsMock).when(clientMock).open(testFile.toString());
 
-      Mockito.doReturn(Long.valueOf(4)).when(fsMock).getFileLength();
+      Mockito.doReturn(4L).when(fsMock).getFileLength();
 
       try {
         sfile.doGet(mockHttpServletRequest, mockHttpServletResponse);

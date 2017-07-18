@@ -167,9 +167,8 @@ public class NamenodeFsck {
     this.totalDatanodes = totalDatanodes;
     this.minReplication = minReplication;
     this.remoteAddress = remoteAddress;
-
-    for (Iterator<String> it = pmap.keySet().iterator(); it.hasNext(); ) {
-      String key = it.next();
+  
+    for (String key : pmap.keySet()) {
       if (key.equals("path")) {
         this.path = pmap.get("path")[0];
       } else if (key.equals("move")) {
@@ -301,8 +300,8 @@ public class NamenodeFsck {
           return;
         }
         HdfsFileStatus[] files = thisListing.getPartialListing();
-        for (int i = 0; i < files.length; i++) {
-          check(path, files[i], res);
+        for (HdfsFileStatus file1 : files) {
+          check(path, file1, res);
         }
         lastReturnedName = thisListing.getLastName();
       } while (thisListing.hasMore());
@@ -563,7 +562,7 @@ public class NamenodeFsck {
       throws Exception {
     int failures = 0;
     InetSocketAddress targetAddr = null;
-    TreeSet<DatanodeInfo> deadNodes = new TreeSet<DatanodeInfo>();
+    TreeSet<DatanodeInfo> deadNodes = new TreeSet<>();
     Socket s = null;
     BlockReader blockReader = null;
     ExtendedBlock block = lblock.getBlock();
@@ -695,7 +694,7 @@ public class NamenodeFsck {
    */
   @VisibleForTesting
   static class Result {
-    List<String> missingIds = new ArrayList<String>();
+    List<String> missingIds = new ArrayList<>();
     long missingSize = 0L;
     long corruptFiles = 0L;
     long corruptBlocks = 0L;

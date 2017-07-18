@@ -237,7 +237,7 @@ public class HftpFileSystem extends FileSystem
     renewToken = token;
     // emulate the 203 usage of the tokens
     // by setting the kind and service as if they were hdfs tokens
-    delegationToken = new Token<T>(token);
+    delegationToken = new Token<>(token);
     // NOTE: the remote nn must be configured to use hdfs
     delegationToken.setKind(DelegationTokenIdentifier.HDFS_DELEGATION_KIND);
     // no need to change service because we aren't exactly sure what it
@@ -427,7 +427,7 @@ public class HftpFileSystem extends FileSystem
    */
   class LsParser extends DefaultHandler {
 
-    ArrayList<FileStatus> fslist = new ArrayList<FileStatus>();
+    ArrayList<FileStatus> fslist = new ArrayList<>();
 
     @Override
     public void startElement(String ns, String localname, String qname,
@@ -454,9 +454,9 @@ public class HftpFileSystem extends FileSystem
         throw new SAXException(e);
       }
       FileStatus fs = "file".equals(qname) ?
-          new FileStatus(Long.valueOf(attrs.getValue("size")).longValue(),
-              false, Short.valueOf(attrs.getValue("replication")).shortValue(),
-              Long.valueOf(attrs.getValue("blocksize")).longValue(), modif,
+          new FileStatus(Long.valueOf(attrs.getValue("size")),
+              false, Short.valueOf(attrs.getValue("replication")),
+              Long.valueOf(attrs.getValue("blocksize")), modif,
               atime, FsPermission.valueOf(attrs.getValue("permission")),
               attrs.getValue("owner"), attrs.getValue("group"),
               HftpFileSystem.this.makeQualified(

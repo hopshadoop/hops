@@ -127,21 +127,21 @@ class Writer extends Thread {
   
   // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   static void startWriters(Writer[] writers) {
-    for (int i = 0; i < writers.length; i++) {
-      writers[i].start();
+    for (Writer writer : writers) {
+      writer.start();
     }
   }
 
   static void stopWriters(Writer[] writers) throws InterruptedException {
-    for (int i = 0; i < writers.length; i++) {
-      if (writers[i] != null) {
-        writers[i].running = false;
-        writers[i].interrupt();
+    for (Writer writer1 : writers) {
+      if (writer1 != null) {
+        writer1.running = false;
+        writer1.interrupt();
       }
     }
-    for (int i = 0; i < writers.length; i++) {
-      if (writers[i] != null) {
-        writers[i].join();
+    for (Writer writer : writers) {
+      if (writer != null) {
+        writer.join();
       }
     }
   }
@@ -149,12 +149,12 @@ class Writer extends Thread {
   // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   static void verifyFile(Writer[] writers, FileSystem fs) throws IOException {
     LOG.info("Verify the file");
-    for (int i = 0; i < writers.length; i++) {
-      LOG.info(writers[i].filepath + ": length=" +
-          fs.getFileStatus(writers[i].filepath).getLen());
+    for (Writer writer : writers) {
+      LOG.info(writer.filepath + ": length=" +
+          fs.getFileStatus(writer.filepath).getLen());
       FSDataInputStream in = null;
       try {
-        in = fs.open(writers[i].filepath);
+        in = fs.open(writer.filepath);
         boolean eof = false;
         int j = 0, x = 0;
         long dataRead = 0;
@@ -168,20 +168,20 @@ class Writer extends Thread {
             eof = true; // finished reading file
           }
         }
-        if (writers[i].datawrote != dataRead) {
+        if (writer.datawrote != dataRead) {
           LOG.debug("File length read lenght is not consistant. wrote " +
-              writers[i].datawrote + " data read " + dataRead + " file path " +
-              writers[i].filepath);
+              writer.datawrote + " data read " + dataRead + " file path " +
+              writer.filepath);
           fail("File length read lenght is not consistant. wrote " +
-              writers[i].datawrote + " data read " + dataRead + " file path " +
-              writers[i].filepath);
+              writer.datawrote + " data read " + dataRead + " file path " +
+              writer.filepath);
         }
       } catch (Exception ex) {
-        fail("File varification failed for file: " + writers[i].filepath +
+        fail("File varification failed for file: " + writer.filepath +
             " exception " + ex);
       } finally {
         IOUtils.closeStream(in);
-
+      
       }
     }
   }
@@ -189,17 +189,17 @@ class Writer extends Thread {
   public static void waitReplication(FileSystem fs, Writer[] writers,
       short replicationFactor, long timeout)
       throws IOException, TimeoutException {
-
-    for (int i = 0; i < writers.length; i++) {
+  
+    for (Writer writer : writers) {
       try {
         // increasing timeout to take into consideration 'ping' time with failed namenodes
         // if the client fetches for block locations from a dead NN, it would need to retry many times and eventually this time would cause a timeout
         // to avoid this, we set a larger timeout
         long expectedRetyTime = 20000; // 20seconds
         timeout = timeout + expectedRetyTime;
-        DFSTestUtil.waitReplicationWithTimeout(fs, writers[i].getFilePath(),
+        DFSTestUtil.waitReplicationWithTimeout(fs, writer.getFilePath(),
             replicationFactor, timeout);
-
+      
       } catch (ConnectException ex) {
         LOG.warn("Received Connect Exception (expected due to failure of NN)");
         ex.printStackTrace();

@@ -134,7 +134,7 @@ public class FSDirectory implements Closeable {
             DFSConfigKeys.DFS_NAMENODE_NAME_CACHE_THRESHOLD_DEFAULT);
     NameNode.LOG
         .info("Caching file names occuring more than " + threshold + " times");
-    nameCache = new NameCache<ByteArray>(threshold);
+    nameCache = new NameCache<>(threshold);
     namesystem = ns;
   }
 
@@ -577,7 +577,7 @@ public class FSDirectory implements Closeable {
         if (removedDst != null) {
           INode rmdst = removedDst;
           removedDst = null;
-          List<Block> collectedBlocks = new ArrayList<Block>();
+          List<Block> collectedBlocks = new ArrayList<>();
           filesDeleted = 1; // rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
                             // [S] as the dst dir was empty it will always return 1
                             // if the destination is file then we need to collect the blocks for it
@@ -1020,7 +1020,7 @@ public class FSDirectory implements Closeable {
         if (removedDst != null) {
           INode rmdst = removedDst;
           removedDst = null;
-          List<Block> collectedBlocks = new ArrayList<Block>();
+          List<Block> collectedBlocks = new ArrayList<>();
           filesDeleted = rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
           getFSNamesystem().removePathAndBlocks(src, collectedBlocks);
         }
@@ -1222,9 +1222,9 @@ public class FSDirectory implements Closeable {
     INodeCandidatePrimaryKey trg_param =
         new INodeCandidatePrimaryKey(trgInode.getId());
     List<INodeCandidatePrimaryKey> srcs_param =
-        new ArrayList<INodeCandidatePrimaryKey>();
-    for (int j = 0; j < allSrcInodes.length; j++) {
-      srcs_param.add(new INodeCandidatePrimaryKey(allSrcInodes[j].getId()));
+        new ArrayList<>();
+    for (INodeFile allSrcInode : allSrcInodes) {
+      srcs_param.add(new INodeCandidatePrimaryKey(allSrcInode.getId()));
     }
 
     // since we are in the same dir - we can use same parent to remove files
@@ -1301,7 +1301,7 @@ public class FSDirectory implements Closeable {
    */
   void unprotectedDelete(String src, long mtime)
       throws UnresolvedLinkException, StorageException, IOException {
-    List<Block> collectedBlocks = new ArrayList<Block>();
+    List<Block> collectedBlocks = new ArrayList<>();
     int filesRemoved = unprotectedDelete(src, collectedBlocks, mtime);
     if (filesRemoved > 0) {
       getFSNamesystem().removePathAndBlocks(src, collectedBlocks);

@@ -39,8 +39,8 @@ public class StorageIdMap {
   private Map<Integer, String> sIdtoStorageId;
   
   public StorageIdMap() throws IOException {
-    this.sIdtoStorageId = new HashMap<Integer, String>();
-    this.storageIdtoSId = new HashMap<String, Integer>();
+    this.sIdtoStorageId = new HashMap<>();
+    this.storageIdtoSId = new HashMap<>();
     initialize();
   }
 

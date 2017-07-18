@@ -296,7 +296,7 @@ public class TestServer extends HTestCase {
   }
 
   public static class TestService implements Service {
-    static List<String> LIFECYCLE = new ArrayList<String>();
+    static List<String> LIFECYCLE = new ArrayList<>();
 
     @Override
     public void init(Server server) throws ServiceException {
@@ -468,7 +468,7 @@ public class TestServer extends HTestCase {
     server.init();
   }
 
-  private static List<String> ORDER = new ArrayList<String>();
+  private static List<String> ORDER = new ArrayList<>();
 
   public abstract static class MyService implements Service, XException.ERROR {
     private String id;

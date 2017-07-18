@@ -139,20 +139,20 @@ public class TestBalancer {
     System.arraycopy(distribution, 0, usedSpace, 0, distribution.length);
 
     List<List<Block>> blockReports =
-        new ArrayList<List<Block>>(usedSpace.length);
+        new ArrayList<>(usedSpace.length);
     Block[][] results = new Block[usedSpace.length][];
-    for (int i = 0; i < usedSpace.length; i++) {
+    for (long anUsedSpace : usedSpace) {
       blockReports.add(new ArrayList<Block>());
     }
-    for (int i = 0; i < blocks.length; i++) {
+    for (ExtendedBlock block : blocks) {
       for (int j = 0; j < replicationFactor; j++) {
         boolean notChosen = true;
         while (notChosen) {
           int chosenIndex = r.nextInt(usedSpace.length);
           if (usedSpace[chosenIndex] > 0) {
             notChosen = false;
-            blockReports.get(chosenIndex).add(blocks[i].getLocalBlock());
-            usedSpace[chosenIndex] -= blocks[i].getNumBytes();
+            blockReports.get(chosenIndex).add(block.getLocalBlock());
+            usedSpace[chosenIndex] -= block.getNumBytes();
           }
         }
       }

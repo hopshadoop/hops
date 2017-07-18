@@ -99,7 +99,7 @@ public class DFSInputStream extends FSInputStream
   /* XXX Use of CocurrentHashMap is temp fix. Need to fix 
    * parallel accesses to DFSInputStream (through ptreads) properly */
   private final ConcurrentHashMap<DatanodeInfo, DatanodeInfo> deadNodes =
-      new ConcurrentHashMap<DatanodeInfo, DatanodeInfo>();
+      new ConcurrentHashMap<>();
   private int buffersize = 1;
   
   private final byte[] oneByteBuf = new byte[1]; // used for 'int read()'
@@ -377,7 +377,7 @@ public class DFSInputStream extends FSInputStream
       blocks = getFinalizedBlockRange(offset,
           Math.min(length, lengthOfCompleteBlk - offset));
     } else {
-      blocks = new ArrayList<LocatedBlock>(1);
+      blocks = new ArrayList<>(1);
     }
 
     // get the blocks from incomplete block range
@@ -396,7 +396,7 @@ public class DFSInputStream extends FSInputStream
   private synchronized List<LocatedBlock> getFinalizedBlockRange(long offset,
       long length) throws IOException {
     assert (locatedBlocks != null) : "locatedBlocks is null";
-    List<LocatedBlock> blockRange = new ArrayList<LocatedBlock>();
+    List<LocatedBlock> blockRange = new ArrayList<>();
     // search cached blocks first
     int blockIdx = locatedBlocks.findBlock(offset);
     if (blockIdx < 0) { // block is not cached
@@ -656,7 +656,7 @@ public class DFSInputStream extends FSInputStream
       throw new IOException("Stream closed");
     }
     Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap =
-        new HashMap<ExtendedBlock, Set<DatanodeInfo>>();
+        new HashMap<>();
     failures = 0;
     if (pos < getFileLength()) {
       int retries = 2;
@@ -734,7 +734,7 @@ public class DFSInputStream extends FSInputStream
     if ((corruptedBlockMap.containsKey(blk))) {
       dnSet = corruptedBlockMap.get(blk);
     } else {
-      dnSet = new HashSet<DatanodeInfo>();
+      dnSet = new HashSet<>();
     }
     if (!dnSet.contains(node)) {
       dnSet.add(node);
@@ -1037,7 +1037,7 @@ public class DFSInputStream extends FSInputStream
     List<LocatedBlock> blockRange = getBlockRange(position, realLen);
     int remaining = realLen;
     Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap =
-        new HashMap<ExtendedBlock, Set<DatanodeInfo>>();
+        new HashMap<>();
     for (LocatedBlock blk : blockRange) {
       long targetStart = position - blk.getStartOffset();
       long bytesToRead = Math.min(remaining, blk.getBlockSize() - targetStart);
@@ -1241,9 +1241,9 @@ public class DFSInputStream extends FSInputStream
   static DatanodeInfo bestNode(DatanodeInfo nodes[],
       AbstractMap<DatanodeInfo, DatanodeInfo> deadNodes) throws IOException {
     if (nodes != null) {
-      for (int i = 0; i < nodes.length; i++) {
-        if (!deadNodes.containsKey(nodes[i])) {
-          return nodes[i];
+      for (DatanodeInfo node : nodes) {
+        if (!deadNodes.containsKey(node)) {
+          return node;
         }
       }
     }

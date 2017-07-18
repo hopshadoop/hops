@@ -163,7 +163,7 @@ public class LayoutVersion {
   
   // Build layout version and corresponding feature matrix
   static final Map<Integer, EnumSet<Feature>> map =
-      new HashMap<Integer, EnumSet<Feature>>();
+      new HashMap<>();
   
   // Static initialization 
   static {

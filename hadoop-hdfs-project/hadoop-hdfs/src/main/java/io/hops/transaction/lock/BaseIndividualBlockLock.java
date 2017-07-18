@@ -26,7 +26,7 @@ abstract class BaseIndividualBlockLock extends Lock {
   protected final List<BlockInfo> blocks;
 
   BaseIndividualBlockLock() {
-    this.blocks = new ArrayList<BlockInfo>();
+    this.blocks = new ArrayList<>();
   }
 
   Collection<BlockInfo> getBlocks() {

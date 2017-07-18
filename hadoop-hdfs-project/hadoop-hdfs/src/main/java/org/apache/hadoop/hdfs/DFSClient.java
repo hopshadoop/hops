@@ -379,7 +379,7 @@ public class DFSClient implements java.io.Closeable {
    * Note that a file can only be written by a single client.
    */
   private final Map<String, DFSOutputStream> filesBeingWritten =
-      new HashMap<String, DFSOutputStream>();
+      new HashMap<>();
 
   private boolean shortCircuitLocalReads;
   
@@ -511,7 +511,7 @@ public class DFSClient implements java.io.Closeable {
    */
   private static SocketAddress[] getLocalInterfaceAddrs(String interfaceNames[])
       throws UnknownHostException {
-    List<SocketAddress> localAddrs = new ArrayList<SocketAddress>();
+    List<SocketAddress> localAddrs = new ArrayList<>();
     for (String interfaceName : interfaceNames) {
       if (InetAddresses.isInetAddress(interfaceName)) {
         localAddrs.add(new InetSocketAddress(interfaceName, 0));
@@ -1269,7 +1269,7 @@ public class DFSClient implements java.io.Closeable {
           "configuration.");
     }
     // Downcast blockLocations and fetch out required LocatedBlock(s)
-    List<LocatedBlock> blocks = new ArrayList<LocatedBlock>();
+    List<LocatedBlock> blocks = new ArrayList<>();
     for (BlockLocation loc : blockLocations) {
       if (!(loc instanceof HdfsBlockLocation)) {
         throw new ClassCastException("DFSClient#getVolumeBlockLocations " +
@@ -1282,7 +1282,7 @@ public class DFSClient implements java.io.Closeable {
     // Re-group the LocatedBlocks to be grouped by datanodes, with the values
     // a list of the LocatedBlocks on the datanode.
     Map<DatanodeInfo, List<LocatedBlock>> datanodeBlocks =
-        new LinkedHashMap<DatanodeInfo, List<LocatedBlock>>();
+        new LinkedHashMap<>();
     for (LocatedBlock b : blocks) {
       for (DatanodeInfo info : b.getLocations()) {
         if (!datanodeBlocks.containsKey(info)) {
@@ -2852,7 +2852,7 @@ public class DFSClient implements java.io.Closeable {
     //for dead Namenodes (depends on the convergence rate of Leader Election). 
     //To avoid contacting a dead node a list of black listed namenodes is also maintained on the 
     //client side to avoid contacting dead NNs
-    List<ActiveNode> blackListedNamenodes = new ArrayList<ActiveNode>();
+    List<ActiveNode> blackListedNamenodes = new ArrayList<>();
 
     IOException exception = null;
     NamenodeSelector.NamenodeHandle handle = null;

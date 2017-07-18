@@ -37,13 +37,13 @@ public class ExceptionProvider implements ExceptionMapper<Throwable> {
 
   protected Response createResponse(Response.Status status,
       Throwable throwable) {
-    Map<String, Object> json = new LinkedHashMap<String, Object>();
+    Map<String, Object> json = new LinkedHashMap<>();
     json.put(HttpFSFileSystem.ERROR_MESSAGE_JSON, getOneLineMessage(throwable));
     json.put(HttpFSFileSystem.ERROR_EXCEPTION_JSON,
         throwable.getClass().getSimpleName());
     json.put(HttpFSFileSystem.ERROR_CLASSNAME_JSON,
         throwable.getClass().getName());
-    Map<String, Object> response = new LinkedHashMap<String, Object>();
+    Map<String, Object> response = new LinkedHashMap<>();
     response.put(HttpFSFileSystem.ERROR_JSON, json);
     log(status, throwable);
     return Response.status(status).type(MediaType.APPLICATION_JSON)

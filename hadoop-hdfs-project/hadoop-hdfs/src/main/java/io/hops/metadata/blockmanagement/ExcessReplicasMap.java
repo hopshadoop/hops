@@ -48,7 +48,7 @@ public class ExcessReplicasMap {
       return null;
     }
     LightWeightLinkedSet<Block> excessBlocks =
-        new LightWeightLinkedSet<Block>();
+        new LightWeightLinkedSet<>();
     for (ExcessReplica er : excessReplicas) {
       //FIXME: [M] might need to get the blockinfo from the db, but for now we don't need it
       excessBlocks.add(new Block(er.getBlockId()));
@@ -87,7 +87,7 @@ public class ExcessReplicasMap {
     if (excessReplicas == null) {
       return null;
     }
-    TreeSet<String> stIds = new TreeSet<String>();
+    TreeSet<String> stIds = new TreeSet<>();
     for (ExcessReplica er : excessReplicas) {
       stIds.add(datanodeManager.getDatanode(er.getStorageId()).getStorageID());
     }

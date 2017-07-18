@@ -143,7 +143,7 @@ public class MiniDFSClusterManager {
     }
 
     if (writeDetails != null) {
-      Map<String, Object> map = new TreeMap<String, Object>();
+      Map<String, Object> map = new TreeMap<>();
       if (dfs != null) {
         map.put("namenode_port", dfs.getNameNodePort());
       }

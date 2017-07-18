@@ -32,10 +32,10 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
     extends BaseEntityContext<Key, Entity> {
 
   private Map<Long, Map<Key, Entity>> blocksToReplicas =
-      new HashMap<Long, Map<Key, Entity>>();
+      new HashMap<>();
 
   private Map<Integer, Map<Key, Entity>> inodesToReplicas =
-      new HashMap<Integer, Map<Key, Entity>>();
+      new HashMap<>();
 
   @Override
   public void update(Entity entity) throws TransactionContextException {
@@ -80,7 +80,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
     if (key.hasBlockId()) {
       entityMap = blocksToReplicas.get(key.getBlockId());
       if (entityMap == null) {
-        entityMap = new HashMap<Key, Entity>();
+        entityMap = new HashMap<>();
         blocksToReplicas.put(key.getBlockId(), entityMap);
       }
       entityMap.put(key, entity);
@@ -88,7 +88,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
     if (key.hasINodeId()) {
       entityMap = inodesToReplicas.get(key.getInodeId());
       if (entityMap == null) {
-        entityMap = new HashMap<Key, Entity>();
+        entityMap = new HashMap<>();
         inodesToReplicas.put(key.getInodeId(), entityMap);
       }
       entityMap.put(key, entity);
@@ -142,7 +142,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
     if (entityMap == null) {
       return null;
     }
-    return new ArrayList<Entity>(entityMap.values());
+    return new ArrayList<>(entityMap.values());
   }
 
   final List<Entity> getByINode(int inodeId) {
@@ -150,7 +150,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
     if (entityMap == null) {
       return null;
     }
-    return new ArrayList<Entity>(entityMap.values());
+    return new ArrayList<>(entityMap.values());
   }
 
 

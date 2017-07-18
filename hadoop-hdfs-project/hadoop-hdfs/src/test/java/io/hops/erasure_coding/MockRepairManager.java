@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MockRepairManager extends BlockRepairManager {
-  private static final List<Report> EMPTY_REPORT = new ArrayList<Report>(0);
+  private static final List<Report> EMPTY_REPORT = new ArrayList<>(0);
 
   public MockRepairManager(Configuration conf) {
     super(conf);

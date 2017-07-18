@@ -72,8 +72,8 @@ public class TestFileCreationClient {
       }
 
       try {
-        for (int i = 0; i < slowwriters.length; i++) {
-          slowwriters[i].start();
+        for (SlowWriter slowwriter : slowwriters) {
+          slowwriter.start();
         }
 
         Thread.sleep(1000);                       // let writers get started
@@ -85,27 +85,27 @@ public class TestFileCreationClient {
         System.out.println("Wait a few seconds");
         Thread.sleep(5000);
       } finally {
-        for (int i = 0; i < slowwriters.length; i++) {
-          if (slowwriters[i] != null) {
-            slowwriters[i].running = false;
-            slowwriters[i].interrupt();
+        for (SlowWriter slowwriter1 : slowwriters) {
+          if (slowwriter1 != null) {
+            slowwriter1.running = false;
+            slowwriter1.interrupt();
           }
         }
-        for (int i = 0; i < slowwriters.length; i++) {
-          if (slowwriters[i] != null) {
-            slowwriters[i].join();
+        for (SlowWriter slowwriter : slowwriters) {
+          if (slowwriter != null) {
+            slowwriter.join();
           }
         }
       }
 
       //Verify the file
       System.out.println("Verify the file");
-      for (int i = 0; i < slowwriters.length; i++) {
-        System.out.println(slowwriters[i].filepath + ": length=" +
-            fs.getFileStatus(slowwriters[i].filepath).getLen());
+      for (SlowWriter slowwriter : slowwriters) {
+        System.out.println(slowwriter.filepath + ": length=" +
+            fs.getFileStatus(slowwriter.filepath).getLen());
         FSDataInputStream in = null;
         try {
-          in = fs.open(slowwriters[i].filepath);
+          in = fs.open(slowwriter.filepath);
           for (int j = 0, x; (x = in.read()) != -1; j++) {
             assertEquals(j, x);
           }

@@ -142,7 +142,7 @@ public class FileSystemAccessService extends BaseService
   private AtomicInteger unmanagedFileSystems = new AtomicInteger();
 
   private ConcurrentHashMap<String, CachedFileSystem> fsCache =
-      new ConcurrentHashMap<String, CachedFileSystem>();
+      new ConcurrentHashMap<>();
 
   private long purgeTimeout;
 
@@ -274,7 +274,7 @@ public class FileSystemAccessService extends BaseService
   }
 
   private Set<String> toLowerCase(Collection<String> collection) {
-    Set<String> set = new HashSet<String>();
+    Set<String> set = new HashSet<>();
     for (String value : collection) {
       set.add(value.toLowerCase());
     }
@@ -400,9 +400,7 @@ public class FileSystemAccessService extends BaseService
           return createFileSystem(conf);
         }
       });
-    } catch (IOException ex) {
-      throw ex;
-    } catch (FileSystemAccessException ex) {
+    } catch (IOException | FileSystemAccessException ex) {
       throw ex;
     } catch (Exception ex) {
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H08,

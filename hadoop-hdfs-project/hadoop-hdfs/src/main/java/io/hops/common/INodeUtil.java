@@ -142,7 +142,7 @@ public class INodeUtil {
 
   public static Set<String> findPathsByLeaseHolder(String holder)
       throws StorageException {
-    HashSet<String> paths = new HashSet<String>();
+    HashSet<String> paths = new HashSet<>();
     LeaseDataAccess<Lease> lda = (LeaseDataAccess) HdfsStorageFactory
         .getDataAccess(LeaseDataAccess.class);
     Lease rcLease = lda.findByPKey(holder,Lease.getHolderId(holder));

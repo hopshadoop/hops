@@ -187,7 +187,7 @@ public class InvalidatedBlockContext
       throws StorageCallPreventedException, StorageException {
     List<InvalidatedBlock> result = null;
     if (allInvBlocksRead) {
-      result = new ArrayList<InvalidatedBlock>(getAll());
+      result = new ArrayList<>(getAll());
       hit(iFinder, result);
     } else {
       aboutToAccessStorage(iFinder);

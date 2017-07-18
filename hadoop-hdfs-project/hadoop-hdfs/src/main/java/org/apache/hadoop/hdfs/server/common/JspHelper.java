@@ -128,7 +128,7 @@ public class JspHelper {
   public static DatanodeInfo bestNode(LocatedBlocks blks, Configuration conf)
       throws IOException {
     HashMap<DatanodeInfo, NodeRecord> map =
-        new HashMap<DatanodeInfo, NodeRecord>();
+        new HashMap<>();
     for (LocatedBlock block : blks.getLocatedBlocks()) {
       DatanodeInfo[] nodes = block.getLocations();
       for (DatanodeInfo node : nodes) {
@@ -153,7 +153,7 @@ public class JspHelper {
 
   public static DatanodeInfo bestNode(DatanodeInfo[] nodes, boolean doRandom,
       Configuration conf) throws IOException {
-    TreeSet<DatanodeInfo> deadNodes = new TreeSet<DatanodeInfo>();
+    TreeSet<DatanodeInfo> deadNodes = new TreeSet<>();
     DatanodeInfo chosenNode = null;
     int failures = 0;
     Socket s = null;
@@ -248,8 +248,8 @@ public class JspHelper {
   public static void addTableRow(JspWriter out, String[] columns)
       throws IOException {
     out.print("<tr>");
-    for (int i = 0; i < columns.length; i++) {
-      out.print("<td style=\"vertical-align: top;\"><B>" + columns[i] +
+    for (String column : columns) {
+      out.print("<td style=\"vertical-align: top;\"><B>" + column +
           "</B><br></td>");
     }
     out.print("</tr>");
@@ -258,17 +258,17 @@ public class JspHelper {
   public static void addTableRow(JspWriter out, String[] columns, int row)
       throws IOException {
     out.print("<tr>");
-
-    for (int i = 0; i < columns.length; i++) {
+  
+    for (String column : columns) {
       if (row / 2 * 2 == row) {//even
         out.print(
             "<td style=\"vertical-align: top;background-color:LightGrey;\"><B>" +
-                columns[i] + "</B><br></td>");
+                column + "</B><br></td>");
       } else {
         out.print(
             "<td style=\"vertical-align: top;background-color:LightBlue;\"><B>" +
-                columns[i] + "</B><br></td>");
-
+                column + "</B><br></td>");
+      
       }
     }
     out.print("</tr>");
@@ -630,7 +630,7 @@ public class JspHelper {
       HttpServletRequest request, String tokenString, Configuration conf)
       throws IOException {
     final Token<DelegationTokenIdentifier> token =
-        new Token<DelegationTokenIdentifier>();
+        new Token<>();
     token.decodeFromUrlString(tokenString);
     InetSocketAddress serviceAddress = getNNServiceAddress(context, request);
     if (serviceAddress != null) {

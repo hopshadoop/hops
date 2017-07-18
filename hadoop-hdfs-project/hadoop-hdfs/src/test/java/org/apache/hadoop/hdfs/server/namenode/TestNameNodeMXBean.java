@@ -82,7 +82,7 @@ public class TestNameNodeMXBean {
       // get attribute percentremaining
       Float percentremaining =
           (Float) (mbs.getAttribute(mxbeanName, "PercentRemaining"));
-      assertEquals(fsn.getPercentRemaining(), percentremaining.floatValue(),
+      assertEquals(fsn.getPercentRemaining(), percentremaining,
           DELTA);
       // get attribute Totalblocks
       Long totalblocks = (Long) (mbs.getAttribute(mxbeanName, "TotalBlocks"));

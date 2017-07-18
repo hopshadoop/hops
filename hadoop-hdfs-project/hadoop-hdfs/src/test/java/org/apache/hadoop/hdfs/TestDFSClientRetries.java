@@ -462,7 +462,7 @@ public class TestDFSClientRetries {
               goodLocatedBlock.getStartOffset(), false);
 
 
-      List<LocatedBlock> badBlocks = new ArrayList<LocatedBlock>();
+      List<LocatedBlock> badBlocks = new ArrayList<>();
       badBlocks.add(badLocatedBlock);
       return new LocatedBlocks(goodBlockList.getFileLength(), false, badBlocks,
           null, true);
@@ -814,7 +814,7 @@ public class TestDFSClientRetries {
       final boolean isWebHDFS) throws Exception {
     ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.ALL);
 
-    final List<Exception> exceptions = new ArrayList<Exception>();
+    final List<Exception> exceptions = new ArrayList<>();
 
     final Path dir = new Path("/testNamenodeRestart");
 

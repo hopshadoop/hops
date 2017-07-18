@@ -156,8 +156,8 @@ public class TestMultiThreadedHflush {
     final FSDataOutputStream stm = createFile(fs, p, 1);
 
 
-    ArrayList<Thread> flushers = new ArrayList<Thread>();
-    final AtomicReference<Throwable> thrown = new AtomicReference<Throwable>();
+    ArrayList<Thread> flushers = new ArrayList<>();
+    final AtomicReference<Throwable> thrown = new AtomicReference<>();
     try {
       for (int i = 0; i < 10; i++) {
         Thread flusher = new Thread() {
@@ -227,8 +227,8 @@ public class TestMultiThreadedHflush {
     stm.hflush();
 
     CountDownLatch countdown = new CountDownLatch(1);
-    ArrayList<Thread> threads = new ArrayList<Thread>();
-    AtomicReference<Throwable> thrown = new AtomicReference<Throwable>();
+    ArrayList<Thread> threads = new ArrayList<>();
+    AtomicReference<Throwable> thrown = new AtomicReference<>();
     for (int i = 0; i < numThreads; i++) {
       Thread t = new WriterThread(stm, thrown, countdown, numWrites);
       threads.add(t);

@@ -34,7 +34,7 @@ class ReplicaMap {
   
   // Map of block pool Id to another map of block Id to ReplicaInfo.
   private Map<String, Map<Long, ReplicaInfo>> map =
-      new HashMap<String, Map<Long, ReplicaInfo>>();
+      new HashMap<>();
   
   ReplicaMap(Object mutex) {
     if (mutex == null) {
@@ -121,7 +121,7 @@ class ReplicaMap {
       Map<Long, ReplicaInfo> m = map.get(bpid);
       if (m == null) {
         // Add an entry for block pool if it does not exist already
-        m = new HashMap<Long, ReplicaInfo>();
+        m = new HashMap<>();
         map.put(bpid, m);
       }
       return m.put(replicaInfo.getBlockId(), replicaInfo);
@@ -146,7 +146,7 @@ class ReplicaMap {
     synchronized (mutex) {
       Map<Long, ReplicaInfo> m = map.get(bpid);
       if (m != null) {
-        Long key = Long.valueOf(block.getBlockId());
+        Long key = block.getBlockId();
         ReplicaInfo replicaInfo = m.get(key);
         if (replicaInfo != null &&
             block.getGenerationStamp() == replicaInfo.getGenerationStamp()) {
@@ -216,7 +216,7 @@ class ReplicaMap {
       Map<Long, ReplicaInfo> m = map.get(bpid);
       if (m == null) {
         // Add an entry for block pool if it does not exist already
-        m = new HashMap<Long, ReplicaInfo>();
+        m = new HashMap<>();
         map.put(bpid, m);
       }
     }

@@ -27,7 +27,7 @@ public class HdfsTransactionLocks implements TransactionLocks {
   private final Map<Lock.Type, Lock> locks;
   
   public HdfsTransactionLocks() {
-    this.locks = new EnumMap<Lock.Type, Lock>(Lock.Type.class);
+    this.locks = new EnumMap<>(Lock.Type.class);
   }
   
   @Override
@@ -64,7 +64,7 @@ public class HdfsTransactionLocks implements TransactionLocks {
   }
 
   public List<Lock> getSortedLocks() {
-    List<Lock> lks = new ArrayList<Lock>(locks.values());
+    List<Lock> lks = new ArrayList<>(locks.values());
     Collections.sort(lks);
     return lks;
   }

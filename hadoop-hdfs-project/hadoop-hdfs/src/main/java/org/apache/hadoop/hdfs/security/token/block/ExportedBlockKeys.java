@@ -94,8 +94,8 @@ public class ExportedBlockKeys implements Writable {
     out.writeLong(tokenLifetime);
     currentKey.write(out);
     out.writeInt(allKeys.length);
-    for (int i = 0; i < allKeys.length; i++) {
-      allKeys[i].write(out);
+    for (BlockKey allKey : allKeys) {
+      allKey.write(out);
     }
   }
 

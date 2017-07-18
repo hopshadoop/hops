@@ -106,14 +106,14 @@ class ClusterJspHelper {
     // Outer map key is datanode. Inner map key is namenode and the value is 
     // decom status of the datanode for the corresponding namenode
     Map<String, Map<String, String>> statusMap =
-        new HashMap<String, Map<String, String>>();
+        new HashMap<>();
 
     // Map of exceptions encountered when connecting to namenode
     // key is namenode and value is exception
     Map<String, Exception> decommissionExceptions =
-        new HashMap<String, Exception>();
+        new HashMap<>();
 
-    List<String> unreportedNamenode = new ArrayList<String>();
+    List<String> unreportedNamenode = new ArrayList<>();
     InetSocketAddress isa = namenode.getServiceRpcAddress();
     NamenodeMXBeanHelper nnHelper = null;
     try {
@@ -322,7 +322,7 @@ class ClusterJspHelper {
       for (Entry<String, Map<String, Object>> entry : nodeMap.entrySet()) {
         Map<String, Object> innerMap = entry.getValue();
         if (innerMap != null && !innerMap.isEmpty()) {
-          if (((Boolean) innerMap.get("decommissioned")).booleanValue() ==
+          if ((Boolean) innerMap.get("decommissioned") ==
               true) {
             nn.deadDecomCount++;
           }
@@ -393,7 +393,7 @@ class ClusterJspHelper {
         String json) throws IOException {
       Map<String, Map<String, Object>> nodeMap = getNodeMap(json);
       if (nodeMap != null && !nodeMap.isEmpty()) {
-        List<String> liveDecommed = new ArrayList<String>();
+        List<String> liveDecommed = new ArrayList<>();
         for (Map.Entry<String, Map<String, Object>> entry : nodeMap
             .entrySet()) {
           Map<String, Object> innerMap = entry.getValue();
@@ -406,7 +406,7 @@ class ClusterJspHelper {
             // the inner map key is namenode, value is datanode status.
             Map<String, String> nnStatus = statusMap.get(dn);
             if (nnStatus == null) {
-              nnStatus = new HashMap<String, String>();
+              nnStatus = new HashMap<>();
             }
             nnStatus.put(namenodeHost, (String) innerMap.get("adminState"));
             // map whose key is datanode, value is the inner map.
@@ -438,8 +438,8 @@ class ClusterJspHelper {
       if (nodeMap == null || nodeMap.isEmpty()) {
         return;
       }
-      List<String> deadDn = new ArrayList<String>();
-      List<String> deadDecommed = new ArrayList<String>();
+      List<String> deadDn = new ArrayList<>();
+      List<String> deadDecommed = new ArrayList<>();
       for (Entry<String, Map<String, Object>> entry : nodeMap.entrySet()) {
         deadDn.add(entry.getKey());
         Map<String, Object> deadNodeDetailMap = entry.getValue();
@@ -448,10 +448,9 @@ class ClusterJspHelper {
           // NN - status
           Map<String, String> nnStatus = statusMap.get(dn);
           if (nnStatus == null) {
-            nnStatus = new HashMap<String, String>();
+            nnStatus = new HashMap<>();
           }
-          if (((Boolean) deadNodeDetailMap.get("decommissioned"))
-              .booleanValue() == true) {
+          if ((Boolean) deadNodeDetailMap.get("decommissioned") == true) {
             deadDecommed.add(dn);
             nnStatus.put(host, AdminStates.DECOMMISSIONED.toString());
           } else {
@@ -483,12 +482,12 @@ class ClusterJspHelper {
       if (nodeMap == null || nodeMap.isEmpty()) {
         return;
       }
-      List<String> decomming = new ArrayList<String>();
+      List<String> decomming = new ArrayList<>();
       for (Entry<String, Map<String, Object>> entry : nodeMap.entrySet()) {
         String dn = entry.getKey();
         decomming.add(dn);
         // nn-status
-        Map<String, String> nnStatus = new HashMap<String, String>();
+        Map<String, String> nnStatus = new HashMap<>();
         if (dataNodeStatusMap.containsKey(dn)) {
           nnStatus = dataNodeStatusMap.get(dn);
         }
@@ -521,13 +520,13 @@ class ClusterJspHelper {
     /**
      * List of namenodes in the cluster
      */
-    final List<NamenodeStatus> nnList = new ArrayList<NamenodeStatus>();
+    final List<NamenodeStatus> nnList = new ArrayList<>();
     
     /**
      * Map of namenode host and exception encountered when getting status
      */
     final Map<String, Exception> nnExceptions =
-        new HashMap<String, Exception>();
+        new HashMap<>();
     
     public void setError(Exception e) {
       error = e;
@@ -704,7 +703,7 @@ class ClusterJspHelper {
     /**
      * Map of namenode and exception encountered when getting decom status
      */
-    Map<String, Exception> exceptions = new HashMap<String, Exception>();
+    Map<String, Exception> exceptions = new HashMap<>();
 
     private DecommissionStatus(Map<String, Map<String, String>> statusMap,
         String cid, int httpPort, Map<String, Exception> exceptions) {

@@ -71,13 +71,13 @@ public class InstrumentationService extends BaseService
     variableLock = new ReentrantLock();
     samplerLock = new ReentrantLock();
     Map<String, VariableHolder> jvmVariables =
-        new ConcurrentHashMap<String, VariableHolder>();
-    counters = new ConcurrentHashMap<String, Map<String, AtomicLong>>();
-    timers = new ConcurrentHashMap<String, Map<String, Timer>>();
-    variables = new ConcurrentHashMap<String, Map<String, VariableHolder>>();
-    samplers = new ConcurrentHashMap<String, Map<String, Sampler>>();
-    samplersList = new ArrayList<Sampler>();
-    all = new LinkedHashMap<String, Map<String, ?>>();
+        new ConcurrentHashMap<>();
+    counters = new ConcurrentHashMap<>();
+    timers = new ConcurrentHashMap<>();
+    variables = new ConcurrentHashMap<>();
+    samplers = new ConcurrentHashMap<>();
+    samplersList = new ArrayList<>();
+    all = new LinkedHashMap<>();
     all.put("os-env", System.getenv());
     all.put("sys-props", (Map<String, ?>) (Map) System.getProperties());
     all.put("jvm", jvmVariables);
@@ -87,21 +87,21 @@ public class InstrumentationService extends BaseService
     all.put("samplers", (Map) samplers);
 
     jvmVariables.put("free.memory",
-        new VariableHolder<Long>(new Instrumentation.Variable<Long>() {
+        new VariableHolder<>(new Instrumentation.Variable<Long>() {
           @Override
           public Long getValue() {
             return Runtime.getRuntime().freeMemory();
           }
         }));
     jvmVariables.put("max.memory",
-        new VariableHolder<Long>(new Instrumentation.Variable<Long>() {
+        new VariableHolder<>(new Instrumentation.Variable<Long>() {
           @Override
           public Long getValue() {
             return Runtime.getRuntime().maxMemory();
           }
         }));
     jvmVariables.put("total.memory",
-        new VariableHolder<Long>(new Instrumentation.Variable<Long>() {
+        new VariableHolder<>(new Instrumentation.Variable<Long>() {
           @Override
           public Long getValue() {
             return Runtime.getRuntime().totalMemory();
@@ -133,7 +133,7 @@ public class InstrumentationService extends BaseService
         locked = true;
         groupMap = map.get(group);
         if (groupMap == null) {
-          groupMap = new ConcurrentHashMap<String, T>();
+          groupMap = new ConcurrentHashMap<>();
           map.put(group, groupMap);
         }
       }

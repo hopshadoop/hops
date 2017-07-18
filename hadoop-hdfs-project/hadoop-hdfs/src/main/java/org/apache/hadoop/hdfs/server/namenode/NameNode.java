@@ -616,10 +616,7 @@ public class NameNode {
       initializeGenericKeys(conf);
       initialize(conf);
       enterActiveState();
-    } catch (IOException e) {
-      this.stop();
-      throw e;
-    } catch (HadoopIllegalArgumentException e) {
+    } catch (IOException | HadoopIllegalArgumentException e) {
       this.stop();
       throw e;
     }

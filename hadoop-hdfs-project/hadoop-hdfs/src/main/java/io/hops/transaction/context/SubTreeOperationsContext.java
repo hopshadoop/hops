@@ -38,7 +38,7 @@ public class SubTreeOperationsContext extends BaseEntityContext<String, SubTreeO
 
   private final OngoingSubTreeOpsDataAccess<SubTreeOperation> dataAccess;
   private final Map<String, Collection<SubTreeOperation>> pathToSubTreeOperation =
-      new HashMap<String, Collection<SubTreeOperation>>();
+      new HashMap<>();
 
   public SubTreeOperationsContext(OngoingSubTreeOpsDataAccess<SubTreeOperation> dataAccess) {
     this.dataAccess = dataAccess;

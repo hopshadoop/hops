@@ -71,7 +71,7 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put("urlString", token.encodeToUrlString());
     return m;
   }
@@ -86,7 +86,7 @@ public class JsonUtil {
     }
 
     final Token<DelegationTokenIdentifier> token =
-        new Token<DelegationTokenIdentifier>();
+        new Token<>();
     token.decodeFromUrlString((String) m.get("urlString"));
     return token;
   }
@@ -137,7 +137,7 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put(Token.class.getSimpleName(), toJsonArray(tokens));
     return toJsonString(Token.class.getSimpleName() + "s", m);
   }
@@ -152,9 +152,9 @@ public class JsonUtil {
     } else if (objects.length == 0) {
       return Collections.emptyList();
     } else {
-      final List<Token<?>> list = new ArrayList<Token<?>>(objects.length);
-      for (int i = 0; i < objects.length; i++) {
-        list.add(toToken((Map<?, ?>) objects[i]));
+      final List<Token<?>> list = new ArrayList<>(objects.length);
+      for (Object object : objects) {
+        list.add(toToken((Map<?, ?>) object));
       }
       return list;
     }
@@ -177,7 +177,7 @@ public class JsonUtil {
    * Convert an exception object to a Json string.
    */
   public static String toJsonString(final Exception e) {
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put("exception", e.getClass().getSimpleName());
     m.put("message", e.getMessage());
     m.put("javaClassName", e.getClass().getName());
@@ -203,7 +203,7 @@ public class JsonUtil {
    * Convert a key-value pair to a Json string.
    */
   public static String toJsonString(final String key, final Object value) {
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put(key, value);
     return JSON.toString(m);
   }
@@ -240,7 +240,7 @@ public class JsonUtil {
     if (status == null) {
       return null;
     }
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put("pathSuffix", status.getLocalName());
     m.put("type", PathType.valueOf(status));
     if (status.isSymlink()) {
@@ -305,7 +305,7 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put("blockPoolId", extendedblock.getBlockPoolId());
     m.put("blockId", extendedblock.getBlockId());
     m.put("numBytes", extendedblock.getNumBytes());
@@ -337,7 +337,7 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put("ipAddr", datanodeinfo.getIpAddr());
     m.put("hostName", datanodeinfo.getHostName());
     m.put("storageID", datanodeinfo.getStorageID());
@@ -420,7 +420,7 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put("blockToken", toJsonMap(locatedblock.getBlockToken()));
     m.put("isCorrupt", locatedblock.isCorrupt());
     m.put("startOffset", locatedblock.getStartOffset());
@@ -479,9 +479,9 @@ public class JsonUtil {
       return Collections.emptyList();
     } else {
       final List<LocatedBlock> list =
-          new ArrayList<LocatedBlock>(objects.length);
-      for (int i = 0; i < objects.length; i++) {
-        list.add(toLocatedBlock((Map<?, ?>) objects[i]));
+          new ArrayList<>(objects.length);
+      for (Object object : objects) {
+        list.add(toLocatedBlock((Map<?, ?>) object));
       }
       return list;
     }
@@ -496,7 +496,7 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put("fileLength", locatedblocks.getFileLength());
     m.put("isUnderConstruction", locatedblocks.isUnderConstruction());
 
@@ -536,7 +536,7 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put("length", contentsummary.getLength());
     m.put("fileCount", contentsummary.getFileCount());
     m.put("directoryCount", contentsummary.getDirectoryCount());
@@ -575,7 +575,7 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<String, Object> m = new TreeMap<String, Object>();
+    final Map<String, Object> m = new TreeMap<>();
     m.put("algorithm", checksum.getAlgorithmName());
     m.put("length", checksum.getLength());
     m.put("bytes", StringUtils.byteToHexString(checksum.getBytes()));

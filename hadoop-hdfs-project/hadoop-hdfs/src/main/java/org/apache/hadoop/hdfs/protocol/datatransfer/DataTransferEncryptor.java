@@ -84,7 +84,7 @@ public class DataTransferEncryptor {
   private static final String PROTOCOL = "hdfs";
   private static final String MECHANISM = "DIGEST-MD5";
   private static final Map<String, String> SASL_PROPS =
-      new TreeMap<String, String>();
+      new TreeMap<>();
   
   static {
     SASL_PROPS.put(Sasl.QOP, "auth-conf");

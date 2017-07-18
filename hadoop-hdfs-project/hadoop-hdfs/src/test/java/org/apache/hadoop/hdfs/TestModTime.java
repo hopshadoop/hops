@@ -72,8 +72,8 @@ public class TestModTime {
 
   private void printDatanodeReport(DatanodeInfo[] info) {
     System.out.println("-------------------------------------------------");
-    for (int i = 0; i < info.length; i++) {
-      System.out.println(info[i].getDatanodeReport());
+    for (DatanodeInfo anInfo : info) {
+      System.out.println(anInfo.getDatanodeReport());
       System.out.println();
     }
   }

@@ -132,7 +132,7 @@ public class HdfsStorageFactory {
   private static boolean isDALInitialized = false;
   private static DalStorageFactory dStorageFactory;
   private static Map<Class, EntityDataAccess> dataAccessAdaptors =
-      new HashMap<Class, EntityDataAccess>();
+      new HashMap<>();
   
   public static StorageConnector getConnector() {
     return dStorageFactory.getConnector();
@@ -210,17 +210,7 @@ public class HdfsStorageFactory {
           urlClass.getDeclaredMethod("addURL", new Class[]{URL.class});
       method.setAccessible(true);
       method.invoke(urlClassLoader, new Object[]{u});
-    } catch (MalformedURLException ex) {
-      throw new StorageInitializtionException(ex);
-    } catch (IllegalAccessException ex) {
-      throw new StorageInitializtionException(ex);
-    } catch (IllegalArgumentException ex) {
-      throw new StorageInitializtionException(ex);
-    } catch (InvocationTargetException ex) {
-      throw new StorageInitializtionException(ex);
-    } catch (NoSuchMethodException ex) {
-      throw new StorageInitializtionException(ex);
-    } catch (SecurityException ex) {
+    } catch (MalformedURLException | SecurityException | NoSuchMethodException | InvocationTargetException | IllegalArgumentException | IllegalAccessException ex) {
       throw new StorageInitializtionException(ex);
     }
   }
@@ -250,7 +240,7 @@ public class HdfsStorageFactory {
       @Override
       public Map<Class, EntityContext> createEntityContexts() {
         Map<Class, EntityContext> entityContexts =
-            new HashMap<Class, EntityContext>();
+            new HashMap<>();
 
         BlockInfoContext bic = new BlockInfoContext(
             (BlockInfoDataAccess) getDataAccess(BlockInfoDataAccess.class));

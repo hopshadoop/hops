@@ -71,7 +71,7 @@ public class PostOpParam extends HttpOpParam<PostOpParam.Op> {
   }
 
   private static final Domain<Op> DOMAIN =
-      new Domain<PostOpParam.Op>(NAME, Op.class);
+      new Domain<>(NAME, Op.class);
 
   /**
    * Constructor.

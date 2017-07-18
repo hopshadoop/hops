@@ -140,7 +140,7 @@ class LeaseRenewer {
      * A map for per user per namenode renewers.
      */
     private final Map<Key, LeaseRenewer> renewers =
-        new HashMap<Key, LeaseRenewer>();
+        new HashMap<>();
 
     /**
      * Get a renewer.
@@ -207,7 +207,7 @@ class LeaseRenewer {
   /**
    * A list of clients corresponding to this renewer.
    */
-  private final List<DFSClient> dfsclients = new ArrayList<DFSClient>();
+  private final List<DFSClient> dfsclients = new ArrayList<>();
 
   /**
    * A stringified stack trace of the call stack when the Lease Renewer
@@ -434,7 +434,7 @@ class LeaseRenewer {
   private void renew() throws IOException {
     final List<DFSClient> copies;
     synchronized (this) {
-      copies = new ArrayList<DFSClient>(dfsclients);
+      copies = new ArrayList<>(dfsclients);
     }
     //sort the client names for finding out repeated names.
     Collections.sort(copies, new Comparator<DFSClient>() {
@@ -444,8 +444,7 @@ class LeaseRenewer {
       }
     });
     String previousName = "";
-    for (int i = 0; i < copies.size(); i++) {
-      final DFSClient c = copies.get(i);
+    for (final DFSClient c : copies) {
       //skip if current client name is the same as the previous name.
       if (!c.getClientName().equals(previousName)) {
         if (!c.renewLease()) {

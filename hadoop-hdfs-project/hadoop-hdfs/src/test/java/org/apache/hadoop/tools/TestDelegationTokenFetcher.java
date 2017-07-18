@@ -76,7 +76,7 @@ public class TestDelegationTokenFetcher {
     // Create a token for the fetcher to fetch, wire NN to return it when asked
     // for this particular user.
     final Token<DelegationTokenIdentifier> t =
-        new Token<DelegationTokenIdentifier>(ident, pw, FakeRenewer.KIND,
+        new Token<>(ident, pw, FakeRenewer.KIND,
             service);
     when(dfs.addDelegationTokens(eq((String) null), any(Credentials.class)))
         .thenAnswer(new Answer<Token<?>[]>() {

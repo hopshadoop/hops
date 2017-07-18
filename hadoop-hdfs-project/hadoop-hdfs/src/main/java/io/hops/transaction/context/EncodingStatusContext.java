@@ -34,7 +34,7 @@ public class EncodingStatusContext
 
   private final EncodingStatusDataAccess<EncodingStatus> dataAccess;
   private final Map<Integer, EncodingStatus> parityInodeIdToEncodingStatus =
-      new HashMap<Integer, EncodingStatus>();
+      new HashMap<>();
 
   public EncodingStatusContext(
       EncodingStatusDataAccess<EncodingStatus> dataAccess) {

@@ -36,7 +36,7 @@ public class QuotaUpdateContext
 
   private final QuotaUpdateDataAccess<QuotaUpdate> dataAccess;
   private final Map<Integer, List<QuotaUpdate>> inodeIdToQuotaUpdates =
-      new HashMap<Integer, List<QuotaUpdate>>();
+      new HashMap<>();
 
   public QuotaUpdateContext(QuotaUpdateDataAccess<QuotaUpdate> dataAccess) {
     this.dataAccess = dataAccess;
@@ -80,7 +80,7 @@ public class QuotaUpdateContext
   public void prepare(TransactionLocks tlm)
       throws TransactionContextException, StorageException {
     Collection<QuotaUpdate> modified =
-        new ArrayList<QuotaUpdate>(getModified());
+        new ArrayList<>(getModified());
     modified.addAll(getAdded());
     dataAccess.prepare(modified, getRemovedForced());
   }

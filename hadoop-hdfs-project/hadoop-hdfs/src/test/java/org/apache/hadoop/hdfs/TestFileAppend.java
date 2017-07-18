@@ -155,8 +155,8 @@ public class TestFileAppend {
       //
       // Detach all blocks. This should remove hardlinks (if any)
       //
-      for (int i = 0; i < blocks.size(); i++) {
-        ExtendedBlock b = blocks.get(i).getBlock();
+      for (LocatedBlock block1 : blocks) {
+        ExtendedBlock b = block1.getBlock();
         System.out.println("testCopyOnWrite detaching block " + b);
         assertTrue("Detaching block " + b + " should have returned true",
             DataNodeTestUtils.unlinkBlock(dn[0], b, 1));
@@ -165,8 +165,8 @@ public class TestFileAppend {
       // Since the blocks were already detached earlier, these calls should
       // return false
       //
-      for (int i = 0; i < blocks.size(); i++) {
-        ExtendedBlock b = blocks.get(i).getBlock();
+      for (LocatedBlock block : blocks) {
+        ExtendedBlock b = block.getBlock();
         System.out.println("testCopyOnWrite detaching block " + b);
         assertTrue("Detaching block " + b + " should have returned false",
             !DataNodeTestUtils.unlinkBlock(dn[0], b, 1));

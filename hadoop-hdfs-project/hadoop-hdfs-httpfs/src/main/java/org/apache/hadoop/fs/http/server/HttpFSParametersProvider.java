@@ -42,7 +42,7 @@ import java.util.Map;
 public class HttpFSParametersProvider extends ParametersProvider {
 
   private static final Map<Enum, Class<Param<?>>[]> PARAMS_DEF =
-      new HashMap<Enum, Class<Param<?>>[]>();
+      new HashMap<>();
 
   static {
     PARAMS_DEF.put(Operation.OPEN,

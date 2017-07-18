@@ -38,7 +38,7 @@ import java.net.UnknownHostException;
  */
 @InterfaceAudience.Private
 public class HostnameFilter implements Filter {
-  static final ThreadLocal<String> HOSTNAME_TL = new ThreadLocal<String>();
+  static final ThreadLocal<String> HOSTNAME_TL = new ThreadLocal<>();
   private static final Logger log =
       LoggerFactory.getLogger(HostnameFilter.class);
 

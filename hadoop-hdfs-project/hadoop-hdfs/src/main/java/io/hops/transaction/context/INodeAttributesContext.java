@@ -99,7 +99,7 @@ public class INodeAttributesContext
   public void prepare(TransactionLocks tlm)
       throws TransactionContextException, StorageException {
     Collection<INodeAttributes> modified =
-        new ArrayList<INodeAttributes>(getModified());
+        new ArrayList<>(getModified());
     modified.addAll(getAdded());
     dataAccess.prepare(modified, getRemoved());
   }
@@ -184,7 +184,7 @@ public class INodeAttributesContext
   private Collection<INodeAttributes> get(
       List<INodeCandidatePrimaryKey> iNodeCandidatePKs) {
     Collection<INodeAttributes> iNodeAttributeses =
-        new ArrayList<INodeAttributes>(iNodeCandidatePKs.size());
+        new ArrayList<>(iNodeCandidatePKs.size());
     for (INodeCandidatePrimaryKey pk : iNodeCandidatePKs) {
       iNodeAttributeses.add(get(pk.getInodeId()));
     }

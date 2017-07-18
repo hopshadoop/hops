@@ -87,7 +87,7 @@ public abstract class ErasureCode {
    */
   public List<Integer> locationsToReadForDecode(List<Integer> erasedLocations)
       throws TooManyErasedLocations {
-    List<Integer> locationsToRead = new ArrayList<Integer>(stripeSize());
+    List<Integer> locationsToRead = new ArrayList<>(stripeSize());
     int limit = stripeSize() + paritySize();
     // Loop through all possible locations in the stripe.
     for (int loc = limit - 1; loc >= 0; loc--) {

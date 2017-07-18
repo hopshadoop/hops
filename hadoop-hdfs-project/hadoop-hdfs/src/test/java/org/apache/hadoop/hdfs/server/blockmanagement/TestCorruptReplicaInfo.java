@@ -60,7 +60,7 @@ public class TestCorruptReplicaInfo {
   private static final Log LOG =
       LogFactory.getLog(TestCorruptReplicaInfo.class);
   
-  private Map<Integer, BlockInfo> block_map = new HashMap<Integer, BlockInfo>();
+  private Map<Integer, BlockInfo> block_map = new HashMap<>();
   private BlocksMap blocksMap = new BlocksMap(null);
 
   // Allow easy block creation by block id
@@ -96,7 +96,7 @@ public class TestCorruptReplicaInfo {
     // create a list of block_ids. A list is used to allow easy validation of the
     // output of getCorruptReplicaBlockIds
     int NUM_BLOCK_IDS = 140;
-    List<Integer> block_ids = new LinkedList<Integer>();
+    List<Integer> block_ids = new LinkedList<>();
     for (int i = 0; i < NUM_BLOCK_IDS; i++) {
       block_ids.add(i);
     }

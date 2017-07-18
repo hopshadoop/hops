@@ -67,14 +67,14 @@ public abstract class BaseINodeLock extends Lock {
 
   protected BaseINodeLock() {
     this.allLockedInodesInTx =
-        new HashMap<INode, TransactionLockTypes.INodeLockType>();
+        new HashMap<>();
     this.resolvedINodesMap = new ResolvedINodesMap();
   }
 
   private class ResolvedINodesMap {
     private final Map<String, PathRelatedINodes> pathToPathINodes =
-        new HashMap<String, PathRelatedINodes>();
-    private final Collection<INode> individualInodes = new ArrayList<INode>();
+        new HashMap<>();
+    private final Collection<INode> individualInodes = new ArrayList<>();
 
     private class PathRelatedINodes {
       private List<INode> pathINodes;
@@ -287,7 +287,7 @@ public abstract class BaseINodeLock extends Lock {
   protected void acquireINodeAttributes()
       throws StorageException, TransactionContextException {
     List<INodeCandidatePrimaryKey> pks =
-        new ArrayList<INodeCandidatePrimaryKey>();
+        new ArrayList<>();
     for (INode inode : getAllResolvedINodes()) {
       if (inode instanceof INodeDirectoryWithQuota) {
         INodeCandidatePrimaryKey pk =

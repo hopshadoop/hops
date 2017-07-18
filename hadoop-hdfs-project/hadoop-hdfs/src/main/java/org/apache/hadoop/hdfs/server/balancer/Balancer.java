@@ -204,24 +204,24 @@ public class Balancer {
   private final double threshold;
   
   // all data node lists
-  private Collection<Source> overUtilizedDatanodes = new LinkedList<Source>();
+  private Collection<Source> overUtilizedDatanodes = new LinkedList<>();
   private Collection<Source> aboveAvgUtilizedDatanodes =
-      new LinkedList<Source>();
+      new LinkedList<>();
   private Collection<BalancerDatanode> belowAvgUtilizedDatanodes =
-      new LinkedList<BalancerDatanode>();
+      new LinkedList<>();
   private Collection<BalancerDatanode> underUtilizedDatanodes =
-      new LinkedList<BalancerDatanode>();
+      new LinkedList<>();
   
-  private Collection<Source> sources = new HashSet<Source>();
+  private Collection<Source> sources = new HashSet<>();
   private Collection<BalancerDatanode> targets =
-      new HashSet<BalancerDatanode>();
+      new HashSet<>();
   
   private Map<Block, BalancerBlock> globalBlockList =
-      new HashMap<Block, BalancerBlock>();
+      new HashMap<>();
   private MovedBlocks movedBlocks = new MovedBlocks();
   // Map storage IDs to BalancerDatanodes
   private Map<String, BalancerDatanode> datanodes =
-      new HashMap<String, BalancerDatanode>();
+      new HashMap<>();
   
   private NetworkTopology cluster = new NetworkTopology();
   
@@ -420,7 +420,7 @@ public class Balancer {
   static private class BalancerBlock {
     private Block block; // the block
     private List<BalancerDatanode> locations =
-        new ArrayList<BalancerDatanode>(3); // its locations
+        new ArrayList<>(3); // its locations
     
     /* Constructor */
     private BalancerBlock(Block block) {
@@ -502,7 +502,7 @@ public class Balancer {
     protected long scheduledSize = 0L;
     //  blocks being moved but not confirmed yet
     private List<PendingBlockMove> pendingBlocks =
-        new ArrayList<PendingBlockMove>(MAX_NUM_CONCURRENT_MOVES);
+        new ArrayList<>(MAX_NUM_CONCURRENT_MOVES);
     
     @Override
     public String toString() {
@@ -615,13 +615,13 @@ public class Balancer {
       }
     }
     
-    private ArrayList<NodeTask> nodeTasks = new ArrayList<NodeTask>(2);
+    private ArrayList<NodeTask> nodeTasks = new ArrayList<>(2);
     private long blocksToReceive = 0L;
     /* source blocks point to balancerBlocks in the global list because
      * we want to keep one copy of a block in balancer and be aware that
      * the locations are changing over time.
      */
-    private List<BalancerBlock> srcBlockList = new ArrayList<BalancerBlock>();
+    private List<BalancerBlock> srcBlockList = new ArrayList<>();
     
     /* constructor */
     private Source(DatanodeInfo node, BalancingPolicy policy,
@@ -1209,7 +1209,7 @@ public class Balancer {
     final private static int OLD_WIN = 1;
     final private static int NUM_WINS = 2;
     final private List<HashMap<Block, BalancerBlock>> movedBlocks =
-        new ArrayList<HashMap<Block, BalancerBlock>>(NUM_WINS);
+        new ArrayList<>(NUM_WINS);
     
     /* initialize the moved blocks collection */
     private MovedBlocks() {
@@ -1460,7 +1460,7 @@ public class Balancer {
         "Time Stamp               Iteration#  Bytes Already Moved  Bytes Left To Move  Bytes Being Moved");
     
     final List<NameNodeConnector> connectors =
-        new ArrayList<NameNodeConnector>(namenodes.size());
+        new ArrayList<>(namenodes.size());
     try {
       for (URI uri : namenodes) {
         connectors.add(new NameNodeConnector(uri, conf));
@@ -1553,15 +1553,12 @@ public class Balancer {
         final List<URI> namenodes = DFSUtil.getNsServiceRpcUris(conf);
         //HOP all the namenodes have the same view of the cluster
         return Balancer.run(namenodes.subList(0, 1), parse(args), conf);
-      } catch (IOException e) {
+      } catch (IOException | URISyntaxException e) {
         System.out.println(e + ".  Exiting ...");
         return ReturnStatus.IO_EXCEPTION.code;
       } catch (InterruptedException e) {
         System.out.println(e + ".  Exiting ...");
         return ReturnStatus.INTERRUPTED.code;
-      } catch (URISyntaxException e) {
-        System.out.println(e + ".  Exiting ...");
-        return ReturnStatus.IO_EXCEPTION.code;
       } finally {
         System.out
             .println("Balancing took " + time2Str(Time.now() - startTime));

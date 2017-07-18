@@ -151,7 +151,7 @@ public class Server {
   private String logDir;
   private String tempDir;
   private Configuration config;
-  private Map<Class, Service> services = new LinkedHashMap<Class, Service>();
+  private Map<Class, Service> services = new LinkedHashMap<>();
 
   /**
    * Creates a server instance.
@@ -597,11 +597,11 @@ public class Server {
    */
   protected List<Service> loadServices() throws ServerException {
     try {
-      Map<Class, Service> map = new LinkedHashMap<Class, Service>();
+      Map<Class, Service> map = new LinkedHashMap<>();
       Class[] classes = getConfig().getClasses(getPrefixedName(CONF_SERVICES));
       Class[] classesExt =
           getConfig().getClasses(getPrefixedName(CONF_SERVICES_EXT));
-      List<Service> list = new ArrayList<Service>();
+      List<Service> list = new ArrayList<>();
       loadServices(classes, list);
       loadServices(classesExt, list);
 
@@ -613,7 +613,7 @@ public class Server {
         }
         map.put(service.getInterface(), service);
       }
-      list = new ArrayList<Service>();
+      list = new ArrayList<>();
       for (Map.Entry<Class, Service> entry : map.entrySet()) {
         list.add(entry.getValue());
       }
@@ -668,7 +668,7 @@ public class Server {
    * Destroys the server services.
    */
   protected void destroyServices() {
-    List<Service> list = new ArrayList<Service>(services.values());
+    List<Service> list = new ArrayList<>(services.values());
     Collections.reverse(list);
     for (Service service : list) {
       try {

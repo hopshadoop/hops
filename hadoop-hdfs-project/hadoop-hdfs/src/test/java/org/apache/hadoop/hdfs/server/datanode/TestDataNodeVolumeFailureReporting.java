@@ -181,8 +181,8 @@ public class TestDataNodeVolumeFailureReporting {
     assertCounter("VolumeFailures", 1L,
         getMetrics(dns.get(2).getMetrics().name()));
 
-    ArrayList<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
-    ArrayList<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+    ArrayList<DatanodeDescriptor> live = new ArrayList<>();
+    ArrayList<DatanodeDescriptor> dead = new ArrayList<>();
     dm.fetchDatanodes(live, dead, false);
     live.clear();
     dead.clear();

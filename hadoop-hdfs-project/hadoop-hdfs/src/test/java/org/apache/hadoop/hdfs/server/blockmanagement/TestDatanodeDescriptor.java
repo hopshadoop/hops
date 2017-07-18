@@ -57,7 +57,7 @@ public class TestDatanodeDescriptor {
     final int MAX_LIMIT = MAX_BLOCKS - REMAINING_BLOCKS;
     
     DatanodeDescriptor dd = DFSTestUtil.getLocalDatanodeDescriptor();
-    ArrayList<Block> blockList = new ArrayList<Block>(MAX_BLOCKS);
+    ArrayList<Block> blockList = new ArrayList<>(MAX_BLOCKS);
     for (int i = 0; i < MAX_BLOCKS; i++) {
       blockList.add(new Block(i, 0, GenerationStamp.FIRST_VALID_STAMP));
     }

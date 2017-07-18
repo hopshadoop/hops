@@ -133,7 +133,7 @@ class BlockPK {
     }
 
     static List<ReplicaPK> getKeys(long[] blockIds, int storageId) {
-      List<BlockPK.ReplicaPK> keys = new ArrayList<ReplicaPK>(blockIds.length);
+      List<BlockPK.ReplicaPK> keys = new ArrayList<>(blockIds.length);
       for (long blockId : blockIds) {
         keys.add(new BlockPK.ReplicaPK(blockId, storageId));
       }
@@ -142,7 +142,7 @@ class BlockPK {
 
     static List<BlockPK.ReplicaPK> getKeys(int[] inodeIds) {
       List<BlockPK.ReplicaPK> keys =
-          new ArrayList<BlockPK.ReplicaPK>(inodeIds.length);
+          new ArrayList<>(inodeIds.length);
       for (int inodeId : inodeIds) {
         keys.add(new BlockPK.ReplicaPK(inodeId));
       }
@@ -151,7 +151,7 @@ class BlockPK {
 
     static List<ReplicaPK> getKeys(long[] blockIds, int[] inodeIds,
         int storageId) {
-      List<BlockPK.ReplicaPK> keys = new ArrayList<ReplicaPK>(blockIds.length);
+      List<BlockPK.ReplicaPK> keys = new ArrayList<>(blockIds.length);
       for (int i = 0; i < blockIds.length; i++) {
         keys.add(new BlockPK.ReplicaPK(blockIds[i], inodeIds[i], storageId));
       }
@@ -160,7 +160,7 @@ class BlockPK {
   }
 
   static List<BlockPK> getBlockKeys(int[] inodeIds) {
-    List<BlockPK> keys = new ArrayList<BlockPK>(inodeIds.length);
+    List<BlockPK> keys = new ArrayList<>(inodeIds.length);
     for (int inodeId : inodeIds) {
       keys.add(new BlockPK(inodeId));
     }

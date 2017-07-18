@@ -56,7 +56,7 @@ public class ParametersProvider
   @Override
   @SuppressWarnings("unchecked")
   public Parameters getValue(HttpContext httpContext) {
-    Map<String, Param<?>> map = new HashMap<String, Param<?>>();
+    Map<String, Param<?>> map = new HashMap<>();
     MultivaluedMap<String, String> queryString =
         httpContext.getRequest().getQueryParameters();
     String str = queryString.getFirst(driverParam);

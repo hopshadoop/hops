@@ -97,7 +97,7 @@ public class NameNodeHttpServer {
 
       private Map<String, String> getAuthFilterParams(Configuration conf)
           throws IOException {
-        Map<String, String> params = new HashMap<String, String>();
+        Map<String, String> params = new HashMap<>();
         String principalInConf = conf.get(
             DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY);
         if (principalInConf != null && !principalInConf.isEmpty()) {
