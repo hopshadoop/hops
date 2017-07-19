@@ -206,6 +206,6 @@ public class NameNodeAdapter {
     if (smi == null) {
       return true;
     }
-    return smi.initializedReplQueues;
+    return smi.initializedReplicationQueues;
   }
 }
