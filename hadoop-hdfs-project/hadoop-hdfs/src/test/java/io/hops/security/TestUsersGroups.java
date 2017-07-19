@@ -556,4 +556,103 @@ public class TestUsersGroups {
     }
 
   }
+
+
+  private class SetOwner implements Callable<Boolean>{
+    private final DistributedFileSystem dfs;
+    private final Path path;
+    private final String userName;
+    private final String groupName;
+    SetOwner(DistributedFileSystem dfs, Path path, String userName, String
+        groupName){
+      this.dfs = dfs;
+      this.path = path;
+      this.userName = userName;
+      this.groupName = groupName;
+    }
+    @Override
+    public Boolean call() throws Exception {
+      dfs.setOwner(path, userName, groupName);
+      FileStatus fileStatus = dfs.getFileStatus(path);
+      if(userName != null) {
+        assertEquals(userName, fileStatus.getOwner());
+      }
+      if(groupName != null) {
+        assertEquals(groupName, fileStatus.getGroup());
+      }
+      return true;
+    }
+  }
+
+  @Test
+  public void testConcurrentSetSameOwner() throws Exception{
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .build();
+    cluster.waitActive();
+
+    DistributedFileSystem dfs = cluster.getFileSystem();
+    Path base = new Path("/base");
+    dfs.mkdirs(base);
+
+    final String userName = "user";
+    final String groupName = "group";
+    final int CONCURRENT_USERS = 100;
+    ExecutorService executorService = Executors.newFixedThreadPool(CONCURRENT_USERS);
+    List<Callable<Boolean>> callables = new ArrayList<>();
+
+    for(int i=0; i<CONCURRENT_USERS; i++){
+      Path file = new Path(base, "file"+i);
+      dfs.create(file).close();
+      callables.add(new SetOwner(dfs, file,userName,
+          groupName));
+    }
+
+    List<Future<Boolean>> futures = executorService.invokeAll(callables);
+    executorService.shutdown();
+    executorService.awaitTermination(1, TimeUnit.SECONDS);
+
+    for(Future<Boolean> f : futures){
+      assertTrue(f.get());
+    }
+  }
+
+
+  @Test
+  public void testSetOwnerOnOutdatedCache() throws Exception{
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .build();
+    cluster.waitActive();
+
+    DistributedFileSystem dfs = cluster.getFileSystem();
+    Path base = new Path("/base");
+    dfs.mkdirs(base);
+
+    final String username = "user";
+    final String groupname = "group";
+    final String newgroupname = "newgroup";
+
+    dfs.setOwner(base, username, groupname);
+
+    FileStatus fileStatus = dfs.getFileStatus(base);
+    assertEquals(username, fileStatus.getOwner());
+    assertEquals(groupname, fileStatus.getGroup());
+
+    int userId = UsersGroups.getUserID(username);
+
+    removeUser(userId);
+
+    dfs.setOwner(base, username, newgroupname);
+
+    fileStatus = dfs.getFileStatus(base);
+    assertEquals(username, fileStatus.getOwner());
+    assertEquals(newgroupname, fileStatus.getGroup());
+
+    int newUserId = UsersGroups.getUserID(username);
+
+    assertTrue(newUserId > userId);
+    assertNotEquals(userId, newUserId);
+  }
+
 }

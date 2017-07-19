@@ -18,10 +18,12 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.protobuf.BlockingService;
+import io.hops.exception.ForeignKeyConstraintViolationException;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
+import io.hops.security.Users;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -426,7 +428,14 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void setOwner(String src, String username, String groupname)
       throws IOException {
-    namesystem.setOwnerSTO(src, username, groupname);
+    try{
+      namesystem.setOwnerSTO(src, username, groupname);
+    }catch (ForeignKeyConstraintViolationException ex){
+      LOG.debug("setOwner: cache is outdated, flush old values and restart " +
+          "the operation - " + ex);
+      Users.flushCache(username, groupname);
+      namesystem.setOwnerSTO(src, username, groupname);
+    }
   }
 
   @Override // ClientProtocol
