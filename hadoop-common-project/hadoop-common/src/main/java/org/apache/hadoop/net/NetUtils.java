@@ -136,9 +136,9 @@ public class NetUtils {
         && (factory instanceof HopsSSLSocketFactory)) {
       CertificateLocalizationCtx certLocCtx = CertificateLocalizationCtx
           .getInstance();
-      certLocCtx.setProxySuperuser(conf);
+      certLocCtx.setProxySuperusers(conf);
       ((HopsSSLSocketFactory) factory).configureCryptoMaterial(certLocCtx.
-          getCertificateLocalization(), certLocCtx.getProxySuperuser());
+          getCertificateLocalization(), certLocCtx.getProxySuperusers());
     }
   }
   

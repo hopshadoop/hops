@@ -320,7 +320,7 @@ public class CertificateLocalizationService extends AbstractService
   
     if (material == null) {
       throw new FileNotFoundException("Materialized crypto material could not" +
-          " be found");
+          " be found for user " + username);
     }
   
     return material;

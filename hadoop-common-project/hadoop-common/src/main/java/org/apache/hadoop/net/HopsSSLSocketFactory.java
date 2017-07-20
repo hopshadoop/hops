@@ -35,6 +35,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.file.Paths;
+import java.util.Set;
 
 public class HopsSSLSocketFactory extends SocketFactory implements Configurable {
 
@@ -119,7 +120,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     }
   
     public void configureCryptoMaterial(CertificateLocalization
-        certificateLocalization, String proxySuperuser) {
+        certificateLocalization, Set<String> proxySuperusers) {
         try {
             String username =
                 UserGroupInformation.getCurrentUser().getUserName();
@@ -130,7 +131,6 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
             if (LOG.isDebugEnabled()) {
               LOG.debug("Current user: " + username + " - Hostname: " + localHostname);
             }
-          
           // Application running in a container is trying to create a
           // SecureSocket. The crypto material should have already been
           // localized.
@@ -145,7 +145,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
                 "t_certificate", conf);
           } else {
             if (username.matches(USERNAME_PATTERN) ||
-                !username.equals(proxySuperuser)) {
+                !proxySuperusers.contains(username)) {
               // It's a normal user
               if (!isCryptoMaterialSet(conf, username)
                   || forceConfigure) {
