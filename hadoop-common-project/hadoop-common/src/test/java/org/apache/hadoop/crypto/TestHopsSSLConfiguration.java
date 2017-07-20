@@ -13,7 +13,9 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 
@@ -74,11 +76,13 @@ public class TestHopsSSLConfiguration {
         String kstore = touchFile("/tmp/project__user__kstore.jks");
         String tstore = touchFile("/tmp/project__user__tstore.jks");
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("superuser");
         ugi.doAs(new PrivilegedAction<Object>() {
             @Override
             public Object run() {
                 hopsFactory.setConf(conf);
-                hopsFactory.configureCryptoMaterial(null, "superuser");
+                hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
         });
@@ -101,11 +105,13 @@ public class TestHopsSSLConfiguration {
         touchFile(Paths.get(cwd, "k_certificate").toString());
         touchFile(Paths.get(cwd, "t_certificate").toString());
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("superuser");
         ugi.doAs(new PrivilegedAction<Object>() {
             @Override
             public Object run() {
                 hopsFactory.setConf(conf);
-                hopsFactory.configureCryptoMaterial(null, "superuser");
+                hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
         });
@@ -149,11 +155,13 @@ public class TestHopsSSLConfiguration {
             .getValue(), "/tmp/" + hostname + "__tstore.jks");
         UserGroupInformation ugi = UserGroupInformation
             .createRemoteUser("project__user");
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("superuser");
         ugi.doAs(new PrivilegedAction<Object>() {
             @Override
             public Object run() {
                 hopsFactory.setConf(conf);
-                hopsFactory.configureCryptoMaterial(null, "superuser");
+                hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
         });
@@ -182,11 +190,13 @@ public class TestHopsSSLConfiguration {
         touchFile(tstore);
 
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("glassfish");
         ugi.doAs(new PrivilegedAction<Object>() {
             @Override
             public Object run() {
                 hopsFactory.setConf(conf);
-                hopsFactory.configureCryptoMaterial(null, "glassfish");
+                hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
         });
@@ -215,11 +225,13 @@ public class TestHopsSSLConfiguration {
         touchFile(tstore);
 
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("glassfish");
         ugi.doAs(new PrivilegedAction<Object>() {
             @Override
             public Object run() {
                 hopsFactory.setConf(conf);
-                hopsFactory.configureCryptoMaterial(null, "glassfish");
+                hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
         });
