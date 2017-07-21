@@ -65,14 +65,11 @@ import java.net.URLEncoder;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -878,12 +875,8 @@ class NamenodeJspHelper {
         }
 
         doc.startTag("replicas");
-        for (final Iterator<DatanodeDescriptor> it =
-                 blockManager.datanodeIterator(block); it.hasNext(); ) {
+        for (DatanodeDescriptor dd : blockManager.datanodeList(block)){
           doc.startTag("replica");
-
-          DatanodeDescriptor dd = it.next();
-
           doc.startTag("host_name");
           doc.pcdata(dd.getHostName());
           doc.endTag();

@@ -277,7 +277,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * Remove block from the list of blocks belonging to the data-node.
    * Remove datanode from the block.
    */
-  public boolean removeBlock(BlockInfo b)
+  public boolean removeReplica(BlockInfo b)
       throws StorageException, TransactionContextException {
     return b.removeReplica(this) != null;
   }
