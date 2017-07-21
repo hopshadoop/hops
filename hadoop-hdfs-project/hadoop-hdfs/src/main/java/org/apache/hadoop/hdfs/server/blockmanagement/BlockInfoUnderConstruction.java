@@ -274,7 +274,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     ReplicaUnderConstruction replica =
         new ReplicaUnderConstruction(rState, storageId, getBlockId(),
             getInodeId());
-    add(replica);
+    update(replica);
   }
 
   private boolean hasExpectedReplicaIn(int storageId)

@@ -29,10 +29,8 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.hdfs.protocol.Block;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -43,8 +41,6 @@ import java.util.List;
 class BlocksMap {
 
   private final DatanodeManager datanodeManager;
-  private final static List<DatanodeDescriptor> empty_datanode_list =
-      Collections.unmodifiableList(new ArrayList<DatanodeDescriptor>());
   
   BlocksMap(DatanodeManager datanodeManager) {
     this.datanodeManager = datanodeManager;
@@ -102,28 +98,19 @@ class BlocksMap {
 
   /**
    * Searches for the block in the BlocksMap and
-   * returns Iterator that iterates through the nodes the block belongs to.
+   * returns a list of datanodes that have this block.
    */
-  Iterator<DatanodeDescriptor> nodeIterator(Block b)
+  List<DatanodeDescriptor> nodeList(Block b)
       throws StorageException, TransactionContextException {
     BlockInfo blockInfo = getStoredBlock(b);
-    return nodeIterator(blockInfo);
-  }
-
-  /**
-   * For a block that has already been retrieved from the BlocksMap
-   * returns Iterator that iterates through the nodes the block belongs to.
-   */
-  Iterator<DatanodeDescriptor> nodeIterator(BlockInfo storedBlock)
-      throws StorageException, TransactionContextException {
-    if (storedBlock == null) {
+    if (blockInfo == null){
       return null;
     }
-    DatanodeDescriptor[] desc = storedBlock.getDatanodes(datanodeManager);
-    if (desc == null) {
-      return empty_datanode_list.iterator();
+    DatanodeDescriptor[] desc = blockInfo.getDatanodes(datanodeManager);
+    if (desc == null){
+      return Collections.emptyList();
     } else {
-      return Arrays.asList(desc).iterator();
+      return Arrays.asList(desc);
     }
   }
 
@@ -148,7 +135,7 @@ class BlocksMap {
     }
 
     // remove block from the data-node list and the node from the block info
-    return node.removeBlock(info);
+    return node.removeReplica(info);
   }
 
   int size() throws IOException {

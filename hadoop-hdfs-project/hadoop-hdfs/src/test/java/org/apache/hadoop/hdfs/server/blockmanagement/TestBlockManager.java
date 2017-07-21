@@ -49,7 +49,6 @@ import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.net.NetworkTopology;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -61,8 +60,6 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -144,7 +141,7 @@ public class TestBlockManager {
   private void removeNode(DatanodeDescriptor deadNode) throws IOException {
     NetworkTopology cluster = bm.getDatanodeManager().getNetworkTopology();
     cluster.remove(deadNode);
-    bm.removeBlocksAssociatedTo(deadNode);
+    bm.datanodeRemoved(deadNode);
   }
 
 
