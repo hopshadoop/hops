@@ -2600,7 +2600,7 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(!dir.isQuotaEnabled()?true:false/*skip Inode Atrr*/,nameNode, INodeLockType.WRITE,
+            locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip Inode Atrr*/,nameNode, INodeLockType.WRITE,
                 INodeResolveType.PATH, src))
                 .add(lf.getLeaseLock(LockType.WRITE, holder))
                 .add(lf.getLeasePathLock(LockType.WRITE))

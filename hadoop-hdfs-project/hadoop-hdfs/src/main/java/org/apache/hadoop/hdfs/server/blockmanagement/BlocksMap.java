@@ -148,8 +148,7 @@ class BlocksMap {
     }
 
     // remove block from the data-node list and the node from the block info
-    boolean removed = node.removeBlock(info);
-    return removed;
+    return node.removeBlock(info);
   }
 
   int size() throws IOException {
@@ -199,19 +198,6 @@ class BlocksMap {
     return Integer.MAX_VALUE;
   }
 
-  /**
-   * Replace a block in the block map by a new block.
-   * The new block and the old one have the same key.
-   *
-   * @param newBlock
-   *     - block for replacement
-   * @return new block
-   */
-  BlockInfo replaceBlock(BlockInfo newBlock) {
-    //HOP: [M] doesn't make sense in our case, beacause the new block will have the same id as the old one
-    return newBlock;
-  }
-  
   List<INodeIdentifier> getAllINodeFiles(final long offset, final long count)
       throws IOException {
     return (List<INodeIdentifier>) new LightWeightRequestHandler(

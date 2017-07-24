@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership. The ASF
@@ -84,11 +84,6 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    * Convert an under construction block to a complete block.
    *
    * @return BlockInfo - a complete block.
-   * @throws IOException
-   *     if the state of the block (the generation stamp and the
-   *     length) has not been committed by the client or it does not have at
-   *     least a
-   *     minimal number of replicas reported from data-nodes.
    */
   BlockInfo convertToCompleteBlock()
       throws StorageException, TransactionContextException {
@@ -103,6 +98,11 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    */
   public void setExpectedLocations(DatanodeDescriptor[] targets)
       throws StorageException, TransactionContextException {
+    
+    for (ReplicaUnderConstruction replicaUnderConstruction : getExpectedReplicas()) {
+      EntityManager.remove(replicaUnderConstruction);
+    }
+    
     for (DatanodeDescriptor dn : targets) {
       addExpectedReplica(dn.getSId(), ReplicaState.RBW);
     }
@@ -198,7 +198,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     }
   }
 
-  void addReplicaIfNotPresent(DatanodeDescriptor dn, Block block,
+  void addExpectedReplicaIfNotPresent(DatanodeDescriptor dn,
       ReplicaState rState)
       throws StorageException, TransactionContextException {
     for (ReplicaUnderConstruction r : getExpectedReplicas()) {
@@ -263,19 +263,18 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     return replicas;
   }
 
-  private ReplicaUnderConstruction addExpectedReplica(int storageId,
+  private void addExpectedReplica(int storageId,
       ReplicaState rState)
       throws StorageException, TransactionContextException {
     if (hasExpectedReplicaIn(storageId)) {
       NameNode.blockStateChangeLog.warn(
           "BLOCK* Trying to store multiple blocks of the file on one DataNode. Returning null");
-      return null;
+      return;
     }
     ReplicaUnderConstruction replica =
         new ReplicaUnderConstruction(rState, storageId, getBlockId(),
             getInodeId());
     add(replica);
-    return replica;
   }
 
   private boolean hasExpectedReplicaIn(int storageId)
@@ -306,13 +305,13 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     }
   }
 
-  public void setBlockUCState(BlockUCState s)
+  void setBlockUCState(BlockUCState s)
       throws StorageException, TransactionContextException {
     setBlockUCStateNoPersistance(s);
     save();
   }
 
-  public void setBlockRecoveryId(long recoveryId)
+  private void setBlockRecoveryId(long recoveryId)
       throws StorageException, TransactionContextException {
     setBlockRecoveryIdNoPersistance(recoveryId);
     save();
