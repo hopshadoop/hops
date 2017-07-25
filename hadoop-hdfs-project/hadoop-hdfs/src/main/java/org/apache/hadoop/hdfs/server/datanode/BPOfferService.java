@@ -30,13 +30,13 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.ExceptionCheck;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.protocol.BalancerBandwidthCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -774,16 +774,16 @@ class BPOfferService implements Runnable {
 
       // Create block report
       long brCreateStartTime = now();
-      BlockListAsLongs bReport =
+      BlockReport bReport =
           dn.getFSDataset().getBlockReport(getBlockPoolId());
 
       // Send block report
       long brSendStartTime = now();
       StorageBlockReport[] report = {new StorageBlockReport(
           new DatanodeStorage(bpRegistration.getStorageID()),
-          bReport.getBlockListAsLongs())};
+          bReport)};
 
-      ActiveNode an = nextNNForBlkReport(bReport.getNumberOfBlocks());
+      ActiveNode an = nextNNForBlkReport(bReport.getNumBlocks());
       if (an != null) {
         blkReportHander = getAnActor(an.getInetSocketAddress());
         if (blkReportHander == null || !blkReportHander.isInitialized()) {
@@ -802,7 +802,7 @@ class BPOfferService implements Runnable {
       long brCreateCost = brSendStartTime - brCreateStartTime;
       dn.getMetrics().addBlockReport(brSendCost);
       LOG.info(
-          "BlockReport of " + bReport.getNumberOfBlocks() + " blocks took " +
+          "BlockReport of " + bReport.getNumBlocks() + " blocks took " +
               brCreateCost + " msec to generate and " + brSendCost +
               " msecs for RPC and NN processing");
 

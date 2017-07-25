@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs.server.datanode;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsBlocksMetadata;
@@ -33,6 +32,7 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.RollingLogs;
 import org.apache.hadoop.hdfs.server.datanode.metrics.FSDatasetMBean;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -68,6 +68,8 @@ import java.util.Random;
  * Note the synchronization is coarse grained - it is at each method.
  */
 public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
+  private final int NUM_BUCKETS;
+  
   static class Factory extends FsDatasetSpi.Factory<SimulatedFSDataset> {
     @Override
     public SimulatedFSDataset newInstance(DataNode datanode,
@@ -399,6 +401,8 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
     registerMBean(storageId);
     this.storage = new SimulatedStorage(
         conf.getLong(CONFIG_PROPERTY_CAPACITY, DEFAULT_CAPACITY));
+    this.NUM_BUCKETS = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
+        DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
   }
 
   public synchronized void injectBlocks(String bpid,
@@ -456,17 +460,18 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   }
 
   @Override
-  public synchronized BlockListAsLongs getBlockReport(String bpid) {
+  public synchronized BlockReport getBlockReport(String bpid) {
     final List<Block> blocks = new ArrayList<>();
     final Map<Block, BInfo> map = blockMap.get(bpid);
+    BlockReport.Builder builder = BlockReport.builder(NUM_BUCKETS);
     if (map != null) {
       for (BInfo b : map.values()) {
         if (b.isFinalized()) {
-          blocks.add(b.theBlock);
+          builder.addAsFinalized(b.theBlock);
         }
       }
     }
-    return new BlockListAsLongs(blocks, null);
+    return builder.build();
   }
 
   @Override // FSDatasetMBean

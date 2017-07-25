@@ -28,6 +28,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -126,11 +127,14 @@ public class TestDeadDatanode {
       // Expected
     }
 
+    int numBuckets = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
+        DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
     // Ensure blockReport from dead datanode is rejected with IOException
     StorageBlockReport[] report =
         {new StorageBlockReport(new DatanodeStorage(reg.getStorageID()),
-            new long[]{0L, 0L, 0L, 0L,
-                0L})};    //problem is with the check in the logging fucntion in BlockListAsLongs.
+            BlockReport.builder(numBuckets).build())};
+    //TODO: HOP is this still valid after changing to BlockReport?
+    //problem is with the check in the logging fucntion in BlockListAsLongs.
     //This problem also occurs in the master branch. After looking in to the code
     //we need to send array of length 5. enable debug log level to get the error in the master branch
     try {

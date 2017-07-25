@@ -51,8 +51,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs.BlockReportIterator;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -73,6 +71,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
@@ -1738,7 +1737,7 @@ public class BlockManager {
    * Update the (machine-->blocklist) and (block-->machinelist) maps.
    */
   public void processReport(final DatanodeID nodeID, final String poolId,
-      final BlockListAsLongs newReport) throws IOException {
+      final BlockReport newReport) throws IOException {
     final long startTime = Time.now(); //after acquiring write lock
     final DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
     if (node == null || !node.isAlive) {
@@ -1777,7 +1776,7 @@ public class BlockManager {
       metrics.addBlockReport((int) (endTime - startTime));
     }
     blockLog.info("BLOCK* processReport: from " + nodeID + ", blocks: " +
-        newReport.getNumberOfBlocks() + ", processing time: " +
+        newReport.getNumBlocks() + ", processing time: " +
         (endTime - startTime) + " msecs");
   }
 
@@ -1846,7 +1845,7 @@ public class BlockManager {
   }
 
   private void processReport(final DatanodeDescriptor node,
-      final BlockListAsLongs report) throws IOException {
+      final BlockReport report) throws IOException {
     // Normal case:
     // Modify the (block-->datanode) map, according to the difference
     // between the old and new block report.
@@ -1899,7 +1898,7 @@ public class BlockManager {
   }
 
   private void reportDiff(final DatanodeDescriptor dn,
-      final BlockListAsLongs newReport, final Collection<BlockInfo> toAdd,
+      final BlockReport newReport, final Collection<BlockInfo> toAdd,
       // add to DatanodeDescriptor
       final Collection<Long> toRemove,
       // remove from DatanodeDescriptor
@@ -1919,10 +1918,10 @@ public class BlockManager {
     final Set<Long> safeBlocks = new HashSet<>(allMachineBlocks);
 
     try {
-      final int numOfReportedBlks = newReport.getNumberOfBlocks();
+      final int numReportedBlocks = newReport.getNumBlocks();
       final Collection subTasks = new ArrayList<Callable>();
 
-      Slicer.slice(numOfReportedBlks, processReportBatchSize,
+      Slicer.slice(numReportedBlocks, processReportBatchSize,
           new Slicer.OperationHandler() {
             @Override
             public void handle(final int startIndex, final int endIndex) throws Exception {
