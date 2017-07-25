@@ -24,7 +24,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsBlocksMetadata;
@@ -54,6 +53,7 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.RoundRobinVolumeChoosing
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.VolumeChoosingPolicy;
 import org.apache.hadoop.hdfs.server.datanode.metrics.FSDatasetMBean;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -92,6 +92,7 @@ import java.util.Map;
 @InterfaceAudience.Private
 class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   static final Log LOG = LogFactory.getLog(FsDatasetImpl.class);
+  private final int NUM_BUCKETS;
 
   @Override // FsDatasetSpi
   public List<FsVolumeImpl> getVolumes() {
@@ -115,7 +116,6 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     final long gs = FsDatasetUtil.parseGenerationStamp(blockfile, metafile);
     return new Block(blkid, blockfile.length(), gs);
   }
-
 
   /**
    * Returns a clone of a replica stored in data-node memory.
@@ -219,6 +219,8 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     }
     asyncDiskService = new FsDatasetAsyncDiskService(datanode, roots);
     registerMBean(storage.getStorageID());
+    NUM_BUCKETS = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
+        DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
   }
 
   /**
@@ -973,27 +975,24 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
    * Generates a block report from the in-memory block map.
    */
   @Override // FsDatasetSpi
-  public BlockListAsLongs getBlockReport(String bpid) {
+  public BlockReport getBlockReport(String bpid) {
     int size = volumeMap.size(bpid);
-    ArrayList<ReplicaInfo> finalized = new ArrayList<>(size);
-    ArrayList<ReplicaInfo> uc = new ArrayList<>();
+    BlockReport.Builder builder = BlockReport.builder(NUM_BUCKETS);
     if (size == 0) {
-      return new BlockListAsLongs(finalized, uc);
+      return builder.build();
     }
     
     synchronized (this) {
       for (ReplicaInfo b : volumeMap.replicas(bpid)) {
         switch (b.getState()) {
           case FINALIZED:
-            finalized.add(b);
-            break;
           case RBW:
           case RWR:
-            uc.add(b);
+            builder.add(b);
             break;
           case RUR:
             ReplicaUnderRecovery rur = (ReplicaUnderRecovery) b;
-            uc.add(rur.getOriginalReplica());
+            builder.add(rur.getOriginalReplica());
             break;
           case TEMPORARY:
             break;
@@ -1001,7 +1000,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
             assert false : "Illegal ReplicaInfo state.";
         }
       }
-      return new BlockListAsLongs(finalized, uc);
+      return builder.build();
     }
   }
 

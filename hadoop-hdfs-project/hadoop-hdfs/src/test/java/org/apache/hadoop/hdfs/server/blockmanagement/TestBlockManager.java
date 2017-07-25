@@ -40,13 +40,13 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor.BlockTargetPair;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.net.NetworkTopology;
 import org.junit.Before;
@@ -91,6 +91,7 @@ public class TestBlockManager {
   private Configuration conf;
   private FSNamesystem fsn;
   private BlockManager bm;
+  private int numBuckets;
 
   private final String USER = "user";
   private final String GROUP = "grp";
@@ -117,6 +118,8 @@ public class TestBlockManager {
     }
     rackA = nodes.subList(0, 3);
     rackB = nodes.subList(3, 6);
+    numBuckets = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, DFSConfigKeys
+        .DFS_NUM_BUCKETS_DEFAULT);
   }
 
   private void formatStorage() throws IOException {
@@ -703,12 +706,12 @@ public class TestBlockManager {
     assertTrue(node.isFirstBlockReport());
     // send block report, should be processed
     reset(node);
-    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
+    bm.processReport(node, "pool", BlockReport.builder(numBuckets).build());
     verify(node).receivedBlockReport();
     assertFalse(node.isFirstBlockReport());
     // send block report again, should NOT be processed
     reset(node);
-    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
+    bm.processReport(node, "pool", BlockReport.builder(numBuckets).build());
     verify(node, never()).receivedBlockReport();
     assertFalse(node.isFirstBlockReport());
 
@@ -720,7 +723,7 @@ public class TestBlockManager {
     assertTrue(node.isFirstBlockReport()); // ready for report again
     // send block report, should be processed after restart
     reset(node);
-    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
+    bm.processReport(node, "pool", BlockReport.builder(numBuckets).build());
     verify(node).receivedBlockReport();
     assertFalse(node.isFirstBlockReport());
   }
@@ -745,7 +748,7 @@ public class TestBlockManager {
     // send block report while pretending to already have blocks
     reset(node);
     doReturn(1).when(node).numBlocks();
-    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
+    bm.processReport(node, "pool", BlockReport.builder(numBuckets).build());
     verify(node).receivedBlockReport();
     assertFalse(node.isFirstBlockReport());
   }
