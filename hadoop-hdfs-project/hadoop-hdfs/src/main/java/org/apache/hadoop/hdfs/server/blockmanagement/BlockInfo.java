@@ -238,10 +238,11 @@ public class BlockInfo extends Block {
   /**
    * Adds new replica for this block.
    */
-  void addReplica(DatanodeDescriptor dn, BlockInfo b)
+  void addReplica(DatanodeDescriptor dn, BlockInfo b )
       throws StorageException, TransactionContextException {
     Replica replica =
-        new Replica(dn.getSId(), getBlockId(), b.getInodeId());
+        new Replica(dn.getSId(), getBlockId(), b.getInodeId(), HashBuckets
+            .getInstance().getBucketForBlock(b));
     update(replica);
   }
 

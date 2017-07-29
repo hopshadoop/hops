@@ -290,6 +290,10 @@ public class BlockManager {
   public BlockManager(final Namesystem namesystem, final FSClusterStats stats,
       final Configuration conf) throws IOException {
     this.namesystem = namesystem;
+    int numBuckets = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
+        DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
+    HashBuckets.initialize(numBuckets);
+    
     datanodeManager = new DatanodeManager(this, namesystem, conf);
     corruptReplicas = new CorruptReplicasMap(datanodeManager);
     heartbeatManager = datanodeManager.getHeartbeatManager();
