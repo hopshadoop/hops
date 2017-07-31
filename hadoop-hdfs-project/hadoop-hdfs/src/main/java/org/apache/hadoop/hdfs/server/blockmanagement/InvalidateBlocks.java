@@ -248,7 +248,7 @@ class InvalidateBlocks {
     return false;
   }
   
-  private List<InvalidatedBlock> findInvBlocksbyStorageId(final int sid)
+  List<InvalidatedBlock> findInvBlocksbyStorageId(final int sid)
       throws IOException {
     return (List<InvalidatedBlock>) new LightWeightRequestHandler(
         HDFSOperationType.GET_INV_BLKS_BY_STORAGEID) {

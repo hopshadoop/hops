@@ -49,6 +49,10 @@ import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.junit.After;
 import org.junit.Before;
+
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState.FINALIZED;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState.RBW;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -539,6 +543,37 @@ public class TestBlockReport {
     }
   }
   
+//  @Test
+//  public void testHashes() throws IOException {
+//
+//    final String METHOD_NAME = GenericTestUtils.getMethodName();
+//    Path filePath = new Path("/" + METHOD_NAME + ".dat");
+//
+//    try {
+//      ArrayList<Block> blocks = writeFile(METHOD_NAME, 1,
+//          filePath);
+//      assert blocks.size() == 1;
+//      BlockChecker bc = new BlockChecker(filePath);
+//      bc.start();
+//
+//      bc.join();
+//      DataNode dn = cluster.getDataNodes().get(DN_N0);
+//      String poolId = cluster.getNamesystem().getBlockPoolId();
+//      DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
+//
+//      StorageBlockReport[] report =
+//          {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
+//              BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks)
+//          .build())};
+//
+//      cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
+//
+//
+//    } catch (InterruptedException e) {
+//      e.printStackTrace();
+//    }
+//
+//  }
   /**
    * Test for the case where one of the DNs in the pipeline is in the
    * process of doing a block report exactly when the block is closed.
@@ -867,7 +902,7 @@ public class TestBlockReport {
       }
     }
   }
-
+  
   private static void resetConfiguration() {
     conf = new Configuration();
     int customPerChecksumSize = 512;
@@ -879,6 +914,7 @@ public class TestBlockReport {
         DN_RESCAN_INTERVAL);
     conf.setInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, DFSConfigKeys
         .DFS_REPLICATION_DEFAULT);
+    conf.setInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, 100);
     NUM_BUCKETS = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, DFSConfigKeys
         .DFS_NUM_BUCKETS_DEFAULT);
   }

@@ -228,7 +228,7 @@ message BlockReportBucketProto {
 
 message BlockReportProto {
   repeated BlockReportBucketProto buckets = 1;
-  repeated uint64 hashes = 2;
+  repeated sint64 hashes = 2;
 }
 
 
@@ -246,9 +246,12 @@ message BlockReportResponseProto {
  */
 message ReceivedDeletedBlockInfoProto {
   enum BlockStatus {
-    RECEIVING = 1; // block being created
-    RECEIVED = 2; // block creation complete
-    DELETED = 3;
+    CREATING = 1;
+    APPENDING = 2;
+    RECOVERING_APPEND = 3;
+    RECEIVED = 4;
+    UPDATE_RECOVERED = 5;
+    DELETED = 6;
   }
 
   required BlockProto block = 1;

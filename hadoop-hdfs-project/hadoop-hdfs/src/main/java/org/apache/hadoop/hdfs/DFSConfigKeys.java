@@ -821,5 +821,5 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   // Hash bucket config
   public static final String DFS_NUM_BUCKETS_KEY = "dfs.defaults.blockreport" +
       ".numbuckets";
-  public static final int DFS_NUM_BUCKETS_DEFAULT = 3;
+  public static final int DFS_NUM_BUCKETS_DEFAULT = 100;
 }

@@ -24,8 +24,10 @@ import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.log.NDCWrapper;
 import io.hops.metadata.hdfs.dal.GroupDataAccess;
+import io.hops.metadata.hdfs.dal.HashBucketDataAccess;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
+import io.hops.metadata.hdfs.entity.HashBucket;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.adaptor.BlockInfoDALAdaptor;
 import io.hops.metadata.adaptor.INodeAttributeDALAdaptor;
@@ -82,6 +84,7 @@ import io.hops.transaction.context.CorruptReplicaContext;
 import io.hops.transaction.context.EncodingStatusContext;
 import io.hops.transaction.context.EntityContext;
 import io.hops.transaction.context.ExcessReplicaContext;
+import io.hops.transaction.context.HashBucketContext;
 import io.hops.transaction.context.INodeAttributesContext;
 import io.hops.transaction.context.INodeContext;
 import io.hops.transaction.context.InvalidatedBlockContext;
@@ -313,6 +316,8 @@ public class HdfsStorageFactory {
 		entityContexts.put(SubTreeOperation.class, new SubTreeOperationsContext(
                 (OngoingSubTreeOpsDataAccess)
                 getDataAccess(OngoingSubTreeOpsDataAccess.class)));
+		entityContexts.put(HashBucket.class, new HashBucketContext(
+        (HashBucketDataAccess) getDataAccess(HashBucketDataAccess.class)));
 
         return entityContexts;
       }

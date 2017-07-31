@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.datanode;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FSOutputSummer;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -164,7 +165,7 @@ class BlockReceiver implements Closeable {
         switch (stage) {
           case PIPELINE_SETUP_CREATE:
             replicaInfo = datanode.data.createRbw(block);
-            datanode.notifyNamenodeReceivingBlock(block);
+            datanode.notifyNamenodeCreatingBlock(block);
             break;
           case PIPELINE_SETUP_STREAMING_RECOVERY:
             replicaInfo = datanode.data
@@ -178,7 +179,7 @@ class BlockReceiver implements Closeable {
                   .deleteBlock(block.getBlockPoolId(), block.getLocalBlock());
             }
             block.setGenerationStamp(newGs);
-            datanode.notifyNamenodeReceivingBlock(block);
+            datanode.notifyNamenodeAppendingBlock(block);
             break;
           case PIPELINE_SETUP_APPEND_RECOVERY:
             replicaInfo =
@@ -188,7 +189,7 @@ class BlockReceiver implements Closeable {
                   .deleteBlock(block.getBlockPoolId(), block.getLocalBlock());
             }
             block.setGenerationStamp(newGs);
-            datanode.notifyNamenodeReceivingBlock(block);
+            datanode.notifyNamenodeAppendingRecoveredAppend(block);
             break;
           case TRANSFER_RBW:
           case TRANSFER_FINALIZED:
