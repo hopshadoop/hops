@@ -29,7 +29,11 @@ import java.util.List;
 public class LockFactory {
 
   private final static LockFactory instance = new LockFactory();
-
+  
+  public Lock getHashBucketLock(int storageId, int bucketId) {
+    return new HashBucketLock(storageId, bucketId);
+  }
+  
   public static enum BLK {
     /**
      * Replica

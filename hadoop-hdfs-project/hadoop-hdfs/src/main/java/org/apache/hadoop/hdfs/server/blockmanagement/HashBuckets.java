@@ -17,7 +17,20 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.HashBucketDataAccess;
+import io.hops.metadata.hdfs.entity.HashBucket;
+import io.hops.transaction.EntityManager;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
+
+import java.io.IOException;
+import java.util.List;
 
 public class HashBuckets {
   
@@ -44,7 +57,49 @@ public class HashBuckets {
     }
   }
   
-  public int getBucketForBlock(Block block){
+  int getBucketForBlock(Block block){
     return (int) (block.getBlockId() % numBuckets);
+  }
+  
+  List<HashBucket> getBucketsForDatanode(final DatanodeDescriptor dn)
+      throws IOException {
+    LightWeightRequestHandler findHashesHandler = new
+        LightWeightRequestHandler(HDFSOperationType.GET_ALL_MACHINE_HASHES) {
+      @Override
+      public Object performTask() throws IOException {
+        HashBucketDataAccess da = (HashBucketDataAccess) HdfsStorageFactory.getDataAccess
+            (HashBucketDataAccess.class);
+        return da.findBucketsByStorageId(dn.getSId());
+      }
+    };
+    
+    return (List<HashBucket>) findHashesHandler.handle();
+  }
+  
+  HashBucket getBucket(int storageId, int bucketId)
+      throws TransactionContextException, StorageException {
+    HashBucket result = EntityManager.find(HashBucket.Finder
+        .ByStorageIdAndBucketId, storageId, bucketId);
+    if(result == null){
+      result = new HashBucket(storageId, bucketId, 0);
+    }
+    return result;
+  }
+  
+  public void applyHash(int storageId, HdfsServerConstants.ReplicaState state,
+      Block block ) throws TransactionContextException, StorageException {
+    int bucketId = getBucketForBlock(block);
+    HashBucket bucket = getBucket(storageId, bucketId);
+    long newHash = bucket.getHash() + BlockReport.hash(block, state);
+    
+    bucket.setHash(newHash);
+  }
+  
+  public void undoHash(int storageId, HdfsServerConstants.ReplicaState
+      state, Block block) throws TransactionContextException, StorageException {
+    int bucketId = getBucketForBlock(block);
+    HashBucket bucket = getBucket(storageId, bucketId);
+    long newHash = bucket.getHash() - BlockReport.hash(block, state);
+    bucket.setHash(newHash);
   }
 }

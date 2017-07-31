@@ -57,6 +57,22 @@ public class DatanodeDescriptor extends DatanodeInfo {
   public DecommissioningStatus decommissioningStatus =
       new DecommissioningStatus();
   
+  public Map<Long,Integer> getAllMachineReplicasInBucket(final int bucketId)
+      throws IOException {
+    LightWeightRequestHandler findReplicasHandler = new
+        LightWeightRequestHandler
+            (HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IN_BUCKET) {
+      @Override
+      public Object performTask() throws IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaDataAccess.class);
+        return da.findBlockAndInodeIdsByStorageIdAndBucketId(getSId(),
+            bucketId);
+      }
+    };
+    return (Map<Long, Integer>) findReplicasHandler.handle();
+  }
+  
   /**
    * Block and targets pair
    */

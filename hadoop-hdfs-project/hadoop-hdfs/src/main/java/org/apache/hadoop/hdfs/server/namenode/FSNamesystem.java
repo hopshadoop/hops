@@ -96,7 +96,9 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStatistics;
+import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
 import org.apache.hadoop.hdfs.server.blockmanagement.MutableBlockCollection;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.Storage;
@@ -5134,6 +5136,25 @@ public class FSNamesystem
         descriptors[i] = dm.getDatanode(newNodes[i]);
       }
     }
+ 
+    //To avoid leaving stale replicas in datanodes we need to undo the
+    // corresponding hashes for ignored locations.
+    DatanodeDescriptor[] expectedLocations = blockInfo.getExpectedLocations(dm);
+    for (DatanodeDescriptor previousLocation : expectedLocations){
+      boolean isInNewLocations = false;
+      for (DatanodeDescriptor newLocation : descriptors){
+        if (newLocation.getSId() == previousLocation.getSId()){
+          isInNewLocations = true;
+          break;
+        }
+      }
+      if(!isInNewLocations){
+        HashBuckets.getInstance().undoHash(previousLocation.getSId(),
+            HdfsServerConstants.ReplicaState.RBW, oldBlock.getLocalBlock());
+      }
+    }
+    
+  
     blockInfo.setExpectedLocations(descriptors);
   }
 
