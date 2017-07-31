@@ -55,55 +55,6 @@ public class BlockReport implements Iterable<BlockReportBlock> {
     this.numBlocks = numBlocks;
   }
  
-  //TODO: THIS WILL BE REMOVED WITH HOPS-64
-  public Object[] getBlocksAndIdsAndStates(int startIndex, int endIndex){
-    int size = endIndex - startIndex;
-    Block[] blocks = new Block[size];
-    long[] blockIds = new long[size];
-    HdfsServerConstants.ReplicaState[] blockStates = new HdfsServerConstants
-        .ReplicaState[size];
-    Iterator<BlockReportBlock> iterator = iterator();
-    for (int i = 0; i < startIndex ; i++){
-      //Skip the first startIndex blocks
-      iterator.next();
-    }
-    for (int index = startIndex ; index < endIndex ; index++){
-      BlockReportBlock current = iterator.next();
-      
-      //Create and store block
-      Block block = new Block();
-      block.setNoPersistance(current.getBlockId(),current.getLength(),current.getGenerationStamp());
-      blocks[index - startIndex] = block;
-      
-      //Store block id
-      blockIds[index-startIndex] = block.getBlockId();
-      
-      //Store block state
-      blockStates[index-startIndex] = fromBlockReportBlockState(current
-          .getState());
-    }
-    
-    return new Object[]{blockIds, blocks, blockStates};
-  }
-  
-  private HdfsServerConstants.ReplicaState fromBlockReportBlockState
-      (BlockReportBlockState state){
-    switch (state){
-      case FINALIZED:
-        return HdfsServerConstants.ReplicaState.FINALIZED;
-      case RBW:
-        return HdfsServerConstants.ReplicaState.RBW;
-      case RUR:
-        return HdfsServerConstants.ReplicaState.RUR;
-      case RWR:
-        return HdfsServerConstants.ReplicaState.RWR;
-      case TEMPORARY:
-        return HdfsServerConstants.ReplicaState.TEMPORARY;
-      default:
-        throw new RuntimeException("Unimplemented state");
-    }
-  }
-  
   @VisibleForTesting
   public Iterable<Block> blockIterable() {
     
@@ -158,12 +109,23 @@ public class BlockReport implements Iterable<BlockReportBlock> {
             .getValue());
   }
   
+  public static long hashAsFinalized(BlockReportBlock block){
+    Block toHash = new Block(block.getBlockId(), block.getLength(),
+        block.getGenerationStamp());
+    return hashAsFinalized(toHash);
+  }
   private static long hash(Replica replica){
     return hash(replica.getBlockId(), replica.getGenerationStamp(), replica
         .getNumBytes(), replica.getState().getValue());
   }
   
-  private static long hash(long blockId, long generationStamp, long numBytes,
+  public static long hash(Block block, HdfsServerConstants.ReplicaState state){
+    return hash(block.getBlockId(), block.getGenerationStamp(), block
+        .getNumBytes(), state.getValue());
+  }
+  
+  private static long hash(long blockId, long generationStamp, long
+      numBytes,
       int replicaState){
     return Hashing.md5().newHasher()
         .putLong(blockId)
@@ -230,7 +192,7 @@ public class BlockReport implements Iterable<BlockReportBlock> {
         .ReplicaState state) {
       switch (state) {
         case FINALIZED:
-          return FINALIZED;
+          return BlockReportBlockState.FINALIZED;
         case RBW:
           return BlockReportBlockState.RBW;
         case RUR:
