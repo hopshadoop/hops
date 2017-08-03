@@ -85,9 +85,10 @@ public class TestProcessCorruptBlocks {
 
       namesystem.setReplication(fileName.toString(), (short) 2);
 
-      // wait for 3 seconds so that all block reports are processed.
+      // HOP had to increase with new hash based reporting: wait for 10 seconds
+      // so that all block reports are processed.
       try {
-        Thread.sleep(3000);
+        Thread.sleep(10000);
       } catch (InterruptedException ignored) {
       }
 
@@ -196,7 +197,7 @@ public class TestProcessCorruptBlocks {
 
       // wait for 3 seconds so that all block reports are processed.
       try {
-        Thread.sleep(3000);
+        Thread.sleep(10000);
       } catch (InterruptedException ignored) {
       }
 

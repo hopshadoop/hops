@@ -3322,8 +3322,8 @@ public class BlockManager {
                 break;
               case DELETED:
                 removeStoredBlock(rdbi.getBlock(), node);
-                hashBuckets.undoHash(node.getSId(), ReplicaState.FINALIZED,
-                    rdbi.getBlock());
+//                hashBuckets.undoHash(node.getSId(), ReplicaState.FINALIZED,
+//                    rdbi.getBlock());
                 deleted[0]++;
                 break;
               default:
