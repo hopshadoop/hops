@@ -1932,7 +1932,8 @@ public class BlockManager {
     final Map<Long, Long> invalidatedReplicas = dn
         .getAllMachineInvalidatedReplicasWithGenStamp();
     final Set<Long> aggregatedMachineBlocks = new HashSet<>();
-    final Set<Long> aggregatedSafeBlocks = new HashSet<>();
+    final Set<Long> aggregatedSafeBlocks = new HashSet<>(); //FIXME, the safe
+    // block logic is doing something wrong
     
     final Collection<Callable<Void>> subTasks = new ArrayList<>();
     for (final int bucketId : bucketsToUpdate){
@@ -1973,7 +1974,7 @@ public class BlockManager {
                       lf.getBlockReportingLocks(Longs.toArray(resolvedBlockIds),
                           Ints.toArray(inodeIds),
                           Longs.toArray(unResolvedBlockIds), dn.getSId()))
-                      .add(lf.getHashBucketLock(dn.getSId(), bucketId));
+                      .add(lf.getIndividualHashBucketLock(dn.getSId(), bucketId));
                 }
 
                 @Override
@@ -2000,6 +2001,10 @@ public class BlockManager {
                   }
                   //Update hash to match:
                   long reportedHash = (long) getParams()[1];
+                  if (bucketId == 0){LOG.debug("block report reported hash ("
+                      + dn
+                      .getSId() +
+                          "," + bucketId + "): " + reportedHash );}
                   HashBucket bucket = HashBuckets.getInstance()
                       .getBucket(dn.getSId(), bucketId);
                   bucket.setHash(reportedHash);
@@ -3220,7 +3225,8 @@ public class BlockManager {
             ReceivedDeletedBlockInfo rdbi =
                 (ReceivedDeletedBlockInfo) getParams()[0];
             inodeIdentifier = INodeUtil.resolveINodeFromBlock(rdbi.getBlock());
-            LOG.debug("reported block id=" + rdbi.getBlock().getBlockId());
+            LOG.debug("reported block id=" + rdbi.getBlock().getBlockId() +
+                " with status: " + rdbi.getStatus().name());
             if (inodeIdentifier == null) {
               LOG.error("Invalid State. deleted blk is not recognized. bid=" +
                   rdbi.getBlock().getBlockId());
@@ -3245,7 +3251,7 @@ public class BlockManager {
               locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE,
                   inodeIdentifier.getInodeId()));
             }
-            locks.add(lf.getHashBucketLock(node.getSId(), HashBuckets
+            locks.add(lf.getIndividualHashBucketLock(node.getSId(), HashBuckets
                 .getInstance().getBucketForBlock(rdbi.getBlock())));
           }
 
@@ -3257,76 +3263,39 @@ public class BlockManager {
                 rdbi.getStatus() + " bid=" + rdbi.getBlock().getBlockId() +
                 " dataNode=" + node.getXferAddr());
             HashBuckets hashBuckets = HashBuckets.getInstance();
+            int storageId = node.getSId();
+            Block reportedBlock = rdbi.getBlock();
+            
             switch (rdbi.getStatus()) {
               case CREATING:
                 processAndHandleReportedBlock(node, rdbi.getBlock(),
                     ReplicaState.RBW, null);
                 received[0]++;
-                
-                //Just add new hash
-                hashBuckets.applyHash(node.getSId(), ReplicaState
-                    .RBW, rdbi.getBlock());
+  
                 break;
               case APPENDING:
                 processAndHandleReportedBlock(node, rdbi.getBlock(),
                     ReplicaState.RBW, null);
                 received[0]++;
-                //Undo previous FIN hash
-                //And add new RBW hash
-                Block undoBlock = new Block(rdbi.getBlock());
-                undoBlock.setGenerationStampNoPersistance(undoBlock
-                    .getGenerationStamp() - 1);
-                hashBuckets.undoHash(node.getSId(), ReplicaState
-                    .FINALIZED, undoBlock);
-                hashBuckets.applyHash(node.getSId(), ReplicaState.RBW, rdbi
-                    .getBlock());
                 break;
               case RECOVERING_APPEND:
                 processAndHandleReportedBlock(node, rdbi.getBlock(),
                     ReplicaState.RBW, null);
                 received[0]++;
-                //Undo previous RBW hash (assume RBW)
-                //And add new RBW hash
-                undoBlock = new Block(rdbi.getBlock());
-                undoBlock.setGenerationStampNoPersistance(rdbi.getBlock()
-                    .getGenerationStamp() - 1);
-                hashBuckets.undoHash(node.getSId(), ReplicaState.RBW,
-                    undoBlock);
-                hashBuckets.applyHash(node.getSId(), ReplicaState.RBW, rdbi
-                    .getBlock());
                 break;
               case RECEIVED:
                 addBlock(node, rdbi.getBlock(), rdbi.getDelHints());
                 received[0]++;
-                //Undo previous RBW hash
-                //And add new FIN hash
-                undoBlock = new Block(rdbi.getBlock());
-                undoBlock.setGenerationStampNoPersistance(rdbi.getBlock()
-                    .getGenerationStamp() - 1);
-                hashBuckets.undoHash(node.getSId(), ReplicaState.RBW,
-                    undoBlock);
                 hashBuckets.applyHash(node.getSId(), ReplicaState.FINALIZED,
                     rdbi.getBlock());
                 break;
               case UPDATE_RECOVERED:
-                //Assume RBW with gs-1, but could be
-                // finalized or other gs. Might trigger mismatch in next report
                 addBlock(node, rdbi.getBlock(), rdbi.getDelHints());
                 received[0]++;
-                undoBlock = new Block(rdbi.getBlock());
-                undoBlock.setGenerationStampNoPersistance(rdbi.getBlock()
-                    .getGenerationStamp() - 1);
-                hashBuckets.undoHash(node.getSId(), ReplicaState.RBW, undoBlock);
-                hashBuckets.applyHash(node.getSId(), ReplicaState.FINALIZED,
-                    rdbi.getBlock());
                 break;
               case DELETED:
                 removeStoredBlock(rdbi.getBlock(), node);
                 deleted[0]++;
-                //Undo finalized. This is a guess and it can trigger mismatch
-                // (which is OK).
-                hashBuckets.undoHash(node.getSId(), ReplicaState.FINALIZED,
-                    rdbi.getBlock());
                 break;
               default:
                 String msg =

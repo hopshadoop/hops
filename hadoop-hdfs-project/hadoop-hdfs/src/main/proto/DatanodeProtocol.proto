@@ -228,7 +228,7 @@ message BlockReportBucketProto {
 
 message BlockReportProto {
   repeated BlockReportBucketProto buckets = 1;
-  repeated uint64 hashes = 2;
+  repeated sint64 hashes = 2;
 }
 
 

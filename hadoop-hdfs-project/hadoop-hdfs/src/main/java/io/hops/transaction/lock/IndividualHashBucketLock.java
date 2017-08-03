@@ -22,11 +22,11 @@ import io.hops.transaction.EntityManager;
 
 import java.io.IOException;
 
-public class HashBucketLock extends Lock {
+public class IndividualHashBucketLock extends Lock {
   private final int storageId;
   private final int bucketId;
   
-  HashBucketLock(int storageId, int bucketId) {
+  IndividualHashBucketLock(int storageId, int bucketId) {
     this.storageId = storageId;
     this.bucketId = bucketId;
   }

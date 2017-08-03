@@ -30,9 +30,6 @@ public class LockFactory {
 
   private final static LockFactory instance = new LockFactory();
   
-  public Lock getHashBucketLock(int storageId, int bucketId) {
-    return new HashBucketLock(storageId, bucketId);
-  }
   
   public static enum BLK {
     /**
@@ -344,6 +341,14 @@ public class LockFactory {
   public Lock getSubTreeOpsLock(TransactionLockTypes.LockType lockType, 
           String pathPrefix) {
     return new SubTreeOpLock(lockType, pathPrefix);
+  }
+  
+  public Lock getIndividualHashBucketLock(int storageId, int bucketId) {
+    return new IndividualHashBucketLock(storageId, bucketId);
+  }
+  
+  public Lock getLastBlockHashBucketsLock(){
+    return new LastBlockReplicasHashBucketLock();
   }
   
   public Collection<Lock> getBlockRelated(BLK... relatedBlks) {
