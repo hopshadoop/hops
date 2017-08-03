@@ -44,6 +44,7 @@ import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
 import io.hops.util.Slicer;
+import org.apache.avro.generic.GenericData;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -1905,6 +1906,17 @@ public class BlockManager {
       }
     }
   }
+  
+  private static class HashMatchingResult{
+    private final List<Integer> matchingBuckets;
+    private final List<Integer> mismatchedBuckets;
+    
+    public HashMatchingResult(List<Integer> matchingBuckets, List<Integer>
+        mismatchedBuckets){
+      this.matchingBuckets = matchingBuckets;
+      this.mismatchedBuckets = mismatchedBuckets;
+    }
+  }
 
   private void reportDiff(final DatanodeDescriptor dn,
       final BlockReport newReport, final Collection<BlockInfo> toAdd,
@@ -1921,28 +1933,36 @@ public class BlockManager {
       return;
     }
     
-    List<Integer> bucketsToUpdate = calculateMismatchedHashes(dn, newReport);
+    HashMatchingResult matchingResult = calculateMismatchedHashes(dn,
+        newReport);
     
     if(LOG.isDebugEnabled()){
       LOG.debug(String.format("%d/%d reported hashes matched",
-          newReport.getHashes().length-bucketsToUpdate.size(),
+          newReport.getHashes().length-matchingResult.mismatchedBuckets.size(),
           newReport.getHashes().length));
     }
     
     final Map<Long, Long> invalidatedReplicas = dn
         .getAllMachineInvalidatedReplicasWithGenStamp();
     final Set<Long> aggregatedMachineBlocks = new HashSet<>();
-    final Set<Long> aggregatedSafeBlocks = new HashSet<>(); //FIXME, the safe
-    // block logic is doing something wrong
+    final Set<Long> aggregatedSafeBlocks = new HashSet<>();
+    
+    for (final int safeBucket : matchingResult.matchingBuckets){
+      for (BlockReportBlock safeBlock : newReport.getBuckets()[safeBucket]
+          .getBlocks()){
+        aggregatedSafeBlocks.add(safeBlock.getBlockId());
+      }
+    }
+    
     
     final Collection<Callable<Void>> subTasks = new ArrayList<>();
-    for (final int bucketId : bucketsToUpdate){
+    for (final int bucketId : matchingResult.mismatchedBuckets){
       final Map<Long, Integer> allMachineReplicasInBucket =
           dn.getAllMachineReplicasInBucket(bucketId);
       final Set<Long> allBlocksInBucket = allMachineReplicasInBucket.keySet();
-      
-      aggregatedMachineBlocks.addAll(allBlocksInBucket);
       aggregatedSafeBlocks.addAll(allBlocksInBucket);
+      aggregatedMachineBlocks.addAll(allBlocksInBucket);
+      
       final Callable<Void> subTask = new Callable<Void>() {
         @Override
         public Void call() throws Exception {
@@ -1993,7 +2013,7 @@ public class BlockManager {
                             toInvalidate,
                             toCorrupt, toUC, aggregatedSafeBlocks,
                             firstBlockReport,
-                            aggregatedMachineBlocks.contains(brb.getBlockId()),
+                            allBlocksInBucket.contains(brb.getBlockId()),
                             invalidatedReplicas);
                     if (storedBlock != null) {
                       aggregatedMachineBlocks.remove(storedBlock.getBlockId());
@@ -2001,12 +2021,7 @@ public class BlockManager {
                   }
                   //Update hash to match:
                   long reportedHash = (long) getParams()[1];
-                  if (bucketId == 0){LOG.debug("block report reported hash ("
-                      + dn
-                      .getSId() +
-                          "," + bucketId + "): " + reportedHash );}
-                  HashBucket bucket = HashBuckets.getInstance()
-                      .getBucket(dn.getSId(), bucketId);
+                  HashBucket bucket = HashBuckets.getInstance().getBucket(dn.getSId(), bucketId);
                   bucket.setHash(reportedHash);
                   return null;
                 }
@@ -2029,7 +2044,10 @@ public class BlockManager {
     toRemove.addAll(aggregatedMachineBlocks);
     if (namesystem.isInStartupSafeMode()) {
       aggregatedSafeBlocks.removeAll(toRemove);
+      LOG.debug("AGGREGATED SAFE BLOCK #: " + aggregatedSafeBlocks.size() +
+          " REPORTED BLOCK #: " + newReport.getNumBlocks());
       namesystem.adjustSafeModeBlocks(aggregatedSafeBlocks);
+      //Should contain all ids that:
     }
     
    
@@ -2052,7 +2070,7 @@ public class BlockManager {
   }
 
   
-  private List<Integer> calculateMismatchedHashes(DatanodeDescriptor dn,
+  private HashMatchingResult calculateMismatchedHashes(DatanodeDescriptor dn,
       BlockReport report) throws IOException {
     List<HashBucket> allMachineHashes = HashBuckets.getInstance()
         .getBucketsForDatanode(dn);
@@ -2066,14 +2084,16 @@ public class BlockManager {
    
     final long[] reportedHashes = report.getHashes();
     
-    final List<Integer> bucketsToUpdate = new ArrayList<>();
+    final List<Integer> matchedBuckets = new ArrayList<>();
+    final List<Integer> mismatchedBuckets = new ArrayList<>();
+    
     
     int reportBucketIndex = 0;
     if (allMachineHashes.isEmpty()){
       // We have not seen any updates yet (at least not to the hashes..)
       // Add all ids as unmatched.
       for (int bucketId = 0 ; bucketId < report.getBuckets().length ; bucketId ++){
-        bucketsToUpdate.add(bucketId);
+        mismatchedBuckets.add(bucketId);
       }
     } else {
       for (HashBucket orderedBucket : allMachineHashes) {
@@ -2081,17 +2101,19 @@ public class BlockManager {
   
         int storedBucketIndex = orderedBucket.getBucketId();
         for (; reportBucketIndex < storedBucketIndex; reportBucketIndex++) {
-          bucketsToUpdate.add(reportBucketIndex);
+          mismatchedBuckets.add(reportBucketIndex);
         }
         assert storedBucketIndex == reportBucketIndex;
         
-        if (reportedHashes[reportBucketIndex] != orderedBucket.getHash()) {
-          bucketsToUpdate.add(reportBucketIndex);
+        if (reportedHashes[reportBucketIndex] == orderedBucket.getHash()) {
+          matchedBuckets.add(reportBucketIndex);
+        } else {
+          mismatchedBuckets.add(reportBucketIndex);
         }
         reportBucketIndex++;
       }
     }
-    return bucketsToUpdate;
+    return new HashMatchingResult(matchedBuckets, mismatchedBuckets);
   }
 
   /**
@@ -3251,8 +3273,13 @@ public class BlockManager {
               locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE,
                   inodeIdentifier.getInodeId()));
             }
-            locks.add(lf.getIndividualHashBucketLock(node.getSId(), HashBuckets
-                .getInstance().getBucketForBlock(rdbi.getBlock())));
+            if (rdbi.getStatus() == ReceivedDeletedBlockInfo.BlockStatus
+                .RECEIVED ||
+                rdbi.getStatus() == ReceivedDeletedBlockInfo.BlockStatus
+                    .DELETED){
+              locks.add(lf.getIndividualHashBucketLock(node.getSId(), HashBuckets
+                  .getInstance().getBucketForBlock(rdbi.getBlock())));
+            }
           }
 
           @Override
@@ -3263,8 +3290,6 @@ public class BlockManager {
                 rdbi.getStatus() + " bid=" + rdbi.getBlock().getBlockId() +
                 " dataNode=" + node.getXferAddr());
             HashBuckets hashBuckets = HashBuckets.getInstance();
-            int storageId = node.getSId();
-            Block reportedBlock = rdbi.getBlock();
             
             switch (rdbi.getStatus()) {
               case CREATING:
@@ -3295,6 +3320,8 @@ public class BlockManager {
                 break;
               case DELETED:
                 removeStoredBlock(rdbi.getBlock(), node);
+                hashBuckets.undoHash(node.getSId(), ReplicaState.FINALIZED,
+                    rdbi.getBlock());
                 deleted[0]++;
                 break;
               default:

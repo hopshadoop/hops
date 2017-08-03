@@ -2144,22 +2144,23 @@ public class FSNamesystem
                 throw new HDFSClientAppendToDBFileException("HDFS can not directly append to a file stored in the database");
               }
               
-              
-              
               LocatedBlock locatedBlock =
                   appendFileInt(src, holder, clientMachine);
              
-              
-              for (DatanodeInfo datanodeInfo : locatedBlock.getLocations()) {
-                int sId = blockManager.getDatanodeManager().getDatanode
-                    (datanodeInfo).getSId();
-                BlockInfo blockInfo =
-                    EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
-                        locatedBlock.getBlock().getBlockId(), target.getId());
-                Block undoBlock = new Block(
-                HashBuckets.getInstance().undoHash(sId, HdfsServerConstants
-                    .ReplicaState.FINALIZED, blockInfo);
-                
+              if (locatedBlock != null) {
+                for (DatanodeInfo datanodeInfo : locatedBlock.getLocations()) {
+                  int sId = blockManager.getDatanodeManager().getDatanode
+                      (datanodeInfo).getSId();
+                  BlockInfo blockInfo =
+                      EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+                          locatedBlock.getBlock().getBlockId(), target.getId());
+                  Block undoBlock = new Block(blockInfo);
+                  undoBlock.setGenerationStampNoPersistance(undoBlock
+                      .getGenerationStamp() - 1);
+                  HashBuckets.getInstance().undoHash(sId, HdfsServerConstants
+                      .ReplicaState.FINALIZED, undoBlock);
+    
+                }
               }
               return locatedBlock;
             } catch (AccessControlException e) {
