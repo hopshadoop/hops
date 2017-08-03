@@ -540,37 +540,37 @@ public class TestBlockReport {
     }
   }
   
-  @Test
-  public void testHashes() throws IOException {
-  
-    final String METHOD_NAME = GenericTestUtils.getMethodName();
-    Path filePath = new Path("/" + METHOD_NAME + ".dat");
-    
-    try {
-      ArrayList<Block> blocks = writeFile(METHOD_NAME, 1,
-          filePath);
-      assert blocks.size() == 1;
-      BlockChecker bc = new BlockChecker(filePath);
-      bc.start();
-      
-      bc.join();
-      DataNode dn = cluster.getDataNodes().get(DN_N0);
-      String poolId = cluster.getNamesystem().getBlockPoolId();
-      DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
-  
-      StorageBlockReport[] report =
-          {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-              BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks)
-          .build())};
-      
-      cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
-      
-      
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
-  
-  }
+//  @Test
+//  public void testHashes() throws IOException {
+//
+//    final String METHOD_NAME = GenericTestUtils.getMethodName();
+//    Path filePath = new Path("/" + METHOD_NAME + ".dat");
+//
+//    try {
+//      ArrayList<Block> blocks = writeFile(METHOD_NAME, 1,
+//          filePath);
+//      assert blocks.size() == 1;
+//      BlockChecker bc = new BlockChecker(filePath);
+//      bc.start();
+//
+//      bc.join();
+//      DataNode dn = cluster.getDataNodes().get(DN_N0);
+//      String poolId = cluster.getNamesystem().getBlockPoolId();
+//      DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
+//
+//      StorageBlockReport[] report =
+//          {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
+//              BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks)
+//          .build())};
+//
+//      cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
+//
+//
+//    } catch (InterruptedException e) {
+//      e.printStackTrace();
+//    }
+//
+//  }
   /**
    * Test for the case where one of the DNs in the pipeline is in the
    * process of doing a block report exactly when the block is closed.

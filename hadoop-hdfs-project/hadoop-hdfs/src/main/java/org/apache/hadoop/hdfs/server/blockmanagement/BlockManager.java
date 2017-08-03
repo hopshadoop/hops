@@ -2013,7 +2013,9 @@ public class BlockManager {
                             toInvalidate,
                             toCorrupt, toUC, aggregatedSafeBlocks,
                             firstBlockReport,
-                            allBlocksInBucket.contains(brb.getBlockId()),
+                            allBlocksInBucket.contains(brb
+                                .getBlockId
+                                ()),
                             invalidatedReplicas);
                     if (storedBlock != null) {
                       aggregatedMachineBlocks.remove(storedBlock.getBlockId());
