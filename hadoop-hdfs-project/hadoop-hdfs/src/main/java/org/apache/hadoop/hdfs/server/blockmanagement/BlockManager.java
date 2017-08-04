@@ -1950,7 +1950,10 @@ public class BlockManager {
     for (final int safeBucket : matchingResult.matchingBuckets){
       for (BlockReportBlock safeBlock : newReport.getBuckets()[safeBucket]
           .getBlocks()){
-        aggregatedSafeBlocks.add(safeBlock.getBlockId());
+//        if (safeBlock.getState() == BlockReportBlockState.FINALIZED) {
+          aggregatedSafeBlocks.add(safeBlock.getBlockId());
+//        }
+        //aggregatedMachineBlocks.add(safeBlock.getBlockId());
       }
     }
     
@@ -2013,9 +2016,7 @@ public class BlockManager {
                             toInvalidate,
                             toCorrupt, toUC, aggregatedSafeBlocks,
                             firstBlockReport,
-                            allBlocksInBucket.contains(brb
-                                .getBlockId
-                                ()),
+                            allBlocksInBucket.contains(brb.getBlockId()),
                             invalidatedReplicas);
                     if (storedBlock != null) {
                       aggregatedMachineBlocks.remove(storedBlock.getBlockId());
@@ -2167,7 +2168,7 @@ public class BlockManager {
       LOG.debug("Reported block " + block + " on " + dn + " size " +
           block.getNumBytes() + " replicaState = " + reportedState);
     }
-
+//TODO: CAN WE UPDATE SAFE BLOCK COUNT FROM HERE?
     // find block by blockId
     BlockInfo storedBlock = blocksMap.getStoredBlock(block);
     if (storedBlock == null) {
@@ -3322,8 +3323,8 @@ public class BlockManager {
                 break;
               case DELETED:
                 removeStoredBlock(rdbi.getBlock(), node);
-//                hashBuckets.undoHash(node.getSId(), ReplicaState.FINALIZED,
-//                    rdbi.getBlock());
+                hashBuckets.undoHash(node.getSId(), ReplicaState.FINALIZED,
+                    rdbi.getBlock());
                 deleted[0]++;
                 break;
               default:

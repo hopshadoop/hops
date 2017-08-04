@@ -2159,7 +2159,6 @@ public class FSNamesystem
                       .getGenerationStamp() - 1);
                   HashBuckets.getInstance().undoHash(sId, HdfsServerConstants
                       .ReplicaState.FINALIZED, undoBlock);
-    
                 }
               }
               return locatedBlock;
@@ -4509,7 +4508,8 @@ public class FSNamesystem
       }
     }
 
-    private void adjustBlockTotals(int deltaSafe, int deltaTotal) {
+    private void adjustBlockTotals(int deltaSafe, int deltaTotal)
+        throws IOException {
       //FIXME ?!
     }
 

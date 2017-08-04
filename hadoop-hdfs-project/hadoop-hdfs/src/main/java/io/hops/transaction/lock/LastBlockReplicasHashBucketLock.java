@@ -34,12 +34,15 @@ public class LastBlockReplicasHashBucketLock extends Lock {
     BlockLock blockLock = (BlockLock) locks.getLock(Type.Block);
     for (INodeFile iNodeFile : blockLock.getFiles()) {
       Block lastBlock = iNodeFile.getLastBlock();
-      List<Replica> replicas = (List<Replica>) EntityManager
-        .findList(Replica.Finder.ByBlockIdAndINodeId, lastBlock.getBlockId(),
-            iNodeFile.getId());
-      for (Replica replica : replicas){
-        EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId, replica
-            .getStorageId(), replica.getBucketId());
+      if (iNodeFile.getLastBlock() != null) {
+        List<Replica> replicas = (List<Replica>) EntityManager
+            .findList(Replica.Finder.ByBlockIdAndINodeId,
+                lastBlock.getBlockId(),
+                iNodeFile.getId());
+        for (Replica replica : replicas) {
+          EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId, replica
+              .getStorageId(), replica.getBucketId());
+        }
       }
     }
   }
