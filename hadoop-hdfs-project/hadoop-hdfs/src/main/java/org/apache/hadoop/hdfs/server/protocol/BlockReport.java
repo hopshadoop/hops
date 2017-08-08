@@ -109,6 +109,11 @@ public class BlockReport implements Iterable<BlockReportBlock> {
             .getValue());
   }
   
+  public static long hashAsFinalized(BlockReportBlock block){
+    Block toHash = new Block(block.getBlockId(), block.getLength(),
+        block.getGenerationStamp());
+    return hashAsFinalized(toHash);
+  }
   private static long hash(Replica replica){
     return hash(replica.getBlockId(), replica.getGenerationStamp(), replica
         .getNumBytes(), replica.getState().getValue());
@@ -119,7 +124,8 @@ public class BlockReport implements Iterable<BlockReportBlock> {
         .getNumBytes(), state.getValue());
   }
   
-  private static long hash(long blockId, long generationStamp, long numBytes,
+  private static long hash(long blockId, long generationStamp, long
+      numBytes,
       int replicaState){
     return Hashing.md5().newHasher()
         .putLong(blockId)
@@ -186,7 +192,7 @@ public class BlockReport implements Iterable<BlockReportBlock> {
         .ReplicaState state) {
       switch (state) {
         case FINALIZED:
-          return FINALIZED;
+          return BlockReportBlockState.FINALIZED;
         case RBW:
           return BlockReportBlockState.RBW;
         case RUR:

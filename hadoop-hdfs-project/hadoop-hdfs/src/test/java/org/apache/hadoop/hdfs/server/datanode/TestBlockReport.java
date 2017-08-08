@@ -34,7 +34,6 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
-import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
@@ -50,6 +49,10 @@ import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.junit.After;
 import org.junit.Before;
+
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState.FINALIZED;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState.RBW;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -898,6 +901,12 @@ public class TestBlockReport {
         Assert.fail("Failed to start BlockChecker: " + e);
       }
     }
+  }
+  @Test
+  public void testHashing(){
+    Block b = new Block(0,0,0);
+    assertNotEquals(BlockReport.hash(b, FINALIZED), BlockReport.hash(b,
+        RBW));
   }
 
   private static void resetConfiguration() {

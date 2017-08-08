@@ -25,6 +25,8 @@ import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class LastBlockReplicasHashBucketLock extends Lock {
@@ -39,6 +41,13 @@ public class LastBlockReplicasHashBucketLock extends Lock {
             .findList(Replica.Finder.ByBlockIdAndINodeId,
                 lastBlock.getBlockId(),
                 iNodeFile.getId());
+        Collections.sort(replicas, new Comparator<Replica>() {
+          @Override
+          public int compare(Replica o1, Replica o2) {
+            return new Integer(o1.getBucketId()).compareTo(o2.getBucketId());
+          }
+        });
+        
         for (Replica replica : replicas) {
           EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId, replica
               .getStorageId(), replica.getBucketId());

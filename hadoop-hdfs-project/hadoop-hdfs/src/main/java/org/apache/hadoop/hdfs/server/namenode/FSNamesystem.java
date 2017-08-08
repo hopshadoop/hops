@@ -2117,8 +2117,8 @@ public class FSNamesystem
                 .add(lf.getLeaseLock(LockType.WRITE, holder))
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                 .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
-                    BLK.IV, BLK.PE))
-                .add(lf.getLastBlockHashBucketsLock());
+                    BLK.IV, BLK.PE));
+                //.add(lf.getLastBlockHashBucketsLock());
             // Always needs to be read. Erasure coding might have been
             // enabled earlier and we don't want to end up in an inconsistent
             // state.
@@ -2147,20 +2147,20 @@ public class FSNamesystem
               LocatedBlock locatedBlock =
                   appendFileInt(src, holder, clientMachine);
              
-              if (locatedBlock != null) {
-                for (DatanodeInfo datanodeInfo : locatedBlock.getLocations()) {
-                  int sId = blockManager.getDatanodeManager().getDatanode
-                      (datanodeInfo).getSId();
-                  BlockInfo blockInfo =
-                      EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
-                          locatedBlock.getBlock().getBlockId(), target.getId());
-                  Block undoBlock = new Block(blockInfo);
-                  undoBlock.setGenerationStampNoPersistance(undoBlock
-                      .getGenerationStamp() - 1);
-                  HashBuckets.getInstance().undoHash(sId, HdfsServerConstants
-                      .ReplicaState.FINALIZED, undoBlock);
-                }
-              }
+//              if (locatedBlock != null) {
+//                for (DatanodeInfo datanodeInfo : locatedBlock.getLocations()) {
+//                  int sId = blockManager.getDatanodeManager().getDatanode
+//                      (datanodeInfo).getSId();
+//                  BlockInfo blockInfo =
+//                      EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+//                          locatedBlock.getBlock().getBlockId(), target.getId());
+//                  Block undoBlock = new Block(blockInfo);
+//                  undoBlock.setGenerationStampNoPersistance(undoBlock
+//                      .getGenerationStamp() - 1);
+//                  HashBuckets.getInstance().undoHash(sId, HdfsServerConstants
+//                      .ReplicaState.FINALIZED, undoBlock);
+//                }
+//              }
               return locatedBlock;
             } catch (AccessControlException e) {
               logAuditEvent(false, "append", src);
