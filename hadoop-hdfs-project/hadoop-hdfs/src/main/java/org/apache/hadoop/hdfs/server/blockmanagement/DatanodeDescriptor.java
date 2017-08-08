@@ -23,7 +23,6 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
-import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -41,7 +40,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 
 /**
  * This class extends the DatanodeInfo class with ephemeral information (eg
@@ -71,6 +69,22 @@ public class DatanodeDescriptor extends DatanodeInfo {
       }
     };
     return (Map<Long, Integer>) findReplicasHandler.handle();
+  }
+  
+  public Map<Long,Integer> getAllMachineReplicasInBuckets(
+      final List<Integer> mismatchedBuckets) throws IOException {
+    LightWeightRequestHandler findReplicasHandler = new
+        LightWeightRequestHandler
+            (HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IN_BUCKETS) {
+      @Override
+      public Object performTask() throws IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaDataAccess.class);
+        return da.findBlockAndInodeIdsByStorageIdAndBucketIds(getSId(),
+            mismatchedBuckets);
+      }
+    };
+    return (Map<Long,Integer>) findReplicasHandler.handle();
   }
   
   /**

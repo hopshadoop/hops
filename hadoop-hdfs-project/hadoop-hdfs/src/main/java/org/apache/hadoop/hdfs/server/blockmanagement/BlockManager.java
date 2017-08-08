@@ -44,7 +44,6 @@ import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
 import io.hops.util.Slicer;
-import org.apache.avro.generic.GenericData;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -1971,12 +1970,13 @@ public class BlockManager {
     
     final Collection<Callable<Void>> subTasks = new ArrayList<>();
     
+    final Map<Long, Integer> mismatchedBlocksAndInodes = dn
+        .getAllMachineReplicasInBuckets(matchingResult.mismatchedBuckets);
+  
+    final Set<Long> allMismatchedBlocksOnServer = mismatchedBlocksAndInodes.keySet();
+    aggregatedSafeBlocks.addAll(allMismatchedBlocksOnServer);
+    
     for (final int bucketId : matchingResult.mismatchedBuckets){
-      final Map<Long, Integer> allMachineReplicasInBucket =
-          dn.getAllMachineReplicasInBucket(bucketId);
-      
-      final Set<Long> allBlocksInBucket = allMachineReplicasInBucket.keySet();
-      final Set<Long> safeBlocksInBucket = new HashSet<>(allBlocksInBucket);
       
       final Callable<Void> subTask = new Callable<Void>() {
         @Override
@@ -1995,7 +1995,7 @@ public class BlockManager {
                   BlockReportBlock[] reportedBlocks =
                       ((BlockReportBucket) getParams()[0]).getBlocks();
                   for (BlockReportBlock reportedBlock : reportedBlocks) {
-                    Integer inodeId = allMachineReplicasInBucket.get
+                    Integer inodeId = mismatchedBlocksAndInodes.get
                         (reportedBlock.getBlockId());
                     if (inodeId != null) {
                       resolvedBlockIds.add(reportedBlock.getBlockId());
@@ -2027,21 +2027,19 @@ public class BlockManager {
                             block, fromBlockReportBlockState(brb.getState()),
                             toAdd,
                             toInvalidate,
-                            toCorrupt, toUC, safeBlocksInBucket,
+                            toCorrupt, toUC, aggregatedSafeBlocks,
                             firstBlockReport,
-                            allBlocksInBucket.contains(brb.getBlockId()),
+                            allMismatchedBlocksOnServer.contains(brb.getBlockId()),
                             invalidatedReplicas);
                     if (storedBlock != null) {
-                      allBlocksInBucket.remove(storedBlock.getBlockId());
+                      mismatchedBlocksAndInodes.remove(storedBlock.getBlockId());
                       if (brb.getState() == BlockReportBlockState.FINALIZED){
                         hash += BlockReport.hashAsFinalized(brb);
                       }
                     }
                     
                   }
-                  safeBlocksInBucket.removeAll(allBlocksInBucket);
-                  toRemove.addAll(allBlocksInBucket);
-                  aggregatedSafeBlocks.addAll(safeBlocksInBucket);
+                  
                   //Update hash to match:
                   long reportedHash = (long) getParams()[1];
                   HashBucket bucket = HashBuckets.getInstance().getBucket(dn.getSId(), bucketId);
@@ -2063,6 +2061,8 @@ public class BlockManager {
     } catch (Exception e) {
       LOG.error("Exception was thrown during block report processing", e);
     }
+    
+    toRemove.addAll(allMismatchedBlocksOnServer);
     if (namesystem.isInStartupSafeMode()) {
       aggregatedSafeBlocks.removeAll(toRemove);
       LOG.debug("AGGREGATED SAFE BLOCK #: " + aggregatedSafeBlocks.size() +
