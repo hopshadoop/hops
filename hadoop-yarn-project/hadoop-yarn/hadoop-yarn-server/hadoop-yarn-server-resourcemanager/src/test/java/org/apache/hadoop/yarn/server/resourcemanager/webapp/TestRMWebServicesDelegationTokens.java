@@ -35,14 +35,10 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.minikdc.MiniKdc;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.KerberosTestUtils;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
@@ -89,13 +85,15 @@ import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.ClientResponse.Status;
 import com.sun.jersey.api.client.filter.LoggingFilter;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
-import com.sun.jersey.test.framework.JerseyTest;
 import com.sun.jersey.test.framework.WebAppDescriptor;
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @RunWith(Parameterized.class)
 public class TestRMWebServicesDelegationTokens extends JerseyTestBase {
-
-  private final Log LOG = LogFactory.getLog(TestRMWebServicesDelegationTokens.class);
 
   private static File testRootDir;
   private static File httpSpnegoKeytabFile = new File(
@@ -152,31 +150,30 @@ public class TestRMWebServicesDelegationTokens extends JerseyTestBase {
 
     @Override
     protected void configureServlets() {
-      bind(JAXBContextResolver.class);
-      bind(RMWebServices.class);
-      bind(GenericExceptionHandler.class);
-      Configuration rmconf = new Configuration();
-      rmconf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
-        YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
-      rmconf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
-        ResourceScheduler.class);
-      rmconf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
-
       try {
+        bind(JAXBContextResolver.class);
+        bind(RMWebServices.class);
+        bind(GenericExceptionHandler.class);
+        Configuration rmconf = new Configuration();
+        rmconf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
+            YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
+        rmconf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
+            ResourceScheduler.class);
+        rmconf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
         RMStorageFactory.setConfiguration(rmconf);
         YarnAPIStorageFactory.setConfiguration(rmconf);
         DBUtility.InitializeDB();
+        rm = new MockRM(rmconf);
+        bind(ResourceManager.class).toInstance(rm);
+        if (isKerberosAuth == true) {
+          filter("/*").through(TestKerberosAuthFilter.class);
+        } else {
+          filter("/*").through(TestSimpleAuthFilter.class);
+        }
+        serve("/*").with(GuiceContainer.class);
       } catch (IOException ex) {
-        LOG.error(ex, ex);
+        Logger.getLogger(TestRMWebServicesDelegationTokens.class.getName()).log(Level.SEVERE, null, ex);
       }
-      rm = new MockRM(rmconf);
-      bind(ResourceManager.class).toInstance(rm);
-      if (isKerberosAuth == true) {
-        filter("/*").through(TestKerberosAuthFilter.class);
-      } else {
-        filter("/*").through(TestSimpleAuthFilter.class);
-      }
-      serve("/*").with(GuiceContainer.class);
     }
   }
 
@@ -261,6 +258,9 @@ public class TestRMWebServicesDelegationTokens extends JerseyTestBase {
     super.setUp();
     httpSpnegoKeytabFile.deleteOnExit();
     testRootDir.deleteOnExit();
+    Configuration conf = new Configuration();
+    conf.set("hadoop.security.authentication", "kerberos");
+    UserGroupInformation.setConfiguration(conf);
   }
 
   @AfterClass
@@ -275,6 +275,7 @@ public class TestRMWebServicesDelegationTokens extends JerseyTestBase {
   public void tearDown() throws Exception {
     rm.stop();
     super.tearDown();
+    UserGroupInformation.setConfiguration(new Configuration());
   }
 
   // Simple test - try to create a delegation token via web services and check

@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.yarn.server;
 
-import java.io.IOException;
-
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
+import java.io.IOException;
+
 import org.junit.Assert;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -35,16 +35,22 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResp
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.junit.Before;
 import org.junit.Test;
 
 public class TestRMNMSecretKeys {
 
-  @Test(timeout = 1000000)
-  public void testNMUpdation() throws Exception {
+  @Before
+  public void setup() throws IOException{
     YarnConfiguration conf = new YarnConfiguration();
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
+  }
+  
+  @Test(timeout = 1000000)
+  public void testNMUpdation() throws Exception {
+    YarnConfiguration conf = new YarnConfiguration();
     // validating RM NM keys for Unsecured environment
     validateRMNMKeyExchange(conf);
     
@@ -69,7 +75,6 @@ public class TestRMNMSecretKeys {
       protected Dispatcher createDispatcher() {
         return new DrainDispatcher();
       }
-      
       @Override
       protected void startWepApp() {
         // Don't need it, skip.
@@ -92,8 +97,8 @@ public class TestRMNMSecretKeys {
     MasterKey nmTokenMasterKey = registrationResponse.getNMTokenMasterKey();
     Assert.assertNotNull(nmToken
         + "Registration should cause a key-update!", nmTokenMasterKey);
-
-    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
+    
+    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
 
     NodeHeartbeatResponse response = nm.nodeHeartbeat(true);
     Assert.assertNull(containerToken +
@@ -102,7 +107,7 @@ public class TestRMNMSecretKeys {
     Assert.assertNull(nmToken +
         "First heartbeat after registration shouldn't get any key updates!",
         response.getNMTokenMasterKey());
-    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
+    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
 
     response = nm.nodeHeartbeat(true);
     Assert.assertNull(containerToken +
@@ -111,8 +116,8 @@ public class TestRMNMSecretKeys {
     Assert.assertNull(nmToken +
         "Even second heartbeat after registration shouldn't get any key updates!",
         response.getContainerTokenMasterKey());
-
-    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
+    
+    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
 
     // Let's force a roll-over
     rm.getRMContext().getContainerTokenSecretManager().rollMasterKey();
@@ -135,7 +140,7 @@ public class TestRMNMSecretKeys {
         "Roll-over should have incremented the key-id only by one!",
         nmTokenMasterKey.getKeyId() + 1,
         response.getNMTokenMasterKey().getKeyId());
-    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
+    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
 
     response = nm.nodeHeartbeat(true);
     Assert.assertNull(containerToken +
@@ -144,7 +149,7 @@ public class TestRMNMSecretKeys {
     Assert.assertNull(nmToken +
         "Second heartbeat after roll-over shouldn't get any key updates!",
         response.getNMTokenMasterKey());
-    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
+    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
 
     // Let's force activation
     rm.getRMContext().getContainerTokenSecretManager().activateNextMasterKey();
@@ -157,7 +162,7 @@ public class TestRMNMSecretKeys {
     Assert.assertNull(nmToken
         + "Activation shouldn't cause any key updates!",
         response.getNMTokenMasterKey());
-    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
+    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
 
     response = nm.nodeHeartbeat(true);
     Assert.assertNull(containerToken +
@@ -166,7 +171,7 @@ public class TestRMNMSecretKeys {
     Assert.assertNull(nmToken +
         "Even second heartbeat after activation shouldn't get any key updates!",
         response.getNMTokenMasterKey());
-    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
+    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
 
     rm.stop();
   }

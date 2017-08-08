@@ -34,3 +34,60 @@ message EchoRequestProto {
 message EchoResponseProto {
   required string message = 1;
 }
+
+message OptRequestProto {
+  optional string message = 1;
+}
+
+message OptResponseProto {
+  optional string message = 1;
+}
+
+message SleepRequestProto{
+  required int32 milliSeconds = 1;
+}
+
+message SleepResponseProto{
+}
+
+message SlowPingRequestProto {
+  required bool shouldSlow = 1;
+}
+
+message EchoRequestProto2 {
+  repeated string message = 1;
+}
+
+message EchoResponseProto2 {
+  repeated string message = 1;
+}
+
+message AddRequestProto {
+  required int32 param1 = 1;
+  required int32 param2 = 2;
+}
+
+message AddRequestProto2 {
+  repeated int32 params = 1;
+}
+
+message AddResponseProto {
+  required int32 result = 1;
+}
+
+message ExchangeRequestProto {
+  repeated int32 values = 1;
+}
+
+message ExchangeResponseProto {
+  repeated int32 values = 1;
+}
+
+message AuthMethodResponseProto {
+  required int32 code = 1;
+  required string mechanismName = 2;
+}
+
+message AuthUserResponseProto {
+  required string authUser = 1;
+}

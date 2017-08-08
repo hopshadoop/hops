@@ -90,10 +90,6 @@ public final class NativeCodeLoader {
    */
   public static native boolean buildSupportsIsal();
 
-  /**
-   * Returns true only if this build was compiled with support for openssl.
-   */
-
   public static native String getLibraryName();
 
 }

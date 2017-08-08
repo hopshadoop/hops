@@ -18,6 +18,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
 import io.hops.metadata.yarn.entity.PendingEvent;
+import io.hops.metadata.yarn.entity.RMNodeApplication;
 import io.hops.util.DBUtility;
 import io.hops.util.ToCommitHB;
 import java.io.IOException;
@@ -28,7 +29,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
@@ -36,15 +40,19 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
+import org.apache.hadoop.yarn.api.records.SignalContainerCommand;
+import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.ClusterMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.NodesListManager;
 import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppRunningOnNodeEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.AllocationExpirationInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeResourceUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
@@ -76,37 +84,46 @@ public class RMNodeImplDist extends RMNodeImpl {
     // Switch the last heartbeatresponse.
     rmNode.latestNodeHeartBeatResponse = statusEvent.getLatestResponse();
 
-    NodeHealthStatus remoteNodeHealthStatus = statusEvent.
-            getNodeHealthStatus();
+    NodeHealthStatus remoteNodeHealthStatus = statusEvent.getNodeHealthStatus();
     rmNode.setHealthReport(remoteNodeHealthStatus.getHealthReport());
     rmNode.setLastHealthReportTime(
-            remoteNodeHealthStatus.getLastHealthReportTime());
-    if (!remoteNodeHealthStatus.getIsNodeHealthy()) {
-      LOG.info("Node " + rmNode.nodeId + " reported UNHEALTHY with details: "
-              + remoteNodeHealthStatus.getHealthReport());
-      rmNode.nodeUpdateQueue.clear();
-      // Inform the scheduler
-//      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
-        //Add NodeRemovedSchedulerEvent to TransactionState
-        LOG.debug("HOP :: Added Pending event to TransactionState");
-        toCommit.addPendingEvent(PendingEvent.Type.NODE_REMOVED,
-                PendingEvent.Status.NEW);
-//      } else {
-//        rmNode.context.getDispatcher().getEventHandler().handle(
-//                new NodeRemovedSchedulerEvent(rmNode));
-      if(rmNode.context.isLeader()){
-        rmNode.context.getDispatcher().getEventHandler().handle(
-                new NodesListManagerEvent(
-                        NodesListManagerEventType.NODE_UNUSABLE, rmNode));
-      }
+        remoteNodeHealthStatus.getLastHealthReportTime());
 
-      // Update metrics
-      rmNode.updateMetricsForDeactivatedNode(rmNode.getState(),
-              NodeState.UNHEALTHY);
-      return NodeState.UNHEALTHY;
+    rmNode.setAggregatedContainersUtilization(
+        statusEvent.getAggregatedContainersUtilization());
+    rmNode.setNodeUtilization(statusEvent.getNodeUtilization());
+    NodeState initialState = rmNode.getState();
+    boolean isNodeDecommissioning = initialState.equals(NodeState.DECOMMISSIONING);
+    if (isNodeDecommissioning) {
+      List<ApplicationId> keepAliveApps = statusEvent.getKeepAliveAppIds();
+      if (rmNode.runningApplications.isEmpty() && (keepAliveApps == null || keepAliveApps.isEmpty())) {
+        deactivateNode(rmNode, NodeState.DECOMMISSIONED);
+        return NodeState.DECOMMISSIONED;
+      }
     }
-    ((RMNodeImplDist) rmNode).handleContainerStatus(statusEvent.
-            getContainers());
+
+    if (!remoteNodeHealthStatus.getIsNodeHealthy()) {
+      LOG.
+          info("Node " + rmNode.nodeId + " reported UNHEALTHY with details: " + remoteNodeHealthStatus.getHealthReport());
+      // if a node in decommissioning receives an unhealthy report,
+      // it will stay in decommissioning.
+      if (isNodeDecommissioning) {
+        return NodeState.DECOMMISSIONING;
+      } else {
+        reportNodeUnusable(rmNode, NodeState.UNHEALTHY);
+        return NodeState.UNHEALTHY;
+      }
+    }
+
+    ((RMNodeImplDist) rmNode).handleContainerStatus(statusEvent.getContainers());
+    rmNode.handleReportedIncreasedContainers(
+        statusEvent.getNMReportedIncreasedContainers());
+
+    List<LogAggregationReport> logAggregationReportsForApps = statusEvent.getLogAggregationReportsForApps();
+    if (logAggregationReportsForApps != null
+        && !logAggregationReportsForApps.isEmpty()) {
+      rmNode.handleLogAggregationStatus(logAggregationReportsForApps);
+    }
 
     if (rmNode.nextHeartBeat) {
       rmNode.nextHeartBeat = false;
@@ -124,19 +141,20 @@ public class RMNodeImplDist extends RMNodeImpl {
             ) {
 
       toCommit.addPendingEvent(PendingEvent.Type.NODE_UPDATED,
-              PendingEvent.Status.SCHEDULER_NOT_FINISHED_PROCESSING);
+          PendingEvent.Status.SCHEDULER_NOT_FINISHED_PROCESSING);
     }
 
     // Update DTRenewer in secure mode to keep these apps alive. Today this is
     // needed for log-aggregation to finish long after the apps are gone.
     if (UserGroupInformation.isSecurityEnabled()) {
       rmNode.context.getDelegationTokenRenewer().updateKeepAliveApplications(
-              statusEvent.getKeepAliveAppIds());
+          statusEvent.getKeepAliveAppIds());
     }
+
     toCommit.addRMNode(hostName, commandPort, httpPort, totalCapability,
-            nodeManagerVersion, getState(), getHealthReport(),
-            getLastHealthReportTime());
-    return NodeState.RUNNING;
+        nodeManagerVersion, getState(), getHealthReport(),
+        getLastHealthReportTime());
+    return initialState;
 
   }
 
@@ -145,10 +163,11 @@ public class RMNodeImplDist extends RMNodeImpl {
     // Filter the map to only obtain just launched containers and finished
     // containers.
     List<ContainerStatus> newlyLaunchedContainers
-            = new ArrayList<>();
-    List<ContainerStatus> completedContainers = new ArrayList<>();
+            = new ArrayList<ContainerStatus>();
+    List<ContainerStatus> completedContainers = new ArrayList<ContainerStatus>();
     List<io.hops.metadata.yarn.entity.ContainerStatus> containerToLog
             = new ArrayList<>();
+    int numRemoteRunningContainers = 0;
     for (ContainerStatus remoteContainer : containerStatuses) {
       ContainerId containerId = remoteContainer.getContainerId();
 
@@ -160,32 +179,53 @@ public class RMNodeImplDist extends RMNodeImpl {
                 + "cleanup, no further processing");
         continue;
       }
-      if (finishedApplications.contains(containerId.getApplicationAttemptId()
-              .getApplicationId())) {
+      
+      ApplicationId containerAppId =
+          containerId.getApplicationAttemptId().getApplicationId();
+      
+      if (finishedApplications.contains(containerAppId)) {
         LOG.info("Container " + containerId
                 + " belongs to an application that is already killed,"
                 + " no further processing");
         continue;
+      } else if (!runningApplications.contains(containerAppId)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Container " + containerId
+              + " is the first container get launched for application "
+              + containerAppId);
+        }
+        handleRunningAppOnNode(this, context, containerAppId, nodeId);
       }
 
       // Process running containers
       if (remoteContainer.getState() == ContainerState.RUNNING) {
+        ++numRemoteRunningContainers;
         if (!launchedContainers.contains(containerId)) {
           // Just launched container. RM knows about it the first time.
           launchedContainers.add(containerId);
           newlyLaunchedContainers.add(remoteContainer);
+          // Unregister from containerAllocationExpirer.
+          containerAllocationExpirer.unregister(
+              new AllocationExpirationInfo(containerId));
         }
       } else {
         // A finished container
         launchedContainers.remove(containerId);
         completedContainers.add(remoteContainer);
+        // Unregister from containerAllocationExpirer.
+        containerAllocationExpirer.unregister(
+            new AllocationExpirationInfo(containerId));
       }
       containerToLog.add(new io.hops.metadata.yarn.entity.ContainerStatus(
               remoteContainer.getContainerId().toString(), remoteContainer.
               getState().name(), remoteContainer.getDiagnostics(),
               remoteContainer.getExitStatus(), nodeId.toString()));
     }
-    if (!newlyLaunchedContainers.isEmpty() || !completedContainers.isEmpty()) {
+    
+    completedContainers.addAll(findLostContainers(
+          numRemoteRunningContainers, containerStatuses));
+    
+    if (newlyLaunchedContainers.size() != 0 || completedContainers.size() != 0) {
       UpdatedContainerInfo uci = new UpdatedContainerInfo(
               newlyLaunchedContainers,
               completedContainers);
@@ -206,8 +246,8 @@ public class RMNodeImplDist extends RMNodeImpl {
               new ArrayList<>(this.containersToClean));
       response.addAllApplicationsToCleanup(this.finishedApplications);
       response.addContainersToBeRemovedFromNM(
-              new ArrayList<>(this.containersToBeRemovedFromNM));
-
+              new ArrayList<ContainerId>(this.containersToBeRemovedFromNM));
+      response.addAllContainersToSignal(this.containersToSignal);
       // We need to make a deep copy of containersToClean and finishedApplications
       // since DBUtility is async and we get ConcurrentModificationException
       Set<ContainerId> copyContainersToClean = new HashSet<>(this.containersToClean.size());
@@ -215,15 +255,23 @@ public class RMNodeImplDist extends RMNodeImpl {
         copyContainersToClean.add(ContainerId.newContainerId(cid.getApplicationAttemptId(),
                 cid.getContainerId()));
       }
+      Set<SignalContainerRequest> copyContainersToSignal = new HashSet<>(this.containersToSignal.size());
+      for (SignalContainerRequest signalContainerRequest : this.containersToSignal) {
+        copyContainersToSignal.add(SignalContainerRequest.newInstance(signalContainerRequest.getContainerId(),
+            signalContainerRequest.getCommand()));
+      }
       DBUtility.removeContainersToClean(copyContainersToClean, this.nodeId);
-
+      DBUtility.removeContainersToSignal(copyContainersToSignal, this.nodeId);
+      
       List<ApplicationId> copyFinishedApplications = new ArrayList<>(this.finishedApplications.size());
       for (ApplicationId appId : this.finishedApplications) {
         copyFinishedApplications.add(ApplicationId.newInstance(appId.getClusterTimestamp(),
                 appId.getId()));
       }
-      DBUtility.removeFinishedApplications(copyFinishedApplications, this.nodeId);
+      DBUtility.removeRMNodeApplications(copyFinishedApplications, this.nodeId,
+          RMNodeApplication.RMNodeApplicationStatus.FINISHED);
       this.containersToClean.clear();
+      this.containersToSignal.clear();
       this.finishedApplications.clear();
       this.containersToBeRemovedFromNM.clear();
     } catch (IOException ex) {
@@ -233,6 +281,24 @@ public class RMNodeImplDist extends RMNodeImpl {
     }
   }
 
+  @Override
+  public void updateNodeHeartbeatResponseForContainersDecreasing(
+      NodeHeartbeatResponse response) {
+    this.writeLock.lock();
+    
+    try {
+      response.addAllContainersToDecrease(toBeDecreasedContainers.values());
+      try{
+        DBUtility.removeContainersToDecrease(toBeDecreasedContainers.values());
+      }catch(IOException ex){
+        LOG.error(ex, ex);
+      }
+      toBeDecreasedContainers.clear();
+    } finally {
+      this.writeLock.unlock();
+    }
+  }
+  
   protected void handleRunningAppOnNode(RMNodeImpl rmNode,
           RMContext context, ApplicationId appId, NodeId nodeId) {
     RMApp app = context.getRMApps().get(appId);
@@ -244,14 +310,22 @@ public class RMNodeImplDist extends RMNodeImpl {
       LOG.warn("Cannot get RMApp by appId=" + appId
               + ", just added it to finishedApplications list for cleanup");
       rmNode.finishedApplications.add(appId);
+      rmNode.runningApplications.remove(appId);
       try {
-        DBUtility.addFinishedApplication(appId, rmNode.nodeId);
+        DBUtility.addRMNodeApplication(appId, rmNode.nodeId, RMNodeApplication.RMNodeApplicationStatus.FINISHED);
+        DBUtility.removeRMNodeApplication(appId, rmNode.nodeId, RMNodeApplication.RMNodeApplicationStatus.RUNNING);
       } catch (IOException ex) {
         LOG.error(ex, ex);
       }
       return;
     }
 
+    rmNode.runningApplications.add(appId);
+    try {
+      DBUtility.addRMNodeApplication(appId, rmNode.nodeId, RMNodeApplication.RMNodeApplicationStatus.RUNNING);
+    } catch (IOException ex) {
+      LOG.error(ex, ex);
+    }
     context.getDispatcher().getEventHandler()
             .handle(new RMAppRunningOnNodeEvent(appId, nodeId));
   }
@@ -259,11 +333,12 @@ public class RMNodeImplDist extends RMNodeImpl {
   @Override
   protected void cleanUpAppTransitionInternal(RMNodeImpl rmNode,
           RMNodeEvent event) {
-    rmNode.finishedApplications.add(((RMNodeCleanAppEvent) event).getAppId());
+    ApplicationId appId = ((RMNodeCleanAppEvent) event).getAppId();
+    rmNode.finishedApplications.add(appId);
+    rmNode.runningApplications.remove(appId);
     try {
-      DBUtility.addFinishedApplication(((RMNodeCleanAppEvent) event).
-              getAppId(),
-              rmNode.getNodeID());
+      DBUtility.addRMNodeApplication(appId, rmNode.nodeId, RMNodeApplication.RMNodeApplicationStatus.FINISHED);
+      DBUtility.removeRMNodeApplication(appId, rmNode.nodeId, RMNodeApplication.RMNodeApplicationStatus.RUNNING);
     } catch (IOException ex) {
       LOG.error(ex, ex);
   }
@@ -278,11 +353,11 @@ public class RMNodeImplDist extends RMNodeImpl {
               getContainerId(), rmNode.getNodeID());
     } catch (IOException ex) {
       LOG.error(ex, ex);
-    }
+  }
   }
 
   @Override
-  public List<UpdatedContainerInfo> pullContainerUpdates() {
+  protected List<UpdatedContainerInfo> pullContainerUpdatesInternal() {
     List<UpdatedContainerInfo> latestContainerInfoList
             = new ArrayList<UpdatedContainerInfo>();
     try {
@@ -319,6 +394,26 @@ public class RMNodeImplDist extends RMNodeImpl {
     }
   }
   
+  public void addContainersToSignal(SignalContainerRequest containerToSignal) {
+    super.writeLock.lock();
+
+    try {
+      super.containersToSignal.add(containerToSignal);
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+  
+  public void addContainersToDecrease(Container containerToDecrease) {
+    super.writeLock.lock();
+
+    try {
+      super.toBeDecreasedContainers.put(containerToDecrease.getId(), containerToDecrease);
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+  
   public void setAppsToCleanUp(List<ApplicationId> appsToCleanUp) {
     super.writeLock.lock();
 
@@ -334,6 +429,16 @@ public class RMNodeImplDist extends RMNodeImpl {
 
     try {
       super.finishedApplications.add(appToCleanUp);
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+  
+  public void addToRunningApps(ApplicationId runningApp) {
+    super.writeLock.lock();
+
+    try {
+      super.runningApplications.add(runningApp);
     } finally {
       super.writeLock.unlock();
     }
@@ -366,31 +471,39 @@ public class RMNodeImplDist extends RMNodeImpl {
   @Override
   protected void addNodeTransitionInternal(RMNodeImpl rmNode, RMNodeEvent event) {
     // Inform the scheduler
-    RMNodeStartedEvent startEvent = (RMNodeStartedEvent) event;
-    List<NMContainerStatus> containers = null;
+      RMNodeStartedEvent startEvent = (RMNodeStartedEvent) event;
+      List<NMContainerStatus> containers = null;
 
-    String host = rmNode.nodeId.getHost();
-    RMNode previousRMNode = rmNode.context.getInactiveRMNodes().remove(host);
-    if (previousRMNode != null) {
-      if (previousRMNode.getNodeID().getPort() != -1) {
-        // Old node rejoining
+      NodeId nodeId = rmNode.nodeId;
+      RMNode previousRMNode =
+          rmNode.context.getInactiveRMNodes().remove(nodeId);
+      if (previousRMNode != null) {
         rmNode.updateMetricsForRejoinedNode(previousRMNode.getState());
       } else {
-        // An old excluded node rejoining
-        ClusterMetrics.getMetrics().decrDecommisionedNMs();
-        containers = updateNewNodeMetricsAndContainers(rmNode, startEvent);
+        NodeId unknownNodeId =
+            NodesListManager.createUnknownNodeId(nodeId.getHost());
+        previousRMNode =
+            rmNode.context.getInactiveRMNodes().remove(unknownNodeId);
+        if (previousRMNode != null) {
+          ClusterMetrics.getMetrics().decrDecommisionedNMs();
+        }
+        // Increment activeNodes explicitly because this is a new node.
+        ClusterMetrics.getMetrics().incrNumActiveNodes();
+        containers = startEvent.getNMContainerStatuses();
+        if (containers != null && !containers.isEmpty()) {
+          for (NMContainerStatus container : containers) {
+            if (container.getContainerState() == ContainerState.RUNNING) {
+              rmNode.launchedContainers.add(container.getContainerId());
+            }
+          }
+        }
       }
-    } else {
-      // Increment activeNodes explicitly because this is a new node.
-      containers = updateNewNodeMetricsAndContainers(rmNode, startEvent);
-    }
 
-    if (null != startEvent.getRunningApplications()) {
-      for (ApplicationId appId : startEvent.getRunningApplications()) {
-        rmNode.handleRunningAppOnNode(rmNode, rmNode.context, appId,
-                rmNode.nodeId);
+      if (null != startEvent.getRunningApplications()) {
+        for (ApplicationId appId : startEvent.getRunningApplications()) {
+          handleRunningAppOnNode(rmNode, rmNode.context, appId, rmNode.nodeId);
+        }
       }
-    }
 
 //    if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
       //Add NodeAddedSchedulerEvent to TransactionState
@@ -406,7 +519,7 @@ if(rmNode.context.isLeader()){
     }
   }
 
-  protected void reconnectNodeTransitionInternal(RMNodeImpl rmNode,
+  protected NodeState reconnectNodeTransitionInternal(RMNodeImpl rmNode,
           RMNodeEvent event) {
     RMNodeReconnectEvent reconnectEvent = (RMNodeReconnectEvent) event;
     RMNode newNode = reconnectEvent.getReconnectedNode();
@@ -417,6 +530,12 @@ if(rmNode.context.isLeader()){
     // No application running on the node, so send node-removal event with 
     // cleaning up old container info.
     if (noRunningApps) {
+      if (rmNode.getState() == NodeState.DECOMMISSIONING) {
+        // When node in decommissioning, and no running apps on this node,
+        // it will return as decommissioned state.
+        deactivateNode(rmNode, NodeState.DECOMMISSIONED);
+        return NodeState.DECOMMISSIONED;
+      }
       rmNode.nodeUpdateQueue.clear();
 //      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
         //Add NodeRemovedSchedulerEvent to TransactionState
@@ -491,16 +610,47 @@ if(rmNode.context.isLeader()){
                                 .newInstance(newNode.getTotalCapability(), -1)));
       }
     }
+    return rmNode.getState();
   }
 
   @Override
-  protected void deactivateNodeTransitionInternal(RMNodeImpl rmNode,
-          RMNodeEvent event, final NodeState finalState) {
-    //check for UnknownNodeId
+  protected void decreaseContainersInt(RMNodeImpl rmNode, RMNodeDecreaseContainerEvent de) {
+    for (Container c : de.getToBeDecreasedContainers()) {
+      rmNode.toBeDecreasedContainers.put(c.getId(), c);
+    }
+    try{
+      DBUtility.addContainersToDecrease(de.getToBeDecreasedContainers());
+    }catch(IOException ex){
+      LOG.error(ex, ex);
+    }
+  }
+  
+  @Override
+  protected void deactivateNode(RMNodeImpl rmNode, final NodeState finalState) {
     if (rmNode.getNodeID().getPort() == -1) {
       rmNode.updateMetricsForDeactivatedNode(rmNode.getState(), finalState);
       return;
     }
+    reportNodeUnusable(rmNode, finalState);
+
+    // Deactivate the node
+    rmNode.context.getRMNodes().remove(rmNode.nodeId);
+    LOG.info("Deactivating Node " + rmNode.nodeId + " as it is now "
+        + finalState);
+    rmNode.context.getInactiveRMNodes().put(rmNode.nodeId, rmNode);
+    if (rmNode.context.getNodesListManager().isUntrackedNode(rmNode.hostName)) {
+      rmNode.setUntrackedTimeStamp(Time.monotonicNow());
+    }
+  }
+
+  /**
+   * Report node is UNUSABLE and update metrics.
+   *
+   * @param rmNode
+   * @param finalState
+   */
+  public void reportNodeUnusable(RMNodeImpl rmNode,
+      NodeState finalState) {
     // Inform the scheduler
     rmNode.nodeUpdateQueue.clear();
     // If the current state is NodeState.UNHEALTHY
@@ -527,11 +677,13 @@ if(rmNode.context.isLeader()){
     rmNode.context.getRMNodes().remove(rmNode.nodeId);
     LOG.info("Deactivating Node " + rmNode.nodeId + " as it is now "
             + finalState);
-    rmNode.context.getInactiveRMNodes().put(rmNode.nodeId.getHost(), rmNode);
+    rmNode.context.getInactiveRMNodes().put(rmNode.nodeId, rmNode);
 
     //Update the metrics
     rmNode.updateMetricsForDeactivatedNode(initialState, finalState);
   }
+
+
 
   protected NodeState statusUpdateWhenUnHealthyTransitionInternal(
           RMNodeImpl rmNode, RMNodeEvent event) {
@@ -543,6 +695,9 @@ if(rmNode.context.isLeader()){
     rmNode.setHealthReport(remoteNodeHealthStatus.getHealthReport());
     rmNode.setLastHealthReportTime(
             remoteNodeHealthStatus.getLastHealthReportTime());
+    rmNode.setAggregatedContainersUtilization(
+          statusEvent.getAggregatedContainersUtilization());
+    rmNode.setNodeUtilization(statusEvent.getNodeUtilization());
     if (remoteNodeHealthStatus.getIsNodeHealthy()) {
 //      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
         //Add NodeAddedSchedulerEvent to TransactionState
@@ -569,6 +724,16 @@ if(rmNode.context.isLeader()){
     return NodeState.UNHEALTHY;
   }
 
+  @Override
+  protected void signalContainerInt(RMNodeImpl rmNode, RMNodeEvent event) {
+    try{
+      DBUtility.addContainerToSignal(((RMNodeSignalContainerEvent) event).getSignalRequest(), this.nodeId);
+    }catch(IOException ex){
+      LOG.error(ex, ex);
+    }
+    rmNode.containersToSignal.add(((RMNodeSignalContainerEvent) event).getSignalRequest());
+  }
+      
   public void handle(RMNodeEvent event) {
     LOG.debug("Processing " + event.getNodeId() + " of type " + event.getType());
     try {

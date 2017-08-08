@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -43,7 +44,10 @@ import org.mortbay.util.ajax.JSON.Output;
  * A servlet to print out metrics data.  By default, the servlet returns a 
  * textual representation (no promises are made for parseability), and
  * users can use "?format=json" for parseable output.
+ *
+ * @deprecated Use org.apache.hadoop.metrics2 package instead.
  */
+@Deprecated
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class MetricsServlet extends HttpServlet {
@@ -106,8 +110,13 @@ public class MetricsServlet extends HttpServlet {
   public void doGet(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
 
-    if (!HttpServer2.isInstrumentationAccessAllowed(getServletContext(),
-                                                   request, response)) {
+    // If user is a static user and auth Type is null, that means
+    // there is a non-security environment and no need authorization,
+    // otherwise, do the authorization.
+    final ServletContext servletContext = getServletContext();
+    if (!HttpServer2.isStaticUserAndNoneAuthType(servletContext, request) &&
+        !HttpServer2.isInstrumentationAccessAllowed(servletContext,
+            request, response)) {
       return;
     }
 

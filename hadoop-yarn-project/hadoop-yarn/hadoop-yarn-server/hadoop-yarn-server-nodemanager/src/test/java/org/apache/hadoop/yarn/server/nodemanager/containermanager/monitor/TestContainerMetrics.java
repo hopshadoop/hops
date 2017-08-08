@@ -94,10 +94,14 @@ public class TestContainerMetrics {
     int anyVmemLimit = 2048;
     int anyVcores = 10;
     int anyGPUs = 4;
+    long anyLaunchDuration = 20L;
+    long anyLocalizationDuration = 1000L;
     String anyProcessId = "1234";
 
     metrics.recordResourceLimit(anyVmemLimit, anyPmemLimit, anyVcores, anyGPUs);
     metrics.recordProcessId(anyProcessId);
+    metrics.recordStateChangeDurations(anyLaunchDuration,
+        anyLocalizationDuration);
 
     int nbTry=0;
     do {
@@ -117,6 +121,12 @@ public class TestContainerMetrics {
     MetricsRecords.assertMetric(record, ContainerMetrics.VCORE_LIMIT_METRIC_NAME, anyVcores);
     MetricsRecords.assertMetric(record, ContainerMetrics
         .GPU_LIMIT_METRIC_NAME, anyGPUs);
+
+    MetricsRecords.assertMetric(record,
+        ContainerMetrics.LAUNCH_DURATION_METRIC_NAME, anyLaunchDuration);
+    MetricsRecords.assertMetric(record,
+        ContainerMetrics.LOCALIZATION_DURATION_METRIC_NAME,
+        anyLocalizationDuration);
 
     collector.clear();
   }
@@ -143,7 +153,6 @@ public class TestContainerMetrics {
     system.sampleMetrics();
     system.sampleMetrics();
     Thread.sleep(100);
-    system.stop();
     // verify metrics1 is unregistered
     assertTrue(metrics1 != ContainerMetrics.forContainer(
         system, containerId1, 1, 0));
@@ -153,6 +162,9 @@ public class TestContainerMetrics {
     // verify metrics3 is still registered
     assertTrue(metrics3 == ContainerMetrics.forContainer(
         system, containerId3, 1, 0));
+    // YARN-5190: move stop() to the end to verify registering containerId1 and
+    // containerId2 won't get MetricsException thrown.
+    system.stop();
     system.shutdown();
   }
 }

@@ -18,11 +18,14 @@
 package org.apache.hadoop.yarn.server.resourcemanager.reservation;
 
 import java.util.Date;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.MismatchedUserException;
+import org.apache.hadoop.yarn.server.resourcemanager.reservation.RLESparseResourceAllocation.RLEOperator;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.PlanningException;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.PlanningQuotaException;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.ResourceOverCommitException;
@@ -81,14 +84,6 @@ public class CapacityOverTimePolicy implements SharingPolicy {
     ReservationAllocation oldReservation =
         plan.getReservationById(reservation.getReservationId());
 
-    // sanity check that the update of a reservation is not changing username
-    if (oldReservation != null
-        && !oldReservation.getUser().equals(reservation.getUser())) {
-      throw new MismatchedUserException(
-          "Updating an existing reservation with mismatched user:"
-              + oldReservation.getUser() + " != " + reservation.getUser());
-    }
-
     long startTime = reservation.getStartTime();
     long endTime = reservation.getEndTime();
     long step = plan.getStep();
@@ -104,14 +99,17 @@ public class CapacityOverTimePolicy implements SharingPolicy {
     IntegralResource maxAllowed = new IntegralResource(maxAvgRes);
     maxAllowed.multiplyBy(validWindow / step);
 
+    RLESparseResourceAllocation userCons =
+        plan.getConsumptionForUserOverTime(reservation.getUser(), startTime
+            - validWindow, endTime + validWindow);
+
     // check that the resources offered to the user during any window of length
     // "validWindow" overlapping this allocation are within maxAllowed
     // also enforce instantaneous and physical constraints during this pass
     for (long t = startTime - validWindow; t < endTime + validWindow; t += step) {
 
       Resource currExistingAllocTot = plan.getTotalCommittedResources(t);
-      Resource currExistingAllocForUser =
-          plan.getConsumptionForUser(reservation.getUser(), t);
+      Resource currExistingAllocForUser = userCons.getCapacityAtTime(t);
       Resource currNewAlloc = reservation.getResourcesAtTime(t);
       Resource currOldAlloc = Resources.none();
       if (oldReservation != null) {
@@ -163,8 +161,7 @@ public class CapacityOverTimePolicy implements SharingPolicy {
 
       // expire contributions from instant in time before (t - validWindow)
       if (t > startTime) {
-        Resource pastOldAlloc =
-            plan.getConsumptionForUser(reservation.getUser(), t - validWindow);
+        Resource pastOldAlloc = userCons.getCapacityAtTime(t - validWindow);
         Resource pastNewAlloc = reservation.getResourcesAtTime(t - validWindow);
 
         // runningTot = runningTot - pastExistingAlloc - pastNewAlloc;
@@ -189,6 +186,48 @@ public class CapacityOverTimePolicy implements SharingPolicy {
   }
 
   @Override
+  public RLESparseResourceAllocation availableResources(
+      RLESparseResourceAllocation available, Plan plan, String user,
+      ReservationId oldId, long start, long end) throws PlanningException {
+
+    // this only propagates the instantaneous maxInst properties, while
+    // the time-varying one depends on the current allocation as well
+    // and are not easily captured here
+    Resource planTotalCapacity = plan.getTotalCapacity();
+    Resource maxInsRes = Resources.multiply(planTotalCapacity, maxInst);
+    NavigableMap<Long, Resource> instQuota = new TreeMap<Long, Resource>();
+    instQuota.put(start, maxInsRes);
+
+    RLESparseResourceAllocation instRLEQuota =
+        new RLESparseResourceAllocation(instQuota,
+            plan.getResourceCalculator());
+
+    RLESparseResourceAllocation used =
+        plan.getConsumptionForUserOverTime(user, start, end);
+
+    // add back in old reservation used resources if any
+    ReservationAllocation old = plan.getReservationById(oldId);
+    if (old != null) {
+      used =
+          RLESparseResourceAllocation.merge(plan.getResourceCalculator(),
+              Resources.clone(plan.getTotalCapacity()), used,
+              old.getResourcesOverTime(), RLEOperator.subtract, start, end);
+    }
+
+    instRLEQuota =
+        RLESparseResourceAllocation.merge(plan.getResourceCalculator(),
+            planTotalCapacity, instRLEQuota, used, RLEOperator.subtract, start,
+            end);
+
+    instRLEQuota =
+        RLESparseResourceAllocation.merge(plan.getResourceCalculator(),
+            planTotalCapacity, available, instRLEQuota, RLEOperator.min, start,
+            end);
+
+    return instRLEQuota;
+  }
+
+  @Override
   public long getValidWindow() {
     return validWindow;
   }
@@ -198,7 +237,7 @@ public class CapacityOverTimePolicy implements SharingPolicy {
    * long(s), as using Resource to store the "integral" of the allocation over
    * time leads to integer overflows for large allocations/clusters. (Evolving
    * Resource to use long is too disruptive at this point.)
-   * 
+   *
    * The comparison/multiplication behaviors of IntegralResource are consistent
    * with the DefaultResourceCalculator.
    */
@@ -208,7 +247,7 @@ public class CapacityOverTimePolicy implements SharingPolicy {
     long gpus;
 
     public IntegralResource(Resource resource) {
-      this.memory = resource.getMemory();
+      this.memory = resource.getMemorySize();
       this.vcores = resource.getVirtualCores();
       this.gpus = resource.getGPUs();
     }
@@ -220,13 +259,13 @@ public class CapacityOverTimePolicy implements SharingPolicy {
     }
 
     public void add(Resource r) {
-      memory += r.getMemory();
+      memory += r.getMemorySize();
       vcores += r.getVirtualCores();
       gpus += r.getGPUs();
     }
 
     public void subtract(Resource r) {
-      memory -= r.getMemory();
+      memory -= r.getMemorySize();
       vcores -= r.getVirtualCores();
       gpus -= r.getGPUs();
     }
@@ -253,4 +292,7 @@ public class CapacityOverTimePolicy implements SharingPolicy {
       return "<memory:" + memory + ", vCores:" + vcores + ", gpus: " + gpus + ">";
     }
   }
+
+
+
 }

@@ -196,4 +196,41 @@ public abstract class NodeReport {
   @Private
   @Unstable
   public abstract void setNodeLabels(Set<String> nodeLabels);
+
+  /**
+   * Get containers aggregated resource utilization in a node
+   * @return containers resource utilization
+   */
+  @Public
+  @Stable
+  public ResourceUtilization getAggregatedContainersUtilization() {
+    throw new UnsupportedOperationException(
+        "subclass must implement this method");
+  }
+
+  @Private
+  @Unstable
+  public void setAggregatedContainersUtilization(ResourceUtilization
+      containersUtilization) {
+    throw new UnsupportedOperationException(
+        "subclass must implement this method");
+  }
+
+  /**
+   * Get node resource utilization
+   * @return node resource utilization
+   */
+  @Public
+  @Stable
+  public ResourceUtilization getNodeUtilization() {
+    throw new UnsupportedOperationException(
+        "subclass must implement this method");
+  }
+
+  @Private
+  @Unstable
+  public void setNodeUtilization(ResourceUtilization nodeUtilization) {
+    throw new UnsupportedOperationException(
+        "subclass must implement this method");
+  }
 }

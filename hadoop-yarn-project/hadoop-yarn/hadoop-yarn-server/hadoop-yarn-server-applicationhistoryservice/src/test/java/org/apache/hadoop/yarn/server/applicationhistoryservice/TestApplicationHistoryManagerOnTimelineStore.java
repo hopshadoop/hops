@@ -22,7 +22,9 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
@@ -78,9 +80,9 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     store = createStore(SCALE);
     TimelineEntities entities = new TimelineEntities();
     entities.addEntity(createApplicationTimelineEntity(
-        ApplicationId.newInstance(0, SCALE + 1), true, true, false));
+        ApplicationId.newInstance(0, SCALE + 1), true, true, false, false));
     entities.addEntity(createApplicationTimelineEntity(
-        ApplicationId.newInstance(0, SCALE + 2), true, false, true));
+        ApplicationId.newInstance(0, SCALE + 2), true, false, true, false));
     store.put(entities);
   }
 
@@ -94,8 +96,10 @@ public class TestApplicationHistoryManagerOnTimelineStore {
   public void setup() throws Exception {
     // Only test the ACLs of the generic history
     TimelineACLsManager aclsManager = new TimelineACLsManager(new YarnConfiguration());
+    aclsManager.setTimelineStore(store);
     TimelineDataManager dataManager =
         new TimelineDataManager(store, aclsManager);
+    dataManager.init(conf);
     ApplicationACLsManager appAclsManager = new ApplicationACLsManager(conf);
     historyManager =
         new ApplicationHistoryManagerOnTimelineStore(dataManager, appAclsManager);
@@ -136,10 +140,13 @@ public class TestApplicationHistoryManagerOnTimelineStore {
       ApplicationId appId = ApplicationId.newInstance(0, i);
       if (i == 2) {
         entities.addEntity(createApplicationTimelineEntity(
-            appId, true, false, false));
+            appId, true, false, false, true));
+      } else if (i == 3) {
+        entities.addEntity(createApplicationTimelineEntity(
+            appId, false, false, false, false, true));
       } else {
         entities.addEntity(createApplicationTimelineEntity(
-            appId, false, false, false));
+            appId, false, false, false, false));
       }
       store.put(entities);
       for (int j = 1; j <= scale; ++j) {
@@ -160,7 +167,7 @@ public class TestApplicationHistoryManagerOnTimelineStore {
 
   @Test
   public void testGetApplicationReport() throws Exception {
-    for (int i = 1; i <= 2; ++i) {
+    for (int i = 1; i <= 3; ++i) {
       final ApplicationId appId = ApplicationId.newInstance(0, i);
       ApplicationReport app;
       if (callerUGI == null) {
@@ -179,15 +186,26 @@ public class TestApplicationHistoryManagerOnTimelineStore {
       Assert.assertEquals("test app", app.getName());
       Assert.assertEquals("test app type", app.getApplicationType());
       Assert.assertEquals("user1", app.getUser());
-      Assert.assertEquals("test queue", app.getQueue());
+      if (i == 2) {
+        // Change event is fired only in case of app with ID 2, hence verify
+        // with updated changes. And make sure last updated change is accepted.
+        Assert.assertEquals("changed queue1", app.getQueue());
+        Assert.assertEquals(Priority.newInstance(6), app.getPriority());
+      } else {
+        Assert.assertEquals("test queue", app.getQueue());
+        Assert.assertEquals(Priority.newInstance(0), app.getPriority());
+      }
       Assert.assertEquals(Integer.MAX_VALUE + 2L
           + app.getApplicationId().getId(), app.getStartTime());
       Assert.assertEquals(Integer.MAX_VALUE + 3L
           + +app.getApplicationId().getId(), app.getFinishTime());
       Assert.assertTrue(Math.abs(app.getProgress() - 1.0F) < 0.0001);
+      Assert.assertEquals(2, app.getApplicationTags().size());
+      Assert.assertTrue(app.getApplicationTags().contains("Test_APP_TAGS_1"));
+      Assert.assertTrue(app.getApplicationTags().contains("Test_APP_TAGS_2"));
       // App 2 doesn't have the ACLs, such that the default ACLs " " will be used.
       // Nobody except admin and owner has access to the details of the app.
-      if ((i ==  1 && callerUGI != null &&
+      if ((i != 2 && callerUGI != null &&
           callerUGI.getShortUserName().equals("user3")) ||
           (i ==  2 && callerUGI != null &&
           (callerUGI.getShortUserName().equals("user2") ||
@@ -216,8 +234,26 @@ public class TestApplicationHistoryManagerOnTimelineStore {
           app.getApplicationResourceUsageReport();
       Assert.assertEquals(123,
           applicationResourceUsageReport.getMemorySeconds());
-      Assert.assertEquals(345, applicationResourceUsageReport.getVcoreSeconds());
-      Assert.assertEquals(345, applicationResourceUsageReport.getGPUSeconds());
+      Assert
+          .assertEquals(345, applicationResourceUsageReport.getVcoreSeconds());
+      Assert
+          .assertEquals(345, applicationResourceUsageReport.getGPUSeconds());
+      long expectedPreemptMemSecs = 456;
+      long expectedPreemptVcoreSecs = 789;
+      long expectedPreemptGPUSecs = 789;
+      if (i == 3) {
+        expectedPreemptMemSecs = 0;
+        expectedPreemptVcoreSecs = 0;
+        expectedPreemptGPUSecs = 0;
+      }
+      Assert.assertEquals(expectedPreemptMemSecs,
+          applicationResourceUsageReport.getPreemptedMemorySeconds());
+      Assert
+          .assertEquals(expectedPreemptVcoreSecs, applicationResourceUsageReport
+              .getPreemptedVcoreSeconds());
+      Assert
+          .assertEquals(expectedPreemptGPUSecs, applicationResourceUsageReport
+              .getPreemptedGPUSeconds());
       Assert.assertEquals(FinalApplicationStatus.UNDEFINED,
           app.getFinalApplicationStatus());
       Assert.assertEquals(YarnApplicationState.FINISHED,
@@ -337,13 +373,21 @@ public class TestApplicationHistoryManagerOnTimelineStore {
   @Test
   public void testGetApplications() throws Exception {
     Collection<ApplicationReport> apps =
-        historyManager.getApplications(Long.MAX_VALUE).values();
+        historyManager.getApplications(Long.MAX_VALUE, 0L, Long.MAX_VALUE)
+          .values();
     Assert.assertNotNull(apps);
     Assert.assertEquals(SCALE + 1, apps.size());
     ApplicationId ignoredAppId = ApplicationId.newInstance(0, SCALE + 2);
     for (ApplicationReport app : apps) {
       Assert.assertNotEquals(ignoredAppId, app.getApplicationId());
     }
+
+    // Get apps by given appStartedTime period
+    apps =
+        historyManager.getApplications(Long.MAX_VALUE, 2147483653L,
+          Long.MAX_VALUE).values();
+    Assert.assertNotNull(apps);
+    Assert.assertEquals(2, apps.size());
   }
 
   @Test
@@ -444,7 +488,15 @@ public class TestApplicationHistoryManagerOnTimelineStore {
 
   private static TimelineEntity createApplicationTimelineEntity(
       ApplicationId appId, boolean emptyACLs, boolean noAttemptId,
-      boolean wrongAppId) {
+      boolean wrongAppId, boolean enableUpdateEvent) {
+    return createApplicationTimelineEntity(appId, emptyACLs, noAttemptId,
+        wrongAppId, enableUpdateEvent, false);
+  }
+
+  private static TimelineEntity createApplicationTimelineEntity(
+      ApplicationId appId, boolean emptyACLs, boolean noAttemptId,
+      boolean wrongAppId, boolean enableUpdateEvent,
+      boolean missingPreemptMetrics) {
     TimelineEntity entity = new TimelineEntity();
     entity.setEntityType(ApplicationMetricsConstants.ENTITY_TYPE);
     if (wrongAppId) {
@@ -461,17 +513,30 @@ public class TestApplicationHistoryManagerOnTimelineStore {
         "test app type");
     entityInfo.put(ApplicationMetricsConstants.USER_ENTITY_INFO, "user1");
     entityInfo.put(ApplicationMetricsConstants.QUEUE_ENTITY_INFO, "test queue");
+    entityInfo.put(
+        ApplicationMetricsConstants.UNMANAGED_APPLICATION_ENTITY_INFO, "false");
+    entityInfo.put(ApplicationMetricsConstants.APPLICATION_PRIORITY_INFO,
+        Priority.newInstance(0));
     entityInfo.put(ApplicationMetricsConstants.SUBMITTED_TIME_ENTITY_INFO,
         Integer.MAX_VALUE + 1L);
-    entityInfo.put(ApplicationMetricsConstants.APP_MEM_METRICS,123);
-    entityInfo.put(ApplicationMetricsConstants.APP_CPU_METRICS,345);
+    entityInfo.put(ApplicationMetricsConstants.APP_MEM_METRICS, 123);
+    entityInfo.put(ApplicationMetricsConstants.APP_CPU_METRICS, 345);
     entityInfo.put(ApplicationMetricsConstants.APP_GPU_METRICS,345);
+    if (!missingPreemptMetrics) {
+      entityInfo.put(ApplicationMetricsConstants.APP_MEM_PREEMPT_METRICS, 456);
+      entityInfo.put(ApplicationMetricsConstants.APP_CPU_PREEMPT_METRICS, 789);
+      entityInfo.put(ApplicationMetricsConstants.APP_GPU_PREEMPT_METRICS, 789);
+    }
     if (emptyACLs) {
       entityInfo.put(ApplicationMetricsConstants.APP_VIEW_ACLS_ENTITY_INFO, "");
     } else {
       entityInfo.put(ApplicationMetricsConstants.APP_VIEW_ACLS_ENTITY_INFO,
           "user2");
     }
+    Set<String> appTags = new HashSet<String>();
+    appTags.add("Test_APP_TAGS_1");
+    appTags.add("Test_APP_TAGS_2");
+    entityInfo.put(ApplicationMetricsConstants.APP_TAGS_INFO, appTags);
     entity.setOtherInfo(entityInfo);
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setEventType(ApplicationMetricsConstants.CREATED_EVENT_TYPE);
@@ -494,7 +559,46 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     }
     tEvent.setEventInfo(eventInfo);
     entity.addEvent(tEvent);
+    // send a YARN_APPLICATION_STATE_UPDATED event
+    // after YARN_APPLICATION_FINISHED
+    // The final YarnApplicationState should not be changed
+    tEvent = new TimelineEvent();
+    tEvent.setEventType(
+        ApplicationMetricsConstants.STATE_UPDATED_EVENT_TYPE);
+    tEvent.setTimestamp(Integer.MAX_VALUE + 4L + appId.getId());
+    eventInfo = new HashMap<String, Object>();
+    eventInfo.put(ApplicationMetricsConstants.STATE_EVENT_INFO,
+        YarnApplicationState.KILLED);
+    tEvent.setEventInfo(eventInfo);
+    entity.addEvent(tEvent);
+    if (enableUpdateEvent) {
+      tEvent = new TimelineEvent();
+      long updatedTimeIndex = 4L;
+      createAppModifiedEvent(appId, tEvent, updatedTimeIndex++, "changed queue",
+          5);
+      entity.addEvent(tEvent);
+      // Change priority alone
+      tEvent = new TimelineEvent();
+      createAppModifiedEvent(appId, tEvent, updatedTimeIndex++, "changed queue",
+          6);
+      // Now change queue
+      tEvent = new TimelineEvent();
+      createAppModifiedEvent(appId, tEvent, updatedTimeIndex++,
+          "changed queue1", 6);
+      entity.addEvent(tEvent);
+    }
     return entity;
+  }
+
+  private static void createAppModifiedEvent(ApplicationId appId,
+      TimelineEvent tEvent, long updatedTimeIndex, String queue, int priority) {
+    tEvent.setEventType(ApplicationMetricsConstants.UPDATED_EVENT_TYPE);
+    tEvent.setTimestamp(Integer.MAX_VALUE + updatedTimeIndex + appId.getId());
+    Map<String, Object> eventInfo = new HashMap<String, Object>();
+    eventInfo.put(ApplicationMetricsConstants.QUEUE_ENTITY_INFO, queue);
+    eventInfo.put(ApplicationMetricsConstants.APPLICATION_PRIORITY_INFO,
+        priority);
+    tEvent.setEventInfo(eventInfo);
   }
 
   private static TimelineEntity createAppAttemptTimelineEntity(

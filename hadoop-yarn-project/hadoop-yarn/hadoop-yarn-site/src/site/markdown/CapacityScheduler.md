@@ -22,7 +22,9 @@ Hadoop: Capacity Scheduler
     * [Setting up `ResourceManager` to use `CapacityScheduler`](#Setting_up_ResourceManager_to_use_CapacityScheduler`)
     * [Setting up queues](#Setting_up_queues)
     * [Queue Properties](#Queue_Properties)
+    * [Setup for application priority](#Setup_for_application_priority.)
     * [Capacity Scheduler container preemption](#Capacity_Scheduler_container_preemption)
+    * [Configuring `ReservationSystem` with `CapacityScheduler`](#Configuring_ReservationSystem_with_CapacityScheduler)
     * [Other Properties](#Other_Properties)
     * [Reviewing the configuration of the CapacityScheduler](#Reviewing_the_configuration_of_the_CapacityScheduler)
 * [Changing Queue Configuration](#Changing_Queue_Configuration)
@@ -37,7 +39,7 @@ Overview
 
 The `CapacityScheduler` is designed to run Hadoop applications as a shared, multi-tenant cluster in an operator-friendly manner while maximizing the throughput and the utilization of the cluster.
 
-Traditionally each organization has it own private set of compute resources that have sufficient capacity to meet the organization's SLA under peak or near peak conditions. This generally leads to poor average utilization and overhead of managing multiple independent clusters, one per each organization. Sharing clusters between organizations is a cost-effective manner of running large Hadoop installations since this allows them to reap benefits of economies of scale without creating private clusters. However, organizations are concerned about sharing a cluster because they are worried about others using the resources that are critical for their SLAs.
+Traditionally each organization has it own private set of compute resources that have sufficient capacity to meet the organization's SLA under peak or near-peak conditions. This generally leads to poor average utilization and overhead of managing multiple independent clusters, one per each organization. Sharing clusters between organizations is a cost-effective manner of running large Hadoop installations since this allows them to reap benefits of economies of scale without creating private clusters. However, organizations are concerned about sharing a cluster because they are worried about others using the resources that are critical for their SLAs.
 
 The `CapacityScheduler` is designed to allow sharing a large cluster while giving each organization capacity guarantees. The central idea is that the available resources in the Hadoop cluster are shared among multiple organizations who collectively fund the cluster based on their computing needs. There is an added benefit that an organization can access any excess capacity not being used by others. This provides elasticity for the organizations in a cost-effective manner.
 
@@ -71,6 +73,8 @@ The `CapacityScheduler` supports the following features:
 * **Resource-based Scheduling** - Support for resource-intensive applications, where-in a application can optionally specify higher resource-requirements than the default, there-by accommodating applications with differing resource requirements. Currently, *memory* is the resource requirement supported.
 
 * **Queue Mapping based on User or Group** - This feature allows users to map a job to a specific queue based on the user or group.
+
+* **Priority Scheduling** - This feature allows applications to be submitted and scheduled with different priorities. Higher integer value indicates higher priority for an application. Currently Application priority is supported only for FIFO ordering policy.
 
 Configuration
 -------------
@@ -178,6 +182,27 @@ Example:
  </property>
 ```
 
+###Setup for application priority.
+
+  Application priority works only along with FIFO ordering policy. Default ordering policy is FIFO.
+
+  Default priority for an application can be at cluster level and queue level.
+
+  * Cluster-level priority : Any application submitted with a priority greater than the cluster-max priority will have its priority reset to the cluster-max priority.
+          $HADOOP_HOME/etc/hadoop/yarn-site.xml is the configuration file for cluster-max priority.
+
+| Property | Description |
+|:---- |:---- |
+| `yarn.cluster.max-application-priority` | Defines maximum application priority in a cluster. |
+
+  * Leaf Queue-level priority : Each leaf queue provides default priority by the administrator. The queue's default priority will be used for any application submitted without a specified priority.
+         $HADOOP_HOME/etc/hadoop/capacity-scheduler.xml is the configuration file for queue-level priority.
+
+| Property | Description |
+|:---- |:---- |
+| `yarn.scheduler.capacity.root.<leaf-queue-path>.default-application-priority` | Defines default application priority in a leaf queue. |
+
+**Note:** Priority of an application will not be changed when application is moved to different queue.
 
 ### Capacity Scheduler container preemption
 
@@ -205,6 +230,44 @@ The following configuration parameters can be configured in yarn-site.xml to con
 |:---- |:---- |
 | `yarn.scheduler.capacity.<queue-path>.disable_preemption` | This configuration can be set to `true` to selectively disable preemption of application containers submitted to a given queue. This property applies only when system wide preemption is enabled by configuring `yarn.resourcemanager.scheduler.monitor.enable` to *true* and `yarn.resourcemanager.scheduler.monitor.policies` to *ProportionalCapacityPreemptionPolicy*. If this property is not set for a queue, then the property value is inherited from the queue's parent. Default value is false.
 
+###Reservation Properties
+
+  * Reservation Administration & Permissions
+
+  The `CapacityScheduler` supports the following parameters to control the creation, deletion, update, and listing of reservations. Note that any user can update, delete, or list their own reservations. If reservation ACLs are enabled but not defined, everyone will have access. In the examples below, \<queue\> is the queue name. For example, to set the reservation ACL to administer reservations on the default queue, use the property `yarn.scheduler.capacity.root.default.acl_administer_reservations`
+
+| Property | Description |
+|:---- |:---- |
+| `yarn.scheduler.capacity.root.<queue>.acl_administer_reservations` | The ACL which controls who can *administer* reservations to the given queue. If the given user/group has necessary ACLs on the given queue or they can submit, delete, update and list all reservations. ACLs for this property *are not* inherited from the parent queue if not specified. |
+| `yarn.scheduler.capacity.root.<queue>.acl_list_reservations` | The ACL which controls who can *list* reservations to the given queue. If the given user/group has necessary ACLs on the given queue they can list all applications. ACLs for this property *are not* inherited from the parent queue if not specified. |
+| `yarn.scheduler.capacity.root.<queue>.acl_submit_reservations` | The ACL which controls who can *submit* reservations to the given queue. If the given user/group has necessary ACLs on the given queue they can submit reservations. ACLs for this property *are not* inherited from the parent queue if not specified. |
+
+### Configuring `ReservationSystem` with `CapacityScheduler`
+
+ The `CapacityScheduler` supports the **ReservationSystem** which allows users to reserve resources ahead of time. The application can request the reserved resources at runtime by specifying the `reservationId` during submission. The following configuration parameters can be configured in yarn-site.xml for `ReservationSystem`.
+
+| Property | Description |
+|:---- |:---- |
+| `yarn.resourcemanager.reservation-system.enable` | *Mandatory* parameter: to enable the `ReservationSystem` in the **ResourceManager**. Boolean value expected. The default value is *false*, i.e. `ReservationSystem` is not enabled by default. |
+| `yarn.resourcemanager.reservation-system.class` | *Optional* parameter: the class name of the `ReservationSystem`. The default value is picked based on the configured Scheduler, i.e. if `CapacityScheduler` is configured, then it is `CapacityReservationSystem`. |
+| `yarn.resourcemanager.reservation-system.plan.follower` | *Optional* parameter: the class name of the `PlanFollower` that runs on a timer, and synchronizes the `CapacityScheduler` with the `Plan` and viceversa. The default value is picked based on the configured Scheduler, i.e. if `CapacityScheduler` is configured, then it is `CapacitySchedulerPlanFollower`. |
+| `yarn.resourcemanager.reservation-system.planfollower.time-step` | *Optional* parameter: the frequency in milliseconds of the `PlanFollower` timer. Long value expected. The default value is *1000*. |
+
+
+The `ReservationSystem` is integrated with the `CapacityScheduler` queue hierachy and can be configured for any **LeafQueue** currently. The `CapacityScheduler` supports the following parameters to tune the `ReservationSystem`:
+
+| Property | Description |
+|:---- |:---- |
+| `yarn.scheduler.capacity.<queue-path>.reservable` | *Mandatory* parameter: indicates to the `ReservationSystem` that the queue's resources is available for users to reserve. Boolean value expected. The default value is *false*, i.e. reservations are not enabled in *LeafQueues* by default. |
+| `yarn.scheduler.capacity.<queue-path>.reservation-agent` | *Optional* parameter: the class name that will be used to determine the implementation of the `ReservationAgent`  which will attempt to place the user's reservation request in the `Plan`. The default value is *org.apache.hadoop.yarn.server.resourcemanager.reservation.planning.AlignedPlannerWithGreedy*. |
+| `yarn.scheduler.capacity.<queue-path>.reservation-move-on-expiry` | *Optional* parameter to specify to the `ReservationSystem` whether the applications should be moved or killed to the parent reservable queue (configured above) when the associated reservation expires. Boolean value expected. The default value is *true* indicating that the application will be moved to the reservable queue. |
+| `yarn.scheduler.capacity.<queue-path>.show-reservations-as-queues` | *Optional* parameter to show or hide the reservation queues in the Scheduler UI. Boolean value expected. The default value is *false*, i.e. reservation queues will be hidden. |
+| `yarn.scheduler.capacity.<queue-path>.reservation-policy` | *Optional* parameter: the class name that will be used to determine the implementation of the `SharingPolicy`  which will validate if the new reservation doesn't violate any invariants.. The default value is *org.apache.hadoop.yarn.server.resourcemanager.reservation.CapacityOverTimePolicy*. |
+| `yarn.scheduler.capacity.<queue-path>.reservation-window` | *Optional* parameter representing the time in milliseconds for which the `SharingPolicy` will validate if the constraints in the Plan are satisfied. Long value expected. The default value is one day. |
+| `yarn.scheduler.capacity.<queue-path>.instantaneous-max-capacity` | *Optional* parameter: maximum capacity at any time in percentage (%) as a float that the `SharingPolicy` allows a single user to reserve. The default value is 1, i.e. 100%. |
+| `yarn.scheduler.capacity.<queue-path>.average-capacity` | *Optional* parameter: the average allowed capacity which will aggregated over the *ReservationWindow* in percentage (%) as a float that the `SharingPolicy` allows a single user to reserve. The default value is 1, i.e. 100%. |
+| `yarn.scheduler.capacity.<queue-path>.reservation-planner` | *Optional* parameter: the class name that will be used to determine the implementation of the *Planner*  which will be invoked if the `Plan` capacity fall below (due to scheduled maintenance or node failuers) the user reserved resources. The default value is *org.apache.hadoop.yarn.server.resourcemanager.reservation.planning.SimpleCapacityReplanner* which scans the `Plan` and greedily removes reservations in reversed order of acceptance (LIFO) till the reserved resources are within the `Plan` capacity |
+| `yarn.scheduler.capacity.<queue-path>.reservation-enforcement-window` | *Optional* parameter representing the time in milliseconds for which the `Planner` will validate if the constraints in the Plan are satisfied. Long value expected. The default value is one hour. |
 
 ###Other Properties
 
@@ -212,7 +275,7 @@ The following configuration parameters can be configured in yarn-site.xml to con
 
 | Property | Description |
 |:---- |:---- |
-| `yarn.scheduler.capacity.resource-calculator` | The ResourceCalculator implementation to be used to compare Resources in the scheduler. The default i.e. org.apache.hadoop.yarn.util.resource.DefaultResourseCalculator only uses Memory while DominantResourceCalculator uses Dominant-resource to compare multi-dimensional resources such as Memory, CPU etc. A Java ResourceCalculator class name is expected. |
+| `yarn.scheduler.capacity.resource-calculator` | The ResourceCalculator implementation to be used to compare Resources in the scheduler. The default i.e. org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator only uses Memory while DominantResourceCalculator uses Dominant-resource to compare multi-dimensional resources such as Memory, CPU etc. A Java ResourceCalculator class name is expected. |
 
   * Data Locality
 

@@ -50,6 +50,8 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.concurrent.HadoopThreadPoolExecutor;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersResponse;
@@ -57,6 +59,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.StopContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersResponse;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
+import org.apache.hadoop.yarn.api.records.SignalContainerCommand;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy.ContainerManagementProtocolProxyData;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
@@ -126,7 +129,11 @@ public class ContainerLauncherImpl extends AbstractService implements
     public synchronized boolean isCompletelyDone() {
       return state == ContainerState.DONE || state == ContainerState.FAILED;
     }
-    
+
+    public synchronized void done() {
+      state = ContainerState.DONE;
+    }
+
     @SuppressWarnings("unchecked")
     public synchronized void launch(ContainerRemoteLaunchEvent event) {
       LOG.info("Launching " + taskAttemptID);
@@ -199,6 +206,11 @@ public class ContainerLauncherImpl extends AbstractService implements
         }
       }
     }
+
+    public void kill() {
+      kill(false);
+    }
+
   
     private void setupCryptoMaterial(StartContainersRequest request, String user)
         throws IOException {
@@ -213,7 +225,7 @@ public class ContainerLauncherImpl extends AbstractService implements
     }
     
     @SuppressWarnings("unchecked")
-    public synchronized void kill() {
+    public synchronized void kill(boolean dumpThreads) {
 
       if(this.state == ContainerState.PREP) {
         this.state = ContainerState.KILLED_BEFORE_LAUNCH;
@@ -223,6 +235,13 @@ public class ContainerLauncherImpl extends AbstractService implements
         ContainerManagementProtocolProxyData proxy = null;
         try {
           proxy = getCMProxy(this.containerMgrAddress, this.containerID);
+
+          if (dumpThreads) {
+            final SignalContainerRequest request = SignalContainerRequest
+                .newInstance(containerID,
+                    SignalContainerCommand.OUTPUT_THREAD_DUMP);
+            proxy.getContainerManagementProtocol().signalToContainer(request);
+          }
 
           // kill the remote container if already launched
           List<ContainerId> ids = new ArrayList<ContainerId>();
@@ -401,8 +420,13 @@ public class ContainerLauncherImpl extends AbstractService implements
         break;
 
       case CONTAINER_REMOTE_CLEANUP:
-        c.kill();
+        c.kill(event.getDumpContainerThreads());
         break;
+
+      case CONTAINER_COMPLETED:
+        c.done();
+        break;
+
       }
       removeContainerIfDone(containerID);
     }

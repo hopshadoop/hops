@@ -31,7 +31,13 @@ ResourceManager REST API's.
 * [Cluster Applications API(Submit Application)](#Cluster_Applications_APISubmit_Application)
 * [Cluster Application State API](#Cluster_Application_State_API)
 * [Cluster Application Queue API](#Cluster_Application_Queue_API)
+* [Cluster Application Priority API](#Cluster_Application_Priority_API)
 * [Cluster Delegation Tokens API](#Cluster_Delegation_Tokens_API)
+* [Cluster Reservation API List](#Cluster_Reservation_API_List)
+* [Cluster Reservation API Create](#Cluster_Reservation_API_Create)
+* [Cluster Reservation API Submit](#Cluster_Reservation_API_Submit)
+* [Cluster Reservation API Update](#Cluster_Reservation_API_Update)
+* [Cluster Reservation API Delete](#Cluster_Reservation_API_Delete)
 
 Overview
 --------
@@ -286,7 +292,7 @@ Response Body:
 Cluster Scheduler API
 ---------------------
 
-A scheduler resource contains information about the current scheduler configured in a cluster. It currently supports both the Fifo and Capacity Scheduler. You will get different information depending on which scheduler is configured so be sure to look at the type information.
+A scheduler resource contains information about the current scheduler configured in a cluster. It currently supports the Fifo, Capacity and Fair Scheduler. You will get different information depending on which scheduler is configured so be sure to look at the type information.
 
 ### URI
 
@@ -329,10 +335,10 @@ The capacity scheduler supports hierarchical queues. This one request will print
 | usedResources | string | A string describing the current resources used by the queue |
 | queueName | string | The name of the queue |
 | state | string of QueueState | The state of the queue |
-| queues | array of queues(JSON)/zero or more queue objects(XML) | A collection of sub-queue information |
+| queues | array of queues(JSON)/zero or more queue objects(XML) | A collection of sub-queue information. Omitted if the queue has no sub-queues. |
 | resourcesUsed | A single resource object | The total amount of resources used by this queue |
 
-### Elements of the queues object for a Leaf queue - contains all elements in parent plus the following:
+### Elements of the queues object for a Leaf queue - contains all the elements in parent except 'queues' plus the following:
 
 | Item | Data Type | Description |
 |:---- |:---- |:---- |
@@ -992,6 +998,318 @@ Response Body:
 </scheduler>
 ```
 
+### Fair Scheduler API
+
+### Elements of the *schedulerInfo* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| type | string | Scheduler type - fairScheduler |
+| rootQueue | The root queue object | A collection of root queue resources |
+
+### Elements of the root queue object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| maxApps | int | The maximum number of applications the queue can have |
+| minResources | A single resource object | The configured minimum resources that are guaranteed to the queue |
+| maxResources | A single resource object | The configured maximum resources that are allowed to the queue |
+| usedResources | A single resource object | The sum of resources allocated to containers within the queue |
+| fairResources | A single resource object | The queue's fair share of resources |
+| clusterResources | A single resource object | The capacity of the cluster |
+| queueName | string | The name of the queue |
+| schedulingPolicy | string | The name of the scheduling policy used by the queue |
+| childQueues | array of queues(JSON)/queue objects(XML) | A collection of sub-queue information. Omitted if the queue has no childQueues. |
+
+### Elements of the queues object for a Leaf queue - contains all the elements in parent except 'childQueues' plus the following
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| type | string | type of the queue - fairSchedulerLeafQueueInfo |
+| numActiveApps | int | The number of active applications in this queue |
+| numPendingApps | int | The number of pending applications in this queue |
+
+### Elements of the resource object for resourcesUsed in queues
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| memory | int | The amount of memory used (in MB) |
+| vCores | int | The number of virtual cores |
+
+#### Response Examples
+
+**JSON response**
+
+HTTP Request:
+
+      GET http://<rm http address:port>/ws/v1/cluster/scheduler
+
+Response Header:
+
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Transfer-Encoding: chunked
+      Server: Jetty(6.1.26)
+
+Response Body:
+
+```json
+{
+    "scheduler": {
+        "schedulerInfo": {
+            "rootQueue": {
+                "childQueues": {
+                    "queue": [
+                        {
+                            "clusterResources": {
+                                "memory": 8192,
+                                "vCores": 8
+                            },
+                            "fairResources": {
+                                "memory": 0,
+                                "vCores": 0
+                            },
+                            "maxApps": 2147483647,
+                            "maxResources": {
+                                "memory": 8192,
+                                "vCores": 8
+                            },
+                            "minResources": {
+                                "memory": 0,
+                                "vCores": 0
+                            },
+                            "numActiveApps": 0,
+                            "numPendingApps": 0,
+                            "queueName": "root.default",
+                            "schedulingPolicy": "fair",
+                            "type": "fairSchedulerLeafQueueInfo",
+                            "usedResources": {
+                                "memory": 0,
+                                "vCores": 0
+                            }
+                        },
+                        {
+                            "childQueues": {
+                                "queue": [
+                                    {
+                                        "clusterResources": {
+                                            "memory": 8192,
+                                           "vCores": 8
+                                        },
+                                        "fairResources": {
+                                            "memory": 10000,
+                                            "vCores": 0
+                                        },
+                                        "maxApps": 2147483647,
+                                        "maxResources": {
+                                            "memory": 8192,
+                                            "vCores": 8
+                                        },
+                                        "minResources": {
+                                            "memory": 5000,
+                                            "vCores": 0
+                                        },
+                                        "numActiveApps": 0,
+                                        "numPendingApps": 0,
+                                        "queueName": "root.sample_queue.sample_sub_queue",
+                                        "schedulingPolicy": "fair",
+                                        "type": "fairSchedulerLeafQueueInfo",
+                                        "usedResources": {
+                                            "memory": 0,
+                                            "vCores": 0
+                                        }
+                                    }
+                                ]
+                            },
+                            "clusterResources": {
+                                "memory": 8192,
+                                "vCores": 8
+                            },
+                            "fairResources": {
+                                "memory": 10000,
+                                "vCores": 0
+                            },
+                            "maxApps": 50,
+                            "maxResources": {
+                                "memory": 8192,
+                                "vCores": 0
+                            },
+                            "minResources": {
+                                "memory": 10000,
+                                "vCores": 0
+                            },
+                            "queueName": "root.sample_queue",
+                            "schedulingPolicy": "fair",
+                            "usedResources": {
+                                "memory": 0,
+                                "vCores": 0
+                            }
+                        }
+                    ],
+                },
+                "clusterResources": {
+                    "memory": 8192,
+                    "vCores": 8
+                },
+                "fairResources": {
+                    "memory": 8192,
+                    "vCores": 8
+                },
+                "maxApps": 2147483647,
+                "maxResources": {
+                    "memory": 8192,
+                    "vCores": 8
+                },
+                "minResources": {
+                    "memory": 0,
+                    "vCores": 0
+                },
+                "queueName": "root",
+                "schedulingPolicy": "fair",
+                "usedResources": {
+                    "memory": 0,
+                    "vCores": 0
+                }
+            },
+            "type": "fairScheduler"
+        }
+    }
+}
+```
+
+**XML response**
+
+HTTP Request:
+
+      GET http://<rm http address:port>/ws/v1/cluster/scheduler
+      Accept: application/xml
+
+Response Header:
+
+      HTTP/1.1 200 OK
+      Content-Type: application/xml
+      Content-Length: 2321 
+      Server: Jetty(6.1.26)
+
+Response Body:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<scheduler>
+  <schedulerInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="fairScheduler">
+    <rootQueue>
+      <maxApps>2147483647</maxApps>
+      <minResources>
+        <memory>0</memory>
+        <vCores>0</vCores>
+      </minResources>
+      <maxResources>
+        <memory>8192</memory>
+        <vCores>8</vCores>
+      </maxResources>
+      <usedResources>
+        <memory>0</memory>
+        <vCores>0</vCores>
+      </usedResources>
+      <fairResources>
+        <memory>8192</memory>
+        <vCores>8</vCores>
+      </fairResources>
+      <clusterResources>
+        <memory>8192</memory>
+        <vCores>8</vCores>
+      </clusterResources>
+      <queueName>root</queueName>
+      <schedulingPolicy>fair</schedulingPolicy>
+      <childQueues>
+        <queue xsi:type="fairSchedulerLeafQueueInfo">
+          <maxApps>2147483647</maxApps>
+          <minResources>
+            <memory>0</memory>
+            <vCores>0</vCores>
+          </minResources>
+          <maxResources>
+            <memory>8192</memory>
+            <vCores>8</vCores>
+          </maxResources>
+          <usedResources>
+            <memory>0</memory>
+            <vCores>0</vCores>
+          </usedResources>
+          <fairResources>
+            <memory>0</memory>
+            <vCores>0</vCores>
+          </fairResources>
+          <clusterResources>
+            <memory>8192</memory>
+            <vCores>8</vCores>
+          </clusterResources>
+          <queueName>root.default</queueName>
+          <schedulingPolicy>fair</schedulingPolicy>
+          <numPendingApps>0</numPendingApps>
+          <numActiveApps>0</numActiveApps>
+        </queue>
+        <queue>
+          <maxApps>50</maxApps>
+          <minResources>
+            <memory>10000</memory>
+            <vCores>0</vCores>
+          </minResources>
+          <maxResources>
+            <memory>8192</memory>
+            <vCores>0</vCores>
+          </maxResources>
+          <usedResources>
+            <memory>0</memory>
+            <vCores>0</vCores>
+          </usedResources>
+          <fairResources>
+            <memory>10000</memory>
+            <vCores>0</vCores>
+          </fairResources>
+          <clusterResources>
+            <memory>8192</memory>
+            <vCores>8</vCores>
+          </clusterResources>
+          <queueName>root.sample_queue</queueName>
+          <schedulingPolicy>fair</schedulingPolicy>
+          <childQueues>
+            <queue xsi:type="fairSchedulerLeafQueueInfo">
+              <maxApps>2147483647</maxApps>
+              <minResources>
+                <memory>5000</memory>
+                <vCores>0</vCores>
+              </minResources>
+              <maxResources>
+                <memory>8192</memory>
+                <vCores>8</vCores>
+              </maxResources>
+              <usedResources>
+                <memory>0</memory>
+                <vCores>0</vCores>
+              </usedResources>
+              <fairResources>
+                <memory>10000</memory>
+                <vCores>0</vCores>
+              </fairResources>
+              <clusterResources>
+                <memory>8192</memory>
+                <vCores>8</vCores>
+              </clusterResources>
+              <queueName>root.sample_queue.sample_sub_queue</queueName>
+              <schedulingPolicy>fair</schedulingPolicy>
+              <numPendingApps>0</numPendingApps>
+              <numActiveApps>0</numActiveApps>
+            </queue>
+          </childQueues>
+        </queue>
+      </childQueues>
+    </rootQueue>
+  </schedulerInfo>
+</scheduler>
+```
+
+
 Cluster Applications API
 ------------------------
 
@@ -1063,6 +1381,7 @@ Response Body:
           "clusterId" : 1326815542473,
           "finalStatus" : "SUCCEEDED",
           "amHostHttpAddress" : "host.domain.com:8042",
+          "amRPCAddress" : "host.domain.com:4201",
           "progress" : 100,
           "name" : "word count",
           "startedTime" : 1326815573334,
@@ -1073,8 +1392,14 @@ Response Body:
           "allocatedMB" : 0,
           "allocatedVCores" : 0,
           "runningContainers" : 0,
+	  "applicationType" : "MAPREDUCE",
+	  "applicationTags" : "",
           "memorySeconds" : 151730,
-          "vcoreSeconds" : 103
+          "vcoreSeconds" : 103,
+          "unmanagedApplication" : "false",
+          "applicationPriority" : 0,
+          "appNodeLabelExpression" : "",
+          "amnodeLabelExpression" : ""
        },
        {
           "finishedTime" : 1326815789546,
@@ -1086,6 +1411,7 @@ Response Body:
           "clusterId" : 1326815542473,
           "finalStatus" : "SUCCEEDED",
           "amHostHttpAddress" : "host.domain.com:8042",
+          "amRPCAddress" : "host.domain.com:4202",
           "progress" : 100,
           "name" : "Sleep job",
           "startedTime" : 1326815641380,
@@ -1096,9 +1422,15 @@ Response Body:
           "allocatedMB" : 0,
           "allocatedVCores" : 0,
           "runningContainers" : 1,
+	  "applicationType" : "YARN",
+	  "applicationTags" : "tag1",
           "memorySeconds" : 640064,
-          "vcoreSeconds" : 442
-       } 
+          "vcoreSeconds" : 442,
+          "unmanagedApplication" : "false",
+          "applicationPriority" : 0,
+          "appNodeLabelExpression" : "",
+          "amNodeLabelExpression" : ""
+       }
     ]
   }
 }
@@ -1128,6 +1460,7 @@ Response Body:
     <user>user1</user>
     <name>word count</name>
     <applicationType>MAPREDUCE</applicationType>
+    <applicationTags></applicationTags>
     <queue>default</queue>
     <state>FINISHED</state>
     <finalStatus>SUCCEEDED</finalStatus>
@@ -1141,17 +1474,23 @@ Response Body:
     <elapsedTime>25196</elapsedTime>
     <amContainerLogs>http://host.domain.com:8042/node/containerlogs/container_1326815542473_0001_01_000001</amContainerLogs>
     <amHostHttpAddress>host.domain.com:8042</amHostHttpAddress>
+    <amRPCAddress>host.domain.com:4201</amRPCAddress>
     <allocatedMB>0</allocatedMB>
     <allocatedVCores>0</allocatedVCores>
     <runningContainers>0</runningContainers>
     <memorySeconds>151730</memorySeconds>
     <vcoreSeconds>103</vcoreSeconds>
+    <unmanagedApplication>false</unmanagedApplication>
+    <applicationPriority>0</applicationPriority>
+    <appNodeLabelExpression></appNodeLabelExpression>
+    <amNodeLabelExpression></amNodeLabelExpression>
   </app>
   <app>
     <id>application_1326815542473_0002</id>
     <user>user1</user>
     <name>Sleep job</name>
     <applicationType>YARN</applicationType>
+    <applicationTags>tag1</applicationTags>
     <queue>default</queue>
     <state>FINISHED</state>
     <finalStatus>SUCCEEDED</finalStatus>
@@ -1165,11 +1504,16 @@ Response Body:
     <elapsedTime>148166</elapsedTime>
     <amContainerLogs>http://host.domain.com:8042/node/containerlogs/container_1326815542473_0002_01_000001</amContainerLogs>
     <amHostHttpAddress>host.domain.com:8042</amHostHttpAddress>
+    <amRPCAddress>host.domain.com:4202</amRPCAddress>
     <allocatedMB>0</allocatedMB>
     <allocatedVCores>0</allocatedVCores>
     <runningContainers>0</runningContainers>
     <memorySeconds>640064</memorySeconds>
     <vcoreSeconds>442</vcoreSeconds>
+    <unmanagedApplication>false</unmanagedApplication>
+    <applicationPriority>0</applicationPriority>
+    <appNodeLabelExpression></appNodeLabelExpression>
+    <amNodeLabelExpression></amNodeLabelExpression>
   </app>
 </apps>
 ```
@@ -1324,11 +1668,16 @@ Note that depending on security settings a user might not be able to see all the
 | elapsedTime | long | The elapsed time since the application started (in ms) |
 | amContainerLogs | string | The URL of the application master container logs |
 | amHostHttpAddress | string | The nodes http address of the application master |
+| amRPCAddress | string | The RPC address of the application master |
 | allocatedMB | int | The sum of memory in MB allocated to the application's running containers |
 | allocatedVCores | int | The sum of virtual cores allocated to the application's running containers |
 | runningContainers | int | The number of containers currently running for the application |
 | memorySeconds | long | The amount of memory the application has allocated (megabyte-seconds) |
 | vcoreSeconds | long | The amount of CPU resources the application has allocated (virtual core-seconds) |
+| unmanagedApplication | boolean | Is the application unmanaged. |
+| applicationPriority | int | priority of the submitted application |
+| appNodeLabelExpression | string | Node Label expression which is used to identify the nodes on which application's containers are expected to run by default.|
+| amNodeLabelExpression | string | Node Label expression which is used to identify the node on which application's  AM container is expected to run.|
 
 ### Response Examples
 
@@ -1359,6 +1708,7 @@ Response Body:
       "clusterId" : 1326821518301,
       "finalStatus" : "SUCCEEDED",
       "amHostHttpAddress" : "host.domain.com:8042",
+      "amRPCAddress" : "host.domain.com:4201",
       "progress" : 100,
       "name" : "Sleep job",
       "applicationType" : "Yarn",
@@ -1368,7 +1718,11 @@ Response Body:
       "trackingUrl" : "http://host.domain.com:8088/proxy/application_1326821518301_0005/jobhistory/job/job_1326821518301_5_5",
       "queue" : "a1",
       "memorySeconds" : 151730,
-      "vcoreSeconds" : 103
+      "vcoreSeconds" : 103,
+      "unmanagedApplication" : "false",
+      "applicationPriority" : 0,
+      "appNodeLabelExpression" : "",
+      "amNodeLabelExpression" : ""
    }
 }
 ```
@@ -1408,8 +1762,13 @@ Response Body:
   <elapsedTime>446748</elapsedTime>
   <amContainerLogs>http://host.domain.com:8042/node/containerlogs/container_1326821518301_0005_01_000001</amContainerLogs>
   <amHostHttpAddress>host.domain.com:8042</amHostHttpAddress>
+  <amRPCAddress>host.domain.com:4201</amRPCAddress>
   <memorySeconds>151730</memorySeconds>
   <vcoreSeconds>103</vcoreSeconds>
+  <unmanagedApplication>false</unmanagedApplication>
+  <applicationPriority>0</applicationPriority>
+  <appNodeLabelExpression></appNodeLabelExpression>
+  <amNodeLabelExpression></amNodeLabelExpression>
 </app>
 ```
 
@@ -2446,6 +2805,125 @@ Response Body:
       <queue>test</queue>
     </appqueue>
 
+Cluster Application Priority API
+-----------------------------
+
+With the application priority API, you can query the priority of a submitted app as well update priority of a running or accepted app using a PUT request specifying the target priority. To perform the PUT operation, authentication has to be setup for the RM web services. In addition, you must be authorized to update the app priority. Currently you can only update the app priority if you're using the Capacity scheduler.
+
+Please note that in order to update priority of an app, you must have an authentication filter setup for the HTTP interface. The functionality requires that a username is set in the HttpServletRequest. If no filter is setup, the response will be an "UNAUTHORIZED" response.
+
+This feature is currently in the alpha stage and may change in the future.
+
+### URI
+
+      * http://<rm http address:port>/ws/v1/cluster/apps/{appid}/priority
+
+### HTTP Operations Supported
+
+      * GET
+      * PUT
+
+### Query Parameters Supported
+
+      None
+
+### Elements of *apppriority* object
+
+When you make a request for the state of an app, the information returned has the following fields
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| priority | int | The application priority |
+
+### Response Examples
+
+**JSON responses**
+
+HTTP Request
+
+      GET http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/priority
+
+Response Header:
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+    Transfer-Encoding: chunked
+    Server: Jetty(6.1.26)
+
+Response Body:
+
+    {
+      "priority":0
+    }
+
+HTTP Request
+
+      PUT http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/priority
+
+Request Body:
+
+    {
+      "priority":8
+    }
+
+Response Header:
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+    Transfer-Encoding: chunked
+    Server: Jetty(6.1.26)
+
+Response Body:
+
+    {
+      "priority":8
+    }
+
+**XML responses**
+
+HTTP Request
+
+      GET http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/priority
+
+Response Header:
+
+    HTTP/1.1 200 OK
+    Content-Type: application/xml
+    Content-Length: 98
+    Server: Jetty(6.1.26)
+
+Response Body:
+
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <applicationpriority>
+      <priority>0</priority>
+    </applicationpriority>
+
+HTTP Request
+
+      PUT http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/priority
+
+Request Body:
+
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <applicationpriority>
+      <priority>8</priority>
+    </applicationpriority>
+
+Response Header:
+
+    HTTP/1.1 200 OK
+    Content-Type: application/xml
+    Content-Length: 95
+    Server: Jetty(6.1.26)
+
+Response Body:
+
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <applicationpriority>
+      <priority>8</priority>
+    </applicationpriority>
+
 Cluster Delegation Tokens API
 -----------------------------
 
@@ -2646,3 +3124,726 @@ Once setup, delegation tokens can be fetched using the web services listed above
       {
         "state":"KILLED"
       }
+
+Cluster Reservation API List
+----------------------------
+
+The Cluster Reservation API can be used to list reservations. When listing reservations the user must specify the constraints in terms of a queue, reservation-id, start time or end time. The user must also specify whether or not to include the full resource allocations of the reservations being listed. The resulting page returns a response containing information related to the reservation such as the acceptance time, the user, the resource allocations, the reservation-id, as well as the reservation definition.
+
+### URI
+
+    * http://<rm http address:port>/ws/v1/cluster/reservation/list
+
+### HTTP Operations Supported
+
+    * GET
+
+### Query Parameters Supported
+
+      * queue - the queue name containing the reservations to be listed. if not set, this value will default to "default".
+      * reservation-id - the reservation-id of the reservation which will be listed. If this parameter is present, start-time and end-time will be ignored.
+      * start-time - reservations that end after this start-time will be listed. If unspecified or invalid, this will default to 0.
+      * end-time - reservations that start after this end-time will be listed. If unspecified or invalid, this will default to Long.MaxValue.
+      * include-resource-allocations - true or false. If true, the resource allocations of the reservation will be included in the response. If false, no resource allocations will be included in the response. This will default to false.
+
+### Elements of the *ReservationListInfo* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| reservations | array of ReservationInfo(JSON) / zero or more ReservationInfo objects(XML) | The reservations that are listed with the given query |
+
+### Elements of the *reservations* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| acceptance-time | long | Time that the reservation was accepted |
+| resource-allocations | array of ResourceAllocationInfo(JSON) / zero or more ResourceAllocationInfo objects(XML) | Resource allocation information for the reservation |
+| reservation-id | A single ReservationId string | The unique reservation identifier |
+| reservation-definition | A single ReservationDefinition Object | A set of constraints representing the need for resources over time of a user |
+| user | string | User who made the reservation |
+
+### Elements of the *resource-allocations* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| resource | A single Resource object | The resources allocated for the reservation allocation |
+| startTime | long | Start time that the resource is allocated for |
+| endTime | long | End time that the resource is allocated for |
+
+### Elements of the  *resource* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| memory | int | The memory allocated for the reservation allocation |
+| vCores | int | The number of cores allocated for the reservation allocation |
+
+### Elements of the *reservation-definition* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| arrival | long | The UTC time representation of the earliest time this reservation can be allocated from. |
+| deadline | long | The UTC time representation of the latest time within which this reservation can be allocated. |
+| reservation-name | string | A mnemonic name of the reservation (not a valid identifier). |
+| reservation-requests | object | A list of "stages" or phases of this reservation, each describing resource requirements and duration |
+
+### Elements of the *reservation-requests* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| reservation-request-interpreter | int | A numeric choice of how to interpret the set of ReservationRequest: 0 is an ANY, 1 for ALL, 2 for ORDER, 3 for ORDER\_NO\_GAP |
+| reservation-request | object | The description of the resource and time capabilities for a phase/stage of this reservation |
+
+### Elements of the *reservation-request* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| duration | long | The duration of a ReservationRequest in milliseconds (amount of consecutive milliseconds a satisfiable allocation for this portion of the reservation should exist for). |
+| num-containers | int | The number of containers required in this phase of the reservation (capture the maximum parallelism of the job(s) in this phase). |
+| min-concurrency | int | The minimum number of containers that must be concurrently allocated to satisfy this allocation (capture min-parallelism, useful to express gang semantics). |
+| capability | object | Allows to specify the size of each container (memory, vCores).|
+
+### GET Response Examples
+
+Get requests can be used to list reservations to the ResourceManager. As mentioned above, information pertaining to the reservation is returned upon success (in the body of the answer). Successful list requests result in a 200 response. Please note that in order to submit a reservation, you must have an authentication filter setup for the HTTP interface. the functionality requires that the username is set in the HttpServletRequest. If no filter is setup, the response will be an "UNAUTHORIZED" response. Please note that this feature is currently in the alpha stage and may change in the future.
+
+**JSON response**
+
+This request return all active reservations within the start time 1455159355000 and 1475160036000. Since include-resource-allocations is set to true, the full set of resource allocations will be included in the response.
+
+HTTP Request:
+
+      GET http://<rm http address:port>/ws/v1/cluster/reservation/list?queue=dedicated&start-time=1455159355000&end-time=1475160036000&include-resource-allocations=true
+
+Response Header:
+
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Transfer-Encoding: chunked
+      Cache-Control: no-cache
+      Content-Encoding: gzip
+      Pragma: no-cache,no-cache
+      Server: Jetty(6.1.26)
+
+Response Body:
+
+```json
+{
+  "reservations": {
+    "acceptance-time": "1455160008442",
+    "user": "submitter",
+    "resource-allocations": [
+      {
+        "resource": {
+          "memory": "0",
+          "vCores": "0"
+        },
+        "startTime": "1465541532000",
+        "endTime": "1465542250000"
+      },
+      {
+        "resource": {
+          "memory": "1024",
+          "vCores": "1"
+        },
+        "startTime": "1465542250000",
+        "endTime": "1465542251000"
+      },
+      {
+        "resource": {
+          "memory": "0",
+          "vCores": "0"
+        },
+        "startTime": "1465542251000",
+        "endTime": "1465542252000"
+      }
+    ],
+    "reservation-id": "reservation_1458852875788_0002",
+    "reservation-definition": {
+      "arrival": "1465541532000",
+      "deadline": "1465542252000",
+      "reservation-requests": {
+        "reservation-request-interpreter": "0",
+        "reservation-request": {
+          "capability": {
+            "memory": "1024",
+            "vCores": "1"
+          },
+          "min-concurrency": "1",
+          "num-containers": "1",
+          "duration": "60"
+        }
+      },
+      "reservation-name": "res_1"
+    }
+  }
+}
+```
+
+**XML Response**
+
+HTTP Request:
+
+      GET http://<rm http address:port>/ws/v1/cluster/reservation/list?queue=dedicated&start-time=1455159355000&end-time=1475160036000&include-resource-allocations=true
+
+Response Header:
+
+      HTTP/1.1 200 OK
+      Content-Type: application/xml
+      Content-length: 395
+      Cache-Control: no-cache
+      Content-Encoding: gzip
+      Pragma: no-cache,no-cache
+      Server: Jetty(6.1.26)
+
+Response Body:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <reservationListInfo>
+        <reservations>
+        <acceptance-time>1455233661003</acceptance-time>
+        <user>dr.who</user>
+        <resource-allocations>
+            <resource>
+                <memory>0</memory>
+                <vCores>0</vCores>
+            </resource>
+            <startTime>1465541532000</startTime>
+            <endTime>1465542251000</endTime>
+        </resource-allocations>
+        <resource-allocations>
+            <resource>
+                <memory>1024</memory>
+                <vCores>1</vCores>
+            </resource>
+            <startTime>1465542251000</startTime>
+            <endTime>1465542252000</endTime>
+        </resource-allocations>
+        <reservation-id>reservation_1458852875788_0002</reservation-id>
+        <reservation-definition>
+            <arrival>1465541532000</arrival>
+            <deadline>1465542252000</deadline>
+            <reservation-requests>
+                <reservation-request-interpreter>0</reservation-request-interpreter>
+                <reservation-request>
+                    <capability>
+                        <memory>1024</memory>
+                        <vCores>1</vCores>
+                    </capability>
+                    <min-concurrency>1</min-concurrency>
+                    <num-containers>1</num-containers>
+                    <duration>60</duration>
+                </reservation-request>
+            </reservation-requests>
+            <reservation-name>res_1</reservation-name>
+        </reservation-definition>
+    </reservations>
+</reservationListInfo>
+```
+
+Cluster Reservation API Create
+---------------------------
+
+Use the New Reservation API, to obtain a reservation-id which can then be used as part of the [Cluster Reservation API Submit](#Cluster_Reservation_API_Submit) to submit reservations.
+
+This feature is currently in the alpha stage and may change in the future.
+
+### URI
+
+      * http://<rm http address:port>/ws/v1/cluster/reservation/new-reservation
+
+### HTTP Operations Supported
+
+      * POST
+
+### Query Parameters Supported
+
+      None
+
+### Elements of the new-reservation object
+
+The new-reservation response contains the following elements:
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| reservation-id | string | The newly created reservation id |
+
+### Response Examples
+
+**JSON response**
+
+HTTP Request:
+
+      POST http://<rm http address:port>/ws/v1/cluster/reservation/new-reservation
+
+Response Header:
+
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Transfer-Encoding: chunked
+      Server: Jetty(6.1.26)
+
+Response Body:
+
+```json
+{
+  "reservation-id":"reservation_1404198295326_0003"
+}
+```
+
+**XML response**
+
+HTTP Request:
+
+      POST http://<rm http address:port>/ws/v1/cluster/reservation/new-reservation
+
+Response Header:
+
+      HTTP/1.1 200 OK
+      Content-Type: application/xml
+      Content-Length: 248
+      Server: Jetty(6.1.26)
+
+Response Body:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<new-reservation>
+  <reservation-id>reservation_1404198295326_0003</reservation-id>
+</new-reservation>
+```
+
+Cluster Reservation API Submit
+------------------------------
+
+The Cluster Reservation API can be used to submit reservations. When submitting a reservation the user specifies the constraints in terms of resources, and time that is required. The resulting response is successful if the reservation can be made. If a reservation-id is used to submit a reservation multiple times, the request will succeed if the reservation definition is the same, but only one reservation will be created. If the reservation definition is different, the server will respond with an error response. When the reservation is made, the user can use the reservation-id used to submit the reservation to get access to the resources by specifying it as part of [Cluster Submit Applications API](#Cluster_Applications_APISubmit_Application).
+
+### URI
+
+      * http://<rm http address:port>/ws/v1/cluster/reservation/submit
+
+### HTTP Operations Supported
+
+      * POST
+
+### POST Response Examples
+
+POST requests can be used to submit reservations to the ResourceManager. As mentioned above, a reservation-id is returned upon success (in the body of the answer). Successful submissions result in a 200 response. Please note that in order to submit a reservation, you must have an authentication filter setup for the HTTP interface. The functionality requires that a username is set in the HttpServletRequest. If no filter is setup, the response will be an "UNAUTHORIZED" response.
+
+Please note that this feature is currently in the alpha stage and may change in the future.
+
+#### Elements of the POST request object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| queue | string | The (reservable) queue you are submitting to|
+| reservation-definition | object | A set of constraints representing the need for resources over time of a user. |
+| reservation-id | string | The reservation id to use to submit the reservation. |
+
+Elements of the *reservation-definition* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+|arrival | long | The UTC time representation of the earliest time this reservation can be allocated from. |
+| deadline | long | The UTC time representation of the latest time within which this reservation can be allocated. |
+| reservation-name | string | A mnemonic name of the reservation (not a valid identifier). |
+| reservation-requests | object | A list of "stages" or phases of this reservation, each describing resource requirements and duration |
+
+Elements of the *reservation-requests* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| reservation-request-interpreter | int | A numeric choice of how to interpret the set of ReservationRequest: 0 is an ANY, 1 for ALL, 2 for ORDER, 3 for ORDER\_NO\_GAP |
+| reservation-request | object | The description of the resource and time capabilities for a phase/stage of this reservation |
+
+Elements of the *reservation-request* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| duration | long | The duration of a ReservationRequeust in milliseconds (amount of consecutive milliseconds a satisfiable allocation for this portion of the reservation should exist for). |
+| num-containers | int | The number of containers required in this phase of the reservation (capture the maximum parallelism of the job(s) in this phase). |
+| min-concurrency | int | The minimum number of containers that must be concurrently allocated to satisfy this allocation (capture min-parallelism, useful to express gang semantics). |
+| capability | object | Allows to specify the size of each container (memory, vCores).|
+
+Elements of the *capability* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| memory | int | the number of MB of memory for this container |
+| vCores | int | the number of virtual cores for this container |
+
+
+**JSON response**
+
+This examples contains a reservation composed of two stages (alternative to each other as the *reservation-request-interpreter* is set to 0), so that the first is shorter and "taller" and "gang"
+with exactly 220 containers for 60 seconds, while the second alternative is longer with 120 seconds duration and less tall with 110 containers (and a min-concurrency of 1 container, thus no gang semantics).
+
+HTTP Request:
+
+```json
+POST http://rmdns:8088/ws/v1/cluster/reservation/submit
+Content-Type: application/json
+{
+  "queue" : "dedicated",
+  "reservation-id":"reservation_1404198295326_0003"
+  "reservation-definition" : {
+     "arrival" : 1765541532000,
+     "deadline" : 1765542252000,
+     "reservation-name" : "res_1",
+     "reservation-requests" : {
+        "reservation-request-interpreter" : 0,
+        "reservation-request" : [
+           {
+             "duration" : 60000,
+             "num-containers" : 220,
+             "min-concurrency" : 220,
+             "capability" : {
+               "memory" : 1024,
+               "vCores" : 1
+             }
+           },
+           {
+             "duration" : 120000,
+             "num-containers" : 110,
+             "min-concurrency" : 1,
+             "capability" : {
+               "memory" : 1024,
+               "vCores" : 1
+             }
+           }
+        ]
+     }
+   }
+}
+```
+
+Response Header:
+
+200 OK
+Cache-Control:  no-cache
+Expires:  Thu, 17 Dec 2015 23:36:34 GMT, Thu, 17 Dec 2015 23:36:34 GMT
+Date:  Thu, 17 Dec 2015 23:36:34 GMT, Thu, 17 Dec 2015 23:36:34 GMT
+Pragma:  no-cache, no-cache
+Content-Type:  application/xml
+Content-Encoding:  gzip
+Content-Length:  137
+Server:  Jetty(6.1.26)
+
+Response Body:
+
+      No response body
+
+**XML response**
+
+HTTP Request:
+
+```xml
+POST http://rmdns:8088/ws/v1/cluster/reservation/submit
+Accept: application/xml
+Content-Type: application/xml
+<reservation-submission-context>
+  <queue>dedicated</queue>
+  <reservation-id>reservation_1404198295326_0003</reservation-id>
+  <reservation-definition>
+     <arrival>1765541532000</arrival>
+     <deadline>1765542252000</deadline>
+     <reservation-name>res_1</reservation-name>
+     <reservation-requests>
+        <reservation-request-interpreter>0</reservation-request-interpreter>
+        <reservation-request>
+             <duration>60000</duration>
+             <num-containers>220</num-containers>
+             <min-concurrency>220</min-concurrency>
+             <capability>
+               <memory>1024</memory>
+               <vCores>1</vCores>
+             </capability>
+        </reservation-request>
+        <reservation-request>
+             <duration>120000</duration>
+             <num-containers>110</num-containers>
+             <min-concurrency>1</min-concurrency>
+             <capability>
+               <memory>1024</memory>
+               <vCores>1</vCores>
+             </capability>
+        </reservation-request>
+     </reservation-requests>
+  </reservation-definition>
+</reservation-submission-context>
+```
+
+Response Header:
+
+200 OK
+Cache-Control:  no-cache
+Expires:  Thu, 17 Dec 2015 23:49:21 GMT, Thu, 17 Dec 2015 23:49:21 GMT
+Date:  Thu, 17 Dec 2015 23:49:21 GMT, Thu, 17 Dec 2015 23:49:21 GMT
+Pragma:  no-cache, no-cache
+Content-Type:  application/xml
+Content-Encoding:  gzip
+Content-Length:  137
+Server:  Jetty(6.1.26)
+
+Response Body:
+
+      No response body
+
+Cluster Reservation API Update
+------------------------------
+
+The Cluster Reservation API Update can be used to update existing reservations.Update of a Reservation works similarly to submit described above, but the user submits the reservation-id of an existing reservation to be updated. The semantics is a try-and-swap, successful operation will modify the existing reservation based on the requested update parameter, while a failed execution will leave the existing reservation unchanged.
+
+### URI
+
+      * http://<rm http address:port>/ws/v1/cluster/reservation/update
+
+### HTTP Operations Supported
+
+      * POST
+
+### POST Response Examples
+
+POST requests can be used to update reservations to the ResourceManager. Successful submissions result in a 200 response, indicate in-place update of the existing reservation (id does not change). Please note that in order to update a reservation, you must have an authentication filter setup for the HTTP interface. The functionality requires that a username is set in the HttpServletRequest. If no filter is setup, the response will be an "UNAUTHORIZED" response.
+
+Please note that this feature is currently in the alpha stage and may change in the future.
+
+#### Elements of the POST request object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| reservation-id | string | The id of the reservation to be updated (the system automatically looks up the right queue from this)|
+| reservation-definition | object | A set of constraints representing the need for resources over time of a user. |
+
+Elements of the *reservation-definition* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+|arrival | long | The UTC time representation of the earliest time this reservation can be allocated from. |
+| deadline | long | The UTC time representation of the latest time within which this reservation can be allocated. |
+| reservation-name | string | A mnemonic name of the reservation (not a valid identifier). |
+| reservation-requests | object | A list of "stages" or phases of this reservation, each describing resource requirements and duration |
+
+Elements of the *reservation-requests* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| reservation-request-interpreter | int | A numeric choice of how to interpret the set of ReservationRequest: 0 is an ANY, 1 for ALL, 2 for ORDER, 3 for ORDER\_NO\_GAP |
+| reservation-request | object | The description of the resource and time capabilities for a phase/stage of this reservation |
+
+Elements of the *reservation-request* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| duration | long | The duration of a ReservationRequeust in milliseconds (amount of consecutive milliseconds a satisfiable allocation for this portion of the reservation should exist for). |
+| num-containers | int | The number of containers required in this phase of the reservation (capture the maximum parallelism of the job(s) in this phase). |
+| min-concurrency | int | The minimum number of containers that must be concurrently allocated to satisfy this allocation (capture min-parallelism, useful to express gang semantics). |
+| capability | object | Allows to specify the size of each container (memory, vCores).|
+
+Elements of the *capability* object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| memory | int | the number of MB of memory for this container |
+| vCores | int | the number of virtual cores for this container |
+
+
+**JSON response**
+
+This examples updates an existing reservation identified by *reservation_1449259268893_0005* with two stages (in order as the *reservation-request-interpreter* is set to 2), with the first stage being a "gang" of 10 containers for 5 minutes (min-concurrency of 10 containers) followed by a 50 containers for 10 minutes(min-concurrency of 1 container, thus no gang semantics).
+
+HTTP Request:
+
+```json
+POST http://rmdns:8088/ws/v1/cluster/reservation/update
+Accept: application/json
+Content-Type: application/json
+{
+  "reservation-id" : "reservation_1449259268893_0005",
+  "reservation-definition" : {
+     "arrival" : 1765541532000,
+     "deadline" : 1765542252000,
+     "reservation-name" : "res_1",
+     "reservation-requests" : {
+        "reservation-request-interpreter" : 2,
+        "reservation-request" : [
+           {
+             "duration" : 300000,
+             "num-containers" : 10,
+             "min-concurrency" : 10,
+             "capability" : {
+               "memory" : 1024,
+               "vCores" : 1
+             }
+           },
+           {
+             "duration" : 60000,
+             "num-containers" : 50,
+             "min-concurrency" : 1,
+             "capability" : {
+               "memory" : 1024,
+               "vCores" : 1
+             }
+           }
+          ]
+     }
+   }
+}
+```
+
+Response Header:
+
+200 OK
+Cache-Control:  no-cache
+Expires:  Thu, 17 Dec 2015 23:36:34 GMT, Thu, 17 Dec 2015 23:36:34 GMT
+Date:  Thu, 17 Dec 2015 23:36:34 GMT, Thu, 17 Dec 2015 23:36:34 GMT
+Pragma:  no-cache, no-cache
+Content-Type:  application/json
+Content-Encoding:  gzip
+Content-Length:  137
+Server:  Jetty(6.1.26)
+
+Response Body:
+
+      No response body
+
+**XML response**
+
+HTTP Request:
+
+```xml
+POST http://rmdns:8088/ws/v1/cluster/reservation/update
+Accept: application/xml
+Content-Type: application/xml
+<reservation-update-context>
+  <reservation-id>reservation_1449259268893_0005</reservation-id>
+  <reservation-definition>
+     <arrival>1765541532000</arrival>
+     <deadline>1765542252000</deadline>
+     <reservation-name>res_1</reservation-name>
+     <reservation-requests>
+        <reservation-request-interpreter>2</reservation-request-interpreter>
+        <reservation-request>
+             <duration>300000</duration>
+             <num-containers>10</num-containers>
+             <min-concurrency>10</min-concurrency>
+             <capability>
+               <memory>1024</memory>
+               <vCores>1</vCores>
+             </capability>
+        </reservation-request>
+        <reservation-request>
+             <duration>60000</duration>
+             <num-containers>50</num-containers>
+             <min-concurrency>1</min-concurrency>
+             <capability>
+               <memory>1024</memory>
+               <vCores>1</vCores>
+             </capability>
+        </reservation-request>
+     </reservation-requests>
+  </reservation-definition>
+</reservation-update-context>
+```
+
+Response Header:
+
+200 OK
+Cache-Control:  no-cache
+Expires:  Thu, 17 Dec 2015 23:49:21 GMT, Thu, 17 Dec 2015 23:49:21 GMT
+Date:  Thu, 17 Dec 2015 23:49:21 GMT, Thu, 17 Dec 2015 23:49:21 GMT
+Pragma:  no-cache, no-cache
+Content-Type:  application/xml
+Content-Encoding:  gzip
+Content-Length:  137
+Server:  Jetty(6.1.26)
+
+Response Body:
+
+      No response body
+
+Cluster Reservation API Delete
+------------------------------
+
+The Cluster Reservation API Delete can be used to delete existing reservations.Delete works similar to update. The requests contains the reservation-id, and if successful the reservation is cancelled, otherwise the reservation remains in the system.
+
+### URI
+
+      * http://<rm http address:port>/ws/v1/cluster/reservation/delete
+
+### HTTP Operations Supported
+
+      * POST
+
+### POST Response Examples
+
+POST requests can be used to delete reservations to the ResourceManager. Successful submissions result in a 200 response, indicating that the delete succeeded. Please note that in order to delete a reservation, you must have an authentication filter setup for the HTTP interface. The functionality requires that a username is set in the HttpServletRequest. If no filter is setup, the response will be an "UNAUTHORIZED" response.
+
+Please note that this feature is currently in the alpha stage and may change in the future.
+
+#### Elements of the POST request object
+
+| Item | Data Type | Description |
+|:---- |:---- |:---- |
+| reservation-id | string | The id of the reservation to be deleted (the system automatically looks up the right queue from this)|
+
+
+**JSON response**
+
+This examples deletes an existing reservation identified by *reservation_1449259268893_0006*
+
+HTTP Request:
+
+```json
+POST http://10.200.91.98:8088/ws/v1/cluster/reservation/delete
+Accept: application/json
+Content-Type: application/json
+{
+  "reservation-id" : "reservation_1449259268893_0006"
+}
+```
+
+Response Header:
+
+200 OK
+Cache-Control:  no-cache
+Expires:  Fri, 18 Dec 2015 01:31:05 GMT, Fri, 18 Dec 2015 01:31:05 GMT
+Date:  Fri, 18 Dec 2015 01:31:05 GMT, Fri, 18 Dec 2015 01:31:05 GMT
+Pragma:  no-cache, no-cache
+Content-Type:  application/json
+Content-Encoding:  gzip
+Transfer-Encoding:  chunked
+Server:  Jetty(6.1.26)
+
+Response Body:
+
+      No response body
+
+**XML response**
+
+HTTP Request:
+
+```xml
+POST http://10.200.91.98:8088/ws/v1/cluster/reservation/delete
+Accept: application/xml
+Content-Type: application/xml
+<reservation-delete-context>
+<reservation-id>reservation_1449259268893_0006</reservation-id>
+</reservation-delete-context>
+```
+
+Response Header:
+
+200 OK
+Cache-Control:  no-cache
+Expires:  Fri, 18 Dec 2015 01:33:23 GMT, Fri, 18 Dec 2015 01:33:23 GMT
+Date:  Fri, 18 Dec 2015 01:33:23 GMT, Fri, 18 Dec 2015 01:33:23 GMT
+Pragma:  no-cache, no-cache
+Content-Type:  application/xml
+Content-Encoding:  gzip
+Content-Length:  101
+Server:  Jetty(6.1.26)
+
+Response Body:
+
+      No response body

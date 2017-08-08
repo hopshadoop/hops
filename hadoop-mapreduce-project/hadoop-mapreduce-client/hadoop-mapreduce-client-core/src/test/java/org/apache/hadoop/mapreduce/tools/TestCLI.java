@@ -20,15 +20,21 @@ package org.apache.hadoop.mapreduce.tools;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.JobPriority;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.JobStatus.State;
+import org.junit.Assert;
 import org.junit.Test;
+
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.times;
@@ -44,7 +50,7 @@ public class TestCLI {
     JobID jobId = JobID.forName(jobIdStr);
     Cluster mockCluster = mock(Cluster.class);
     Job job = mock(Job.class);
-    CLI cli = spy(new CLI());
+    CLI cli = spy(new CLI(new Configuration()));
 
     doReturn(mockCluster).when(cli).createCluster();
     when(job.getTaskReports(TaskType.MAP)).thenReturn(
@@ -112,7 +118,7 @@ public class TestCLI {
   @Test
   public void testJobKIll() throws Exception {
     Cluster mockCluster = mock(Cluster.class);
-    CLI cli = spy(new CLI());
+    CLI cli = spy(new CLI(new Configuration()));
     doReturn(mockCluster).when(cli).createCluster();
     String jobId1 = "job_1234654654_001";
     String jobId2 = "job_1234654654_002";
@@ -148,5 +154,35 @@ public class TestCLI {
         JobPriority.HIGH, null, null, null, null);
     when(mockJob.getStatus()).thenReturn(status);
     return mockJob;
+  }
+
+  @Test
+  public void testGetJobWithoutRetry() throws Exception {
+    Configuration conf = new Configuration();
+    conf.setInt(MRJobConfig.MR_CLIENT_JOB_MAX_RETRIES, 0);
+
+    final Cluster mockCluster = mock(Cluster.class);
+    when(mockCluster.getJob(any(JobID.class))).thenReturn(null);
+    CLI cli = new CLI(conf);
+    cli.cluster = mockCluster;
+
+    Job job = cli.getJob(JobID.forName("job_1234654654_001"));
+    Assert.assertTrue("job is not null", job == null);
+  }
+
+  @Test
+  public void testGetJobWithRetry() throws Exception {
+    Configuration conf = new Configuration();
+    conf.setInt(MRJobConfig.MR_CLIENT_JOB_MAX_RETRIES, 1);
+
+    final Cluster mockCluster = mock(Cluster.class);
+    final Job mockJob = Job.getInstance(conf);
+    when(mockCluster.getJob(any(JobID.class))).thenReturn(
+        null).thenReturn(mockJob);
+    CLI cli = new CLI(conf);
+    cli.cluster = mockCluster;
+
+    Job job = cli.getJob(JobID.forName("job_1234654654_001"));
+    Assert.assertTrue("job is null", job != null);
   }
 }

@@ -28,23 +28,33 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.DiskChecker;
 
+import com.google.common.annotations.VisibleForTesting;
+
 /**
  * Manages a list of local storage directories.
  */
-class DirectoryCollection {
+public class DirectoryCollection {
   private static final Log LOG = LogFactory.getLog(DirectoryCollection.class);
 
+  /**
+   * The enum defines disk failure type.
+   */
   public enum DiskErrorCause {
     DISK_FULL, OTHER
   }
@@ -57,6 +67,13 @@ class DirectoryCollection {
       this.cause = cause;
       this.message = message;
     }
+  }
+
+  /**
+   * The interface provides a callback when localDirs is changed.
+   */
+  public interface DirsChangeListener {
+    void onDirsChanged();
   }
 
   /**
@@ -77,10 +94,19 @@ class DirectoryCollection {
   private List<String> errorDirs;
   private List<String> fullDirs;
 
+  // read/write lock for accessing above directories.
+  private final ReadLock readLock;
+  private final WriteLock writeLock;
+
   private int numFailures;
-  
-  private float diskUtilizationPercentageCutoff;
+
+  private float diskUtilizationPercentageCutoffHigh;
+  private float diskUtilizationPercentageCutoffLow;
   private long diskUtilizationSpaceCutoff;
+
+  private int goodDirsDiskUtilizationPercentage;
+
+  private Set<DirsChangeListener> dirsChangeListeners;
 
   /**
    * Create collection for the directories specified. No check for free space.
@@ -89,7 +115,7 @@ class DirectoryCollection {
    *          directories to be monitored
    */
   public DirectoryCollection(String[] dirs) {
-    this(dirs, 100.0F, 0);
+    this(dirs, 100.0F, 100.0F, 0);
   }
 
   /**
@@ -105,7 +131,7 @@ class DirectoryCollection {
    * 
    */
   public DirectoryCollection(String[] dirs, float utilizationPercentageCutOff) {
-    this(dirs, utilizationPercentageCutOff, 0);
+    this(dirs, utilizationPercentageCutOff, utilizationPercentageCutOff, 0);
   }
 
   /**
@@ -120,7 +146,7 @@ class DirectoryCollection {
    * 
    */
   public DirectoryCollection(String[] dirs, long utilizationSpaceCutOff) {
-    this(dirs, 100.0F, utilizationSpaceCutOff);
+    this(dirs, 100.0F, 100.0F, utilizationSpaceCutOff);
   }
 
   /**
@@ -131,57 +157,100 @@ class DirectoryCollection {
    * 
    * @param dirs
    *          directories to be monitored
-   * @param utilizationPercentageCutOff
+   * @param utilizationPercentageCutOffHigh
    *          percentage of disk that can be used before the dir is taken out of
    *          the good dirs list
+   * @param utilizationPercentageCutOffLow
+   *          percentage of disk that can be used when the dir is moved from
+   *          the bad dirs list to the good dirs list
    * @param utilizationSpaceCutOff
    *          minimum space, in MB, that must be available on the disk for the
    *          dir to be marked as good
    * 
    */
-  public DirectoryCollection(String[] dirs, 
-      float utilizationPercentageCutOff,
+  public DirectoryCollection(String[] dirs,
+      float utilizationPercentageCutOffHigh,
+      float utilizationPercentageCutOffLow,
       long utilizationSpaceCutOff) {
-    localDirs = new CopyOnWriteArrayList<String>(dirs);
-    errorDirs = new CopyOnWriteArrayList<String>();
-    fullDirs = new CopyOnWriteArrayList<String>();
+    localDirs = new CopyOnWriteArrayList<>(dirs);
+    errorDirs = new CopyOnWriteArrayList<>();
+    fullDirs = new CopyOnWriteArrayList<>();
 
-    diskUtilizationPercentageCutoff =
-        utilizationPercentageCutOff < 0.0F ? 0.0F
-            : (utilizationPercentageCutOff > 100.0F ? 100.0F
-                : utilizationPercentageCutOff);
+    ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    this.readLock = lock.readLock();
+    this.writeLock = lock.writeLock();
+
+    diskUtilizationPercentageCutoffHigh = Math.max(0.0F, Math.min(100.0F,
+        utilizationPercentageCutOffHigh));
+    diskUtilizationPercentageCutoffLow = Math.max(0.0F, Math.min(
+        diskUtilizationPercentageCutoffHigh, utilizationPercentageCutOffLow));
     diskUtilizationSpaceCutoff =
         utilizationSpaceCutOff < 0 ? 0 : utilizationSpaceCutOff;
+
+    dirsChangeListeners = Collections.newSetFromMap(
+        new ConcurrentHashMap<DirsChangeListener, Boolean>());
+  }
+
+  void registerDirsChangeListener(
+      DirsChangeListener listener) {
+    if (dirsChangeListeners.add(listener)) {
+      listener.onDirsChanged();
+    }
+  }
+
+  void deregisterDirsChangeListener(
+      DirsChangeListener listener) {
+    dirsChangeListeners.remove(listener);
   }
 
   /**
    * @return the current valid directories 
    */
-  synchronized List<String> getGoodDirs() {
-    return Collections.unmodifiableList(localDirs);
+  List<String> getGoodDirs() {
+    this.readLock.lock();
+    try {
+      return Collections.unmodifiableList(localDirs);
+    } finally {
+      this.readLock.unlock();
+    }
   }
 
   /**
    * @return the failed directories
    */
-  synchronized List<String> getFailedDirs() {
-    return Collections.unmodifiableList(
-        DirectoryCollection.concat(errorDirs, fullDirs));
+  List<String> getFailedDirs() {
+    this.readLock.lock();
+    try {
+      return Collections.unmodifiableList(
+          DirectoryCollection.concat(errorDirs, fullDirs));
+    } finally {
+      this.readLock.unlock();
+    }
   }
 
   /**
    * @return the directories that have used all disk space
    */
 
-  synchronized List<String> getFullDirs() {
-    return fullDirs;
+  List<String> getFullDirs() {
+    this.readLock.lock();
+    try {
+      return fullDirs;
+    } finally {
+      this.readLock.unlock();
+    }
   }
 
   /**
    * @return total the number of directory failures seen till now
    */
-  synchronized int getNumFailures() {
-    return numFailures;
+  int getNumFailures() {
+    this.readLock.lock();
+    try {
+      return numFailures;
+    }finally {
+      this.readLock.unlock();
+    }
   }
 
   /**
@@ -191,18 +260,30 @@ class DirectoryCollection {
    * @param perm absolute permissions to use for any directories created
    * @return true if there were no errors, false if at least one error occurred
    */
-  synchronized boolean createNonExistentDirs(FileContext localFs,
+  boolean createNonExistentDirs(FileContext localFs,
       FsPermission perm) {
     boolean failed = false;
-    for (final String dir : localDirs) {
+    List<String> localDirectories = null;
+    this.readLock.lock();
+    try {
+      localDirectories = new ArrayList<>(localDirs);
+    } finally {
+      this.readLock.unlock();
+    }
+    for (final String dir : localDirectories) {
       try {
         createDir(localFs, new Path(dir), perm);
       } catch (IOException e) {
         LOG.warn("Unable to create directory " + dir + " error " +
             e.getMessage() + ", removing from the list of valid directories.");
-        localDirs.remove(dir);
-        errorDirs.add(dir);
-        numFailures++;
+        this.writeLock.lock();
+        try {
+          localDirs.remove(dir);
+          errorDirs.add(dir);
+          numFailures++;
+        } finally {
+          this.writeLock.unlock();
+        }
         failed = true;
       }
     }
@@ -217,70 +298,97 @@ class DirectoryCollection {
    *         checking or a failed directory passes the disk check <em>false</em>
    *         otherwise.
    */
-  synchronized boolean checkDirs() {
+  boolean checkDirs() {
     boolean setChanged = false;
-    Set<String> preCheckGoodDirs = new HashSet<String>(localDirs);
-    Set<String> preCheckFullDirs = new HashSet<String>(fullDirs);
-    Set<String> preCheckOtherErrorDirs = new HashSet<String>(errorDirs);
-    List<String> failedDirs = DirectoryCollection.concat(errorDirs, fullDirs);
-    List<String> allLocalDirs =
-        DirectoryCollection.concat(localDirs, failedDirs);
-
-    Map<String, DiskErrorInformation> dirsFailedCheck = testDirs(allLocalDirs);
-
-    localDirs.clear();
-    errorDirs.clear();
-    fullDirs.clear();
-
-    for (Map.Entry<String, DiskErrorInformation> entry : dirsFailedCheck
-      .entrySet()) {
-      String dir = entry.getKey();
-      DiskErrorInformation errorInformation = entry.getValue();
-      switch (entry.getValue().cause) {
-      case DISK_FULL:
-        fullDirs.add(entry.getKey());
-        break;
-      case OTHER:
-        errorDirs.add(entry.getKey());
-        break;
-      }
-      if (preCheckGoodDirs.contains(dir)) {
-        LOG.warn("Directory " + dir + " error, " + errorInformation.message
-            + ", removing from list of valid directories");
-        setChanged = true;
-        numFailures++;
-      }
+    Set<String> preCheckGoodDirs = null;
+    Set<String> preCheckFullDirs = null;
+    Set<String> preCheckOtherErrorDirs = null;
+    List<String> failedDirs = null;
+    List<String> allLocalDirs = null;
+    this.readLock.lock();
+    try {
+      preCheckGoodDirs = new HashSet<String>(localDirs);
+      preCheckFullDirs = new HashSet<String>(fullDirs);
+      preCheckOtherErrorDirs = new HashSet<String>(errorDirs);
+      failedDirs = DirectoryCollection.concat(errorDirs, fullDirs);
+      allLocalDirs = DirectoryCollection.concat(localDirs, failedDirs);
+    } finally {
+      this.readLock.unlock();
     }
-    for (String dir : allLocalDirs) {
-      if (!dirsFailedCheck.containsKey(dir)) {
-        localDirs.add(dir);
-        if (preCheckFullDirs.contains(dir)
-            || preCheckOtherErrorDirs.contains(dir)) {
+
+    // move testDirs out of any lock as it could wait for very long time in
+    // case of busy IO
+    Map<String, DiskErrorInformation> dirsFailedCheck = testDirs(allLocalDirs,
+        preCheckGoodDirs);
+
+    this.writeLock.lock();
+    try {
+      localDirs.clear();
+      errorDirs.clear();
+      fullDirs.clear();
+
+      for (Map.Entry<String, DiskErrorInformation> entry : dirsFailedCheck
+          .entrySet()) {
+        String dir = entry.getKey();
+        DiskErrorInformation errorInformation = entry.getValue();
+        switch (entry.getValue().cause) {
+        case DISK_FULL:
+          fullDirs.add(entry.getKey());
+          break;
+        case OTHER:
+          errorDirs.add(entry.getKey());
+          break;
+        default:
+          LOG.warn(entry.getValue().cause + " is unknown for disk error.");
+          break;
+        }
+        if (preCheckGoodDirs.contains(dir)) {
+          LOG.warn("Directory " + dir + " error, " + errorInformation.message
+              + ", removing from list of valid directories");
           setChanged = true;
-          LOG.info("Directory " + dir
-              + " passed disk check, adding to list of valid directories.");
+          numFailures++;
         }
       }
-    }
-    Set<String> postCheckFullDirs = new HashSet<String>(fullDirs);
-    Set<String> postCheckOtherDirs = new HashSet<String>(errorDirs);
-    for (String dir : preCheckFullDirs) {
-      if (postCheckOtherDirs.contains(dir)) {
-        LOG.warn("Directory " + dir + " error "
-            + dirsFailedCheck.get(dir).message);
+      for (String dir : allLocalDirs) {
+        if (!dirsFailedCheck.containsKey(dir)) {
+          localDirs.add(dir);
+          if (preCheckFullDirs.contains(dir)
+              || preCheckOtherErrorDirs.contains(dir)) {
+            setChanged = true;
+            LOG.info("Directory " + dir
+                + " passed disk check, adding to list of valid directories.");
+          }
+        }
       }
-    }
+      Set<String> postCheckFullDirs = new HashSet<String>(fullDirs);
+      Set<String> postCheckOtherDirs = new HashSet<String>(errorDirs);
+      for (String dir : preCheckFullDirs) {
+        if (postCheckOtherDirs.contains(dir)) {
+          LOG.warn("Directory " + dir + " error "
+              + dirsFailedCheck.get(dir).message);
+        }
+      }
 
-    for (String dir : preCheckOtherErrorDirs) {
-      if (postCheckFullDirs.contains(dir)) {
-        LOG.warn("Directory " + dir + " error "
-            + dirsFailedCheck.get(dir).message);
+      for (String dir : preCheckOtherErrorDirs) {
+        if (postCheckFullDirs.contains(dir)) {
+          LOG.warn("Directory " + dir + " error "
+              + dirsFailedCheck.get(dir).message);
+        }
       }
+      setGoodDirsDiskUtilizationPercentage();
+      if (setChanged) {
+        for (DirsChangeListener listener : dirsChangeListeners) {
+          listener.onDirsChanged();
+        }
+      }
+      return setChanged;
+    } finally {
+      this.writeLock.unlock();
     }
-    return setChanged;
   }
 
-  Map<String, DiskErrorInformation> testDirs(List<String> dirs) {
+  Map<String, DiskErrorInformation> testDirs(List<String> dirs,
+      Set<String> goodDirs) {
     HashMap<String, DiskErrorInformation> ret =
         new HashMap<String, DiskErrorInformation>();
     for (final String dir : dirs) {
@@ -288,7 +396,10 @@ class DirectoryCollection {
       try {
         File testDir = new File(dir);
         DiskChecker.checkDir(testDir);
-        if (isDiskUsageOverPercentageLimit(testDir)) {
+        float diskUtilizationPercentageCutoff = goodDirs.contains(dir) ?
+            diskUtilizationPercentageCutoffHigh : diskUtilizationPercentageCutoffLow;
+        if (isDiskUsageOverPercentageLimit(testDir,
+            diskUtilizationPercentageCutoff)) {
           msg =
               "used space above threshold of "
                   + diskUtilizationPercentageCutoff
@@ -340,7 +451,8 @@ class DirectoryCollection {
     }
   }
 
-  private boolean isDiskUsageOverPercentageLimit(File dir) {
+  private boolean isDiskUsageOverPercentageLimit(File dir,
+      float diskUtilizationPercentageCutoff) {
     float freePercentage =
         100 * (dir.getUsableSpace() / (float) dir.getTotalSpace());
     float usedPercentage = 100.0F - freePercentage;
@@ -362,23 +474,34 @@ class DirectoryCollection {
       localFs.getFileStatus(dir);
     } catch (FileNotFoundException e) {
       createDir(localFs, dir.getParent(), perm);
-      localFs.mkdir(dir, perm, false);
+      try {
+        localFs.mkdir(dir, perm, false);
+      } catch (FileAlreadyExistsException ex) {
+        // do nothing as other threads could in creating the same directory.
+      }
       if (!perm.equals(perm.applyUMask(localFs.getUMask()))) {
         localFs.setPermission(dir, perm);
       }
     }
   }
-  
-  public float getDiskUtilizationPercentageCutoff() {
-    return diskUtilizationPercentageCutoff;
+
+  @VisibleForTesting
+  float getDiskUtilizationPercentageCutoffHigh() {
+    return diskUtilizationPercentageCutoffHigh;
+  }
+
+  @VisibleForTesting
+  float getDiskUtilizationPercentageCutoffLow() {
+    return diskUtilizationPercentageCutoffLow;
   }
 
   public void setDiskUtilizationPercentageCutoff(
-      float diskUtilizationPercentageCutoff) {
-    this.diskUtilizationPercentageCutoff =
-        diskUtilizationPercentageCutoff < 0.0F ? 0.0F
-            : (diskUtilizationPercentageCutoff > 100.0F ? 100.0F
-                : diskUtilizationPercentageCutoff);
+      float utilizationPercentageCutOffHigh,
+      float utilizationPercentageCutOffLow) {
+    diskUtilizationPercentageCutoffHigh = Math.max(0.0F, Math.min(100.0F,
+        utilizationPercentageCutOffHigh));
+    diskUtilizationPercentageCutoffLow = Math.max(0.0F, Math.min(
+        diskUtilizationPercentageCutoffHigh, utilizationPercentageCutOffLow));
   }
 
   public long getDiskUtilizationSpaceCutoff() {
@@ -389,5 +512,33 @@ class DirectoryCollection {
     diskUtilizationSpaceCutoff =
         diskUtilizationSpaceCutoff < 0 ? 0 : diskUtilizationSpaceCutoff;
     this.diskUtilizationSpaceCutoff = diskUtilizationSpaceCutoff;
+  }
+
+  private void setGoodDirsDiskUtilizationPercentage() {
+
+    long totalSpace = 0;
+    long usableSpace = 0;
+
+    for (String dir : localDirs) {
+      File f = new File(dir);
+      if (!f.isDirectory()) {
+        continue;
+      }
+      totalSpace += f.getTotalSpace();
+      usableSpace += f.getUsableSpace();
+    }
+    if (totalSpace != 0) {
+      long tmp = ((totalSpace - usableSpace) * 100) / totalSpace;
+      if (Integer.MIN_VALUE < tmp && Integer.MAX_VALUE > tmp) {
+        goodDirsDiskUtilizationPercentage = (int) tmp;
+      }
+    } else {
+      // got no good dirs
+      goodDirsDiskUtilizationPercentage = 0;
+    }
+  }
+
+  public int getGoodDirsDiskUtilizationPercentage() {
+    return goodDirsDiskUtilizationPercentage;
   }
 }

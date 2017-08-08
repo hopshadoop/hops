@@ -19,6 +19,8 @@
 Hadoop Key Management Server (KMS) - Documentation Sets
 =======================================================
 
+<!-- MACRO{toc|fromDepth=0|toDepth=3} -->
+
 Hadoop KMS is a cryptographic key management server based on Hadoop's **KeyProvider** API.
 
 It provides a client and a server components which communicate over HTTP using a REST API.
@@ -33,6 +35,18 @@ KMS Client Configuration
 ------------------------
 
 The KMS client `KeyProvider` uses the **kms** scheme, and the embedded URL must be the URL of the KMS. For example, for a KMS running on `http://localhost:16000/kms`, the KeyProvider URI is `kms://http@localhost:16000/kms`. And, for a KMS running on `https://localhost:16000/kms`, the KeyProvider URI is `kms://https@localhost:16000/kms`
+
+The following is an example to configure HDFS NameNode as a KMS client in
+`core-site.xml`:
+
+    <property>
+      <name>hadoop.security.key.provider.path</name>
+      <value>kms://http@localhost:9600/kms</value>
+      <description>
+        The KeyProvider to use when interacting with encryption keys used
+        when reading and writing to an encryption zone.
+      </description>
+    </property>
 
 KMS
 ---
@@ -59,15 +73,21 @@ NOTE: You need to restart the KMS for the configuration changes to take effect.
 
 $H3 KMS Cache
 
-KMS caches keys for short period of time to avoid excessive hits to the underlying key provider.
+KMS has two kinds of caching: a CachingKeyProvider for caching the encryption keys, and a KeyProvider for caching the EEKs.
 
-The Cache is enabled by default (can be dissabled by setting the `hadoop.kms.cache.enable` boolean property to false)
+$H4 CachingKeyProvider
 
-The cache is used with the following 3 methods only, `getCurrentKey()` and `getKeyVersion()` and `getMetadata()`.
+KMS caches encryption keys for a short period of time to avoid excessive hits to the underlying KeyProvider.
 
-For the `getCurrentKey()` method, cached entries are kept for a maximum of 30000 millisecond regardless the number of times the key is being access (to avoid stale keys to be considered current).
+This Cache is enabled by default (can be disabled by setting the `hadoop.kms.cache.enable` boolean property to false)
 
-For the `getKeyVersion()` method, cached entries are kept with a default inactivity timeout of 600000 milliseconds (10 mins). This time out is configurable via the following property in the `etc/hadoop/kms-site.xml` configuration file:
+This cache is used with the following 3 methods only, `getCurrentKey()` and `getKeyVersion()` and `getMetadata()`.
+
+For the `getCurrentKey()` method, cached entries are kept for a maximum of 30000 milliseconds regardless the number of times the key is being accessed (to avoid stale keys to be considered current).
+
+For the `getKeyVersion()` method, cached entries are kept with a default inactivity timeout of 600000 milliseconds (10 mins).
+
+These configurations can be changed via the following properties in the `etc/hadoop/kms-site.xml` configuration file:
 
 ```xml
    <property>
@@ -83,6 +103,67 @@ For the `getKeyVersion()` method, cached entries are kept with a default inactiv
    <property>
      <name>hadoop.kms.current.key.cache.timeout.ms</name>
      <value>30000</value>
+   </property>
+```
+
+$H4 KeyProvider
+
+Architecturally, both server-side (e.g. KMS) and client-side (e.g. NameNode) have a cache for EEKs. The following are configurable on the cache:
+
+* The size of the cache. This is the maximum number of EEKs that can be cached under each key name.
+* A low watermark on the cache. For each key name, if after a get call, the number of cached EEKs are less than (size * low watermark), then the cache under this key name will be filled asynchronously. For each key name, only 1 thread could be running for the asynchronous filling.
+* The maximum number of asynchronous threads overall, across key names, allowed to fill the queue in a cache.
+* The cache expiry time, in milliseconds. Internally Guava cache is used as the cache implementation. The expiry approach is [expireAfterAccess](https://code.google.com/p/guava-libraries/wiki/CachesExplained).
+
+Note that due to the asynchronous filling mechanism, it is possible that after rollNewVersion(), the caller still gets the old EEKs. In the worst case, the caller may get up to (server-side cache size + client-side cache size) number of old EEKs, or until both caches expire. This behavior is a trade off to avoid locking on the cache, and is acceptable since the old version EEKs can still be used to decrypt.
+
+Below are the configurations and their default values:
+
+Server-side can be changed via the following properties in the `etc/hadoop/kms-site.xml` configuration file:
+
+```xml
+   <property>
+     <name>hadoop.security.kms.encrypted.key.cache.size</name>
+     <value>500</value>
+   </property>
+
+   <property>
+     <name>hadoop.security.kms.encrypted.key.cache.low.watermark</name>
+     <value>0.3</value>
+   </property>
+
+   <property>
+     <name>hadoop.security.kms.encrypted.key.cache.num.fill.threads</name>
+     <value>2</value>
+   </property>
+
+   <property>
+     <name>hadoop.security.kms.encrypted.key.cache.expiry</name>
+     <value>43200000</value>
+   </property>
+```
+
+Client-side can be changed via the following properties in the `etc/hadoop/core-site.xml` configuration file:
+
+```xml
+   <property>
+     <name>hadoop.security.kms.client.encrypted.key.cache.size</name>
+     <value>500</value>
+   </property>
+
+   <property>
+     <name>hadoop.security.kms.client.encrypted.key.cache.low-watermark</name>
+     <value>0.3</value>
+   </property>
+
+   <property>
+     <name>hadoop.security.kms.client.encrypted.key.cache.num.refill.threads</name>
+     <value>2</value>
+   </property>
+
+   <property>
+     <name>hadoop.security.kms.client.encrypted.key.cache.expiry</name>
+     <value>43200000</value>
    </property>
 ```
 
@@ -120,6 +201,7 @@ The following environment variables (which can be set in KMS's `etc/hadoop/kms-e
 * KMS_HTTP_PORT
 * KMS_ADMIN_PORT
 * KMS_MAX_THREADS
+* KMS_MAX_HTTP_HEADER_SIZE
 * KMS_LOGNOTE: You need to restart the KMS for the configuration changes to take effect.
 
 $H3 Loading native libraries
@@ -216,7 +298,17 @@ The answer to "What is your first and last name?" (i.e. "CN") must be the hostna
 
 NOTE: You need to restart the KMS for the configuration changes to take effect.
 
-$H4 KMS Access Control
+NOTE: Some old SSL clients may use weak ciphers that are not supported by the KMS server. It is recommended to upgrade the SSL client.
+
+$H4 ACLs (Access Control Lists)
+
+KMS supports ACLs (Access Control Lists) for fine-grained permission control.
+
+Two levels of ACLs exist in KMS: KMS ACLs and Key ACLs. KMS ACLs control access at KMS operation level, and precede Key ACLs. In particular, only if permission is granted at KMS ACLs level, shall the permission check against Key ACLs be performed.
+
+The configuration and usage of KMS ACLs and Key ACLs are described in the sections below.
+
+$H5 KMS ACLs
 
 KMS ACLs configuration are defined in the KMS `etc/hadoop/kms-acls.xml` configuration file. This file is hot-reloaded when it changes.
 
@@ -384,7 +476,7 @@ A user accessing KMS is first checked for inclusion in the Access Control List f
 </configuration>
 ```
 
-$H4 Key Access Control
+$H5 Key ACLs
 
 KMS supports access control for all non-read operations at the Key level. All Key Access operations are classified as :
 
@@ -398,9 +490,9 @@ These can be defined in the KMS `etc/hadoop/kms-acls.xml` as follows
 
 For all keys for which a key access has not been explicitly configured, It is possible to configure a default key access control for a subset of the operation types.
 
-It is also possible to configure a "whitelist" key ACL for a subset of the operation types. The whitelist key ACL is a whitelist in addition to the explicit or default per-key ACL. That is, if no per-key ACL is explicitly set, a user will be granted access if they are present in the default per-key ACL or the whitelist key ACL. If a per-key ACL is explicitly set, a user will be granted access if they are present in the per-key ACL or the whitelist key ACL.
+It is also possible to configure a "whitelist" key ACL for a subset of the operation types. The whitelist key ACL grants access to the key, in addition to the explicit or default per-key ACL. That is, if no per-key ACL is explicitly set, a user will be granted access if they are present in the default per-key ACL or the whitelist key ACL. If a per-key ACL is explicitly set, a user will be granted access if they are present in the per-key ACL or the whitelist key ACL.
 
-If no ACL is configured for a specific key AND no default ACL is configured AND no root key ACL is configured for the requested operation, then access will be DENIED.
+If no ACL is configured for a specific key AND no default ACL is configured AND no whitelist key ACL is configured for the requested operation, then access will be DENIED.
 
 **NOTE:** The default and whitelist key ACL does not support `ALL` operation qualifier.
 
@@ -507,7 +599,11 @@ If no ACL is configured for a specific key AND no default ACL is configured AND 
 
 $H3 KMS Delegation Token Configuration
 
-KMS delegation token secret manager can be configured with the following properties:
+KMS supports delegation tokens to authenticate to the key providers from processes without Kerberos credentials.
+
+KMS delegation token authentication extends the default Hadoop authentication. Same as Hadoop authentication, KMS delegation tokens must not be fetched or renewed using delegation token authentication. See [Hadoop Auth](../hadoop-auth/index.html) page for more details.
+
+Additionally, KMS delegation token secret manager can be configured with the following properties:
 
 ```xml
   <property>
@@ -522,7 +618,7 @@ KMS delegation token secret manager can be configured with the following propert
     <name>hadoop.kms.authentication.delegation-token.max-lifetime.sec</name>
     <value>604800</value>
     <description>
-      Maximum lifetime of a delagation token, in seconds. Default value 7 days.
+      Maximum lifetime of a delegation token, in seconds. Default value 7 days.
     </description>
   </property>
 
@@ -530,7 +626,7 @@ KMS delegation token secret manager can be configured with the following propert
     <name>hadoop.kms.authentication.delegation-token.renew-interval.sec</name>
     <value>86400</value>
     <description>
-      Renewal interval of a delagation token, in seconds. Default value 1 day.
+      Renewal interval of a delegation token, in seconds. Default value 1 day.
     </description>
   </property>
 
@@ -543,13 +639,51 @@ KMS delegation token secret manager can be configured with the following propert
   </property>
 ```
 
-$H3 Using Multiple Instances of KMS Behind a Load-Balancer or VIP
+$H3 High Availability
 
-KMS supports multiple KMS instances behind a load-balancer or VIP for scalability and for HA purposes.
+Multiple KMS instances may be used to provide high availability and scalability.
+Currently there are two approaches to supporting multiple KMS instances:
+running KMS instances behind a load-balancer/VIP,
+or using LoadBalancingKMSClientProvider.
 
-When using multiple KMS instances behind a load-balancer or VIP, requests from the same user may be handled by different KMS instances.
+In both approaches, KMS instances must be specially configured to work properly
+as a single logical service, because requests from the same client may be
+handled by different KMS instances. In particular,
+Kerberos Principals Configuration, HTTP Authentication Signature and Delegation
+Tokens require special attention.
 
-KMS instances behind a load-balancer or VIP must be specially configured to work properly as a single logical service.
+$H4 Behind a Load-Balancer or VIP
+
+Because KMS clients and servers communicate via a REST API over HTTP,
+Load-balancer or VIP may be used to distribute incoming traffic to achieve
+scalability and HA. In this mode, clients are unaware of multiple KMS instances
+at the server-side.
+
+$H4 Using LoadBalancingKMSClientProvider
+
+An alternative to running multiple KMS instances behind a load-balancer or VIP,
+is to use LoadBalancingKMSClientProvider. Using this approach, a KMS client
+(for example, a HDFS NameNode) is aware of multiple KMS instances, and it sends
+requests to them in a round-robin fashion. LoadBalancingKMSClientProvider is
+implicitly used when more than one URI is specified in
+`hadoop.security.key.provider.path`.
+
+The following example in `core-site.xml` configures two KMS
+instances, `kms01.example.com` and `kms02.example.com`.
+The hostnames are separated by semi-colons, and all KMS instances must run
+on the same port.
+
+    <property>
+      <name>hadoop.security.key.provider.path</name>
+      <value>kms://https@kms01.example.com;kms02.example.com:9600/kms</value>
+      <description>
+        The KeyProvider to use when interacting with encryption keys used
+        when reading and writing to an encryption zone.
+      </description>
+    </property>
+
+If a request to a KMS instance fails, clients retry with the next instance. The
+request is returned as failure only if all instances fail.
 
 $H4 HTTP Kerberos Principals Configuration
 
@@ -572,7 +706,7 @@ $H4 HTTP Authentication Signature
 
 KMS uses Hadoop Authentication for HTTP authentication. Hadoop Authentication issues a signed HTTP Cookie once the client has authenticated successfully. This HTTP Cookie has an expiration time, after which it will trigger a new authentication sequence. This is done to avoid triggering the authentication on every HTTP request of a client.
 
-A KMS instance must verify the HTTP Cookie signatures signed by other KMS instances. To do this all KMS instances must share the signing secret.
+A KMS instance must verify the HTTP Cookie signatures signed by other KMS instances. To do this, all KMS instances must share the signing secret. Please see [SignerSecretProvider Configuration](../hadoop-auth/Configuration.html#SignerSecretProvider_Configuration) for detailed description and configuration examples. Note that KMS configurations need to be prefixed with `hadoop.kms.authentication`, as shown in the example below.
 
 This secret sharing can be done using a Zookeeper service which is configured in KMS with the following properties in the `kms-site.xml`:
 
@@ -582,8 +716,9 @@ This secret sharing can be done using a Zookeeper service which is configured in
     <value>zookeeper</value>
     <description>
       Indicates how the secret to sign the authentication cookies will be
-      stored. Options are 'random' (default), 'string' and 'zookeeper'.
+      stored. Options are 'random' (default), 'file' and 'zookeeper'.
       If using a setup with multiple KMS instances, 'zookeeper' should be used.
+      If using file, signature.secret.file should be configured and point to the secret file.
     </description>
   </property>
   <property>
@@ -591,7 +726,7 @@ This secret sharing can be done using a Zookeeper service which is configured in
     <value>/hadoop-kms/hadoop-auth-signature-secret</value>
     <description>
       The Zookeeper ZNode path where the KMS instances will store and retrieve
-      the secret from.
+      the secret from. All KMS instances that need to coordinate should point to the same path.
     </description>
   </property>
   <property>
@@ -604,9 +739,9 @@ This secret sharing can be done using a Zookeeper service which is configured in
   </property>
   <property>
     <name>hadoop.kms.authentication.signer.secret.provider.zookeeper.auth.type</name>
-    <value>kerberos</value>
+    <value>sasl</value>
     <description>
-      The Zookeeper authentication type, 'none' or 'sasl' (Kerberos).
+      The Zookeeper authentication type, 'none' (default) or 'sasl' (Kerberos).
     </description>
   </property>
   <property>
@@ -628,7 +763,11 @@ This secret sharing can be done using a Zookeeper service which is configured in
 
 $H4 Delegation Tokens
 
-TBD
+Similar to HTTP authentication, KMS uses Hadoop Authentication for delegation tokens too.
+
+Under HA, A KMS instance must verify the delegation token given by another KMS instance, by checking the shared secret used to sign the delegation token. To do this, all KMS instances must be able to retrieve the shared secret from ZooKeeper.
+
+Please see the examples given in HTTP Authentication section to configure ZooKeeper for secret sharing.
 
 $H3 KMS HTTP REST API
 

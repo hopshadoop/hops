@@ -27,7 +27,6 @@ import java.util.Collection;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.http.HttpConfig;
@@ -129,7 +128,6 @@ public class TestTimelineAuthenticationFilter {
       conf.set("hadoop.proxyuser.HTTP.hosts", "*");
       conf.set("hadoop.proxyuser.HTTP.users", FOO_USER);
       conf.setInt(YarnConfiguration.TIMELINE_SERVICE_CLIENT_MAX_RETRIES, 1);
-      conf.setLong(CommonConfigurationKeys.HADOOP_SECURITY_GROUPS_CACHE_SECS, 1);
 
       if (withSsl) {
         conf.set(YarnConfiguration.YARN_HTTP_POLICY_KEY,

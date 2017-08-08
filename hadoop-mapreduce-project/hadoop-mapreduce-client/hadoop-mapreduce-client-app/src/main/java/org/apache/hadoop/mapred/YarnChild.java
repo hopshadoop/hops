@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
@@ -57,6 +58,7 @@ import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 /**
@@ -85,6 +87,9 @@ class YarnChild {
     long jvmIdLong = Long.parseLong(args[3]);
     JVMId jvmId = new JVMId(firstTaskid.getJobID(),
         firstTaskid.getTaskType() == TaskType.MAP, jvmIdLong);
+    
+    CallerContext.setCurrent(
+        new CallerContext.Builder("mr_" + firstTaskid.toString()).build());
 
     // initialize metrics
     DefaultMetricsSystem.initialize(
@@ -140,6 +145,12 @@ class YarnChild {
 
       // Create the job-conf and set credentials
       configureTask(job, task, credentials, jt);
+
+      // log the system properties
+      String systemPropsToLog = MRApps.getSystemPropertiesToLog(job);
+      if (systemPropsToLog != null) {
+        LOG.info(systemPropsToLog);
+      }
 
       // Initiate Java VM metrics
       JvmMetrics.initSingleton(jvmId.toString(), job.getSessionId());
@@ -280,11 +291,10 @@ class YarnChild {
   private static void configureTask(JobConf job, Task task,
       Credentials credentials, Token<JobTokenIdentifier> jt) throws IOException {
     job.setCredentials(credentials);
-    
-    ApplicationAttemptId appAttemptId =
-        ConverterUtils.toContainerId(
-            System.getenv(Environment.CONTAINER_ID.name()))
-            .getApplicationAttemptId();
+
+    ApplicationAttemptId appAttemptId = ContainerId.fromString(
+        System.getenv(Environment.CONTAINER_ID.name()))
+        .getApplicationAttemptId();
     LOG.debug("APPLICATION_ATTEMPT_ID: " + appAttemptId);
     // Set it in conf, so as to be able to be used the the OutputCommitter.
     job.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID,

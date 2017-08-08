@@ -18,46 +18,46 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.resourcetracker;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
-import org.apache.hadoop.yarn.api.records.NodeState;
-import org.apache.hadoop.yarn.event.DrainDispatcher;
-import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
-import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
-import org.junit.Assert;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.ConfigurationProvider;
 import org.apache.hadoop.yarn.conf.ConfigurationProviderFactory;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.event.InlineDispatcher;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
+import org.apache.hadoop.yarn.server.api.records.NodeAction;
+import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
+import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.NMLivelinessMonitor;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.NodesListManager;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContextImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager.NodeEventDispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceTrackerService;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -82,8 +82,11 @@ public class TestNMReconnect {
   ResourceTrackerService resourceTrackerService;
 
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     Configuration conf = new Configuration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
     // Dispatcher that processes events inline
     dispatcher = new InlineDispatcher();
 
@@ -198,17 +201,38 @@ public class TestNMReconnect {
     scheduler.stop();
   }
 
+  @SuppressWarnings("unchecked")
+  @Test(timeout = 10000)
+  public void testDecommissioningNodeReconnect()
+      throws Exception {
+    MockRM rm = new MockRM();
+    rm.start();
+    MockNM nm1 =
+        new MockNM("127.0.0.1:1234", 15120, rm.getResourceTrackerService());
+    nm1.registerNode();
+    rm.waitForState(nm1.getNodeId(), NodeState.RUNNING);
+
+    rm.getRMContext().getNodesListManager().getHostsReader().
+        getExcludedHosts().add("127.0.0.1");
+    rm.getRMContext().getDispatcher().getEventHandler().handle(
+        new RMNodeEvent(nm1.getNodeId(),
+            RMNodeEventType.GRACEFUL_DECOMMISSION));
+    rm.waitForState(nm1.getNodeId(), NodeState.DECOMMISSIONING);
+
+    MockNM nm2 =
+        new MockNM("127.0.0.1:1234", 15120, rm.getResourceTrackerService());
+    RegisterNodeManagerResponse response = nm2.registerNode();
+    // not SHUTDOWN
+    Assert.assertTrue(response.getNodeAction().equals(NodeAction.NORMAL));
+    rm.stop();
+  }
+
   @Test(timeout = 10000)
   public void testRMNodeStatusAfterReconnect() throws Exception {
     // The node(127.0.0.1:1234) reconnected with RM. When it registered with
     // RM, RM set its lastNodeHeartbeatResponse's id to 0 asynchronously. But
     // the node's heartbeat come before RM succeeded setting the id to 0.
-    //final DrainDispatcher dispatcher = new DrainDispatcher();
-    Configuration conf = new YarnConfiguration();
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
-
+    final DrainDispatcher dispatcher = new DrainDispatcher();
     MockRM rm = new MockRM(){
       @Override
       protected Dispatcher createDispatcher() {
@@ -222,7 +246,7 @@ public class TestNMReconnect {
     int i = 0;
     while(i < 3) {
       nm1.nodeHeartbeat(true);
-      ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
+      dispatcher.await();
       i++;
     }
 
@@ -231,7 +255,7 @@ public class TestNMReconnect {
     nm2.registerNode();
     RMNode rmNode = rm.getRMContext().getRMNodes().get(nm2.getNodeId());
     nm2.nodeHeartbeat(true);
-    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
+    dispatcher.await();
     Assert.assertEquals("Node is Not in Running state.", NodeState.RUNNING,
         rmNode.getState());
     rm.stop();

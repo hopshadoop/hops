@@ -28,6 +28,7 @@ The following table lists the configuration property names that are deprecated i
 | dfs.data.dir | dfs.datanode.data.dir |
 | dfs.datanode.max.xcievers | dfs.datanode.max.transfer.threads |
 | dfs.df.interval | fs.df.interval |
+| dfs.encryption.key.provider.uri | hadoop.security.key.provider.path |
 | dfs.federation.nameservice.id | dfs.nameservice.id |
 | dfs.federation.nameservices | dfs.nameservices |
 | dfs.http.address | dfs.namenode.http-address |
@@ -239,7 +240,6 @@ The following table lists the configuration property names that are deprecated i
 | mapred.tasktracker.reduce.tasks.maximum | mapreduce.tasktracker.reduce.tasks.maximum |
 | mapred.task.tracker.report.address | mapreduce.tasktracker.report.address |
 | mapred.task.tracker.task-controller | mapreduce.tasktracker.taskcontroller |
-| mapred.tasktracker.taskmemorymanager.monitoring-interval | mapreduce.tasktracker.taskmemorymanager.monitoringinterval |
 | mapred.tasktracker.tasks.sleeptime-before-sigkill | mapreduce.tasktracker.tasks.sleeptimebeforesigkill |
 | mapred.temp.dir | mapreduce.cluster.temp.dir |
 | mapred.text.key.comparator.options | mapreduce.partition.keycomparator.options |
@@ -277,6 +277,7 @@ The following table lists the configuration property names that are deprecated i
 | user.name | mapreduce.job.user.name |
 | webinterface.private.actions | mapreduce.jobtracker.webinterface.trusted |
 | yarn.app.mapreduce.yarn.app.mapreduce.client-am.ipc.max-retries-on-timeouts | yarn.app.mapreduce.client-am.ipc.max-retries-on-timeouts |
+| yarn.client.app-submission.poll-interval | yarn.client.application-client-protocol.poll-timeout-ms |
 
 The following table lists additional changes to some configuration properties:
 

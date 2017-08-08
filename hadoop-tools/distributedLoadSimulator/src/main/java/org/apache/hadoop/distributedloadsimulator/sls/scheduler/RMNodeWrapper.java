@@ -35,6 +35,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ResourceUtilization;
 
 @Private
 @Unstable
@@ -119,6 +121,11 @@ public class RMNodeWrapper implements RMNode {
   }
 
   @Override
+  public List<ApplicationId> getRunningApps() {
+    return node.getRunningApps();
+  }
+
+  @Override
   public void updateNodeHeartbeatResponseForCleanup(
           NodeHeartbeatResponse nodeHeartbeatResponse) {
     node.updateNodeHeartbeatResponseForCleanup(nodeHeartbeatResponse);
@@ -157,5 +164,37 @@ public class RMNodeWrapper implements RMNode {
   @Override
   public Set<String> getNodeLabels() {
     return RMNodeLabelsManager.EMPTY_STRING_SET;
+  }
+
+  @Override
+  public void updateNodeHeartbeatResponseForContainersDecreasing(
+      NodeHeartbeatResponse response) {
+    // TODO Auto-generated method stub
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override
+  public List<Container> pullNewlyIncreasedContainers() {
+    // TODO Auto-generated method stub
+    return Collections.EMPTY_LIST;
+  }
+
+  @Override
+  public ResourceUtilization getAggregatedContainersUtilization() {
+    return node.getAggregatedContainersUtilization();
+  }
+
+  @Override
+  public ResourceUtilization getNodeUtilization() {
+    return node.getNodeUtilization();
+  }
+
+  @Override
+  public long getUntrackedTimeStamp() {
+    return 0;
+  }
+
+  @Override
+  public void setUntrackedTimeStamp(long timeStamp) {
   }
 }

@@ -29,6 +29,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceWeights;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.Schedulable;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.SchedulingPolicy;
+
+import org.apache.hadoop.yarn.util.resource.DominantResourceCalculator;
+import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import static org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceType.*;
@@ -44,8 +47,10 @@ public class DominantResourceFairnessPolicy extends SchedulingPolicy {
 
   public static final String NAME = "DRF";
 
-  private DominantResourceFairnessComparator comparator =
+  private static final DominantResourceFairnessComparator COMPARATOR =
       new DominantResourceFairnessComparator();
+  private static final DominantResourceCalculator CALCULATOR =
+      new DominantResourceCalculator();
 
   @Override
   public String getName() {
@@ -59,9 +64,14 @@ public class DominantResourceFairnessPolicy extends SchedulingPolicy {
 
   @Override
   public Comparator<Schedulable> getComparator() {
-    return comparator;
+    return COMPARATOR;
   }
-  
+
+  @Override
+  public ResourceCalculator getResourceCalculator() {
+    return CALCULATOR;
+  }
+
   @Override
   public void computeShares(Collection<? extends Schedulable> schedulables,
       Resource totalResources) {
@@ -91,13 +101,13 @@ public class DominantResourceFairnessPolicy extends SchedulingPolicy {
   @Override
   public Resource getHeadroom(Resource queueFairShare, Resource queueUsage,
                               Resource maxAvailable) {
-    int queueAvailableMemory =
-        Math.max(queueFairShare.getMemory() - queueUsage.getMemory(), 0);
+    long queueAvailableMemory =
+        Math.max(queueFairShare.getMemorySize() - queueUsage.getMemorySize(), 0);
     int queueAvailableCPU =
         Math.max(queueFairShare.getVirtualCores() - queueUsage
             .getVirtualCores(), 0);
     Resource headroom = Resources.createResource(
-        Math.min(maxAvailable.getMemory(), queueAvailableMemory),
+        Math.min(maxAvailable.getMemorySize(), queueAvailableMemory),
         Math.min(maxAvailable.getVirtualCores(),
             queueAvailableCPU));
     return headroom;
@@ -105,7 +115,7 @@ public class DominantResourceFairnessPolicy extends SchedulingPolicy {
 
   @Override
   public void initialize(Resource clusterCapacity) {
-    comparator.setClusterCapacity(clusterCapacity);
+    COMPARATOR.setClusterCapacity(clusterCapacity);
   }
 
   public static class DominantResourceFairnessComparator implements Comparator<Schedulable> {
@@ -170,8 +180,8 @@ public class DominantResourceFairnessPolicy extends SchedulingPolicy {
      */
     void calculateShares(Resource resource, Resource pool,
         ResourceWeights shares, ResourceType[] resourceOrder, ResourceWeights weights) {
-      shares.setWeight(MEMORY, (float)resource.getMemory() /
-          (pool.getMemory() * weights.getWeight(MEMORY)));
+      shares.setWeight(MEMORY, (float)resource.getMemorySize() /
+          (pool.getMemorySize() * weights.getWeight(MEMORY)));
       shares.setWeight(CPU, (float)resource.getVirtualCores() /
           (pool.getVirtualCores() * weights.getWeight(CPU)));
       // sort order vector by resource share
@@ -179,9 +189,11 @@ public class DominantResourceFairnessPolicy extends SchedulingPolicy {
         if (shares.getWeight(MEMORY) > shares.getWeight(CPU)) {
           resourceOrder[0] = MEMORY;
           resourceOrder[1] = CPU;
+          resourceOrder[2] = GPU;
         } else  {
           resourceOrder[0] = CPU;
           resourceOrder[1] = MEMORY;
+          resourceOrder[2] = GPU;
         }
       }
     }

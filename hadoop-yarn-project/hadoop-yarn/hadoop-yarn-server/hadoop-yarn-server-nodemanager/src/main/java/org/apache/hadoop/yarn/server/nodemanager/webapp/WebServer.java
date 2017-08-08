@@ -22,7 +22,6 @@ import static org.apache.hadoop.yarn.util.StringHelper.pajoin;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.security.HttpCrossOriginFilterInitializer;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -36,6 +35,8 @@ import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
 import org.apache.hadoop.yarn.webapp.YarnWebParams;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
+
+import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
 public class WebServer extends AbstractService {
 
@@ -134,7 +135,12 @@ public class WebServer extends AbstractService {
       route(
           pajoin("/containerlogs", CONTAINER_ID, APP_OWNER, CONTAINER_LOG_TYPE),
           NMController.class, "logs");
+      route("/errors-and-warnings", NMController.class, "errorsAndWarnings");
     }
 
+    @Override
+    protected Class<? extends GuiceContainer> getWebAppFilterClass() {
+      return NMWebAppFilter.class;
+    }
   }
 }

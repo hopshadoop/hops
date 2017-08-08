@@ -24,6 +24,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
+import org.apache.hadoop.yarn.server.nodemanager.NodeManager;
 import org.apache.hadoop.yarn.server.nodemanager.ResourceView;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 
@@ -50,6 +51,7 @@ public class NodeInfo {
   protected String hadoopVersionBuiltOn;
   protected String id;
   protected String nodeHostName;
+  protected long nmStartupTime;
 
   public NodeInfo() {
   } // JAXB needs this
@@ -80,6 +82,7 @@ public class NodeInfo {
     this.hadoopVersion = VersionInfo.getVersion();
     this.hadoopBuildVersion = VersionInfo.getBuildVersion();
     this.hadoopVersionBuiltOn = VersionInfo.getDate();
+    this.nmStartupTime = NodeManager.getNMStartupTime();
   }
 
   public String getNodeId() {
@@ -150,4 +153,7 @@ public class NodeInfo {
     return this.pmemCheckEnabled;
   }
 
+  public long getNMStartupTime() {
+    return nmStartupTime;
+  }
 }

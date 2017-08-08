@@ -46,11 +46,9 @@ public class TestAMSimulator {
     conf.set(SLSConfiguration.RM_SCHEDULER,
         "org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler");
     conf.setBoolean(SLSConfiguration.METRICS_SWITCH, false);
-
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
-
     rm = new ResourceManager();
     rm.init(conf);
     rm.start();

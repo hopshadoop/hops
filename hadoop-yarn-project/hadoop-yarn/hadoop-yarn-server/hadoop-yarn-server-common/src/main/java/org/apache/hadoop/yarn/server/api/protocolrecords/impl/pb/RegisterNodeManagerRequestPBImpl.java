@@ -20,32 +20,30 @@ package org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb;
 
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.NodeLabelPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationIdProto;
-import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.NodeLabelProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.NMContainerStatusProto;
+import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.NodeLabelsProto;
+import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.NodeLabelsProto.Builder;
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.RegisterNodeManagerRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.RegisterNodeManagerRequestProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
-
-
     
 public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest {
   RegisterNodeManagerRequestProto proto = RegisterNodeManagerRequestProto.getDefaultInstance();
@@ -56,7 +54,8 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
   private NodeId nodeId = null;
   private List<NMContainerStatus> containerStatuses = null;
   private List<ApplicationId> runningApplications = null;
-  
+  private Set<NodeLabel> labels = null;
+
   public RegisterNodeManagerRequestPBImpl() {
     builder = RegisterNodeManagerRequestProto.newBuilder();
   }
@@ -86,7 +85,14 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     if (this.nodeId != null) {
       builder.setNodeId(convertToProtoFormat(this.nodeId));
     }
-
+    if (this.labels != null) {
+      builder.clearNodeLabels();
+      Builder newBuilder = NodeLabelsProto.newBuilder();
+      for (NodeLabel label : labels) {
+        newBuilder.addNodeLabels(convertToProtoFormat(label));
+      }
+      builder.setNodeLabels(newBuilder.build());
+    }
   }
 
   private synchronized void addNMContainerStatusesToProto() {
@@ -292,6 +298,43 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     builder.setNmVersion(version);
   }
   
+  @Override
+  public Set<NodeLabel> getNodeLabels() {
+    initNodeLabels();
+    return this.labels;
+  }
+
+  @Override
+  public void setNodeLabels(Set<NodeLabel> nodeLabels) {
+    maybeInitBuilder();
+    builder.clearNodeLabels();
+    this.labels = nodeLabels;
+  }
+  
+  private void initNodeLabels() {
+    if (this.labels != null) {
+      return;
+    }
+    RegisterNodeManagerRequestProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasNodeLabels()) {
+      labels=null;
+      return;
+    }
+    NodeLabelsProto nodeLabels = p.getNodeLabels();
+    labels = new HashSet<NodeLabel>();
+    for(NodeLabelProto nlp : nodeLabels.getNodeLabelsList()) {
+      labels.add(convertFromProtoFormat(nlp));
+    }
+  }
+
+  private NodeLabelPBImpl convertFromProtoFormat(NodeLabelProto p) {
+    return new NodeLabelPBImpl(p);
+  }
+
+  private NodeLabelProto convertToProtoFormat(NodeLabel t) {
+    return ((NodeLabelPBImpl)t).getProto();
+  }
+
   private ApplicationIdPBImpl convertFromProtoFormat(ApplicationIdProto p) {
     return new ApplicationIdPBImpl(p);
   }

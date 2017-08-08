@@ -18,6 +18,7 @@
 -->
 
 <Project DefaultTargets="CheckRequireSnappy;CheckRequireIsal;Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="CheckRequireSnappy;Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
@@ -125,6 +126,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;NATIVE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\winutils\include;..\native\src\org\apache\hadoop\io\erasurecode\include;..\..\..\target\native\javah;%JAVA_HOME%\include;%JAVA_HOME%\include\win32;.\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\winutils\include;..\..\..\target\native\javah;%JAVA_HOME%\include;%JAVA_HOME%\include\win32;.\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
       <DisableSpecificWarnings>4244</DisableSpecificWarnings>
     </ClCompile>

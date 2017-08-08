@@ -194,13 +194,13 @@ public class TestRMHA {
    * 1. Standby: Should be a no-op
    * 2. Active: Active services should start
    * 3. Active: Should be a no-op.
-   *    While active, submit a couple of jobs
+   * While active, submit a couple of jobs
    * 4. Standby: Active services should stop
    * 5. Active: Active services should start
    * 6. Stop the RM: All services should stop and RM should not be ready to
    * become Active
    */
-  @Test (timeout = 30000)
+  @Test(timeout = 30000)
   public void testFailoverAndTransitions() throws Exception {
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
     configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
@@ -222,37 +222,37 @@ public class TestRMHA {
     checkMonitorHealth();
     checkStandbyRMFunctionality();
     verifyClusterMetrics(0, 0, 0, 0, 0, 0);
-    
+
     // 1. Transition to Standby - must be a no-op
     rm.adminService.transitionToStandby(requestInfo);
     checkMonitorHealth();
     checkStandbyRMFunctionality();
     verifyClusterMetrics(0, 0, 0, 0, 0, 0);
-    
+
     // 2. Transition to active
     rm.adminService.transitionToActive(requestInfo);
     checkMonitorHealth();
     checkActiveRMFunctionality();
     verifyClusterMetrics(1, 1, 1, 1, 2048, 1);
-    
+
     // 3. Transition to active - no-op
     rm.adminService.transitionToActive(requestInfo);
     checkMonitorHealth();
     checkActiveRMFunctionality();
     verifyClusterMetrics(1, 2, 2, 2, 2048, 2);
-    
+
     // 4. Transition to standby
     rm.adminService.transitionToStandby(requestInfo);
     checkMonitorHealth();
     checkStandbyRMFunctionality();
     verifyClusterMetrics(0, 0, 0, 0, 0, 0);
-   
+
     // 5. Transition to active to check Active->Standby->Active works
     rm.adminService.transitionToActive(requestInfo);
     checkMonitorHealth();
     checkActiveRMFunctionality();
     verifyClusterMetrics(1, 1, 1, 1, 2048, 1);
-    
+
     // 6. Stop the RM. All services should stop and RM should not be ready to
     // become active
     rm.stop();
@@ -362,7 +362,7 @@ public class TestRMHA {
     rm.adminService.transitionToStandby(requestInfo);
     rm.adminService.transitionToActive(requestInfo);
     rm.adminService.transitionToStandby(requestInfo);
-    
+
     MyCountingDispatcher dispatcher =
         (MyCountingDispatcher) rm.getRMContext().getDispatcher();
     assertTrue(!dispatcher.isStopped());
@@ -370,24 +370,24 @@ public class TestRMHA {
     rm.adminService.transitionToActive(requestInfo);
     assertEquals(errorMessageForEventHandler, expectedEventHandlerCount,
         ((MyCountingDispatcher) rm.getRMContext().getDispatcher())
-        .getEventHandlerCount());
+            .getEventHandlerCount());
     assertEquals(errorMessageForService, expectedServiceCount,
         rm.getServices().size());
 
-    
+
     // Keep the dispatcher reference before transitioning to standby
     dispatcher = (MyCountingDispatcher) rm.getRMContext().getDispatcher();
-    
-    
+
+
     rm.adminService.transitionToStandby(requestInfo);
     assertEquals(errorMessageForEventHandler, expectedEventHandlerCount,
         ((MyCountingDispatcher) rm.getRMContext().getDispatcher())
-        .getEventHandlerCount());
+            .getEventHandlerCount());
     assertEquals(errorMessageForService, expectedServiceCount,
         rm.getServices().size());
 
     assertTrue(dispatcher.isStopped());
-    
+
     rm.stop();
   }
 
@@ -408,7 +408,8 @@ public class TestRMHA {
     assertEquals(conf.get(YarnConfiguration.RM_HA_ID), RM1_NODE_ID);
 
     //test if RM_HA_ID can not be found
-    configuration.set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID+ "," + RM3_NODE_ID);
+    configuration
+        .set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + "," + RM3_NODE_ID);
     configuration.unset(YarnConfiguration.RM_HA_ID);
     conf = new YarnConfiguration(configuration);
     try {
@@ -498,14 +499,13 @@ public class TestRMHA {
 
     MemoryRMStateStore memStore = new MemoryRMStateStore() {
       @Override
-      public synchronized void updateApplicationState(
-          ApplicationStateData appState) {
+      public void updateApplicationState(ApplicationStateData appState) {
         notifyStoreOperationFailed(new StoreFencedException());
       }
     };
     memStore.init(conf);
     rm = new MockRM(conf, memStore) {
-      @Override
+	  @Override
       void stopSchedulerServices() throws Exception {
         Thread.sleep(10000);
         super.stopSchedulerServices();
@@ -748,7 +748,7 @@ public class TestRMHA {
   }
   
   private void verifyClusterMetrics(int activeNodes, int appsSubmitted,
-      int appsPending, int containersPending, int availableMB,
+      int appsPending, int containersPending, long availableMB,
       int activeApplications) throws Exception {
     int timeoutSecs = 0;
     QueueMetrics metrics = rm.getResourceScheduler().getRootQueueMetrics();
@@ -779,7 +779,7 @@ public class TestRMHA {
     assertTrue(message, isAllMetricAssertionDone);
   }
 
-  private void assertMetric(String metricName, int expected, int actual) {
+  private void assertMetric(String metricName, long expected, long actual) {
     assertEquals("Incorrect value for metric " + metricName, expected, actual);
   }
 

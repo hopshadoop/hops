@@ -100,6 +100,7 @@ import org.apache.hadoop.yarn.util.AuxiliaryServiceHelper;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.LinuxResourceCalculatorPlugin;
 import org.apache.hadoop.yarn.util.ResourceCalculatorPlugin;
+import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
@@ -125,7 +126,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
   @Before
   public void setup() throws IOException {
     conf.setClass(
-        YarnConfiguration.NM_CONTAINER_MON_RESOURCE_CALCULATOR,
+        YarnConfiguration.NM_MON_RESOURCE_CALCULATOR,
         LinuxResourceCalculatorPlugin.class, ResourceCalculatorPlugin.class);
     super.setup();
   }
@@ -166,7 +167,9 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
         commands.add("/bin/sh ./\\\"" + badSymlink + "\\\"");
       }
 
-      new DefaultContainerExecutor().writeLaunchEnv(fos, env, resources, commands);
+      new DefaultContainerExecutor()
+          .writeLaunchEnv(fos, env, resources, commands,
+              new Path(localLogDir.getAbsolutePath()), tempFile.getName());
       fos.flush();
       fos.close();
       FileUtil.setExecutable(tempFile, true);
@@ -233,7 +236,9 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       } else {
         commands.add("/bin/sh ./\\\"" + symLink + "\\\"");
       }
-      new DefaultContainerExecutor().writeLaunchEnv(fos, env, resources, commands);
+      new DefaultContainerExecutor()
+          .writeLaunchEnv(fos, env, resources, commands,
+              new Path(localLogDir.getAbsolutePath()));
       fos.flush();
       fos.close();
       FileUtil.setExecutable(tempFile, true);
@@ -286,7 +291,9 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
           "\"workflowName\":\"\n\ninsert table " +
           "\npartition (cd_education_status)\nselect cd_demo_sk, cd_gender, " );
       List<String> commands = new ArrayList<String>();
-      new DefaultContainerExecutor().writeLaunchEnv(fos, env, resources, commands);
+      new DefaultContainerExecutor()
+          .writeLaunchEnv(fos, env, resources, commands,
+              new Path(localLogDir.getAbsolutePath()));
       fos.flush();
       fos.close();
 
@@ -364,7 +371,8 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       List<String> commands = new ArrayList<String>();
       commands.add(command);
       ContainerExecutor exec = new DefaultContainerExecutor();
-      exec.writeLaunchEnv(fos, env, resources, commands);
+      exec.writeLaunchEnv(fos, env, resources, commands,
+          new Path(localLogDir.getAbsolutePath()));
       fos.flush();
       fos.close();
 
@@ -592,7 +600,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
 
     // upload the script file so that the container can run it
     URL resource_alpha =
-        ConverterUtils.getYarnUrlFromPath(localFS
+        URL.fromPath(localFS
             .makeQualified(new Path(scriptFile.getAbsolutePath())));
     LocalResource rsrc_alpha =
         recordFactory.newRecordInstance(LocalResource.class);
@@ -793,7 +801,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
 
     // upload the script file so that the container can run it
     URL resource_alpha =
-        ConverterUtils.getYarnUrlFromPath(localFS
+        URL.fromPath(localFS
             .makeQualified(new Path(scriptFile.getAbsolutePath())));
     LocalResource rsrc_alpha =
         recordFactory.newRecordInstance(LocalResource.class);
@@ -978,7 +986,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     Assume.assumeTrue(Shell.WINDOWS);
 
     // The tests are built on assuming 8191 max command line length
-    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGHT);
+    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGTH);
 
     ShellScriptBuilder builder = ShellScriptBuilder.create();
 
@@ -987,14 +995,14 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
         org.apache.commons.lang.StringUtils.repeat("A", 1024)));
     builder.command(Arrays.asList(
         org.apache.commons.lang.StringUtils.repeat(
-            "E", Shell.WINDOWS_MAX_SHELL_LENGHT - callCmd.length())));
+            "E", Shell.WINDOWS_MAX_SHELL_LENGTH - callCmd.length())));
     try {
       builder.command(Arrays.asList(
           org.apache.commons.lang.StringUtils.repeat(
-              "X", Shell.WINDOWS_MAX_SHELL_LENGHT -callCmd.length() + 1)));
+              "X", Shell.WINDOWS_MAX_SHELL_LENGTH -callCmd.length() + 1)));
       fail("longCommand was expected to throw");
     } catch(IOException e) {
-      assertThat(e.getMessage(), containsString(expectedMessage));
+      assertThat(e.getMessage(), CoreMatchers.containsString(expectedMessage));
     }
 
     // Composite tests, from parts: less, exact and +
@@ -1016,7 +1024,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
           org.apache.commons.lang.StringUtils.repeat("X", 2048 - callCmd.length())));
       fail("long commands was expected to throw");
     } catch(IOException e) {
-      assertThat(e.getMessage(), containsString(expectedMessage));
+      assertThat(e.getMessage(), CoreMatchers.containsString(expectedMessage));
     }
   }
   
@@ -1026,20 +1034,20 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     Assume.assumeTrue(Shell.WINDOWS);
 
     // The tests are built on assuming 8191 max command line length
-    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGHT);
+    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGTH);
 
     ShellScriptBuilder builder = ShellScriptBuilder.create();
 
     // test env
     builder.env("somekey", org.apache.commons.lang.StringUtils.repeat("A", 1024));
     builder.env("somekey", org.apache.commons.lang.StringUtils.repeat(
-        "A", Shell.WINDOWS_MAX_SHELL_LENGHT - ("@set somekey=").length()));
+        "A", Shell.WINDOWS_MAX_SHELL_LENGTH - ("@set somekey=").length()));
     try {
       builder.env("somekey", org.apache.commons.lang.StringUtils.repeat(
-          "A", Shell.WINDOWS_MAX_SHELL_LENGHT - ("@set somekey=").length()) + 1);
+          "A", Shell.WINDOWS_MAX_SHELL_LENGTH - ("@set somekey=").length()) + 1);
       fail("long env was expected to throw");
     } catch(IOException e) {
-      assertThat(e.getMessage(), containsString(expectedMessage));
+      assertThat(e.getMessage(), CoreMatchers.containsString(expectedMessage));
     }
   }
     
@@ -1051,20 +1059,20 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     Assume.assumeTrue(Shell.WINDOWS);
 
     // The tests are built on assuming 8191 max command line length
-    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGHT);
+    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGTH);
 
     ShellScriptBuilder builder = ShellScriptBuilder.create();
 
     // test mkdir
     builder.mkdir(new Path(org.apache.commons.lang.StringUtils.repeat("A", 1024)));
-    builder.mkdir(new Path(org.apache.commons.lang.StringUtils.repeat(
-        "E", (Shell.WINDOWS_MAX_SHELL_LENGHT - mkDirCmd.length())/2)));
+    builder.mkdir(new Path(org.apache.commons.lang.StringUtils.repeat("E",
+        (Shell.WINDOWS_MAX_SHELL_LENGTH - mkDirCmd.length()) / 2)));
     try {
       builder.mkdir(new Path(org.apache.commons.lang.StringUtils.repeat(
-          "X", (Shell.WINDOWS_MAX_SHELL_LENGHT - mkDirCmd.length())/2 +1)));
+          "X", (Shell.WINDOWS_MAX_SHELL_LENGTH - mkDirCmd.length())/2 +1)));
       fail("long mkdir was expected to throw");
     } catch(IOException e) {
-      assertThat(e.getMessage(), containsString(expectedMessage));
+      assertThat(e.getMessage(), CoreMatchers.containsString(expectedMessage));
     }    
   }
 
@@ -1072,11 +1080,10 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
   public void testWindowsShellScriptBuilderLink() throws IOException {
     // Test is only relevant on Windows
     Assume.assumeTrue(Shell.WINDOWS);
-
-    String linkCmd = "@" +Shell.WINUTILS + " symlink \"\" \"\"";
+    String linkCmd = "@" + Shell.getWinUtilsPath() + " symlink \"\" \"\"";
 
     // The tests are built on assuming 8191 max command line length
-    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGHT);
+    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGTH);
 
     ShellScriptBuilder builder = ShellScriptBuilder.create();
 
@@ -1085,18 +1092,18 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
         new Path(org.apache.commons.lang.StringUtils.repeat("B", 1024)));
     builder.link(
         new Path(org.apache.commons.lang.StringUtils.repeat(
-            "E", (Shell.WINDOWS_MAX_SHELL_LENGHT - linkCmd.length())/2)),
+            "E", (Shell.WINDOWS_MAX_SHELL_LENGTH - linkCmd.length())/2)),
         new Path(org.apache.commons.lang.StringUtils.repeat(
-            "F", (Shell.WINDOWS_MAX_SHELL_LENGHT - linkCmd.length())/2)));
+            "F", (Shell.WINDOWS_MAX_SHELL_LENGTH - linkCmd.length())/2)));
     try {
       builder.link(
           new Path(org.apache.commons.lang.StringUtils.repeat(
-              "X", (Shell.WINDOWS_MAX_SHELL_LENGHT - linkCmd.length())/2 + 1)),
+              "X", (Shell.WINDOWS_MAX_SHELL_LENGTH - linkCmd.length())/2 + 1)),
           new Path(org.apache.commons.lang.StringUtils.repeat(
-              "Y", (Shell.WINDOWS_MAX_SHELL_LENGHT - linkCmd.length())/2) + 1));
+              "Y", (Shell.WINDOWS_MAX_SHELL_LENGTH - linkCmd.length())/2) + 1));
       fail("long link was expected to throw");
     } catch(IOException e) {
-      assertThat(e.getMessage(), containsString(expectedMessage));
+      assertThat(e.getMessage(), CoreMatchers.containsString(expectedMessage));
     }
   }
 
@@ -1133,7 +1140,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
 
     // upload the script file so that the container can run it
     URL resource_alpha =
-        ConverterUtils.getYarnUrlFromPath(localFS
+        URL.fromPath(localFS
             .makeQualified(new Path(scriptFile.getAbsolutePath())));
     LocalResource rsrc_alpha =
         recordFactory.newRecordInstance(LocalResource.class);
@@ -1208,5 +1215,77 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
             .getContainerStatuses().get(0);
     Assert.assertEquals(ExitCode.FORCE_KILLED.getExitCode(),
         containerStatus.getExitStatus());
+  }
+
+  @Test
+  public void testDebuggingInformation() throws IOException {
+
+    File shellFile = null;
+    File tempFile = null;
+    Configuration conf = new YarnConfiguration();
+    try {
+      shellFile = Shell.appendScriptExtension(tmpDir, "hello");
+      tempFile = Shell.appendScriptExtension(tmpDir, "temp");
+      String testCommand = Shell.WINDOWS ? "@echo \"hello\"" :
+          "echo \"hello\"";
+      PrintWriter writer = new PrintWriter(new FileOutputStream(shellFile));
+      FileUtil.setExecutable(shellFile, true);
+      writer.println(testCommand);
+      writer.close();
+
+      Map<Path, List<String>> resources = new HashMap<Path, List<String>>();
+      Map<String, String> env = new HashMap<String, String>();
+      List<String> commands = new ArrayList<String>();
+      if (Shell.WINDOWS) {
+        commands.add("cmd");
+        commands.add("/c");
+        commands.add("\"" + shellFile.getAbsolutePath() + "\"");
+      } else {
+        commands.add("/bin/sh \\\"" + shellFile.getAbsolutePath() + "\\\"");
+      }
+
+      boolean[] debugLogsExistArray = { false, true };
+      for (boolean debugLogsExist : debugLogsExistArray) {
+
+        conf.setBoolean(YarnConfiguration.NM_LOG_CONTAINER_DEBUG_INFO,
+          debugLogsExist);
+        FileOutputStream fos = new FileOutputStream(tempFile);
+        ContainerExecutor exec = new DefaultContainerExecutor();
+        exec.setConf(conf);
+        exec.writeLaunchEnv(fos, env, resources, commands,
+          new Path(localLogDir.getAbsolutePath()), tempFile.getName());
+        fos.flush();
+        fos.close();
+        FileUtil.setExecutable(tempFile, true);
+
+        Shell.ShellCommandExecutor shexc = new Shell.ShellCommandExecutor(
+          new String[] { tempFile.getAbsolutePath() }, tmpDir);
+
+        shexc.execute();
+        assertEquals(shexc.getExitCode(), 0);
+        File directorInfo =
+          new File(localLogDir, ContainerExecutor.DIRECTORY_CONTENTS);
+        File scriptCopy = new File(localLogDir, tempFile.getName());
+
+        Assert.assertEquals("Directory info file missing", debugLogsExist,
+          directorInfo.exists());
+        Assert.assertEquals("Copy of launch script missing", debugLogsExist,
+          scriptCopy.exists());
+        if (debugLogsExist) {
+          Assert.assertTrue("Directory info file size is 0",
+            directorInfo.length() > 0);
+          Assert.assertTrue("Size of copy of launch script is 0",
+            scriptCopy.length() > 0);
+        }
+      }
+    } finally {
+      // cleanup
+      if (shellFile != null && shellFile.exists()) {
+        shellFile.delete();
+      }
+      if (tempFile != null && tempFile.exists()) {
+        tempFile.delete();
+      }
+    }
   }
 }

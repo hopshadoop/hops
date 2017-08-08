@@ -340,7 +340,7 @@ public class NamenodeSelector {
         if (e instanceof RemoteException
                 && ((RemoteException) e).getErrorCode().equals(
                 RpcHeaderProtos.RpcResponseHeaderProto.RpcErrorCodeProto.FATAL_UNAUTHORIZED)) {
-          throw new RpcServerException(e.getMessage());
+          throw e;
         }
         LOG.warn("Failed to get list of NN from default NN. Default NN was " +
             defaultUri);

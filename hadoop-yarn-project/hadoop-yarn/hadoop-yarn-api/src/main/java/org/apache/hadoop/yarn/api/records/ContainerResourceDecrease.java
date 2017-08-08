@@ -18,15 +18,13 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Used by Application Master to ask Node Manager reduce size of a specified
- * container
+ * Use {@link UpdatedContainer} instead
  */
+@Deprecated
 public abstract class ContainerResourceDecrease {
-  @Public
   public static ContainerResourceDecrease newInstance(
       ContainerId existingContainerId, Resource targetCapability) {
     ContainerResourceDecrease context = Records
@@ -36,18 +34,14 @@ public abstract class ContainerResourceDecrease {
     return context;
   }
 
-  @Public
   public abstract ContainerId getContainerId();
 
-  @Public
   public abstract void setContainerId(ContainerId containerId);
 
-  @Public
   public abstract Resource getCapability();
 
-  @Public
   public abstract void setCapability(Resource capability);
-  
+
   @Override
   public int hashCode() {
     return getCapability().hashCode() + getContainerId().hashCode();
@@ -57,19 +51,19 @@ public abstract class ContainerResourceDecrease {
   public boolean equals(Object other) {
     if (other instanceof ContainerResourceDecrease) {
       ContainerResourceDecrease ctx = (ContainerResourceDecrease)other;
-      
+
       if (getContainerId() == null && ctx.getContainerId() != null) {
         return false;
       } else if (!getContainerId().equals(ctx.getContainerId())) {
         return false;
       }
-      
+
       if (getCapability() == null && ctx.getCapability() != null) {
         return false;
       } else if (!getCapability().equals(ctx.getCapability())) {
         return false;
       }
-      
+
       return true;
     } else {
       return false;

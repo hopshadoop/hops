@@ -22,13 +22,13 @@
   <parent>
     <artifactId>hadoop-yarn-server</artifactId>
     <groupId>io.hops</groupId>
-    <version>2.7.3</version>
+    <version>2.8.2</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn-server-applicationhistoryservice</artifactId>
-  <version>2.7.3</version>
-  <name>hadoop-yarn-server-applicationhistoryservice</name>
+  <version>2.8.2</version>
+  <name>Apache Hadoop YARN ApplicationHistoryService</name>
 
   <properties>
     <!-- Needed for generating FindBugs warnings using parent pom -->
@@ -180,6 +180,21 @@
       <artifactId>bcprov-jdk16</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>de.ruedigermoeller</groupId>
+      <artifactId>fst</artifactId>
+      <version>2.50</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.javassist</groupId>
+          <artifactId>javassist</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.objenesis</groupId>
+          <artifactId>objenesis</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
   </dependencies>
 
   <build>
@@ -200,7 +215,7 @@
               <imports>
                 <param>${basedir}/../../../../hadoop-common-project/hadoop-common/src/main/proto</param>
                 <param>${basedir}/../../hadoop-yarn-api/src/main/proto</param>
-                <param>${basedir}/../../hadoop-yarn-common/src/main/proto/server/</param>
+                <param>${basedir}/../../hadoop-yarn-common/src/main/proto</param>
                 <param>${basedir}/../hadoop-yarn-server-common/src/main/proto</param>
                 <param>${basedir}/src/main/proto</param>
               </imports>
@@ -212,6 +227,17 @@
               </source>
               <output>${project.build.directory}/generated-sources/java</output>
             </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+            <phase>test-compile</phase>
           </execution>
         </executions>
       </plugin>

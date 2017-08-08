@@ -31,11 +31,17 @@ import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersResponse;
@@ -43,6 +49,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.StopContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.SerializedException;
@@ -56,6 +63,7 @@ import org.apache.hadoop.yarn.exceptions.NMNotYetReadyException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
+import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
@@ -135,6 +143,19 @@ public class TestApplicationMasterLauncher {
     @Override
     public GetContainerStatusesResponse getContainerStatuses(
         GetContainerStatusesRequest request) throws YarnException {
+      return null;
+    }
+
+    @Override
+    public IncreaseContainersResourceResponse increaseContainersResource(
+        IncreaseContainersResourceRequest request)
+            throws YarnException {
+      return null;
+    }
+
+    @Override
+    public SignalContainerResponse signalToContainer(
+        SignalContainerRequest request) throws YarnException, IOException {
       return null;
     }
   }
@@ -318,6 +339,63 @@ public class TestApplicationMasterLauncher {
         new ArrayList<ContainerId>());
       Assert.fail();
     } catch (ApplicationAttemptNotFoundException e) {
+    }
+  }
+
+  @Test
+  public void testSetupTokens() throws Exception {
+    MockRM rm = new MockRM();
+    rm.start();
+    MockNM nm1 = rm.registerNode("h1:1234", 5000);
+    RMApp app = rm.submitApp(2000);
+    /// kick the scheduling
+    nm1.nodeHeartbeat(true);
+    RMAppAttempt attempt = app.getCurrentAppAttempt();
+    MyAMLauncher launcher = new MyAMLauncher(rm.getRMContext(),
+        attempt, AMLauncherEventType.LAUNCH, rm.getConfig());
+    DataOutputBuffer dob = new DataOutputBuffer();
+    Credentials ts = new Credentials();
+    ts.writeTokenStorageToStream(dob);
+    ByteBuffer securityTokens = ByteBuffer.wrap(dob.getData(),
+        0, dob.getLength());
+    ContainerLaunchContext amContainer =
+        ContainerLaunchContext.newInstance(null, null,
+            null, null, securityTokens, null);
+    ContainerId containerId = ContainerId.newContainerId(
+        attempt.getAppAttemptId(), 0L);
+
+    try {
+      launcher.setupTokens(amContainer, containerId);
+    } catch (Exception e) {
+      // ignore the first fake exception
+    }
+    try {
+      launcher.setupTokens(amContainer, containerId);
+    } catch (java.io.EOFException e) {
+      Assert.fail("EOFException should not happen.");
+    }
+  }
+
+  static class MyAMLauncher extends AMLauncher {
+    int count;
+    public MyAMLauncher(RMContext rmContext, RMAppAttempt application,
+        AMLauncherEventType eventType, Configuration conf) {
+      super(rmContext, application, eventType, conf);
+      count = 0;
+    }
+
+    protected org.apache.hadoop.security.token.Token<AMRMTokenIdentifier>
+        createAndSetAMRMToken() {
+      count++;
+      if (count == 1) {
+        throw new RuntimeException("createAndSetAMRMToken failure");
+      }
+      return null;
+    }
+
+    protected void setupTokens(ContainerLaunchContext container,
+        ContainerId containerID) throws IOException {
+      super.setupTokens(container, containerID);
     }
   }
 }

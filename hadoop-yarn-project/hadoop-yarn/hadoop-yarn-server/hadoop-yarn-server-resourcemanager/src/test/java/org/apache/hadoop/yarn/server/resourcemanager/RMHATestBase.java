@@ -32,6 +32,8 @@ import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
@@ -48,7 +50,7 @@ import org.junit.Assert;
 import org.junit.Before;
 
 
-public class RMHATestBase extends ClientBaseWithFixes{
+public abstract class RMHATestBase extends ClientBaseWithFixes{
 
   private static final int ZK_TIMEOUT_MS = 5000;
   private static StateChangeRequestInfo requestInfo =
@@ -118,8 +120,18 @@ public class RMHATestBase extends ClientBaseWithFixes{
   }
 
   protected void startRMs() throws IOException {
-    rm1 = new MockRM(confForRM1, null, false);
-    rm2 = new MockRM(confForRM2, null, false);
+    rm1 = new MockRM(confForRM1, null, false, false){
+      @Override
+      protected Dispatcher createDispatcher() {
+        return new DrainDispatcher();
+      }
+    };
+    rm2 = new MockRM(confForRM2, null, false, false){
+      @Override
+      protected Dispatcher createDispatcher() {
+        return new DrainDispatcher();
+      }
+    };
     startRMs(rm1, confForRM1, rm2, confForRM2);
 
   }

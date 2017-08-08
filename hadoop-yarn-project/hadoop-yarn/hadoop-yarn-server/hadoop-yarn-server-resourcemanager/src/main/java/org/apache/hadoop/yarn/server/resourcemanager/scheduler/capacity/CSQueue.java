@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -32,11 +33,15 @@ import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueState;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.exceptions.InvalidResourceRequestException;
+import org.apache.hadoop.yarn.security.PrivilegedEntity;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceLimits;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceUsage;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedContainerChangeRequest;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 
@@ -190,10 +195,13 @@ extends org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue {
    * @param clusterResource the resource of the cluster.
    * @param node node on which resources are available
    * @param resourceLimits how much overall resource of this queue can use. 
+   * @param schedulingMode Type of exclusive check when assign container on a 
+   * NodeManager, see {@link SchedulingMode}.
    * @return the assignment
    */
   public CSAssignment assignContainers(Resource clusterResource,
-      FiCaSchedulerNode node, ResourceLimits resourceLimits);
+      FiCaSchedulerNode node, ResourceLimits resourceLimits,
+      SchedulingMode schedulingMode);
   
   /**
    * A container assigned to the queue has completed.
@@ -213,6 +221,14 @@ extends org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue {
       RMContainer container, ContainerStatus containerStatus, 
       RMContainerEventType event, CSQueue childQueue,
       boolean sortQueues);
+
+  /**
+   * We have a reserved increased container in the queue, we need to unreserve
+   * it. Since we just want to cancel the reserved increase request instead of
+   * stop the container, we shouldn't call completedContainer for such purpose.
+   */
+  public void unreserveIncreasedContainer(Resource clusterResource,
+      FiCaSchedulerApp app, FiCaSchedulerNode node, RMContainer rmContainer);
 
   /**
    * Get the number of applications in the queue.
@@ -286,16 +302,40 @@ extends org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue {
   public ResourceUsage getQueueResourceUsage();
 
   /**
-   * Get used capacity for the specified label.
-   * @param nodeLabel
-   * @return used capacity
+   * When partition of node updated, we will update queue's resource usage if it
+   * has container(s) running on that.
    */
-  public float getUsedCapacity(String nodeLabel);
+  public void incUsedResource(String nodePartition, Resource resourceToInc,
+      SchedulerApplicationAttempt application);
 
   /**
-   * Get absolute used capacity for the specified label.
-   * @param nodeLabel
-   * @return absolute used capacity
+   * When partition of node updated, we will update queue's resource usage if it
+   * has container(s) running on that.
    */
-  public float getAbsoluteUsedCapacity(String nodeLabel);
+  public void decUsedResource(String nodePartition, Resource resourceToDec,
+      SchedulerApplicationAttempt application);
+
+  /**
+   * When an outstanding resource is fulfilled or canceled, calling this will
+   * decrease pending resource in a queue.
+   *
+   * @param nodeLabel
+   *          asked by application
+   * @param resourceToDec
+   *          new resource asked
+   */
+  public void decPendingResource(String nodeLabel, Resource resourceToDec);
+  
+  /**
+   * Decrease container resource in the queue
+   */
+  public void decreaseContainer(Resource clusterResource,
+      SchedContainerChangeRequest decreaseRequest,
+      FiCaSchedulerApp app) throws InvalidResourceRequestException;
+
+  /**
+   * Get valid Node Labels for this queue
+   * @return valid node labels
+   */
+  public Set<String> getNodeLabelsForQueue();
 }

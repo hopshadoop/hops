@@ -51,6 +51,9 @@ public class RMAppAttemptMetrics {
   private AtomicLong finishedMemorySeconds = new AtomicLong(0);
   private AtomicLong finishedVcoreSeconds = new AtomicLong(0);
   private AtomicLong finishedGPUSeconds = new AtomicLong(0);
+  private AtomicLong preemptedMemorySeconds = new AtomicLong(0);
+  private AtomicLong preemptedVcoreSeconds = new AtomicLong(0);
+  private AtomicLong preemptedGPUSeconds = new AtomicLong(0);
   private RMContext rmContext;
 
   private int[][] localityStatistics =
@@ -99,6 +102,18 @@ public class RMAppAttemptMetrics {
     }
   }
 
+  public long getPreemptedMemory() {
+    return preemptedMemorySeconds.get();
+  }
+
+  public long getPreemptedVcore() {
+    return preemptedVcoreSeconds.get();
+  }
+
+  public long getPreemptedGPU() {
+    return preemptedGPUSeconds.get();
+  }
+
   public int getNumNonAMContainersPreempted() {
     return numNonAMContainersPreempted.get();
   }
@@ -137,6 +152,14 @@ public class RMAppAttemptMetrics {
     this.finishedMemorySeconds.addAndGet(finishedMemorySeconds);
     this.finishedVcoreSeconds.addAndGet(finishedVcoreSeconds);
     this.finishedGPUSeconds.addAndGet(finishedGPUSeconds);
+  }
+
+  public void updateAggregatePreemptedAppResourceUsage(
+      long preemptedMemorySeconds, long preemptedVcoreSeconds,
+      long preemptedGPUSeconds) {
+    this.preemptedMemorySeconds.addAndGet(preemptedMemorySeconds);
+    this.preemptedVcoreSeconds.addAndGet(preemptedVcoreSeconds);
+    this.preemptedGPUSeconds.addAndGet(preemptedGPUSeconds);
   }
 
   public void incNumAllocatedContainers(NodeType containerType,

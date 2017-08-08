@@ -36,6 +36,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.ipc.RemoteException;
 
 @RunWith(Parameterized.class)
 public class TestDFSSSLServer extends HopsSSLTestUtils {
@@ -127,7 +128,7 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
         if (error_mode.equals(CERT_ERR.NO_CA)) {
             rule.expect(SSLException.class);
         } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
-            rule.expect(RpcServerException.class);
+            rule.expect(RemoteException.class);            
         }
         dfs2 = DistributedFileSystem.newInstance(conf);
     }

@@ -31,9 +31,11 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
@@ -61,10 +63,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.MockRMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.ContainerPreemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
@@ -78,12 +83,6 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.mockito.Mockito;
-
-import java.io.IOException;
-import java.util.HashMap;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @SuppressWarnings("unchecked")
 public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
@@ -109,7 +108,7 @@ public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
     try {
       rm.start();
       testMaximumAllocationMemoryHelper(
-          (AbstractYarnScheduler) rm.getResourceScheduler(),
+          rm.getResourceScheduler(),
           node1MaxMemory, node2MaxMemory, node3MaxMemory,
           configuredMaxMemory, configuredMaxMemory, configuredMaxMemory,
           configuredMaxMemory, configuredMaxMemory, configuredMaxMemory);
@@ -124,7 +123,7 @@ public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
     try {
       rm.start();
       testMaximumAllocationMemoryHelper(
-          (AbstractYarnScheduler) rm.getResourceScheduler(),
+          rm.getResourceScheduler(),
           node1MaxMemory, node2MaxMemory, node3MaxMemory,
           configuredMaxMemory, configuredMaxMemory, configuredMaxMemory,
           node2MaxMemory, node3MaxMemory, node2MaxMemory);
@@ -134,45 +133,45 @@ public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
   }
 
   private void testMaximumAllocationMemoryHelper(
-       AbstractYarnScheduler scheduler,
+       YarnScheduler scheduler,
        final int node1MaxMemory, final int node2MaxMemory,
        final int node3MaxMemory, final int... expectedMaxMemory)
        throws Exception {
     Assert.assertEquals(6, expectedMaxMemory.length);
 
     Assert.assertEquals(0, scheduler.getNumClusterNodes());
-    int maxMemory = scheduler.getMaximumResourceCapability().getMemory();
+    long maxMemory = scheduler.getMaximumResourceCapability().getMemorySize();
     Assert.assertEquals(expectedMaxMemory[0], maxMemory);
 
     RMNode node1 = MockNodes.newNodeInfo(
         0, Resources.createResource(node1MaxMemory), 1, "127.0.0.2");
     scheduler.handle(new NodeAddedSchedulerEvent(node1));
     Assert.assertEquals(1, scheduler.getNumClusterNodes());
-    maxMemory = scheduler.getMaximumResourceCapability().getMemory();
+    maxMemory = scheduler.getMaximumResourceCapability().getMemorySize();
     Assert.assertEquals(expectedMaxMemory[1], maxMemory);
 
     scheduler.handle(new NodeRemovedSchedulerEvent(node1));
     Assert.assertEquals(0, scheduler.getNumClusterNodes());
-    maxMemory = scheduler.getMaximumResourceCapability().getMemory();
+    maxMemory = scheduler.getMaximumResourceCapability().getMemorySize();
     Assert.assertEquals(expectedMaxMemory[2], maxMemory);
 
     RMNode node2 = MockNodes.newNodeInfo(
         0, Resources.createResource(node2MaxMemory), 2, "127.0.0.3");
     scheduler.handle(new NodeAddedSchedulerEvent(node2));
     Assert.assertEquals(1, scheduler.getNumClusterNodes());
-    maxMemory = scheduler.getMaximumResourceCapability().getMemory();
+    maxMemory = scheduler.getMaximumResourceCapability().getMemorySize();
     Assert.assertEquals(expectedMaxMemory[3], maxMemory);
 
     RMNode node3 = MockNodes.newNodeInfo(
         0, Resources.createResource(node3MaxMemory), 3, "127.0.0.4");
     scheduler.handle(new NodeAddedSchedulerEvent(node3));
     Assert.assertEquals(2, scheduler.getNumClusterNodes());
-    maxMemory = scheduler.getMaximumResourceCapability().getMemory();
+    maxMemory = scheduler.getMaximumResourceCapability().getMemorySize();
     Assert.assertEquals(expectedMaxMemory[4], maxMemory);
 
     scheduler.handle(new NodeRemovedSchedulerEvent(node3));
     Assert.assertEquals(1, scheduler.getNumClusterNodes());
-    maxMemory = scheduler.getMaximumResourceCapability().getMemory();
+    maxMemory = scheduler.getMaximumResourceCapability().getMemorySize();
     Assert.assertEquals(expectedMaxMemory[5], maxMemory);
 
     scheduler.handle(new NodeRemovedSchedulerEvent(node2));
@@ -196,7 +195,7 @@ public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
     try {
       rm.start();
       testMaximumAllocationVCoresHelper(
-          (AbstractYarnScheduler) rm.getResourceScheduler(),
+          rm.getResourceScheduler(),
           node1MaxVCores, node2MaxVCores, node3MaxVCores,
           configuredMaxVCores, configuredMaxVCores, configuredMaxVCores,
           configuredMaxVCores, configuredMaxVCores, configuredMaxVCores);
@@ -211,7 +210,7 @@ public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
     try {
       rm.start();
       testMaximumAllocationVCoresHelper(
-          (AbstractYarnScheduler) rm.getResourceScheduler(),
+          rm.getResourceScheduler(),
           node1MaxVCores, node2MaxVCores, node3MaxVCores,
           configuredMaxVCores, configuredMaxVCores, configuredMaxVCores,
           node2MaxVCores, node3MaxVCores, node2MaxVCores);
@@ -221,7 +220,7 @@ public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
   }
 
   private void testMaximumAllocationVCoresHelper(
-      AbstractYarnScheduler scheduler,
+      YarnScheduler scheduler,
       final int node1MaxVCores, final int node2MaxVCores,
       final int node3MaxVCores, final int... expectedMaxVCores)
       throws Exception {
@@ -388,6 +387,171 @@ public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
     }
   }
 
+  /*
+   * This test case is to test the pending containers are cleared from the
+   * attempt even if one of the application in the list have current attempt as
+   * null (no attempt).
+   */
+  @SuppressWarnings({ "rawtypes" })
+  @Test(timeout = 10000)
+  public void testReleasedContainerIfAppAttemptisNull() throws Exception {
+    YarnConfiguration conf=getConf();
+    conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
+    MemoryRMStateStore memStore = new MemoryRMStateStore();
+    memStore.init(conf);
+    MockRM rm1 = new MockRM(conf, memStore);
+    try {
+      rm1.start();
+      MockNM nm1 =
+          new MockNM("127.0.0.1:1234", 8192, rm1.getResourceTrackerService());
+      nm1.registerNode();
+
+      AbstractYarnScheduler scheduler =
+          (AbstractYarnScheduler) rm1.getResourceScheduler();
+      // Mock App without attempt
+      RMApp mockAPp =
+          new MockRMApp(125, System.currentTimeMillis(), RMAppState.NEW);
+      SchedulerApplication<FiCaSchedulerApp> application =
+          new SchedulerApplication<FiCaSchedulerApp>(null, mockAPp.getUser());
+
+      // Second app with one app attempt
+      RMApp app = rm1.submitApp(200);
+      MockAM am1 = MockRM.launchAndRegisterAM(app, rm1, nm1);
+      final ContainerId runningContainer =
+          ContainerId.newContainerId(am1.getApplicationAttemptId(), 2);
+      am1.allocate(null, Arrays.asList(runningContainer));
+
+      Map schedulerApplications = scheduler.getSchedulerApplications();
+      SchedulerApplication schedulerApp =
+          (SchedulerApplication) scheduler.getSchedulerApplications().get(
+              app.getApplicationId());
+      schedulerApplications.put(mockAPp.getApplicationId(), application);
+
+      scheduler.clearPendingContainerCache();
+
+      Assert.assertEquals("Pending containers are not released "
+          + "when one of the application attempt is null !", schedulerApp
+          .getCurrentAppAttempt().getPendingRelease().size(), 0);
+    } finally {
+      if (rm1 != null) {
+        rm1.stop();
+      }
+    }
+  }
+
+  @Test(timeout=60000)
+  public void testContainerReleasedByNode() throws Exception {
+    System.out.println("Starting testContainerReleasedByNode");
+    configureScheduler();
+    YarnConfiguration conf = getConf();
+    MockRM rm1 = new MockRM(conf);
+    try {
+      rm1.start();
+      RMApp app1 =
+          rm1.submitApp(200, "name", "user",
+              new HashMap<ApplicationAccessType, String>(), false, "default",
+              -1, null, "Test", false, true);
+      MockNM nm1 =
+          new MockNM("127.0.0.1:1234", 10240, rm1.getResourceTrackerService());
+      nm1.registerNode();
+
+      MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nm1);
+
+      // allocate a container that fills more than half the node
+      am1.allocate("127.0.0.1", 8192, 1, new ArrayList<ContainerId>());
+      nm1.nodeHeartbeat(true);
+
+      // wait for containers to be allocated.
+      List<Container> containers =
+          am1.allocate(new ArrayList<ResourceRequest>(),
+              new ArrayList<ContainerId>()).getAllocatedContainers();
+      while (containers.isEmpty()) {
+        Thread.sleep(10);
+        nm1.nodeHeartbeat(true);
+        containers = am1.allocate(new ArrayList<ResourceRequest>(),
+            new ArrayList<ContainerId>()).getAllocatedContainers();
+      }
+
+      // release the container from the AM
+      ContainerId cid = containers.get(0).getId();
+      List<ContainerId> releasedContainers = new ArrayList<>(1);
+      releasedContainers.add(cid);
+      List<ContainerStatus> completedContainers = am1.allocate(
+          new ArrayList<ResourceRequest>(), releasedContainers)
+          .getCompletedContainersStatuses();
+      while (completedContainers.isEmpty()) {
+        Thread.sleep(10);
+        completedContainers = am1.allocate(
+          new ArrayList<ResourceRequest>(), releasedContainers)
+          .getCompletedContainersStatuses();
+      }
+
+      // verify new container can be allocated immediately because container
+      // never launched on the node
+      containers = am1.allocate("127.0.0.1", 8192, 1,
+          new ArrayList<ContainerId>()).getAllocatedContainers();
+      nm1.nodeHeartbeat(true);
+      while (containers.isEmpty()) {
+        Thread.sleep(10);
+        nm1.nodeHeartbeat(true);
+        containers = am1.allocate(new ArrayList<ResourceRequest>(),
+            new ArrayList<ContainerId>()).getAllocatedContainers();
+      }
+
+      // launch the container on the node
+      cid = containers.get(0).getId();
+      nm1.nodeHeartbeat(cid.getApplicationAttemptId(), cid.getContainerId(),
+          ContainerState.RUNNING);
+      rm1.waitForState(nm1, cid, RMContainerState.RUNNING);
+
+      // release the container from the AM
+      releasedContainers.clear();
+      releasedContainers.add(cid);
+      completedContainers = am1.allocate(
+          new ArrayList<ResourceRequest>(), releasedContainers)
+          .getCompletedContainersStatuses();
+      while (completedContainers.isEmpty()) {
+        Thread.sleep(10);
+        completedContainers = am1.allocate(
+          new ArrayList<ResourceRequest>(), releasedContainers)
+          .getCompletedContainersStatuses();
+      }
+
+      // verify new container cannot be allocated immediately because container
+      // has not been released by the node
+      containers = am1.allocate("127.0.0.1", 8192, 1,
+          new ArrayList<ContainerId>()).getAllocatedContainers();
+      nm1.nodeHeartbeat(true);
+      Assert.assertTrue("new container allocated before node freed old",
+          containers.isEmpty());
+      for (int i = 0; i < 10; ++i) {
+        Thread.sleep(10);
+        containers = am1.allocate(new ArrayList<ResourceRequest>(),
+            new ArrayList<ContainerId>()).getAllocatedContainers();
+        nm1.nodeHeartbeat(true);
+        Assert.assertTrue("new container allocated before node freed old",
+            containers.isEmpty());
+      }
+
+      // free the old container from the node
+      nm1.nodeHeartbeat(cid.getApplicationAttemptId(), cid.getContainerId(),
+          ContainerState.COMPLETE);
+
+      // verify new container is now allocated
+      containers = am1.allocate(new ArrayList<ResourceRequest>(),
+          new ArrayList<ContainerId>()).getAllocatedContainers();
+      while (containers.isEmpty()) {
+        Thread.sleep(10);
+        nm1.nodeHeartbeat(true);
+        containers = am1.allocate(new ArrayList<ResourceRequest>(),
+            new ArrayList<ContainerId>()).getAllocatedContainers();
+      }
+    } finally {
+      rm1.stop();
+      System.out.println("Stopping testContainerReleasedByNode");
+    }
+  }
+
   @Test(timeout = 60000)
   public void testResourceRequestRestoreWhenRMContainerIsAtAllocated()
       throws Exception {
@@ -472,13 +636,121 @@ public class TestAbstractYarnScheduler extends ParameterizedSchedulerTestBase {
     }
   }
 
+  /**
+   * Test to verify that ResourceRequests recovery back to the right app-attempt
+   * after a container gets killed at ACQUIRED state: YARN-4502.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testResourceRequestRecoveryToTheRightAppAttempt()
+      throws Exception {
+
+    configureScheduler();
+    YarnConfiguration conf = getConf();
+    MockRM rm = new MockRM(conf);
+    try {
+      rm.start();
+      RMApp rmApp =
+          rm.submitApp(200, "name", "user",
+            new HashMap<ApplicationAccessType, String>(), false, "default", -1,
+            null, "Test", false, true);
+      MockNM node =
+          new MockNM("127.0.0.1:1234", 10240, rm.getResourceTrackerService());
+      node.registerNode();
+
+      MockAM am1 = MockRM.launchAndRegisterAM(rmApp, rm, node);
+      ApplicationAttemptId applicationAttemptOneID =
+          am1.getApplicationAttemptId();
+      ContainerId am1ContainerID =
+          ContainerId.newContainerId(applicationAttemptOneID, 1);
+
+      // allocate NUM_CONTAINERS containers
+      am1.allocate("127.0.0.1", 1024, 1, new ArrayList<ContainerId>());
+      node.nodeHeartbeat(true);
+
+      // wait for containers to be allocated.
+      List<Container> containers =
+          am1.allocate(new ArrayList<ResourceRequest>(),
+            new ArrayList<ContainerId>()).getAllocatedContainers();
+      while (containers.size() != 1) {
+        node.nodeHeartbeat(true);
+        containers.addAll(am1.allocate(new ArrayList<ResourceRequest>(),
+          new ArrayList<ContainerId>()).getAllocatedContainers());
+        Thread.sleep(200);
+      }
+
+      // launch a 2nd container, for testing running-containers transfer.
+      node.nodeHeartbeat(applicationAttemptOneID, 2, ContainerState.RUNNING);
+      ContainerId runningContainerID =
+          ContainerId.newContainerId(applicationAttemptOneID, 2);
+      rm.waitForState(node, runningContainerID, RMContainerState.RUNNING);
+
+      // 3rd container is in Allocated state.
+      int ALLOCATED_CONTAINER_PRIORITY = 1047;
+      am1.allocate("127.0.0.1", 1024, 1, ALLOCATED_CONTAINER_PRIORITY,
+        new ArrayList<ContainerId>(), null);
+      node.nodeHeartbeat(true);
+      ContainerId allocatedContainerID =
+          ContainerId.newContainerId(applicationAttemptOneID, 3);
+      rm.waitForContainerAllocated(node, allocatedContainerID);
+      rm.waitForState(node, allocatedContainerID, RMContainerState.ALLOCATED);
+      RMContainer allocatedContainer =
+          rm.getResourceScheduler().getRMContainer(allocatedContainerID);
+
+      // Capture scheduler app-attempt before AM crash.
+      SchedulerApplicationAttempt firstSchedulerAppAttempt =
+          ((AbstractYarnScheduler<SchedulerApplicationAttempt, SchedulerNode>) rm
+            .getResourceScheduler())
+            .getApplicationAttempt(applicationAttemptOneID);
+
+      // AM crashes, and a new app-attempt gets created
+      node.nodeHeartbeat(applicationAttemptOneID, 1, ContainerState.COMPLETE);
+      rm.waitForState(node, am1ContainerID, RMContainerState.COMPLETED);
+      RMAppAttempt rmAppAttempt2 = MockRM.waitForAttemptScheduled(rmApp, rm);
+      ApplicationAttemptId applicationAttemptTwoID =
+          rmAppAttempt2.getAppAttemptId();
+      Assert.assertEquals(2, applicationAttemptTwoID.getAttemptId());
+
+      // All outstanding allocated containers will be killed (irrespective of
+      // keep-alive of container across app-attempts)
+      Assert.assertEquals(RMContainerState.KILLED,
+        allocatedContainer.getState());
+
+      // The core part of this test
+      // The killed containers' ResourceRequests are recovered back to the
+      // original app-attempt, not the new one
+      for (ResourceRequest request : firstSchedulerAppAttempt
+        .getAppSchedulingInfo().getAllResourceRequests()) {
+        if (request.getPriority().getPriority() == 0) {
+          Assert.assertEquals(0, request.getNumContainers());
+        } else if (request.getPriority().getPriority() == ALLOCATED_CONTAINER_PRIORITY) {
+          Assert.assertEquals(1, request.getNumContainers());
+        }
+      }
+
+      // Also, only one running container should be transferred after AM
+      // launches
+      MockRM.launchAM(rmApp, rm, node);
+      List<Container> transferredContainers =
+          rm.getResourceScheduler().getTransferredContainers(
+            applicationAttemptTwoID);
+      Assert.assertEquals(1, transferredContainers.size());
+      Assert.assertEquals(runningContainerID, transferredContainers.get(0)
+        .getId());
+
+    } finally {
+      rm.stop();
+    }
+  }
+
   private void verifyMaximumResourceCapability(
-      Resource expectedMaximumResource, AbstractYarnScheduler scheduler) {
+      Resource expectedMaximumResource, YarnScheduler scheduler) {
 
     final Resource schedulerMaximumResourceCapability = scheduler
         .getMaximumResourceCapability();
-    Assert.assertEquals(expectedMaximumResource.getMemory(),
-        schedulerMaximumResourceCapability.getMemory());
+    Assert.assertEquals(expectedMaximumResource.getMemorySize(),
+        schedulerMaximumResourceCapability.getMemorySize());
     Assert.assertEquals(expectedMaximumResource.getVirtualCores(),
         schedulerMaximumResourceCapability.getVirtualCores());
   }

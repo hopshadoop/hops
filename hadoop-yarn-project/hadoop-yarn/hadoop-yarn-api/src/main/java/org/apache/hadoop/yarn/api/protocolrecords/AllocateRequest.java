@@ -18,16 +18,19 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ResourceBlacklistRequest;
 import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
+import org.apache.hadoop.yarn.api.records.ResourceBlacklistRequest;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.UpdateContainerRequest;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
@@ -46,6 +49,11 @@ import org.apache.hadoop.yarn.util.Records;
  *   <li>
  *     A list of unused {@link Container} which are being returned.
  *   </li>
+ *   <li>
+ *     A list of {@link UpdateContainerRequest} to inform
+ *     the <code>ResourceManager</code> about the change in
+ *     requirements of running containers.
+ *   </li>
  * </ul>
  * 
  * @see ApplicationMasterProtocol#allocate(AllocateRequest)
@@ -61,11 +69,21 @@ public abstract class AllocateRequest {
       List<ContainerId> containersToBeReleased,
       ResourceBlacklistRequest resourceBlacklistRequest) {
     return newInstance(responseID, appProgress, resourceAsk,
-        containersToBeReleased, resourceBlacklistRequest, null);
+        containersToBeReleased, null, resourceBlacklistRequest);
   }
-  
-  @Public
-  @Stable
+
+  /**
+   * Use {@link AllocateRequest#newInstance(int, float, List, List,
+   * ResourceBlacklistRequest, List)} instead
+   * @param responseID responseId
+   * @param appProgress appProgress
+   * @param resourceAsk resourceAsk
+   * @param containersToBeReleased containersToBeReleased
+   * @param resourceBlacklistRequest resourceBlacklistRequest
+   * @param increaseRequests increaseRequests
+   * @return AllocateRequest
+   */
+  @Deprecated
   public static AllocateRequest newInstance(int responseID, float appProgress,
       List<ResourceRequest> resourceAsk,
       List<ContainerId> containersToBeReleased,
@@ -78,6 +96,23 @@ public abstract class AllocateRequest {
     allocateRequest.setReleaseList(containersToBeReleased);
     allocateRequest.setResourceBlacklistRequest(resourceBlacklistRequest);
     allocateRequest.setIncreaseRequests(increaseRequests);
+    return allocateRequest;
+  }
+  
+  @Public
+  @Unstable
+  public static AllocateRequest newInstance(int responseID, float appProgress,
+      List<ResourceRequest> resourceAsk,
+      List<ContainerId> containersToBeReleased,
+      List<UpdateContainerRequest> updateRequests,
+      ResourceBlacklistRequest resourceBlacklistRequest) {
+    AllocateRequest allocateRequest = Records.newRecord(AllocateRequest.class);
+    allocateRequest.setResponseId(responseID);
+    allocateRequest.setProgress(appProgress);
+    allocateRequest.setAskList(resourceAsk);
+    allocateRequest.setReleaseList(containersToBeReleased);
+    allocateRequest.setResourceBlacklistRequest(resourceBlacklistRequest);
+    allocateRequest.setUpdateRequests(updateRequests);
     return allocateRequest;
   }
   
@@ -182,22 +217,42 @@ public abstract class AllocateRequest {
   @Stable
   public abstract void setResourceBlacklistRequest(
       ResourceBlacklistRequest resourceBlacklistRequest);
-  
+
   /**
-   * Get the <code>ContainerResourceIncreaseRequest</code> being sent by the
-   * <code>ApplicationMaster</code>
+   * Use {@link AllocateRequest#getUpdateRequests()} instead
+   * @return ContainerResourceIncreaseRequests
    */
-  @Public
-  @Stable
+  @Deprecated
   public abstract List<ContainerResourceIncreaseRequest> getIncreaseRequests();
-  
+
   /**
-   * Set the <code>ContainerResourceIncreaseRequest</code> to inform the
-   * <code>ResourceManager</code> about some container's resources need to be
-   * increased
+   * Use {@link AllocateRequest#setUpdateRequests(List)} instead
+   * @param increaseRequests increaseRequests
    */
-  @Public
-  @Stable
+  @Deprecated
   public abstract void setIncreaseRequests(
       List<ContainerResourceIncreaseRequest> increaseRequests);
+  
+  /**
+   * Get the list of container update requests being sent by the
+   * <code>ApplicationMaster</code>.
+   * @return list of {@link UpdateContainerRequest}
+   *         being sent by the
+   *         <code>ApplicationMaster</code>.
+   */
+  @Public
+  @Unstable
+  public abstract List<UpdateContainerRequest> getUpdateRequests();
+
+  /**
+   * Set the list of container update requests to inform the
+   * <code>ResourceManager</code> about the containers that need to be
+   * updated.
+   * @param updateRequests list of <code>UpdateContainerRequest</code> for
+   *                       containers to be updated
+   */
+  @Public
+  @Unstable
+  public abstract void setUpdateRequests(
+      List<UpdateContainerRequest> updateRequests);
 }

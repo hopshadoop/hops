@@ -19,13 +19,13 @@
   <parent>
     <artifactId>hadoop-yarn</artifactId>
     <groupId>io.hops</groupId>
-    <version>2.7.3</version>
+    <version>2.8.2</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn-common</artifactId>
-  <version>2.7.3</version>
-  <name>hadoop-yarn-common</name>
+  <version>2.8.2</version>
+  <name>Apache Hadoop YARN Common</name>
 
   <properties>
     <!-- Needed for generating FindBugs warnings using parent pom -->
@@ -232,6 +232,10 @@
             <exclude>src/main/resources/webapps/static/dt-1.9.4/css/demo_table.css</exclude>
             <exclude>src/main/resources/webapps/static/dt-1.9.4/images/Sorting icons.psd</exclude>
             <exclude>src/main/resources/webapps/static/jquery/themes-1.9.1/base/jquery-ui.css</exclude>
+            <exclude>src/test/resources/application_1440536969523_0001.har/_index</exclude>
+            <exclude>src/test/resources/application_1440536969523_0001.har/part-0</exclude>
+            <exclude>src/test/resources/application_1440536969523_0001.har/_masterindex</exclude>
+            <exclude>src/test/resources/application_1440536969523_0001.har/_SUCCESS</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -270,7 +274,7 @@
                 <param>${basedir}/src/main/proto</param>
               </imports>
               <source>
-                <directory>${basedir}/src/main/proto/server</directory>
+                <directory>${basedir}/src/main/proto</directory>
                 <includes>
                   <include>yarn_security_token.proto</include>
                   <include>yarn_GroupMembership_service.proto</include>
@@ -311,7 +315,21 @@
           </execution>
         </executions>
       </plugin>
-
+      <plugin>
+        <artifactId>maven-clean-plugin</artifactId>
+        <configuration>
+          <filesets>
+            <fileset>
+              <directory>src/site/resources</directory>
+              <includes>
+                <include>configuration.xsl</include>
+                <include>yarn-default.xml</include>
+              </includes>
+              <followSymlinks>false</followSymlinks>
+            </fileset>
+          </filesets>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

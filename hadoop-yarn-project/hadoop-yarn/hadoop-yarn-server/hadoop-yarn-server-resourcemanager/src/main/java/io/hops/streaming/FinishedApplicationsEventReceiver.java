@@ -24,10 +24,9 @@ public class FinishedApplicationsEventReceiver {
   private static final Log LOG = LogFactory.getLog(
           FinishedApplicationsEventReceiver.class);
 
-  public void createAndAddToQueue(String rmnodeId, String applicationId) {
+  public void createAndAddToQueue(String rmnodeId, String applicationId, String status) {
 
-    FinishedApplicationsEvent event = new FinishedApplicationsEvent(rmnodeId,
-            applicationId);
+    RMNodeApplicationsEvent event = new RMNodeApplicationsEvent(rmnodeId, applicationId, status);
     receivedEvents.add(event);
 
   }

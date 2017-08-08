@@ -29,6 +29,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.MissingArgumentException;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -38,7 +44,11 @@ import org.apache.hadoop.ha.HAServiceTarget;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.hadoop.yarn.api.records.DecommissionType;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeLabel;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.client.RMHAServiceTarget;
 import org.apache.hadoop.yarn.conf.HAUtil;
@@ -50,18 +60,25 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.server.api.ResourceManagerAdministrationProtocol;
 import org.apache.hadoop.yarn.server.api.protocolrecords.AddToClusterNodeLabelsRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.CheckForDecommissioningNodesRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.CheckForDecommissioningNodesResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshAdminAclsRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshClusterMaxPriorityRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshNodesRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshNodesResourcesRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshQueuesRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshServiceAclsRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshSuperUserGroupsConfigurationRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshUserToGroupsMappingsRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RemoveFromClusterNodeLabelsRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.ReplaceLabelsOnNodeRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdateNodeResourceRequest;
 import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.apache.hadoop.yarn.util.resource.Resources;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 @Private
 @Unstable
@@ -69,12 +86,16 @@ public class RMAdminCLI extends HAAdmin {
 
   private final RecordFactory recordFactory = 
     RecordFactoryProvider.getRecordFactory(null);
-  private boolean directlyAccessNodeLabelStore = false;
   static CommonNodeLabelsManager localNodeLabelsManager = null;
   private static final String NO_LABEL_ERR_MSG =
       "No cluster node-labels are specified";
   private static final String NO_MAPPING_ERR_MSG =
       "No node-to-labels mappings are specified";
+  private static final String INVALID_TIMEOUT_ERR_MSG =
+      "Invalid timeout specified : ";
+  private static final String ADD_LABEL_FORMAT_ERR_MSG =
+      "Input format for adding node-labels is not correct, it should be "
+          + "labelName1[(exclusive=true/false)],LabelName2[] ..";
 
   protected final static Map<String, UsageInfo> ADMIN_USAGE =
       ImmutableMap.<String, UsageInfo>builder()
@@ -82,8 +103,19 @@ public class RMAdminCLI extends HAAdmin {
               "Reload the queues' acls, states and scheduler specific " +
                   "properties. \n\t\tResourceManager will reload the " +
                   "mapred-queues configuration file."))
-          .put("-refreshNodes", new UsageInfo("",
-              "Refresh the hosts information at the ResourceManager."))
+          .put("-refreshNodes",
+              new UsageInfo("[-g [timeout in seconds] -client|server]",
+              "Refresh the hosts information at the ResourceManager. Here "
+              + "[-g [timeout in seconds] -client|server] is optional, if we "
+              + "specify the timeout then ResourceManager will wait for "
+              + "timeout before marking the NodeManager as decommissioned."
+              + " The -client|server indicates if the timeout tracking should"
+              + " be handled by the client or the ResourceManager. The client"
+              + "-side tracking is blocking, while the server-side tracking"
+              + " is not. Omitting the timeout, or a timeout of -1, indicates"
+              + " an infinite timeout."))
+          .put("-refreshNodesResources", new UsageInfo("",
+              "Refresh resources of NodeManagers at the ResourceManager."))
           .put("-refreshSuperUserGroupsConfiguration", new UsageInfo("",
               "Refresh superuser proxy groups mappings"))
           .put("-refreshUserToGroupsMappings", new UsageInfo("",
@@ -96,19 +128,23 @@ public class RMAdminCLI extends HAAdmin {
           .put("-getGroups", new UsageInfo("[username]",
               "Get the groups which given user belongs to."))
           .put("-addToClusterNodeLabels",
-              new UsageInfo("[label1,label2,label3] (label splitted by \",\")",
-                  "add to cluster node labels "))
+              new UsageInfo("<\"label1(exclusive=true),"
+                  + "label2(exclusive=false),label3\">",
+                  "add to cluster node labels. Default exclusivity is true"))
           .put("-removeFromClusterNodeLabels",
-              new UsageInfo("[label1,label2,label3] (label splitted by \",\")",
+              new UsageInfo("<label1,label2,label3> (label splitted by \",\")",
                   "remove from cluster node labels"))
           .put("-replaceLabelsOnNode",
               new UsageInfo(
-                  "[node1[:port]=label1,label2 node2[:port]=label1,label2]",
-                  "replace labels on nodes"
-                      + " (please note that we do not support specifying multiple"
-                      + " labels on a single host for now.)"))
+                  "<\"node1[:port]=label1,label2 node2[:port]=label1,label2\"> "
+                  + "[-failOnUnknownNodes] ",
+              "replace labels on nodes"
+                  + " (please note that we do not support specifying multiple"
+                  + " labels on a single host for now.)\n\t\t"
+                  + "[-failOnUnknownNodes] is optional, when we set this"
+                  + " option, it will fail if specified nodes are unknown."))
           .put("-directlyAccessNodeLabelStore",
-              new UsageInfo("", "Directly access node label store, "
+              new UsageInfo("", "This is DEPRECATED, will be removed in future releases. Directly access node label store, "
                   + "with this option, all node label related operations"
                   + " will not connect RM. Instead, they will"
                   + " access/modify stored node labels directly."
@@ -118,7 +154,13 @@ public class RMAdminCLI extends HAAdmin {
                   + " (instead of NFS or HDFS), this option will only work"
                   +
                   " when the command run on the machine where RM is running."))
-              .build();
+          .put("-refreshClusterMaxPriority",
+              new UsageInfo("",
+                  "Refresh cluster max priority"))
+          .put("-updateNodeResource",
+              new UsageInfo("[NodeID] [MemSize] [vCores] ([OvercommitTimeout])",
+                  "Update resource on specific node."))
+          .build();
 
   public RMAdminCLI() {
     super();
@@ -134,7 +176,8 @@ public class RMAdminCLI extends HAAdmin {
 
   private static void appendHAUsage(final StringBuilder usageBuilder) {
     for (Map.Entry<String,UsageInfo> cmdEntry : USAGE.entrySet()) {
-      if (cmdEntry.getKey().equals("-help")) {
+      if (cmdEntry.getKey().equals("-help")
+          || cmdEntry.getKey().equals("-failover")) {
         continue;
       }
       UsageInfo usageInfo = cmdEntry.getValue();
@@ -201,16 +244,22 @@ public class RMAdminCLI extends HAAdmin {
     summary.append("The full syntax is: \n\n" +
     "yarn rmadmin" +
       " [-refreshQueues]" +
-      " [-refreshNodes]" +
+      " [-refreshNodes [-g [timeout in seconds] -client|server]]" +
+      " [-refreshNodesResources]" +
       " [-refreshSuperUserGroupsConfiguration]" +
       " [-refreshUserToGroupsMappings]" +
       " [-refreshAdminAcls]" +
       " [-refreshServiceAcl]" +
       " [-getGroup [username]]" +
-      " [[-addToClusterNodeLabels [label1,label2,label3]]" +
-      " [-removeFromClusterNodeLabels [label1,label2,label3]]" +
-      " [-replaceLabelsOnNode [node1[:port]=label1,label2 node2[:port]=label1]" +
-      " [-directlyAccessNodeLabelStore]]");
+      " [-addToClusterNodeLabels <\"label1(exclusive=true),"
+                  + "label2(exclusive=false),label3\">]" +
+      " [-removeFromClusterNodeLabels <label1,label2,label3>]" +
+      " [-replaceLabelsOnNode " +
+            "<\"node1[:port]=label1,label2 node2[:port]=label1\"> " +
+            "[-failOnUnknownNodes]]" +
+      " [-directlyAccessNodeLabelStore]" +
+      " [-refreshClusterMaxPriority]" +
+      " [-updateNodeResource [NodeID] [MemSize] [vCores] ([OvercommitTimeout])");
     if (isHAEnabled) {
       appendHAUsage(summary);
     }
@@ -225,7 +274,7 @@ public class RMAdminCLI extends HAAdmin {
     }
     if (isHAEnabled) {
       for (String cmdKey : USAGE.keySet()) {
-        if (!cmdKey.equals("-help")) {
+        if (!cmdKey.equals("-help") && !cmdKey.equals("-failover")) {
           buildHelpMsg(cmdKey, helpBuilder);
           helpBuilder.append("\n");
         }
@@ -261,7 +310,7 @@ public class RMAdminCLI extends HAAdmin {
     return ClientRMProxy.createRMProxy(conf,
         ResourceManagerAdministrationProtocol.class, true);
   }
-  
+
   private int refreshQueues() throws IOException, YarnException {
     // Refresh the queue properties
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
@@ -274,12 +323,74 @@ public class RMAdminCLI extends HAAdmin {
   private int refreshNodes() throws IOException, YarnException {
     // Refresh the nodes
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
-    RefreshNodesRequest request = 
-      recordFactory.newRecordInstance(RefreshNodesRequest.class);
+    RefreshNodesRequest request = RefreshNodesRequest
+        .newInstance(DecommissionType.NORMAL);
     adminProtocol.refreshNodes(request);
     return 0;
   }
-  
+
+  private int refreshNodes(long timeout, String trackingMode)
+      throws IOException, YarnException {
+    if (!"client".equals(trackingMode)) {
+      throw new UnsupportedOperationException(
+          "Only client tracking mode is currently supported.");
+    }
+    // Graceful decommissioning with timeout
+    ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
+    RefreshNodesRequest gracefulRequest = RefreshNodesRequest
+        .newInstance(DecommissionType.GRACEFUL);
+    adminProtocol.refreshNodes(gracefulRequest);
+    CheckForDecommissioningNodesRequest checkForDecommissioningNodesRequest = recordFactory
+        .newRecordInstance(CheckForDecommissioningNodesRequest.class);
+    long waitingTime;
+    boolean nodesDecommissioning = true;
+    // timeout=-1 means wait for all the nodes to be gracefully
+    // decommissioned
+    for (waitingTime = 0; waitingTime < timeout || timeout == -1; waitingTime++) {
+      // wait for one second to check nodes decommissioning status
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException e) {
+        // Ignore the InterruptedException
+      }
+      CheckForDecommissioningNodesResponse checkForDecommissioningNodes = adminProtocol
+          .checkForDecommissioningNodes(checkForDecommissioningNodesRequest);
+      Set<NodeId> decommissioningNodes = checkForDecommissioningNodes
+          .getDecommissioningNodes();
+      if (decommissioningNodes.isEmpty()) {
+        nodesDecommissioning = false;
+        break;
+      } else {
+        StringBuilder nodes = new StringBuilder();
+        for (NodeId nodeId : decommissioningNodes) {
+          nodes.append(nodeId).append(",");
+        }
+        nodes.deleteCharAt(nodes.length() - 1);
+        System.out.println("Nodes '" + nodes + "' are still decommissioning.");
+      }
+    }
+    if (nodesDecommissioning) {
+      System.out.println("Graceful decommissioning not completed in " + timeout
+          + " seconds, issueing forceful decommissioning command.");
+      RefreshNodesRequest forcefulRequest = RefreshNodesRequest
+          .newInstance(DecommissionType.FORCEFUL);
+      adminProtocol.refreshNodes(forcefulRequest);
+    } else {
+      System.out.println("Graceful decommissioning completed in " + waitingTime
+          + " seconds.");
+    }
+    return 0;
+  }
+
+  private int refreshNodesResources() throws IOException, YarnException {
+    // Refresh the resources at the Nodemanager
+    ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
+    RefreshNodesResourcesRequest request =
+    recordFactory.newRecordInstance(RefreshNodesResourcesRequest.class);
+    adminProtocol.refreshNodesResources(request);
+    return 0;
+  }
+
   private int refreshUserToGroupsMappings() throws IOException,
       YarnException {
     // Refresh the user-to-groups mappings
@@ -317,7 +428,44 @@ public class RMAdminCLI extends HAAdmin {
     adminProtocol.refreshServiceAcls(request);
     return 0;
   }
-  
+
+  private int refreshClusterMaxPriority() throws IOException, YarnException {
+    // Refresh cluster max priority
+    ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
+    RefreshClusterMaxPriorityRequest request =
+        recordFactory.newRecordInstance(RefreshClusterMaxPriorityRequest.class);
+    adminProtocol.refreshClusterMaxPriority(request);
+    return 0;
+  }
+
+  private int updateNodeResource(String nodeIdStr, int memSize,
+      int cores, int overCommitTimeout) throws IOException, YarnException {
+    // check resource value first
+    if (invalidResourceValue(memSize, cores)) {
+      throw new IllegalArgumentException("Invalid resource value: " + "(" +
+          memSize + "," + cores + ") for updateNodeResource.");
+    }
+    // Refresh the nodes
+    ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
+    UpdateNodeResourceRequest request =
+      recordFactory.newRecordInstance(UpdateNodeResourceRequest.class);
+    NodeId nodeId = NodeId.fromString(nodeIdStr);
+    
+    Resource resource = Resources.createResource(memSize, cores);
+    Map<NodeId, ResourceOption> resourceMap =
+        new HashMap<NodeId, ResourceOption>();
+    resourceMap.put(
+        nodeId, ResourceOption.newInstance(resource, overCommitTimeout));
+    request.setNodeResourceMap(resourceMap);
+    adminProtocol.updateNodeResource(request);
+    return 0;
+  }
+
+  // complain negative value for cpu or memory.
+  private boolean invalidResourceValue(int memValue, int coreValue) {
+    return (memValue < 0) || (coreValue < 0);
+  }
+
   private int getGroups(String[] usernames) throws IOException {
     // Get groups users belongs to
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
@@ -350,7 +498,66 @@ public class RMAdminCLI extends HAAdmin {
     return localNodeLabelsManager;
   }
   
-  private Set<String> buildNodeLabelsSetFromStr(String args) {
+  private List<NodeLabel> buildNodeLabelsFromStr(String args) {
+    List<NodeLabel> nodeLabels = new ArrayList<>();
+    for (String p : args.split(",")) {
+      if (!p.trim().isEmpty()) {
+        String labelName = p;
+
+        // Try to parse exclusive
+        boolean exclusive = NodeLabel.DEFAULT_NODE_LABEL_EXCLUSIVITY;
+        int leftParenthesisIdx = p.indexOf("(");
+        int rightParenthesisIdx = p.indexOf(")");
+
+        if ((leftParenthesisIdx == -1 && rightParenthesisIdx != -1)
+            || (leftParenthesisIdx != -1 && rightParenthesisIdx == -1)) {
+          // Parenthese not match
+          throw new IllegalArgumentException(ADD_LABEL_FORMAT_ERR_MSG);
+        }
+
+        if (leftParenthesisIdx > 0 && rightParenthesisIdx > 0) {
+          if (leftParenthesisIdx > rightParenthesisIdx) {
+            // Parentese not match
+            throw new IllegalArgumentException(ADD_LABEL_FORMAT_ERR_MSG);
+          }
+
+          String property = p.substring(p.indexOf("(") + 1, p.indexOf(")"));
+          if (property.contains("=")) {
+            String key = property.substring(0, property.indexOf("=")).trim();
+            String value =
+                property
+                    .substring(property.indexOf("=") + 1, property.length())
+                    .trim();
+
+            // Now we only support one property, which is exclusive, so check if
+            // key = exclusive and value = {true/false}
+            if (key.equals("exclusive")
+                && ImmutableSet.of("true", "false").contains(value)) {
+              exclusive = Boolean.parseBoolean(value);
+            } else {
+              throw new IllegalArgumentException(ADD_LABEL_FORMAT_ERR_MSG);
+            }
+          } else if (!property.trim().isEmpty()) {
+            throw new IllegalArgumentException(ADD_LABEL_FORMAT_ERR_MSG);
+          }
+        }
+
+        // Try to get labelName if there's "(..)"
+        if (labelName.contains("(")) {
+          labelName = labelName.substring(0, labelName.indexOf("(")).trim();
+        }
+
+        nodeLabels.add(NodeLabel.newInstance(labelName, exclusive));
+      }
+    }
+
+    if (nodeLabels.isEmpty()) {
+      throw new IllegalArgumentException(NO_LABEL_ERR_MSG);
+    }
+    return nodeLabels;
+  }
+
+  private Set<String> buildNodeLabelNamesFromStr(String args) {
     Set<String> labels = new HashSet<String>();
     for (String p : args.split(",")) {
       if (!p.trim().isEmpty()) {
@@ -364,11 +571,26 @@ public class RMAdminCLI extends HAAdmin {
     return labels;
   }
 
-  private int addToClusterNodeLabels(String args) throws IOException,
-      YarnException {
-    Set<String> labels = buildNodeLabelsSetFromStr(args);
+  private int handleAddToClusterNodeLabels(String[] args, String cmd,
+      boolean isHAEnabled) throws IOException, YarnException, ParseException {
+    Options opts = new Options();
+    opts.addOption("addToClusterNodeLabels", true,
+        "Add to cluster node labels.");
+    opts.addOption("directlyAccessNodeLabelStore", false,
+        "Directly access node label store.");
+    int exitCode = -1;
+    CommandLine cliParser = null;
+    try {
+      cliParser = new GnuParser().parse(opts, args);
+    } catch (MissingArgumentException ex) {
+      System.err.println(NO_LABEL_ERR_MSG);
+      printUsage(args[0], isHAEnabled);
+      return exitCode;
+    }
 
-    if (directlyAccessNodeLabelStore) {
+    List<NodeLabel> labels = buildNodeLabelsFromStr(
+        cliParser.getOptionValue("addToClusterNodeLabels"));
+    if (cliParser.hasOption("directlyAccessNodeLabelStore")) {
       getNodeLabelManagerInstance(getConf()).addToCluserNodeLabels(labels);
     } else {
       ResourceManagerAdministrationProtocol adminProtocol =
@@ -380,11 +602,26 @@ public class RMAdminCLI extends HAAdmin {
     return 0;
   }
 
-  private int removeFromClusterNodeLabels(String args) throws IOException,
-      YarnException {
-    Set<String> labels = buildNodeLabelsSetFromStr(args);
+  private int handleRemoveFromClusterNodeLabels(String[] args, String cmd,
+      boolean isHAEnabled) throws IOException, YarnException, ParseException {
+    Options opts = new Options();
+    opts.addOption("removeFromClusterNodeLabels", true,
+        "Remove From cluster node labels.");
+    opts.addOption("directlyAccessNodeLabelStore", false,
+        "Directly access node label store.");
+    int exitCode = -1;
+    CommandLine cliParser = null;
+    try {
+      cliParser = new GnuParser().parse(opts, args);
+    } catch (MissingArgumentException ex) {
+      System.err.println(NO_LABEL_ERR_MSG);
+      printUsage(args[0], isHAEnabled);
+      return exitCode;
+    }
 
-    if (directlyAccessNodeLabelStore) {
+    Set<String> labels = buildNodeLabelNamesFromStr(
+        cliParser.getOptionValue("removeFromClusterNodeLabels"));
+    if (cliParser.hasOption("directlyAccessNodeLabelStore")) {
       getNodeLabelManagerInstance(getConf()).removeFromClusterNodeLabels(
           labels);
     } else {
@@ -407,26 +644,29 @@ public class RMAdminCLI extends HAAdmin {
         continue;
       }
 
-      // "," also supported for compatibility
       String[] splits = nodeToLabels.split("=");
-      int index = 0;
-      if (splits.length != 2) {
+      int labelsStartIndex = 0;
+      String nodeIdStr = splits[0];
+
+      if (splits.length == 2) {
+        splits = splits[1].split(",");
+      } else if (nodeToLabels.endsWith("=")) {
+        //case where no labels are mapped to a node
+        splits = new String[0];
+      } else {
+        // "," also supported for compatibility
         splits = nodeToLabels.split(",");
-        index = 1;
+        nodeIdStr = splits[0];
+        labelsStartIndex = 1;
       }
 
-      String nodeIdStr = splits[0];
-      if (index == 0) {
-        splits = splits[1].split(",");
-      }
-      
       Preconditions.checkArgument(!nodeIdStr.trim().isEmpty(),
           "node name cannot be empty");
 
       NodeId nodeId = ConverterUtils.toNodeIdWithDefaultPort(nodeIdStr);
       map.put(nodeId, new HashSet<String>());
 
-      for (int i = index; i < splits.length; i++) {
+      for (int i = labelsStartIndex; i < splits.length; i++) {
         if (!splits[i].trim().isEmpty()) {
           map.get(nodeId).add(splits[i].trim());
         }
@@ -444,13 +684,34 @@ public class RMAdminCLI extends HAAdmin {
     return map;
   }
 
-  private int replaceLabelsOnNodes(String args) throws IOException,
-      YarnException {
-    Map<NodeId, Set<String>> map = buildNodeLabelsMapFromStr(args);
-    return replaceLabelsOnNodes(map);
+  private int handleReplaceLabelsOnNodes(String[] args, String cmd,
+      boolean isHAEnabled) throws IOException, YarnException, ParseException {
+    Options opts = new Options();
+    opts.addOption("replaceLabelsOnNode", true,
+        "Replace label on node.");
+    opts.addOption("failOnUnknownNodes", false,
+        "Fail on unknown nodes.");
+    opts.addOption("directlyAccessNodeLabelStore", false,
+        "Directly access node label store.");
+    int exitCode = -1;
+    CommandLine cliParser = null;
+    try {
+      cliParser = new GnuParser().parse(opts, args);
+    } catch (MissingArgumentException ex) {
+      System.err.println(NO_MAPPING_ERR_MSG);
+      printUsage(args[0], isHAEnabled);
+      return exitCode;
+    }
+
+    Map<NodeId, Set<String>> map = buildNodeLabelsMapFromStr(
+        cliParser.getOptionValue("replaceLabelsOnNode"));
+    return replaceLabelsOnNodes(map,
+        cliParser.hasOption("failOnUnknownNodes"),
+        cliParser.hasOption("directlyAccessNodeLabelStore"));
   }
 
-  private int replaceLabelsOnNodes(Map<NodeId, Set<String>> map)
+  private int replaceLabelsOnNodes(Map<NodeId, Set<String>> map,
+      boolean failOnUnknownNodes, boolean directlyAccessNodeLabelStore)
       throws IOException, YarnException {
     if (directlyAccessNodeLabelStore) {
       getNodeLabelManagerInstance(getConf()).replaceLabelsOnNode(map);
@@ -459,25 +720,14 @@ public class RMAdminCLI extends HAAdmin {
           createAdminProtocol();
       ReplaceLabelsOnNodeRequest request =
           ReplaceLabelsOnNodeRequest.newInstance(map);
+      request.setFailOnUnknownNodes(failOnUnknownNodes);
       adminProtocol.replaceLabelsOnNode(request);
     }
     return 0;
   }
-  
+
   @Override
   public int run(String[] args) throws Exception {
-    // -directlyAccessNodeLabelStore is a additional option for node label
-    // access, so just search if we have specified this option, and remove it
-    List<String> argsList = new ArrayList<String>();
-    for (int i = 0; i < args.length; i++) {
-      if (args[i].equals("-directlyAccessNodeLabelStore")) {
-        directlyAccessNodeLabelStore = true;
-      } else {
-        argsList.add(args[i]);
-      }
-    }
-    args = argsList.toArray(new String[0]);
-    
     YarnConfiguration yarnConf =
         getConf() == null ? new YarnConfiguration() : new YarnConfiguration(
             getConf());
@@ -517,7 +767,8 @@ public class RMAdminCLI extends HAAdmin {
     // verify that we have enough command line parameters
     //
     if ("-refreshAdminAcls".equals(cmd) || "-refreshQueues".equals(cmd) ||
-        "-refreshNodes".equals(cmd) || "-refreshServiceAcl".equals(cmd) ||
+        "-refreshNodesResources".equals(cmd) ||
+        "-refreshServiceAcl".equals(cmd) ||
         "-refreshUserToGroupsMappings".equals(cmd) ||
         "-refreshSuperUserGroupsConfiguration".equals(cmd)) {
       if (args.length != 1) {
@@ -530,7 +781,9 @@ public class RMAdminCLI extends HAAdmin {
       if ("-refreshQueues".equals(cmd)) {
         exitCode = refreshQueues();
       } else if ("-refreshNodes".equals(cmd)) {
-        exitCode = refreshNodes();
+        exitCode = handleRefreshNodes(args, cmd, isHAEnabled);
+      } else if ("-refreshNodesResources".equals(cmd)) {
+        exitCode = refreshNodesResources();
       } else if ("-refreshUserToGroupsMappings".equals(cmd)) {
         exitCode = refreshUserToGroupsMappings();
       } else if ("-refreshSuperUserGroupsConfiguration".equals(cmd)) {
@@ -539,30 +792,19 @@ public class RMAdminCLI extends HAAdmin {
         exitCode = refreshAdminAcls();
       } else if ("-refreshServiceAcl".equals(cmd)) {
         exitCode = refreshServiceAcls();
+      } else if ("-refreshClusterMaxPriority".equals(cmd)) {
+        exitCode = refreshClusterMaxPriority();
       } else if ("-getGroups".equals(cmd)) {
         String[] usernames = Arrays.copyOfRange(args, i, args.length);
         exitCode = getGroups(usernames);
+      } else if ("-updateNodeResource".equals(cmd)) {
+        exitCode = handleUpdateNodeResource(args, cmd, isHAEnabled);
       } else if ("-addToClusterNodeLabels".equals(cmd)) {
-        if (i >= args.length) {
-          System.err.println(NO_LABEL_ERR_MSG);
-          exitCode = -1;
-        } else {
-          exitCode = addToClusterNodeLabels(args[i]);
-        }
+        exitCode = handleAddToClusterNodeLabels(args, cmd, isHAEnabled);
       } else if ("-removeFromClusterNodeLabels".equals(cmd)) {
-        if (i >= args.length) {
-          System.err.println(NO_LABEL_ERR_MSG);
-          exitCode = -1;
-        } else {
-          exitCode = removeFromClusterNodeLabels(args[i]);
-        }
+        exitCode = handleRemoveFromClusterNodeLabels(args, cmd, isHAEnabled);
       } else if ("-replaceLabelsOnNode".equals(cmd)) {
-        if (i >= args.length) {
-          System.err.println(NO_MAPPING_ERR_MSG);
-          exitCode = -1;
-        } else {
-          exitCode = replaceLabelsOnNodes(args[i]);
-        }
+        exitCode = handleReplaceLabelsOnNodes(args, cmd, isHAEnabled);
       } else {
         exitCode = -1;
         System.err.println(cmd.substring(1) + ": Unknown command");
@@ -576,7 +818,7 @@ public class RMAdminCLI extends HAAdmin {
     } catch (RemoteException e) {
       //
       // This is a error returned by hadoop server. Print
-      // out the first line of the error mesage, ignore the stack trace.
+      // out the first line of the error message, ignore the stack trace.
       exitCode = -1;
       try {
         String[] content;
@@ -596,6 +838,97 @@ public class RMAdminCLI extends HAAdmin {
       localNodeLabelsManager.stop();
     }
     return exitCode;
+  }
+
+  // A helper method to reduce the number of lines of run()
+  private int handleRefreshNodes(String[] args, String cmd, boolean isHAEnabled)
+      throws IOException, YarnException, ParseException {
+    Options opts = new Options();
+    opts.addOption("refreshNodes", false,
+        "Refresh the hosts information at the ResourceManager.");
+    Option gracefulOpt = new Option("g", "graceful", true,
+        "Wait for timeout before marking the NodeManager as decommissioned.");
+    gracefulOpt.setOptionalArg(true);
+    opts.addOption(gracefulOpt);
+    opts.addOption("client", false,
+        "Indicates the timeout tracking should be handled by the client.");
+    opts.addOption("server", false,
+        "Indicates the timeout tracking should be handled by the RM.");
+
+    int exitCode = -1;
+    CommandLine cliParser = null;
+    try {
+      cliParser = new GnuParser().parse(opts, args);
+    } catch (MissingArgumentException ex) {
+      System.out.println("Missing argument for options");
+      printUsage(args[0], isHAEnabled);
+      return exitCode;
+    }
+
+    long timeout = -1;
+    if (cliParser.hasOption("g")) {
+      String strTimeout = cliParser.getOptionValue("g");
+      if (strTimeout != null) {
+        timeout = validateTimeout(strTimeout);
+      }
+      String trackingMode = null;
+      if (cliParser.hasOption("client")) {
+        trackingMode = "client";
+      } else if (cliParser.hasOption("server")) {
+        trackingMode = "server";
+      } else {
+        printUsage(cmd, isHAEnabled);
+        return -1;
+      }
+      return refreshNodes(timeout, trackingMode);
+    } else {
+      return refreshNodes();
+    }
+  }
+
+  private long validateTimeout(String strTimeout) {
+    long timeout;
+    try {
+      timeout = Long.parseLong(strTimeout);
+    } catch (NumberFormatException ex) {
+      throw new IllegalArgumentException(INVALID_TIMEOUT_ERR_MSG + strTimeout);
+    }
+    if (timeout < -1) {
+      throw new IllegalArgumentException(INVALID_TIMEOUT_ERR_MSG + timeout);
+    }
+    return timeout;
+  }
+
+  private int handleUpdateNodeResource(String[] args, String cmd,
+      boolean isHAEnabled) throws NumberFormatException, IOException,
+      YarnException {
+    int i = 1;
+    if (args.length < 4 || args.length > 5) {
+      System.err.println("Number of parameters specified for "
+          + "updateNodeResource is wrong.");
+      printUsage(cmd, isHAEnabled);
+      return -1;
+    } else {
+      String nodeID = args[i++];
+      String memSize = args[i++];
+      String cores = args[i++];
+      int overCommitTimeout = ResourceOption.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT;
+      if (i == args.length - 1) {
+        overCommitTimeout = Integer.parseInt(args[i]);
+      }
+      return updateNodeResource(nodeID, Integer.parseInt(memSize),
+          Integer.parseInt(cores), overCommitTimeout);
+    }
+  }
+
+  private String validateTrackingMode(String mode) {
+    if ("-client".equals(mode)) {
+      return "client";
+    }
+    if ("-server".equals(mode)) {
+      return "server";
+    }
+    throw new IllegalArgumentException("Invalid mode specified: " + mode);
   }
 
   @Override
@@ -644,7 +977,15 @@ public class RMAdminCLI extends HAAdmin {
           "Could not connect to RM HA Admin for node " + rmId);
     }
   }
-  
+
+  /**
+   * returns the list of all resourcemanager ids for the given configuration.
+   */
+  @Override
+  protected Collection<String> getTargetIds(String targetNodeToActivate) {
+    return HAUtil.getRMHAIds(getConf());
+  }
+
   @Override
   protected String getUsageString() {
     return "Usage: rmadmin";

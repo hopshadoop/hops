@@ -21,7 +21,7 @@ cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
 # Default to release builds
 set(CMAKE_BUILD_TYPE, Release)
 
-include(../../../hadoop-common-project/hadoop-common/src/JNIFlags.cmake NO_POLICY_SCOPE)
+#include(../../../hadoop-common-project/hadoop-common/src/JNIFlags.cmake NO_POLICY_SCOPE)
 
 # Compile a library with both shared and static variants
 function(add_dual_library LIBNAME)

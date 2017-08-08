@@ -17,17 +17,8 @@ package org.apache.hadoop.yarn.server.resourcemanager.quota;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
-import io.hops.metadata.common.entity.LongVariable;
-import io.hops.metadata.common.entity.Variable;
-import io.hops.metadata.hdfs.dal.VariableDataAccess;
-import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.PendingEventDataAccess;
-import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.quota.ContainersLogsDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
-import io.hops.metadata.yarn.entity.ContainerStatus;
-import io.hops.metadata.yarn.entity.PendingEvent;
-import io.hops.metadata.yarn.entity.RMNode;
 import io.hops.metadata.yarn.entity.quota.ContainerLog;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.util.DBUtility;
@@ -40,7 +31,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,17 +43,12 @@ import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
-import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.MockAM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
-import org.apache.hadoop.yarn.server.resourcemanager.RMActiveServiceContext;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContextImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.junit.Assert;
 
 public class TestContainersLogsService {
@@ -79,10 +64,6 @@ public class TestContainersLogsService {
       conf = new YarnConfiguration();
       YarnAPIStorageFactory.setConfiguration(conf);
       RMStorageFactory.setConfiguration(conf);
-      conf.set(YarnConfiguration.EVENT_RT_CONFIG_PATH,
-              "target/test-classes/RT_EventAPIConfig.ini");
-      conf.set(YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
-              "target/test-classes/RM_EventAPIConfig.ini");
       LOG.info("initialize db");
       DBUtility.InitializeDB();
     } catch (StorageInitializtionException ex) {

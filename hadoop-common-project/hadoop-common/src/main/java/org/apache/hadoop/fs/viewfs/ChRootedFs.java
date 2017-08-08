@@ -20,6 +20,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.AbstractFileSystem;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.BlockStoragePolicySpi;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -35,8 +37,10 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.FsStatus;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
@@ -97,8 +101,7 @@ class ChRootedFs extends AbstractFileSystem {
 
   public ChRootedFs(final AbstractFileSystem fs, final Path theRoot)
     throws URISyntaxException {
-    super(fs.getUri(), fs.getUri().getScheme(),
-        fs.getUri().getAuthority() != null, fs.getUriDefaultPort());
+    super(fs.getUri(), fs.getUri().getScheme(), false, fs.getUriDefaultPort());
     myFs = fs;
     myFs.checkPath(theRoot);
     chRootPathPart = new Path(myFs.getUriPath(theRoot));
@@ -219,8 +222,14 @@ class ChRootedFs extends AbstractFileSystem {
   }
 
   @Override
+  @Deprecated
   public FsServerDefaults getServerDefaults() throws IOException {
     return myFs.getServerDefaults();
+  }
+
+  @Override
+  public FsServerDefaults getServerDefaults(final Path f) throws IOException {
+    return myFs.getServerDefaults(fullPath(f));
   }
 
   @Override
@@ -232,6 +241,18 @@ class ChRootedFs extends AbstractFileSystem {
   public FileStatus[] listStatus(final Path f) 
       throws IOException, UnresolvedLinkException {
     return myFs.listStatus(fullPath(f));
+  }
+
+  @Override
+  public RemoteIterator<FileStatus> listStatusIterator(final Path f)
+    throws IOException, UnresolvedLinkException {
+    return myFs.listStatusIterator(fullPath(f));
+  }
+
+  @Override
+  public RemoteIterator<LocatedFileStatus> listLocatedStatus(final Path f)
+      throws IOException, UnresolvedLinkException {
+    return myFs.listLocatedStatus(fullPath(f));
   }
 
   @Override
@@ -361,7 +382,48 @@ class ChRootedFs extends AbstractFileSystem {
   }
 
   @Override
-  public void setVerifyChecksum(final boolean verifyChecksum) 
+  public Path createSnapshot(Path path, String name) throws IOException {
+    return myFs.createSnapshot(fullPath(path), name);
+  }
+
+  @Override
+  public void renameSnapshot(Path path, String snapshotOldName,
+      String snapshotNewName) throws IOException {
+    myFs.renameSnapshot(fullPath(path), snapshotOldName, snapshotNewName);
+  }
+
+  @Override
+  public void deleteSnapshot(Path snapshotDir, String snapshotName)
+      throws IOException {
+    myFs.deleteSnapshot(fullPath(snapshotDir), snapshotName);
+  }
+
+  @Override
+  public void setStoragePolicy(Path path, String policyName)
+    throws IOException {
+    myFs.setStoragePolicy(fullPath(path), policyName);
+  }
+
+  @Override
+  public void unsetStoragePolicy(final Path src)
+    throws IOException {
+    myFs.unsetStoragePolicy(fullPath(src));
+  }
+
+  @Override
+  public BlockStoragePolicySpi getStoragePolicy(final Path src)
+      throws IOException {
+    return myFs.getStoragePolicy(src);
+  }
+
+  @Override
+  public Collection<? extends BlockStoragePolicySpi> getAllStoragePolicies()
+      throws IOException {
+    return myFs.getAllStoragePolicies();
+  }
+
+  @Override
+  public void setVerifyChecksum(final boolean verifyChecksum)
       throws IOException, UnresolvedLinkException {
     myFs.setVerifyChecksum(verifyChecksum);
   }

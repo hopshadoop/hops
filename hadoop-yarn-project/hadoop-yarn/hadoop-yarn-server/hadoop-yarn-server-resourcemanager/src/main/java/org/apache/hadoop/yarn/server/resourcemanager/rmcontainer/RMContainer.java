@@ -30,6 +30,7 @@ import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.event.EventHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
 
 /**
  * Represents the ResourceManager's view of an application container. See 
@@ -57,6 +58,8 @@ public interface RMContainer extends EventHandler<RMContainerEvent> {
 
   Resource getAllocatedResource();
 
+  Resource getLastConfirmedResource();
+
   NodeId getAllocatedNode();
 
   Priority getAllocatedPriority();
@@ -80,4 +83,12 @@ public interface RMContainer extends EventHandler<RMContainerEvent> {
   List<ResourceRequest> getResourceRequests();
 
   String getNodeHttpAddress();
+  
+  String getNodeLabelExpression();
+  
+  boolean hasIncreaseReservation();
+  
+  void cancelIncreaseReservation();
+
+  String getQueueName();
 }

@@ -15,12 +15,26 @@
  */
 package io.hops.util;
 
-import io.hops.metadata.yarn.entity.FinishedApplications;
+import com.google.protobuf.InvalidProtocolBufferException;
+import io.hops.metadata.yarn.entity.ContainerToSignal;
+import io.hops.metadata.yarn.entity.RMNodeApplication;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.streaming.ContainerIdToCleanEvent;
+import io.hops.streaming.ContainerToDecreaseEvent;
+import io.hops.streaming.ContainerToSignalEvent;
 import io.hops.streaming.DBEvent;
-import io.hops.streaming.FinishedApplicationsEvent;
+import io.hops.streaming.RMNodeApplicationsEvent;
 import io.hops.streaming.NextHeartBeatEvent;
+import org.apache.hadoop.security.proto.SecurityProtos;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.Priority;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.SignalContainerCommand;
+import org.apache.hadoop.yarn.api.records.impl.pb.TokenPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplDist;
@@ -48,6 +62,19 @@ public class RtStreamingProcessor extends StreamingReceiver {
                       containerId.getRmnodeid()));
               ((RMNodeImplDist) node).addContainersToCleanUp(ConverterUtils.
                       toContainerId(containerId.getContainerId()));
+            } else if (event instanceof ContainerToSignalEvent) {
+              ContainerToSignal containerToSignal
+                  = ((ContainerToSignalEvent) event).getContainerToSignal();
+              RMNode node = rmContext.getRMNodes().get(NodeId.fromString(containerToSignal.getRmnodeid()));
+              ((RMNodeImplDist) node).addContainersToSignal(SignalContainerRequest.newInstance(ContainerId.fromString(
+                  containerToSignal.getContainerId()), SignalContainerCommand.valueOf(containerToSignal.getCommand())));
+            } else if (event instanceof ContainerToDecreaseEvent) {
+              io.hops.metadata.yarn.entity.Container container = ((ContainerToDecreaseEvent) event).getContainer();
+              RMNode node = rmContext.getRMNodes().get(NodeId.fromString(container.getNodeId()));
+              ((RMNodeImplDist) node).addContainersToDecrease(Container.newInstance(ContainerId.fromString(
+                  container.getContainerId()), NodeId.fromString(container.getNodeId()), container.getHttpAddress(),
+                  Resource.newInstance(container.getMemSize(), container.getVirtualCores(), container.getGpus()),
+                  Priority.newInstance(container.getPriority()), null));
             } else if (event instanceof NextHeartBeatEvent) {
               NextHeartbeat nextHB = ((NextHeartBeatEvent) event).
                       getNextHeartbeat();
@@ -57,14 +84,14 @@ public class RtStreamingProcessor extends StreamingReceiver {
                 ((RMNodeImplDist) node).setNextHeartbeat(nextHB.
                         isNextheartbeat());
               }
-            } else if (event instanceof FinishedApplicationsEvent) {
-              FinishedApplications finishedApp
-                      = ((FinishedApplicationsEvent) event).
-                      getFinishedApplication();
-              RMNode node = rmContext.getRMNodes().get(ConverterUtils.toNodeId(
-                      finishedApp.getRMNodeID()));
-              ((RMNodeImplDist) node).addAppToCleanUp(ConverterUtils.
-                      toApplicationId(finishedApp.getApplicationId()));
+            } else if (event instanceof RMNodeApplicationsEvent) {
+              RMNodeApplication rmNodeApp = ((RMNodeApplicationsEvent) event).getRmNodeApplication();
+              RMNode node = rmContext.getRMNodes().get(NodeId.fromString(rmNodeApp.getRMNodeID()));
+              if(rmNodeApp.getStatus().equals(RMNodeApplication.RMNodeApplicationStatus.FINISHED)){
+                ((RMNodeImplDist) node).addAppToCleanUp(ApplicationId.fromString(rmNodeApp.getApplicationId()));
+              } else if (rmNodeApp.getStatus().equals(RMNodeApplication.RMNodeApplicationStatus.RUNNING)){
+                ((RMNodeImplDist) node).addToRunningApps(ApplicationId.fromString(rmNodeApp.getApplicationId()));
+              }
             }
 //TODO if scale well
 //                            if (streamingRTComps.getCurrentNMMasterKey() != null) {

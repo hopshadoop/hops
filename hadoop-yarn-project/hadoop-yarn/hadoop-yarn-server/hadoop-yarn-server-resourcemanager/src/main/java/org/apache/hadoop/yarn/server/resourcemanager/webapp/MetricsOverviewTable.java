@@ -53,8 +53,7 @@ public class MetricsOverviewTable extends HtmlBlock {
     //CSS in the correct spot
     html.style(".metrics {margin-bottom:5px}"); 
     
-    ClusterMetricsInfo clusterMetrics = 
- new ClusterMetricsInfo(this.rm);
+    ClusterMetricsInfo clusterMetrics = new ClusterMetricsInfo(this.rm);
     
     DIV<Hamlet> div = html.div().$class("metrics");
     
@@ -76,11 +75,6 @@ public class MetricsOverviewTable extends HtmlBlock {
         th().$class("ui-state-default")._("GPUs Used")._().
         th().$class("ui-state-default")._("GPUs Total")._().
         th().$class("ui-state-default")._("GPUs Reserved")._().
-        th().$class("ui-state-default")._("Active Nodes")._().
-        th().$class("ui-state-default")._("Decommissioned Nodes")._().
-        th().$class("ui-state-default")._("Lost Nodes")._().
-        th().$class("ui-state-default")._("Unhealthy Nodes")._().
-        th().$class("ui-state-default")._("Rebooted Nodes")._().
       _().
     _().
     tbody().$class("ui-widget-content").
@@ -104,14 +98,34 @@ public class MetricsOverviewTable extends HtmlBlock {
         td(String.valueOf(clusterMetrics.getAllocatedGPUs())).
         td(String.valueOf(clusterMetrics.getTotalGPUs())).
         td(String.valueOf(clusterMetrics.getReservedGPUs())).
+      _().
+    _()._();
+
+    div.h3("Cluster Nodes Metrics").
+    table("#nodemetricsoverview").
+    thead().$class("ui-widget-header").
+      tr().
+        th().$class("ui-state-default")._("Active Nodes")._().
+        th().$class("ui-state-default")._("Decommissioning Nodes")._().
+        th().$class("ui-state-default")._("Decommissioned Nodes")._().
+        th().$class("ui-state-default")._("Lost Nodes")._().
+        th().$class("ui-state-default")._("Unhealthy Nodes")._().
+        th().$class("ui-state-default")._("Rebooted Nodes")._().
+        th().$class("ui-state-default")._("Shutdown Nodes")._().
+      _().
+    _().
+    tbody().$class("ui-widget-content").
+      tr().
         td().a(url("nodes"),String.valueOf(clusterMetrics.getActiveNodes()))._().
+        td().a(url("nodes/decommissioning"), String.valueOf(clusterMetrics.getDecommissioningNodes()))._().
         td().a(url("nodes/decommissioned"),String.valueOf(clusterMetrics.getDecommissionedNodes()))._().
         td().a(url("nodes/lost"),String.valueOf(clusterMetrics.getLostNodes()))._().
         td().a(url("nodes/unhealthy"),String.valueOf(clusterMetrics.getUnhealthyNodes()))._().
         td().a(url("nodes/rebooted"),String.valueOf(clusterMetrics.getRebootedNodes()))._().
+        td().a(url("nodes/shutdown"),String.valueOf(clusterMetrics.getShutdownNodes()))._().
       _().
     _()._();
-    
+
     String user = request().getRemoteUser();
     if (user != null) {
       UserMetricsInfo userMetrics = new UserMetricsInfo(this.rm, user);
@@ -177,6 +191,8 @@ public class MetricsOverviewTable extends HtmlBlock {
         th().$class("ui-state-default")._("Scheduling Resource Type")._().
         th().$class("ui-state-default")._("Minimum Allocation")._().
         th().$class("ui-state-default")._("Maximum Allocation")._().
+        th().$class("ui-state-default")
+            ._("Maximum Cluster Application Priority")._().
       _().
     _().
     tbody().$class("ui-widget-content").
@@ -185,6 +201,7 @@ public class MetricsOverviewTable extends HtmlBlock {
         td(String.valueOf(schedulerInfo.getSchedulerResourceTypes())).
         td(schedulerInfo.getMinAllocation().toString()).
         td(schedulerInfo.getMaxAllocation().toString()).
+        td(String.valueOf(schedulerInfo.getMaxClusterLevelAppPriority())).
       _().
     _()._();
 

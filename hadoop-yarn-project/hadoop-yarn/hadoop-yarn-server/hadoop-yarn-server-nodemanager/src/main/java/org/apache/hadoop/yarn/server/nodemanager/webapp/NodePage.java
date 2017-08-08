@@ -83,7 +83,9 @@ public class NodePage extends NMView {
               info.getLastNodeUpdateTime()))
           ._("NodeHealthReport",
               info.getHealthReport())
-          ._("Node Manager Version:", info.getNMBuildVersion() +
+          ._("NodeManager started on", new Date(
+              info.getNMStartupTime()))
+          ._("NodeManager Version:", info.getNMBuildVersion() +
               " on " + info.getNMVersionBuiltOn())
           ._("Hadoop Version:", info.getHadoopBuildVersion() +
               " on " + info.getHadoopVersionBuiltOn());

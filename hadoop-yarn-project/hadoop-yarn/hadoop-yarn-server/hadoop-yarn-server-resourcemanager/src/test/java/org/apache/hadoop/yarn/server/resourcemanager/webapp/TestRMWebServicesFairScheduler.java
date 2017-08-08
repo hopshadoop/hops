@@ -19,21 +19,19 @@
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 import javax.ws.rs.core.MediaType;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.QueueManager;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.JerseyTestBase;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Test;
@@ -46,35 +44,36 @@ import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.test.framework.WebAppDescriptor;
-
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class TestRMWebServicesFairScheduler extends JerseyTestBase {
-  private final Log LOG = LogFactory.getLog(TestRMWebServicesFairScheduler.class);
-
   private static MockRM rm;
   private YarnConfiguration conf;
   
   private Injector injector = Guice.createInjector(new ServletModule() {
     @Override
     protected void configureServlets() {
-      bind(JAXBContextResolver.class);
-      bind(RMWebServices.class);
-      bind(GenericExceptionHandler.class);
-      conf = new YarnConfiguration();
-      conf.setClass(YarnConfiguration.RM_SCHEDULER, FairScheduler.class,
-        ResourceScheduler.class);
-
       try {
+        bind(JAXBContextResolver.class);
+        bind(RMWebServices.class);
+        bind(GenericExceptionHandler.class);
+        conf = new YarnConfiguration();
+        conf.setClass(YarnConfiguration.RM_SCHEDULER, FairScheduler.class,
+            ResourceScheduler.class);
         RMStorageFactory.setConfiguration(conf);
         YarnAPIStorageFactory.setConfiguration(conf);
         DBUtility.InitializeDB();
+        rm = new MockRM(conf);
+        bind(ResourceManager.class).toInstance(rm);
+        serve("/*").with(GuiceContainer.class);
       } catch (IOException ex) {
-        LOG.error(ex, ex);
+        Logger.getLogger(TestRMWebServicesFairScheduler.class.getName()).log(Level.SEVERE, null, ex);
       }
-      rm = new MockRM(conf);
-      bind(ResourceManager.class).toInstance(rm);
-      serve("/*").with(GuiceContainer.class);
     }
   });
   
@@ -116,6 +115,38 @@ public class TestRMWebServicesFairScheduler extends JerseyTestBase {
     verifyClusterScheduler(json);
   }
   
+  @Test
+  public void testClusterSchedulerWithSubQueues() throws JSONException,
+      Exception {
+    FairScheduler scheduler = (FairScheduler)rm.getResourceScheduler();
+    QueueManager queueManager = scheduler.getQueueManager();
+    // create LeafQueue
+    queueManager.getLeafQueue("root.q.subqueue1", true);
+    queueManager.getLeafQueue("root.q.subqueue2", true);
+
+    WebResource r = resource();
+    ClientResponse response = r.path("ws").path("v1").path("cluster")
+        .path("scheduler").accept(MediaType.APPLICATION_JSON)
+        .get(ClientResponse.class);
+    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    JSONObject json = response.getEntity(JSONObject.class);
+    JSONArray subQueueInfo = json.getJSONObject("scheduler")
+        .getJSONObject("schedulerInfo").getJSONObject("rootQueue")
+        .getJSONObject("childQueues").getJSONArray("queue")
+        .getJSONObject(1).getJSONObject("childQueues").getJSONArray("queue");
+    // subQueueInfo is consist of subqueue1 and subqueue2 info
+    assertEquals(2, subQueueInfo.length());
+
+    // Verify 'childQueues' field is omitted from FairSchedulerLeafQueueInfo.
+    try {
+      subQueueInfo.getJSONObject(1).getJSONObject("childQueues");
+      fail("FairSchedulerQueueInfo should omit field 'childQueues'" +
+           "if child queue is empty.");
+    } catch (JSONException je) {
+      assertEquals("JSONObject[\"childQueues\"] not found.", je.getMessage());
+    }
+  }
+
   private void verifyClusterScheduler(JSONObject json) throws JSONException,
       Exception {
     assertEquals("incorrect number of elements", 1, json.length());

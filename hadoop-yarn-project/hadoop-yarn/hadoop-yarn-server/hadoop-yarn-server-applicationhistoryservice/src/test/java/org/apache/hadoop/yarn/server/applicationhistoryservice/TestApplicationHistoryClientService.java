@@ -56,8 +56,8 @@ import org.junit.Test;
 public class TestApplicationHistoryClientService {
 
   private static ApplicationHistoryClientService clientService;
-  private final static int MAX_APPS = 2;
   private static TimelineDataManager dataManager;
+  private final static int MAX_APPS = 2;
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -65,8 +65,10 @@ public class TestApplicationHistoryClientService {
     TimelineStore store =
         TestApplicationHistoryManagerOnTimelineStore.createStore(MAX_APPS);
     TimelineACLsManager aclsManager = new TimelineACLsManager(conf);
+    aclsManager.setTimelineStore(store);
     dataManager =
         new TimelineDataManager(store, aclsManager);
+    dataManager.init(conf);
     ApplicationACLsManager appAclsManager = new ApplicationACLsManager(conf);
     ApplicationHistoryManagerOnTimelineStore historyManager =
         new ApplicationHistoryManagerOnTimelineStore(dataManager, appAclsManager);

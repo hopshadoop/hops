@@ -55,6 +55,11 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String  IPC_CLIENT_PING_KEY = "ipc.client.ping";
   /** Default value of IPC_CLIENT_PING_KEY */
   public static final boolean IPC_CLIENT_PING_DEFAULT = true;
+  /** Timeout value for RPC client on waiting for response. */
+  public static final String IPC_CLIENT_RPC_TIMEOUT_KEY =
+      "ipc.client.rpc-timeout.ms";
+  /** Default value for IPC_CLIENT_RPC_TIMEOUT_KEY. */
+  public static final int IPC_CLIENT_RPC_TIMEOUT_DEFAULT = 0;
   /** Responses larger than this will be logged */
   public static final String  IPC_SERVER_RPC_MAX_RESPONSE_SIZE_KEY =
     "ipc.server.max.response.size";
@@ -73,11 +78,19 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   /** Default value for IPC_SERVER_RPC_READ_CONNECTION_QUEUE_SIZE */
   public static final int IPC_SERVER_RPC_READ_CONNECTION_QUEUE_SIZE_DEFAULT =
       100;
-      
+
+  /** Max request size a server will accept. */
   public static final String IPC_MAXIMUM_DATA_LENGTH =
       "ipc.maximum.data.length";
-  
+  /** Default value for IPC_MAXIMUM_DATA_LENGTH. */
   public static final int IPC_MAXIMUM_DATA_LENGTH_DEFAULT = 64 * 1024 * 1024;
+
+  /** Max response size a client will accept. */
+  public static final String IPC_MAXIMUM_RESPONSE_LENGTH =
+      "ipc.maximum.response.length";
+  /** Default value for IPC_MAXIMUM_RESPONSE_LENGTH. */
+  public static final int IPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT =
+      128 * 1024 * 1024;
 
   /** How many calls per handler are allowed in the queue. */
   public static final String  IPC_SERVER_HANDLER_QUEUE_SIZE_KEY =
@@ -88,11 +101,21 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   /**
    * CallQueue related settings. These are not used directly, but rather
    * combined with a namespace and port. For instance:
-   * IPC_CALLQUEUE_NAMESPACE + ".8020." + IPC_CALLQUEUE_IMPL_KEY
+   * IPC_NAMESPACE + ".8020." + IPC_CALLQUEUE_IMPL_KEY
    */
-  public static final String IPC_CALLQUEUE_NAMESPACE = "ipc";
+  public static final String IPC_NAMESPACE = "ipc";
   public static final String IPC_CALLQUEUE_IMPL_KEY = "callqueue.impl";
-  public static final String IPC_CALLQUEUE_IDENTITY_PROVIDER_KEY = "identity-provider.impl";
+  public static final String IPC_SCHEDULER_IMPL_KEY = "scheduler.impl";
+  public static final String IPC_IDENTITY_PROVIDER_KEY = "identity-provider.impl";
+  public static final String IPC_BACKOFF_ENABLE = "backoff.enable";
+  public static final boolean IPC_BACKOFF_ENABLE_DEFAULT = false;
+
+  /**
+   * IPC scheduler priority levels.
+   */
+  public static final String IPC_SCHEDULER_PRIORITY_LEVELS_KEY =
+      "scheduler.priority.levels";
+  public static final int IPC_SCHEDULER_PRIORITY_LEVELS_DEFAULT_KEY = 4;
 
   /** This is for specifying the implementation for the mappings from
    * hostnames to the racks they belong to
@@ -164,6 +187,9 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String
   HADOOP_SECURITY_SERVICE_AUTHORIZATION_TRACING =
       "security.trace.protocol.acl";
+  public static final String
+      HADOOP_SECURITY_SERVICE_AUTHORIZATION_DATANODE_LIFELINE =
+          "security.datanode.lifeline.protocol.acl";
   public static final String 
   SECURITY_HA_SERVICE_PROTOCOL_ACL = "security.ha.service.protocol.acl";
   public static final String 
@@ -184,7 +210,27 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
       "hadoop.security.token.service.use_ip";
   public static final boolean HADOOP_SECURITY_TOKEN_SERVICE_USE_IP_DEFAULT =
       true;
-  
+
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String HADOOP_SECURITY_DNS_LOG_SLOW_LOOKUPS_ENABLED_KEY =
+      "hadoop.security.dns.log-slow-lookups.enabled";
+  public static final boolean
+      HADOOP_SECURITY_DNS_LOG_SLOW_LOOKUPS_ENABLED_DEFAULT = false;
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String
+      HADOOP_SECURITY_DNS_LOG_SLOW_LOOKUPS_THRESHOLD_MS_KEY =
+      "hadoop.security.dns.log-slow-lookups.threshold.ms";
+  public static final int
+      HADOOP_SECURITY_DNS_LOG_SLOW_LOOKUPS_THRESHOLD_MS_DEFAULT = 1000;
+
   /**
    * HA health monitor and failover controller.
    */
@@ -269,6 +315,9 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final long HADOOP_SECURITY_UID_NAME_CACHE_TIMEOUT_DEFAULT =
     4*60*60; // 4 hours
   
+  public static final String  IPC_CLIENT_ASYNC_CALLS_MAX_KEY =
+      "ipc.client.async.calls.max";
+  public static final int     IPC_CLIENT_ASYNC_CALLS_MAX_DEFAULT = 100;
   public static final String  IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY = "ipc.client.fallback-to-simple-auth-allowed";
   public static final boolean IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT = false;
 
@@ -297,7 +346,10 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String NFS_EXPORTS_ALLOWED_HOSTS_KEY = "nfs.exports.allowed.hosts";
   public static final String NFS_EXPORTS_ALLOWED_HOSTS_KEY_DEFAULT = "* rw";
 
-  public static final String DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY =
+  // HDFS client HTrace configuration.
+  public static final String  FS_CLIENT_HTRACE_PREFIX = "fs.client.htrace.";
+  
+    public static final String DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY =
       "dfs.leader.check.interval";
   public static final int DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT = 2 * 1000; // 1 second
   
@@ -343,13 +395,4 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String IO_ERASURECODE_CODEC_XOR_RAWCODER_DEFAULT =
       XORRawErasureCoderFactory.class.getCanonicalName();
 
-  /**
-   * Timeout value for RPC client on waiting for response.
-   */
-  public static final String IPC_CLIENT_RPC_TIMEOUT_KEY
-          = "ipc.client.rpc-timeout.ms";
-  /**
-   * Default value for IPC_CLIENT_RPC_TIMEOUT_KEY.
-   */
-  public static final int IPC_CLIENT_RPC_TIMEOUT_DEFAULT = 0;
 }

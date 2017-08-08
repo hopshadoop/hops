@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.text.DecimalFormat;
 import java.util.Date;
 import java.util.Random;
 import java.util.StringTokenizer;
@@ -230,57 +231,45 @@ public class TestDFSIO implements Tool {
 
   public static void testWrite() throws Exception {
     FileSystem fs = cluster.getFileSystem();
-    long tStart = System.currentTimeMillis();
-    bench.writeTest(fs);
-    long execTime = System.currentTimeMillis() - tStart;
+    long execTime = bench.writeTest(fs);
     bench.analyzeResult(fs, TestType.TEST_TYPE_WRITE, execTime);
   }
 
   @Test (timeout = 10000)
   public void testRead() throws Exception {
     FileSystem fs = cluster.getFileSystem();
-    long tStart = System.currentTimeMillis();
-    bench.readTest(fs);
-    long execTime = System.currentTimeMillis() - tStart;
+    long execTime = bench.readTest(fs);
     bench.analyzeResult(fs, TestType.TEST_TYPE_READ, execTime);
   }
 
   @Test (timeout = 10000)
   public void testReadRandom() throws Exception {
     FileSystem fs = cluster.getFileSystem();
-    long tStart = System.currentTimeMillis();
     bench.getConf().setLong("test.io.skip.size", 0);
-    bench.randomReadTest(fs);
-    long execTime = System.currentTimeMillis() - tStart;
+    long execTime = bench.randomReadTest(fs);
     bench.analyzeResult(fs, TestType.TEST_TYPE_READ_RANDOM, execTime);
   }
 
   @Test (timeout = 10000)
   public void testReadBackward() throws Exception {
     FileSystem fs = cluster.getFileSystem();
-    long tStart = System.currentTimeMillis();
     bench.getConf().setLong("test.io.skip.size", -DEFAULT_BUFFER_SIZE);
-    bench.randomReadTest(fs);
-    long execTime = System.currentTimeMillis() - tStart;
+    long execTime = bench.randomReadTest(fs);
     bench.analyzeResult(fs, TestType.TEST_TYPE_READ_BACKWARD, execTime);
   }
 
   @Test (timeout = 10000)
   public void testReadSkip() throws Exception {
     FileSystem fs = cluster.getFileSystem();
-    long tStart = System.currentTimeMillis();
     bench.getConf().setLong("test.io.skip.size", 1);
-    bench.randomReadTest(fs);
-    long execTime = System.currentTimeMillis() - tStart;
+    long execTime = bench.randomReadTest(fs);
     bench.analyzeResult(fs, TestType.TEST_TYPE_READ_SKIP, execTime);
   }
 
-  @Test (timeout = 6000)
+  @Test (timeout = 10000)
   public void testAppend() throws Exception {
     FileSystem fs = cluster.getFileSystem();
-    long tStart = System.currentTimeMillis();
-    bench.appendTest(fs);
-    long execTime = System.currentTimeMillis() - tStart;
+    long execTime = bench.appendTest(fs);
     bench.analyzeResult(fs, TestType.TEST_TYPE_APPEND, execTime);
   }
 
@@ -289,9 +278,7 @@ public class TestDFSIO implements Tool {
   public void testTruncate() throws Exception {
     FileSystem fs = cluster.getFileSystem();
     bench.createControlFile(fs, DEFAULT_NR_BYTES / 2, DEFAULT_NR_FILES);
-    long tStart = System.currentTimeMillis();
-    bench.truncateTest(fs);
-    long execTime = System.currentTimeMillis() - tStart;
+    long execTime = bench.truncateTest(fs);
     bench.analyzeResult(fs, TestType.TEST_TYPE_TRUNCATE, execTime);
   }
 
@@ -433,12 +420,14 @@ public class TestDFSIO implements Tool {
     }
   }
 
-  private void writeTest(FileSystem fs) throws IOException {
+  private long writeTest(FileSystem fs) throws IOException {
     Path writeDir = getWriteDir(config);
     fs.delete(getDataDir(config), true);
     fs.delete(writeDir, true);
-    
+    long tStart = System.currentTimeMillis();
     runIOTest(WriteMapper.class, writeDir);
+    long execTime = System.currentTimeMillis() - tStart;
+    return execTime;
   }
   
   private void runIOTest(
@@ -499,10 +488,13 @@ public class TestDFSIO implements Tool {
     }
   }
 
-  private void appendTest(FileSystem fs) throws IOException {
+  private long appendTest(FileSystem fs) throws IOException {
     Path appendDir = getAppendDir(config);
     fs.delete(appendDir, true);
+    long tStart = System.currentTimeMillis();
     runIOTest(AppendMapper.class, appendDir);
+    long execTime = System.currentTimeMillis() - tStart;
+    return execTime;
   }
 
   /**
@@ -542,10 +534,13 @@ public class TestDFSIO implements Tool {
     }
   }
 
-  private void readTest(FileSystem fs) throws IOException {
+  private long readTest(FileSystem fs) throws IOException {
     Path readDir = getReadDir(config);
     fs.delete(readDir, true);
+    long tStart = System.currentTimeMillis();
     runIOTest(ReadMapper.class, readDir);
+    long execTime = System.currentTimeMillis() - tStart;
+    return execTime;
   }
 
   /**
@@ -623,10 +618,13 @@ public class TestDFSIO implements Tool {
     }
   }
 
-  private void randomReadTest(FileSystem fs) throws IOException {
+  private long randomReadTest(FileSystem fs) throws IOException {
     Path readDir = getRandomReadDir(config);
     fs.delete(readDir, true);
+    long tStart = System.currentTimeMillis();
     runIOTest(RandomReadMapper.class, readDir);
+    long execTime = System.currentTimeMillis() - tStart;
+    return execTime;
   }
 
   /**
@@ -668,10 +666,13 @@ public class TestDFSIO implements Tool {
     }
   }
 
-  private void truncateTest(FileSystem fs) throws IOException {
+  private long truncateTest(FileSystem fs) throws IOException {
     Path TruncateDir = getTruncateDir(config);
     fs.delete(TruncateDir, true);
+    long tStart = System.currentTimeMillis();
     runIOTest(TruncateMapper.class, TruncateDir);
+    long execTime = System.currentTimeMillis() - tStart;
+    return execTime;
   }
 
   private void sequentialTest(FileSystem fs, 
@@ -905,19 +906,21 @@ public class TestDFSIO implements Tool {
       if(in != null) in.close();
       if(lines != null) lines.close();
     }
-    
+
     double med = rate / 1000 / tasks;
     double stdDev = Math.sqrt(Math.abs(sqrate / 1000 / tasks - med*med));
+    DecimalFormat df = new DecimalFormat("#.##");
     String resultLines[] = {
-      "----- TestDFSIO ----- : " + testType,
-      "           Date & time: " + new Date(System.currentTimeMillis()),
-      "       Number of files: " + tasks,
-      "Total MBytes processed: " + toMB(size),
-      "     Throughput mb/sec: " + size * 1000.0 / (time * MEGA),
-      "Average IO rate mb/sec: " + med,
-      " IO rate std deviation: " + stdDev,
-      "    Test exec time sec: " + (float)execTime / 1000,
-      "" };
+        "----- TestDFSIO ----- : " + testType,
+        "            Date & time: " + new Date(System.currentTimeMillis()),
+        "        Number of files: " + tasks,
+        " Total MBytes processed: " + df.format(toMB(size)),
+        "      Throughput mb/sec: " + df.format(size * 1000.0 / (time * MEGA)),
+        "Total Throughput mb/sec: " + df.format(toMB(size) / ((float)execTime)),
+        " Average IO rate mb/sec: " + df.format(med),
+        "  IO rate std deviation: " + df.format(stdDev),
+        "     Test exec time sec: " + df.format((float)execTime / 1000),
+        "" };
 
     PrintStream res = null;
     try {

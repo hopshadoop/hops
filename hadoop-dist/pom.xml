@@ -20,12 +20,12 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>2.7.3</version>
+    <version>2.8.2</version>
     <relativePath>../hadoop-project</relativePath>
   </parent>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-dist</artifactId>
-  <version>2.7.3</version>
+  <version>2.8.2</version>
   <description>Apache Hadoop Distribution</description>
   <name>Apache Hadoop Distribution</name>
   <packaging>jar</packaging>
@@ -67,6 +67,24 @@
         <artifactId>apache-rat-plugin</artifactId>
         <configuration>
         </configuration>
+      </plugin>
+
+      <!--
+           The "dist" profile automatically attaches many artifacts
+           to the module.
+
+           Disable these, since we are only concerned with assembling
+           the dist layout.
+      -->
+      <!-- Disable the sign plugin, since there isn't anything to sign -->
+      <plugin>
+        <artifactId>maven-gpg-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>sign-artifacts</id>
+            <phase>never</phase>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
@@ -114,10 +132,13 @@
                       run rm -rf hadoop-${project.version}
                       run mkdir hadoop-${project.version}
                       run cd hadoop-${project.version}
+                      run cp $ROOT/LICENSE.txt .
+                      run cp $ROOT/NOTICE.txt .
                       run cp -r $ROOT/hadoop-common-project/hadoop-common/target/hadoop-common-${project.version}/* .
                       run cp -r $ROOT/hadoop-common-project/hadoop-nfs/target/hadoop-nfs-${project.version}/* .
                       run cp -r $ROOT/hadoop-hdfs-project/hadoop-hdfs/target/hadoop-hdfs-${project.version}/* .
                       run cp -r $ROOT/hadoop-hdfs-project/hadoop-hdfs-httpfs/target/hadoop-hdfs-httpfs-${project.version}/* .
+                      run cp -r $ROOT/hadoop-common-project/hadoop-kms/target/hadoop-kms-${project.version}/* .
                       #run cp -r$ROOT/hadoop-hdfs-project/hadoop-hdfs-nfs/target/hadoop-hdfs-nfs-${project.version}/* .
                       run cp -r $ROOT/hadoop-yarn-project/target/hadoop-yarn-project-${project.version}/* .
                       run cp -r $ROOT/hadoop-mapreduce-project/target/hadoop-mapreduce-${project.version}/* .

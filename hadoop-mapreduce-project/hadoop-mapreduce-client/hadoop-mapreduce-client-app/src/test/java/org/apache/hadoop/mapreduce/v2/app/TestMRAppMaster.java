@@ -20,35 +20,47 @@ package org.apache.hadoop.mapreduce.v2.app;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.Assert;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TypeConverter;
+import org.apache.hadoop.mapreduce.jobhistory.EventType;
+import org.apache.hadoop.mapreduce.jobhistory.EventWriter;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryEventHandler;
+import org.apache.hadoop.mapreduce.jobhistory.JobInitedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobUnsuccessfulCompletionEvent;
+import org.apache.hadoop.mapreduce.split.JobSplitWriter;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.app.client.ClientService;
 import org.apache.hadoop.mapreduce.v2.app.commit.CommitterEvent;
@@ -56,6 +68,8 @@ import org.apache.hadoop.mapreduce.v2.app.commit.CommitterEventHandler;
 import org.apache.hadoop.mapreduce.v2.app.job.JobStateInternal;
 import org.apache.hadoop.mapreduce.v2.app.rm.ContainerAllocator;
 import org.apache.hadoop.mapreduce.v2.app.rm.RMHeartbeatHandler;
+import org.apache.hadoop.mapreduce.v2.jobhistory.JHAdminConfig;
+import org.apache.hadoop.mapreduce.v2.jobhistory.JobHistoryUtils;
 import org.apache.hadoop.mapreduce.v2.util.MRApps;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.AccessControlException;
@@ -63,6 +77,7 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -72,6 +87,7 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -80,11 +96,13 @@ import org.mockito.Mockito;
 
 public class TestMRAppMaster {
   private static final Log LOG = LogFactory.getLog(TestMRAppMaster.class);
-  static String stagingDir = "staging/";
+  private static final Path TEST_ROOT_DIR =
+      new Path(System.getProperty("test.build.data", "target/test-dir"));
+  private static final Path testDir = new Path(TEST_ROOT_DIR,
+      TestMRAppMaster.class.getName() + "-tmpDir");
+  static String stagingDir = new Path(testDir, "staging").toString();
   private static FileContext localFS = null;
-  private static final File testDir = new File("target",
-    TestMRAppMaster.class.getName() + "-tmpDir").getAbsoluteFile();
-  
+
   @BeforeClass
   public static void setup() throws AccessControlException,
       FileNotFoundException, IllegalArgumentException, IOException {
@@ -93,29 +111,34 @@ public class TestMRAppMaster {
     File dir = new File(stagingDir);
     stagingDir = dir.getAbsolutePath();
     localFS = FileContext.getLocalFSFileContext();
-    localFS.delete(new Path(testDir.getAbsolutePath()), true);
-    testDir.mkdir();
+    localFS.delete(testDir, true);
+    new File(testDir.toString()).mkdir();
   }
-  
+
   @Before
-  public void cleanup() throws IOException {
+  public void prepare() throws IOException {
     File dir = new File(stagingDir);
     if(dir.exists()) {
       FileUtils.deleteDirectory(dir);
     }
     dir.mkdirs();
   }
-  
+
+  @AfterClass
+  public static void cleanup() throws IOException {
+    localFS.delete(testDir, true);
+  }
+
   @Test
   public void testMRAppMasterForDifferentUser() throws IOException,
       InterruptedException {
     String applicationAttemptIdStr = "appattempt_1317529182569_0004_000001";
     String containerIdStr = "container_1317529182569_0004_000001_1";
-    
+
     String userName = "TestAppMasterUser";
-    ApplicationAttemptId applicationAttemptId = ConverterUtils
-        .toApplicationAttemptId(applicationAttemptIdStr);
-    ContainerId containerId = ConverterUtils.toContainerId(containerIdStr);
+    ApplicationAttemptId applicationAttemptId = ApplicationAttemptId.fromString(
+        applicationAttemptIdStr);
+    ContainerId containerId = ContainerId.fromString(containerIdStr);
     MRAppMasterTest appMaster =
         new MRAppMasterTest(applicationAttemptId, containerId, "host", -1, -1,
             System.currentTimeMillis());
@@ -136,15 +159,15 @@ public class TestMRAppMaster {
     String userName = "TestAppMasterUser";
     JobConf conf = new JobConf();
     conf.set(MRJobConfig.MR_AM_STAGING_DIR, stagingDir);
-    ApplicationAttemptId applicationAttemptId = ConverterUtils
-        .toApplicationAttemptId(applicationAttemptIdStr);
+    ApplicationAttemptId applicationAttemptId = ApplicationAttemptId.fromString(
+        applicationAttemptIdStr);
     JobId jobId =  TypeConverter.toYarn(
         TypeConverter.fromYarn(applicationAttemptId.getApplicationId()));
     Path start = MRApps.getStartJobCommitFile(conf, userName, jobId);
     FileSystem fs = FileSystem.get(conf);
     //Create the file, but no end file so we should unregister with an error.
     fs.create(start).close();
-    ContainerId containerId = ConverterUtils.toContainerId(containerIdStr);
+    ContainerId containerId = ContainerId.fromString(containerIdStr);
     MRAppMaster appMaster =
         new MRAppMasterTest(applicationAttemptId, containerId, "host", -1, -1,
             System.currentTimeMillis(), false, false);
@@ -164,7 +187,46 @@ public class TestMRAppMaster {
     // verify the final status is FAILED
     verifyFailedStatus((MRAppMasterTest)appMaster, "FAILED");
   }
-  
+
+  @Test
+  public void testMRAppMasterJobLaunchTime() throws IOException,
+      InterruptedException {
+    String applicationAttemptIdStr = "appattempt_1317529182569_0004_000002";
+    String containerIdStr = "container_1317529182569_0004_000002_1";
+    String userName = "TestAppMasterUser";
+    JobConf conf = new JobConf();
+    conf.set(MRJobConfig.MR_AM_STAGING_DIR, stagingDir);
+    conf.setInt(MRJobConfig.NUM_REDUCES, 0);
+    conf.set(JHAdminConfig.MR_HS_JHIST_FORMAT, "json");
+    ApplicationAttemptId applicationAttemptId = ApplicationAttemptId.fromString(
+        applicationAttemptIdStr);
+    JobId jobId = TypeConverter.toYarn(
+        TypeConverter.fromYarn(applicationAttemptId.getApplicationId()));
+
+    File dir = new File(MRApps.getStagingAreaDir(conf, userName).toString(),
+        jobId.toString());
+    dir.mkdirs();
+    File historyFile = new File(JobHistoryUtils.getStagingJobHistoryFile(
+        new Path(dir.toURI().toString()), jobId,
+        (applicationAttemptId.getAttemptId() - 1)).toUri().getRawPath());
+    historyFile.createNewFile();
+    FSDataOutputStream out = new FSDataOutputStream(
+        new FileOutputStream(historyFile), null);
+    EventWriter writer = new EventWriter(out, EventWriter.WriteMode.JSON);
+    writer.close();
+    FileSystem fs = FileSystem.get(conf);
+    JobSplitWriter.createSplitFiles(new Path(dir.getAbsolutePath()), conf,
+        fs, new org.apache.hadoop.mapred.InputSplit[0]);
+    ContainerId containerId = ContainerId.fromString(containerIdStr);
+    MRAppMasterTestLaunchTime appMaster =
+        new MRAppMasterTestLaunchTime(applicationAttemptId, containerId,
+            "host", -1, -1, System.currentTimeMillis());
+    MRAppMaster.initAndStartAppMaster(appMaster, conf, userName);
+    appMaster.stop();
+    assertTrue("Job launch time should not be negative.",
+            appMaster.jobLaunchTime.get() >= 0);
+  }
+
   @Test
   public void testMRAppMasterSuccessLock() throws IOException,
       InterruptedException {
@@ -173,8 +235,8 @@ public class TestMRAppMaster {
     String userName = "TestAppMasterUser";
     JobConf conf = new JobConf();
     conf.set(MRJobConfig.MR_AM_STAGING_DIR, stagingDir);
-    ApplicationAttemptId applicationAttemptId = ConverterUtils
-        .toApplicationAttemptId(applicationAttemptIdStr);
+    ApplicationAttemptId applicationAttemptId = ApplicationAttemptId.fromString(
+        applicationAttemptIdStr);
     JobId jobId =  TypeConverter.toYarn(
         TypeConverter.fromYarn(applicationAttemptId.getApplicationId()));
     Path start = MRApps.getStartJobCommitFile(conf, userName, jobId);
@@ -182,7 +244,7 @@ public class TestMRAppMaster {
     FileSystem fs = FileSystem.get(conf);
     fs.create(start).close();
     fs.create(end).close();
-    ContainerId containerId = ConverterUtils.toContainerId(containerIdStr);
+    ContainerId containerId = ContainerId.fromString(containerIdStr);
     MRAppMaster appMaster =
         new MRAppMasterTest(applicationAttemptId, containerId, "host", -1, -1,
             System.currentTimeMillis(), false, false);
@@ -202,7 +264,7 @@ public class TestMRAppMaster {
     // verify the final status is SUCCEEDED
     verifyFailedStatus((MRAppMasterTest)appMaster, "SUCCEEDED");
   }
-  
+
   @Test
   public void testMRAppMasterFailLock() throws IOException,
       InterruptedException {
@@ -211,8 +273,8 @@ public class TestMRAppMaster {
     String userName = "TestAppMasterUser";
     JobConf conf = new JobConf();
     conf.set(MRJobConfig.MR_AM_STAGING_DIR, stagingDir);
-    ApplicationAttemptId applicationAttemptId = ConverterUtils
-        .toApplicationAttemptId(applicationAttemptIdStr);
+    ApplicationAttemptId applicationAttemptId = ApplicationAttemptId.fromString(
+        applicationAttemptIdStr);
     JobId jobId =  TypeConverter.toYarn(
         TypeConverter.fromYarn(applicationAttemptId.getApplicationId()));
     Path start = MRApps.getStartJobCommitFile(conf, userName, jobId);
@@ -220,7 +282,7 @@ public class TestMRAppMaster {
     FileSystem fs = FileSystem.get(conf);
     fs.create(start).close();
     fs.create(end).close();
-    ContainerId containerId = ConverterUtils.toContainerId(containerIdStr);
+    ContainerId containerId = ContainerId.fromString(containerIdStr);
     MRAppMaster appMaster =
         new MRAppMasterTest(applicationAttemptId, containerId, "host", -1, -1,
             System.currentTimeMillis(), false, false);
@@ -240,7 +302,7 @@ public class TestMRAppMaster {
     // verify the final status is FAILED
     verifyFailedStatus((MRAppMasterTest)appMaster, "FAILED");
   }
-  
+
   @Test
   public void testMRAppMasterMissingStaging() throws IOException,
       InterruptedException {
@@ -249,16 +311,16 @@ public class TestMRAppMaster {
     String userName = "TestAppMasterUser";
     JobConf conf = new JobConf();
     conf.set(MRJobConfig.MR_AM_STAGING_DIR, stagingDir);
-    ApplicationAttemptId applicationAttemptId = ConverterUtils
-        .toApplicationAttemptId(applicationAttemptIdStr);
+    ApplicationAttemptId applicationAttemptId = ApplicationAttemptId.fromString(
+        applicationAttemptIdStr);
 
     //Delete the staging directory
     File dir = new File(stagingDir);
     if(dir.exists()) {
       FileUtils.deleteDirectory(dir);
     }
-    
-    ContainerId containerId = ConverterUtils.toContainerId(containerIdStr);
+
+    ContainerId containerId = ContainerId.fromString(containerIdStr);
     MRAppMaster appMaster =
         new MRAppMasterTest(applicationAttemptId, containerId, "host", -1, -1,
             System.currentTimeMillis(), false, false);
@@ -289,9 +351,9 @@ public class TestMRAppMaster {
     String containerIdStr = "container_1317529182569_0004_000002_1";
 
     String userName = "TestAppMasterUser";
-    ApplicationAttemptId applicationAttemptId = ConverterUtils
-        .toApplicationAttemptId(applicationAttemptIdStr);
-    ContainerId containerId = ConverterUtils.toContainerId(containerIdStr);
+    ApplicationAttemptId applicationAttemptId = ApplicationAttemptId.fromString(
+        applicationAttemptIdStr);
+    ContainerId containerId = ContainerId.fromString(containerIdStr);
     JobConf conf = new JobConf();
     conf.set(MRJobConfig.MR_AM_STAGING_DIR, stagingDir);
 
@@ -363,7 +425,7 @@ public class TestMRAppMaster {
         new Token<AMRMTokenIdentifier>(identifier, password,
             AMRMTokenIdentifier.KIND_NAME, appTokenService);
     credentials.addToken(appTokenService, appToken);
-    
+
     Text keyAlias = new Text("mySecretKeyAlias");
     credentials.addSecretKey(keyAlias, "mySecretKey".getBytes());
     Token<? extends TokenIdentifier> storedToken =
@@ -371,7 +433,7 @@ public class TestMRAppMaster {
 
     JobConf conf = new JobConf();
 
-    Path tokenFilePath = new Path(testDir.getAbsolutePath(), "tokens-file");
+    Path tokenFilePath = new Path(testDir, "tokens-file");
     Map<String, String> newEnv = new HashMap<String, String>();
     newEnv.put(UserGroupInformation.HADOOP_TOKEN_FILE_LOCATION, tokenFilePath
       .toUri().getPath());
@@ -424,7 +486,7 @@ public class TestMRAppMaster {
     Assert.assertEquals(storedToken, confCredentials.getToken(tokenAlias));
     Assert.assertEquals("mySecretKey",
       new String(confCredentials.getSecretKey(keyAlias)));
-    
+
     // Verify the AM's ugi - app token should be present
     Credentials ugiCredentials = appMaster.getUgi().getCredentials();
     Assert.assertEquals(1, ugiCredentials.numberOfSecretKeys());
@@ -435,6 +497,47 @@ public class TestMRAppMaster {
       new String(ugiCredentials.getSecretKey(keyAlias)));
 
 
+  }
+
+  @Test
+  public void testMRAppMasterShutDownJob() throws Exception,
+      InterruptedException {
+    String applicationAttemptIdStr = "appattempt_1317529182569_0004_000002";
+    String containerIdStr = "container_1317529182569_0004_000002_1";
+    String userName = "TestAppMasterUser";
+    ApplicationAttemptId applicationAttemptId = ApplicationAttemptId.fromString(
+        applicationAttemptIdStr);
+    ContainerId containerId = ContainerId.fromString(containerIdStr);
+    JobConf conf = new JobConf();
+    conf.set(MRJobConfig.MR_AM_STAGING_DIR, stagingDir);
+
+    File stagingDir =
+        new File(MRApps.getStagingAreaDir(conf, userName).toString());
+    stagingDir.mkdirs();
+    MRAppMasterTest appMaster =
+        spy(new MRAppMasterTest(applicationAttemptId, containerId, "host", -1, -1,
+            System.currentTimeMillis(), false, true));
+    MRAppMaster.initAndStartAppMaster(appMaster, conf, userName);
+    doReturn(conf).when(appMaster).getConfig();
+    appMaster.isLastAMRetry = true;
+    doNothing().when(appMaster).serviceStop();
+    // Test normal shutdown.
+    appMaster.shutDownJob();
+    Assert.assertTrue("Expected shutDownJob to terminate.",
+                      ExitUtil.terminateCalled());
+    Assert.assertEquals("Expected shutDownJob to exit with status code of 0.",
+        0, ExitUtil.getFirstExitException().status);
+
+    // Test shutdown with exception.
+    ExitUtil.resetFirstExitException();
+    String msg = "Injected Exception";
+    doThrow(new RuntimeException(msg))
+            .when(appMaster).notifyIsLastAMRetry(anyBoolean());
+    appMaster.shutDownJob();
+    assertTrue("Expected message from ExitUtil.ExitException to be " + msg,
+        ExitUtil.getFirstExitException().getMessage().contains(msg));
+    Assert.assertEquals("Expected shutDownJob to exit with status code of 1.",
+        1, ExitUtil.getFirstExitException().status);
   }
 
   private void verifyFailedStatus(MRAppMasterTest appMaster,
@@ -486,7 +589,7 @@ class MRAppMasterTest extends MRAppMaster {
     }
     this.conf = conf;
   }
-  
+
   @Override
   protected ContainerAllocator createContainerAllocator(
       final ClientService clientService, final AppContext context) {
@@ -523,7 +626,7 @@ class MRAppMasterTest extends MRAppMaster {
   public Credentials getCredentials() {
     return super.getCredentials();
   }
-  
+
   public UserGroupInformation getUgi() {
     return currentUser;
   }
@@ -536,5 +639,41 @@ class MRAppMasterTest extends MRAppMaster {
             .createJobHistoryHandler(context));
     spyHistoryService.setForcejobCompletion(this.isLastAMRetry);
     return spyHistoryService;
+  }
+}
+
+class MRAppMasterTestLaunchTime extends MRAppMasterTest {
+  final AtomicLong jobLaunchTime = new AtomicLong(0L);
+  public MRAppMasterTestLaunchTime(ApplicationAttemptId applicationAttemptId,
+      ContainerId containerId, String host, int port, int httpPort,
+      long submitTime) {
+    super(applicationAttemptId, containerId, host, port, httpPort,
+        submitTime, false, false);
+  }
+
+  @Override
+  protected EventHandler<CommitterEvent> createCommitterEventHandler(
+      AppContext context, OutputCommitter committer) {
+    return new CommitterEventHandler(context, committer,
+        getRMHeartbeatHandler()) {
+      @Override
+      public void handle(CommitterEvent event) {
+      }
+    };
+  }
+
+  @Override
+  protected EventHandler<JobHistoryEvent> createJobHistoryHandler(
+      AppContext context) {
+    return new JobHistoryEventHandler(context, getStartCount()) {
+      @Override
+      public void handle(JobHistoryEvent event) {
+        if (event.getHistoryEvent().getEventType() == EventType.JOB_INITED) {
+          JobInitedEvent jie = (JobInitedEvent) event.getHistoryEvent();
+          jobLaunchTime.set(jie.getLaunchTime());
+        }
+        super.handle(event);
+      }
+    };
   }
 }

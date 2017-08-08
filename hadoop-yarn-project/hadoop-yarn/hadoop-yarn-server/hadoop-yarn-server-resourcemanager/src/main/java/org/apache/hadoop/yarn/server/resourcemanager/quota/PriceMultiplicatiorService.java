@@ -161,11 +161,11 @@ public class PriceMultiplicatiorService extends AbstractService {
     QueueMetrics metrics = rmcontext.getScheduler().
             getRootQueueMetrics();
 
-    int totalMB = metrics.getAllocatedMB() + metrics.getAvailableMB();
+    long totalMB = metrics.getAllocatedMB() + metrics.getAvailableMB();
     int totalCores = metrics.getAllocatedVirtualCores() + metrics.
             getAvailableVirtualCores();
 
-    int usedMB = metrics.getAllocatedMB() + metrics.getPendingMB();
+    long usedMB = metrics.getAllocatedMB() + metrics.getPendingMB();
     float persentUsedMB = (float) usedMB / totalMB;
 
     int usedCores = metrics.getAllocatedVirtualCores() + metrics.
@@ -195,6 +195,7 @@ public class PriceMultiplicatiorService extends AbstractService {
                 currentMultiplicator));
 
         connector.commit();
+        LOG.debug("Commited new multiplicator: " + currentMultiplicator + "for VARIABLE");
         return null;
       }
     };

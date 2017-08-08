@@ -43,7 +43,6 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.security.NMTokenIdentifier;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
-import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.Assert;
@@ -69,7 +68,7 @@ public class TestNMProxy extends BaseContainerManagerTest {
   protected ContainerManagerImpl
       createContainerManager(DeletionService delSrvc) {
     return new ContainerManagerImpl(context, exec, delSrvc, nodeStatusUpdater,
-      metrics, new ApplicationACLsManager(conf), dirsHandler) {
+      metrics, dirsHandler) {
 
       @Override
       public StartContainersResponse startContainers(
@@ -189,8 +188,7 @@ public class TestNMProxy extends BaseContainerManagerTest {
       Assert.fail("should get socket exception");
     } catch (IOException e) {
       // socket exception should be thrown immediately, without RPC retries.
-      Assert.assertTrue(e.toString().
-          contains("Failed on local exception: java.net.SocketException"));
+      Assert.assertTrue(e instanceof java.net.SocketException);
     }
   }
 

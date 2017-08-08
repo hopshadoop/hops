@@ -52,17 +52,35 @@ public class NodeManagerMetrics {
   
   @Metric("Container launch duration")
       MutableRate containerLaunchDuration;
+  @Metric("# of bad local dirs")
+      MutableGaugeInt badLocalDirs;
+  @Metric("# of bad log dirs")
+      MutableGaugeInt badLogDirs;
+  @Metric("Disk utilization % on good local dirs")
+      MutableGaugeInt goodLocalDirsDiskUtilizationPerc;
+  @Metric("Disk utilization % on good log dirs")
+      MutableGaugeInt goodLogDirsDiskUtilizationPerc;
+
+  private JvmMetrics jvmMetrics = null;
 
   private long allocatedMB;
   private long availableMB;
+
+  public NodeManagerMetrics(JvmMetrics jvmMetrics) {
+    this.jvmMetrics = jvmMetrics;
+  }
 
   public static NodeManagerMetrics create() {
     return create(DefaultMetricsSystem.instance());
   }
 
   static NodeManagerMetrics create(MetricsSystem ms) {
-    JvmMetrics.create("NodeManager", null, ms);
-    return ms.register(new NodeManagerMetrics());
+    JvmMetrics jm = JvmMetrics.create("NodeManager", null, ms);
+    return ms.register(new NodeManagerMetrics(jm));
+  }
+
+  public JvmMetrics getJvmMetrics() {
+    return jvmMetrics;
   }
 
   // Potential instrumentation interface methods
@@ -101,9 +119,9 @@ public class NodeManagerMetrics {
 
   public void allocateContainer(Resource res) {
     allocatedContainers.incr();
-    allocatedMB = allocatedMB + res.getMemory();
+    allocatedMB = allocatedMB + res.getMemorySize();
     allocatedGB.set((int)Math.ceil(allocatedMB/1024d));
-    availableMB = availableMB - res.getMemory();
+    availableMB = availableMB - res.getMemorySize();
     availableGB.set((int)Math.floor(availableMB/1024d));
     allocatedVCores.incr(res.getVirtualCores());
     availableVCores.decr(res.getVirtualCores());
@@ -113,9 +131,9 @@ public class NodeManagerMetrics {
 
   public void releaseContainer(Resource res) {
     allocatedContainers.decr();
-    allocatedMB = allocatedMB - res.getMemory();
+    allocatedMB = allocatedMB - res.getMemorySize();
     allocatedGB.set((int)Math.ceil(allocatedMB/1024d));
-    availableMB = availableMB + res.getMemory();
+    availableMB = availableMB + res.getMemorySize();
     availableGB.set((int)Math.floor(availableMB/1024d));
     allocatedVCores.decr(res.getVirtualCores());
     availableVCores.incr(res.getVirtualCores());
@@ -123,8 +141,19 @@ public class NodeManagerMetrics {
     availableGPUs.incr(res.getGPUs());
   }
 
+  public void changeContainer(Resource before, Resource now) {
+    long deltaMB = now.getMemorySize() - before.getMemorySize();
+    int deltaVCores = now.getVirtualCores() - before.getVirtualCores();
+    allocatedMB = allocatedMB + deltaMB;
+    allocatedGB.set((int)Math.ceil(allocatedMB/1024d));
+    availableMB = availableMB - deltaMB;
+    availableGB.set((int)Math.floor(availableMB/1024d));
+    allocatedVCores.incr(deltaVCores);
+    availableVCores.decr(deltaVCores);
+  }
+
   public void addResource(Resource res) {
-    availableMB = availableMB + res.getMemory();
+    availableMB = availableMB + res.getMemorySize();
     availableGB.incr((int)Math.floor(availableMB/1024d));
     availableVCores.incr(res.getVirtualCores());
     availableGPUs.incr(res.getGPUs());
@@ -132,6 +161,24 @@ public class NodeManagerMetrics {
 
   public void addContainerLaunchDuration(long value) {
     containerLaunchDuration.add(value);
+  }
+
+  public void setBadLocalDirs(int badLocalDirs) {
+    this.badLocalDirs.set(badLocalDirs);
+  }
+
+  public void setBadLogDirs(int badLogDirs) {
+    this.badLogDirs.set(badLogDirs);
+  }
+
+  public void setGoodLocalDirsDiskUtilizationPerc(
+      int goodLocalDirsDiskUtilizationPerc) {
+    this.goodLocalDirsDiskUtilizationPerc.set(goodLocalDirsDiskUtilizationPerc);
+  }
+
+  public void setGoodLogDirsDiskUtilizationPerc(
+      int goodLogDirsDiskUtilizationPerc) {
+    this.goodLogDirsDiskUtilizationPerc.set(goodLogDirsDiskUtilizationPerc);
   }
 
   public int getRunningContainers() {
@@ -152,4 +199,25 @@ public class NodeManagerMetrics {
   public int getCompletedContainers() {
     return containersCompleted.value();
   }
+
+  @VisibleForTesting
+  public int getBadLogDirs() {
+    return badLogDirs.value();
+  }
+
+  @VisibleForTesting
+  public int getBadLocalDirs() {
+    return badLocalDirs.value();
+  }
+
+  @VisibleForTesting
+  public int getGoodLogDirsDiskUtilizationPerc() {
+    return goodLogDirsDiskUtilizationPerc.value();
+  }
+
+  @VisibleForTesting
+  public int getGoodLocalDirsDiskUtilizationPerc() {
+    return goodLocalDirsDiskUtilizationPerc.value();
+  }
+
 }

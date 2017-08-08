@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
 
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.Assert;
 
 import org.apache.avro.AvroRemoteException;

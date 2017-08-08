@@ -31,11 +31,12 @@ import javax.ws.rs.core.MediaType;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
-import org.junit.*;
+import org.junit.Assert;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.NodeHealthScriptRunner;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -62,6 +63,9 @@ import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebServicesTestUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.Test;
 import org.mortbay.log.Log;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -96,14 +100,16 @@ public class TestNMWebServices extends JerseyTestBase {
       TestNMWebServices.class.getSimpleName() + "LogDir");
 
   private Injector injector = Guice.createInjector(new ServletModule() {
+
     @Override
     protected void configureServlets() {
       Configuration conf = new Configuration();
       conf.set(YarnConfiguration.NM_LOCAL_DIRS, testRootDir.getAbsolutePath());
       conf.set(YarnConfiguration.NM_LOG_DIRS, testLogDir.getAbsolutePath());
-      NodeHealthCheckerService healthChecker = new NodeHealthCheckerService();
+      dirsHandler = new LocalDirsHandlerService();
+      NodeHealthCheckerService healthChecker = new NodeHealthCheckerService(
+          NodeManager.getNodeHealthScriptRunner(conf), dirsHandler);
       healthChecker.init(conf);
-      dirsHandler = healthChecker.getDiskHandler();
       aclsManager = new ApplicationACLsManager(conf);
       nmContext = new NodeManager.NMContext(null, null, dirsHandler,
           aclsManager, null);
@@ -405,7 +411,7 @@ public class TestNMWebServices extends JerseyTestBase {
   public void verifyNodeInfo(JSONObject json) throws JSONException, Exception {
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject info = json.getJSONObject("nodeInfo");
-    assertEquals("incorrect number of elements", 17, info.length());
+    assertEquals("incorrect number of elements", 18, info.length());
     verifyNodeInfoGeneric(info.getString("id"), info.getString("healthReport"),
         info.getLong("totalVmemAllocatedContainersMB"),
         info.getLong("totalPmemAllocatedContainersMB"),

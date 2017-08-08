@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import com.google.common.base.Optional;
-
 import static org.apache.hadoop.fs.CreateFlag.CREATE;
 import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 
@@ -38,14 +36,15 @@ import java.util.Map;
 import org.apache.commons.lang.math.RandomUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Shell;
-import org.apache.hadoop.util.Shell.ExitCodeException;
 import org.apache.hadoop.util.Shell.CommandExecutor;
+import org.apache.hadoop.util.Shell.ExitCodeException;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -56,9 +55,15 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerDiagnosticsUpdateEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.ContainerLaunch;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ContainerLocalizer;
+import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerLivenessContext;
+import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerSignalContext;
+import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerStartContext;
+import org.apache.hadoop.yarn.server.nodemanager.executor.DeletionAsUserContext;
+import org.apache.hadoop.yarn.server.nodemanager.executor.LocalizerStartContext;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 
 public class DefaultContainerExecutor extends ContainerExecutor {
 
@@ -95,10 +100,14 @@ public class DefaultContainerExecutor extends ContainerExecutor {
   }
   
   @Override
-  public void startLocalizer(Path nmPrivateContainerTokensPath,
-      InetSocketAddress nmAddr, String user, String appId, String locId,
-      LocalDirsHandlerService dirsHandler)
+  public void startLocalizer(LocalizerStartContext ctx)
       throws IOException, InterruptedException {
+    Path nmPrivateContainerTokensPath = ctx.getNmPrivateContainerTokens();
+    InetSocketAddress nmAddr = ctx.getNmAddr();
+    String user = ctx.getUser();
+    String appId = ctx.getAppId();
+    String locId = ctx.getLocId();
+    LocalDirsHandlerService dirsHandler = ctx.getDirsHandler();
 
     List<String> localDirs = dirsHandler.getLocalDirs();
     List<String> logDirs = dirsHandler.getLogDirs();
@@ -123,12 +132,25 @@ public class DefaultContainerExecutor extends ContainerExecutor {
     localizerFc.setWorkingDirectory(appStorageDir);
     LOG.info("Localizer CWD set to " + appStorageDir + " = " 
         + localizerFc.getWorkingDirectory());
+
     ContainerLocalizer localizer =
-        new ContainerLocalizer(localizerFc, user, appId, locId, 
-            getPaths(localDirs), RecordFactoryProvider.getRecordFactory(getConf()));
+        createContainerLocalizer(user, appId, locId, localDirs, localizerFc);
     // TODO: DO it over RPC for maintaining similarity?
     localizer.runLocalization(nmAddr);
   }
+
+  @Private
+  @VisibleForTesting
+  protected ContainerLocalizer createContainerLocalizer(String user,
+      String appId, String locId, List<String> localDirs,
+      FileContext localizerFc) throws IOException {
+    ContainerLocalizer localizer =
+        new ContainerLocalizer(localizerFc, user, appId, locId,
+            getPaths(localDirs),
+            RecordFactoryProvider.getRecordFactory(getConf()));
+    return localizer;
+  }
+
   
   @Override
   public void recoverDeviceControlSystem(ContainerId containerId) {
@@ -136,20 +158,23 @@ public class DefaultContainerExecutor extends ContainerExecutor {
   }
   
   @Override
-  public int launchContainer(Container container,
-      Path nmPrivateContainerScriptPath, Path nmPrivateTokensPath,
-      String user, String appId, Path containerWorkDir,
-      List<String> localDirs, List<String> logDirs) throws IOException {
-    
+  public int launchContainer(ContainerStartContext ctx) throws IOException {
+    Container container = ctx.getContainer();
+    Path nmPrivateContainerScriptPath = ctx.getNmPrivateContainerScriptPath();
+    Path nmPrivateTokensPath = ctx.getNmPrivateTokensPath();
+    String user = ctx.getUser();
+    Path containerWorkDir = ctx.getContainerWorkDir();
+    List<String> localDirs = ctx.getLocalDirs();
+    List<String> logDirs = ctx.getLogDirs();
+
     FsPermission dirPerm = new FsPermission(APPDIR_PERM);
     ContainerId containerId = container.getContainerId();
 
     // create container dirs on all disks
-    String containerIdStr = ConverterUtils.toString(containerId);
+    String containerIdStr = containerId.toString();
     String appIdStr =
-        ConverterUtils.toString(
             containerId.getApplicationAttemptId().
-                getApplicationId());
+                getApplicationId().toString();
     for (String sLocalDir : localDirs) {
       Path usersdir = new Path(sLocalDir, ContainerLocalizer.USERCACHE);
       Path userdir = new Path(usersdir, user);
@@ -274,7 +299,9 @@ public class DefaultContainerExecutor extends ContainerExecutor {
       return new ShellCommandExecutor(
           command,
           wordDir,
-          environment); 
+          environment,
+          0L,
+          false);
   }
 
   protected LocalWrapperScriptBuilder getLocalWrapperScriptBuilder(
@@ -400,8 +427,12 @@ public class DefaultContainerExecutor extends ContainerExecutor {
   }
 
   @Override
-  public boolean signalContainer(String user, String pid, Signal signal)
+  public boolean signalContainer(ContainerSignalContext ctx)
       throws IOException {
+    String user = ctx.getUser();
+    String pid = ctx.getPid();
+    Signal signal = ctx.getSignal();
+
     LOG.debug("Sending signal " + signal.getValue() + " to pid " + pid
         + " as user " + user);
     if (!containerIsAlive(pid)) {
@@ -419,8 +450,10 @@ public class DefaultContainerExecutor extends ContainerExecutor {
   }
 
   @Override
-  public boolean isContainerProcessAlive(String user, String pid)
+  public boolean isContainerAlive(ContainerLivenessContext ctx)
       throws IOException {
+    String pid = ctx.getPid();
+
     return containerIsAlive(pid);
   }
 
@@ -457,9 +490,12 @@ public class DefaultContainerExecutor extends ContainerExecutor {
   }
 
   @Override
-  public void deleteAsUser(String user, Path subDir, Path... baseDirs)
+  public void deleteAsUser(DeletionAsUserContext ctx)
       throws IOException, InterruptedException {
-    if (baseDirs == null || baseDirs.length == 0) {
+    Path subDir = ctx.getSubDir();
+    List<Path> baseDirs = ctx.getBasedirs();
+
+    if (baseDirs == null || baseDirs.size() == 0) {
       LOG.info("Deleting absolute path : " + subDir);
       if (!lfs.delete(subDir, true)) {
         //Maybe retry

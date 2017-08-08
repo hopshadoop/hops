@@ -39,6 +39,7 @@ function print_usage(){
   echo "  historyserver        run job history servers as a standalone daemon"
   echo "  distcp <srcurl> <desturl> copy file or directories recursively"
   echo "  archive -archiveName NAME -p <parent path> <src>* <dest> create a hadoop archive"
+  echo "  archive-logs         combine aggregated logs into hadoop archives"
   echo "  hsadmin              job history server admin interface"
   echo ""
   echo "Most commands print help when invoked w/o parameters."
@@ -96,6 +97,10 @@ elif [ "$COMMAND" = "archive" ] ; then
   CLASS=org.apache.hadoop.tools.HadoopArchives
   CLASSPATH=${CLASSPATH}:${TOOL_PATH}
   HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
+elif [ "$COMMAND" = "archive-logs" ] ; then
+  CLASS=org.apache.hadoop.tools.HadoopArchiveLogs
+  CLASSPATH=${CLASSPATH}:${TOOL_PATH}
+  HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
 elif [ "$COMMAND" = "hsadmin" ] ; then
   CLASS=org.apache.hadoop.mapreduce.v2.hs.client.HSAdmin
   HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
@@ -146,7 +151,7 @@ if [ "$COMMAND" = "classpath" ] ; then
   if [ "$#" -gt 0 ]; then
     CLASS=org.apache.hadoop.util.Classpath
   else
-    if $cygwin; then
+    if [ "$cygwin" = true ]; then
       CLASSPATH=$(cygpath -p -w "$CLASSPATH" 2>/dev/null)
     fi
     echo $CLASSPATH
@@ -155,7 +160,7 @@ if [ "$COMMAND" = "classpath" ] ; then
 fi
 
 # cygwin path translation
-if $cygwin; then
+if [ "$cygwin" = true ]; then
   CLASSPATH=$(cygpath -p -w "$CLASSPATH" 2>/dev/null)
   HADOOP_LOG_DIR=$(cygpath -w "$HADOOP_LOG_DIR" 2>/dev/null)
   HADOOP_PREFIX=$(cygpath -w "$HADOOP_PREFIX" 2>/dev/null)

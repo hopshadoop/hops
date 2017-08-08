@@ -23,13 +23,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
@@ -45,8 +45,10 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.security.YarnAuthorizationProvider;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceLimits;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.preemption.PreemptionManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
@@ -90,10 +92,9 @@ public class TestParentQueue {
         Resources.createResource(16*GB, 32, 32));
     when(csContext.getClusterResource()).
         thenReturn(Resources.createResource(100 * 16 * GB, 100 * 32, 100 * 32));
-    when(csContext.getApplicationComparator()).
-    thenReturn(CapacityScheduler.applicationComparator);
-    when(csContext.getQueueComparator()).
-    thenReturn(CapacityScheduler.queueComparator);
+    when(csContext.getNonPartitionedQueueComparator()).
+    thenReturn(CapacityScheduler.nonPartitionedQueueComparator);
+    when(csContext.getPreemptionManager()).thenReturn(new PreemptionManager());
     when(csContext.getResourceCalculator()).
     thenReturn(resourceComparator);
     when(csContext.getRMContext()).thenReturn(rmContext);
@@ -146,18 +147,18 @@ public class TestParentQueue {
         final Resource allocatedResource = Resources.createResource(allocation);
         if (queue instanceof ParentQueue) {
           ((ParentQueue)queue).allocateResource(clusterResource, 
-              allocatedResource, null);
+              allocatedResource, RMNodeLabelsManager.NO_LABEL, false);
         } else {
           FiCaSchedulerApp app1 = getMockApplication(0, "");
           ((LeafQueue)queue).allocateResource(clusterResource, app1, 
-              allocatedResource, null);
+              allocatedResource, null, null, false);
         }
         
         // Next call - nothing
         if (allocation > 0) {
           doReturn(new CSAssignment(Resources.none(), type)).when(queue)
               .assignContainers(eq(clusterResource), eq(node),
-                  any(ResourceLimits.class));
+                  any(ResourceLimits.class), any(SchedulingMode.class));
 
           // Mock the node's resource availability
           Resource available = node.getAvailableResource();
@@ -168,20 +169,20 @@ public class TestParentQueue {
         return new CSAssignment(allocatedResource, type);
       }
     }).when(queue).assignContainers(eq(clusterResource), eq(node),
-        any(ResourceLimits.class));
+        any(ResourceLimits.class), any(SchedulingMode.class));
   }
   
   private float computeQueueAbsoluteUsedCapacity(CSQueue queue, 
       int expectedMemory, Resource clusterResource) {
     return (
-        ((float)expectedMemory / (float)clusterResource.getMemory())
+        ((float)expectedMemory / (float)clusterResource.getMemorySize())
       );
   }
   
   private float computeQueueUsedCapacity(CSQueue queue,
       int expectedMemory, Resource clusterResource) {
     return (expectedMemory / 
-        (clusterResource.getMemory() * queue.getAbsoluteCapacity()));
+        (clusterResource.getMemorySize() * queue.getAbsoluteCapacity()));
   }
   
   final static float DELTA = 0.0001f;
@@ -229,11 +230,16 @@ public class TestParentQueue {
     LeafQueue a = (LeafQueue)queues.get(A);
     LeafQueue b = (LeafQueue)queues.get(B);
     
+    a.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
+    b.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
+    queues.get(CapacitySchedulerConfiguration.ROOT).getQueueResourceUsage()
+    .incPending(Resources.createResource(1 * GB));
+    
     // Simulate B returning a container on node_0
     stubQueueAllocation(a, clusterResource, node_0, 0*GB);
     stubQueueAllocation(b, clusterResource, node_0, 1*GB);
     root.assignContainers(clusterResource, node_0, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     verifyQueueMetrics(a, 0*GB, clusterResource);
     verifyQueueMetrics(b, 1*GB, clusterResource);
     
@@ -241,12 +247,12 @@ public class TestParentQueue {
     stubQueueAllocation(a, clusterResource, node_1, 2*GB);
     stubQueueAllocation(b, clusterResource, node_1, 1*GB);
     root.assignContainers(clusterResource, node_1, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     InOrder allocationOrder = inOrder(a, b);
     allocationOrder.verify(a).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(b).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     verifyQueueMetrics(a, 2*GB, clusterResource);
     verifyQueueMetrics(b, 2*GB, clusterResource);
 
@@ -255,12 +261,12 @@ public class TestParentQueue {
     stubQueueAllocation(a, clusterResource, node_0, 1*GB);
     stubQueueAllocation(b, clusterResource, node_0, 2*GB);
     root.assignContainers(clusterResource, node_0, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     allocationOrder = inOrder(b, a);
     allocationOrder.verify(b).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(a).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     verifyQueueMetrics(a, 3*GB, clusterResource);
     verifyQueueMetrics(b, 4*GB, clusterResource);
 
@@ -269,12 +275,12 @@ public class TestParentQueue {
     stubQueueAllocation(a, clusterResource, node_0, 0*GB);
     stubQueueAllocation(b, clusterResource, node_0, 4*GB);
     root.assignContainers(clusterResource, node_0, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     allocationOrder = inOrder(b, a);
     allocationOrder.verify(b).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(a).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     verifyQueueMetrics(a, 3*GB, clusterResource);
     verifyQueueMetrics(b, 8*GB, clusterResource);
 
@@ -283,12 +289,12 @@ public class TestParentQueue {
     stubQueueAllocation(a, clusterResource, node_1, 1*GB);
     stubQueueAllocation(b, clusterResource, node_1, 1*GB);
     root.assignContainers(clusterResource, node_1, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     allocationOrder = inOrder(a, b);
     allocationOrder.verify(b).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(a).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     verifyQueueMetrics(a, 4*GB, clusterResource);
     verifyQueueMetrics(b, 9*GB, clusterResource);
   }
@@ -450,16 +456,27 @@ public class TestParentQueue {
 
     // Start testing
     CSQueue a = queues.get(A);
+    a.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
     CSQueue b = queues.get(B);
+    b.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
     CSQueue c = queues.get(C);
+    c.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
     CSQueue d = queues.get(D);
+    d.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
 
     CSQueue a1 = queues.get(A1);
+    a1.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
     CSQueue a2 = queues.get(A2);
+    a2.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
 
     CSQueue b1 = queues.get(B1);
+    b1.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
     CSQueue b2 = queues.get(B2);
+    b2.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
     CSQueue b3 = queues.get(B3);
+    b3.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
+    queues.get(CapacitySchedulerConfiguration.ROOT).getQueueResourceUsage()
+    .incPending(Resources.createResource(1 * GB));
 
     // Simulate C returning a container on node_0
     stubQueueAllocation(a, clusterResource, node_0, 0*GB);
@@ -467,7 +484,7 @@ public class TestParentQueue {
     stubQueueAllocation(c, clusterResource, node_0, 1*GB);
     stubQueueAllocation(d, clusterResource, node_0, 0*GB);
     root.assignContainers(clusterResource, node_0, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     verifyQueueMetrics(a, 0*GB, clusterResource);
     verifyQueueMetrics(b, 0*GB, clusterResource);
     verifyQueueMetrics(c, 1*GB, clusterResource);
@@ -480,7 +497,7 @@ public class TestParentQueue {
     stubQueueAllocation(b2, clusterResource, node_1, 4*GB);
     stubQueueAllocation(c, clusterResource, node_1, 0*GB);
     root.assignContainers(clusterResource, node_1, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     verifyQueueMetrics(a, 0*GB, clusterResource);
     verifyQueueMetrics(b, 4*GB, clusterResource);
     verifyQueueMetrics(c, 1*GB, clusterResource);
@@ -492,14 +509,14 @@ public class TestParentQueue {
     stubQueueAllocation(b3, clusterResource, node_0, 2*GB);
     stubQueueAllocation(c, clusterResource, node_0, 2*GB);
     root.assignContainers(clusterResource, node_0, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     InOrder allocationOrder = inOrder(a, c, b);
     allocationOrder.verify(a).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(c).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(b).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     verifyQueueMetrics(a, 1*GB, clusterResource);
     verifyQueueMetrics(b, 6*GB, clusterResource);
     verifyQueueMetrics(c, 3*GB, clusterResource);
@@ -519,16 +536,16 @@ public class TestParentQueue {
     stubQueueAllocation(b1, clusterResource, node_2, 1*GB);
     stubQueueAllocation(c, clusterResource, node_2, 1*GB);
     root.assignContainers(clusterResource, node_2, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     allocationOrder = inOrder(a, a2, a1, b, c);
     allocationOrder.verify(a).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(a2).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(b).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(c).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     verifyQueueMetrics(a, 3*GB, clusterResource);
     verifyQueueMetrics(b, 8*GB, clusterResource);
     verifyQueueMetrics(c, 4*GB, clusterResource);
@@ -599,6 +616,8 @@ public class TestParentQueue {
   public void testOffSwitchScheduling() throws Exception {
     // Setup queue configs
     setupSingleLevelQueues(csConf);
+    csConf.setOffSwitchPerHeartbeatLimit(2);
+
     
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = 
@@ -625,13 +644,23 @@ public class TestParentQueue {
     // Start testing
     LeafQueue a = (LeafQueue)queues.get(A);
     LeafQueue b = (LeafQueue)queues.get(B);
+    a.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
+    b.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
+    queues.get(CapacitySchedulerConfiguration.ROOT).getQueueResourceUsage()
+    .incPending(Resources.createResource(1 * GB));
     
-    // Simulate B returning a container on node_0
-    stubQueueAllocation(a, clusterResource, node_0, 0*GB, NodeType.OFF_SWITCH);
+    // Simulate returning 2 containers on node_0 before offswitch limit
+    stubQueueAllocation(a, clusterResource, node_0, 1*GB, NodeType.OFF_SWITCH);
     stubQueueAllocation(b, clusterResource, node_0, 1*GB, NodeType.OFF_SWITCH);
+
     root.assignContainers(clusterResource, node_0, 
-        new ResourceLimits(clusterResource));
-    verifyQueueMetrics(a, 0*GB, clusterResource);
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
+    InOrder allocationOrder = inOrder(a, b);
+    allocationOrder.verify(a, times(1)).assignContainers(eq(clusterResource),
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
+    allocationOrder.verify(b, times(1)).assignContainers(eq(clusterResource),
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
+    verifyQueueMetrics(a, 1*GB, clusterResource);
     verifyQueueMetrics(b, 1*GB, clusterResource);
     
     // Now, A should get the scheduling opportunity since A=0G/6G, B=1G/14G
@@ -639,28 +668,29 @@ public class TestParentQueue {
     stubQueueAllocation(a, clusterResource, node_1, 2*GB, NodeType.RACK_LOCAL);
     stubQueueAllocation(b, clusterResource, node_1, 1*GB, NodeType.OFF_SWITCH);
     root.assignContainers(clusterResource, node_1, 
-        new ResourceLimits(clusterResource));
-    InOrder allocationOrder = inOrder(a, b);
-    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
-    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
-    verifyQueueMetrics(a, 2*GB, clusterResource);
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
+    allocationOrder = inOrder(a, b);
+    allocationOrder.verify(a, times(1)).assignContainers(eq(clusterResource),
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
+    allocationOrder.verify(b, times(1)).assignContainers(eq(clusterResource),
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
+    verifyQueueMetrics(a, 3*GB, clusterResource);
     verifyQueueMetrics(b, 2*GB, clusterResource);
     
     // Now, B should get the scheduling opportunity 
     // since A has 2/6G while B has 2/14G, 
-    // However, since B returns off-switch, A won't get an opportunity
+    // A also gets an opportunity because offswitchlimit not reached
     stubQueueAllocation(a, clusterResource, node_0, 1*GB, NodeType.NODE_LOCAL);
     stubQueueAllocation(b, clusterResource, node_0, 2*GB, NodeType.OFF_SWITCH);
+
     root.assignContainers(clusterResource, node_0, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     allocationOrder = inOrder(b, a);
-    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
-    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
-    verifyQueueMetrics(a, 2*GB, clusterResource);
+    allocationOrder.verify(b, times(1)).assignContainers(eq(clusterResource),
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
+    allocationOrder.verify(a, times(1)).assignContainers(eq(clusterResource),
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
+    verifyQueueMetrics(a, 4*GB, clusterResource);
     verifyQueueMetrics(b, 4*GB, clusterResource);
 
   }
@@ -695,12 +725,19 @@ public class TestParentQueue {
     // Start testing
     LeafQueue b3 = (LeafQueue)queues.get(B3);
     LeafQueue b2 = (LeafQueue)queues.get(B2);
+    b2.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
+    b3.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
+    queues.get(CapacitySchedulerConfiguration.ROOT).getQueueResourceUsage()
+    .incPending(Resources.createResource(1 * GB));
+    
+    CSQueue b = queues.get(B);
+    b.getQueueResourceUsage().incPending(Resources.createResource(1 * GB));
     
     // Simulate B3 returning a container on node_0
     stubQueueAllocation(b2, clusterResource, node_0, 0*GB, NodeType.OFF_SWITCH);
     stubQueueAllocation(b3, clusterResource, node_0, 1*GB, NodeType.OFF_SWITCH);
     root.assignContainers(clusterResource, node_0, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     verifyQueueMetrics(b2, 0*GB, clusterResource);
     verifyQueueMetrics(b3, 1*GB, clusterResource);
     
@@ -709,12 +746,12 @@ public class TestParentQueue {
     stubQueueAllocation(b2, clusterResource, node_1, 1*GB, NodeType.RACK_LOCAL);
     stubQueueAllocation(b3, clusterResource, node_1, 1*GB, NodeType.OFF_SWITCH);
     root.assignContainers(clusterResource, node_1, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     InOrder allocationOrder = inOrder(b2, b3);
     allocationOrder.verify(b2).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(b3).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     verifyQueueMetrics(b2, 1*GB, clusterResource);
     verifyQueueMetrics(b3, 2*GB, clusterResource);
     
@@ -724,12 +761,12 @@ public class TestParentQueue {
     stubQueueAllocation(b2, clusterResource, node_0, 1*GB, NodeType.NODE_LOCAL);
     stubQueueAllocation(b3, clusterResource, node_0, 1*GB, NodeType.OFF_SWITCH);
     root.assignContainers(clusterResource, node_0, 
-        new ResourceLimits(clusterResource));
+        new ResourceLimits(clusterResource), SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY);
     allocationOrder = inOrder(b3, b2);
     allocationOrder.verify(b3).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     allocationOrder.verify(b2).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class), anyResourceLimits());
+        any(FiCaSchedulerNode.class), anyResourceLimits(), any(SchedulingMode.class));
     verifyQueueMetrics(b2, 1*GB, clusterResource);
     verifyQueueMetrics(b3, 3*GB, clusterResource);
 

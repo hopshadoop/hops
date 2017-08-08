@@ -34,7 +34,9 @@ import java.io.Reader;
 import java.io.Writer;
 import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
+import java.net.JarURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -165,7 +167,13 @@ import com.google.common.base.Preconditions;
  * will be resolved to another property in this Configuration, while
  * <tt>${<i>user.name</i>}</tt> would then ordinarily be resolved to the value
  * of the System property with that name.
- * By default, warnings will be given to any deprecated configuration 
+ * <p>When <tt>conf.get("otherdir")</tt> is called, then <tt>${<i>env.BASE_DIR</i>}</tt>
+ * will be resolved to the value of the <tt>${<i>BASE_DIR</i>}</tt> environment variable.
+ * It supports <tt>${<i>env.NAME:-default</i>}</tt> and <tt>${<i>env.NAME-default</i>}</tt> notations.
+ * The former is resolved to "default" if <tt>${<i>NAME</i>}</tt> environment variable is undefined
+ * or its value is empty.
+ * The latter behaves the same way only if <tt>${<i>NAME</i>}</tt> is undefined.
+ * <p>By default, warnings will be given to any deprecated configuration 
  * parameters and these are suppressible by configuring
  * <tt>log4j.logger.org.apache.hadoop.conf.Configuration.deprecation</tt> in
  * log4j.properties file.
@@ -602,37 +610,44 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * deprecated key, the value of the deprecated key is set as the value for
    * the provided property name.
    *
+   * @param deprecations deprecation context
    * @param name the property name
    * @return the first property in the list of properties mapping
    *         the <code>name</code> or the <code>name</code> itself.
    */
   private String[] handleDeprecation(DeprecationContext deprecations,
-      String name) {
+                                     String name) {
     if (null != name) {
       name = name.trim();
     }
-    ArrayList<String > names = new ArrayList<String>();
-	if (isDeprecated(name)) {
-      DeprecatedKeyInfo keyInfo = deprecations.getDeprecatedKeyMap().get(name);
-      warnOnceIfDeprecated(deprecations, name);
-      for (String newKey : keyInfo.newKeys) {
-        if(newKey != null) {
-          names.add(newKey);
+    // Initialize the return value with requested name
+    String[] names = new String[]{name};
+    // Deprecated keys are logged once and an updated names are returned
+    DeprecatedKeyInfo keyInfo = deprecations.getDeprecatedKeyMap().get(name);
+    if (keyInfo != null) {
+      if (!keyInfo.getAndSetAccessed()) {
+        logDeprecation(keyInfo.getWarningMessage(name));
+      }
+      // Override return value for deprecated keys
+      names = keyInfo.newKeys;
+    }
+    // If there are no overlay values we can return early
+    Properties overlay = getOverlay();
+    if (overlay.isEmpty()) {
+      return names;
+    }
+    // Update properties and overlays with reverse lookup values
+    for (String n : names) {
+      String deprecatedKey = deprecations.getReverseDeprecatedKeyMap().get(n);
+      if (deprecatedKey != null && !overlay.containsKey(n)) {
+        String deprecatedValue = overlay.getProperty(deprecatedKey);
+        if (deprecatedValue != null) {
+          getProps().setProperty(n, deprecatedValue);
+          overlay.setProperty(n, deprecatedValue);
         }
       }
     }
-    if(names.size() == 0) {
-    	names.add(name);
-    }
-    for(String n : names) {
-	  String deprecatedKey = deprecations.getReverseDeprecatedKeyMap().get(n);
-	  if (deprecatedKey != null && !getOverlay().containsKey(n) &&
-	      getOverlay().containsKey(deprecatedKey)) {
-	    getProps().setProperty(n, getOverlay().getProperty(deprecatedKey));
-	    getOverlay().setProperty(n, getOverlay().getProperty(deprecatedKey));
-	  }
-    }
-    return names.toArray(new String[names.size()]);
+    return names;
   }
  
   private void handleDeprecation() {
@@ -724,7 +739,20 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     this.loadDefaults = other.loadDefaults;
     setQuietMode(other.getQuietMode());
   }
-  
+
+  /**
+   * Reload existing configuration instances.
+   */
+  public static synchronized void reloadExistingConfigurations() {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Reloading " + REGISTRY.keySet().size()
+          + " existing configurations");
+    }
+    for (Configuration conf : REGISTRY.keySet()) {
+      conf.reloadConfiguration();
+    }
+  }
+
   /**
    * Add a default resource. Resources are loaded in the order of the resources 
    * added.
@@ -1133,7 +1161,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
         "Property name must not be null");
     Preconditions.checkArgument(
         value != null,
-        "The value of property " + name + " must not be null");
+        "The value of property %s must not be null", name);
     name = name.trim();
     DeprecationContext deprecations = deprecationContext.get();
     if (deprecations.getDeprecatedKeyMap().isEmpty()) {
@@ -1167,11 +1195,8 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     }
   }
 
-  private void warnOnceIfDeprecated(DeprecationContext deprecations, String name) {
-    DeprecatedKeyInfo keyInfo = deprecations.getDeprecatedKeyMap().get(name);
-    if (keyInfo != null && !keyInfo.getAndSetAccessed()) {
-      LOG_DEPRECATION.info(keyInfo.getWarningMessage(name));
-    }
+  private void logDeprecation(String message) {
+    LOG_DEPRECATION.info(message);
   }
 
   /**
@@ -1562,6 +1587,10 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       return defaultValue;
     }
     vStr = vStr.trim();
+    return getTimeDurationHelper(name, vStr, unit);
+  }
+
+  private long getTimeDurationHelper(String name, String vStr, TimeUnit unit) {
     ParsedTimeDuration vUnit = ParsedTimeDuration.unitFor(vStr);
     if (null == vUnit) {
       LOG.warn("No unit for " + name + "(" + vStr + ") assuming " + unit);
@@ -1570,6 +1599,15 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       vStr = vStr.substring(0, vStr.lastIndexOf(vUnit.suffix()));
     }
     return unit.convert(Long.parseLong(vStr), vUnit.unit());
+  }
+
+  public long[] getTimeDurations(String name, TimeUnit unit) {
+    String[] strings = getTrimmedStrings(name);
+    long[] durations = new long[strings.length];
+    for (int i = 0; i < strings.length; i++) {
+      durations[i] = getTimeDurationHelper(name, strings[i], unit);
+    }
+    return durations;
   }
 
   /**
@@ -2457,15 +2495,45 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     return result.entrySet().iterator();
   }
 
+  /**
+   * Constructs a mapping of configuration and includes all properties that
+   * start with the specified configuration prefix.  Property names in the
+   * mapping are trimmed to remove the configuration prefix.
+   *
+   * @param confPrefix configuration prefix
+   * @return mapping of configuration properties with prefix stripped
+   */
+  public Map<String, String> getPropsWithPrefix(String confPrefix) {
+    Map<String, String> configMap = new HashMap<>();
+    for (Map.Entry<String, String> entry : this) {
+      String name = entry.getKey();
+      if (name.startsWith(confPrefix)) {
+        String value = this.get(name);
+        name = name.substring(confPrefix.length());
+        configMap.put(name, value);
+      }
+    }
+    return configMap;
+  }
+
   private Document parse(DocumentBuilder builder, URL url)
       throws IOException, SAXException {
     if (!quietmode) {
-      LOG.debug("parsing URL " + url);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("parsing URL " + url);
+      }
     }
     if (url == null) {
       return null;
     }
-    return parse(builder, url.openStream(), url.toString());
+
+    URLConnection connection = url.openConnection();
+    if (connection instanceof JarURLConnection) {
+      // Disable caching for JarURLConnection to avoid sharing JarFile
+      // with other users.
+      connection.setUseCaches(false);
+    }
+    return parse(builder, connection.getInputStream(), url.toString());
   }
 
   private Document parse(DocumentBuilder builder, InputStream is,
@@ -2654,14 +2722,14 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       to.put(entry.getKey(), entry.getValue());
     }
   }
-  
+
   private void loadProperty(Properties properties, String name, String attr,
       String value, boolean finalParameter, String[] source) {
     if (value != null || allowNullValueProperties) {
+      if (value == null) {
+        value = DEFAULT_STRING_CHECK;
+      }
       if (!finalParameters.contains(attr)) {
-        if (value==null && allowNullValueProperties) {
-          value = DEFAULT_STRING_CHECK;
-        }
         properties.setProperty(attr, value);
         if(source != null) {
           updatingResource.put(attr, source);

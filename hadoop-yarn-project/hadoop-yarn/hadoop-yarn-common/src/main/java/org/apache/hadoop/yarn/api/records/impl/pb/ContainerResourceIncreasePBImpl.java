@@ -28,6 +28,7 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceIncreaseProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceIncreaseProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 
+@Deprecated
 public class ContainerResourceIncreasePBImpl extends ContainerResourceIncrease {
   ContainerResourceIncreaseProto proto = ContainerResourceIncreaseProto
       .getDefaultInstance();
@@ -95,7 +96,7 @@ public class ContainerResourceIncreasePBImpl extends ContainerResourceIncrease {
     }
     this.targetCapability = targetCapability;
   }
-  
+
   @Override
   public Token getContainerToken() {
     ContainerResourceIncreaseProtoOrBuilder p = viaProto ? proto : builder;
@@ -132,7 +133,7 @@ public class ContainerResourceIncreasePBImpl extends ContainerResourceIncrease {
   private ResourceProto convertToProtoFormat(Resource t) {
     return ((ResourcePBImpl) t).getProto();
   }
-  
+
   private Token convertFromProtoFormat(TokenProto p) {
     return new TokenPBImpl(p);
   }

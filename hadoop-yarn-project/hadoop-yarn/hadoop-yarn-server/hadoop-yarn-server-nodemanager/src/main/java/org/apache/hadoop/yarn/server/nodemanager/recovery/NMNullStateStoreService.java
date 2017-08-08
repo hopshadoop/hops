@@ -27,6 +27,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceProto;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.ContainerManagerApplicationProto;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.DeletionServiceDeleteTaskProto;
@@ -69,7 +70,7 @@ public class NMNullStateStoreService extends NMStateStoreService {
   }
 
   @Override
-  public void storeContainer(ContainerId containerId,
+  public void storeContainer(ContainerId containerId, int version,
       StartContainerRequest startRequest) throws IOException {
   }
 
@@ -81,6 +82,11 @@ public class NMNullStateStoreService extends NMStateStoreService {
   @Override
   public void storeContainerLaunched(ContainerId containerId)
       throws IOException {
+  }
+
+  @Override
+  public void storeContainerResourceChanged(ContainerId containerId,
+      int version, Resource capability) throws IOException {
   }
 
   @Override

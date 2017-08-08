@@ -109,7 +109,7 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
-import org.apache.hadoop.util.DiskChecker2;
+import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
@@ -1704,7 +1704,7 @@ public class DataNode extends Configured
       // drop any (illegal) authority in the URI for backwards compatibility
       File dir = new File(dirURI.getPath());
       try {
-        DiskChecker2.checkDir(localFS, new Path(dir.toURI()), permission);
+        DiskChecker.checkDir(localFS, new Path(dir.toURI()), permission);
         dirs.add(dir);
       } catch (IOException ioe) {
         LOG.warn("Invalid " + DFS_DATANODE_DATA_DIR_KEY + " " + dir + " : ",

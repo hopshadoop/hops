@@ -53,24 +53,29 @@ class CopyCommands {
   /** merge multiple files together */
   public static class Merge extends FsCommand {
     public static final String NAME = "getmerge";    
-    public static final String USAGE = "[-nl] <src> <localdst>";
+    public static final String USAGE = "[-nl] [-skip-empty-file] "
+        + "<src> <localdst>";
     public static final String DESCRIPTION =
-      "Get all the files in the directories that " +
-      "match the source file pattern and merge and sort them to only " +
-      "one file on local fs. <src> is kept.\n" +
-      "-nl: Add a newline character at the end of each file.";
+        "Get all the files in the directories that "
+        + "match the source file pattern and merge and sort them to only "
+        + "one file on local fs. <src> is kept.\n"
+        + "-nl: Add a newline character at the end of each file.\n"
+        + "-skip-empty-file: Do not add new line character for empty file.";
 
     protected PathData dst = null;
     protected String delimiter = null;
+    private boolean skipEmptyFileDelimiter;
     protected List<PathData> srcs = null;
 
     @Override
     protected void processOptions(LinkedList<String> args) throws IOException {
       try {
-        CommandFormat cf = new CommandFormat(2, Integer.MAX_VALUE, "nl");
+        CommandFormat cf = new CommandFormat(2, Integer.MAX_VALUE, "nl",
+            "skip-empty-file");
         cf.parse(args);
 
         delimiter = cf.getOpt("nl") ? "\n" : null;
+        skipEmptyFileDelimiter = cf.getOpt("skip-empty-file");
 
         dst = new PathData(new URI(args.removeLast()), getConf());
         if (dst.exists && dst.stat.isDirectory()) {
@@ -92,21 +97,26 @@ class CopyCommands {
       FSDataOutputStream out = dst.fs.create(dst.path);
       try {
         for (PathData src : srcs) {
-          FSDataInputStream in = src.fs.open(src.path);
-          try {
-            IOUtils.copyBytes(in, out, getConf(), false);
-            if (delimiter != null) {
-              out.write(delimiter.getBytes("UTF-8"));
+          if (src.stat.getLen() != 0) {
+            try (FSDataInputStream in = src.fs.open(src.path)) {
+              IOUtils.copyBytes(in, out, getConf(), false);
+              writeDelimiter(out);
             }
-          } finally {
-            in.close();
+          } else if (!skipEmptyFileDelimiter) {
+            writeDelimiter(out);
           }
         }
       } finally {
         out.close();
-      }      
+      }
     }
- 
+
+    private void writeDelimiter(FSDataOutputStream out) throws IOException {
+      if (delimiter != null) {
+        out.write(delimiter.getBytes("UTF-8"));
+      }
+    }
+
     @Override
     protected void processNonexistentPath(PathData item) throws IOException {
       exitCode = 1; // flag that a path is bad
@@ -133,7 +143,8 @@ class CopyCommands {
 
   static class Cp extends CommandWithDestination {
     public static final String NAME = "cp";
-    public static final String USAGE = "[-f] [-p | -p[topax]] <src> ... <dst>";
+    public static final String USAGE =
+        "[-f] [-p | -p[topax]] [-d] <src> ... <dst>";
     public static final String DESCRIPTION =
       "Copy files that match the file pattern <src> to a " +
       "destination.  When copying multiple files, the destination " +
@@ -147,13 +158,15 @@ class CopyCommands {
       "if (1) they are supported (HDFS only) and, (2) all of the source and " +
       "target pathnames are in the /.reserved/raw hierarchy. raw namespace " +
       "xattr preservation is determined solely by the presence (or absence) " +
-      "of the /.reserved/raw prefix and not by the -p option.\n";
+        "of the /.reserved/raw prefix and not by the -p option. Passing -d "+
+        "will skip creation of temporary file(<dst>._COPYING_).\n";
 
     @Override
     protected void processOptions(LinkedList<String> args) throws IOException {
       popPreserveOption(args);
-      CommandFormat cf = new CommandFormat(2, Integer.MAX_VALUE, "f");
+      CommandFormat cf = new CommandFormat(2, Integer.MAX_VALUE, "f", "d");
       cf.parse(args);
+      setDirectWrite(cf.getOpt("d"));
       setOverwrite(cf.getOpt("f"));
       // should have a -r option
       setRecursive(true);
@@ -188,11 +201,12 @@ class CopyCommands {
   public static class Get extends CommandWithDestination {
     public static final String NAME = "get";
     public static final String USAGE =
-      "[-p] [-ignoreCrc] [-crc] <src> ... <localdst>";
+      "[-f] [-p] [-ignoreCrc] [-crc] <src> ... <localdst>";
     public static final String DESCRIPTION =
       "Copy files that match the file pattern <src> " +
       "to the local name.  <src> is kept.  When copying multiple " +
       "files, the destination must be a directory. Passing " +
+      "-f overwrites the destination if it already exists and " +
       "-p preserves access and modification times, " +
       "ownership and the mode.\n";
 
@@ -200,11 +214,12 @@ class CopyCommands {
     protected void processOptions(LinkedList<String> args)
     throws IOException {
       CommandFormat cf = new CommandFormat(
-          1, Integer.MAX_VALUE, "crc", "ignoreCrc", "p");
+          1, Integer.MAX_VALUE, "crc", "ignoreCrc", "p", "f");
       cf.parse(args);
       setWriteChecksum(cf.getOpt("crc"));
       setVerifyChecksum(!cf.getOpt("ignoreCrc"));
       setPreserve(cf.getOpt("p"));
+      setOverwrite(cf.getOpt("f"));
       setRecursive(true);
       getLocalDestination(args);
     }
@@ -215,7 +230,8 @@ class CopyCommands {
    */
   public static class Put extends CommandWithDestination {
     public static final String NAME = "put";
-    public static final String USAGE = "[-f] [-p] [-l] <localsrc> ... <dst>";
+    public static final String USAGE =
+        "[-f] [-p] [-l] [-d] <localsrc> ... <dst>";
     public static final String DESCRIPTION =
       "Copy files from the local file system " +
       "into fs. Copying fails if the file already " +
@@ -225,15 +241,18 @@ class CopyCommands {
       "  -f : Overwrites the destination if it already exists.\n" +
       "  -l : Allow DataNode to lazily persist the file to disk. Forces\n" +
       "       replication factor of 1. This flag will result in reduced\n" +
-      "       durability. Use with care.\n";
+      "       durability. Use with care.\n" +
+        "  -d : Skip creation of temporary file(<dst>._COPYING_).\n";
 
     @Override
     protected void processOptions(LinkedList<String> args) throws IOException {
-      CommandFormat cf = new CommandFormat(1, Integer.MAX_VALUE, "f", "p", "l");
+      CommandFormat cf =
+          new CommandFormat(1, Integer.MAX_VALUE, "f", "p", "l", "d");
       cf.parse(args);
       setOverwrite(cf.getOpt("f"));
       setPreserve(cf.getOpt("p"));
       setLazyPersist(cf.getOpt("l"));
+      setDirectWrite(cf.getOpt("d"));
       getRemoteDestination(args);
       // should have a -r option
       setRecursive(true);

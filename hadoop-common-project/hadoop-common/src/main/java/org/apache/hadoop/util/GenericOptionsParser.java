@@ -208,11 +208,12 @@ public class GenericOptionsParser {
    * Specify properties of each generic option
    */
   @SuppressWarnings("static-access")
-  private static Options buildGeneralOptions(Options opts) {
-    Option fs = OptionBuilder.withArgName("local|namenode:port")
-    .hasArg()
-    .withDescription("specify a namenode")
-    .create("fs");
+  private static synchronized Options buildGeneralOptions(Options opts) {
+    Option fs = OptionBuilder.withArgName("file:///|hdfs://namenode:port")
+        .hasArg()
+        .withDescription("specify default filesystem URL to use, "
+        + "overrides 'fs.defaultFS' property from configurations.")
+        .create("fs");
     Option jt = OptionBuilder.withArgName("local|resourcemanager:port")
     .hasArg()
     .withDescription("specify a ResourceManager")
@@ -503,7 +504,9 @@ public class GenericOptionsParser {
     out.println("Generic options supported are");
     out.println("-conf <configuration file>     specify an application configuration file");
     out.println("-D <property=value>            use value for given property");
-    out.println("-fs <local|namenode:port>      specify a namenode");
+    out.println("-fs <file:///|hdfs://namenode:port> "
+        + "specify default filesystem URL to use, overrides "
+        + "'fs.defaultFS' property from configurations.");
     out.println("-jt <local|resourcemanager:port>    specify a ResourceManager");
     out.println("-files <comma separated list of files>    " + 
       "specify comma separated files to be copied to the map reduce cluster");
@@ -513,7 +516,7 @@ public class GenericOptionsParser {
                 "specify comma separated archives to be unarchived" +
                 " on the compute machines.\n");
     out.println("The general command line syntax is");
-    out.println("bin/hadoop command [genericOptions] [commandOptions]\n");
+    out.println("command [genericOptions] [commandOptions]\n");
   }
   
 }

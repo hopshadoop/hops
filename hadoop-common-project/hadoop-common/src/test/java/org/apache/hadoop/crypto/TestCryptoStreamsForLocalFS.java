@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -38,8 +39,8 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestCryptoStreamsForLocalFS extends CryptoStreamsTestBase {
-  private static final String TEST_ROOT_DIR
-    = System.getProperty("test.build.data","build/test/data") + "/work-dir/localfs";
+  private static final String TEST_ROOT_DIR =
+      GenericTestUtils.getTempPath("work-dir/testcryptostreamsforlocalfs");
 
   private final File base = new File(TEST_ROOT_DIR);
   private final Path file = new Path(TEST_ROOT_DIR, "test-file");
@@ -47,15 +48,9 @@ public class TestCryptoStreamsForLocalFS extends CryptoStreamsTestBase {
   
   @BeforeClass
   public static void init() throws Exception {
-    Configuration conf = new Configuration();
-    conf = new Configuration(false);
+    Configuration conf = new Configuration(false);
     conf.set("fs.file.impl", LocalFileSystem.class.getName());
     fileSys = FileSystem.getLocal(conf);
-    conf.set(
-        CommonConfigurationKeysPublic.HADOOP_SECURITY_CRYPTO_CODEC_CLASSES_KEY_PREFIX
-            + CipherSuite.AES_CTR_NOPADDING.getConfigSuffix(),
-        OpensslAesCtrCryptoCodec.class.getName() + ","
-            + JceAesCtrCryptoCodec.class.getName());
     codec = CryptoCodec.getInstance(conf);
   }
   

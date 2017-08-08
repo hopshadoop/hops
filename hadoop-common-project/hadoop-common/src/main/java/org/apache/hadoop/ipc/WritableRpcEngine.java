@@ -34,7 +34,6 @@ import org.apache.hadoop.io.*;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client.ConnectionId;
 import org.apache.hadoop.ipc.RPC.RpcInvoker;
-import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -42,8 +41,8 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.*;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 
 /** An RpcEngine implementation for Writable data. */
 @InterfaceStability.Evolving
@@ -221,7 +220,7 @@ public class WritableRpcEngine implements RpcEngine {
                    int rpcTimeout, AtomicBoolean fallbackToSimpleAuth)
         throws IOException {
       this.remoteId = Client.ConnectionId.getConnectionId(address, protocol,
-          ticket, rpcTimeout, conf);
+          ticket, rpcTimeout, null, conf);
       this.client = CLIENTS.getClient(conf, factory);
       this.fallbackToSimpleAuth = fallbackToSimpleAuth;
     }
@@ -233,9 +232,14 @@ public class WritableRpcEngine implements RpcEngine {
       if (LOG.isDebugEnabled()) {
         startTime = Time.now();
       }
+
+      // if Tracing is on then start a new span for this rpc.
+      // guard it in the if statement to make sure there isn't
+      // any extra string manipulation.
+      Tracer tracer = Tracer.curThreadTracer();
       TraceScope traceScope = null;
-      if (Trace.isTracing()) {
-        traceScope = Trace.startSpan(RpcClientUtil.methodToTraceString(method));
+      if (tracer != null) {
+        traceScope = tracer.newScope(RpcClientUtil.methodToTraceString(method));
       }
       ObjectWritable value;
       try {
@@ -497,13 +501,12 @@ public class WritableRpcEngine implements RpcEngine {
             }
           }
         }
-          
 
-          // Invoke the protocol method
-       long startTime = Time.now();
-       int qTime = (int) (startTime-receivedTime);
-       Exception exception = null;
-       try {
+        // Invoke the protocol method
+        long startTime = Time.now();
+        int qTime = (int) (startTime-receivedTime);
+        Exception exception = null;
+        try {
           Method method =
               protocolImpl.protocolClass.getMethod(call.getMethodName(),
               call.getParameterClasses());
@@ -534,24 +537,20 @@ public class WritableRpcEngine implements RpcEngine {
           exception = ioe;
           throw ioe;
         } finally {
-         int processingTime = (int) (Time.now() - startTime);
-         if (LOG.isDebugEnabled()) {
-           String msg = "Served: " + call.getMethodName() +
-               " queueTime= " + qTime +
-               " procesingTime= " + processingTime;
-           if (exception != null) {
-             msg += " exception= " + exception.getClass().getSimpleName();
-           }
-           LOG.debug(msg);
-         }
-         String detailedMetricsName = (exception == null) ?
-             call.getMethodName() :
-             exception.getClass().getSimpleName();
-         server.rpcMetrics.addRpcQueueTime(qTime);
-         server.rpcMetrics.addRpcProcessingTime(processingTime);
-         server.rpcDetailedMetrics.addProcessingTime(detailedMetricsName,
-             processingTime);
-       }
+          int processingTime = (int) (Time.now() - startTime);
+          if (LOG.isDebugEnabled()) {
+            String msg = "Served: " + call.getMethodName() +
+                " queueTime= " + qTime + " procesingTime= " + processingTime;
+            if (exception != null) {
+              msg += " exception= " + exception.getClass().getSimpleName();
+            }
+            LOG.debug(msg);
+          }
+          String detailedMetricsName = (exception == null) ?
+              call.getMethodName() :
+              exception.getClass().getSimpleName();
+          server.updateMetrics(detailedMetricsName, qTime, processingTime);
+        }
       }
     }
   }

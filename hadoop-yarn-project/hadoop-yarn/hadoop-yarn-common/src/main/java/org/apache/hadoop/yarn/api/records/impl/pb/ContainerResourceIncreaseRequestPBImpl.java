@@ -26,10 +26,10 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceIncreaseRequestP
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceIncreaseRequestProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 
-
+@Deprecated
 public class ContainerResourceIncreaseRequestPBImpl extends
     ContainerResourceIncreaseRequest {
-  ContainerResourceIncreaseRequestProto proto = 
+  ContainerResourceIncreaseRequestProto proto =
       ContainerResourceIncreaseRequestProto.getDefaultInstance();
   ContainerResourceIncreaseRequestProto.Builder builder = null;
   boolean viaProto = false;

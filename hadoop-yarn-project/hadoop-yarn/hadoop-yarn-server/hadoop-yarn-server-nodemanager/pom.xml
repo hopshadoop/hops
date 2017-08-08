@@ -19,13 +19,13 @@
   <parent>
     <artifactId>hadoop-yarn-server</artifactId>
     <groupId>io.hops</groupId>
-    <version>2.7.3</version>
+    <version>2.8.2</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn-server-nodemanager</artifactId>
-  <version>2.7.3</version>
-  <name>hadoop-yarn-server-nodemanager</name>
+  <version>2.8.2</version>
+  <name>Apache Hadoop YARN NodeManager</name>
 
   <properties>
     <!-- Basedir eeded for generating FindBugs warnings using parent pom -->
@@ -219,7 +219,7 @@
                 <phase>test</phase>
                 <configuration>
                   <target>
-                    <exec executable="sh" failonerror="true" dir="${project.build.directory}/native">
+                    <exec executable="${shell-executable}" failonerror="true" dir="${project.build.directory}/native">
                       <arg value="-c"/>
                       <arg value="[ x$SKIPTESTS = xtrue ] || test-container-executor"/>
                       <env key="SKIPTESTS" value="${skipTests}"/>
@@ -291,6 +291,18 @@
           </systemPropertyVariables>
           <excludes>
             <exclude>**/TestFSDownload.java</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>src/main/native/container-executor/impl/compat/fstatat.h</exclude>
+            <exclude>src/main/native/container-executor/impl/compat/openat.h</exclude>
+            <exclude>src/main/native/container-executor/impl/compat/unlinkat.h</exclude>
           </excludes>
         </configuration>
       </plugin>

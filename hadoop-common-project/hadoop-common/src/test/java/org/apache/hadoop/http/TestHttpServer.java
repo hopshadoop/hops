@@ -31,7 +31,9 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.mockito.Mockito;
 import org.mockito.internal.util.reflection.Whitebox;
 import org.mortbay.jetty.Connector;
@@ -64,10 +66,16 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeys.DEFAULT_HADOOP_HTTP_STATIC_USER;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_HTTP_STATIC_USER;
+
 public class TestHttpServer extends HttpServerFunctionalTest {
   static final Log LOG = LogFactory.getLog(TestHttpServer.class);
   private static HttpServer2 server;
   private static final int MAX_THREADS = 10;
+
+  @Rule
+  public ExpectedException exception = ExpectedException.none();
   
   @SuppressWarnings("serial")
   public static class EchoMapServlet extends HttpServlet {
@@ -235,6 +243,71 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     assertEquals("text/html; charset=utf-8", conn.getContentType());
   }
 
+  @Test
+  public void testHttpResonseContainsXFrameOptions() throws Exception {
+    validateXFrameOption(HttpServer2.XFrameOption.SAMEORIGIN);
+  }
+
+  @Test
+  public void testHttpResonseContainsDeny() throws Exception {
+    validateXFrameOption(HttpServer2.XFrameOption.DENY);
+  }
+
+  @Test
+  public void testHttpResonseContainsAllowFrom() throws Exception {
+    validateXFrameOption(HttpServer2.XFrameOption.ALLOWFROM);
+  }
+
+  private void validateXFrameOption(HttpServer2.XFrameOption option) throws
+      Exception {
+    Configuration conf = new Configuration();
+    boolean xFrameEnabled = true;
+    HttpServer2 httpServer = createServer(xFrameEnabled,
+        option.toString(), conf);
+    try {
+      HttpURLConnection conn = getHttpURLConnection(httpServer);
+      String xfoHeader = conn.getHeaderField("X-FRAME-OPTIONS");
+      assertTrue("X-FRAME-OPTIONS is absent in the header", xfoHeader != null);
+      assertTrue(xfoHeader.endsWith(option.toString()));
+    } finally {
+      httpServer.stop();
+    }
+  }
+
+  @Test
+  public void testHttpResonseDoesNotContainXFrameOptions() throws Exception {
+    Configuration conf = new Configuration();
+    boolean xFrameEnabled = false;
+    HttpServer2 httpServer = createServer(xFrameEnabled,
+        HttpServer2.XFrameOption.SAMEORIGIN.toString(), conf);
+    try {
+      HttpURLConnection conn = getHttpURLConnection(httpServer);
+      String xfoHeader = conn.getHeaderField("X-FRAME-OPTIONS");
+      assertTrue("Unexpected X-FRAME-OPTIONS in header", xfoHeader == null);
+    } finally {
+      httpServer.stop();
+    }
+  }
+
+  private HttpURLConnection getHttpURLConnection(HttpServer2 httpServer)
+      throws IOException {
+    httpServer.start();
+    URL newURL = getServerURL(httpServer);
+    URL url = new URL(newURL, "");
+    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+    conn.connect();
+    return conn;
+  }
+
+  @Test
+  public void testHttpResonseInvalidValueType() throws Exception {
+    Configuration conf = new Configuration();
+    boolean xFrameEnabled = true;
+    exception.expect(IllegalArgumentException.class);
+    createServer(xFrameEnabled, "Hadoop", conf);
+  }
+
+
   /**
    * Dummy filter that mimics as an authentication filter. Obtains user identity
    * from the request parameter user.name. Wraps around the request so that
@@ -382,8 +455,8 @@ public class TestHttpServer extends HttpServerFunctionalTest {
 
     String serverURL = "http://"
         + NetUtils.getHostPortString(myServer.getConnectorAddress(0)) + "/";
-    for (String servlet : new String[] { "conf", "logs", "stacks",
-        "logLevel", "metrics" }) {
+    for (String servlet : new String[] {"conf", "logs", "stacks",
+        "logLevel", "jmx", "metrics"}) {
       for (String user : new String[] { "userA", "userB", "userC", "userD" }) {
         assertEquals(HttpURLConnection.HTTP_OK, getHttpStatusCode(serverURL
             + servlet, user));
@@ -391,6 +464,18 @@ public class TestHttpServer extends HttpServerFunctionalTest {
       assertEquals(HttpURLConnection.HTTP_FORBIDDEN, getHttpStatusCode(
           serverURL + servlet, "userE"));
     }
+
+    // hadoop.security.authorization is set as true while
+    // hadoop.http.authentication.type's value is `simple`(default value)
+    // in this case, static user has administrator access
+    final String staticUser = conf.get(HADOOP_HTTP_STATIC_USER,
+        DEFAULT_HADOOP_HTTP_STATIC_USER);
+    for (String servlet : new String[] {"conf", "logs", "stacks",
+        "logLevel", "jmx", "metrics"}) {
+      assertEquals(HttpURLConnection.HTTP_OK, getHttpStatusCode(
+          serverURL + servlet, staticUser));
+    }
+
     myServer.stop();
   }
   
