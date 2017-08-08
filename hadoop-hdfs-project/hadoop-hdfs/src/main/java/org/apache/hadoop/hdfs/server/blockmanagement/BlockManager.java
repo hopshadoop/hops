@@ -2017,7 +2017,8 @@ public class BlockManager {
                   BlockReportBlock[] reportedBlocks = ((BlockReportBucket)
                       getParams()[0]).getBlocks();
                   // scan the report and process newly reported blocks
-                  long hash = 0;
+                  long hash = 0; // Our updated hash should only consider
+                  // finalized, stored blocks
                   for (BlockReportBlock brb : reportedBlocks) {
                     Block block = new Block();
                     block.setNoPersistance(brb.getBlockId(), brb.getLength(),
@@ -2041,7 +2042,7 @@ public class BlockManager {
                   }
                   
                   //Update hash to match:
-                  long reportedHash = (long) getParams()[1];
+                  //long reportedHash = (long) getParams()[1];
                   HashBucket bucket = HashBuckets.getInstance().getBucket(dn.getSId(), bucketId);
                   bucket.setHash(hash);
                   return null;

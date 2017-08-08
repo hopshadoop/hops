@@ -2147,7 +2147,7 @@ public class FSNamesystem
               LocatedBlock locatedBlock =
                   appendFileInt(src, holder, clientMachine);
              
-              if (locatedBlock != null) {
+              if (locatedBlock != null && !locatedBlock.isPhantomBlock()) {
                 for (DatanodeInfo datanodeInfo : locatedBlock.getLocations()) {
                   int sId = blockManager.getDatanodeManager().getDatanode
                       (datanodeInfo).getSId();
