@@ -19,6 +19,9 @@
 package org.apache.hadoop.fs;
 
 import java.io.*;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -378,6 +381,7 @@ public class FileUtil {
   
   }
 
+  @Deprecated
   /** Copy all files in a directory to one output file (merge). */
   public static boolean copyMerge(FileSystem srcFS, Path srcDir, 
                                   FileSystem dstFS, Path dstFile, 
@@ -727,6 +731,12 @@ public class FileUtil {
       }
     }
 
+    if (entry.isLink()) {
+      File src = new File(outputDir, entry.getLinkName());
+      HardLink.createHardLink(src, outputFile);
+      return;
+    }
+
     int count;
     byte data[] = new byte[2048];
     try (BufferedOutputStream outputStream = new BufferedOutputStream(
@@ -770,35 +780,6 @@ public class FileUtil {
         Path.getPathWithoutSchemeAndAuthority(new Path(target)).toString());
     File linkFile = new File(
         Path.getPathWithoutSchemeAndAuthority(new Path(linkname)).toString());
-
-    // If not on Java7+, copy a file instead of creating a symlink since
-    // Java6 has close to no support for symlinks on Windows. Specifically
-    // File#length and File#renameTo do not work as expected.
-    // (see HADOOP-9061 for additional details)
-    // We still create symlinks for directories, since the scenario in this
-    // case is different. The directory content could change in which
-    // case the symlink loses its purpose (for example task attempt log folder
-    // is symlinked under userlogs and userlogs are generated afterwards).
-    if (Shell.WINDOWS && !Shell.isJava7OrAbove() && targetFile.isFile()) {
-      try {
-        LOG.warn("FileUtil#symlink: On Windows+Java6, copying file instead " +
-            "of creating a symlink. Copying " + target + " -> " + linkname);
-
-        if (!linkFile.getParentFile().exists()) {
-          LOG.warn("Parent directory " + linkFile.getParent() +
-              " does not exist.");
-          return 1;
-        } else {
-          org.apache.commons.io.FileUtils.copyFile(targetFile, linkFile);
-        }
-      } catch (IOException ex) {
-        LOG.warn("FileUtil#symlink failed to copy the file with error: "
-            + ex.getMessage());
-        // Exit with non-zero exit code
-        return 1;
-      }
-      return 0;
-    }
 
     String[] cmd = Shell.getSymlinkCommand(
         targetFile.toString(),
@@ -1318,5 +1299,44 @@ public class FileUtil {
     String[] jarCp = {classPathJar.getCanonicalPath(),
                         unexpandedWildcardClasspath.toString()};
     return jarCp;
+  }
+
+  public static boolean compareFs(FileSystem srcFs, FileSystem destFs) {
+    if (srcFs==null || destFs==null) {
+      return false;
+    }
+    URI srcUri = srcFs.getUri();
+    URI dstUri = destFs.getUri();
+    if (srcUri.getScheme()==null) {
+      return false;
+    }
+    if (!srcUri.getScheme().equals(dstUri.getScheme())) {
+      return false;
+    }
+    String srcHost = srcUri.getHost();
+    String dstHost = dstUri.getHost();
+    if ((srcHost!=null) && (dstHost!=null)) {
+      if (srcHost.equals(dstHost)) {
+        return srcUri.getPort()==dstUri.getPort();
+      }
+      try {
+        srcHost = InetAddress.getByName(srcHost).getCanonicalHostName();
+        dstHost = InetAddress.getByName(dstHost).getCanonicalHostName();
+      } catch (UnknownHostException ue) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Could not compare file-systems. Unknown host: ", ue);
+        }
+        return false;
+      }
+      if (!srcHost.equals(dstHost)) {
+        return false;
+      }
+    } else if (srcHost==null && dstHost!=null) {
+      return false;
+    } else if (srcHost!=null) {
+      return false;
+    }
+    // check for ports
+    return srcUri.getPort()==dstUri.getPort();
   }
 }

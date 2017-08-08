@@ -72,6 +72,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.JobDiagnosticsUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobFinishEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.JobSetupCompletedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobStartEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptCompletedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskEvent;
@@ -92,6 +93,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.NodeState;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
@@ -100,7 +102,6 @@ import org.apache.hadoop.yarn.event.InlineDispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.SystemClock;
 import org.junit.Assert;
@@ -214,6 +215,14 @@ public class TestJobImpl {
 
     JobImpl job = createRunningStubbedJob(conf, dispatcher, 2, null);
     completeJobTasks(job);
+    assertJobState(job, JobStateInternal.COMMITTING);
+
+    job.handle(new JobEvent(job.getID(),
+        JobEventType.JOB_TASK_ATTEMPT_COMPLETED));
+    assertJobState(job, JobStateInternal.COMMITTING);
+
+    job.handle(new JobEvent(job.getID(),
+        JobEventType.JOB_MAP_TASK_RESCHEDULED));
     assertJobState(job, JobStateInternal.COMMITTING);
 
     // let the committer complete and verify the job succeeds
@@ -488,9 +497,10 @@ public class TestJobImpl {
   public void testKilledDuringKillAbort() throws Exception {
     Configuration conf = new Configuration();
     conf.set(MRJobConfig.MR_AM_STAGING_DIR, stagingDir);
+    // not initializing dispatcher to avoid potential race condition between
+    // the dispatcher thread & test thread - see MAPREDUCE-6831
     AsyncDispatcher dispatcher = new AsyncDispatcher();
-    dispatcher.init(conf);
-    dispatcher.start();
+
     OutputCommitter committer = new StubbedOutputCommitter() {
       @Override
       public synchronized void abortJob(JobContext jobContext, State state)
@@ -529,7 +539,7 @@ public class TestJobImpl {
     Configuration conf = new Configuration();
     conf.set(MRJobConfig.MR_AM_STAGING_DIR, stagingDir);
     conf.setInt(MRJobConfig.NUM_REDUCES, 1);
-    AsyncDispatcher dispatcher = new AsyncDispatcher();
+    DrainDispatcher dispatcher = new DrainDispatcher();
     dispatcher.init(conf);
     dispatcher.start();
     CyclicBarrier syncBarrier = new CyclicBarrier(2);
@@ -606,6 +616,7 @@ public class TestJobImpl {
     NodeReport secondMapperNodeReport = nodeReports.get(1);
     job.handle(new JobUpdatedNodesEvent(job.getID(),
         Collections.singletonList(firstMapperNodeReport)));
+    dispatcher.await();
     // complete the reducer
     for (TaskId taskId: job.tasks.keySet()) {
       if (taskId.getTaskType() == TaskType.REDUCE) {
@@ -889,6 +900,39 @@ public class TestJobImpl {
                       job.getDiagnostics().toString().contains(EXCEPTIONMSG));
   }
 
+  @Test
+  public void testJobPriorityUpdate() throws Exception {
+    Configuration conf = new Configuration();
+    AsyncDispatcher dispatcher = new AsyncDispatcher();
+    Priority submittedPriority = Priority.newInstance(5);
+
+    AppContext mockContext = mock(AppContext.class);
+    when(mockContext.hasSuccessfullyUnregistered()).thenReturn(false);
+    JobImpl job = createStubbedJob(conf, dispatcher, 2, mockContext);
+
+    JobId jobId = job.getID();
+    job.handle(new JobEvent(jobId, JobEventType.JOB_INIT));
+    assertJobState(job, JobStateInternal.INITED);
+    job.handle(new JobStartEvent(jobId));
+    assertJobState(job, JobStateInternal.SETUP);
+    // Update priority of job to 5, and it will be updated
+    job.setJobPriority(submittedPriority);
+    Assert.assertEquals(submittedPriority, job.getReport().getJobPriority());
+
+    job.handle(new JobSetupCompletedEvent(jobId));
+    assertJobState(job, JobStateInternal.RUNNING);
+
+    // Update priority of job to 8, and see whether its updated
+    Priority updatedPriority = Priority.newInstance(8);
+    job.setJobPriority(updatedPriority);
+    assertJobState(job, JobStateInternal.RUNNING);
+    Priority jobPriority = job.getReport().getJobPriority();
+    Assert.assertNotNull(jobPriority);
+
+    // Verify whether changed priority is same as what is set in Job.
+    Assert.assertEquals(updatedPriority, jobPriority);
+  }
+
   private static CommitterEventHandler createCommitterEventHandler(
       Dispatcher dispatcher, OutputCommitter committer) {
     final SystemClock clock = new SystemClock();
@@ -906,8 +950,8 @@ public class TestJobImpl {
         callback.run();
       }
     };
-    ApplicationAttemptId id = 
-      ConverterUtils.toApplicationAttemptId("appattempt_1234567890000_0001_0");
+    ApplicationAttemptId id = ApplicationAttemptId.fromString(
+        "appattempt_1234567890000_0001_0");
     when(appContext.getApplicationID()).thenReturn(id.getApplicationId());
     when(appContext.getApplicationAttemptId()).thenReturn(id);
     CommitterEventHandler handler =

@@ -15,6 +15,8 @@
 
 # Notation
 
+<!-- MACRO{toc|fromDepth=1|toDepth=3} -->
+
 A formal notation such as [The Z Notation](http://www.open-std.org/jtc1/sc22/open/n3187.pdf)
 would be the strictest way to define Hadoop FileSystem behavior, and could even
 be used to prove some axioms.
@@ -128,7 +130,7 @@ Strings are lists of characters represented in double quotes. e.g. `"abc"`
 
 All system state declarations are immutable.
 
-The suffix "'" (single quote) is used as the convention to indicate the state of the system after a operation:
+The suffix "'" (single quote) is used as the convention to indicate the state of the system after an operation:
 
     L' = L + ['d','e']
 

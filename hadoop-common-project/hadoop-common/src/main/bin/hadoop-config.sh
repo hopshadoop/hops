@@ -261,7 +261,7 @@ fi
 HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.id.str=$HADOOP_IDENT_STRING"
 HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.root.logger=${HADOOP_ROOT_LOGGER:-${HADOOP_LOGLEVEL},console}"
 if [ "x$JAVA_LIBRARY_PATH" != "x" ]; then
-  if $cygwin; then
+  if [ "$cygwin" = true ]; then
     JAVA_LIBRARY_PATH=$(cygpath -w "$JAVA_LIBRARY_PATH" 2>/dev/null)
   fi
   HADOOP_OPTS="$HADOOP_OPTS -Djava.library.path=$JAVA_LIBRARY_PATH"

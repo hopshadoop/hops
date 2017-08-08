@@ -26,6 +26,7 @@ import org.apache.hadoop.yarn.api.records.impl.pb.ContainerIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.PriorityPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
+import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStateProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.PriorityProto;
@@ -33,8 +34,6 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.NMContainerStatusProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.NMContainerStatusProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
-
-import com.google.protobuf.TextFormat;
 
 public class NMContainerStatusPBImpl extends NMContainerStatus {
 
@@ -84,10 +83,12 @@ public class NMContainerStatusPBImpl extends NMContainerStatus {
     StringBuilder sb = new StringBuilder();
     sb.append("[").append(getContainerId()).append(", ")
         .append("CreateTime: ").append(getCreationTime()).append(", ")
+        .append("Version: ").append(getVersion()).append(", ")
         .append("State: ").append(getContainerState()).append(", ")
         .append("Capability: ").append(getAllocatedResource()).append(", ")
         .append("Diagnostics: ").append(getDiagnostics()).append(", ")
         .append("ExitStatus: ").append(getContainerExitStatus()).append(", ")
+        .append("NodeLabelExpression: ").append(getNodeLabelExpression())
         .append("Priority: ").append(getPriority())
         .append("]");
     return sb.toString();
@@ -185,6 +186,18 @@ public class NMContainerStatusPBImpl extends NMContainerStatus {
   }
 
   @Override
+  public int getVersion() {
+    NMContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getVersion();
+  }
+
+  @Override
+  public void setVersion(int version) {
+    maybeInitBuilder();
+    builder.setVersion(version);
+  }
+
+  @Override
   public Priority getPriority() {
     NMContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
     if (this.priority != null) {
@@ -215,6 +228,25 @@ public class NMContainerStatusPBImpl extends NMContainerStatus {
   public void setCreationTime(long creationTime) {
     maybeInitBuilder();
     builder.setCreationTime(creationTime);
+  }
+  
+  @Override
+  public String getNodeLabelExpression() {
+    NMContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
+    if (p.hasNodeLabelExpression()) {
+      return p.getNodeLabelExpression();
+    }
+    return CommonNodeLabelsManager.NO_LABEL;
+  }
+
+  @Override
+  public void setNodeLabelExpression(String nodeLabelExpression) {
+    maybeInitBuilder();
+    if (nodeLabelExpression == null) {
+      builder.clearNodeLabelExpression();
+      return;
+    }
+    builder.setNodeLabelExpression(nodeLabelExpression);
   }
 
   private void mergeLocalToBuilder() {
@@ -283,5 +315,4 @@ public class NMContainerStatusPBImpl extends NMContainerStatus {
   private PriorityProto convertToProtoFormat(Priority t) {
     return ((PriorityPBImpl)t).getProto();
   }
-
 }

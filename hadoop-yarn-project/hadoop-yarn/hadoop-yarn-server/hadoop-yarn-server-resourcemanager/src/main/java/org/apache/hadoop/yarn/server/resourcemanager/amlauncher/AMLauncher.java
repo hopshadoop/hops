@@ -30,6 +30,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.DataInputByteBuffer;
@@ -254,19 +255,16 @@ public class AMLauncher implements Runnable {
     // Construct the actual Container
     ContainerLaunchContext container = 
         applicationMasterContext.getAMContainerSpec();
-    LOG.info("Command to launch container "
-        + containerID
-        + " : "
-        + StringUtils.arrayToString(container.getCommands().toArray(
-            new String[0])));
-    
+
     // Finalize the container
     setupTokens(container, containerID);
-    
+
     return container;
   }
 
-  private void setupTokens(
+  @Private
+  @VisibleForTesting
+  protected void setupTokens(
       ContainerLaunchContext container, ContainerId containerID)
       throws IOException {
     Map<String, String> environment = container.getEnvironment();
@@ -286,10 +284,12 @@ public class AMLauncher implements Runnable {
 
     Credentials credentials = new Credentials();
     DataInputByteBuffer dibb = new DataInputByteBuffer();
-    if (container.getTokens() != null) {
+    ByteBuffer tokens = container.getTokens();
+    if (tokens != null) {
       // TODO: Don't do this kind of checks everywhere.
-      dibb.reset(container.getTokens());
+      dibb.reset(tokens);
       credentials.readTokenStorageStream(dibb);
+      tokens.rewind();
     }
 
     // Add AMRMToken

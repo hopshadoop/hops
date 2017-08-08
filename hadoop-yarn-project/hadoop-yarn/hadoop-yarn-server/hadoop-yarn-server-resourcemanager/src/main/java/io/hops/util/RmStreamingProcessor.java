@@ -60,7 +60,7 @@ public class RmStreamingProcessor extends StreamingReceiver {
     if (rmNode.getState() == NodeState.DECOMMISSIONED || rmNode.getState()
             == NodeState.REBOOTED || rmNode.getState() == NodeState.LOST) {
 
-      rmContext.getInactiveRMNodes().put(rmNode.getNodeID().getHost(), rmNode);
+      rmContext.getInactiveRMNodes().put(rmNode.getNodeID(), rmNode);
       rmContext.getRMNodes().remove(rmNode.getNodeID(), rmNode);
     } else {
       rmContext.getInactiveRMNodes().

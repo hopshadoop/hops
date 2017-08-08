@@ -39,6 +39,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
@@ -68,11 +70,13 @@ import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.Token;
+import org.apache.hadoop.yarn.api.records.UpdatedContainer;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
 import org.apache.hadoop.yarn.client.api.InvalidContainerRequestException;
+import org.apache.hadoop.yarn.client.api.NMClient;
 import org.apache.hadoop.yarn.client.api.NMTokenCache;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -126,7 +130,14 @@ public class TestAMRMClient {
       rolling_interval_sec);
     conf.setLong(YarnConfiguration.RM_AM_EXPIRY_INTERVAL_MS, am_expire_ms);
     conf.setInt(YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_MS, 100);
+    // set the minimum allocation so that resource decrease can go under 1024
+    conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 512);
     conf.setLong(YarnConfiguration.NM_LOG_RETAIN_SECONDS, 1);
+    createClientAndCluster(conf);
+  }
+
+  private static void createClientAndCluster(Configuration conf)
+      throws Exception {
     yarnCluster = new MiniYARNCluster(TestAMRMClient.class.getName(), nodeCount, 1, 1);
     yarnCluster.init(conf);
     yarnCluster.start();
@@ -137,8 +148,13 @@ public class TestAMRMClient {
     yarnClient.start();
 
     // get node info
+    assertTrue("All node managers did not connect to the RM within the "
+        + "allotted 5-second timeout",
+        yarnCluster.waitForNodeManagersToConnect(5000L));
     nodeReports = yarnClient.getNodeReports(NodeState.RUNNING);
-    
+    assertEquals("Not all node managers were reported running",
+        nodeCount, nodeReports.size());
+
     priority = Priority.newInstance(1);
     priority2 = Priority.newInstance(2);
     capability = Resource.newInstance(1024, 1);
@@ -645,6 +661,29 @@ public class TestAMRMClient {
 
   @Test (timeout=60000)
   public void testAMRMClient() throws YarnException, IOException {
+    registerAndAllocate();
+  }
+
+  @Test (timeout=60000)
+  public void testAMRMClientWithSaslEncryption() throws Exception {
+    conf.set(CommonConfigurationKeysPublic.HADOOP_RPC_PROTECTION, "privacy");
+    // we have to create a new instance of MiniYARNCluster to avoid SASL qop
+    // mismatches between client and server
+    tearDown();
+    createClientAndCluster(conf);
+    startApp();
+    registerAndAllocate();
+
+    // recreate the original MiniYARNCluster and YarnClient for other tests
+    conf.unset(CommonConfigurationKeysPublic.HADOOP_RPC_PROTECTION);
+    tearDown();
+    createClientAndCluster(conf);
+    // unless we start an application the cancelApp() method will fail when
+    // it runs after this test
+    startApp();
+  }
+
+  private void registerAndAllocate() throws YarnException, IOException {
     AMRMClient<ContainerRequest> amClient = null;
     try {
       // start am rm client
@@ -708,6 +747,17 @@ public class TestAMRMClient {
         Assert.assertNull(req.getNodeLabelExpression());
       }
     }
+    // set container with nodes and racks with labels
+    client.addContainerRequest(new ContainerRequest(
+        Resource.newInstance(1024, 1), new String[] { "rack1" },
+        new String[] { "node1", "node2" }, Priority.UNDEFINED, true, "y"));
+    for (ResourceRequest req : client.ask) {
+      if (ResourceRequest.ANY.equals(req.getResourceName())) {
+        Assert.assertEquals("y", req.getNodeLabelExpression());
+      } else {
+        Assert.assertNull(req.getNodeLabelExpression());
+      }
+    }
   }
   
   private void verifyAddRequestFailed(AMRMClient<ContainerRequest> client,
@@ -730,8 +780,154 @@ public class TestAMRMClient {
         new ContainerRequest(Resource.newInstance(1024, 1), null, null,
             Priority.UNDEFINED, true, "x && y"));
   }
-    
-  private void testAllocation(final AMRMClientImpl<ContainerRequest> amClient)  
+
+  @Test(timeout=60000)
+  public void testAMRMClientWithContainerResourceChange()
+      throws YarnException, IOException {
+    AMRMClient<ContainerRequest> amClient = null;
+    try {
+      // start am rm client
+      amClient = AMRMClient.createAMRMClient();
+      Assert.assertNotNull(amClient);
+      // asserting we are using the singleton instance cache
+      Assert.assertSame(
+          NMTokenCache.getSingleton(), amClient.getNMTokenCache());
+      amClient.init(conf);
+      amClient.start();
+      assertEquals(STATE.STARTED, amClient.getServiceState());
+      // start am nm client
+      NMClientImpl nmClient = (NMClientImpl) NMClient.createNMClient();
+      Assert.assertNotNull(nmClient);
+      // asserting we are using the singleton instance cache
+      Assert.assertSame(
+          NMTokenCache.getSingleton(), nmClient.getNMTokenCache());
+      nmClient.init(conf);
+      nmClient.start();
+      assertEquals(STATE.STARTED, nmClient.getServiceState());
+      // am rm client register the application master with RM
+      amClient.registerApplicationMaster("Host", 10000, "");
+      // allocate three containers and make sure they are in RUNNING state
+      List<Container> containers =
+          allocateAndStartContainers(amClient, nmClient, 3);
+      // perform container resource increase and decrease tests
+      doContainerResourceChange(amClient, containers);
+      // unregister and finish up the test
+      amClient.unregisterApplicationMaster(FinalApplicationStatus.SUCCEEDED,
+          null, null);
+    } finally {
+      if (amClient != null && amClient.getServiceState() == STATE.STARTED) {
+        amClient.stop();
+      }
+    }
+  }
+
+  private List<Container> allocateAndStartContainers(
+      final AMRMClient<ContainerRequest> amClient, final NMClient nmClient,
+      int num) throws YarnException, IOException {
+    // set up allocation requests
+    for (int i = 0; i < num; ++i) {
+      amClient.addContainerRequest(
+          new ContainerRequest(capability, nodes, racks, priority));
+    }
+    // send allocation requests
+    amClient.allocate(0.1f);
+    // sleep to let NM's heartbeat to RM and trigger allocations
+    sleep(150);
+    // get allocations
+    AllocateResponse allocResponse = amClient.allocate(0.1f);
+    List<Container> containers = allocResponse.getAllocatedContainers();
+    Assert.assertEquals(num, containers.size());
+    // build container launch context
+    Credentials ts = new Credentials();
+    DataOutputBuffer dob = new DataOutputBuffer();
+    ts.writeTokenStorageToStream(dob);
+    ByteBuffer securityTokens =
+        ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
+    // start a process long enough for increase/decrease action to take effect
+    ContainerLaunchContext clc = BuilderUtils.newContainerLaunchContext(
+        Collections.<String, LocalResource>emptyMap(),
+        new HashMap<String, String>(), Arrays.asList("sleep", "100"),
+        new HashMap<String, ByteBuffer>(), securityTokens,
+        new HashMap<ApplicationAccessType, String>());
+    // start the containers and make sure they are in RUNNING state
+    try {
+      for (int i = 0; i < num; i++) {
+        Container container = containers.get(i);
+        nmClient.startContainer(container, clc);
+        // NodeManager may still need some time to get the stable
+        // container status
+        while (true) {
+          ContainerStatus status = nmClient.getContainerStatus(
+              container.getId(), container.getNodeId());
+          if (status.getState() == ContainerState.RUNNING) {
+            break;
+          }
+          sleep(100);
+        }
+      }
+    } catch (YarnException e) {
+      throw new AssertionError("Exception is not expected: " + e);
+    }
+    // sleep to let NM's heartbeat to RM to confirm container launch
+    sleep(200);
+    return containers;
+  }
+
+
+  private void doContainerResourceChange(
+      final AMRMClient<ContainerRequest> amClient, List<Container> containers)
+      throws YarnException, IOException {
+    Assert.assertEquals(3, containers.size());
+    // remember the container IDs
+    Container container1 = containers.get(0);
+    Container container2 = containers.get(1);
+    Container container3 = containers.get(2);
+    AMRMClientImpl<ContainerRequest> amClientImpl =
+        (AMRMClientImpl<ContainerRequest>) amClient;
+    Assert.assertEquals(0, amClientImpl.change.size());
+    // verify newer request overwrites older request for the container1
+    amClientImpl.requestContainerResourceChange(
+        container1, Resource.newInstance(2048, 1));
+    amClientImpl.requestContainerResourceChange(
+        container1, Resource.newInstance(4096, 1));
+    Assert.assertEquals(Resource.newInstance(4096, 1),
+        amClientImpl.change.get(container1.getId()).getValue());
+    // verify new decrease request cancels old increase request for container1
+    amClientImpl.requestContainerResourceChange(
+        container1, Resource.newInstance(512, 1));
+    Assert.assertEquals(Resource.newInstance(512, 1),
+        amClientImpl.change.get(container1.getId()).getValue());
+    // request resource increase for container2
+    amClientImpl.requestContainerResourceChange(
+        container2, Resource.newInstance(2048, 1));
+    Assert.assertEquals(Resource.newInstance(2048, 1),
+        amClientImpl.change.get(container2.getId()).getValue());
+    // verify release request will cancel pending change requests for the same
+    // container
+    amClientImpl.requestContainerResourceChange(
+        container3, Resource.newInstance(2048, 1));
+    Assert.assertEquals(3, amClientImpl.pendingChange.size());
+    amClientImpl.releaseAssignedContainer(container3.getId());
+    Assert.assertEquals(2, amClientImpl.pendingChange.size());
+    // as of now: container1 asks to decrease to (512, 1)
+    //            container2 asks to increase to (2048, 1)
+    // send allocation requests
+    AllocateResponse allocResponse = amClient.allocate(0.1f);
+    Assert.assertEquals(0, amClientImpl.change.size());
+    // we should get decrease confirmation right away
+    List<UpdatedContainer> updatedContainers =
+        allocResponse.getUpdatedContainers();
+    Assert.assertEquals(1, updatedContainers.size());
+    // we should get increase allocation after the next NM's heartbeat to RM
+    sleep(150);
+    // get allocations
+    allocResponse = amClient.allocate(0.1f);
+    updatedContainers =
+        allocResponse.getUpdatedContainers();
+    Assert.assertEquals(1, updatedContainers.size());
+  }
+
+  private void testAllocation(final AMRMClientImpl<ContainerRequest> amClient)
       throws YarnException, IOException {
     // setup container request
     

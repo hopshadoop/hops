@@ -83,13 +83,7 @@ public class RMStorageFactory {
             conf.getInt(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_DB_PORT, 
                     YarnConfiguration.DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT);
     
-    dNdbEventStreaming.init(conf.get(
-            YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
-            YarnConfiguration.DEFAULT_EVENT_SHEDULER_CONFIG_PATH), conf.get(
-                    YarnConfiguration.EVENT_RT_CONFIG_PATH,
-                    YarnConfiguration.DEFAULT_EVENT_RT_CONFIG_PATH),
-            connectionString, dStorageFactory.getConnector().getDatabaseName()
-            );
+    dNdbEventStreaming.init(connectionString, dStorageFactory.getConnector().getDatabaseName());
     dNdbEventStreaming.startHopsNdbEvetAPISession(isLeader);
     ndbStreaingRunning = true;
   }

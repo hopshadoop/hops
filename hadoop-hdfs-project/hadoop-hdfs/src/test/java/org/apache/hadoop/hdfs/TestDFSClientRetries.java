@@ -1113,7 +1113,7 @@ public class TestDFSClientRetries {
           dis.read(arr, 0, (int) FILE_LENGTH);
           fail("Expected ChecksumException not thrown");
         } catch (Exception ex) {
-          GenericTestUtils.assertExceptionContains("Checksum error", ex);
+          GenericTestUtils.assertExceptionContains("Checksum", ex);
         }
       }
     } finally {

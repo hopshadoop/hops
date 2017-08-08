@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.yarn.webapp;
 
-import org.junit.Before;
+import java.io.IOException;
+import java.util.Random;
+
+import org.apache.hadoop.net.ServerSocketUtil;
+
 import com.sun.jersey.test.framework.JerseyTest;
 import com.sun.jersey.test.framework.WebAppDescriptor;
 
@@ -27,16 +31,16 @@ public abstract class JerseyTestBase extends JerseyTest {
     super(appDescriptor);
   }
 
-  @Before
-  public void initializeJerseyPort() {
-    int jerseyPort = 9998;
-    String port = System.getProperty("jersey.test.port");
-    if(null != port) {
-      jerseyPort = Integer.parseInt(port) + 10;
-      if(jerseyPort > 65535) {
-        jerseyPort = 9998;
-      }
+  @Override
+  protected int getPort(int port) {
+    Random rand = new Random();
+    int jerseyPort = port + rand.nextInt(1000);
+    try {
+      jerseyPort = ServerSocketUtil.getPort(jerseyPort, 10);
+    } catch (IOException e) {
+      // Ignore exception even after 10 times free port is
+      // not received.
     }
-    System.setProperty("jersey.test.port", Integer.toString(jerseyPort));
+    return super.getPort(jerseyPort);
   }
 }

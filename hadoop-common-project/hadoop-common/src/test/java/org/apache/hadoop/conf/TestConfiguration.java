@@ -48,6 +48,8 @@ import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.test.GenericTestUtils;
+
 import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
 import static org.junit.Assert.fail;
 
@@ -67,6 +69,9 @@ public class TestConfiguration extends TestCase {
   final static String XMLHEADER = 
             IBM_JAVA?"<?xml version=\"1.0\" encoding=\"UTF-8\"?><configuration>":
   "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><configuration>";
+
+  /** Four apostrophes. */
+  public static final String ESCAPED = "&apos;&#39;&#0039;&#x27;";
 
   @Override
   protected void setUp() throws Exception {
@@ -312,7 +317,18 @@ public class TestConfiguration extends TestCase {
     //two spaces one after "this", one before "contains"
     assertEquals("this  contains a comment", conf.get("my.comment"));
   }
-  
+
+  public void testEscapedCharactersInValue() throws IOException {
+    out=new BufferedWriter(new FileWriter(CONFIG));
+    startConfig();
+    appendProperty("my.comment", ESCAPED);
+    endConfig();
+    Path fileResource = new Path(CONFIG);
+    conf.addResource(fileResource);
+    //two spaces one after "this", one before "contains"
+    assertEquals("''''", conf.get("my.comment"));
+  }
+
   public void testTrim() throws IOException {
     out=new BufferedWriter(new FileWriter(CONFIG));
     startConfig();
@@ -341,8 +357,7 @@ public class TestConfiguration extends TestCase {
     Configuration conf = new Configuration();
     String[] dirs = new String[]{"a", "b", "c"};
     for (int i = 0; i < dirs.length; i++) {
-      dirs[i] = new Path(System.getProperty("test.build.data"), dirs[i])
-          .toString();
+      dirs[i] = new Path(GenericTestUtils.getTempPath(dirs[i])).toString();
     }
     conf.set("dirs", StringUtils.join(dirs, ","));
     for (int i = 0; i < 1000; i++) {
@@ -358,8 +373,7 @@ public class TestConfiguration extends TestCase {
     Configuration conf = new Configuration();
     String[] dirs = new String[]{"a", "b", "c"};
     for (int i = 0; i < dirs.length; i++) {
-      dirs[i] = new Path(System.getProperty("test.build.data"), dirs[i])
-          .toString();
+      dirs[i] = new Path(GenericTestUtils.getTempPath(dirs[i])).toString();
     }
     conf.set("dirs", StringUtils.join(dirs, ","));
     for (int i = 0; i < 1000; i++) {
@@ -1335,7 +1349,7 @@ public class TestConfiguration extends TestCase {
 
       @Override
       public void run() {
-        for (int i = 0; i < 100000; i++) {
+        for (int i = 0; i < 10000; i++) {
           config.set("some.config.value-" + prefix + i, "value");
         }
       }
@@ -1353,6 +1367,19 @@ public class TestConfiguration extends TestCase {
     }
     // If this test completes without going into infinite loop,
     // it's expected behaviour.
+  }
+
+  public void testNullValueProperties() throws Exception {
+    Configuration conf = new Configuration();
+    conf.setAllowNullValueProperties(true);
+    out = new BufferedWriter(new FileWriter(CONFIG));
+    startConfig();
+    appendProperty("attr", "value", true);
+    appendProperty("attr", "", true);
+    endConfig();
+    Path fileResource = new Path(CONFIG);
+    conf.addResource(fileResource);
+    assertEquals("value", conf.get("attr"));
   }
 
   public static void main(String[] argv) throws Exception {

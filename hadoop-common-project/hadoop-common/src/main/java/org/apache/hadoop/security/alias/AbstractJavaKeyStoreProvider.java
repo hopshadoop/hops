@@ -18,7 +18,8 @@
 
 package org.apache.hadoop.security.alias;
 
-import org.apache.commons.io.IOUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -31,7 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.URL;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -39,9 +40,7 @@ import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -60,66 +59,36 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 @InterfaceAudience.Private
 public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
-  public static final String CREDENTIAL_PASSWORD_NAME =
+  public static final Log LOG = LogFactory.getLog(
+      AbstractJavaKeyStoreProvider.class);
+  public static final String CREDENTIAL_PASSWORD_ENV_VAR =
       "HADOOP_CREDSTORE_PASSWORD";
-  public static final String KEYSTORE_PASSWORD_FILE_KEY =
+  public static final String CREDENTIAL_PASSWORD_FILE_KEY =
       "hadoop.security.credstore.java-keystore-provider.password-file";
-  public static final String KEYSTORE_PASSWORD_DEFAULT = "none";
+  public static final String CREDENTIAL_PASSWORD_DEFAULT = "none";
 
   private Path path;
   private final URI uri;
-  private final KeyStore keyStore;
+  private KeyStore keyStore;
   private char[] password = null;
   private boolean changed = false;
   private Lock readLock;
   private Lock writeLock;
+  private final Configuration conf;
 
   protected AbstractJavaKeyStoreProvider(URI uri, Configuration conf)
       throws IOException {
     this.uri = uri;
-    initFileSystem(uri, conf);
-    // Get the password from the user's environment
-    if (System.getenv().containsKey(CREDENTIAL_PASSWORD_NAME)) {
-      password = System.getenv(CREDENTIAL_PASSWORD_NAME).toCharArray();
-    }
-    // if not in ENV get check for file
-    if (password == null) {
-      String pwFile = conf.get(KEYSTORE_PASSWORD_FILE_KEY);
-      if (pwFile != null) {
-        ClassLoader cl = Thread.currentThread().getContextClassLoader();
-        URL pwdFile = cl.getResource(pwFile);
-        if (pwdFile != null) {
-          try (InputStream is = pwdFile.openStream()) {
-            password = IOUtils.toString(is).trim().toCharArray();
-          }
-        }
-      }
-    }
-    if (password == null) {
-      password = KEYSTORE_PASSWORD_DEFAULT.toCharArray();
-    }
-    try {
-      keyStore = KeyStore.getInstance("jceks");
-      if (keystoreExists()) {
-        stashOriginalFilePermissions();
-        try (InputStream in = getInputStreamForFile()) {
-          keyStore.load(in, password);
-        }
-      } else {
-        createPermissions("700");
-        // required to create an empty keystore. *sigh*
-        keyStore.load(null, password);
-      }
-    } catch (KeyStoreException e) {
-      throw new IOException("Can't create keystore", e);
-    } catch (NoSuchAlgorithmException e) {
-      throw new IOException("Can't load keystore " + getPathAsString(), e);
-    } catch (CertificateException e) {
-      throw new IOException("Can't load keystore " + getPathAsString(), e);
-    }
+    this.conf = conf;
+    initFileSystem(uri);
+    locateKeystore();
     ReadWriteLock lock = new ReentrantReadWriteLock(true);
     readLock = lock.readLock();
     writeLock = lock.writeLock();
+  }
+
+  protected Configuration getConf() {
+    return conf;
   }
 
   public Path getPath() {
@@ -170,13 +139,6 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
     return keyStore;
   }
 
-  public Map<String, CredentialEntry> getCache() {
-    return cache;
-  }
-
-  private final Map<String, CredentialEntry> cache =
-      new HashMap<String, CredentialEntry>();
-
   protected final String getPathAsString() {
     return getPath().toString();
   }
@@ -194,9 +156,12 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
 
   protected abstract void stashOriginalFilePermissions() throws IOException;
 
-  protected void initFileSystem(URI keystoreUri, Configuration conf)
+  protected void initFileSystem(URI keystoreUri)
       throws IOException {
     path = ProviderUtils.unnestUri(keystoreUri);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("backing jks path initialized to " + path);
+    }
   }
 
   @Override
@@ -206,9 +171,6 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
     try {
       SecretKeySpec key = null;
       try {
-        if (cache.containsKey(alias)) {
-          return cache.get(alias);
-        }
         if (!keyStore.containsAlias(alias)) {
           return null;
         }
@@ -262,7 +224,7 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
       throws IOException {
     writeLock.lock();
     try {
-      if (keyStore.containsAlias(alias) || cache.containsKey(alias)) {
+      if (keyStore.containsAlias(alias)) {
         throw new IOException("Credential " + alias + " already exists in "
             + this);
       }
@@ -289,7 +251,6 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
       } catch (KeyStoreException e) {
         throw new IOException("Problem removing " + name + " from " + this, e);
       }
-      cache.remove(name);
       changed = true;
     } finally {
       writeLock.unlock();
@@ -318,9 +279,10 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
     writeLock.lock();
     try {
       if (!changed) {
+        LOG.debug("Keystore hasn't changed, returning.");
         return;
       }
-      // write out the keystore
+      LOG.debug("Writing out keystore.");
       try (OutputStream out = getOutputStreamForKeystore()) {
         keyStore.store(out, password);
       } catch (KeyStoreException e) {
@@ -335,6 +297,58 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
     } finally {
       writeLock.unlock();
     }
+  }
+
+  /**
+   * Open up and initialize the keyStore.
+   *
+   * @throws IOException If there is a problem reading the password file
+   * or a problem reading the keystore.
+   */
+  private void locateKeystore() throws IOException {
+    try {
+      password = ProviderUtils.locatePassword(CREDENTIAL_PASSWORD_ENV_VAR,
+          conf.get(CREDENTIAL_PASSWORD_FILE_KEY));
+      if (password == null) {
+        password = CREDENTIAL_PASSWORD_DEFAULT.toCharArray();
+      }
+      KeyStore ks;
+      ks = KeyStore.getInstance("jceks");
+      if (keystoreExists()) {
+        stashOriginalFilePermissions();
+        try (InputStream in = getInputStreamForFile()) {
+          ks.load(in, password);
+        }
+      } else {
+        createPermissions("600");
+        // required to create an empty keystore. *sigh*
+        ks.load(null, password);
+      }
+      keyStore = ks;
+    } catch (KeyStoreException e) {
+      throw new IOException("Can't create keystore", e);
+    } catch (GeneralSecurityException e) {
+      throw new IOException("Can't load keystore " + getPathAsString(), e);
+    }
+  }
+
+  @Override
+  public boolean needsPassword() throws IOException {
+    return (null == ProviderUtils.locatePassword(CREDENTIAL_PASSWORD_ENV_VAR,
+        conf.get(CREDENTIAL_PASSWORD_FILE_KEY)));
+
+  }
+
+  @Override
+  public String noPasswordWarning() {
+    return ProviderUtils.noPasswordWarning(CREDENTIAL_PASSWORD_ENV_VAR,
+            CREDENTIAL_PASSWORD_FILE_KEY);
+  }
+
+  @Override
+  public String noPasswordError() {
+    return ProviderUtils.noPasswordError(CREDENTIAL_PASSWORD_ENV_VAR,
+        CREDENTIAL_PASSWORD_FILE_KEY);
   }
 
   @Override

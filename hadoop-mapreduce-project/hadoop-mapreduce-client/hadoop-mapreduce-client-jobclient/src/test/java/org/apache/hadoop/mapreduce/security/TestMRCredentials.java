@@ -111,7 +111,6 @@ public class TestMRCredentials {
     Configuration jobConf =  new JobConf(mrCluster.getConfig());
 
     // provide namenodes names for the job to get the delegation tokens for
-    //String nnUri = dfsCluster.getNameNode().getUri(namenode).toString();
     NameNode nn = dfsCluster.getNameNode();
     URI nnUri = NameNode.getUri(nn.getNameNodeAddress());
     jobConf.set(JobContext.JOB_NAMENODES, nnUri + "," + nnUri.toString());

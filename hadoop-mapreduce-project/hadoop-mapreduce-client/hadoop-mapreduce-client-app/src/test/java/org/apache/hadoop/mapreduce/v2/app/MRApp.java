@@ -481,7 +481,21 @@ public class MRApp extends MRAppMaster {
   }
 
   @Override
-  protected TaskAttemptListener createTaskAttemptListener(AppContext context) {
+  protected TaskAttemptFinishingMonitor
+      createTaskAttemptFinishingMonitor(
+      EventHandler eventHandler) {
+    return new TaskAttemptFinishingMonitor(eventHandler) {
+      @Override
+      public synchronized void register(TaskAttemptId attemptID) {
+        getContext().getEventHandler().handle(
+            new TaskAttemptEvent(attemptID,
+                TaskAttemptEventType.TA_CONTAINER_COMPLETED));
+      }
+    };
+  }
+
+  @Override
+    protected TaskAttemptListener createTaskAttemptListener(AppContext context) {
     return new TaskAttemptListener(){
       @Override
       public InetSocketAddress getAddress() {
@@ -535,6 +549,8 @@ public class MRApp extends MRAppMaster {
         getContext().getEventHandler().handle(
             new TaskAttemptEvent(event.getTaskAttemptID(),
                 TaskAttemptEventType.TA_CONTAINER_CLEANED));
+        break;
+      case CONTAINER_COMPLETED:
         break;
       }
     }
@@ -789,5 +805,20 @@ public class MRApp extends MRAppMaster {
             new Text(containerToken.getService()));
     return token.decodeIdentifier();
   }
+
+  @Override
+  protected void shutdownTaskLog() {
+    // Avoid closing the logging system during unit tests,
+    // otherwise subsequent MRApp instances in the same test
+    // will fail to log anything.
+  }
+
+  @Override
+  protected void shutdownLogManager() {
+    // Avoid closing the logging system during unit tests,
+    // otherwise subsequent MRApp instances in the same test
+    // will fail to log anything.
+  }
+
 }
  

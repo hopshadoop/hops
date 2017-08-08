@@ -45,6 +45,11 @@ public class TestDataDirs {
   public void testGetDataDirsFromURIs() throws Throwable {
     File localDir = make(stub(File.class).returning(true).from.exists());
     when(localDir.mkdir()).thenReturn(true);
+    when(localDir.isDirectory()).thenReturn(true);
+    when(localDir.canRead()).thenReturn(true);
+    when(localDir.canWrite()).thenReturn(true);
+    when(localDir.canExecute()).thenReturn(true);
+    when(localDir.exists()).thenReturn(false);
     FsPermission normalPerm = new FsPermission("700");
     FsPermission badPerm = new FsPermission("000");
     FileStatus stat = make(

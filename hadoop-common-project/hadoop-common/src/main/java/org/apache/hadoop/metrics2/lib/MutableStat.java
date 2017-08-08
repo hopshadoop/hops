@@ -99,6 +99,10 @@ public class MutableStat extends MutableMetric {
 
   /**
    * Add a number of samples and their sum to the running stat
+   *
+   * Note that although use of this method will preserve accurate mean values,
+   * large values for numSamples may result in inaccurate variance values due
+   * to the use of a single step of the Welford method for variance calculation.
    * @param numSamples  number of samples
    * @param sum of the samples
    */
@@ -139,7 +143,12 @@ public class MutableStat extends MutableMetric {
     }
   }
 
-  private SampleStat lastStat() {
+  /**
+   * Return a SampleStat object that supports
+   * calls like StdDev and Mean.
+   * @return SampleStat
+   */
+  public SampleStat lastStat() {
     return changed() ? intervalStat : prevStat;
   }
 
@@ -150,4 +159,8 @@ public class MutableStat extends MutableMetric {
     minMax.reset();
   }
 
+  @Override
+  public String toString() {
+    return lastStat().toString();
+  }
 }

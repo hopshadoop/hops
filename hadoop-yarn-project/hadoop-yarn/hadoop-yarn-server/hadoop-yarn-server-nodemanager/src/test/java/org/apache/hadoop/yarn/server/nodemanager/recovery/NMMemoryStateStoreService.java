@@ -33,6 +33,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceProto;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.ContainerManagerApplicationProto;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.DeletionServiceDeleteTaskProto;
@@ -113,16 +114,18 @@ public class NMMemoryStateStoreService extends NMStateStoreService {
       rcsCopy.killed = rcs.killed;
       rcsCopy.diagnostics = rcs.diagnostics;
       rcsCopy.startRequest = rcs.startRequest;
+      rcsCopy.capability = rcs.capability;
       result.add(rcsCopy);
     }
-    return new ArrayList<RecoveredContainerState>();
+    return result;
   }
 
   @Override
   public synchronized void storeContainer(ContainerId containerId,
-      StartContainerRequest startRequest) throws IOException {
+      int version, StartContainerRequest startRequest) throws IOException {
     RecoveredContainerState rcs = new RecoveredContainerState();
     rcs.startRequest = startRequest;
+    rcs.version = version;
     containerStates.put(containerId, rcs);
   }
 
@@ -141,6 +144,15 @@ public class NMMemoryStateStoreService extends NMStateStoreService {
       throw new IOException("Container already completed");
     }
     rcs.status = RecoveredContainerStatus.LAUNCHED;
+  }
+
+  @Override
+  public synchronized void storeContainerResourceChanged(
+      ContainerId containerId, int version, Resource capability)
+      throws IOException {
+    RecoveredContainerState rcs = getRecoveredContainerState(containerId);
+    rcs.capability = capability;
+    rcs.version = version;
   }
 
   @Override

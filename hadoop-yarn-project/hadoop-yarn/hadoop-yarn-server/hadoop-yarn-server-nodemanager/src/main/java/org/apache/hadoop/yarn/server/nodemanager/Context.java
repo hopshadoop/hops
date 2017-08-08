@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.nodemanager;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 
 import org.apache.hadoop.security.Credentials;
@@ -27,6 +28,7 @@ import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Application;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
@@ -61,6 +63,9 @@ public interface Context {
 
   ConcurrentMap<ContainerId, Container> getContainers();
 
+  ConcurrentMap<ContainerId, org.apache.hadoop.yarn.api.records.Container>
+      getIncreasedContainers();
+
   NMContainerTokenSecretManager getContainerTokenSecretManager();
   
   NMTokenSecretManagerInNM getNMTokenSecretManager();
@@ -68,6 +73,8 @@ public interface Context {
   NodeHealthStatus getNodeHealthStatus();
 
   ContainerManagementProtocol getContainerManager();
+
+  NodeResourceMonitor getNodeResourceMonitor();
 
   LocalDirsHandlerService getLocalDirsHandler();
 
@@ -78,6 +85,9 @@ public interface Context {
   boolean getDecommissioned();
 
   void setDecommissioned(boolean isDecommissioned);
+
+  ConcurrentLinkedQueue<LogAggregationReport>
+      getLogAggregationStatusForApps();
 
   NodeStatusUpdater getNodeStatusUpdater();
   

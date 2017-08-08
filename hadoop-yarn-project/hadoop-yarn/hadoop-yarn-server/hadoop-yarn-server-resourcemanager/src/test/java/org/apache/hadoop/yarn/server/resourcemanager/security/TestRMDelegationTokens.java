@@ -65,7 +65,7 @@ import org.junit.Test;
 public class TestRMDelegationTokens {
 
   private YarnConfiguration conf;
-
+  
   private FileSystem fs;
   private Path tmpDir;
   
@@ -78,6 +78,7 @@ public class TestRMDelegationTokens {
     YarnAPIStorageFactory.setConfiguration(conf);
     RMStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
+    UserGroupInformation.setLoginUser(null);
     UserGroupInformation.setConfiguration(conf);
     fs = FileSystem.get(conf);
     tmpDir = new Path(new File("target", this.getClass().getSimpleName()
@@ -87,17 +88,15 @@ public class TestRMDelegationTokens {
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.set(YarnConfiguration.FS_RM_STATE_STORE_URI,tmpDir.toString());
     conf.set(YarnConfiguration.RM_STORE, FileSystemRMStateStore.class.getName());
-    conf.set(YarnConfiguration.RM_SCHEDULER, FairScheduler.class.getName());
-  }
-
-    @After
-  public void tearDown() throws IOException {
-    fs.delete(tmpDir, true);
   }
   
   // Test the DT mast key in the state-store when the mast key is being rolled.
-  @Test(timeout = 15000)
+  @Test(timeout = 1500000)
   public void testRMDTMasterKeyStateOnRollingMasterKey() throws Exception {
+    Configuration conf = new Configuration(this.conf);
+    conf.set("hadoop.security.authentication", "kerberos");
+    UserGroupInformation.setLoginUser(null);
+    UserGroupInformation.setConfiguration(conf);
 
     MockRM rm1 = new MyMockRM(conf);
     rm1.start();
@@ -123,10 +122,6 @@ public class TestRMDelegationTokens {
       }
       Assert.assertTrue(foundIt);
     }
-    
-    Set<DelegationKey> expiringKeys = new HashSet<DelegationKey>();
-    expiringKeys.addAll(dtSecretManager.getAllMasterKeys());
-
 
     // request to generate a RMDelegationToken
     GetDelegationTokenRequest request = mock(GetDelegationTokenRequest.class);
@@ -207,6 +202,7 @@ public class TestRMDelegationTokens {
         break;
       Thread.sleep(500);
     }
+    rm1.stop();
   }
 
   class MyMockRM extends TestSecurityMockRM {
@@ -256,7 +252,17 @@ public class TestRMDelegationTokens {
       for (int keyId : allKeys.keySet()) {
         if (keyId == currentId) {
           DelegationKey currentKey = allKeys.get(keyId);
-          Assert.assertTrue(rmDTMasterKeyState.contains(currentKey));
+          // There's a small window where the key expiry has changed in memory
+          // but not the state store yet, and DelegationKey hashcode/equals
+          // uses the expiry so the contains method will fail to find it.
+          boolean found = false;
+          for (DelegationKey k : rmDTMasterKeyState) {
+            if (k.getKeyId() == keyId) {
+              found = true;
+              break;
+            }
+          }
+          Assert.assertTrue(found);
           return currentKey;
         }
       }

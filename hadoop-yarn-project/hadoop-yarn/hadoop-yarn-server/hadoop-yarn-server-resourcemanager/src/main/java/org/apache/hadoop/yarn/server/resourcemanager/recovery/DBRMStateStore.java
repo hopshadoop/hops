@@ -24,11 +24,13 @@ import io.hops.metadata.common.entity.IntVariable;
 import io.hops.metadata.common.entity.LongVariable;
 import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
+import io.hops.metadata.yarn.dal.ReservationStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationKeyDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationTokenDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
+import io.hops.metadata.yarn.entity.ReservationState;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationState;
 import io.hops.metadata.yarn.entity.rmstatestore.DelegationToken;
@@ -40,6 +42,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -47,7 +50,9 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.server.records.Version;
 import org.apache.hadoop.yarn.server.records.impl.pb.VersionPBImpl;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.VersionProto;
@@ -199,6 +204,7 @@ public class DBRMStateStore extends RMStateStore {
         loadRMDTSecretManagerState(rmState);
         loadRMApps(rmState);
         loadAMRMTokenSecretManagerState(rmState);
+        loadReservationSystemState(rmState);
         connector.commit();
         return null;
       }
@@ -259,6 +265,25 @@ public class DBRMStateStore extends RMStateStore {
         }
       }
     }
+  }
+  
+  private void loadReservationSystemState(RMState rmState) throws IOException {
+
+    ReservationStateDataAccess DA = (ReservationStateDataAccess) RMStorageFactory.getDataAccess(
+        ReservationStateDataAccess.class);
+
+    List<ReservationState> reservationStates = DA.getAll();
+
+    for (ReservationState state : reservationStates) {
+
+      if (!rmState.getReservationState().containsKey(state.getPlanName())) {
+        rmState.getReservationState().put(state.getPlanName(),
+            new HashMap<ReservationId, YarnProtos.ReservationAllocationStateProto>());
+      };
+      rmState.getReservationState().get(state.getPlanName()).put(ReservationId.parseReservationId(state.
+          getReservationIdName()), YarnProtos.ReservationAllocationStateProto.parseFrom(state.getState()));
+    }
+
   }
 
   private ApplicationStateData createApplicationState(String appIdStr,
@@ -735,4 +760,64 @@ public class DBRMStateStore extends RMStateStore {
     };
     return (Integer) countEntriesHandler.handle();
   }
+  
+  @Override
+  public void removeApplication(final ApplicationId removeAppId) throws Exception {
+    LightWeightRequestHandler removeApplicationHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
+      @Override
+      public Object performTask() throws StorageException {
+        if (removeAppId != null) {
+          connector.beginTransaction();
+          connector.writeLock();
+          ApplicationStateDataAccess DA = (ApplicationStateDataAccess) RMStorageFactory.getDataAccess(ApplicationStateDataAccess.class);
+          //Remove this particular appState from NDB
+          ApplicationState hop = new ApplicationState(removeAppId.toString());
+          DA.remove(hop);
+
+          connector.commit();
+        }
+        return null;
+      }
+    };
+    removeApplicationHandler.handle();
+  }
+  
+  protected void removeReservationState(final String planName, final String reservationIdName) throws Exception{
+    LightWeightRequestHandler removeReservationStateHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
+      @Override
+      public Object performTask() throws StorageException {
+        connector.beginTransaction();
+        connector.writeLock();
+        ReservationStateDataAccess DA = (ReservationStateDataAccess) RMStorageFactory.getDataAccess(
+            ReservationStateDataAccess.class);
+
+        DA.remove(new ReservationState(planName, reservationIdName));
+
+        connector.commit();
+        return null;
+      }
+    };
+    removeReservationStateHandler.handle();
+  }
+  
+  protected void storeReservationState(final YarnProtos.ReservationAllocationStateProto reservationAllocation,
+      final String planName, final String reservationIdName) throws Exception {
+
+    LightWeightRequestHandler storeReservationStateHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
+      @Override
+      public Object performTask() throws StorageException {
+        connector.beginTransaction();
+        connector.writeLock();
+        ReservationStateDataAccess DA = (ReservationStateDataAccess) RMStorageFactory.getDataAccess(
+            ReservationStateDataAccess.class);
+
+        DA.add(new ReservationState(reservationAllocation.toByteArray(), planName, reservationIdName));
+
+        connector.commit();
+        return null;
+      }
+    };
+    storeReservationStateHandler.handle();
+  }
+  
 }

@@ -56,10 +56,6 @@ public class TestPriceMultiplicationFactorService {
   @Before
   public void setup() throws IOException {
     conf = new YarnConfiguration();
-    conf.set(YarnConfiguration.EVENT_RT_CONFIG_PATH,
-            "target/test-classes/RT_EventAPIConfig.ini");
-    conf.set(YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
-            "target/test-classes/RM_EventAPIConfig.ini");
 
     YarnAPIStorageFactory.setConfiguration(conf);
     RMStorageFactory.setConfiguration(conf);
@@ -77,6 +73,7 @@ public class TestPriceMultiplicationFactorService {
     rm.start();
 
     ConsumeSomeResources(rm);
+    Thread.sleep(1000);
     //all the resources are allocated: 1AM and 14 Containers 
     //so cluster utilisation is 1, overpricing is 1-0.2(threshold)=0,8
     //multiplicator is 1+0,8*10(increment factor) = 9
@@ -152,10 +149,21 @@ public class TestPriceMultiplicationFactorService {
           Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> priceList = pmDA.getAll();
 
           connector.commit();
+          LOG.debug("got new multiplicator: " + priceList.get(PriceMultiplicator.MultiplicatorType.VARIABLE).getValue()
+              + "for VARIABLE");
           return priceList.get(PriceMultiplicator.MultiplicatorType.VARIABLE).getValue();
         }
       };
-      float currentMultiplicator = (Float) currentMultiplicatorHandler.handle();
+      int nbTry=0;
+      float currentMultiplicator = -1;
+      while(nbTry<10){
+       currentMultiplicator = (Float) currentMultiplicatorHandler.handle();
+       if(currentMultiplicator==value){
+         break;
+       }
+       Thread.sleep(500);
+       nbTry++;
+      }
       Assert.assertEquals(value, currentMultiplicator,0);
   }
 }

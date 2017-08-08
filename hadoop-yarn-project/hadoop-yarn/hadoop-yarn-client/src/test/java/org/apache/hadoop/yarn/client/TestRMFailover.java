@@ -44,6 +44,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
 import org.apache.hadoop.yarn.server.resourcemanager.AdminService;
+import org.apache.hadoop.yarn.server.resourcemanager.HATestUtil;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.webproxy.WebAppProxyServer;
 import org.apache.hadoop.yarn.webapp.YarnWebParams;
@@ -96,8 +97,8 @@ public class TestRMFailover extends ClientBaseWithFixes {
     conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + "," + RM2_NODE_ID);
-    setRpcAddressForRM(RM1_NODE_ID, RM1_PORT_BASE);
-    setRpcAddressForRM(RM2_NODE_ID, RM2_PORT_BASE);
+    HATestUtil.setRpcAddressForRM(RM1_NODE_ID, RM1_PORT_BASE, conf);
+    HATestUtil.setRpcAddressForRM(RM2_NODE_ID, RM2_PORT_BASE, conf);
 
     conf.setLong(YarnConfiguration.CLIENT_FAILOVER_SLEEPTIME_BASE_MS, 100L);
 
@@ -166,14 +167,19 @@ public class TestRMFailover extends ClientBaseWithFixes {
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
     cluster.init(conf);
     cluster.start();
+    LOG.info("Checkpoint 1");
     assertFalse("RM never turned active", -1 == cluster.getActiveRMIndex());
     verifyConnections();
 
+    LOG.info("Checkpoint 2");
     explicitFailover();
+    LOG.info("Checkpoint 3");
     verifyConnections();
-
+    LOG.info("Checkpoint 4");
     explicitFailover();
+    LOG.info("Checkpoint 5");
     verifyConnections();
+    LOG.info("Checkpoint 6");
   }
 
   @Test
@@ -302,8 +308,8 @@ public class TestRMFailover extends ClientBaseWithFixes {
     redirectURL = getRedirectURL(rm2Url + "/metrics");
     assertEquals(redirectURL,rm1Url + "/metrics");
 
-    redirectURL = getRedirectURL(rm2Url + "/jmx");
-    assertEquals(redirectURL,rm1Url + "/jmx");
+    redirectURL = getRedirectURL(rm2Url + "/jmx?param1=value1+x&param2=y");
+    assertEquals(rm1Url + "/jmx?param1=value1+x&param2=y", redirectURL);
 
     // standby RM links /conf, /stacks, /logLevel, /static, /logs,
     // /cluster/cluster as well as webService
@@ -356,8 +362,9 @@ public class TestRMFailover extends ClientBaseWithFixes {
       // do not automatically follow the redirection
       // otherwise we get too many redirections exception
       conn.setInstanceFollowRedirects(false);
-      if(conn.getResponseCode() == HttpServletResponse.SC_TEMPORARY_REDIRECT)
+      if(conn.getResponseCode() == HttpServletResponse.SC_TEMPORARY_REDIRECT) {
         redirectUrl = conn.getHeaderField("Location");
+      }
     } catch (Exception e) {
       // throw new RuntimeException(e);
     }

@@ -43,7 +43,7 @@ JNIEXPORT jboolean JNICALL Java_org_apache_hadoop_util_NativeCodeLoader_buildSup
   (JNIEnv *env, jclass clazz)
 {
 #ifdef HADOOP_OPENSSL_LIBRARY
-    return JNI_TRUE;
+  return JNI_TRUE;
 #else
   return JNI_FALSE;
 #endif

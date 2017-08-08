@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.util;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Random;
@@ -212,7 +213,7 @@ public class TestLightWeightCache {
     int iterate_count = 0;
     int contain_count = 0;
 
-    private long currentTestTime = ran.nextInt();
+    private FakeTimer fakeTimer = new FakeTimer();
 
     LightWeightCacheTestCase(int tablelength, int sizeLimit,
         long creationExpirationPeriod, long accessExpirationPeriod,
@@ -229,12 +230,7 @@ public class TestLightWeightCache {
 
       data = new IntData(datasize, modulus);
       cache = new LightWeightCache<IntEntry, IntEntry>(tablelength, sizeLimit,
-          creationExpirationPeriod, 0, new LightWeightCache.Clock() {
-        @Override
-        long currentTime() {
-          return currentTestTime;
-        }
-      });
+          creationExpirationPeriod, 0, fakeTimer);
 
       Assert.assertEquals(0, cache.size());
     }
@@ -246,7 +242,7 @@ public class TestLightWeightCache {
       } else {
         final IntEntry h = hashMap.remove(key);
         if (h != null) {
-          Assert.assertTrue(cache.isExpired(h, currentTestTime));
+          Assert.assertTrue(cache.isExpired(h, fakeTimer.monotonicNowNanos()));
         }
       }
       return c;
@@ -265,7 +261,7 @@ public class TestLightWeightCache {
       } else {
         final IntEntry h = hashMap.remove(key);
         if (h != null) {
-          Assert.assertTrue(cache.isExpired(h, currentTestTime));
+          Assert.assertTrue(cache.isExpired(h, fakeTimer.monotonicNowNanos()));
         }
       }
       return c;
@@ -285,7 +281,7 @@ public class TestLightWeightCache {
         final IntEntry h = hashMap.put(entry);
         if (h != null && h != entry) {
           // if h == entry, its expiration time is already updated
-          Assert.assertTrue(cache.isExpired(h, currentTestTime));
+          Assert.assertTrue(cache.isExpired(h, fakeTimer.monotonicNowNanos()));
         }
       }
       return c;
@@ -304,7 +300,7 @@ public class TestLightWeightCache {
       } else {
         final IntEntry h = hashMap.remove(key);
         if (h != null) {
-          Assert.assertTrue(cache.isExpired(h, currentTestTime));
+          Assert.assertTrue(cache.isExpired(h, fakeTimer.monotonicNowNanos()));
         }
       }
       return c;
@@ -338,7 +334,7 @@ public class TestLightWeightCache {
     }
 
     void check() {
-      currentTestTime += ran.nextInt() & 0x3;
+      fakeTimer.advanceNanos(ran.nextInt() & 0x3);
 
       //test size
       sizeTest();
@@ -378,6 +374,11 @@ public class TestLightWeightCache {
       hashMap.clear();
       cache.clear();
       Assert.assertEquals(0, size());
+    }
+
+    @Override
+    public Collection<IntEntry> values() {
+      throw new UnsupportedOperationException();
     }
   }
 

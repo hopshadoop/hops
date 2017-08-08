@@ -30,6 +30,7 @@ import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenRespo
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocolPB;
 import org.apache.hadoop.yarn.api.protocolrecords.CancelDelegationTokenResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.FailApplicationAttemptResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptReportResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportResponse;
@@ -42,6 +43,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetContainersResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetDelegationTokenResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetNewReservationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoResponse;
@@ -49,11 +51,16 @@ import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.ReservationDeleteResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.ReservationListResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.ReservationSubmissionResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.ReservationUpdateResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationPriorityResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.CancelDelegationTokenRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.CancelDelegationTokenResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.FailApplicationAttemptRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.FailApplicationAttemptResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetApplicationAttemptReportRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetApplicationAttemptReportResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetApplicationAttemptsRequestPBImpl;
@@ -78,6 +85,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetLabelsToNodesReques
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetLabelsToNodesResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNewApplicationRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNewApplicationResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNewReservationRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNewReservationResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNodesToLabelsRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNodesToLabelsResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetQueueInfoRequestPBImpl;
@@ -92,13 +101,22 @@ import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.RenewDelegationTokenRe
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.RenewDelegationTokenResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationDeleteRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationDeleteResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationListRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationListResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationSubmissionRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationSubmissionResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationUpdateRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationUpdateResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.SignalContainerRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.SignalContainerResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.UpdateApplicationPriorityRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.UpdateApplicationPriorityResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.SubmitApplicationRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.SubmitApplicationResponsePBImpl;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.FailApplicationAttemptRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.FailApplicationAttemptResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptReportRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptReportResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptsRequestProto;
@@ -121,6 +139,8 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetLabelsToNodesRequestPro
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetLabelsToNodesResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNewApplicationRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNewApplicationResponseProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNewReservationRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNewReservationResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNodesToLabelsRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNodesToLabelsResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueInfoRequestProto;
@@ -137,6 +157,11 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.ReservationSubmissionReque
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.ReservationSubmissionResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.ReservationUpdateRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.ReservationUpdateResponseProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.ReservationListRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.ReservationListResponseProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.SignalContainerResponseProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.UpdateApplicationPriorityRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.UpdateApplicationPriorityResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SubmitApplicationRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SubmitApplicationResponseProto;
 
@@ -152,6 +177,20 @@ public class ApplicationClientProtocolPBServiceImpl implements ApplicationClient
     this.real = impl;
   }
   
+  @Override
+  public FailApplicationAttemptResponseProto failApplicationAttempt(RpcController arg0,
+          FailApplicationAttemptRequestProto proto) throws ServiceException {
+    FailApplicationAttemptRequestPBImpl request = new FailApplicationAttemptRequestPBImpl(proto);
+    try {
+      FailApplicationAttemptResponse response = real.failApplicationAttempt(request);
+      return ((FailApplicationAttemptResponsePBImpl)response).getProto();
+    } catch (YarnException e) {
+      throw new ServiceException(e);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
   @Override
   public KillApplicationResponseProto forceKillApplication(RpcController arg0,
       KillApplicationRequestProto proto) throws ServiceException {
@@ -415,6 +454,22 @@ public class ApplicationClientProtocolPBServiceImpl implements ApplicationClient
   }
 
   @Override
+  public GetNewReservationResponseProto getNewReservation(
+      RpcController arg0, GetNewReservationRequestProto proto) throws
+      ServiceException {
+    GetNewReservationRequestPBImpl request =
+        new GetNewReservationRequestPBImpl(proto);
+    try {
+      GetNewReservationResponse response = real.getNewReservation(request);
+      return ((GetNewReservationResponsePBImpl)response).getProto();
+    } catch (YarnException e) {
+      throw new ServiceException(e);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
   public ReservationSubmissionResponseProto submitReservation(RpcController controller,
       ReservationSubmissionRequestProto requestProto) throws ServiceException {
     ReservationSubmissionRequestPBImpl request =
@@ -452,6 +507,21 @@ public class ApplicationClientProtocolPBServiceImpl implements ApplicationClient
     try {
       ReservationDeleteResponse response = real.deleteReservation(request);
       return ((ReservationDeleteResponsePBImpl) response).getProto();
+    } catch (YarnException e) {
+      throw new ServiceException(e);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public ReservationListResponseProto listReservations(RpcController controller,
+            ReservationListRequestProto requestProto) throws ServiceException {
+    ReservationListRequestPBImpl request =
+            new ReservationListRequestPBImpl(requestProto);
+    try {
+      ReservationListResponse response = real.listReservations(request);
+      return ((ReservationListResponsePBImpl) response).getProto();
     } catch (YarnException e) {
       throw new ServiceException(e);
     } catch (IOException e) {
@@ -501,6 +571,38 @@ public class ApplicationClientProtocolPBServiceImpl implements ApplicationClient
       GetClusterNodeLabelsResponse response =
           real.getClusterNodeLabels(request);
       return ((GetClusterNodeLabelsResponsePBImpl) response).getProto();
+    } catch (YarnException e) {
+      throw new ServiceException(e);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public UpdateApplicationPriorityResponseProto updateApplicationPriority(
+      RpcController controller, UpdateApplicationPriorityRequestProto proto)
+      throws ServiceException {
+    UpdateApplicationPriorityRequestPBImpl request =
+        new UpdateApplicationPriorityRequestPBImpl(proto);
+    try {
+      UpdateApplicationPriorityResponse response =
+          real.updateApplicationPriority(request);
+      return ((UpdateApplicationPriorityResponsePBImpl) response).getProto();
+    } catch (YarnException e) {
+      throw new ServiceException(e);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public SignalContainerResponseProto signalToContainer(
+      RpcController controller,
+      YarnServiceProtos.SignalContainerRequestProto proto) throws ServiceException {
+    SignalContainerRequestPBImpl request = new SignalContainerRequestPBImpl(proto);
+    try {
+      SignalContainerResponse response = real.signalToContainer(request);
+      return ((SignalContainerResponsePBImpl)response).getProto();
     } catch (YarnException e) {
       throw new ServiceException(e);
     } catch (IOException e) {

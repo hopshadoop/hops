@@ -285,7 +285,7 @@ public class TestFileOutputCommitter extends TestCase {
   public void testCommitterV2() throws Exception {
     testCommitterInternal(2);
   }
-
+  
   public void testCommitterWithDuplicatedCommitV1() throws Exception {
     testCommitterWithDuplicatedCommitInternal(1);
   }
@@ -478,6 +478,15 @@ public class TestFileOutputCommitter extends TestCase {
     // do commit
     committer.commitTask(tContext);
     committer.commitJob(jContext);
+
+    // Ensure getReaders call works and also ignores
+    // hidden filenames (_ or . prefixes)
+    try {
+      MapFileOutputFormat.getReaders(outDir, conf);
+    } catch (Exception e) {
+      fail("Fail to read from MapFileOutputFormat: " + e);
+      e.printStackTrace();
+    }
 
     // validate output
     validateMapFileOutputContent(FileSystem.get(job.getConfiguration()), outDir);

@@ -24,13 +24,13 @@ import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
@@ -46,14 +46,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
@@ -65,6 +60,7 @@ import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
 import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.ClusterInfo;
 import org.apache.hadoop.mapreduce.v2.app.MRApp;
+import org.apache.hadoop.mapreduce.v2.app.MRAppMaster;
 import org.apache.hadoop.mapreduce.v2.app.client.ClientService;
 import org.apache.hadoop.mapreduce.v2.app.job.Job;
 import org.apache.hadoop.mapreduce.v2.app.job.JobStateInternal;
@@ -75,6 +71,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.JobEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobUpdatedNodesEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerAssignedEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptDiagnosticsUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptKillEvent;
@@ -84,6 +81,7 @@ import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -110,6 +108,7 @@ import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.UpdateContainerRequest;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
@@ -126,13 +125,13 @@ import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.AMRMTokenSecretManager;
@@ -146,6 +145,14 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.google.common.base.Supplier;
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import java.io.File;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
+import org.mockito.InOrder;
 
 @SuppressWarnings("unchecked")
 public class TestRMContainerAllocator {
@@ -155,13 +162,12 @@ public class TestRMContainerAllocator {
   static final RecordFactory recordFactory = RecordFactoryProvider
       .getRecordFactory(null);
 
-  private Configuration conf;
   private FileSystem fs;
   private Path tmpDir;
 
   @Before
   public void setup() throws IOException {
-    conf = new YarnConfiguration();
+    YarnConfiguration conf = new YarnConfiguration();
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
@@ -185,6 +191,7 @@ public class TestRMContainerAllocator {
 
     LOG.info("Running testSimple");
 
+    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -261,8 +268,7 @@ public class TestRMContainerAllocator {
     // check that the assigned container requests are cancelled
     assigned = allocator.schedule();
     dispatcher.await();
-    Assert.assertEquals(5, rm.getMyFifoScheduler().lastAsk.size());
-    rm.stop();
+    Assert.assertEquals(5, rm.getMyFifoScheduler().lastAsk.size());    
   }
   
   @Test 
@@ -275,6 +281,7 @@ public class TestRMContainerAllocator {
     // Regression test for MAPREDUCE-4893
     LOG.info("Running testMapNodeLocality");
 
+    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -348,7 +355,6 @@ public class TestRMContainerAllocator {
     }
     checkAssignments(new ContainerRequestEvent[] { event1, event2},
         assigned, true);
-    rm.stop();
   }
 
   @Test
@@ -356,6 +362,7 @@ public class TestRMContainerAllocator {
 
     LOG.info("Running testResource");
 
+    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -414,13 +421,13 @@ public class TestRMContainerAllocator {
     dispatcher.await();
     checkAssignments(new ContainerRequestEvent[] { event1, event2 },
         assigned, false);
-    rm.stop();
   }
 
   @Test(timeout = 30000)
   public void testReducerRampdownDiagnostics() throws Exception {
     LOG.info("Running tesReducerRampdownDiagnostics");
 
+    final Configuration conf = new Configuration();
     conf.setFloat(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 0.0f);
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
@@ -467,13 +474,13 @@ public class TestRMContainerAllocator {
         .getMessage();
     Assert.assertTrue("No reducer rampDown preemption message",
         killEventMessage.contains(RMContainerAllocator.RAMPDOWN_DIAGNOSTIC));
-    rm.stop();
   }
 
   @Test(timeout = 30000)
   public void testPreemptReducers() throws Exception {
     LOG.info("Running testPreemptReducers");
 
+    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -508,14 +515,13 @@ public class TestRMContainerAllocator {
     ContainerRequestEvent event1 =
         createReq(jobId, 1, 2048, new String[] { "h1" }, false, false);
     scheduledRequests.maps.put(mock(TaskAttemptId.class),
-        new RMContainerRequestor.ContainerRequest(event1, null));
+        new RMContainerRequestor.ContainerRequest(event1, null,null));
     assignedRequests.reduces.put(mock(TaskAttemptId.class),
         mock(Container.class));
 
     allocator.preemptReducesIfNeeded();
     Assert.assertEquals("The reducer is not preempted",
         1, assignedRequests.preemptionWaitingReduces.size());
-    rm.stop();
   }
 
   @Test(timeout = 30000)
@@ -523,6 +529,7 @@ public class TestRMContainerAllocator {
     LOG.info("Running testNonAggressivelyPreemptReducers");
 
     final int preemptThreshold = 2; //sec
+    Configuration conf = new Configuration();
     conf.setInt(
         MRJobConfig.MR_JOB_REDUCER_PREEMPT_DELAY_SEC,
         preemptThreshold);
@@ -576,7 +583,6 @@ public class TestRMContainerAllocator {
     allocator.preemptReducesIfNeeded();
     Assert.assertEquals("The reducer is not preeempted", 1,
         assignedRequests.preemptionWaitingReduces.size());
-    rm.stop();
   }
 
   @Test(timeout = 30000)
@@ -584,6 +590,7 @@ public class TestRMContainerAllocator {
     LOG.info("Running testForcePreemptReducers");
 
     int forcePreemptThresholdSecs = 2;
+    Configuration conf = new Configuration();
     conf.setInt(MRJobConfig.MR_JOB_REDUCER_PREEMPT_DELAY_SEC,
         2 * forcePreemptThresholdSecs);
     conf.setInt(MRJobConfig.MR_JOB_REDUCER_UNCONDITIONAL_PREEMPT_DELAY_SEC,
@@ -639,7 +646,138 @@ public class TestRMContainerAllocator {
     allocator.preemptReducesIfNeeded();
     Assert.assertEquals("The reducer is not preeempted", 1,
         assignedRequests.preemptionWaitingReduces.size());
-    rm.stop();
+  }
+
+  @Test(timeout = 30000)
+  public void testExcessReduceContainerAssign() throws Exception {
+  final Configuration conf = new Configuration();
+    conf.setFloat(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 0.0f);
+    final MyResourceManager2 rm = new MyResourceManager2(conf);
+    rm.start();
+    final DrainDispatcher dispatcher = (DrainDispatcher)rm.getRMContext()
+            .getDispatcher();
+    final RMApp app = rm.submitApp(2048);
+    dispatcher.await();
+    final String host = "host1";
+    final MockNM nm = rm.registerNode(String.format("%s:1234", host), 4096);
+    nm.nodeHeartbeat(true);
+    dispatcher.await();
+    final ApplicationAttemptId appAttemptId = app.getCurrentAppAttempt()
+          .getAppAttemptId();
+    rm.sendAMLaunched(appAttemptId);
+    dispatcher.await();
+    final JobId jobId = MRBuilderUtils
+                 .newJobId(appAttemptId.getApplicationId(), 0);
+    final Job mockJob = mock(Job.class);
+    when(mockJob.getReport()).thenReturn(
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
+            0, 0, 0, 0, 0, 0, "jobfile", null, false, ""));
+    final MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
+        appAttemptId, mockJob, new SystemClock());
+
+    // request to allocate two reduce priority containers
+    final String[] locations = new String[] { host };
+    allocator.sendRequest(createReq(jobId, 0, 1024, locations, false, true));
+    allocator.scheduleAllReduces();
+    allocator.makeRemoteRequest();
+    nm.nodeHeartbeat(true);
+    dispatcher.await();
+    allocator.sendRequest(createReq(jobId, 1, 1024, locations, false, false));
+
+    int assignedContainer;
+    for (assignedContainer = 0; assignedContainer < 1;) {
+      assignedContainer += allocator.schedule().size();
+      nm.nodeHeartbeat(true);
+      dispatcher.await();
+    }
+    // only 1 allocated container should be assigned
+    Assert.assertEquals(assignedContainer, 1);
+  }
+
+  @Test
+  public void testMapReduceAllocationWithNodeLabelExpression() throws Exception {
+
+    LOG.info("Running testMapReduceAllocationWithNodeLabelExpression");
+    Configuration conf = new Configuration();
+    /*
+     * final int MAP_LIMIT = 3; final int REDUCE_LIMIT = 1;
+     * conf.setInt(MRJobConfig.JOB_RUNNING_MAP_LIMIT, MAP_LIMIT);
+     * conf.setInt(MRJobConfig.JOB_RUNNING_REDUCE_LIMIT, REDUCE_LIMIT);
+     */
+    conf.setFloat(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 1.0f);
+    conf.set(MRJobConfig.MAP_NODE_LABEL_EXP, "MapNodes");
+    conf.set(MRJobConfig.REDUCE_NODE_LABEL_EXP, "ReduceNodes");
+    ApplicationId appId = ApplicationId.newInstance(1, 1);
+    ApplicationAttemptId appAttemptId =
+        ApplicationAttemptId.newInstance(appId, 1);
+    JobId jobId = MRBuilderUtils.newJobId(appAttemptId.getApplicationId(), 0);
+    Job mockJob = mock(Job.class);
+    when(mockJob.getReport()).thenReturn(
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
+            0, 0, 0, 0, 0, 0, "jobfile", null, false, ""));
+    final MockScheduler mockScheduler = new MockScheduler(appAttemptId);
+    MyContainerAllocator allocator =
+        new MyContainerAllocator(null, conf, appAttemptId, mockJob,
+            new SystemClock()) {
+          @Override
+          protected void register() {
+          }
+
+          @Override
+          protected ApplicationMasterProtocol createSchedulerProxy() {
+            return mockScheduler;
+          }
+        };
+
+    // create some map requests
+    ContainerRequestEvent reqMapEvents;
+    reqMapEvents = createReq(jobId, 0, 1024, new String[] { "map" });
+    allocator.sendRequests(Arrays.asList(reqMapEvents));
+
+    // create some reduce requests
+    ContainerRequestEvent reqReduceEvents;
+    reqReduceEvents =
+        createReq(jobId, 0, 2048, new String[] { "reduce" }, false, true);
+    allocator.sendRequests(Arrays.asList(reqReduceEvents));
+    allocator.schedule();
+    // verify all of the host-specific asks were sent plus one for the
+    // default rack and one for the ANY request
+    Assert.assertEquals(3, mockScheduler.lastAsk.size());
+    // verify ResourceRequest sent for MAP have appropriate node
+    // label expression as per the configuration
+    validateLabelsRequests(mockScheduler.lastAsk.get(0), false);
+    validateLabelsRequests(mockScheduler.lastAsk.get(1), false);
+    validateLabelsRequests(mockScheduler.lastAsk.get(2), false);
+
+    // assign a map task and verify we do not ask for any more maps
+    ContainerId cid0 = mockScheduler.assignContainer("map", false);
+    allocator.schedule();
+    // default rack and one for the ANY request
+    Assert.assertEquals(3, mockScheduler.lastAsk.size());
+    validateLabelsRequests(mockScheduler.lastAsk.get(0), true);
+    validateLabelsRequests(mockScheduler.lastAsk.get(1), true);
+    validateLabelsRequests(mockScheduler.lastAsk.get(2), true);
+
+    // complete the map task and verify that we ask for one more
+    allocator.close();
+  }
+
+  private void validateLabelsRequests(ResourceRequest resourceRequest,
+      boolean isReduce) {
+    switch (resourceRequest.getResourceName()) {
+    case "map":
+    case "reduce":
+    case NetworkTopology.DEFAULT_RACK:
+      Assert.assertNull(resourceRequest.getNodeLabelExpression());
+      break;
+    case "*":
+      Assert.assertEquals(isReduce ? "ReduceNodes" : "MapNodes",
+          resourceRequest.getNodeLabelExpression());
+      break;
+    default:
+      Assert.fail("Invalid resource location "
+          + resourceRequest.getResourceName());
+    }
   }
 
   @Test
@@ -647,6 +785,7 @@ public class TestRMContainerAllocator {
 
     LOG.info("Running testMapReduceScheduling");
 
+    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -717,7 +856,6 @@ public class TestRMContainerAllocator {
       Assert.assertFalse("Assigned count not correct", "h1".equals(assig
           .getContainer().getNodeId().getHost()));
     }
-    rm.stop();
   }
 
   private static class MyResourceManager extends MockRM {
@@ -765,11 +903,23 @@ public class TestRMContainerAllocator {
     }
   }
 
+  private static class MyResourceManager2 extends MyResourceManager {
+    public MyResourceManager2(Configuration conf) {
+      super(conf);
+    }
+
+    @Override
+    protected ResourceScheduler createScheduler() {
+      return new ExcessReduceContainerAllocateScheduler(this.getRMContext());
+    }
+  }
+
   @Test
   public void testReportedAppProgress() throws Exception {
 
     LOG.info("Running testReportedAppProgress");
 
+    Configuration conf = new Configuration();
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher rmDispatcher = (DrainDispatcher) rm.getRMContext()
@@ -889,7 +1039,6 @@ public class TestRMContainerAllocator {
     // Remaining is JobCleanup
     Assert.assertEquals(0.95f, job.getProgress(), 0.001f);
     Assert.assertEquals(0.95f, rmApp.getProgress(), 0.001f);
-    rm.stop();
   }
 
   private void finishNextNTasks(DrainDispatcher rmDispatcher, MockNM node,
@@ -922,6 +1071,7 @@ public class TestRMContainerAllocator {
 
     LOG.info("Running testReportedAppProgressWithOnlyMaps");
 
+    Configuration conf = new Configuration();
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher rmDispatcher = (DrainDispatcher) rm.getRMContext()
@@ -1012,11 +1162,11 @@ public class TestRMContainerAllocator {
     rmDispatcher.await();
     Assert.assertEquals(0.95f, job.getProgress(), 0.001f);
     Assert.assertEquals(0.95f, rmApp.getProgress(), 0.001f);
-    rm.stop();
   }
   
   @Test
   public void testUpdatedNodes() throws Exception {
+    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -1097,7 +1247,6 @@ public class TestRMContainerAllocator {
     // no updated nodes reported
     Assert.assertTrue(allocator.getJobUpdatedNodeEvents().isEmpty());
     Assert.assertTrue(allocator.getTaskAttemptKillEvents().isEmpty());
-    rm.stop();
   }
 
   @Test
@@ -1105,6 +1254,7 @@ public class TestRMContainerAllocator {
     
     LOG.info("Running testBlackListedNodes");
 
+    Configuration conf = new Configuration();
     conf.setBoolean(MRJobConfig.MR_AM_JOB_NODE_BLACKLISTING_ENABLE, true);
     conf.setInt(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, 1);
     conf.setInt(
@@ -1203,13 +1353,13 @@ public class TestRMContainerAllocator {
       Assert.assertTrue("Assigned container host not correct", "h3".equals(assig
           .getContainer().getNodeId().getHost()));
     }
-    rm.stop();
   }
   
   @Test
   public void testIgnoreBlacklisting() throws Exception {
     LOG.info("Running testIgnoreBlacklisting");
 
+    Configuration conf = new Configuration();
     conf.setBoolean(MRJobConfig.MR_AM_JOB_NODE_BLACKLISTING_ENABLE, true);
     conf.setInt(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, 1);
     conf.setInt(
@@ -1357,7 +1507,6 @@ public class TestRMContainerAllocator {
         getContainerOnHost(jobId, 20, 1024, new String[] { "h3" },
             nodeManagers[2], dispatcher, allocator, 0, 0, 0, 0, rm);
     Assert.assertEquals("No of assignments must be 0", 0, assigned.size());
-    rm.stop();
   }
 
   private MockNM registerNodeManager(int i, MyResourceManager rm,
@@ -1400,6 +1549,7 @@ public class TestRMContainerAllocator {
   public void testBlackListedNodesWithSchedulingToThatNode() throws Exception {
     LOG.info("Running testBlackListedNodesWithSchedulingToThatNode");
 
+    Configuration conf = new Configuration();
     conf.setBoolean(MRJobConfig.MR_AM_JOB_NODE_BLACKLISTING_ENABLE, true);
     conf.setInt(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, 1);
     conf.setInt(
@@ -1529,7 +1679,6 @@ public class TestRMContainerAllocator {
       Assert.assertEquals("Assigned container " + assig.getContainer().getId()
           + " host not correct", "h3", assig.getContainer().getNodeId().getHost());
     }
-    rm.stop();
   }
 
   private static void assertBlacklistAdditionsAndRemovals(
@@ -1571,8 +1720,10 @@ public class TestRMContainerAllocator {
     @Override
     public synchronized Allocation allocate(
         ApplicationAttemptId applicationAttemptId, List<ResourceRequest> ask,
-        List<ContainerId> release, 
-        List<String> blacklistAdditions, List<String> blacklistRemovals) {
+        List<ContainerId> release, List<String> blacklistAdditions,
+        List<String> blacklistRemovals,
+        List<UpdateContainerRequest> increaseRequests,
+        List<UpdateContainerRequest> decreaseRequests) {
       List<ResourceRequest> askCopy = new ArrayList<ResourceRequest>();
       for (ResourceRequest req : ask) {
         ResourceRequest reqCopy = ResourceRequest.newInstance(req
@@ -1580,13 +1731,14 @@ public class TestRMContainerAllocator {
             .getNumContainers(), req.getRelaxLocality());
         askCopy.add(reqCopy);
       }
+      SecurityUtil.setTokenServiceUseIp(false);
       lastAsk = ask;
       lastRelease = release;
       lastBlacklistAdditions = blacklistAdditions;
       lastBlacklistRemovals = blacklistRemovals;
       Allocation allocation = super.allocate(
-          applicationAttemptId, askCopy, release, 
-          blacklistAdditions, blacklistRemovals);
+          applicationAttemptId, askCopy, release, blacklistAdditions,
+          blacklistRemovals, increaseRequests, decreaseRequests);
       if (forceResourceLimit != null) {
         // Test wants to force the non-default resource limit
         allocation.setResourceLimit(forceResourceLimit);
@@ -1596,6 +1748,60 @@ public class TestRMContainerAllocator {
 
     public void forceResourceLimit(Resource resource) {
       this.forceResourceLimit = resource;
+    }
+  }
+
+  private static class ExcessReduceContainerAllocateScheduler extends FifoScheduler {
+
+    public ExcessReduceContainerAllocateScheduler(RMContext rmContext) {
+      super();
+      try {
+        Configuration conf = new Configuration();
+        reinitialize(conf, rmContext);
+      } catch (IOException ie) {
+        LOG.info("add application failed with ", ie);
+        assert (false);
+      }
+    }
+
+    @Override
+    public synchronized Allocation allocate(
+        ApplicationAttemptId applicationAttemptId, List<ResourceRequest> ask,
+        List<ContainerId> release, List<String> blacklistAdditions,
+        List<String> blacklistRemovals,
+        List<UpdateContainerRequest> increaseRequest,
+        List<UpdateContainerRequest> decreaseRequests) {
+      List<ResourceRequest> askCopy = new ArrayList<ResourceRequest>();
+      for (ResourceRequest req : ask) {
+        ResourceRequest reqCopy = ResourceRequest.newInstance(req
+            .getPriority(), req.getResourceName(), req.getCapability(), req
+            .getNumContainers(), req.getRelaxLocality());
+        askCopy.add(reqCopy);
+      }
+      SecurityUtil.setTokenServiceUseIp(false);
+      Allocation normalAlloc = super.allocate(
+          applicationAttemptId, askCopy, release,
+          blacklistAdditions, blacklistRemovals, null, null);
+      List<Container> containers = normalAlloc.getContainers();
+      if(containers.size() > 0) {
+        // allocate excess container
+        FiCaSchedulerApp application = super.getApplicationAttempt(applicationAttemptId);
+        ContainerId containerId = BuilderUtils.newContainerId(application
+            .getApplicationAttemptId(), application.getNewContainerId());
+        Container excessC = mock(Container.class);
+        when(excessC.getId()).thenReturn(containerId);
+        when(excessC.getPriority()).thenReturn(RMContainerAllocator.PRIORITY_REDUCE);
+        Resource mockR = mock(Resource.class);
+        when(mockR.getMemorySize()).thenReturn(2048L);
+        when(excessC.getResource()).thenReturn(mockR);
+        NodeId nId = mock(NodeId.class);
+        when(nId.getHost()).thenReturn("local");
+        when(excessC.getNodeId()).thenReturn(nId);
+        containers.add(excessC);
+      }
+      Allocation excessAlloc = mock(Allocation.class);
+      when(excessAlloc.getContainers()).thenReturn(containers);
+      return excessAlloc;
     }
   }
 
@@ -1713,8 +1919,7 @@ public class TestRMContainerAllocator {
       when(context.getApplicationID()).thenReturn(appId);
       when(context.getApplicationAttemptId()).thenReturn(appAttemptId);
       when(context.getJob(isA(JobId.class))).thenReturn(job);
-      when(context.getClock()).thenReturn(
-        new ControlledClock(new SystemClock()));
+      when(context.getClock()).thenReturn(new ControlledClock());
       when(context.getClusterInfo()).thenReturn(
         new ClusterInfo(Resource.newInstance(10240, 1)));
       when(context.getEventHandler()).thenReturn(new EventHandler() {
@@ -2030,6 +2235,7 @@ public class TestRMContainerAllocator {
   public void testCompletedTasksRecalculateSchedule() throws Exception {
     LOG.info("Running testCompletedTasksRecalculateSchedule");
 
+    Configuration conf = new Configuration();
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -2070,13 +2276,13 @@ public class TestRMContainerAllocator {
     allocator.schedule();
     Assert.assertTrue("Expected recalculate of reduce schedule",
         allocator.recalculatedReduceSchedule);
-    rm.stop();
   }
 
   @Test
   public void testHeartbeatHandler() throws Exception {
     LOG.info("Running testHeartbeatHandler");
 
+    Configuration conf = new Configuration();
     conf.setInt(MRJobConfig.MR_AM_TO_RM_HEARTBEAT_INTERVAL_MS, 1);
     ControlledClock clock = new ControlledClock(new SystemClock());
     AppContext appContext = mock(AppContext.class);
@@ -2179,6 +2385,7 @@ public class TestRMContainerAllocator {
   
   @Test
   public void testUnregistrationOnlyIfRegistered() throws Exception {
+    Configuration conf = new Configuration();
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher rmDispatcher =
@@ -2219,9 +2426,8 @@ public class TestRMContainerAllocator {
     Assert.assertTrue(allocator.isApplicationMasterRegistered());
     mrApp.stop();
     Assert.assertTrue(allocator.isUnregistered());
-    rm.stop();
   }
-
+  
   // Step-1 : AM send allocate request for 2 ContainerRequests and 1
   // blackListeNode
   // Step-2 : 2 containers are allocated by RM.
@@ -2238,6 +2444,7 @@ public class TestRMContainerAllocator {
   public void testRMContainerAllocatorResendsRequestsOnRMRestart()
       throws Exception {
 
+    Configuration conf = new Configuration();
     conf.set(YarnConfiguration.RECOVERY_ENABLED, "true");
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
         YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
@@ -2418,6 +2625,7 @@ public class TestRMContainerAllocator {
   @Test
   public void testRMUnavailable()
       throws Exception {
+    Configuration conf = new Configuration();
     conf.setInt(
       MRJobConfig.MR_AM_TO_RM_WAIT_INTERVAL_MS, 0);
     MyResourceManager rm1 = new MyResourceManager(conf);
@@ -2456,7 +2664,6 @@ public class TestRMContainerAllocator {
         allocator.jobEvents.size());
     JobEvent event = allocator.jobEvents.get(0); 
     Assert.assertTrue("Should Reboot", event.getType().equals(JobEventType.JOB_AM_REBOOT));
-    rm1.stop();
   }
 
   @Test(timeout=60000)
@@ -2464,6 +2671,7 @@ public class TestRMContainerAllocator {
     LOG.info("Running testAMRMTokenUpdate");
 
     final String rmAddr = "somermaddress:1234";
+    final Configuration conf = new YarnConfiguration();
     conf.setLong(
       YarnConfiguration.RM_AMRM_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS, 8);
     conf.setLong(YarnConfiguration.RM_AM_EXPIRY_INTERVAL_MS, 2000);
@@ -2543,7 +2751,6 @@ public class TestRMContainerAllocator {
         newToken.getPassword(), ugiToken.getPassword());
     Assert.assertEquals("AMRM token service not updated",
         new Text(rmAddr), ugiToken.getService());
-    rm.stop();
   }
 
   @Test
@@ -2551,6 +2758,7 @@ public class TestRMContainerAllocator {
     final int MAP_LIMIT = 3;
     final int REDUCE_LIMIT = 1;
     LOG.info("Running testConcurrentTaskLimits");
+    Configuration conf = new Configuration();
     conf.setInt(MRJobConfig.JOB_RUNNING_MAP_LIMIT, MAP_LIMIT);
     conf.setInt(MRJobConfig.JOB_RUNNING_REDUCE_LIMIT, REDUCE_LIMIT);
     conf.setFloat(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 1.0f);
@@ -2673,6 +2881,7 @@ public class TestRMContainerAllocator {
   public void testAttemptNotFoundCausesRMCommunicatorException()
       throws Exception {
 
+    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -2703,12 +2912,12 @@ public class TestRMContainerAllocator {
     rm.killApp(app.getApplicationId());
     rm.waitForState(app.getApplicationId(), RMAppState.KILLED);
     allocator.schedule();
-    rm.stop();
   }
 
   @Test
   public void testUpdateAskOnRampDownAllReduces() throws Exception {
     LOG.info("Running testUpdateAskOnRampDownAllReduces");
+    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher =
@@ -2825,14 +3034,55 @@ public class TestRMContainerAllocator {
       Assert.assertEquals(Resource.newInstance(1024, 1), req.getCapability());
       Assert.assertEquals(0, req.getNumContainers());
     }
-    rm.stop();
   }
 
+  /**
+   * MAPREDUCE-6771. Test if RMContainerAllocator generates the events in the
+   * right order while processing finished containers.
+   */
+  @Test
+  public void testHandlingFinishedContainers() {
+    EventHandler eventHandler = mock(EventHandler.class);
+
+    AppContext context = mock(MRAppMaster.RunningAppContext.class);
+    when(context.getClock()).thenReturn(new ControlledClock());
+    when(context.getClusterInfo()).thenReturn(
+        new ClusterInfo(Resource.newInstance(10240, 1)));
+    when(context.getEventHandler()).thenReturn(eventHandler);
+    RMContainerAllocator containerAllocator =
+        new RMContainerAllocatorForFinishedContainer(null, context);
+
+    ContainerStatus finishedContainer = ContainerStatus.newInstance(
+        mock(ContainerId.class), ContainerState.COMPLETE, "", 0);
+    containerAllocator.processFinishedContainer(finishedContainer);
+
+    InOrder inOrder = inOrder(eventHandler);
+    inOrder.verify(eventHandler).handle(
+        isA(TaskAttemptDiagnosticsUpdateEvent.class));
+    inOrder.verify(eventHandler).handle(isA(TaskAttemptEvent.class));
+    inOrder.verifyNoMoreInteractions();
+  }
+
+  private static class RMContainerAllocatorForFinishedContainer
+      extends RMContainerAllocator {
+    public RMContainerAllocatorForFinishedContainer(ClientService clientService,
+        AppContext context) {
+      super(clientService, context);
+    }
+    @Override
+    protected AssignedRequests createAssignedRequests() {
+      AssignedRequests assignedReqs = mock(AssignedRequests.class);
+      TaskAttemptId taskAttempt = mock(TaskAttemptId.class);
+      when(assignedReqs.get(any(ContainerId.class))).thenReturn(taskAttempt);
+      return assignedReqs;
+    }
+  }
 
   @Test
   public void testAvoidAskMoreReducersWhenReducerPreemptionIsRequired()
       throws Exception {
     LOG.info("Running testAvoidAskMoreReducersWhenReducerPreemptionIsRequired");
+    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher =
@@ -2952,7 +3202,128 @@ public class TestRMContainerAllocator {
       Assert.assertEquals(Resource.newInstance(1024, 1), req.getCapability());
       Assert.assertEquals(0, req.getNumContainers());
     }
-    rm.stop();
+  }
+
+  /**
+   * Tests whether scheduled reducers are excluded from headroom while
+   * calculating headroom.
+   */
+  @Test
+  public void testExcludeSchedReducesFromHeadroom() throws Exception {
+    LOG.info("Running testExcludeSchedReducesFromHeadroom");
+    Configuration conf = new Configuration();
+    conf.setInt(MRJobConfig.MR_JOB_REDUCER_UNCONDITIONAL_PREEMPT_DELAY_SEC, -1);
+    MyResourceManager rm = new MyResourceManager(conf);
+    rm.start();
+    DrainDispatcher dispatcher =
+        (DrainDispatcher) rm.getRMContext().getDispatcher();
+
+    // Submit the application
+    RMApp app = rm.submitApp(1024);
+    dispatcher.await();
+
+    MockNM amNodeManager = rm.registerNode("amNM:1234", 1260);
+    amNodeManager.nodeHeartbeat(true);
+    dispatcher.await();
+
+    ApplicationAttemptId appAttemptId = app.getCurrentAppAttempt()
+        .getAppAttemptId();
+    rm.sendAMLaunched(appAttemptId);
+    dispatcher.await();
+
+    JobId jobId = MRBuilderUtils.newJobId(appAttemptId.getApplicationId(), 0);
+    Job mockJob = mock(Job.class);
+    when(mockJob.getReport()).thenReturn(
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
+            0, 0, 0, 0, 0, 0, "jobfile", null, false, ""));
+    Task mockTask = mock(Task.class);
+    TaskAttempt mockTaskAttempt = mock(TaskAttempt.class);
+    when(mockJob.getTask((TaskId)any())).thenReturn(mockTask);
+    when(mockTask.getAttempt((TaskAttemptId)any())).thenReturn(mockTaskAttempt);
+    when(mockTaskAttempt.getProgress()).thenReturn(0.01f);
+    MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
+        appAttemptId, mockJob);
+
+    MockNM nodeManager = rm.registerNode("h1:1234", 4096);
+    dispatcher.await();
+    // Register nodes to RM.
+    MockNM nodeManager2 = rm.registerNode("h2:1234", 1024);
+    dispatcher.await();
+
+    // Request 2 maps and 1 reducer(sone on nodes which are not registered).
+    ContainerRequestEvent event1 =
+        createReq(jobId, 1, 1024, new String[] { "h1" });
+    allocator.sendRequest(event1);
+    ContainerRequestEvent event2 =
+        createReq(jobId, 2, 1024, new String[] { "h2" });
+    allocator.sendRequest(event2);
+    ContainerRequestEvent event3 =
+         createReq(jobId, 3, 1024, new String[] { "h1" }, false, true);
+    allocator.sendRequest(event3);
+
+    // This will tell the scheduler about the requests but there will be no
+    // allocations as nodes are not added.
+    allocator.schedule();
+    dispatcher.await();
+
+    // Request for another reducer on h3 which has not registered.
+    ContainerRequestEvent event4 =
+        createReq(jobId, 4, 1024, new String[] { "h3" }, false, true);
+    allocator.sendRequest(event4);
+
+    allocator.schedule();
+    dispatcher.await();
+
+    // Update resources in scheduler through node heartbeat from h1.
+    nodeManager.nodeHeartbeat(true);
+    dispatcher.await();
+
+    rm.getMyFifoScheduler().forceResourceLimit(Resource.newInstance(3072, 3));
+    allocator.schedule();
+    dispatcher.await();
+
+    // Two maps are assigned.
+    Assert.assertEquals(2, allocator.getAssignedRequests().maps.size());
+    // Send deallocate request for map so that no maps are assigned after this.
+    ContainerAllocatorEvent deallocate1 = createDeallocateEvent(jobId, 1, false);
+    allocator.sendDeallocate(deallocate1);
+    ContainerAllocatorEvent deallocate2 = createDeallocateEvent(jobId, 2, false);
+    allocator.sendDeallocate(deallocate2);
+    // No map should be assigned.
+    Assert.assertEquals(0, allocator.getAssignedRequests().maps.size());
+
+    nodeManager.nodeHeartbeat(true);
+    dispatcher.await();
+
+    rm.getMyFifoScheduler().forceResourceLimit(Resource.newInstance(1024, 1));
+    allocator.schedule();
+    dispatcher.await();
+
+    // h2 heartbeats.
+    nodeManager2.nodeHeartbeat(true);
+    dispatcher.await();
+
+    // Send request for one more mapper.
+    ContainerRequestEvent event5 =
+        createReq(jobId, 5, 1024, new String[] { "h1" });
+    allocator.sendRequest(event5);
+
+    rm.getMyFifoScheduler().forceResourceLimit(Resource.newInstance(2048, 2));
+    allocator.schedule();
+    dispatcher.await();
+    // One reducer is assigned and one map is scheduled
+    Assert.assertEquals(1, allocator.getScheduledRequests().maps.size());
+    Assert.assertEquals(1, allocator.getAssignedRequests().reduces.size());
+    // Headroom enough to run a mapper if headroom is taken as it is but wont be
+    // enough if scheduled reducers resources are deducted.
+    rm.getMyFifoScheduler().forceResourceLimit(Resource.newInstance(1260, 2));
+    allocator.schedule();
+    dispatcher.await();
+    // After allocate response, the one assigned reducer is preempted and killed
+    Assert.assertEquals(1, MyContainerAllocator.getTaskAttemptKillEvents().size());
+    Assert.assertEquals(RMContainerAllocator.RAMPDOWN_DIAGNOSTIC,
+        MyContainerAllocator.getTaskAttemptKillEvents().get(0).getMessage());
+    Assert.assertEquals(1, allocator.getNumOfPendingReduces());
   }
 
   private static class MockScheduler implements ApplicationMasterProtocol {
@@ -3010,6 +3381,8 @@ public class TestRMContainerAllocator {
           Collections.<NodeReport>emptyList(),
           Resource.newInstance(512000, 1024), null, 10, null,
           Collections.<NMToken>emptyList());
+      // RM will always ensure that a default priority is sent to AM
+      response.setApplicationPriority(Priority.newInstance(0));
       containersToComplete.clear();
       containersToAllocate.clear();
       return response;

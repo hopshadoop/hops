@@ -38,12 +38,13 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterInt;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
-import org.apache.hadoop.yarn.util.resource.Resources;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,25 +60,32 @@ public class QueueMetrics implements MetricsSource {
   @Metric("# of apps killed") MutableCounterInt appsKilled;
   @Metric("# of apps failed") MutableCounterInt appsFailed;
 
-  @Metric("Allocated memory in MB") MutableGaugeInt allocatedMB;
+  @Metric("Allocated memory in MB") MutableGaugeLong allocatedMB;
   @Metric("Allocated CPU in virtual cores") MutableGaugeInt allocatedVCores;
   @Metric("Allocated GPU") MutableGaugeInt allocatedGPUs;
   @Metric("# of allocated containers") MutableGaugeInt allocatedContainers;
   @Metric("Aggregate # of allocated containers") MutableCounterLong aggregateContainersAllocated;
+  @Metric("Aggregate # of allocated node-local containers")
+    MutableCounterLong aggregateNodeLocalContainersAllocated;
+  @Metric("Aggregate # of allocated rack-local containers")
+    MutableCounterLong aggregateRackLocalContainersAllocated;
+  @Metric("Aggregate # of allocated off-switch containers")
+    MutableCounterLong aggregateOffSwitchContainersAllocated;
   @Metric("Aggregate # of released containers") MutableCounterLong aggregateContainersReleased;
-  @Metric("Available memory in MB") MutableGaugeInt availableMB;
+  @Metric("Available memory in MB") MutableGaugeLong availableMB;
   @Metric("Available CPU in virtual cores") MutableGaugeInt availableVCores;
+  @Metric("Pending memory allocation in MB") MutableGaugeLong pendingMB;
   @Metric("Available GPU") MutableGaugeInt availableGPUs;
-  @Metric("Pending memory allocation in MB") MutableGaugeInt pendingMB;
   @Metric("Pending CPU allocation in virtual cores") MutableGaugeInt pendingVCores;
   @Metric("Pending GPU allocation") MutableGaugeInt pendingGPUs;
   @Metric("# of pending containers") MutableGaugeInt pendingContainers;
-  @Metric("# of reserved memory in MB") MutableGaugeInt reservedMB;
+  @Metric("# of reserved memory in MB") MutableGaugeLong reservedMB;
   @Metric("Reserved CPU in virtual cores") MutableGaugeInt reservedVCores;
   @Metric("Reserved GPU") MutableGaugeInt reservedGPUs;
   @Metric("# of reserved containers") MutableGaugeInt reservedContainers;
   @Metric("# of active users") MutableGaugeInt activeUsers;
   @Metric("# of active applications") MutableGaugeInt activeApplications;
+  @Metric("App Attempt First Container Allocation Delay") MutableRate appAttemptFirstContainerAllocationDelay;
   private final MutableGaugeInt[] runningTime;
   private TimeBucketMetrics<ApplicationId> runBuckets;
 
@@ -85,16 +93,17 @@ public class QueueMetrics implements MetricsSource {
   static final MetricsInfo RECORD_INFO = info("QueueMetrics",
       "Metrics for the resource scheduler");
   protected static final MetricsInfo QUEUE_INFO = info("Queue", "Metrics by queue");
-  static final MetricsInfo USER_INFO = info("User", "Metrics by user");
+  protected static final MetricsInfo USER_INFO =
+      info("User", "Metrics by user");
   static final Splitter Q_SPLITTER =
       Splitter.on('.').omitEmptyStrings().trimResults();
 
-  final MetricsRegistry registry;
-  final String queueName;
-  final QueueMetrics parent;
-  final MetricsSystem metricsSystem;
-  private final Map<String, QueueMetrics> users;
-  private final Configuration conf;
+  protected final MetricsRegistry registry;
+  protected final String queueName;
+  protected final QueueMetrics parent;
+  protected final MetricsSystem metricsSystem;
+  protected final Map<String, QueueMetrics> users;
+  protected final Configuration conf;
 
   protected QueueMetrics(MetricsSystem ms, String queueName, Queue parent, 
 	       boolean enableUserMetrics, Configuration conf) {
@@ -321,7 +330,7 @@ public class QueueMetrics implements MetricsSource {
    * @param limit resource limit
    */
   public void setAvailableResourcesToQueue(Resource limit) {
-    availableMB.set(limit.getMemory());
+    availableMB.set(limit.getMemorySize());
     availableVCores.set(limit.getVirtualCores());
     availableGPUs.set(limit.getGPUs());
   }
@@ -359,7 +368,7 @@ public class QueueMetrics implements MetricsSource {
 
   private void _incrPendingResources(int containers, Resource res) {
     pendingContainers.incr(containers);
-    pendingMB.incr(res.getMemory() * containers);
+    pendingMB.incr(res.getMemorySize() * containers);
     pendingVCores.incr(res.getVirtualCores() * containers);
     pendingGPUs.incr(res.getGPUs() * containers);
   }
@@ -377,16 +386,36 @@ public class QueueMetrics implements MetricsSource {
 
   private void _decrPendingResources(int containers, Resource res) {
     pendingContainers.decr(containers);
-    pendingMB.decr(res.getMemory() * containers);
+    pendingMB.decr(res.getMemorySize() * containers);
     pendingVCores.decr(res.getVirtualCores() * containers);
     pendingGPUs.decr(res.getGPUs() * containers);
+  }
+
+  public void incrNodeTypeAggregations(String user, NodeType type) {
+    if (type == NodeType.NODE_LOCAL) {
+      aggregateNodeLocalContainersAllocated.incr();
+    } else if (type == NodeType.RACK_LOCAL) {
+      aggregateRackLocalContainersAllocated.incr();
+    } else if (type == NodeType.OFF_SWITCH) {
+      aggregateOffSwitchContainersAllocated.incr();
+    } else {
+      return;
+    }
+    QueueMetrics userMetrics = getUserMetrics(user);
+    if (userMetrics != null) {
+      userMetrics.incrNodeTypeAggregations(user, type);
+    }
+    if (parent != null) {
+      parent.incrNodeTypeAggregations(user, type);
+    }
   }
 
   public void allocateResources(String user, int containers, Resource res,
       boolean decrPending) {
     allocatedContainers.incr(containers);
     aggregateContainersAllocated.incr(containers);
-    allocatedMB.incr(res.getMemory() * containers);
+
+    allocatedMB.incr(res.getMemorySize() * containers);
     allocatedVCores.incr(res.getVirtualCores() * containers);
     allocatedGPUs.incr(res.getGPUs() * containers);
     if (decrPending) {
@@ -401,10 +430,32 @@ public class QueueMetrics implements MetricsSource {
     }
   }
 
+  /**
+   * Allocate Resource for container size change.
+   *
+   * @param user
+   * @param res
+   */
+  public void allocateResources(String user, Resource res) {
+    allocatedMB.incr(res.getMemorySize());
+    allocatedVCores.incr(res.getVirtualCores());
+
+    pendingMB.decr(res.getMemorySize());
+    pendingVCores.decr(res.getVirtualCores());
+
+    QueueMetrics userMetrics = getUserMetrics(user);
+    if (userMetrics != null) {
+      userMetrics.allocateResources(user, res);
+    }
+    if (parent != null) {
+      parent.allocateResources(user, res);
+    }
+  }
+
   public void releaseResources(String user, int containers, Resource res) {
     allocatedContainers.decr(containers);
     aggregateContainersReleased.incr(containers);
-    allocatedMB.decr(res.getMemory() * containers);
+    allocatedMB.decr(res.getMemorySize() * containers);
     allocatedVCores.decr(res.getVirtualCores() * containers);
     allocatedGPUs.decr(res.getGPUs() * containers);
     QueueMetrics userMetrics = getUserMetrics(user);
@@ -416,9 +467,27 @@ public class QueueMetrics implements MetricsSource {
     }
   }
 
+  /**
+   * Release Resource for container size change.
+   *
+   * @param user
+   * @param res
+   */
+  public void releaseResources(String user, Resource res) {
+    allocatedMB.decr(res.getMemorySize());
+    allocatedVCores.decr(res.getVirtualCores());
+    QueueMetrics userMetrics = getUserMetrics(user);
+    if (userMetrics != null) {
+      userMetrics.releaseResources(user, res);
+    }
+    if (parent != null) {
+      parent.releaseResources(user, res);
+    }
+  }
+
   public void reserveResource(String user, Resource res) {
     reservedContainers.incr();
-    reservedMB.incr(res.getMemory());
+    reservedMB.incr(res.getMemorySize());
     reservedVCores.incr(res.getVirtualCores());
     reservedGPUs.incr(res.getGPUs());
     QueueMetrics userMetrics = getUserMetrics(user);
@@ -432,7 +501,7 @@ public class QueueMetrics implements MetricsSource {
 
   public void unreserveResource(String user, Resource res) {
     reservedContainers.decr();
-    reservedMB.decr(res.getMemory());
+    reservedMB.decr(res.getMemorySize());
     reservedVCores.decr(res.getVirtualCores());
     reservedGPUs.decr(res.getGPUs());
     QueueMetrics userMetrics = getUserMetrics(user);
@@ -473,7 +542,11 @@ public class QueueMetrics implements MetricsSource {
       parent.deactivateApp(user);
     }
   }
-  
+
+  public void addAppAttemptFirstContainerAllocationDelay(long latency) {
+    appAttemptFirstContainerAllocationDelay.add(latency);
+  }
+
   public int getAppsSubmitted() {
     return appsSubmitted.value();
   }
@@ -499,11 +572,11 @@ public class QueueMetrics implements MetricsSource {
   }
   
   public Resource getAllocatedResources() {
-    return BuilderUtils.newResource(allocatedMB.value(), allocatedVCores
-        .value(), allocatedGPUs.value());
+    return BuilderUtils.newResource(allocatedMB.value(),
+        (int) allocatedVCores.value(), allocatedGPUs.value());
   }
 
-  public int getAllocatedMB() {
+  public long getAllocatedMB() {
     return allocatedMB.value();
   }
   
@@ -519,7 +592,7 @@ public class QueueMetrics implements MetricsSource {
     return allocatedContainers.value();
   }
 
-  public int getAvailableMB() {
+  public long getAvailableMB() {
     return availableMB.value();
   }  
   
@@ -529,7 +602,7 @@ public class QueueMetrics implements MetricsSource {
   
   public int getAvailableGPUs() { return availableGPUs.value(); }
 
-  public int getPendingMB() {
+  public long getPendingMB() {
     return pendingMB.value();
   }
   
@@ -545,7 +618,7 @@ public class QueueMetrics implements MetricsSource {
     return pendingContainers.value();
   }
   
-  public int getReservedMB() {
+  public long getReservedMB() {
     return reservedMB.value();
   }
   
@@ -571,5 +644,25 @@ public class QueueMetrics implements MetricsSource {
   
   public MetricsSystem getMetricsSystem() {
     return metricsSystem;
+  }
+
+  public long getAggregateAllocatedContainers() {
+    return aggregateContainersAllocated.value();
+  }
+
+  public long getAggregateNodeLocalContainersAllocated() {
+    return aggregateNodeLocalContainersAllocated.value();
+  }
+
+  public long getAggregateRackLocalContainersAllocated() {
+    return aggregateRackLocalContainersAllocated.value();
+  }
+
+  public long getAggregateOffSwitchContainersAllocated() {
+    return aggregateOffSwitchContainersAllocated.value();
+  }
+
+  public long getAggegatedReleasedContainers() {
+    return aggregateContainersReleased.value();
   }
 }

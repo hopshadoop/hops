@@ -95,7 +95,31 @@ public class RMProxy<T> {
     YarnConfiguration conf = (configuration instanceof YarnConfiguration)
         ? (YarnConfiguration) configuration
         : new YarnConfiguration(configuration);
-    RetryPolicy retryPolicy = createRetryPolicy(conf);
+        RetryPolicy retryPolicy =  createRetryPolicy(conf);
+    return createRMProxy(conf, protocol, instance, retryPolicy, toLeader);
+  }
+
+  /**
+   * Create a proxy for the specified protocol. For non-HA,
+   * this is a direct connection to the ResourceManager address. When HA is
+   * enabled, the proxy handles the failover between the ResourceManagers as
+   * well.
+   */
+  @Private
+  protected static <T> T createRMProxy(final Configuration configuration,
+      final Class<T> protocol, RMProxy instance, final long retryTime,
+      final long retryInterval, boolean toLeader) throws IOException {
+    YarnConfiguration conf = (configuration instanceof YarnConfiguration)
+        ? (YarnConfiguration) configuration
+        : new YarnConfiguration(configuration);
+    RetryPolicy retryPolicy =
+        createRetryPolicy(conf, retryTime, retryInterval);
+    return createRMProxy(conf, protocol, instance, retryPolicy, toLeader);
+  }
+
+  private static <T> T createRMProxy(final YarnConfiguration conf,
+      final Class<T> protocol, RMProxy instance, RetryPolicy retryPolicy, boolean toLeader)
+          throws IOException{
     if (HAUtil.isHAEnabled(conf) || conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
             YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       RMFailoverProxyProvider<T> provider =
@@ -208,6 +232,18 @@ public class RMProxy<T> {
             YarnConfiguration.RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS,
             YarnConfiguration
                 .DEFAULT_RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS);
+    return createRetryPolicy(
+        conf, rmConnectWaitMS, rmConnectionRetryIntervalMS);
+  }
+
+  /**
+   * Fetch retry policy from Configuration and create the
+   * retry policy with specified retryTime and retry interval.
+   */
+  private static RetryPolicy createRetryPolicy(Configuration conf,
+      long retryTime, long retryInterval) {
+    long rmConnectWaitMS = retryTime;
+    long rmConnectionRetryIntervalMS = retryInterval;
 
     boolean waitForEver = (rmConnectWaitMS == -1);
     if (!waitForEver) {
@@ -261,7 +297,8 @@ public class RMProxy<T> {
 
     RetryPolicy retryPolicy = null;
     if (waitForEver) {
-      retryPolicy = RetryPolicies.RETRY_FOREVER;
+      retryPolicy = RetryPolicies.retryForeverWithFixedSleep(
+          rmConnectionRetryIntervalMS, TimeUnit.MILLISECONDS);
     } else {
       retryPolicy =
           RetryPolicies.retryUpToMaximumTimeWithFixedSleep(rmConnectWaitMS,

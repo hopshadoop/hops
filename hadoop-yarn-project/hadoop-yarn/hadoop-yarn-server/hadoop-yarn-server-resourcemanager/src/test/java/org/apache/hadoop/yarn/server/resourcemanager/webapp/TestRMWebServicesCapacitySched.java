@@ -19,20 +19,16 @@
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import java.io.IOException;
 import java.io.StringReader;
 
 import javax.ws.rs.core.MediaType;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
@@ -64,10 +60,14 @@ import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.test.framework.WebAppDescriptor;
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class TestRMWebServicesCapacitySched extends JerseyTestBase {
-
-  private final Log LOG = LogFactory.getLog(TestRMWebServicesCapacitySched.class);
 
   private static MockRM rm;
   private CapacitySchedulerConfiguration csConf;
@@ -98,25 +98,24 @@ public class TestRMWebServicesCapacitySched extends JerseyTestBase {
   private Injector injector = Guice.createInjector(new ServletModule() {
     @Override
     protected void configureServlets() {
-      bind(JAXBContextResolver.class);
-      bind(RMWebServices.class);
-      bind(GenericExceptionHandler.class);
-      csConf = new CapacitySchedulerConfiguration();
-      setupQueueConfiguration(csConf);
-      conf = new YarnConfiguration(csConf);
-      conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
-		    ResourceScheduler.class);
-
       try {
+        bind(JAXBContextResolver.class);
+        bind(RMWebServices.class);
+        bind(GenericExceptionHandler.class);
+        csConf = new CapacitySchedulerConfiguration();
+        setupQueueConfiguration(csConf);
+        conf = new YarnConfiguration(csConf);
+        conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
+            ResourceScheduler.class);
         RMStorageFactory.setConfiguration(conf);
         YarnAPIStorageFactory.setConfiguration(conf);
         DBUtility.InitializeDB();
+        rm = new MockRM(conf);
+        bind(ResourceManager.class).toInstance(rm);
+        serve("/*").with(GuiceContainer.class);
       } catch (IOException ex) {
-        LOG.error(ex, ex);
+        Logger.getLogger(TestRMWebServicesCapacitySched.class.getName()).log(Level.SEVERE, null, ex);
       }
-      rm = new MockRM(conf);
-      bind(ResourceManager.class).toInstance(rm);
-      serve("/*").with(GuiceContainer.class);
     }
   });
 
@@ -331,11 +330,14 @@ public class TestRMWebServicesCapacitySched extends JerseyTestBase {
     JSONObject info = json.getJSONObject("scheduler");
     assertEquals("incorrect number of elements", 1, info.length());
     info = info.getJSONObject("schedulerInfo");
-    assertEquals("incorrect number of elements", 6, info.length());
+    assertEquals("incorrect number of elements", 8, info.length());
     verifyClusterSchedulerGeneric(info.getString("type"),
         (float) info.getDouble("usedCapacity"),
         (float) info.getDouble("capacity"),
         (float) info.getDouble("maxCapacity"), info.getString("queueName"));
+    JSONObject health = info.getJSONObject("health");
+    assertNotNull(health);
+    assertEquals("incorrect number of elements", 3, health.length());
 
     JSONArray arr = info.getJSONObject("queues").getJSONArray("queue");
     assertEquals("incorrect number of elements", 2, arr.length());
@@ -361,10 +363,10 @@ public class TestRMWebServicesCapacitySched extends JerseyTestBase {
   private void verifySubQueue(JSONObject info, String q, 
       float parentAbsCapacity, float parentAbsMaxCapacity)
       throws JSONException, Exception {
-    int numExpectedElements = 13;
+    int numExpectedElements = 18;
     boolean isParentQueue = true;
     if (!info.has("queues")) {
-      numExpectedElements = 25;
+      numExpectedElements = 31;
       isParentQueue = false;
     }
     assertEquals("incorrect number of elements", numExpectedElements, info.length());
@@ -593,6 +595,15 @@ public class TestRMWebServicesCapacitySched extends JerseyTestBase {
         user.getInt("numActiveApplications");
         user.getInt("numPendingApplications");
         checkResourcesUsed(user);
+      }
+
+      // Verify 'queues' field is omitted from CapacitySchedulerLeafQueueInfo.
+      try {
+        b1.getJSONObject("queues");
+        fail("CapacitySchedulerQueueInfo should omit field 'queues'" +
+             "if child queue is empty.");
+      } catch (JSONException je) {
+        assertEquals("JSONObject[\"queues\"] not found.", je.getMessage());
       }
     } finally {
       rm.stop();

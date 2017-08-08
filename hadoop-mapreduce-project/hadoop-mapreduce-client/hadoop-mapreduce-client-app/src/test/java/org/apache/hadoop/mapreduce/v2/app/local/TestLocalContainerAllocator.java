@@ -46,12 +46,12 @@ import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRespo
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerResourceDecrease;
-import org.apache.hadoop.yarn.api.records.ContainerResourceIncrease;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NMToken;
 import org.apache.hadoop.yarn.api.records.NodeReport;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.UpdatedContainer;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -247,15 +247,16 @@ public class TestLocalContainerAllocator {
             amToken.getIdentifier(), amToken.getKind().toString(),
             amToken.getPassword(), amToken.getService().toString());
       }
-      return AllocateResponse.newInstance(responseId,
+      AllocateResponse response = AllocateResponse.newInstance(responseId,
           Collections.<ContainerStatus>emptyList(),
           Collections.<Container>emptyList(),
           Collections.<NodeReport>emptyList(),
           Resources.none(), null, 1, null,
           Collections.<NMToken>emptyList(),
           yarnToken,
-          Collections.<ContainerResourceIncrease>emptyList(),
-          Collections.<ContainerResourceDecrease>emptyList());
+          Collections.<UpdatedContainer>emptyList());
+      response.setApplicationPriority(Priority.newInstance(0));
+      return response;
     }
   }
 }

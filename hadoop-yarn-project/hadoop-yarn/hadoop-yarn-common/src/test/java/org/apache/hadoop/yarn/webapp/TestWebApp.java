@@ -38,6 +38,7 @@ import org.apache.commons.lang.ArrayUtils;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.webapp.view.HtmlPage;
 import org.apache.hadoop.yarn.webapp.view.JQueryUI;
+import org.apache.hadoop.yarn.webapp.view.RobotsTextPage;
 import org.apache.hadoop.yarn.webapp.view.TextPage;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -260,8 +261,33 @@ public class TestWebApp {
     }
   }
 
+  @Test public void testRobotsText() throws Exception {
+    WebApp app =
+        WebApps.$for("test", TestWebApp.class, this, "ws").start(new WebApp() {
+          @Override
+          public void setup() {
+            bind(MyTestJAXBContextResolver.class);
+            bind(MyTestWebService.class);
+          }
+        });
+    String baseUrl = baseUrl(app);
+    try {
+      //using system line separator here since that is what
+      // TextView (via PrintWriter) seems to use.
+      String[] robotsTxtOutput = getContent(baseUrl +
+          RobotsTextPage.ROBOTS_TXT).trim().split(System.getProperty("line"
+          + ".separator"));
+
+      assertEquals(2, robotsTxtOutput.length);
+      assertEquals("User-agent: *", robotsTxtOutput[0]);
+      assertEquals("Disallow: /", robotsTxtOutput[1]);
+    } finally {
+      app.stop();
+    }
+  }
+
   // This is to test the GuiceFilter should only be applied to webAppContext,
-  // not to staticContext  and logContext;
+  // not to logContext;
   @Test public void testYARNWebAppContext() throws Exception {
     // setting up the log context
     System.setProperty("hadoop.log.dir", "/Not/Existing/dir");
@@ -272,8 +298,6 @@ public class TestWebApp {
     });
     String baseUrl = baseUrl(app);
     try {
-      // should not redirect to foo
-      assertFalse("foo".equals(getContent(baseUrl +"static").trim()));
       // Not able to access a non-existing dir, should not redirect to foo.
       assertEquals(404, getResponseCode(baseUrl +"logs"));
       // should be able to redirect to foo.

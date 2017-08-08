@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
+import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.util.Records;
+
 
 /**
  * <p><code>Resource</code> models a set of computer resources in the 
@@ -58,7 +60,16 @@ public abstract class Resource implements Comparable<Resource> {
    */
   public static Resource newInstance(int memory, int vCores) {
     Resource resource = Records.newRecord(Resource.class);
-    resource.setMemory(memory);
+    resource.setMemorySize(memory);
+    resource.setVirtualCores(vCores);
+    return resource;
+  }
+
+  @Public
+  @Stable
+  public static Resource newInstance(long memory, int vCores) {
+    Resource resource = Records.newRecord(Resource.class);
+    resource.setMemorySize(memory);
     resource.setVirtualCores(vCores);
     resource.setGPUs(0);
     return resource;
@@ -73,6 +84,27 @@ public abstract class Resource implements Comparable<Resource> {
     resource.setGPUs(gpus);
     return resource;
   }
+  
+  @Public
+  @Stable
+  public static Resource newInstance(long memory, int vCores, int gpus) {
+    Resource resource = Records.newRecord(Resource.class);
+    resource.setMemorySize(memory);
+    resource.setVirtualCores(vCores);
+    resource.setGPUs(gpus);
+    return resource;
+  }
+
+  /**
+   * This method is DEPRECATED:
+   * Use {@link Resource#getMemorySize()} instead
+   *
+   * Get <em>memory</em> of the resource.
+   * @return <em>memory</em> of the resource
+   */
+  @Public
+  @Deprecated
+  public abstract int getMemory();
 
   /**
    * Get <em>memory</em> of the resource.
@@ -80,15 +112,29 @@ public abstract class Resource implements Comparable<Resource> {
    */
   @Public
   @Stable
-  public abstract int getMemory();
-  
+  public long getMemorySize() {
+    throw new NotImplementedException(
+        "This method is implemented by ResourcePBImpl");
+  }
+
+  /**
+   * Set <em>memory</em> of the resource.
+   * @param memory <em>memory</em> of the resource
+   */
+  @Public
+  @Deprecated
+  public abstract void setMemory(int memory);
+
   /**
    * Set <em>memory</em> of the resource.
    * @param memory <em>memory</em> of the resource
    */
   @Public
   @Stable
-  public abstract void setMemory(int memory);
+  public void setMemorySize(long memory) {
+    throw new NotImplementedException(
+        "This method is implemented by ResourcePBImpl");
+  }
 
 
   /**
@@ -132,8 +178,9 @@ public abstract class Resource implements Comparable<Resource> {
   @Override
   public int hashCode() {
     final int prime = 263167;
-    int result = 3571;
-    result = 939769357 + getMemory(); // prime * result = 939769357 initially
+
+    int result = (int) (939769357
+        + getMemorySize()); // prime * result = 939769357 initially
     result = prime * result + getVirtualCores();
     result = prime * result + getGPUs();
     return result;
@@ -148,8 +195,8 @@ public abstract class Resource implements Comparable<Resource> {
     if (!(obj instanceof Resource))
       return false;
     Resource other = (Resource) obj;
-    if (getMemory() != other.getMemory() ||
-        getVirtualCores() != other.getVirtualCores() ||
+    if (getMemorySize() != other.getMemorySize() ||
+        getVirtualCores() != other.getVirtualCores()||
         getGPUs() != other.getGPUs()) {
       return false;
     }
@@ -158,7 +205,7 @@ public abstract class Resource implements Comparable<Resource> {
 
   @Override
   public String toString() {
-    return "<memory:" + getMemory() + ", vCores:" + getVirtualCores() + ", " +
+    return "<memory:" + getMemorySize() + ", vCores:" + getVirtualCores() + ", "+
         "gpus:" + getGPUs() + ">";
   }
 }

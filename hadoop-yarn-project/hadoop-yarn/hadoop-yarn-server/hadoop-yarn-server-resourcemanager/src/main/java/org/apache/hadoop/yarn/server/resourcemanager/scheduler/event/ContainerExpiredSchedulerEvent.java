@@ -29,14 +29,24 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAlloca
 public class ContainerExpiredSchedulerEvent extends SchedulerEvent {
 
   private final ContainerId containerId;
-  
+  private final boolean increase;
+
   public ContainerExpiredSchedulerEvent(ContainerId containerId) {
+    this(containerId, false);
+  }
+
+  public ContainerExpiredSchedulerEvent(
+      ContainerId containerId, boolean increase) {
     super(SchedulerEventType.CONTAINER_EXPIRED);
     this.containerId = containerId;
+    this.increase = increase;
   }
 
   public ContainerId getContainerId() {
     return containerId;
   }
 
+  public boolean isIncrease() {
+    return increase;
+  }
 }

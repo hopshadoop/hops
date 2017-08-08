@@ -32,6 +32,8 @@ import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMDelegatedNodeLabelsUpdater;
+import org.apache.hadoop.yarn.server.resourcemanager.placement.PlacementManager;
 import org.apache.hadoop.yarn.server.resourcemanager.quota.ContainersLogsService;
 import org.apache.hadoop.yarn.server.resourcemanager.quota.QuotaService;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
@@ -65,7 +67,7 @@ public interface RMContext {
   
   ConcurrentMap<ApplicationId, ByteBuffer> getSystemCredentialsForApps();
 
-  ConcurrentMap<String, RMNode> getInactiveRMNodes();
+  ConcurrentMap<NodeId, RMNode> getInactiveRMNodes();
 
   ConcurrentMap<NodeId, RMNode> getRMNodes();
 
@@ -125,6 +127,11 @@ public interface RMContext {
   
   public void setNodeLabelManager(RMNodeLabelsManager mgr);
 
+  RMDelegatedNodeLabelsUpdater getRMDelegatedNodeLabelsUpdater();
+
+  void setRMDelegatedNodeLabelsUpdater(
+      RMDelegatedNodeLabelsUpdater nodeLabelsUpdater);
+
   long getEpoch();
 
   ReservationSystem getReservationSystem();
@@ -132,6 +139,16 @@ public interface RMContext {
   boolean isSchedulerReadyForAllocatingContainers();
   
   Configuration getYarnConfiguration();
+  
+  PlacementManager getQueuePlacementManager();
+  
+  void setQueuePlacementManager(PlacementManager placementMgr);
+
+  void setLeaderElectorService(EmbeddedElector elector);
+
+  EmbeddedElector getLeaderElectorService();
+
+  String getHAZookeeperConnectionState();
   
   boolean isLeader();
   

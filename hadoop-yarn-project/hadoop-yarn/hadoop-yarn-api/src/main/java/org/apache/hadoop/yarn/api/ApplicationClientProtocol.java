@@ -24,6 +24,8 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.io.retry.Idempotent;
+import org.apache.hadoop.yarn.api.protocolrecords.FailApplicationAttemptRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.FailApplicationAttemptResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterMetricsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterMetricsResponse;
@@ -35,6 +37,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetNewReservationRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetNewReservationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoRequest;
@@ -47,22 +51,27 @@ import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesReq
 import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.ReservationDeleteRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.ReservationDeleteResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.ReservationListRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.ReservationListResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.ReservationSubmissionRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.ReservationSubmissionResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.ReservationUpdateRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.ReservationUpdateResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationPriorityRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationPriorityResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationResponse;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.YarnClusterMetrics;
 import org.apache.hadoop.yarn.exceptions.ApplicationNotFoundException;
-import org.apache.hadoop.yarn.exceptions.InvalidResourceRequestException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
@@ -146,6 +155,32 @@ public interface ApplicationClientProtocol extends ApplicationBaseProtocol {
   
   /**
    * <p>The interface used by clients to request the 
+   * <code>ResourceManager</code> to fail an application attempt.</p>
+   *
+   * <p>The client, via {@link FailApplicationAttemptRequest} provides the
+   * {@link ApplicationAttemptId} of the attempt to be failed.</p>
+   *
+   * <p> In secure mode,the <code>ResourceManager</code> verifies access to the
+   * application, queue etc. before failing the attempt.</p>
+   *
+   * <p>Currently, the <code>ResourceManager</code> returns an empty response
+   * on success and throws an exception on rejecting the request.</p>
+   *
+   * @param request request to fail an attempt
+   * @return <code>ResourceManager</code> returns an empty response
+   *         on success and throws an exception on rejecting the request
+   * @throws YarnException
+   * @throws IOException
+   * @see #getQueueUserAcls(GetQueueUserAclsInfoRequest)
+   */
+  @Public
+  @Unstable
+  public FailApplicationAttemptResponse failApplicationAttempt(
+      FailApplicationAttemptRequest request)
+  throws YarnException, IOException;
+
+  /**
+   * <p>The interface used by clients to request the
    * <code>ResourceManager</code> to abort submitted application.</p>
    * 
    * <p>The client, via {@link KillApplicationRequest} provides the
@@ -269,6 +304,28 @@ public interface ApplicationClientProtocol extends ApplicationBaseProtocol {
       MoveApplicationAcrossQueuesRequest request) throws YarnException, IOException;
 
   /**
+   * <p>The interface used by clients to obtain a new {@link ReservationId} for
+   * submitting new reservations.</p>
+   *
+   * <p>The <code>ResourceManager</code> responds with a new, unique,
+   * {@link ReservationId} which is used by the client to submit
+   * a new reservation.</p>
+   *
+   * @param request to get a new <code>ReservationId</code>
+   * @return response containing the new <code>ReservationId</code> to be used
+   * to submit a new reservation
+   * @throws YarnException if the reservation system is not enabled.
+   * @throws IOException on IO failures.
+   * @see #submitReservation(ReservationSubmissionRequest)
+   */
+  @Public
+  @Unstable
+  @Idempotent
+  GetNewReservationResponse getNewReservation(
+          GetNewReservationRequest request)
+          throws YarnException, IOException;
+
+  /**
    * <p>
    * The interface used by clients to submit a new reservation to the
    * {@code ResourceManager}.
@@ -316,6 +373,7 @@ public interface ApplicationClientProtocol extends ApplicationBaseProtocol {
    */
   @Public
   @Unstable
+  @Idempotent
   public ReservationSubmissionResponse submitReservation(
       ReservationSubmissionRequest request) throws YarnException, IOException;
 
@@ -367,12 +425,57 @@ public interface ApplicationClientProtocol extends ApplicationBaseProtocol {
    * @throws YarnException if the request is invalid or reservation cannot be
    *           deleted successfully
    * @throws IOException
-   * 
+   *
    */
   @Public
   @Unstable
   public ReservationDeleteResponse deleteReservation(
       ReservationDeleteRequest request) throws YarnException, IOException;
+
+  /**
+   * <p>
+   * The interface used by clients to get the list of reservations in a plan.
+   * The reservationId will be used to search for reservations to list if it is
+   * provided. Otherwise, it will select active reservations within the
+   * startTime and endTime (inclusive).
+   * </p>
+   *
+   * @param request to list reservations in a plan. Contains fields to select
+   *                String queue, ReservationId reservationId, long startTime,
+   *                long endTime, and a bool includeReservationAllocations.
+   *
+   *                queue: Required. Cannot be null or empty. Refers to the
+   *                reservable queue in the scheduler that was selected when
+   *                creating a reservation submission
+   *                {@link ReservationSubmissionRequest}.
+   *
+   *                reservationId: Optional. If provided, other fields will
+   *                be ignored.
+   *
+   *                startTime: Optional. If provided, only reservations that
+   *                end after the startTime will be selected. This defaults
+   *                to 0 if an invalid number is used.
+   *
+   *                endTime: Optional. If provided, only reservations that
+   *                start on or before endTime will be selected. This defaults
+   *                to Long.MAX_VALUE if an invalid number is used.
+   *
+   *                includeReservationAllocations: Optional. Flag that
+   *                determines whether the entire reservation allocations are
+   *                to be returned. Reservation allocations are subject to
+   *                change in the event of re-planning as described by
+   *                {@code ReservationDefinition}.
+   *
+   * @return response that contains information about reservations that are
+   *                being searched for.
+   * @throws YarnException if the request is invalid
+   * @throws IOException on IO failures
+   *
+   */
+  @Public
+  @Unstable
+  ReservationListResponse listReservations(
+            ReservationListRequest request) throws YarnException, IOException;
 
   /**
    * <p>
@@ -419,4 +522,48 @@ public interface ApplicationClientProtocol extends ApplicationBaseProtocol {
   @Unstable
   public GetClusterNodeLabelsResponse getClusterNodeLabels(
       GetClusterNodeLabelsRequest request) throws YarnException, IOException;
+
+  /**
+   * <p>
+   * The interface used by client to set priority of an application.
+   * </p>
+   * @param request to set priority of an application
+   * @return an empty response
+   * @throws YarnException
+   * @throws IOException
+   */
+  @Public
+  @Unstable
+  @Idempotent
+  public UpdateApplicationPriorityResponse updateApplicationPriority(
+      UpdateApplicationPriorityRequest request) throws YarnException,
+      IOException;
+
+  /**
+   * <p>The interface used by clients to request the
+   * <code>ResourceManager</code> to signal a container. For example,
+   * the client can send command OUTPUT_THREAD_DUMP to dump threads of the
+   * container.</p>
+   *
+   * <p>The client, via {@link SignalContainerRequest} provides the
+   * id of the container and the signal command. </p>
+   *
+   * <p> In secure mode,the <code>ResourceManager</code> verifies access to the
+   * application before signaling the container.
+   * The user needs to have <code>MODIFY_APP</code> permission.</p>
+   *
+   * <p>Currently, the <code>ResourceManager</code> returns an empty response
+   * on success and throws an exception on rejecting the request.</p>
+   *
+   * @param request request to signal a container
+   * @return <code>ResourceManager</code> returns an empty response
+   *         on success and throws an exception on rejecting the request
+   * @throws YarnException
+   * @throws IOException
+   */
+  @Public
+  @Unstable
+  SignalContainerResponse signalToContainer(
+      SignalContainerRequest request) throws YarnException,
+      IOException;
 }

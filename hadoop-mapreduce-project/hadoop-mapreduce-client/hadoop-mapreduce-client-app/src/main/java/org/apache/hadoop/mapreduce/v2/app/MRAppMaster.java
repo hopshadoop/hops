@@ -21,6 +21,7 @@ package org.apache.hadoop.mapreduce.v2.app;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -34,6 +35,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
@@ -42,6 +45,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.mapred.FileOutputCommitter;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.LocalContainerLauncher;
@@ -209,6 +213,14 @@ public class MRAppMaster extends CompositeService {
   private SpeculatorEventDispatcher speculatorEventDispatcher;
   private byte[] encryptedSpillKey;
 
+  // After a task attempt completes from TaskUmbilicalProtocol's point of view,
+  // it will be transitioned to finishing state.
+  // taskAttemptFinishingMonitor is just a timer for attempts in finishing
+  // state. If the attempt stays in finishing state for too long,
+  // taskAttemptFinishingMonitor will notify the attempt via TA_TIMED_OUT
+  // event.
+  private TaskAttemptFinishingMonitor taskAttemptFinishingMonitor;
+
   private Job job;
   private Credentials jobCredentials = new Credentials(); // Filled during init
   protected UserGroupInformation currentUser; // Will be setup during init
@@ -221,7 +233,8 @@ public class MRAppMaster extends CompositeService {
   JobStateInternal forcedState = null;
   private final ScheduledExecutorService logSyncer;
 
-  private long recoveredJobStartTime = 0;
+  private long recoveredJobStartTime = -1L;
+  private static boolean mainStarted = false;
 
   @VisibleForTesting
   protected AtomicBoolean successfullyUnregistered =
@@ -250,6 +263,12 @@ public class MRAppMaster extends CompositeService {
     logSyncer = TaskLog.createLogSyncer();
     LOG.info("Created MRAppMaster for application " + applicationAttemptId);
   }
+  protected TaskAttemptFinishingMonitor createTaskAttemptFinishingMonitor(
+      EventHandler eventHandler) {
+    TaskAttemptFinishingMonitor monitor =
+        new TaskAttemptFinishingMonitor(eventHandler);
+    return monitor;
+  }
 
   @Override
   protected void serviceInit(final Configuration conf) throws Exception {
@@ -260,7 +279,11 @@ public class MRAppMaster extends CompositeService {
 
     initJobCredentialsAndUGI(conf);
 
-    context = new RunningAppContext(conf);
+    dispatcher = createDispatcher();
+    addIfService(dispatcher);
+    taskAttemptFinishingMonitor = createTaskAttemptFinishingMonitor(dispatcher.getEventHandler());
+    addIfService(taskAttemptFinishingMonitor);
+    context = new RunningAppContext(conf, taskAttemptFinishingMonitor);
 
     // Job name is the same as the app name util we support DAG of jobs
     // for an app later
@@ -313,10 +336,14 @@ public class MRAppMaster extends CompositeService {
             " because a commit was started.");
         copyHistory = true;
         if (commitSuccess) {
-          shutDownMessage = "We crashed after successfully committing. Recovering.";
+          shutDownMessage =
+              "Job commit succeeded in a prior MRAppMaster attempt " +
+              "before it crashed. Recovering.";
           forcedState = JobStateInternal.SUCCEEDED;
         } else if (commitFailure) {
-          shutDownMessage = "We crashed after a commit failure.";
+          shutDownMessage =
+              "Job commit failed in a prior MRAppMaster attempt " +
+              "before it crashed. Not retrying.";
           forcedState = JobStateInternal.FAILED;
         } else {
           if (isCommitJobRepeatable()) {
@@ -326,7 +353,9 @@ public class MRAppMaster extends CompositeService {
             cleanupInterruptedCommit(conf, fs, startCommitFile);
           } else {
             //The commit is still pending, commit error
-            shutDownMessage = "We crashed durring a commit";
+            shutDownMessage =
+                "Job commit from a prior MRAppMaster attempt is " +
+                "potentially in progress. Preventing multiple commit executions";
             forcedState = JobStateInternal.ERROR;
           }
         }
@@ -334,11 +363,8 @@ public class MRAppMaster extends CompositeService {
     } catch (IOException e) {
       throw new YarnRuntimeException("Error while initializing", e);
     }
-    
+
     if (errorHappenedShutDown) {
-      dispatcher = createDispatcher();
-      addIfService(dispatcher);
-      
       NoopEventHandler eater = new NoopEventHandler();
       //We do not have a JobEventDispatcher in this path
       dispatcher.register(JobEventType.class, eater);
@@ -383,9 +409,6 @@ public class MRAppMaster extends CompositeService {
         addIfService(cpHist);
       }
     } else {
-
-      dispatcher = createDispatcher();
-      addIfService(dispatcher);
 
       //service to handle requests from JobClient
       clientService = createClientService(context);
@@ -528,9 +551,27 @@ public class MRAppMaster extends CompositeService {
     });
   }
 
-  protected boolean keepJobFiles(JobConf conf) {
-    return (conf.getKeepTaskFilesPattern() != null || conf
-        .getKeepFailedTaskFiles());
+  private boolean isJobNamePatternMatch(JobConf conf, String jobTempDir) {
+    // Matched staging files should be preserved after job is finished.
+    if (conf.getKeepTaskFilesPattern() != null && jobTempDir != null) {
+      String jobFileName = Paths.get(jobTempDir).getFileName().toString();
+      Pattern pattern = Pattern.compile(conf.getKeepTaskFilesPattern());
+      Matcher matcher = pattern.matcher(jobFileName);
+      return matcher.find();
+    } else {
+      return false;
+    }
+  }
+
+  private boolean isKeepFailedTaskFiles(JobConf conf) {
+    // TODO: Decide which failed task files that should
+    // be kept are in application log directory.
+    return conf.getKeepFailedTaskFiles();
+  }
+
+  protected boolean keepJobFiles(JobConf conf, String jobTempDir) {
+    return isJobNamePatternMatch(conf, jobTempDir)
+            || isKeepFailedTaskFiles(conf);
   }
   
   /**
@@ -553,10 +594,10 @@ public class MRAppMaster extends CompositeService {
    */
   public void cleanupStagingDir() throws IOException {
     /* make sure we clean the staging files */
-    String jobTempDir = null;
+    String jobTempDir = getConfig().get(MRJobConfig.MAPREDUCE_JOB_DIR);
     FileSystem fs = getFileSystem(getConfig());
     try {
-      if (!keepJobFiles(new JobConf(getConfig()))) {
+      if (!keepJobFiles(new JobConf(getConfig()), jobTempDir)) {
         jobTempDir = getConfig().get(MRJobConfig.MAPREDUCE_JOB_DIR);
         if (jobTempDir == null) {
           LOG.warn("Job Staging directory is null");
@@ -590,7 +631,7 @@ public class MRAppMaster extends CompositeService {
       //if isLastAMRetry comes as true, should never set it to false
       if ( !isLastAMRetry){
         if (((JobImpl)job).getInternalState() != JobStateInternal.REBOOT) {
-          LOG.info("We are finishing cleanly so this is the last retry");
+          LOG.info("Job finished cleanly, recording last MRAppMaster retry");
           isLastAMRetry = true;
         }
       }
@@ -632,11 +673,37 @@ public class MRAppMaster extends CompositeService {
       clientService.stop();
     } catch (Throwable t) {
       LOG.warn("Graceful stop failed. Exiting.. ", t);
-      ExitUtil.terminate(1, t);
+      exitMRAppMaster(1, t);
     }
-
+    exitMRAppMaster(0, null);
   }
- 
+
+  /** MRAppMaster exit method which has been instrumented for both runtime and
+   *  unit testing.
+   * If the main thread has not been started, this method was called from a
+   * test. In that case, configure the ExitUtil object to not exit the JVM.
+   *
+   * @param status integer indicating exit status
+   * @param t throwable exception that could be null
+   */
+  private void exitMRAppMaster(int status, Throwable t) {
+    if (!mainStarted) {
+      ExitUtil.disableSystemExit();
+    }
+    try {
+      if (t != null) {
+        ExitUtil.terminate(status, t);
+      } else {
+        ExitUtil.terminate(status);
+      }
+    } catch (ExitUtil.ExitException ee) {
+      // ExitUtil.ExitException is only thrown from the ExitUtil test code when
+      // SystemExit has been disabled. It is always thrown in in the test code,
+      // even when no error occurs. Ignore the exception so that tests don't
+      // need to handle it.
+    }
+  }
+
   private class JobFinishEventHandler implements EventHandler<JobFinishEvent> {
     @Override
     public void handle(JobFinishEvent event) {
@@ -929,7 +996,7 @@ public class MRAppMaster extends CompositeService {
     protected void serviceStart() throws Exception {
       if (job.isUber()) {
         this.containerLauncher = new LocalContainerLauncher(context,
-            (TaskUmbilicalProtocol) taskAttemptListener);
+            (TaskUmbilicalProtocol) taskAttemptListener, jobClassLoader);
         ((LocalContainerLauncher) this.containerLauncher)
                 .setEncryptedSpillKey(encryptedSpillKey);
       } else {
@@ -980,10 +1047,14 @@ public class MRAppMaster extends CompositeService {
     private final ClusterInfo clusterInfo = new ClusterInfo();
     private final ClientToAMTokenSecretManager clientToAMTokenSecretManager;
 
-    public RunningAppContext(Configuration config) {
+    private final TaskAttemptFinishingMonitor taskAttemptFinishingMonitor;
+
+    public RunningAppContext(Configuration config,
+        TaskAttemptFinishingMonitor taskAttemptFinishingMonitor) {
       this.conf = config;
       this.clientToAMTokenSecretManager =
           new ClientToAMTokenSecretManager(appAttemptID, null);
+      this.taskAttemptFinishingMonitor = taskAttemptFinishingMonitor;
     }
 
     @Override
@@ -1068,6 +1139,12 @@ public class MRAppMaster extends CompositeService {
     public String getNMHostname() {
       return nmHost;
     }
+
+    @Override
+    public TaskAttemptFinishingMonitor getTaskAttemptFinishingMonitor() {
+      return taskAttemptFinishingMonitor;
+    }
+
   }
 
   @SuppressWarnings("unchecked")
@@ -1160,11 +1237,15 @@ public class MRAppMaster extends CompositeService {
       startJobs();
     }
   }
-  
+
+  protected void shutdownTaskLog() {
+    TaskLog.syncLogsShutdown(logSyncer);
+  }
+
   @Override
   public void stop() {
     super.stop();
-    TaskLog.syncLogsShutdown(logSyncer);
+    shutdownTaskLog();
   }
 
   private boolean isRecoverySupported() throws IOException {
@@ -1440,6 +1521,7 @@ public class MRAppMaster extends CompositeService {
 
   public static void main(String[] args) {
     try {
+      mainStarted = true;
       Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
       String containerIdStr =
           System.getenv(Environment.CONTAINER_ID.name());
@@ -1459,9 +1541,13 @@ public class MRAppMaster extends CompositeService {
       validateInputParam(appSubmitTimeStr,
           ApplicationConstants.APP_SUBMIT_TIME_ENV);
 
-      ContainerId containerId = ConverterUtils.toContainerId(containerIdStr);
+      ContainerId containerId = ContainerId.fromString(containerIdStr);
       ApplicationAttemptId applicationAttemptId =
           containerId.getApplicationAttemptId();
+      if (applicationAttemptId != null) {
+        CallerContext.setCurrent(new CallerContext.Builder(
+            "mr_appmaster_" + applicationAttemptId.toString()).build());
+      }
       long appSubmitTime = Long.parseLong(appSubmitTimeStr);
       
       
@@ -1475,6 +1561,12 @@ public class MRAppMaster extends CompositeService {
       conf.addResource(new Path(MRJobConfig.JOB_CONF_FILE));
       
       MRWebAppUtil.initialize(conf);
+      // log the system properties
+      String systemPropsToLog = MRApps.getSystemPropertiesToLog(conf);
+      if (systemPropsToLog != null) {
+        LOG.info(systemPropsToLog);
+      }
+
       String jobUserName = System
           .getenv(ApplicationConstants.Environment.USER.name());
       conf.set(MRJobConfig.USER_NAME, jobUserName);
@@ -1654,10 +1746,14 @@ public class MRAppMaster extends CompositeService {
     T call(Configuration conf) throws Exception;
   }
 
+  protected void shutdownLogManager() {
+    LogManager.shutdown();
+  }
+
   @Override
   protected void serviceStop() throws Exception {
     super.serviceStop();
-    LogManager.shutdown();
+    shutdownLogManager();
   }
 
   public ClientService getClientService() {

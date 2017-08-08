@@ -33,7 +33,6 @@ import javax.management.ObjectName;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Locale;
 import static com.google.common.base.Preconditions.*;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -105,7 +104,7 @@ public class MetricsSystemImpl extends MetricsSystem implements MetricsSource {
   private Map<String, MetricsConfig> sourceConfigs, sinkConfigs;
   private boolean monitoring = false;
   private Timer timer;
-  private int period; // seconds
+  private long period; // milliseconds
   private long logicalTime; // number of timer invocations * period
   private ObjectName mbeanName;
   private boolean publishSelfMetrics = true;
@@ -255,6 +254,7 @@ public class MetricsSystemImpl extends MetricsSystem implements MetricsSource {
     if (namedCallbacks.containsKey(name)) {
       namedCallbacks.remove(name);
     }
+    DefaultMetricsSystem.removeSourceName(name);
   }
 
   synchronized
@@ -262,7 +262,7 @@ public class MetricsSystemImpl extends MetricsSystem implements MetricsSource {
     checkNotNull(config, "config");
     MetricsConfig conf = sourceConfigs.get(name);
     MetricsSourceAdapter sa = new MetricsSourceAdapter(prefix, name, desc,
-        source, injectedTags, period * 1000L, conf != null ? conf
+        source, injectedTags, period, conf != null ? conf
             : config.subset(SOURCE_KEY));
     sources.put(name, sa);
     sa.start();
@@ -360,19 +360,19 @@ public class MetricsSystemImpl extends MetricsSystem implements MetricsSource {
       return;
     }
     logicalTime = 0;
-    long millis = period * 1000L;
+    long millis = period;
     timer = new Timer("Timer for '"+ prefix +"' metrics system", true);
     timer.scheduleAtFixedRate(new TimerTask() {
           public void run() {
             try {
               onTimerEvent();
-            }
-            catch (Exception e) {
-              LOG.warn(e);
+            } catch (Exception e) {
+              LOG.warn("Error invoking metrics timer", e);
             }
           }
         }, millis, millis);
-    LOG.info("Scheduled snapshot period at "+ period +" second(s).");
+    LOG.info("Scheduled Metric snapshot period at " + (period / 1000)
+        + " second(s).");
   }
 
   synchronized void onTimerEvent() {
@@ -487,12 +487,15 @@ public class MetricsSystemImpl extends MetricsSystem implements MetricsSource {
 
   private synchronized void configureSinks() {
     sinkConfigs = config.getInstanceConfigs(SINK_KEY);
-    int confPeriod = 0;
+    long confPeriodMillis = 0;
     for (Entry<String, MetricsConfig> entry : sinkConfigs.entrySet()) {
       MetricsConfig conf = entry.getValue();
       int sinkPeriod = conf.getInt(PERIOD_KEY, PERIOD_DEFAULT);
-      confPeriod = confPeriod == 0 ? sinkPeriod
-                                   : ArithmeticUtils.gcd(confPeriod, sinkPeriod);
+      // Support configuring periodMillis for testing.
+      long sinkPeriodMillis =
+          conf.getLong(PERIOD_MILLIS_KEY, sinkPeriod * 1000);
+      confPeriodMillis = confPeriodMillis == 0 ? sinkPeriodMillis
+          : ArithmeticUtils.gcd(confPeriodMillis, sinkPeriodMillis);
       String clsName = conf.getClassName("");
       if (clsName == null) continue;  // sink can be registered later on
       String sinkName = entry.getKey();
@@ -506,8 +509,9 @@ public class MetricsSystemImpl extends MetricsSystem implements MetricsSource {
         LOG.warn("Error creating sink '"+ sinkName +"'", e);
       }
     }
-    period = confPeriod > 0 ? confPeriod
-                            : config.getInt(PERIOD_KEY, PERIOD_DEFAULT);
+    long periodSec = config.getInt(PERIOD_KEY, PERIOD_DEFAULT);
+    period = confPeriodMillis > 0 ? confPeriodMillis
+        : config.getLong(PERIOD_MILLIS_KEY, periodSec * 1000);
   }
 
   static MetricsSinkAdapter newSink(String name, String desc, MetricsSink sink,
@@ -554,7 +558,7 @@ public class MetricsSystemImpl extends MetricsSystem implements MetricsSource {
   private void registerSystemSource() {
     MetricsConfig sysConf = sourceConfigs.get(MS_NAME);
     sysSource = new MetricsSourceAdapter(prefix, MS_STATS_NAME, MS_STATS_DESC,
-        MetricsAnnotations.makeSource(this), injectedTags, period * 1000L,
+        MetricsAnnotations.makeSource(this), injectedTags, period,
         sysConf == null ? config.subset(SOURCE_KEY) : sysConf);
     sysSource.start();
   }

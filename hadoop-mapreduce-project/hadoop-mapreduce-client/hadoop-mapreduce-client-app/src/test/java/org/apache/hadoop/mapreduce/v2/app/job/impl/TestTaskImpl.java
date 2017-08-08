@@ -145,6 +145,8 @@ public class TestTaskImpl {
 
     private float progress = 0;
     private TaskAttemptState state = TaskAttemptState.NEW;
+    boolean rescheduled = false;
+    boolean containerAssigned = false;
     private TaskType taskType;
     private Counters attemptCounters = TaskAttemptImpl.EMPTY_COUNTERS;
 
@@ -156,6 +158,15 @@ public class TestTaskImpl {
       super(taskId, id, eventHandler, taskAttemptListener, jobFile, partition, conf,
           dataLocations, jobToken, credentials, clock, appContext);
       this.taskType = taskType;
+    }
+
+    public void assignContainer() {
+      containerAssigned = true;
+    }
+
+    @Override
+    boolean isContainerAssigned() {
+      return containerAssigned;
     }
 
     public TaskAttemptId getAttemptId() {
@@ -178,9 +189,18 @@ public class TestTaskImpl {
     public void setState(TaskAttemptState state) {
       this.state = state;
     }
-    
+
+    @Override
     public TaskAttemptState getState() {
       return state;
+    }
+
+    public boolean getRescheduled() {
+      return this.rescheduled;
+    }
+
+    public void setRescheduled(boolean rescheduled) {
+      this.rescheduled = rescheduled;
     }
 
     @Override
@@ -291,7 +311,9 @@ public class TestTaskImpl {
   private void launchTaskAttempt(TaskAttemptId attemptId) {
     mockTask.handle(new TaskTAttemptEvent(attemptId, 
         TaskEventType.T_ATTEMPT_LAUNCHED));
-    assertTaskRunningState();    
+    ((MockTaskAttemptImpl)(mockTask.getAttempt(attemptId)))
+        .assignContainer();
+    assertTaskRunningState();
   }
   
   private void commitTaskAttempt(TaskAttemptId attemptId) {
@@ -748,6 +770,71 @@ public class TestTaskImpl {
     mockTask.handle(new TaskTAttemptKilledEvent(taskAttempt.getAttemptId(),
         false));
     assertEquals(TaskState.FAILED, mockTask.getState());
+  }
+
+  private class PartialAttemptEventHandler implements EventHandler {
+
+    @Override
+    public void handle(Event event) {
+      if (event instanceof TaskAttemptEvent)
+        if (event.getType() == TaskAttemptEventType.TA_RESCHEDULE) {
+          TaskAttempt attempt = mockTask.getAttempt(((TaskAttemptEvent) event).getTaskAttemptID());
+          ((MockTaskAttemptImpl)attempt).setRescheduled(true);
+        }
+    }
+  }
+
+  @Test
+  public void testFailedTransitionWithHangingSpeculativeMap() {
+    mockTask = new MockTaskImpl(jobId, partition, new PartialAttemptEventHandler(),
+        remoteJobConfFile, conf, taskAttemptListener, jobToken,
+        credentials, clock, startCount, metrics, appContext, TaskType.MAP) {
+      @Override
+      protected int getMaxAttempts() {
+        return 4;
+      }
+    };
+
+    // start a new task, schedule and launch a new attempt
+    TaskId taskId = getNewTaskID();
+    scheduleTaskAttempt(taskId);
+    launchTaskAttempt(getLastAttempt().getAttemptId());
+
+    // add a speculative attempt(#2), but not launch it
+    mockTask.handle(new TaskTAttemptEvent(getLastAttempt().getAttemptId(),
+        TaskEventType.T_ADD_SPEC_ATTEMPT));
+
+    // have the first attempt(#1) fail, verify task still running since the
+    // max attempts is 4
+    MockTaskAttemptImpl taskAttempt = taskAttempts.get(0);
+    taskAttempt.setState(TaskAttemptState.FAILED);
+    mockTask.handle(new TaskTAttemptEvent(taskAttempt.getAttemptId(),
+        TaskEventType.T_ATTEMPT_FAILED));
+    assertEquals(TaskState.RUNNING, mockTask.getState());
+
+    // verify a new attempt(#3) added because the speculative attempt(#2)
+    // is hanging
+    assertEquals(3, taskAttempts.size());
+
+    // verify the speculative attempt(#2) is not a rescheduled attempt
+    assertEquals(false, taskAttempts.get(1).getRescheduled());
+
+    // verify the third attempt is a rescheduled attempt
+    assertEquals(true, taskAttempts.get(2).getRescheduled());
+
+    // now launch the latest attempt(#3) and set the internal state to running
+    launchTaskAttempt(getLastAttempt().getAttemptId());
+
+    // have the speculative attempt(#2) fail, verify task still since it
+    // hasn't reach the max attempts which is 4
+    MockTaskAttemptImpl taskAttempt1 = taskAttempts.get(1);
+    taskAttempt1.setState(TaskAttemptState.FAILED);
+    mockTask.handle(new TaskTAttemptEvent(taskAttempt1.getAttemptId(),
+        TaskEventType.T_ATTEMPT_FAILED));
+    assertEquals(TaskState.RUNNING, mockTask.getState());
+
+    // verify there's no new attempt added because of the running attempt(#3)
+    assertEquals(3, taskAttempts.size());
   }
 
   @Test

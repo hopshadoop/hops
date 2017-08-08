@@ -23,12 +23,15 @@ import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.ssl.HopsSSLTestUtils;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
+import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.LocalResource;
@@ -44,6 +47,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -51,6 +55,7 @@ import org.junit.runners.Parameterized;
 import javax.net.ssl.SSLException;
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -163,6 +168,18 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
         assertNotNull(newAppRes);
         LOG.debug("I have gotten the new application");
         
+        List<ApplicationReport> appsReport = acClient.getApplications(
+            GetApplicationsRequest.newInstance()).getApplicationList();
+        boolean found = false;
+        
+        for (ApplicationReport appRep : appsReport) {
+            if (appRep.getApplicationId().equals(appCtx.getApplicationId())) {
+                found = true;
+                break;
+            }
+        }
+        
+        assertTrue(found);
         TimeUnit.SECONDS.sleep(10);
     }
     

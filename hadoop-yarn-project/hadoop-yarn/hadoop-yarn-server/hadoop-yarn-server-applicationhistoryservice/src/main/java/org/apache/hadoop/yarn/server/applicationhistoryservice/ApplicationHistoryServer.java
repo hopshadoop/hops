@@ -36,6 +36,7 @@ import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.GenericOptionsParser;
+import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
@@ -77,6 +78,7 @@ public class ApplicationHistoryServer extends CompositeService {
   private TimelineDelegationTokenSecretManagerService secretManagerService;
   private TimelineDataManager timelineDataManager;
   private WebApp webApp;
+  private JvmPauseMonitor pauseMonitor;
 
   public ApplicationHistoryServer() {
     super(ApplicationHistoryServer.class.getName());
@@ -84,7 +86,14 @@ public class ApplicationHistoryServer extends CompositeService {
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    // init timeline services first
+
+    // do security login first.
+    try {
+      doSecureLogin(conf);
+    } catch(IOException ie) {
+      throw new YarnRuntimeException("Failed to login", ie);
+    }
+    // init timeline services
     timelineStore = createTimelineStore(conf);
     addIfService(timelineStore);
     secretManagerService = createTimelineDelegationTokenSecretManagerService(conf);
@@ -100,17 +109,14 @@ public class ApplicationHistoryServer extends CompositeService {
     addService((Service) historyManager);
 
     DefaultMetricsSystem.initialize("ApplicationHistoryServer");
-    JvmMetrics.initSingleton("ApplicationHistoryServer", null);
+    JvmMetrics jm = JvmMetrics.initSingleton("ApplicationHistoryServer", null);
+    pauseMonitor = new JvmPauseMonitor(conf);
+    jm.setPauseMonitor(pauseMonitor);
     super.serviceInit(conf);
   }
 
   @Override
   protected void serviceStart() throws Exception {
-    try {
-      doSecureLogin(getConfig());
-    } catch(IOException ie) {
-      throw new YarnRuntimeException("Failed to login", ie);
-    }
     super.serviceStart();
     startWebApp();
   }
@@ -120,7 +126,9 @@ public class ApplicationHistoryServer extends CompositeService {
     if (webApp != null) {
       webApp.stop();
     }
-
+    if (pauseMonitor != null) {
+      pauseMonitor.stop();
+    }
     DefaultMetricsSystem.shutdown();
     super.serviceStop();
   }
@@ -223,8 +231,9 @@ public class ApplicationHistoryServer extends CompositeService {
   }
 
   private TimelineDataManager createTimelineDataManager(Configuration conf) {
-    return new TimelineDataManager(
-        timelineStore, new TimelineACLsManager(conf));
+    TimelineACLsManager aclsMgr = new TimelineACLsManager(conf);
+    aclsMgr.setTimelineStore(timelineStore);
+    return new TimelineDataManager(timelineStore, aclsMgr);
   }
 
   @SuppressWarnings("unchecked")

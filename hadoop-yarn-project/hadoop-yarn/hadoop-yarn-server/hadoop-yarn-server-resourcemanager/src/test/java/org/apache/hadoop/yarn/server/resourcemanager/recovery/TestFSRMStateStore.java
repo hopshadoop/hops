@@ -119,6 +119,11 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
       this.store = new TestFileSystemRMStore(conf);
       Assert.assertEquals(store.getNumRetries(), 20);
       Assert.assertEquals(store.getRetryInterval(), 900L);
+      Assert.assertTrue(store.fs.getConf() == store.fsConf);
+      FileSystem previousFs = store.fs;
+      store.startInternal();
+      Assert.assertTrue(store.fs != previousFs);
+      Assert.assertTrue(store.fs.getConf() == store.fsConf);
       return store;
     }
 
@@ -163,7 +168,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
               (FileSystemRMStateStore) fsTester.getRMStateStore();
       String appAttemptIdStr3 = "appattempt_1352994193343_0001_000003";
       ApplicationAttemptId attemptId3 =
-              ConverterUtils.toApplicationAttemptId(appAttemptIdStr3);
+          ApplicationAttemptId.fromString(appAttemptIdStr3);
       Path appDir =
               fsTester.store.getAppDir(attemptId3.getApplicationId().toString());
       Path tempAppAttemptFile =
@@ -180,7 +185,9 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
       testEpoch(fsTester);
       testAppDeletion(fsTester);
       testDeleteStore(fsTester);
+      testRemoveApplication(fsTester);
       testAMRMTokenSecretManagerStateStore(fsTester);
+      testReservationStateStore(fsTester);
     } finally {
       cluster.shutdown();
     }
@@ -342,7 +349,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
     // imitate appAttemptFile1 is still .new, but old one is deleted
     String appAttemptIdStr1 = "appattempt_1352994193343_0001_000001";
     ApplicationAttemptId attemptId1 =
-        ConverterUtils.toApplicationAttemptId(appAttemptIdStr1);
+        ApplicationAttemptId.fromString(appAttemptIdStr1);
     Path appDir =
             fsTester.store.getAppDir(attemptId1.getApplicationId().toString());
     Path appAttemptFile1 =
@@ -387,7 +394,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
             store.storeApplicationStateInternal(
                 ApplicationId.newInstance(100L, 1),
                 ApplicationStateData.newInstance(111, 111, "user", null,
-                    RMAppState.ACCEPTED, "diagnostics", 333));
+                    RMAppState.ACCEPTED, "diagnostics", 333, null));
           } catch (Exception e) {
             assertionFailedInThread.set(true);
             e.printStackTrace();

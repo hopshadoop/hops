@@ -59,8 +59,6 @@ public class ContainersLogsService extends CompositeService {
   private long monitorInterval; //Time in ms till next ContainerStatus read
   private boolean checkpointEnabled;
   private int checkpointInterval; //Time in ticks between checkpoints
-  private double alertThreshold;
-  private double threshold;
   private final RMContext rMContext;
   private float currentMultiplicator; // This variable will be set/updated by the streaming service.
   private long multiplicatorPeirod;
@@ -104,12 +102,7 @@ public class ContainersLogsService extends CompositeService {
             YarnConfiguration.DEFAULT_QUOTA_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS)
             * this.conf.getInt(YarnConfiguration.QUOTA_MIN_TICKS_CHARGE,
                     YarnConfiguration.DEFAULT_QUOTA_MIN_TICKS_CHARGE);
-    this.alertThreshold = this.conf.getDouble(
-            YarnConfiguration.QUOTA_CONTAINERS_LOGS_ALERT_THRESHOLD,
-            YarnConfiguration.DEFAULT_QUOTA_CONTAINERS_LOGS_ALERT_THRESHOLD);
-    // Calculate execution time warning threshold
-    this.threshold = this.monitorInterval * alertThreshold;
-
+    
     this.multiplicatorPeirod = this.conf.getLong(
             YarnConfiguration.QUOTA_FIXED_MULTIPLICATOR_PERIOD,
             YarnConfiguration.DEFAULT_QUOTA_FIXED_MULTIPLICATOR_PERIOD)
@@ -501,10 +494,10 @@ public class ContainersLogsService extends CompositeService {
 
           //Check alert threshold
           executionTime = System.currentTimeMillis() - startTime;
-          if (threshold < executionTime) {
+          if (monitorInterval < executionTime) {
             LOG.warn("Monitor interval threshold exceeded!"
-                    + " Execution time: " + Long.toString(executionTime) + "ms."
-                    + " Threshold: " + Double.toString(threshold) + "ms."
+                    + " Execution time: " + executionTime + "ms."
+                    + " Monitor interval: " + monitorInterval + "ms."
                     + " Consider increasing monitor interval!");
             //To avoid negative values
             executionTime = (executionTime > monitorInterval) ? monitorInterval

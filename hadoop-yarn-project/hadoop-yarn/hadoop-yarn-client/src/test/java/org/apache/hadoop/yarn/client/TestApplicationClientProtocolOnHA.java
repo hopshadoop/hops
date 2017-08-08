@@ -41,26 +41,17 @@ import org.apache.hadoop.yarn.api.records.YarnClusterMetrics;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.Records;
-import org.junit.*;
-import org.junit.rules.TestName;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
-@RunWith(Parameterized.class)
 public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
-  @Rule
-  public TestName testName = new TestName();
   private YarnClient client = null;
-  private HA_MODE haMode = HA_MODE.MANUAL_HA;
-
-  public TestApplicationClientProtocolOnHA(HA_MODE haMode) {
-    this.haMode = haMode;
-  }
 
   @Before
   public void initiate() throws Exception {
-    LOG.info(">>> Running test " + testName.getMethodName());
-    startHACluster(1, true, false, false, true, haMode);
+    startHACluster(1, true, false, false, true);
     Configuration conf = new YarnConfiguration(this.conf);
     client = createAndStartYarnClient(conf);
   }
@@ -102,7 +93,8 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
   public void testGetApplicationsOnHA() throws Exception {
     List<ApplicationReport> reports =
         client.getApplications();
-    Assert.assertTrue(reports != null && !reports.isEmpty());
+    Assert.assertTrue(reports != null);
+    Assert.assertFalse(reports.isEmpty());
     Assert.assertEquals(cluster.createFakeAppReports(),
         reports);
   }
@@ -110,7 +102,8 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
   @Test(timeout = 15000)
   public void testGetClusterNodesOnHA() throws Exception {
     List<NodeReport> reports = client.getNodeReports(NodeState.RUNNING);
-    Assert.assertTrue(reports != null && !reports.isEmpty());
+    Assert.assertTrue(reports != null);
+    Assert.assertFalse(reports.isEmpty());
     Assert.assertEquals(cluster.createFakeNodeReports(),
         reports);
   }
@@ -126,8 +119,8 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
   @Test(timeout = 15000)
   public void testGetQueueUserAclsOnHA() throws Exception {
     List<QueueUserACLInfo> queueUserAclsList = client.getQueueAclsInfo();
-    Assert.assertTrue(queueUserAclsList != null
-        && !queueUserAclsList.isEmpty());
+    Assert.assertTrue(queueUserAclsList != null);
+    Assert.assertFalse(queueUserAclsList.isEmpty());
     Assert.assertEquals(cluster.createFakeQueueUserACLInfoList(),
         queueUserAclsList);
   }
@@ -145,7 +138,8 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
   public void testGetApplicationAttemptsOnHA() throws Exception {
     List<ApplicationAttemptReport> reports =
         client.getApplicationAttempts(cluster.createFakeAppId());
-    Assert.assertTrue(reports != null && !reports.isEmpty());
+    Assert.assertTrue(reports != null);
+    Assert.assertFalse(reports.isEmpty());
     Assert.assertEquals(cluster.createFakeApplicationAttemptReports(),
         reports);
   }
@@ -162,7 +156,8 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
   public void testGetContainersOnHA() throws Exception {
     List<ContainerReport> reports =
         client.getContainers(cluster.createFakeApplicationAttemptId());
-    Assert.assertTrue(reports != null && !reports.isEmpty());
+    Assert.assertTrue(reports != null);
+    Assert.assertFalse(reports.isEmpty());
     Assert.assertEquals(cluster.createFakeContainerReports(),
         reports);
   }
@@ -176,7 +171,7 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
         Records.newRecord(ContainerLaunchContext.class);
     appContext.setAMContainerSpec(amContainer);
     Resource capability = Records.newRecord(Resource.class);
-    capability.setMemory(10);
+    capability.setMemorySize(10);
     capability.setVirtualCores(1);
     appContext.setResource(capability);
     ApplicationId appId = client.submitApplication(appContext);

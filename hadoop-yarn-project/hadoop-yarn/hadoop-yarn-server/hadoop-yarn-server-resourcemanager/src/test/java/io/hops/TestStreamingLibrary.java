@@ -55,8 +55,6 @@ public class TestStreamingLibrary {
     public static void setUp() throws Exception {
         conf = new YarnConfiguration();
         // Set configuration options
-        conf.set(YarnConfiguration.EVENT_RT_CONFIG_PATH, "target/test-classes/RT_EventAPIConfig.ini");
-        conf.set(YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH, "target/test-classes/RM_EventAPIConfig.ini");
         conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
         RMStorageFactory.setConfiguration(conf);
         YarnAPIStorageFactory.setConfiguration(conf);

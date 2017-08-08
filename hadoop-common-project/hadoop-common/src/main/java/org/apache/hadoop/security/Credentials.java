@@ -26,6 +26,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -33,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.commons.io.Charsets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -50,10 +50,10 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
 /**
- * A class that provides the facilities of reading and writing 
+ * A class that provides the facilities of reading and writing
  * secret keys and Tokens.
  */
-@InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
+@InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class Credentials implements Writable {
   private static final Log LOG = LogFactory.getLog(Credentials.class);
@@ -91,10 +91,20 @@ public class Credentials implements Writable {
    * @param t the token object
    */
   public void addToken(Text alias, Token<? extends TokenIdentifier> t) {
-    if (t != null) {
-      tokenMap.put(alias, t);
-    } else {
+    if (t == null) {
       LOG.warn("Null token ignored for " + alias);
+    } else if (tokenMap.put(alias, t) != null) {
+      // Update private tokens
+      Map<Text, Token<? extends TokenIdentifier>> tokensToAdd =
+          new HashMap<>();
+      for (Map.Entry<Text, Token<? extends TokenIdentifier>> e :
+          tokenMap.entrySet()) {
+        Token<? extends TokenIdentifier> token = e.getValue();
+        if (token.isPrivateCloneOf(alias)) {
+          tokensToAdd.put(e.getKey(), t.privateClone(token.getService()));
+        }
+      }
+      tokenMap.putAll(tokensToAdd);
     }
   }
   
@@ -220,7 +230,7 @@ public class Credentials implements Writable {
   }
   
   private static final byte[] TOKEN_STORAGE_MAGIC =
-      "HDTS".getBytes(Charsets.UTF_8);
+      "HDTS".getBytes(StandardCharsets.UTF_8);
   private static final byte TOKEN_STORAGE_VERSION = 0;
   
   public void writeTokenStorageToStream(DataOutputStream os)
@@ -319,7 +329,7 @@ public class Credentials implements Writable {
     for(Map.Entry<Text, Token<?>> token: other.tokenMap.entrySet()){
       Text key = token.getKey();
       if (!tokenMap.containsKey(key) || overwrite) {
-        tokenMap.put(key, token.getValue());
+        addToken(key, token.getValue());
       }
     }
   }

@@ -52,6 +52,7 @@ public class NodeInfo {
   protected long usedGPUs;
   protected long availableGPUs;
   protected ArrayList<String> nodeLabels = new ArrayList<String>();
+  protected ResourceUtilizationInfo resourceUtilization;
 
   public NodeInfo() {
   } // JAXB needs this
@@ -64,8 +65,8 @@ public class NodeInfo {
     this.availMemoryMB = 0;
     if (report != null) {
       this.numContainers = report.getNumContainers();
-      this.usedMemoryMB = report.getUsedResource().getMemory();
-      this.availMemoryMB = report.getAvailableResource().getMemory();
+      this.usedMemoryMB = report.getUsedResource().getMemorySize();
+      this.availMemoryMB = report.getAvailableResource().getMemorySize();
       this.usedVirtualCores = report.getUsedResource().getVirtualCores();
       this.availableVirtualCores = report.getAvailableResource().getVirtualCores();
       this.usedGPUs = report.getUsedResource().getGPUs();
@@ -86,6 +87,9 @@ public class NodeInfo {
       nodeLabels.addAll(labelSet);
       Collections.sort(nodeLabels);
     }
+
+    // update node and containers resource utilization
+    this.resourceUtilization = new ResourceUtilizationInfo(ni);
   }
 
   public String getRack() {
@@ -150,5 +154,9 @@ public class NodeInfo {
 
   public ArrayList<String> getNodeLabels() {
     return this.nodeLabels;
+  }
+
+  public ResourceUtilizationInfo getResourceUtilization() {
+    return this.resourceUtilization;
   }
 }

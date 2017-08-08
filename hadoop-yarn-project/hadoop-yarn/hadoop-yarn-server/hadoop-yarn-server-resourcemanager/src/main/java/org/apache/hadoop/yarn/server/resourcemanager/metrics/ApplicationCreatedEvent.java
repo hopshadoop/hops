@@ -18,7 +18,12 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.metrics;
 
+import java.util.Set;
+
+import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
+import org.apache.hadoop.yarn.api.records.Priority;
 
 public class ApplicationCreatedEvent extends
     SystemMetricsEvent {
@@ -29,6 +34,14 @@ public class ApplicationCreatedEvent extends
   private String user;
   private String queue;
   private long submittedTime;
+  private Set<String> appTags;
+  private boolean unmanagedApplication;
+  private Priority applicationPriority;
+  private String appNodeLabelsExpression;
+  private String amNodeLabelsExpression;
+  private final CallerContext callerContext;
+  private ContainerLaunchContext amContainerSpec;
+
 
   public ApplicationCreatedEvent(ApplicationId appId,
       String name,
@@ -36,7 +49,14 @@ public class ApplicationCreatedEvent extends
       String user,
       String queue,
       long submittedTime,
-      long createdTime) {
+      long createdTime,
+      Set<String> appTags,
+      boolean unmanagedApplication,
+      Priority applicationPriority,
+      String appNodeLabelsExpression,
+      String amNodeLabelsExpression,
+      CallerContext callerContext,
+      ContainerLaunchContext amContainerSpec) {
     super(SystemMetricsEventType.APP_CREATED, createdTime);
     this.appId = appId;
     this.name = name;
@@ -44,6 +64,13 @@ public class ApplicationCreatedEvent extends
     this.user = user;
     this.queue = queue;
     this.submittedTime = submittedTime;
+    this.appTags = appTags;
+    this.unmanagedApplication = unmanagedApplication;
+    this.applicationPriority = applicationPriority;
+    this.appNodeLabelsExpression = appNodeLabelsExpression;
+    this.amNodeLabelsExpression = amNodeLabelsExpression;
+    this.callerContext = callerContext;
+    this.amContainerSpec = amContainerSpec;
   }
 
   @Override
@@ -75,4 +102,31 @@ public class ApplicationCreatedEvent extends
     return submittedTime;
   }
 
+  public Set<String> getAppTags() {
+    return appTags;
+  }
+
+  public boolean isUnmanagedApp() {
+    return unmanagedApplication;
+  }
+
+  public Priority getApplicationPriority() {
+    return applicationPriority;
+  }
+
+  public String getAppNodeLabelsExpression() {
+    return appNodeLabelsExpression;
+  }
+
+  public String getAmNodeLabelsExpression() {
+    return amNodeLabelsExpression;
+  }
+  
+  public CallerContext getCallerContext() {
+    return callerContext;
+  }
+
+  public ContainerLaunchContext getAmContainerSpec() {
+    return amContainerSpec;
+  }
 }

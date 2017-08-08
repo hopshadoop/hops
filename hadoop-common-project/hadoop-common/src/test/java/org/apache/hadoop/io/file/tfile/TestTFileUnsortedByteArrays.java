@@ -19,8 +19,8 @@ package org.apache.hadoop.io.file.tfile;
 
 import java.io.IOException;
 
+import org.junit.After;
 import org.junit.Assert;
-import junit.framework.TestCase;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -29,11 +29,12 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.file.tfile.TFile.Reader;
 import org.apache.hadoop.io.file.tfile.TFile.Writer;
 import org.apache.hadoop.io.file.tfile.TFile.Reader.Scanner;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.Before;
+import org.junit.Test;
 
-public class TestTFileUnsortedByteArrays extends TestCase {
-  private static String ROOT =
-      System.getProperty("test.build.data", "/tmp/tfile-test");
-
+public class TestTFileUnsortedByteArrays {
+  private static String ROOT = GenericTestUtils.getTestDir().getAbsolutePath();
 
   private final static int BLOCK_SIZE = 512;
   private final static int BUF_SIZE = 64;
@@ -61,7 +62,7 @@ public class TestTFileUnsortedByteArrays extends TestCase {
     this.records2ndBlock = numRecords2ndBlock;
   }
 
-  @Override
+  @Before
   public void setUp() throws IOException {
     conf = new Configuration();
     path = new Path(ROOT, outputFile);
@@ -75,12 +76,13 @@ public class TestTFileUnsortedByteArrays extends TestCase {
     closeOutput();
   }
 
-  @Override
+  @After
   public void tearDown() throws IOException {
     fs.delete(path, true);
   }
 
   // we still can scan records in an unsorted TFile
+  @Test
   public void testFailureScannerWithKeys() throws IOException {
     Reader reader =
         new Reader(fs.open(path), fs.getFileStatus(path).getLen(), conf);
@@ -101,6 +103,7 @@ public class TestTFileUnsortedByteArrays extends TestCase {
   }
 
   // we still can scan records in an unsorted TFile
+  @Test
   public void testScan() throws IOException {
     Reader reader =
         new Reader(fs.open(path), fs.getFileStatus(path).getLen(), conf);
@@ -142,6 +145,7 @@ public class TestTFileUnsortedByteArrays extends TestCase {
   }
 
   // we still can scan records in an unsorted TFile
+  @Test
   public void testScanRange() throws IOException {
     Reader reader =
         new Reader(fs.open(path), fs.getFileStatus(path).getLen(), conf);
@@ -182,6 +186,7 @@ public class TestTFileUnsortedByteArrays extends TestCase {
     }
   }
 
+  @Test
   public void testFailureSeek() throws IOException {
     Reader reader =
         new Reader(fs.open(path), fs.getFileStatus(path).getLen(), conf);

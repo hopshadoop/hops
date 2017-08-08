@@ -37,6 +37,12 @@ public class ApplicationMetricsConstants {
   public static final String ACLS_UPDATED_EVENT_TYPE =
       "YARN_APPLICATION_ACLS_UPDATED";
 
+  public static final String UPDATED_EVENT_TYPE =
+      "YARN_APPLICATION_UPDATED";
+
+  public static final String STATE_UPDATED_EVENT_TYPE =
+      "YARN_APPLICATION_STATE_UPDATED";
+
   public static final String NAME_ENTITY_INFO =
       "YARN_APPLICATION_NAME";
 
@@ -73,7 +79,38 @@ public class ApplicationMetricsConstants {
   public static final String APP_MEM_METRICS =
       "YARN_APPLICATION_MEM_METRIC";
 
+  public static final String APP_CPU_PREEMPT_METRICS =
+      "YARN_APPLICATION_CPU_PREEMPT_METRIC";
+
+  public static final String APP_GPU_PREEMPT_METRICS =
+      "YARN_APPLICATION_GPU_PREEMPT_METRIC";
+  
+  public static final String APP_MEM_PREEMPT_METRICS =
+      "YARN_APPLICATION_MEM_PREEMPT_METRIC";
+
   public static final String LATEST_APP_ATTEMPT_EVENT_INFO =
       "YARN_APPLICATION_LATEST_APP_ATTEMPT";
+  
+  public static final String YARN_APP_CALLER_CONTEXT =
+      "YARN_APPLICATION_CALLER_CONTEXT";
+  
+  public static final String YARN_APP_CALLER_SIGNATURE =
+      "YARN_APPLICATION_CALLER_SIGNATURE";
 
+  public static final String APP_TAGS_INFO = "YARN_APPLICATION_TAGS";
+
+  public static final String UNMANAGED_APPLICATION_ENTITY_INFO =
+      "YARN_APPLICATION_UNMANAGED_APPLICATION";
+
+  public static final String APPLICATION_PRIORITY_INFO =
+      "YARN_APPLICATION_PRIORITY";
+
+  public static final String APP_NODE_LABEL_EXPRESSION =
+      "YARN_APP_NODE_LABEL_EXPRESSION";
+
+  public static final String AM_NODE_LABEL_EXPRESSION =
+      "YARN_AM_NODE_LABEL_EXPRESSION";
+
+  public static final String AM_CONTAINER_LAUNCH_COMMAND =
+      "YARN_AM_CONTAINER_LAUNCH_COMMAND";
 }

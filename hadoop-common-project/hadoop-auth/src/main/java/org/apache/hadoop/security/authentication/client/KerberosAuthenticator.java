@@ -14,6 +14,7 @@
 package org.apache.hadoop.security.authentication.client;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.hadoop.security.authentication.server.HttpConstants;
 import org.apache.hadoop.security.authentication.util.AuthToken;
 import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.ietf.jgss.GSSContext;
@@ -24,8 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.Subject;
-import javax.security.auth.kerberos.KerberosKey;
-import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.login.AppConfigurationEntry;
 import javax.security.auth.login.Configuration;
 import javax.security.auth.login.LoginContext;
@@ -59,17 +58,18 @@ public class KerberosAuthenticator implements Authenticator {
   /**
    * HTTP header used by the SPNEGO server endpoint during an authentication sequence.
    */
-  public static final String WWW_AUTHENTICATE = "WWW-Authenticate";
+  public static final String WWW_AUTHENTICATE =
+      HttpConstants.WWW_AUTHENTICATE_HEADER;
 
   /**
    * HTTP header used by the SPNEGO client endpoint during an authentication sequence.
    */
-  public static final String AUTHORIZATION = "Authorization";
+  public static final String AUTHORIZATION = HttpConstants.AUTHORIZATION_HEADER;
 
   /**
    * HTTP header prefix used by the SPNEGO client/server endpoints during an authentication sequence.
    */
-  public static final String NEGOTIATE = "Negotiate";
+  public static final String NEGOTIATE = HttpConstants.NEGOTIATE;
 
   private static final String AUTH_HTTP_METHOD = "OPTIONS";
 
@@ -272,8 +272,8 @@ public class KerberosAuthenticator implements Authenticator {
       AccessControlContext context = AccessController.getContext();
       Subject subject = Subject.getSubject(context);
       if (subject == null
-          || (subject.getPrivateCredentials(KerberosKey.class).isEmpty()
-              && subject.getPrivateCredentials(KerberosTicket.class).isEmpty())) {
+          || (!KerberosUtil.hasKerberosKeyTab(subject)
+              && !KerberosUtil.hasKerberosTicket(subject))) {
         LOG.debug("No subject in context, logging in");
         subject = new Subject();
         LoginContext login = new LoginContext("", subject,
@@ -329,7 +329,11 @@ public class KerberosAuthenticator implements Authenticator {
         }
       });
     } catch (PrivilegedActionException ex) {
-      throw new AuthenticationException(ex.getException());
+      if (ex.getException() instanceof IOException) {
+        throw (IOException) ex.getException();
+      } else {
+        throw new AuthenticationException(ex.getException());
+      }
     } catch (LoginException ex) {
       throw new AuthenticationException(ex);
     }

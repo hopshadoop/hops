@@ -20,6 +20,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -56,8 +57,7 @@ public abstract class FilterFs extends AbstractFileSystem {
   }
   
   protected FilterFs(AbstractFileSystem fs) throws URISyntaxException {
-    super(fs.getUri(), fs.getUri().getScheme(),
-        fs.getUri().getAuthority() != null, fs.getUriDefaultPort());
+    super(fs.getUri(), fs.getUri().getScheme(), false, fs.getUriDefaultPort());
     myFs = fs;
   }
 
@@ -146,10 +146,15 @@ public abstract class FilterFs extends AbstractFileSystem {
   }
 
   @Override
+  @Deprecated
   public FsServerDefaults getServerDefaults() throws IOException {
     return myFs.getServerDefaults();
   }
   
+  @Override
+  public FsServerDefaults getServerDefaults(final Path f) throws IOException {
+    return myFs.getServerDefaults(f);
+  }
 
   @Override
   public Path resolvePath(final Path p) throws FileNotFoundException,
@@ -182,6 +187,14 @@ public abstract class FilterFs extends AbstractFileSystem {
       throws IOException, UnresolvedLinkException {
     checkPath(f);
     return myFs.listStatus(f);
+  }
+
+  @Override
+  public RemoteIterator<LocatedFileStatus> listLocatedStatus(final Path f)
+      throws AccessControlException, FileNotFoundException,
+             UnresolvedLinkException, IOException {
+    checkPath(f);
+    return myFs.listLocatedStatus(f);
   }
 
   @Override
@@ -370,5 +383,47 @@ public abstract class FilterFs extends AbstractFileSystem {
   @Override
   public void removeXAttr(Path path, String name) throws IOException {
     myFs.removeXAttr(path, name);
+  }
+
+  @Override
+  public Path createSnapshot(final Path path, final String snapshotName)
+      throws IOException {
+    return myFs.createSnapshot(path, snapshotName);
+  }
+
+  @Override
+  public void renameSnapshot(final Path path, final String snapshotOldName,
+      final String snapshotNewName) throws IOException {
+    myFs.renameSnapshot(path, snapshotOldName, snapshotNewName);
+  }
+
+  @Override
+  public void deleteSnapshot(final Path path, final String snapshotName)
+      throws IOException {
+    myFs.deleteSnapshot(path, snapshotName);
+  }
+
+  @Override
+  public void setStoragePolicy(Path path, String policyName)
+      throws IOException {
+    myFs.setStoragePolicy(path, policyName);
+  }
+
+  @Override
+  public void unsetStoragePolicy(final Path src)
+      throws IOException {
+    myFs.unsetStoragePolicy(src);
+  }
+
+  @Override
+  public BlockStoragePolicySpi getStoragePolicy(final Path src)
+      throws IOException {
+    return myFs.getStoragePolicy(src);
+  }
+
+  @Override
+  public Collection<? extends BlockStoragePolicySpi> getAllStoragePolicies()
+      throws IOException {
+    return myFs.getAllStoragePolicies();
   }
 }

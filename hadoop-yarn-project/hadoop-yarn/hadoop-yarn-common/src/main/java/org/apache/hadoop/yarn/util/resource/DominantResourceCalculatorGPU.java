@@ -22,13 +22,13 @@ import org.apache.hadoop.yarn.api.records.Resource;
 public class DominantResourceCalculatorGPU extends DominantResourceCalculator {
   
   @Override
-  public int computeAvailableContainers(Resource available, Resource required) {
-    int vCoreMemoryContainers = Math.min(
-        available.getMemory() / required.getMemory(),
+  public long computeAvailableContainers(Resource available, Resource required) {
+    long vCoreMemoryContainers = Math.min(
+        available.getMemorySize() / required.getMemorySize(),
         available.getVirtualCores() / required.getVirtualCores());
     //If request needs GPUs, we need to account for it too
     if(required.getGPUs() > 0) {
-      int vCoreMemoryGPUContainers = Math.min(vCoreMemoryContainers,
+      long vCoreMemoryGPUContainers = Math.min(vCoreMemoryContainers,
           available.getGPUs() / required.getGPUs());
       return vCoreMemoryGPUContainers;
     } else {
@@ -39,7 +39,7 @@ public class DominantResourceCalculatorGPU extends DominantResourceCalculator {
   @Override
   public Resource divideAndCeil(Resource numerator, int denominator) {
     return Resources.createResource(
-        divideAndCeil(numerator.getMemory(), denominator),
+        divideAndCeil(numerator.getMemorySize(), denominator),
         divideAndCeil(numerator.getVirtualCores(), denominator),
         numerator.getGPUs()
     );
@@ -48,16 +48,16 @@ public class DominantResourceCalculatorGPU extends DominantResourceCalculator {
   @Override
   public Resource normalize(Resource r, Resource minimumResource,
       Resource maximumResource, Resource stepFactor) {
-    int normalizedMemory = Math.min(
-        roundUp(
-            Math.max(r.getMemory(), minimumResource.getMemory()),
-            stepFactor.getMemory()),
-        maximumResource.getMemory());
+    long normalizedMemory = Math.min(
+            roundUp(
+            Math.max(r.getMemorySize(), minimumResource.getMemorySize()),
+            stepFactor.getMemorySize()),
+            maximumResource.getMemorySize());
     int normalizedCores = Math.min(
-        roundUp(
+            roundUp(
             Math.max(r.getVirtualCores(), minimumResource.getVirtualCores()),
             stepFactor.getVirtualCores()),
-        maximumResource.getVirtualCores());
+            maximumResource.getVirtualCores());
     int normalizedGPUs = Math.min(
         roundUpWithZero(
             Math.max(r.getGPUs(), minimumResource.getGPUs()),
@@ -70,7 +70,7 @@ public class DominantResourceCalculatorGPU extends DominantResourceCalculator {
   @Override
   public Resource roundUp(Resource r, Resource stepFactor) {
     return Resources.createResource(
-        roundUp(r.getMemory(), stepFactor.getMemory()),
+        roundUp(r.getMemorySize(), stepFactor.getMemorySize()),
         roundUp(r.getVirtualCores(), stepFactor.getVirtualCores()),
         roundUpWithZero(r.getGPUs(), stepFactor.getGPUs())
     );
@@ -79,7 +79,7 @@ public class DominantResourceCalculatorGPU extends DominantResourceCalculator {
   @Override
   public Resource roundDown(Resource r, Resource stepFactor) {
     return Resources.createResource(
-        roundDown(r.getMemory(), stepFactor.getMemory()),
+        roundDown(r.getMemorySize(), stepFactor.getMemorySize()),
         roundDown(r.getVirtualCores(), stepFactor.getVirtualCores()),
         roundDownWithZero(r.getGPUs(), stepFactor.getGPUs())
     );
@@ -90,7 +90,7 @@ public class DominantResourceCalculatorGPU extends DominantResourceCalculator {
       Resource stepFactor) {
     return Resources.createResource(
         roundUp(
-            (int)Math.ceil(r.getMemory() * by), stepFactor.getMemory()),
+            (int)Math.ceil(r.getMemorySize() * by), stepFactor.getMemorySize()),
         roundUp(
             (int)Math.ceil(r.getVirtualCores() * by),
             stepFactor.getVirtualCores()),
@@ -105,8 +105,8 @@ public class DominantResourceCalculatorGPU extends DominantResourceCalculator {
       Resource stepFactor) {
     return Resources.createResource(
         roundDown(
-            (int)(r.getMemory() * by),
-            stepFactor.getMemory()
+            (int)(r.getMemorySize() * by),
+            stepFactor.getMemorySize()
         ),
         roundDown(
             (int)(r.getVirtualCores() * by),
@@ -117,6 +117,14 @@ public class DominantResourceCalculatorGPU extends DominantResourceCalculator {
             stepFactor.getGPUs()
         )
     );
+  }
+
+  @Override
+  public boolean fitsIn(Resource cluster,
+                        Resource smaller, Resource bigger) {
+    return smaller.getMemorySize() <= bigger.getMemorySize()
+            && smaller.getVirtualCores() <= bigger.getVirtualCores()
+            && smaller.getGPUs() <= bigger.getGPUs();
   }
   
 }

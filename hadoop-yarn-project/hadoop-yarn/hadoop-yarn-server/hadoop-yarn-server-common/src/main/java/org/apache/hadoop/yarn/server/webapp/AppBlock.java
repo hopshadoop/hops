@@ -21,8 +21,10 @@ package org.apache.hadoop.yarn.server.webapp;
 import static org.apache.hadoop.yarn.util.StringHelper.join;
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.APPLICATION_ID;
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.WEB_UI_TYPE;
+
 import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
+
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -38,6 +40,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.ContainerReport;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.LogAggregationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.ContainerNotFoundException;
@@ -46,6 +49,7 @@ import org.apache.hadoop.yarn.server.webapp.dao.AppInfo;
 import org.apache.hadoop.yarn.server.webapp.dao.ContainerInfo;
 import org.apache.hadoop.yarn.util.Apps;
 import org.apache.hadoop.yarn.util.Times;
+import org.apache.hadoop.yarn.webapp.ResponseInfo;
 import org.apache.hadoop.yarn.webapp.YarnWebParams;
 import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.TABLE;
@@ -157,12 +161,13 @@ public class AppBlock extends HtmlBlock {
     String schedulerPath = WebAppUtils.getResolvedRMWebAppURLWithScheme(conf) +
         "/cluster/scheduler?openQueues=" + app.getQueue();
 
-    info("Application Overview")
+    ResponseInfo overviewTable = info("Application Overview")
       ._("User:", schedulerPath, app.getUser())
       ._("Name:", app.getName())
       ._("Application Type:", app.getType())
       ._("Application Tags:",
         app.getApplicationTags() == null ? "" : app.getApplicationTags())
+      ._("Application Priority:", clarifyAppPriority(app.getPriority()))
       ._(
         "YarnApplicationState:",
         app.getAppState() == null ? UNAVAILABLE : clarifyAppState(app
@@ -185,9 +190,30 @@ public class AppBlock extends HtmlBlock {
           .getAppState() == YarnApplicationState.FINISHED
             || app.getAppState() == YarnApplicationState.FAILED
             || app.getAppState() == YarnApplicationState.KILLED ? "History"
-            : "ApplicationMaster")
-      ._("Diagnostics:",
+            : "ApplicationMaster");
+    if (webUiType != null
+        && webUiType.equals(YarnWebParams.RM_WEB_UI)) {
+      LogAggregationStatus status = getLogAggregationStatus();
+      if (status == null) {
+        overviewTable._("Log Aggregation Status:", "N/A");
+      } else if (status == LogAggregationStatus.DISABLED
+          || status == LogAggregationStatus.NOT_START
+          || status == LogAggregationStatus.SUCCEEDED) {
+        overviewTable._("Log Aggregation Status:", status.name());
+      } else {
+        overviewTable._("Log Aggregation Status:",
+            root_url("logaggregationstatus", app.getAppId()), status.name());
+      }
+    }
+    overviewTable._("Diagnostics:",
         app.getDiagnosticsInfo() == null ? "" : app.getDiagnosticsInfo());
+    overviewTable._("Unmanaged Application:", app.isUnmanagedApp());
+    overviewTable._("Application Node Label expression:",
+        app.getAppNodeLabelExpression() == null ? "<Not set>"
+            : app.getAppNodeLabelExpression());
+    overviewTable._("AM container Node Label expression:",
+        app.getAmNodeLabelExpression() == null ? "<Not set>"
+            : app.getAmNodeLabelExpression());
 
     Collection<ApplicationAttemptReport> attempts;
     try {
@@ -323,6 +349,10 @@ public class AppBlock extends HtmlBlock {
     }
   }
 
+  private String clarifyAppPriority(int priority) {
+    return priority + " (Higher Integer value indicates higher priority)";
+  }
+
   private String clairfyAppFinalStatus(FinalApplicationStatus status) {
     if (status == FinalApplicationStatus.UNDEFINED) {
       return "Application has not completed yet.";
@@ -333,5 +363,10 @@ public class AppBlock extends HtmlBlock {
   // The preemption metrics only need to be shown in RM WebUI
   protected void createApplicationMetricsTable(Block html) {
 
+  }
+
+  // This will be overrided in RMAppBlock
+  protected LogAggregationStatus getLogAggregationStatus() {
+    return null;
   }
 }

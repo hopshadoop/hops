@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.applications.distributedshell;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -27,6 +31,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,42 +41,87 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileContext;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.ServerSocketUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.JarFinder;
 import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
+import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineDomain;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
+import org.apache.hadoop.yarn.applications.distributedshell.ApplicationMaster;
+import org.apache.hadoop.yarn.client.api.impl.DirectTimelineWriter;
+import org.apache.hadoop.yarn.client.api.impl.TimelineClientImpl;
+import org.apache.hadoop.yarn.client.api.impl.TimelineWriter;
+import org.apache.hadoop.yarn.client.api.impl.TestTimelineClient;
+import org.apache.hadoop.yarn.client.api.TimelineClient;
 import org.apache.hadoop.yarn.client.api.YarnClient;
+
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
+import org.apache.hadoop.yarn.server.timeline.PluginStoreTestUtils;
+import org.apache.hadoop.yarn.server.timeline.NameValuePair;
+import org.apache.hadoop.yarn.server.timeline.TimelineVersion;
+import org.apache.hadoop.yarn.server.timeline.TimelineVersionWatcher;
+import org.apache.hadoop.yarn.server.utils.BuilderUtils;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
+
+import com.sun.jersey.api.client.ClientHandlerException;
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 
 public class TestDistributedShell {
 
   private static final Log LOG =
       LogFactory.getLog(TestDistributedShell.class);
 
-  protected MiniYARNCluster yarnCluster = null;  
+  protected MiniYARNCluster yarnCluster = null;
+  protected MiniDFSCluster hdfsCluster = null;
+  private FileSystem fs = null;
+  private TimelineWriter spyTimelineWriter;
   protected YarnConfiguration conf = null;
   private static final int NUM_NMS = 1;
+  private static final float DEFAULT_TIMELINE_VERSION = 1.0f;
 
   protected final static String APPMASTER_JAR =
       JarFinder.getJar(ApplicationMaster.class);
 
+  @Rule
+  public TimelineVersionWatcher timelineVersionWatcher
+      = new TimelineVersionWatcher();
+  @Rule
+  public Timeout globalTimeout = new Timeout(90000);
+
   @Before
   public void setup() throws Exception {
-    setupInternal(NUM_NMS);
+    setupInternal(NUM_NMS, timelineVersionWatcher.getTimelineVersion());
   }
 
   protected void setupInternal(int numNodeManager) throws Exception {
+    setupInternal(numNodeManager, DEFAULT_TIMELINE_VERSION);
+  }
+
+  private void setupInternal(int numNodeManager, float timelineVersion)
+      throws Exception {
 
     LOG.info("Starting up YARN cluster");
     
@@ -81,11 +131,35 @@ public class TestDistributedShell {
     conf.setBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED, true);
     conf.set(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class.getName());
     conf.setBoolean(YarnConfiguration.NODE_LABELS_ENABLED, true);
+    conf.set("mapreduce.jobhistory.address",
+        "0.0.0.0:" + ServerSocketUtil.getPort(10021, 10));
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+    // ATS version specific settings
+    if (timelineVersion == 1.0f) {
+      conf.setFloat(YarnConfiguration.TIMELINE_SERVICE_VERSION, 1.0f);
+      conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
+          CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT);
+    } else if (timelineVersion == 1.5f) {
+      if (hdfsCluster == null) {
+        Configuration hdfsConfig = new Configuration();
+        hdfsCluster = new MiniDFSCluster.Builder(hdfsConfig)
+            .numDataNodes(1).build();
+      }
+      fs = hdfsCluster.getFileSystem();
+      PluginStoreTestUtils.prepareFileSystemForPluginStore(fs);
+      PluginStoreTestUtils.prepareConfiguration(conf, hdfsCluster);
+      conf.set(YarnConfiguration.TIMELINE_SERVICE_ENTITY_GROUP_PLUGIN_CLASSES,
+          DistributedShellTimelinePlugin.class.getName());
+    } else {
+      Assert.fail("Wrong timeline version number: " + timelineVersion);
+    }
     
     if (yarnCluster == null) {
       yarnCluster =
           new MiniYARNCluster(TestDistributedShell.class.getSimpleName(), 1,
-              numNodeManager, 1, 1);
+              numNodeManager, 1, 1, false, false);
       yarnCluster.init(conf);
       
       yarnCluster.start();
@@ -135,6 +209,13 @@ public class TestDistributedShell {
         yarnCluster = null;
       }
     }
+    if (hdfsCluster != null) {
+      try {
+        hdfsCluster.shutdown();
+      } finally {
+        hdfsCluster = null;
+      }
+    }
     FileContext fsContext = FileContext.getLocalFSFileContext();
     fsContext
         .delete(
@@ -143,14 +224,26 @@ public class TestDistributedShell {
             true);
   }
   
-  @Test(timeout=90000)
+  @Test
   public void testDSShellWithDomain() throws Exception {
     testDSShell(true);
   }
 
-  @Test(timeout=90000)
+  @Test
   public void testDSShellWithoutDomain() throws Exception {
     testDSShell(false);
+  }
+
+  @Test
+  @TimelineVersion(1.5f)
+  public void testDSShellWithoutDomainV1_5() throws Exception {
+    testDSShell(false);
+  }
+
+  @Test
+  @TimelineVersion(1.5f)
+  public void testDSShellWithDomainV1_5() throws Exception {
+    testDSShell(true);
   }
 
   public void testDSShell(boolean haveDomain) throws Exception {
@@ -236,6 +329,24 @@ public class TestDistributedShell {
     LOG.info("Client run completed. Result=" + result);
     Assert.assertTrue(result.get());
 
+    if (timelineVersionWatcher.getTimelineVersion() == 1.5f) {
+      long scanInterval = conf.getLong(
+          YarnConfiguration.TIMELINE_SERVICE_ENTITYGROUP_FS_STORE_SCAN_INTERVAL_SECONDS,
+          YarnConfiguration.TIMELINE_SERVICE_ENTITYGROUP_FS_STORE_SCAN_INTERVAL_SECONDS_DEFAULT
+      );
+      Path doneDir = new Path(
+          YarnConfiguration.TIMELINE_SERVICE_ENTITYGROUP_FS_STORE_DONE_DIR_DEFAULT
+      );
+      // Wait till the data is moved to done dir, or timeout and fail
+      while (true) {
+        RemoteIterator<FileStatus> iterApps = fs.listStatusIterator(doneDir);
+        if (iterApps.hasNext()) {
+          break;
+        }
+        Thread.sleep(scanInterval * 2);
+      }
+    }
+
     TimelineDomain domain = null;
     if (haveDomain) {
       domain = yarnCluster.getApplicationHistoryServer()
@@ -262,11 +373,18 @@ public class TestDistributedShell {
       Assert.assertEquals("DEFAULT",
           entitiesAttempts.getEntities().get(0).getDomainId());
     }
+    String currAttemptEntityId
+        = entitiesAttempts.getEntities().get(0).getEntityId();
+    ApplicationAttemptId attemptId = ApplicationAttemptId.fromString(
+        currAttemptEntityId);
+    NameValuePair primaryFilter = new NameValuePair(
+        ApplicationMaster.APPID_TIMELINE_FILTER_NAME,
+        attemptId.getApplicationId().toString());
     TimelineEntities entities = yarnCluster
         .getApplicationHistoryServer()
         .getTimelineStore()
         .getEntities(ApplicationMaster.DSEntity.DS_CONTAINER.toString(), null,
-            null, null, null, null, null, null, null, null);
+            null, null, null, null, primaryFilter, null, null, null);
     Assert.assertNotNull(entities);
     Assert.assertEquals(2, entities.getEntities().size());
     Assert.assertEquals(entities.getEntities().get(0).getEntityType()
@@ -338,7 +456,7 @@ public class TestDistributedShell {
 
   }
 
-  @Test(timeout=90000)
+  @Test
   public void testDSRestartWithPreviousRunningContainers() throws Exception {
     String[] args = {
         "--jar",
@@ -373,7 +491,7 @@ public class TestDistributedShell {
    * how many attempt failures for previous 2.5 seconds.
    * The application is expected to be successful.
    */
-  @Test(timeout=90000)
+  @Test
   public void testDSAttemptFailuresValidityIntervalSucess() throws Exception {
     String[] args = {
         "--jar",
@@ -411,7 +529,7 @@ public class TestDistributedShell {
    * how many attempt failure for previous 15 seconds.
    * The application is expected to be fail.
    */
-  @Test(timeout=90000)
+  @Test
   public void testDSAttemptFailuresValidityIntervalFailed() throws Exception {
     String[] args = {
         "--jar",
@@ -443,7 +561,7 @@ public class TestDistributedShell {
       Assert.assertFalse(result);
     }
 
-  @Test(timeout=90000)
+  @Test
   public void testDSShellWithCustomLogPropertyFile() throws Exception {
     final File basedir =
         new File("target", TestDistributedShell.class.getName());
@@ -538,7 +656,7 @@ public class TestDistributedShell {
     verifyContainerLog(2, expectedContent, false, "");
   }
 
-  @Test(timeout=90000)
+  @Test
   public void testDSShellWithMultipleArgs() throws Exception {
     String[] args = {
         "--jar",
@@ -572,7 +690,7 @@ public class TestDistributedShell {
     verifyContainerLog(4, expectedContent, false, "");
   }
 
-  @Test(timeout=90000)
+  @Test
   public void testDSShellWithShellScript() throws Exception {
     final File basedir =
         new File("target", TestDistributedShell.class.getName());
@@ -620,7 +738,7 @@ public class TestDistributedShell {
     verifyContainerLog(1, expectedContent, false, "");
   }
 
-  @Test(timeout=90000)
+  @Test
   public void testDSShellWithInvalidArgs() throws Exception {
     Client client = new Client(new Configuration(yarnCluster.getConfig()));
 
@@ -770,6 +888,37 @@ public class TestDistributedShell {
     }
   }
 
+  @Test
+  public void testDSTimelineClientWithConnectionRefuse() throws Exception {
+    ApplicationMaster am = new ApplicationMaster();
+
+    TimelineClientImpl client = new TimelineClientImpl() {
+      @Override
+      protected TimelineWriter createTimelineWriter(Configuration conf,
+          UserGroupInformation authUgi, com.sun.jersey.api.client.Client client,
+          URI resURI) throws IOException {
+        TimelineWriter timelineWriter =
+            new DirectTimelineWriter(authUgi, client, resURI);
+        spyTimelineWriter = spy(timelineWriter);
+        return spyTimelineWriter;
+      }
+    };
+    client.init(conf);
+    client.start();
+    TestTimelineClient.mockEntityClientResponse(spyTimelineWriter, null,
+        false, true);
+    try {
+      UserGroupInformation ugi = mock(UserGroupInformation.class);
+      when(ugi.getShortUserName()).thenReturn("user1");
+      // verify no ClientHandlerException get thrown out.
+      am.publishContainerEndEvent(client, ContainerStatus.newInstance(
+          BuilderUtils.newContainerId(1, 1, 1, 1), ContainerState.COMPLETE, "",
+          1), "domainId", ugi);
+    } finally {
+      client.stop();
+    }
+  }
+
   protected void waitForNMsToRegister() throws Exception {
     int sec = 60;
     while (sec >= 0) {
@@ -782,7 +931,7 @@ public class TestDistributedShell {
     }
   }
 
-  @Test(timeout=90000)
+  @Test
   public void testContainerLaunchFailureHandling() throws Exception {
     String[] args = {
       "--jar",
@@ -810,7 +959,7 @@ public class TestDistributedShell {
 
   }
 
-  @Test(timeout=90000)
+  @Test
   public void testDebugFlag() throws Exception {
     String[] args = {
         "--jar",

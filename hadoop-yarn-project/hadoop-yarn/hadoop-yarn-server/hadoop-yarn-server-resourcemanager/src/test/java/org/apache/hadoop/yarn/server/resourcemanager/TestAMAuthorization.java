@@ -43,10 +43,14 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersRequest;
@@ -135,6 +139,12 @@ public class TestAMAuthorization {
       return GetContainerStatusesResponse.newInstance(null, null);
     }
 
+    @Override
+    public IncreaseContainersResourceResponse increaseContainersResource(IncreaseContainersResourceRequest request)
+        throws YarnException {
+      return IncreaseContainersResourceResponse.newInstance(null, null);
+    }
+
     public Credentials getContainerCredentials() throws IOException {
       Credentials credentials = new Credentials();
       DataInputByteBuffer buf = new DataInputByteBuffer();
@@ -142,6 +152,12 @@ public class TestAMAuthorization {
       buf.reset(containerTokens);
       credentials.readTokenStorageStream(buf);
       return credentials;
+    }
+
+    @Override
+    public SignalContainerResponse signalToContainer(
+        SignalContainerRequest request) throws YarnException, IOException {
+      return null;
     }
   }
 

@@ -80,7 +80,8 @@ Customizing the Fair Scheduler typically involves altering two files. First, sch
 | `yarn.scheduler.fair.preemption.cluster-utilization-threshold` | The utilization threshold after which preemption kicks in. The utilization is computed as the maximum ratio of usage to capacity among all resources. Defaults to 0.8f. |
 | `yarn.scheduler.fair.sizebasedweight` | Whether to assign shares to individual apps based on their size, rather than providing an equal share to all apps regardless of size. When set to true, apps are weighted by the natural logarithm of one plus the app's total requested memory, divided by the natural logarithm of 2. Defaults to false. |
 | `yarn.scheduler.fair.assignmultiple` | Whether to allow multiple container assignments in one heartbeat. Defaults to false. |
-| `yarn.scheduler.fair.max.assign` | If assignmultiple is true, the maximum amount of containers that can be assigned in one heartbeat. Defaults to -1, which sets no limit. |
+| `yarn.scheduler.fair.dynamic.max.assign` | If assignmultiple is true, whether to dynamically determine the amount of resources that can be assigned in one heartbeat. When turned on, about half of the un-allocated resources on the node are allocated to containers in a single heartbeat. Defaults to true. |
+| `yarn.scheduler.fair.max.assign` | If assignmultiple is true and dynamic.max.assign is false, the maximum amount of containers that can be assigned in one heartbeat. Defaults to -1, which sets no limit. |
 | `yarn.scheduler.fair.locality.threshold.node` | For applications that request containers on particular nodes, the number of scheduling opportunities since the last container assignment to wait before accepting a placement on another node. Expressed as a float between 0 and 1, which, as a fraction of the cluster size, is the number of scheduling opportunities to pass up. The default value of -1.0 means don't pass up any scheduling opportunities. |
 | `yarn.scheduler.fair.locality.threshold.rack` | For applications that request containers on particular racks, the number of scheduling opportunities since the last container assignment to wait before accepting a placement on another rack. Expressed as a float between 0 and 1, which, as a fraction of the cluster size, is the number of scheduling opportunities to pass up. The default value of -1.0 means don't pass up any scheduling opportunities. |
 | `yarn.scheduler.fair.allow-undeclared-pools` | If this is true, new queues can be created at application submission time, whether because they are specified as the application's queue by the submitter or because they are placed there by the user-as-default-queue property. If this is false, any time an app would be placed in a queue that is not specified in the allocations file, it is placed in the "default" queue instead. Defaults to true. If a queue placement policy is given in the allocations file, this property is ignored. |
@@ -126,6 +127,8 @@ The allocation file must be in XML format. The format contains five types of ele
 
 * **A queueMaxAppsDefault element**: which sets the default running app limit for queues; overriden by maxRunningApps element in each queue.
 
+* **A queueMaxResourcesDefault element**: which sets the default max resource limit for queue; overriden by maxResources element in each queue.
+
 * **A queueMaxAMShareDefault element**: which sets the default AM resource limit for queue; overriden by maxAMShare element in each queue.
 
 * **A defaultQueueSchedulingPolicy element**: which sets the default scheduling policy for queues; overriden by the schedulingPolicy element in each queue if specified. Defaults to "fair".
@@ -165,18 +168,19 @@ The allocation file must be in XML format. The format contains five types of ele
   </queue>
 
   <queueMaxAMShareDefault>0.5</queueMaxAMShareDefault>
+  <queueMaxResourcesDefault>40000 mb,0vcores</queueMaxResourcesDefault>
 
   <!-- Queue 'secondary_group_queue' is a parent queue and may have
        user queues under it -->
   <queue name="secondary_group_queue" type="parent">
   <weight>3.0</weight>
   </queue>
-  
+
   <user name="sample_user">
     <maxRunningApps>30</maxRunningApps>
   </user>
   <userMaxAppsDefault>5</userMaxAppsDefault>
-  
+
   <queuePlacementPolicy>
     <rule name="specified" />
     <rule name="primaryGroup" create="false" />
@@ -192,11 +196,15 @@ The allocation file must be in XML format. The format contains five types of ele
 
 ###Queue Access Control Lists
 
-Queue Access Control Lists (ACLs) allow administrators to control who may take actions on particular queues. They are configured with the aclSubmitApps and aclAdministerApps properties, which can be set per queue. Currently the only supported administrative action is killing an application. Anybody who may administer a queue may also submit applications to it. These properties take values in a format like "user1,user2 group1,group2" or " group1,group2". An action on a queue will be permitted if its user or group is in the ACL of that queue or in the ACL of any of that queue's ancestors. So if queue2 is inside queue1, and user1 is in queue1's ACL, and user2 is in queue2's ACL, then both users may submit to queue2.
+Queue Access Control Lists (ACLs) allow administrators to control who may take actions on particular queues. They are configured with the aclSubmitApps and aclAdministerApps properties, which can be set per queue. Currently the only supported administrative action is killing an application. An administrator may also submit applications to it. These properties take values in a format like "user1,user2 group1,group2" or " group1,group2". Actions on a queue are permitted if the user/group is a member of the queue ACL or a member of the queue ACL of any of that queue's ancestors. So if queue2 is inside queue1, and user1 is in queue1's ACL, and user2 is in queue2's ACL, then both users may submit to queue2.
 
 **Note:** The delimiter is a space character. To specify only ACL groups, begin the value with a space character.
 
 The root queue's ACLs are "\*" by default which, because ACLs are passed down, means that everybody may submit to and kill applications from every queue. To start restricting access, change the root queue's ACLs to something other than "\*".
+
+###Reservation Access Control Lists
+
+Reservation Access Control Lists (ACLs) allow administrators to control who may take reservation actions on particular queues. They are configured with the aclAdministerReservations, aclListReservations, and the aclSubmitReservations properties, which can be set per queue. Currently the supported administrative actions are updating and deleting reservations. An administrator may also submit and list *all* reservations on the queue. These properties take values in a format like "user1,user2 group1,group2" or " group1,group2". Actions on a queue are permitted if the user/group is a member of the reservation ACL. Note that any user can update, delete, or list their own reservations. If reservation ACLs are enabled but not defined, everyone will have access.
 
 ##Administration
 

@@ -46,8 +46,12 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
 import org.apache.hadoop.mapreduce.v2.app.launcher.ContainerLauncher.EventType;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersRequest;
@@ -454,7 +458,20 @@ public class TestContainerLauncherImpl {
     }
 
     @Override
+    public IncreaseContainersResourceResponse increaseContainersResource(
+        IncreaseContainersResourceRequest request) throws YarnException,
+        IOException {
+      return null;
+    }
+
+    @Override
     public void close() throws IOException {
+    }
+
+    @Override
+    public SignalContainerResponse signalToContainer(
+        SignalContainerRequest request) throws YarnException, IOException {
+      return null;
     }
   }
   

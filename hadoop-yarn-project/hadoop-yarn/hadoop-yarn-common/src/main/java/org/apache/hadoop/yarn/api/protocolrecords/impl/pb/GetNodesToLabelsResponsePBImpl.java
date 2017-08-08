@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -26,14 +27,17 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.NodeLabelPBImpl;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdProto;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsResponse;
-
-import com.google.common.collect.Sets;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdToLabelsProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.NodeLabelProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNodesToLabelsResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetNodesToLabelsResponseProtoOrBuilder;
+
+import com.google.common.collect.Sets;
 
 public class GetNodesToLabelsResponsePBImpl extends
     GetNodesToLabelsResponse {
@@ -43,7 +47,7 @@ public class GetNodesToLabelsResponsePBImpl extends
   boolean viaProto = false;
 
   private Map<NodeId, Set<String>> nodeToLabels;
-  
+
   public GetNodesToLabelsResponsePBImpl() {
     this.builder = GetNodesToLabelsResponseProto.newBuilder();
   }
@@ -149,7 +153,7 @@ public class GetNodesToLabelsResponsePBImpl extends
   private NodeIdProto convertToProtoFormat(NodeId t) {
     return ((NodeIdPBImpl)t).getProto();
   }
-  
+
   @Override
   public int hashCode() {
     assert false : "hashCode not designed";

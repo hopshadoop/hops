@@ -27,10 +27,16 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.*;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
-import org.apache.hadoop.tools.*;
+import org.apache.hadoop.tools.CopyListing;
+import org.apache.hadoop.tools.CopyListingFileStatus;
+import org.apache.hadoop.tools.DistCpConstants;
+import org.apache.hadoop.tools.DistCpOptions;
 import org.apache.hadoop.tools.DistCpOptions.FileAttribute;
+import org.apache.hadoop.tools.GlobbedCopyListing;
 import org.apache.hadoop.tools.util.DistCpUtils;
 
 import java.io.IOException;
@@ -54,7 +60,10 @@ public class CopyCommitter extends FileOutputCommitter {
   private static final Log LOG = LogFactory.getLog(CopyCommitter.class);
 
   private final TaskAttemptContext taskAttemptContext;
-
+  private boolean syncFolder = false;
+  private boolean overwrite = false;
+  private boolean targetPathExists = true;
+  
   /**
    * Create a output committer
    *
@@ -67,16 +76,22 @@ public class CopyCommitter extends FileOutputCommitter {
     this.taskAttemptContext = context;
   }
 
-  /** @inheritDoc */
+  /** {@inheritDoc} */
   @Override
   public void commitJob(JobContext jobContext) throws IOException {
     Configuration conf = jobContext.getConfiguration();
+    syncFolder = conf.getBoolean(DistCpConstants.CONF_LABEL_SYNC_FOLDERS, false);
+    overwrite = conf.getBoolean(DistCpConstants.CONF_LABEL_OVERWRITE, false);
+    targetPathExists = conf.getBoolean(DistCpConstants.CONF_LABEL_TARGET_PATH_EXISTS, true);
+    
     super.commitJob(jobContext);
 
     cleanupTempFiles(jobContext);
 
     String attributes = conf.get(DistCpConstants.CONF_LABEL_PRESERVE_STATUS);
-    if (attributes != null && !attributes.isEmpty()) {
+    final boolean preserveRawXattrs =
+        conf.getBoolean(DistCpConstants.CONF_LABEL_PRESERVE_RAWXATTRS, false);
+    if ((attributes != null && !attributes.isEmpty()) || preserveRawXattrs) {
       preserveFileAttributesForDirectories(conf);
     }
 
@@ -93,7 +108,7 @@ public class CopyCommitter extends FileOutputCommitter {
     }
   }
 
-  /** @inheritDoc */
+  /** {@inheritDoc} */
   @Override
   public void abortJob(JobContext jobContext,
                        JobStatus.State state) throws IOException {
@@ -123,6 +138,9 @@ public class CopyCommitter extends FileOutputCommitter {
   private void deleteAttemptTempFiles(Path targetWorkPath,
                                       FileSystem targetFS,
                                       String jobId) throws IOException {
+    if (targetWorkPath == null) {
+      return;
+    }
 
     FileStatus[] tempFiles = targetFS.globStatus(
         new Path(targetWorkPath, ".distcp.tmp." + jobId.replaceAll("job","attempt") + "*"));
@@ -155,9 +173,13 @@ public class CopyCommitter extends FileOutputCommitter {
   // user/group permissions, etc.) based on the corresponding source directories.
   private void preserveFileAttributesForDirectories(Configuration conf) throws IOException {
     String attrSymbols = conf.get(DistCpConstants.CONF_LABEL_PRESERVE_STATUS);
+    final boolean syncOrOverwrite = syncFolder || overwrite;
+
     LOG.info("About to preserve attributes: " + attrSymbols);
 
     EnumSet<FileAttribute> attributes = DistCpUtils.unpackAttributes(attrSymbols);
+    final boolean preserveRawXattrs =
+        conf.getBoolean(DistCpConstants.CONF_LABEL_PRESERVE_RAWXATTRS, false);
 
     Path sourceListing = new Path(conf.get(DistCpConstants.CONF_LABEL_LISTING_FILE_PATH));
     FileSystem clusterFS = sourceListing.getFileSystem(conf);
@@ -169,7 +191,7 @@ public class CopyCommitter extends FileOutputCommitter {
 
     long preservedEntries = 0;
     try {
-      FileStatus srcFileStatus = new FileStatus();
+      CopyListingFileStatus srcFileStatus = new CopyListingFileStatus();
       Text srcRelPath = new Text();
 
       // Iterate over every source path that was copied.
@@ -179,15 +201,14 @@ public class CopyCommitter extends FileOutputCommitter {
         if (! srcFileStatus.isDirectory()) continue;
 
         Path targetFile = new Path(targetRoot.toString() + "/" + srcRelPath);
-
-        // Skip the root folder.
-        // Status can't be preserved on root-folder. (E.g. multiple paths may
-        // be copied to a single target folder. Which source-attributes to use
-        // on the target is undefined.)
-        if (targetRoot.equals(targetFile)) continue;
+        //
+        // Skip the root folder when syncOrOverwrite is true.
+        //
+        if (targetRoot.equals(targetFile) && syncOrOverwrite) continue;
 
         FileSystem targetFS = targetFile.getFileSystem(conf);
-        DistCpUtils.preserve(targetFS, targetFile, srcFileStatus,  attributes);
+        DistCpUtils.preserve(targetFS, targetFile, srcFileStatus, attributes,
+            preserveRawXattrs);
 
         taskAttemptContext.progress();
         taskAttemptContext.setStatus("Preserving status on directory entries. [" +
@@ -217,8 +238,18 @@ public class CopyCommitter extends FileOutputCommitter {
     List<Path> targets = new ArrayList<Path>(1);
     Path targetFinalPath = new Path(conf.get(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH));
     targets.add(targetFinalPath);
-    DistCpOptions options = new DistCpOptions(targets, new Path("/NONE"));
-
+    Path resultNonePath = Path.getPathWithoutSchemeAndAuthority(targetFinalPath)
+        .toString().startsWith(DistCpConstants.HDFS_RESERVED_RAW_DIRECTORY_NAME)
+        ? DistCpConstants.RAW_NONE_PATH : DistCpConstants.NONE_PATH;
+    DistCpOptions options = new DistCpOptions(targets, resultNonePath);
+    //
+    // Set up options to be the same from the CopyListing.buildListing's perspective,
+    // so to collect similar listings as when doing the copy
+    //
+    options.setOverwrite(overwrite);
+    options.setSyncFolder(syncFolder);
+    options.setTargetPathExists(targetPathExists);
+    
     target.buildListing(targetListing, options);
     Path sortedTargetListing = DistCpUtils.sortListing(clusterFS, conf, targetListing);
     long totalLen = clusterFS.getFileStatus(sortedTargetListing).getLen();
@@ -232,9 +263,9 @@ public class CopyCommitter extends FileOutputCommitter {
     // Delete all from target that doesn't also exist on source.
     long deletedEntries = 0;
     try {
-      FileStatus srcFileStatus = new FileStatus();
+      CopyListingFileStatus srcFileStatus = new CopyListingFileStatus();
       Text srcRelPath = new Text();
-      FileStatus trgtFileStatus = new FileStatus();
+      CopyListingFileStatus trgtFileStatus = new CopyListingFileStatus();
       Text trgtRelPath = new Text();
 
       FileSystem targetFS = targetFinalPath.getFileSystem(conf);

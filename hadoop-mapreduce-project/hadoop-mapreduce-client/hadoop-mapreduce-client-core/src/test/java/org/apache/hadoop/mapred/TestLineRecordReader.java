@@ -34,7 +34,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
-import org.apache.commons.io.Charsets;
+import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -72,7 +72,7 @@ public class TestLineRecordReader {
     String delimiter = conf.get("textinputformat.record.delimiter");
     byte[] recordDelimiterBytes = null;
     if (null != delimiter) {
-      recordDelimiterBytes = delimiter.getBytes(Charsets.UTF_8);
+      recordDelimiterBytes = delimiter.getBytes(StandardCharsets.UTF_8);
     }
     // read the data without splitting to count the records
     FileSplit split = new FileSplit(testFilePath, 0, testFileSize,
@@ -120,7 +120,7 @@ public class TestLineRecordReader {
     String delimiter = conf.get("textinputformat.record.delimiter");
     byte[] recordDelimiterBytes = null;
     if (null != delimiter) {
-      recordDelimiterBytes = delimiter.getBytes(Charsets.UTF_8);
+      recordDelimiterBytes = delimiter.getBytes(StandardCharsets.UTF_8);
     }
     // read the data without splitting to count the records
     FileSplit split = new FileSplit(testFilePath, 0, testFileSize,
@@ -182,6 +182,13 @@ public class TestLineRecordReader {
 
     //Start next split 10 bytes from behind the end marker.
     testSplitRecords("blockEndingInCR.txt.bz2", 136494);
+  }
+
+  @Test(expected=IOException.class)
+  public void testSafeguardSplittingUnsplittableFiles() throws IOException {
+    // The LineRecordReader must fail when trying to read a file that
+    // was compressed using an unsplittable file format
+    testSplitRecords("TestSafeguardSplittingUnsplittableFiles.txt.gz", 2);
   }
 
   // Use the LineRecordReader to read records from the file
@@ -475,7 +482,7 @@ public class TestLineRecordReader {
     String inputData = "abcdefghij++kl++mno";
     Path inputFile = createInputFile(conf, inputData);
     String delimiter = "++";
-    byte[] recordDelimiterBytes = delimiter.getBytes(Charsets.UTF_8);
+    byte[] recordDelimiterBytes = delimiter.getBytes(StandardCharsets.UTF_8);
     // the first split must contain two records to make sure that it also pulls
     // in the record from the 2nd split
     int splitLength = 15;
@@ -548,7 +555,7 @@ public class TestLineRecordReader {
     inputData = "abcd|efgh|+|ij|kl|+|mno|pqr";
     inputFile = createInputFile(conf, inputData);
     delimiter = "|+|";
-    recordDelimiterBytes = delimiter.getBytes(Charsets.UTF_8);
+    recordDelimiterBytes = delimiter.getBytes(StandardCharsets.UTF_8);
     // walking over the buffer and split sizes checks for proper processing
     // of the ambiguous bytes of the delimiter
     for (int bufferSize = 1; bufferSize <= inputData.length(); bufferSize++) {

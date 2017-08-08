@@ -26,16 +26,23 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.JobSubmissionFiles;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.tools.util.TestDistCpUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
+@RunWith(value = Parameterized.class)
 public class TestIntegration {
   private static final Log LOG = LogFactory.getLog(TestIntegration.class);
 
@@ -44,6 +51,17 @@ public class TestIntegration {
   private static Path listFile;
   private static Path target;
   private static String root;
+  private int numListstatusThreads;
+
+  public TestIntegration(int numListstatusThreads) {
+    this.numListstatusThreads = numListstatusThreads;
+  }
+
+  @Parameters
+  public static Collection<Object[]> data() {
+    Object[][] data = new Object[][] { { 1 }, { 2 }, { 10 } };
+    return Arrays.asList(data);
+  }
 
   private static Configuration getConf() {
     Configuration conf = new Configuration();
@@ -56,11 +74,11 @@ public class TestIntegration {
   public static void setup() {
     try {
       fs = FileSystem.get(getConf());
-      listFile = new Path("target/tmp/listing").makeQualified(fs.getUri(),
+      listFile = new Path("target/tmp/root/listing").makeQualified(fs.getUri(),
               fs.getWorkingDirectory());
-      target = new Path("target/tmp/target").makeQualified(fs.getUri(),
+      target = new Path("target/tmp/root/target").makeQualified(fs.getUri(),
               fs.getWorkingDirectory());
-      root = new Path("target/tmp").makeQualified(fs.getUri(),
+      root = new Path("target/tmp/root").makeQualified(fs.getUri(),
               fs.getWorkingDirectory()).toString();
       TestDistCpUtils.delete(fs, root);
     } catch (IOException e) {
@@ -68,7 +86,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testSingleFileMissingTarget() {
     caseSingleFileMissingTarget(false);
     caseSingleFileMissingTarget(true);
@@ -80,7 +98,7 @@ public class TestIntegration {
       addEntries(listFile, "singlefile1/file1");
       createFiles("singlefile1/file1");
 
-      runTest(listFile, target, sync);
+      runTest(listFile, target, false, sync);
 
       checkResult(target, 1);
     } catch (IOException e) {
@@ -91,7 +109,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testSingleFileTargetFile() {
     caseSingleFileTargetFile(false);
     caseSingleFileTargetFile(true);
@@ -103,7 +121,7 @@ public class TestIntegration {
       addEntries(listFile, "singlefile1/file1");
       createFiles("singlefile1/file1", "target");
 
-      runTest(listFile, target, sync);
+      runTest(listFile, target, false, sync);
 
       checkResult(target, 1);
     } catch (IOException e) {
@@ -114,7 +132,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testSingleFileTargetDir() {
     caseSingleFileTargetDir(false);
     caseSingleFileTargetDir(true);
@@ -127,7 +145,7 @@ public class TestIntegration {
       createFiles("singlefile2/file2");
       mkdirs(target.toString());
 
-      runTest(listFile, target, sync);
+      runTest(listFile, target, true, sync);
 
       checkResult(target, 1, "file2");
     } catch (IOException e) {
@@ -138,7 +156,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testSingleDirTargetMissing() {
     caseSingleDirTargetMissing(false);
     caseSingleDirTargetMissing(true);
@@ -150,7 +168,7 @@ public class TestIntegration {
       addEntries(listFile, "singledir");
       mkdirs(root + "/singledir/dir1");
 
-      runTest(listFile, target, sync);
+      runTest(listFile, target, false, sync);
 
       checkResult(target, 1, "dir1");
     } catch (IOException e) {
@@ -161,7 +179,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testSingleDirTargetPresent() {
 
     try {
@@ -169,7 +187,7 @@ public class TestIntegration {
       mkdirs(root + "/singledir/dir1");
       mkdirs(target.toString());
 
-      runTest(listFile, target, false);
+      runTest(listFile, target, true, false);
 
       checkResult(target, 1, "singledir/dir1");
     } catch (IOException e) {
@@ -180,7 +198,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testUpdateSingleDirTargetPresent() {
 
     try {
@@ -188,7 +206,7 @@ public class TestIntegration {
       mkdirs(root + "/Usingledir/Udir1");
       mkdirs(target.toString());
 
-      runTest(listFile, target, true);
+      runTest(listFile, target, true, true);
 
       checkResult(target, 1, "Udir1");
     } catch (IOException e) {
@@ -199,7 +217,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testMultiFileTargetPresent() {
     caseMultiFileTargetPresent(false);
     caseMultiFileTargetPresent(true);
@@ -212,7 +230,7 @@ public class TestIntegration {
       createFiles("multifile/file3", "multifile/file4", "multifile/file5");
       mkdirs(target.toString());
 
-      runTest(listFile, target, sync);
+      runTest(listFile, target, true, sync);
 
       checkResult(target, 3, "file3", "file4", "file5");
     } catch (IOException e) {
@@ -223,7 +241,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testMultiFileTargetMissing() {
     caseMultiFileTargetMissing(false);
     caseMultiFileTargetMissing(true);
@@ -235,7 +253,7 @@ public class TestIntegration {
       addEntries(listFile, "multifile/file3", "multifile/file4", "multifile/file5");
       createFiles("multifile/file3", "multifile/file4", "multifile/file5");
 
-      runTest(listFile, target, sync);
+      runTest(listFile, target, false, sync);
 
       checkResult(target, 3, "file3", "file4", "file5");
     } catch (IOException e) {
@@ -246,7 +264,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testMultiDirTargetPresent() {
 
     try {
@@ -254,7 +272,7 @@ public class TestIntegration {
       createFiles("multifile/file3", "multifile/file4", "multifile/file5");
       mkdirs(target.toString(), root + "/singledir/dir1");
 
-      runTest(listFile, target, false);
+      runTest(listFile, target, true, false);
 
       checkResult(target, 2, "multifile/file3", "multifile/file4", "multifile/file5", "singledir/dir1");
     } catch (IOException e) {
@@ -265,7 +283,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testUpdateMultiDirTargetPresent() {
 
     try {
@@ -273,7 +291,7 @@ public class TestIntegration {
       createFiles("Umultifile/Ufile3", "Umultifile/Ufile4", "Umultifile/Ufile5");
       mkdirs(target.toString(), root + "/Usingledir/Udir1");
 
-      runTest(listFile, target, true);
+      runTest(listFile, target, true, true);
 
       checkResult(target, 4, "Ufile3", "Ufile4", "Ufile5", "Udir1");
     } catch (IOException e) {
@@ -284,7 +302,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testMultiDirTargetMissing() {
 
     try {
@@ -292,7 +310,7 @@ public class TestIntegration {
       createFiles("multifile/file3", "multifile/file4", "multifile/file5");
       mkdirs(root + "/singledir/dir1");
 
-      runTest(listFile, target, false);
+      runTest(listFile, target, false, false);
 
       checkResult(target, 2, "multifile/file3", "multifile/file4",
           "multifile/file5", "singledir/dir1");
@@ -304,7 +322,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testUpdateMultiDirTargetMissing() {
 
     try {
@@ -312,7 +330,7 @@ public class TestIntegration {
       createFiles("multifile/file3", "multifile/file4", "multifile/file5");
       mkdirs(root + "/singledir/dir1");
 
-      runTest(listFile, target, true);
+      runTest(listFile, target, false, true);
 
       checkResult(target, 4, "file3", "file4", "file5", "dir1");
     } catch (IOException e) {
@@ -323,7 +341,7 @@ public class TestIntegration {
     }
   }
   
-  @Test
+  @Test(timeout=100000)
   public void testDeleteMissingInDestination() {
     
     try {
@@ -331,7 +349,7 @@ public class TestIntegration {
       createFiles("srcdir/file1", "dstdir/file1", "dstdir/file2");
       
       Path target = new Path(root + "/dstdir");
-      runTest(listFile, target, true, true, false);
+      runTest(listFile, target, false, true, true, false);
       
       checkResult(target, 1, "file1");
     } catch (IOException e) {
@@ -343,7 +361,7 @@ public class TestIntegration {
     }
   }
   
-  @Test
+  @Test(timeout=100000)
   public void testOverwrite() {
     byte[] contents1 = "contents1".getBytes();
     byte[] contents2 = "contents2".getBytes();
@@ -355,7 +373,7 @@ public class TestIntegration {
       createWithContents("dstdir/file1", contents2);
       
       Path target = new Path(root + "/dstdir");
-      runTest(listFile, target, false, false, true);
+      runTest(listFile, target, false, false, false, true);
       
       checkResult(target, 1, "file1");
       
@@ -375,7 +393,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testGlobTargetMissingSingleLevel() {
 
     try {
@@ -385,7 +403,7 @@ public class TestIntegration {
       createFiles("multifile/file3", "multifile/file4", "multifile/file5");
       createFiles("singledir/dir2/file6");
 
-      runTest(listFile, target, false);
+      runTest(listFile, target, false, false);
 
       checkResult(target, 2, "multifile/file3", "multifile/file4", "multifile/file5",
           "singledir/dir2/file6");
@@ -398,7 +416,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testUpdateGlobTargetMissingSingleLevel() {
 
     try {
@@ -408,7 +426,7 @@ public class TestIntegration {
       createFiles("multifile/file3", "multifile/file4", "multifile/file5");
       createFiles("singledir/dir2/file6");
 
-      runTest(listFile, target, true);
+      runTest(listFile, target, false, true);
 
       checkResult(target, 4, "file3", "file4", "file5", "dir2/file6");
     } catch (IOException e) {
@@ -420,7 +438,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testGlobTargetMissingMultiLevel() {
 
     try {
@@ -431,7 +449,7 @@ public class TestIntegration {
       createFiles("singledir1/dir3/file7", "singledir1/dir3/file8",
           "singledir1/dir3/file9");
 
-      runTest(listFile, target, false);
+      runTest(listFile, target, false, false);
 
       checkResult(target, 4, "file3", "file4", "file5",
           "dir3/file7", "dir3/file8", "dir3/file9");
@@ -444,7 +462,7 @@ public class TestIntegration {
     }
   }
 
-  @Test
+  @Test(timeout=100000)
   public void testUpdateGlobTargetMissingMultiLevel() {
 
     try {
@@ -455,7 +473,7 @@ public class TestIntegration {
       createFiles("singledir1/dir3/file7", "singledir1/dir3/file8",
           "singledir1/dir3/file9");
 
-      runTest(listFile, target, true);
+      runTest(listFile, target, false, true);
 
       checkResult(target, 6, "file3", "file4", "file5",
           "file7", "file8", "file9");
@@ -468,7 +486,7 @@ public class TestIntegration {
     }
   }
   
-  @Test
+  @Test(timeout=100000)
   public void testCleanup() {
     try {
       Path sourcePath = new Path("noscheme:///file");
@@ -533,16 +551,20 @@ public class TestIntegration {
     }
   }
     
-  private void runTest(Path listFile, Path target, boolean sync) throws IOException {
-    runTest(listFile, target, sync, false, false);
+  private void runTest(Path listFile, Path target, boolean targetExists,
+      boolean sync) throws IOException {
+    runTest(listFile, target, targetExists, sync, false, false);
   }
   
-  private void runTest(Path listFile, Path target, boolean sync, boolean delete,
+  private void runTest(Path listFile, Path target, boolean targetExists, 
+      boolean sync, boolean delete,
       boolean overwrite) throws IOException {
     DistCpOptions options = new DistCpOptions(listFile, target);
     options.setSyncFolder(sync);
     options.setDeleteMissing(delete);
     options.setOverwrite(overwrite);
+    options.setTargetPathExists(targetExists);
+    options.setNumListstatusThreads(numListstatusThreads);
     try {
       new DistCp(getConf(), options).execute();
     } catch (Exception e) {

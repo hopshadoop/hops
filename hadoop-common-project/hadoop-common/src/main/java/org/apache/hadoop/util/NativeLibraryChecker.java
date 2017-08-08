@@ -88,11 +88,13 @@ public class NativeLibraryChecker {
       if (zlibLoaded) {
         zlibLibraryName = ZlibFactory.getLibraryName();
       }
+
       snappyLoaded = NativeCodeLoader.buildSupportsSnappy() &&
           SnappyCodec.isNativeCodeLoaded();
       if (snappyLoaded && NativeCodeLoader.buildSupportsSnappy()) {
         snappyLibraryName = SnappyCodec.getLibraryName();
       }
+
       if (OpensslCipher.getLoadingFailureReason() != null) {
         openSslDetail = OpensslCipher.getLoadingFailureReason();
         openSslLoaded = false;
@@ -100,7 +102,6 @@ public class NativeLibraryChecker {
         openSslDetail = OpensslCipher.getLibraryName();
         openSslLoaded = true;
       }
-
       isalDetail = ErasureCodeNative.getLoadingFailureReason();
       if (isalDetail != null) {
         isalLoaded = false;
@@ -108,6 +109,7 @@ public class NativeLibraryChecker {
         isalDetail = ErasureCodeNative.getLibraryName();
         isalLoaded = true;
       }
+
 
       if (lz4Loaded) {
         lz4LibraryName = Lz4Codec.getLibraryName();
@@ -117,14 +119,21 @@ public class NativeLibraryChecker {
       }
     }
 
-    // winutils.exe is required on Windows
-    winutilsPath = Shell.getWinUtilsPath();
-    if (winutilsPath != null) {
-      winutilsExists = true;
-    } else {
-      winutilsPath = "";
+    /*
+    if (Shell.WINDOWS) {
+      // winutils.exe is required on Windows
+      try {
+        winutilsPath = Shell.getWinUtilsFile().getCanonicalPath();
+        winutilsExists = true;
+      } catch (IOException e) {
+        LOG.debug("No Winutils: ", e);
+        winutilsPath = e.getMessage();
+        winutilsExists = false;
+      }
+      System.out.printf("winutils: %b %s%n", winutilsExists, winutilsPath);
     }
-
+    */
+ 
     System.out.println("Native library checking:");
     System.out.printf("hadoop:  %b %s%n", nativeHadoopLoaded, hadoopLibraryName);
     System.out.printf("zlib:    %b %s%n", zlibLoaded, zlibLibraryName);

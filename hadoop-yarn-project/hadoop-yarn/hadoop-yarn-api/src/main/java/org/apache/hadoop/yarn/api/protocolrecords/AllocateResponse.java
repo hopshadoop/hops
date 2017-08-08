@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -34,8 +35,11 @@ import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NMToken;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.PreemptionMessage;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.Token;
+import org.apache.hadoop.yarn.api.records.UpdateContainerError;
+import org.apache.hadoop.yarn.api.records.UpdatedContainer;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
@@ -59,6 +63,14 @@ import org.apache.hadoop.yarn.util.Records;
  *   <li>The number of available nodes in a cluster.</li>
  *   <li>A description of resources requested back by the cluster</li>
  *   <li>AMRMToken, if AMRMToken has been rolled over</li>
+ *   <li>
+ *     A list of {@link Container} representing the containers
+ *     whose resource has been increased.
+ *   </li>
+ *   <li>
+ *     A list of {@link Container} representing the containers
+ *     whose resource has been decreased.
+ *   </li>
  * </ul>
  * 
  * @see ApplicationMasterProtocol#allocate(AllocateRequest)
@@ -87,8 +99,23 @@ public abstract class AllocateResponse {
     return response;
   }
 
-  @Public
-  @Stable
+  /**
+   * Use {@link AllocateResponse#newInstance(int, List, List, List, Resource,
+   * AMCommand, int, PreemptionMessage, List, Token, List)} instead
+   * @param responseId responseId
+   * @param completedContainers completedContainers
+   * @param allocatedContainers allocatedContainers
+   * @param updatedNodes updatedNodes
+   * @param availResources availResources
+   * @param command command
+   * @param numClusterNodes numClusterNodes
+   * @param preempt preempt
+   * @param nmTokens nmTokens
+   * @param increasedContainers increasedContainers
+   * @param decreasedContainers decreasedContainers
+   * @return AllocateResponse
+   */
+  @Deprecated
   public static AllocateResponse newInstance(int responseId,
       List<ContainerStatus> completedContainers,
       List<Container> allocatedContainers, List<NodeReport> updatedNodes,
@@ -96,11 +123,23 @@ public abstract class AllocateResponse {
       PreemptionMessage preempt, List<NMToken> nmTokens,
       List<ContainerResourceIncrease> increasedContainers,
       List<ContainerResourceDecrease> decreasedContainers) {
+    return newInstance(responseId, completedContainers, allocatedContainers,
+        updatedNodes, availResources, command, numClusterNodes, preempt,
+        nmTokens);
+  }
+
+  @Public
+  @Unstable
+  public static AllocateResponse newInstance(int responseId,
+      List<ContainerStatus> completedContainers,
+      List<Container> allocatedContainers, List<NodeReport> updatedNodes,
+      Resource availResources, AMCommand command, int numClusterNodes,
+      PreemptionMessage preempt, List<NMToken> nmTokens,
+      List<UpdatedContainer> updatedContainers) {
     AllocateResponse response = newInstance(responseId, completedContainers,
         allocatedContainers, updatedNodes, availResources, command,
         numClusterNodes, preempt, nmTokens);
-    response.setIncreasedContainers(increasedContainers);
-    response.setDecreasedContainers(decreasedContainers);
+    response.setUpdatedContainers(updatedContainers);
     return response;
   }
 
@@ -111,12 +150,11 @@ public abstract class AllocateResponse {
       List<Container> allocatedContainers, List<NodeReport> updatedNodes,
       Resource availResources, AMCommand command, int numClusterNodes,
       PreemptionMessage preempt, List<NMToken> nmTokens, Token amRMToken,
-      List<ContainerResourceIncrease> increasedContainers,
-      List<ContainerResourceDecrease> decreasedContainers) {
+      List<UpdatedContainer> updatedContainers) {
     AllocateResponse response =
         newInstance(responseId, completedContainers, allocatedContainers,
           updatedNodes, availResources, command, numClusterNodes, preempt,
-          nmTokens, increasedContainers, decreasedContainers);
+          nmTokens, updatedContainers);
     response.setAMRMToken(amRMToken);
     return response;
   }
@@ -263,34 +301,23 @@ public abstract class AllocateResponse {
   public abstract void setNMTokens(List<NMToken> nmTokens);
   
   /**
-   * Get the list of newly increased containers by <code>ResourceManager</code>
+   * Get the list of newly updated containers by
+   * <code>ResourceManager</code>.
    */
   @Public
-  @Stable
-  public abstract List<ContainerResourceIncrease> getIncreasedContainers();
+  @Unstable
+  public abstract List<UpdatedContainer> getUpdatedContainers();
 
   /**
-   * Set the list of newly increased containers by <code>ResourceManager</code>
+   * Set the list of newly updated containers by
+   * <code>ResourceManager</code>.
+   *
+   * @param updatedContainers List of Updated Containers.
    */
   @Private
   @Unstable
-  public abstract void setIncreasedContainers(
-      List<ContainerResourceIncrease> increasedContainers);
-
-  /**
-   * Get the list of newly decreased containers by <code>NodeManager</code>
-   */
-  @Public
-  @Stable
-  public abstract List<ContainerResourceDecrease> getDecreasedContainers();
-
-  /**
-   * Set the list of newly decreased containers by <code>NodeManager</code>
-   */
-  @Private
-  @Unstable
-  public abstract void setDecreasedContainers(
-      List<ContainerResourceDecrease> decreasedContainers);
+  public abstract void setUpdatedContainers(
+      List<UpdatedContainer> updatedContainers);
 
   /**
    * The AMRMToken that belong to this attempt
@@ -304,4 +331,56 @@ public abstract class AllocateResponse {
   @Private
   @Unstable
   public abstract void setAMRMToken(Token amRMToken);
+
+  /**
+   * Priority of the application
+   *
+   * @return get application priority
+   */
+  @Public
+  @Unstable
+  public abstract Priority getApplicationPriority();
+
+  @Private
+  @Unstable
+  public abstract void setApplicationPriority(Priority priority);
+
+  /**
+   * Get the list of container update errors to inform the
+   * Application Master about the container updates that could not be
+   * satisfied due to error.
+   *
+   * @return List of Update Container Errors.
+   */
+  @Public
+  @Unstable
+  public List<UpdateContainerError> getUpdateErrors() {
+    return new ArrayList<>();
+  }
+
+  /**
+   * Set the list of container update errors to inform the
+   * Application Master about the container updates that could not be
+   * satisfied due to error.
+   * @param updateErrors list of <code>UpdateContainerError</code> for
+   *                       containers updates requests that were in error
+   */
+  @Public
+  @Unstable
+  public void setUpdateErrors(List<UpdateContainerError> updateErrors) {
+  }
+
+  /**
+   * Use {@link AllocateResponse#getUpdatedContainers()} instead
+   * @return null
+   */
+  @Deprecated
+  public abstract List<ContainerResourceIncrease> getIncreasedContainers();
+
+  /**
+   * Use {@link AllocateResponse#getUpdatedContainers()} instead
+   * @return null
+   */
+  @Deprecated
+  public abstract List<ContainerResourceDecrease> getDecreasedContainers();
 }

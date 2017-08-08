@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.util;
 
+import java.text.SimpleDateFormat;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -26,6 +28,19 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
 @InterfaceStability.Unstable
 public final class Time {
+
+  /**
+   * number of nano seconds in 1 millisecond
+   */
+  private static final long NANOSECONDS_PER_MILLISECOND = 1000000;
+
+  private static final ThreadLocal<SimpleDateFormat> DATE_FORMAT =
+      new ThreadLocal<SimpleDateFormat>() {
+    @Override
+    protected SimpleDateFormat initialValue() {
+      return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSSZ");
+    }
+  };
 
   /**
    * Current system time.  Do not use this to calculate a duration or interval
@@ -47,8 +62,24 @@ public final class Time {
    * @return a monotonic clock that counts in milliseconds.
    */
   public static long monotonicNow() {
-    final long NANOSECONDS_PER_MILLISECOND = 1000000;
-
     return System.nanoTime() / NANOSECONDS_PER_MILLISECOND;
+  }
+
+  /**
+   * Same as {@link #monotonicNow()} but returns its result in nanoseconds.
+   * Note that this is subject to the same resolution constraints as
+   * {@link System#nanoTime()}.
+   * @return a monotonic clock that counts in nanoseconds.
+   */
+  public static long monotonicNowNanos() {
+    return System.nanoTime();
+  }
+
+  /**
+   * Convert time in millisecond to human readable format.
+   * @return a human readable string for the input time
+   */
+  public static String formatTime(long millis) {
+    return DATE_FORMAT.get().format(millis);
   }
 }

@@ -106,22 +106,28 @@ public class RMWebAppFilter extends GuiceContainer {
       HttpServletResponse response, FilterChain chain) throws IOException,
       ServletException {
     response.setCharacterEncoding("UTF-8");
-    String uri = HtmlQuoting.quoteHtmlChars(request.getRequestURI());
+    String htmlEscapedUri = HtmlQuoting.quoteHtmlChars(request.getRequestURI());
 
-    if (uri == null) {
-      uri = "/";
+    if (htmlEscapedUri == null) {
+      htmlEscapedUri = "/";
     }
+
+    String uriWithQueryString =
+        WebAppUtils.appendQueryParams(request, htmlEscapedUri);
+    String htmlEscapedUriWithQueryString =
+        WebAppUtils.getHtmlEscapedURIWithQueryString(request);
+
     RMWebApp rmWebApp = injector.getInstance(RMWebApp.class);
     rmWebApp.checkIfStandbyRM();
     if (rmWebApp.isStandby()
-        && shouldRedirect(rmWebApp, uri)) {
+        && shouldRedirect(rmWebApp, htmlEscapedUri)) {
 
       String redirectPath = rmWebApp.getRedirectPath();
 
       if (redirectPath != null && !redirectPath.isEmpty()) {
-        redirectPath += uri;
-        String redirectMsg =
-            "This is standby RM. The redirect url is: " + redirectPath;
+        redirectPath += uriWithQueryString;
+        String redirectMsg = "This is standby RM. The redirect url is: "
+            + htmlEscapedUriWithQueryString;
         PrintWriter out = response.getWriter();
         out.println(redirectMsg);
         response.setHeader("Location", redirectPath);
@@ -142,7 +148,7 @@ public class RMWebAppFilter extends GuiceContainer {
         int next = calculateExponentialTime(retryInterval);
 
         String redirectUrl =
-            appendOrReplaceParamter(path + uri,
+            appendOrReplaceParamter(path + uriWithQueryString,
               YarnWebParams.NEXT_REFRESH_INTERVAL + "=" + (retryInterval + 1));
         if (redirectUrl == null || next > MAX_SLEEP_TIME) {
           doRetry = false;
@@ -161,7 +167,7 @@ public class RMWebAppFilter extends GuiceContainer {
       }
       return;
     } else if (ahsEnabled) {
-      String ahsRedirectUrl = ahsRedirectPath(uri, rmWebApp);
+      String ahsRedirectUrl = ahsRedirectPath(uriWithQueryString, rmWebApp);
       if(ahsRedirectUrl != null) {
         response.setHeader("Location", ahsRedirectUrl);
         response.setStatus(HttpServletResponse.SC_TEMPORARY_REDIRECT);
@@ -198,7 +204,7 @@ public class RMWebAppFilter extends GuiceContainer {
           break;
         case "appattempt":
           try{
-            appAttemptId = ConverterUtils.toApplicationAttemptId(parts[3]);
+            appAttemptId = ApplicationAttemptId.fromString(parts[3]);
           } catch (IllegalArgumentException e) {
             LOG.debug("Error parsing {} as an ApplicationAttemptId",
                 parts[3], e);

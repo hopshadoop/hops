@@ -45,7 +45,13 @@ done
 #export HADOOP_HEAPSIZE=
 #export HADOOP_NAMENODE_INIT_HEAPSIZE=""
 
+# Enable extra debugging of Hadoop's JAAS binding, used to set up
+# Kerberos security.
+# export HADOOP_JAAS_DEBUG=true
+
 # Extra Java runtime options.  Empty by default.
+# For Kerberos debugging, an extended option set logs more invormation
+# export HADOOP_OPTS="-Djava.net.preferIPv4Stack=true -Dsun.security.krb5.debug=true -Dsun.security.spnego.debug"
 export HADOOP_OPTS="$HADOOP_OPTS -Djava.net.preferIPv4Stack=true"
 
 # Command specific options appended to HADOOP_OPTS when specified
@@ -58,7 +64,11 @@ export HADOOP_NFS3_OPTS="$HADOOP_NFS3_OPTS"
 export HADOOP_PORTMAP_OPTS="-Xmx512m $HADOOP_PORTMAP_OPTS"
 
 # The following applies to multiple commands (fs, dfs, fsck, distcp etc)
-export HADOOP_CLIENT_OPTS="-Xmx512m $HADOOP_CLIENT_OPTS"
+export HADOOP_CLIENT_OPTS="$HADOOP_CLIENT_OPTS"
+# set heap args when HADOOP_HEAPSIZE is empty
+if [ "$HADOOP_HEAPSIZE" = "" ]; then
+  export HADOOP_CLIENT_OPTS="-Xmx512m $HADOOP_CLIENT_OPTS"
+fi
 #HADOOP_JAVA_PLATFORM_OPTS="-XX:-UsePerfData $HADOOP_JAVA_PLATFORM_OPTS"
 
 # On secure datanodes, user to run the datanode as after dropping privileges.
@@ -72,7 +82,7 @@ export HADOOP_SECURE_DN_USER=${HADOOP_SECURE_DN_USER}
 #export HADOOP_LOG_DIR=${HADOOP_LOG_DIR}/$USER
 
 # Where log files are stored in the secure data environment.
-export HADOOP_SECURE_DN_LOG_DIR=${HADOOP_LOG_DIR}/${HADOOP_HDFS_USER}
+#export HADOOP_SECURE_DN_LOG_DIR=${HADOOP_LOG_DIR}/${HADOOP_HDFS_USER}
 
 ###
 # HDFS Mover specific parameters

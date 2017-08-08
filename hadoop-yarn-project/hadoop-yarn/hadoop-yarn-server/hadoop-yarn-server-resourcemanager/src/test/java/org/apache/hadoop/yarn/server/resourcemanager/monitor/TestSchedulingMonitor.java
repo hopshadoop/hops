@@ -21,13 +21,13 @@ package org.apache.hadoop.yarn.server.resourcemanager.monitor;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
+import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy;
 import org.junit.Test;
-
-import java.io.IOException;
 
 import static org.junit.Assert.fail;
 
@@ -43,8 +43,8 @@ public class TestSchedulingMonitor {
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
-
-    ResourceManager rm = new ResourceManager();
+    
+    ResourceManager rm = new MockRM();
     try {
       rm.init(conf);
     } catch (Exception e) {
