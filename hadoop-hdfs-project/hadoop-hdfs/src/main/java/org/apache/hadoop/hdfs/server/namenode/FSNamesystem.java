@@ -3110,10 +3110,10 @@ public class FSNamesystem
               }
               stat = dir.getFileInfo(src, resolveLink);
             } catch (AccessControlException e) {
-              logAuditEvent(false, "getFileInfo", src);
+              logAuditEvent(false, "getfileinfo", src);
               throw e;
             }
-            logAuditEvent(true, "getFileInfo", src);
+            logAuditEvent(true, "getfileinfo", src);
             return stat;
           }
         };
