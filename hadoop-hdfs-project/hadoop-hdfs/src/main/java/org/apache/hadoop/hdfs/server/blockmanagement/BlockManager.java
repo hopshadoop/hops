@@ -2035,6 +2035,9 @@ public class BlockManager {
                     if (storedBlock != null) {
                       mismatchedBlocksAndInodes.remove(storedBlock.getBlockId());
                       if (brb.getState() == BlockReportBlockState.FINALIZED){
+                        //Only update hash with blocks that should not
+                        // be removed and are finalized. This helps catch excess
+                        // replicas as well.
                         hash += BlockReport.hashAsFinalized(brb);
                       }
                     }

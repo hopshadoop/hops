@@ -41,16 +41,18 @@ public class LastBlockReplicasHashBucketLock extends Lock {
             .findList(Replica.Finder.ByBlockIdAndINodeId,
                 lastBlock.getBlockId(),
                 iNodeFile.getId());
-        Collections.sort(replicas, new Comparator<Replica>() {
-          @Override
-          public int compare(Replica o1, Replica o2) {
-            return new Integer(o1.getBucketId()).compareTo(o2.getBucketId());
+        if (replicas != null) {
+          Collections.sort(replicas, new Comparator<Replica>() {
+            @Override
+            public int compare(Replica o1, Replica o2) {
+              return new Integer(o1.getBucketId()).compareTo(o2.getBucketId());
+            }
+          });
+  
+          for (Replica replica : replicas) {
+            EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId, replica
+                .getStorageId(), replica.getBucketId());
           }
-        });
-        
-        for (Replica replica : replicas) {
-          EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId, replica
-              .getStorageId(), replica.getBucketId());
         }
       }
     }
