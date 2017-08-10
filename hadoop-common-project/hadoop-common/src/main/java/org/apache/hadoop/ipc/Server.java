@@ -1636,7 +1636,8 @@ public abstract class Server {
           boolean isHeaderRead = connectionContextRead;
           processOneRpc(data.array());
           data = null;
-          if (!isHeaderRead) {
+          if (!isHeaderRead ||
+              (isSSLEnabled && sslUnwrappedBuffer.position() != 0)) {
             continue;
           }
         } 
@@ -2852,9 +2853,10 @@ public abstract class Server {
     } else if (!isSSLEnabled) {
       count = (buffer.remaining() <= NIO_BUFFER_LIMIT) ?
               channel.read(buffer) : channelIO(channel, null, buffer);
-      if (count > 0) {
-        rpcMetrics.incrReceivedBytes(count);
-      }
+    }
+  
+    if (count > 0) {
+      rpcMetrics.incrReceivedBytes(count);
     }
 
     return count;
