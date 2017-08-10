@@ -38,6 +38,8 @@ public interface LCEResourcesHandler extends Configurable {
   void preExecute(ContainerId containerId, Resource containerResource)
        throws IOException;
 
+  public void setExecutablePath(String path);
+
   /**
    * Called by the LinuxContainerExecutor after the executable inside the
    * container has exited (successfully or not).

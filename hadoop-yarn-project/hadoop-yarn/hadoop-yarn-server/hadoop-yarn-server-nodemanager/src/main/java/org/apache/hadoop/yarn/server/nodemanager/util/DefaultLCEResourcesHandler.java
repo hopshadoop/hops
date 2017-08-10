@@ -53,7 +53,12 @@ public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
   
   public void preExecute(ContainerId containerId, Resource containerResource) {
   }
-  
+
+  @Override
+  public void setExecutablePath(String path) {
+
+  }
+
   public void postExecute(ContainerId containerId) {
   }
   

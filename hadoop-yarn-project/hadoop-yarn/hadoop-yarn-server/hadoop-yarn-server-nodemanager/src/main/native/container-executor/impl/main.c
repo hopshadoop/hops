@@ -49,6 +49,8 @@ void display_usage(FILE *stream) {
           "Usage: container-executor --mount-cgroups "\
           "hierarchy controller=path...\n");
   fprintf(stream,
+          "Usage container-executor --write-cgroups-devices path value\n");
+  fprintf(stream,
       "Usage: container-executor user yarn-user command command-args\n");
   fprintf(stream, "Commands:\n");
   fprintf(stream, "   initialize container: %2d appid tokens " \
@@ -67,6 +69,7 @@ int main(int argc, char **argv) {
   int invalid_args = 0; 
   int do_check_setup = 0;
   int do_mount_cgroups = 0;
+  int do_write_cgroups_devices = 0;
   
   LOGFILE = stdout;
   ERRORFILE = stderr;
@@ -75,12 +78,15 @@ int main(int argc, char **argv) {
     if (strcmp("--mount-cgroups", argv[1]) == 0) {
       do_mount_cgroups = 1;
     }
+    else if(strcmp("--write-cgroups-devices", argv[1]) == 0) {
+      do_write_cgroups_devices = 1;
+    }
   }
 
   // Minimum number of arguments required to run 
   // the std. container-executor commands is 4
   // 4 args not needed for checksetup option
-  if (argc < 4 && !do_mount_cgroups) {
+  if (argc < 4 && !do_mount_cgroups && !do_write_cgroups_devices) {
     invalid_args = 1;
     if (argc == 2) {
       const char *arg1 = argv[1];
@@ -167,6 +173,12 @@ int main(int argc, char **argv) {
 
     return result;
   }
+
+   if (do_write_cgroups_devices) {
+    int result = 0;
+    result = write_device_entry_to_cgroup_devices(argv[2], argv[3]);
+    return result;
+   }
 
   //checks done for user name
   if (argv[optind] == NULL) {

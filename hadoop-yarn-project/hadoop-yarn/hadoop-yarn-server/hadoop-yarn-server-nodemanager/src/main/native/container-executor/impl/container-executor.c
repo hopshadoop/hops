@@ -193,6 +193,44 @@ static int write_pid_to_cgroup_as_root(const char* cgroup_file, pid_t pid) {
 }
 
 /**
+ * Write the device entry to devices_allow or devices_deny.
+ * cgroup_file: Path to cgroup file where device entry needs to be written to.
+ */
+int write_device_entry_to_cgroup_devices(const char* cgroup_file, const char* entry) {
+  uid_t user = geteuid();
+  gid_t group = getegid();
+  if (change_effective_user(0, 0) != 0) {
+    return -1;
+  }
+
+  // open
+  int cgroup_fd = open(cgroup_file, O_WRONLY | O_APPEND, 0);
+  if (cgroup_fd == -1) {
+    fprintf(LOGFILE, "Can't open file %s as node manager - %s\n", cgroup_file,
+           strerror(errno));
+    return -1;
+  }
+
+  // write pid
+  char entry_buf[100];
+  snprintf(entry_buf, sizeof(entry_buf), "%s", entry);
+  ssize_t written = write(cgroup_fd, entry_buf, strlen(entry_buf));
+  close(cgroup_fd);
+  if (written == -1) {
+    fprintf(LOGFILE, "Failed to write device entry to file %s - %s\n",
+       cgroup_file, strerror(errno));
+    return -1;
+  }
+
+  // Revert back to the calling user.
+  if (change_effective_user(user, group)) {
+    return -1;
+  }
+
+  return 0;
+}
+
+/**
  * Write the pid of the current process into the pid file.
  * pid_file: Path to pid file where pid needs to be written to
  */

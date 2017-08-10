@@ -398,6 +398,11 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     setupLimits(containerId, containerResource);
   }
 
+  @Override
+  public void setExecutablePath(String path) {
+
+  }
+
   public void postExecute(ContainerId containerId) {
     clearLimits(containerId);
   }
