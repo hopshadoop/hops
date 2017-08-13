@@ -470,6 +470,11 @@ public class TestLinuxContainerExecutor {
     }
 
     @Override
+    public void setExecutablePath(String path) {
+
+    }
+
+    @Override
     public void postExecute(ContainerId containerId) {
       postExecContainers.add(containerId);
     }

@@ -204,6 +204,8 @@ int change_user(uid_t user, gid_t group);
 
 int mount_cgroup(const char *pair, const char *hierarchy);
 
+int write_device_entry_to_cgroup_devices(const char *path, const char *value);
+
 int check_dir(char* npath, mode_t st_mode, mode_t desired,
    int finalComponent);
 

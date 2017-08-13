@@ -53,6 +53,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -124,11 +126,17 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
   Clock clock;
   
   private float yarnProcessors;
+
+  private String executablePath;
   
   public CgroupsLCEResourcesHandlerGPU() {
     this.controllerPaths = new HashMap<>();
     clock = new SystemClock();
     
+  }
+
+  public void setExecutablePath(String path) {
+    this.executablePath = path;
   }
   
   @Override
@@ -327,22 +335,22 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
    */
   private void prepareDeviceSubsystem() throws IOException {
     String denyAllDevices = "a *:* rwm";
-    updateCgroup(CONTROLLER_DEVICES, "", DEVICES_DENY, denyAllDevices);
+    updateCgroupDevice(CONTROLLER_DEVICES, "", DEVICES_DENY, denyAllDevices);
 
     for(String defaultDevice: DEFAULT_WHITELIST_ENTRIES) {
-      updateCgroup(CONTROLLER_DEVICES, "", DEVICES_ALLOW, defaultDevice);
+      updateCgroupDevice(CONTROLLER_DEVICES, "", DEVICES_ALLOW, defaultDevice);
     }
 
     if(isGpuSupportEnabled()) {
       HashSet<Device> mandatoryDrivers = getGPUAllocator().getMandatoryDrivers();
       for (Device mandatoryDriver : mandatoryDrivers) {
-        updateCgroup(CONTROLLER_DEVICES, "", DEVICES_ALLOW, "c " + mandatoryDriver
+        updateCgroupDevice(CONTROLLER_DEVICES, "", DEVICES_ALLOW, "c " + mandatoryDriver
                 .toString() + " rwm");
       }
 
       HashSet<Device> totalGPUs = getGPUAllocator().getTotalGPUs();
       for (Device gpu : totalGPUs) {
-        updateCgroup(CONTROLLER_DEVICES, "", DEVICES_ALLOW, "c " + gpu.toString() +
+        updateCgroupDevice(CONTROLLER_DEVICES, "", DEVICES_ALLOW, "c " + gpu.toString() +
                 " rwm");
       }
     }
@@ -379,6 +387,35 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
           throw new IOException("Error while closing cgroup file " + path);
         }
       }
+    }
+  }
+
+  private void updateCgroupDevice(String controller, String groupName, String param,
+                                  String value) {
+    //This will only happen during tests
+    if(executablePath == null)
+    {
+      try {
+        updateCgroup(controller, groupName, param, value);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+
+    String path = pathForCgroup(controller, groupName);
+    param = controller + "." + param;
+
+    String filePath = path + "/" + param;
+
+    List<String> command = new ArrayList<String>();
+    command.addAll(Arrays.asList( executablePath, "--write-cgroups-devices", filePath, value));
+
+    String[] commandArray = command.toArray(new String[command.size()]);
+    Shell.ShellCommandExecutor shExec = new Shell.ShellCommandExecutor(commandArray, null); // sanitized env
+    try {
+      shExec.execute();
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
   
@@ -513,7 +550,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
       LinkedList<String> cgroupGPUDenyEntries = createCgroupDeviceEntry
           (deniedDevices);
       for(String deviceEntry: cgroupGPUDenyEntries) {
-        updateCgroup(CONTROLLER_DEVICES, containerName, DEVICES_DENY,
+        updateCgroupDevice(CONTROLLER_DEVICES, containerName, DEVICES_DENY,
             deviceEntry);
       }
     }

@@ -70,6 +70,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
             conf.getClass(YarnConfiguration.NM_LINUX_CONTAINER_RESOURCES_HANDLER,
               DefaultLCEResourcesHandler.class, LCEResourcesHandler.class), conf);
     resourcesHandler.setConf(conf);
+    resourcesHandler.setExecutablePath(containerExecutorExe);
 
     if (conf.get(YarnConfiguration.NM_CONTAINER_EXECUTOR_SCHED_PRIORITY) != null) {
      containerSchedPriorityIsSet = true;
