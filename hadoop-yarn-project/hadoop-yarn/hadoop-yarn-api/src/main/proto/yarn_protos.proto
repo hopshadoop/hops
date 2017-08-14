@@ -360,7 +360,9 @@ message ApplicationSubmissionContextProto {
   optional string node_label_expression = 16;
   optional ResourceRequestProto am_container_resource_request = 17;
   optional bytes key_store = 18;
-  optional bytes trust_store = 19;
+  optional string key_store_password = 19;
+  optional bytes trust_store = 20;
+  optional string trust_store_password = 21;
 }
 
 message LogAggregationContextProto {

@@ -444,7 +444,26 @@ extends ApplicationSubmissionContext {
     }
     this.keyStore = keyStore;
   }
-
+  
+  @Override
+  public String getKeyStorePassword() {
+    ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasKeyStorePassword()) {
+      return null;
+    }
+    return p.getKeyStorePassword();
+  }
+  
+  @Override
+  public void setKeyStorePassword(String password) {
+    maybeInitBuilder();
+    if (password == null) {
+      builder.clearKeyStorePassword();
+      return;
+    }
+    builder.setKeyStorePassword(password);
+  }
+  
   @Override
   public ByteBuffer getTrustStore() {
     ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
@@ -465,6 +484,25 @@ extends ApplicationSubmissionContext {
       builder.clearTrustStore();
     }
     this.trustStore = trustStore;
+  }
+  
+  @Override
+  public String getTrustStorePassword() {
+    ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasTrustStorePassword()) {
+      return null;
+    }
+    return p.getTrustStorePassword();
+  }
+  
+  @Override
+  public void setTrustStorePassword(String password) {
+    maybeInitBuilder();
+    if (password == null) {
+      builder.clearTrustStorePassword();
+      return;
+    }
+    builder.setTrustStorePassword(password);
   }
   
   private PriorityPBImpl convertFromProtoFormat(PriorityProto p) {

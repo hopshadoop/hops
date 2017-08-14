@@ -42,9 +42,17 @@ public abstract class MaterializeCryptoKeysRequest {
   
   public abstract void setKeystore(ByteBuffer keystore);
   
+  public abstract String getKeystorePassword();
+  
+  public abstract void setKeystorePassword(String password);
+  
   public abstract ByteBuffer getTruststore();
   
   public abstract void setTruststore(ByteBuffer truststore);
+  
+  public abstract String getTruststorePassword();
+  
+  public abstract void setTruststorePassword(String password);
   
   @Override
   public String toString() {

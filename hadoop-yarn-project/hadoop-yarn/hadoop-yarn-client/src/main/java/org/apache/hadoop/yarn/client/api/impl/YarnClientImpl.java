@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -32,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import io.hops.security.HopsUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -127,6 +127,7 @@ import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.codehaus.jettison.json.JSONException;
 
 @Private
 @Unstable
@@ -147,6 +148,8 @@ public class YarnClientImpl extends YarnClient {
   String timelineDTRenewer;
   protected boolean timelineServiceEnabled;
   protected boolean timelineServiceBestEffort;
+  
+  private String certificatePassword = null;
 
   private static final String ROOT = "root";
 
@@ -254,9 +257,7 @@ public class YarnClientImpl extends YarnClient {
     if (getConfig().getBoolean(CommonConfigurationKeysPublic
             .IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      ByteBuffer[] cryptoMaterial = getCryptoMaterial();
-      appContext.setKeyStore(cryptoMaterial[0]);
-      appContext.setTrustStore(cryptoMaterial[1]);
+      setCryptoMaterial(appContext);
     }
     
     SubmitApplicationRequest request =
@@ -328,7 +329,8 @@ public class YarnClientImpl extends YarnClient {
     return applicationId;
   }
   
-  private ByteBuffer[] getCryptoMaterial() throws IOException {
+  private void setCryptoMaterial(ApplicationSubmissionContext appContext)
+      throws IOException {
     String username = UserGroupInformation.getCurrentUser().getUserName();
     
     String clientMaterializeDir = getConfig().get(HopsSSLSocketFactory
@@ -336,7 +338,6 @@ public class YarnClientImpl extends YarnClient {
         HopsSSLSocketFactory.CryptoKeys.CLIENT_MATERIALIZE_DIR
             .getDefaultValue());
     
-    ByteBuffer[] material = new ByteBuffer[2];
     Path kStore = Paths.get(clientMaterializeDir, username + "__kstore.jks");
     Path tStore = Paths.get(clientMaterializeDir, username + "__tstore.jks");
     
@@ -345,10 +346,39 @@ public class YarnClientImpl extends YarnClient {
           + " could not be found in " + clientMaterializeDir);
     }
     
-    material[0] = ByteBuffer.wrap(Files.readAllBytes(kStore));
-    material[1] = ByteBuffer.wrap(Files.readAllBytes(tStore));
+    byte[] keyStoreBin = Files.readAllBytes(kStore);
+    ByteBuffer kstoreBB = ByteBuffer.wrap(keyStoreBin);
+    ByteBuffer tstoreBB = ByteBuffer.wrap(Files.readAllBytes(tStore));
     
-    return material;
+    
+    appContext.setKeyStore(kstoreBB);
+    appContext.setTrustStore(tstoreBB);
+  
+    // Passwords have not been set, get them from the REST endpoint
+    if (appContext.getKeyStorePassword() == null || appContext
+        .getKeyStorePassword().isEmpty()
+        || appContext.getTrustStorePassword() == null || appContext
+        .getTrustStorePassword().isEmpty()) {
+      String password = getPasswordFromHopsworks(username, keyStoreBin);
+      appContext.setKeyStorePassword(password);
+      appContext.setTrustStorePassword(password);
+    }
+  }
+  
+  private String getPasswordFromHopsworks(String username, byte[] keyStore)
+      throws IOException {
+    
+    if (null != certificatePassword) {
+      return certificatePassword;
+    }
+    
+    try {
+      certificatePassword = HopsUtil
+          .getCertificatePasswordFromHopsworks(keyStore, username, getConfig());
+      return certificatePassword;
+    } catch (JSONException ex) {
+      throw new IOException(ex);
+    }
   }
   
   private void addTimelineDelegationToken(
