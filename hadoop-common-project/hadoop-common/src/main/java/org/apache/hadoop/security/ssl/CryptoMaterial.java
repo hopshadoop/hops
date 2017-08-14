@@ -25,7 +25,9 @@ public class CryptoMaterial {
   private final String trustStoreLocation;
   private final int trustStoreSize;
   private final ByteBuffer keyStoreMem;
+  private final String keyStorePass;
   private final ByteBuffer trustStoreMem;
+  private final String trustStorePass;
   
   // Number of applications using the same crypto material
   // The same user might have multiple applications running
@@ -33,14 +35,17 @@ public class CryptoMaterial {
   private int requestedApplications;
   
   public CryptoMaterial(String keyStoreLocation, String trustStoreLocation,
-      ByteBuffer kStore, ByteBuffer tstore) {
+      ByteBuffer kStore, String kStorePass,
+      ByteBuffer tstore, String tstorePass) {
     this.keyStoreLocation = keyStoreLocation;
     this.keyStoreSize = kStore.capacity();
     this.trustStoreLocation = trustStoreLocation;
     this.trustStoreSize = tstore.capacity();
     
     this.keyStoreMem = kStore.asReadOnlyBuffer();
+    this.keyStorePass = kStorePass;
     this.trustStoreMem = tstore.asReadOnlyBuffer();
+    this.trustStorePass = tstorePass;
     
     requestedApplications = 1;
   }
@@ -65,8 +70,16 @@ public class CryptoMaterial {
     return keyStoreMem;
   }
   
+  public String getKeyStorePass() {
+    return keyStorePass;
+  }
+  
   public ByteBuffer getTrustStoreMem() {
     return trustStoreMem;
+  }
+  
+  public String getTrustStorePass() {
+    return trustStorePass;
   }
   
   public int getRequestedApplications() {

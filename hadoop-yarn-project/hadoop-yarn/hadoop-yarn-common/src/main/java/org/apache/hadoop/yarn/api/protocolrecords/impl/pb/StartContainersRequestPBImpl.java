@@ -160,6 +160,25 @@ public class StartContainersRequestPBImpl extends StartContainersRequest {
   }
   
   @Override
+  public String getKeyStorePassword() {
+    StartContainersRequestProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasKeyStorePassword()) {
+      return null;
+    }
+    return p.getKeyStorePassword();
+  }
+  
+  @Override
+  public void setKeyStorePassword(String password) {
+    maybeInitBuilder();
+    if (password == null) {
+      builder.clearKeyStorePassword();
+      return;
+    }
+    builder.setKeyStorePassword(password);
+  }
+  
+  @Override
   public ByteBuffer getTrustStore() {
     StartContainersRequestProtoOrBuilder p = viaProto ? proto : builder;
     if (this.trustStore != null) {
@@ -179,6 +198,25 @@ public class StartContainersRequestPBImpl extends StartContainersRequest {
       builder.clearTrustStore();
     }
     this.trustStore = trustStore;
+  }
+  
+  @Override
+  public String getTrustStorePassword() {
+    StartContainersRequestProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasTrustStorePassword()) {
+      return null;
+    }
+    return p.getTrustStorePassword();
+  }
+  
+  @Override
+  public void setTrustStorePassword(String password) {
+    maybeInitBuilder();
+    if (password == null) {
+      builder.clearTrustStorePassword();
+      return;
+    }
+    builder.setTrustStorePassword(password);
   }
   
   private ByteBuffer convertFromProtoFormat(ByteString byteString) {

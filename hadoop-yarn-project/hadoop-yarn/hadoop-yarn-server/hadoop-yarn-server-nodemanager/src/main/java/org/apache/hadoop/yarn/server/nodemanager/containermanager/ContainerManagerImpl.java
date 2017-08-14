@@ -850,7 +850,10 @@ public class ContainerManagerImpl extends CompositeService implements
           .getContainerToken()).getApplicationSubmitter();
     }
     ByteBuffer keyStore = requests.getKeyStore();
+    String keyStorePass = requests.getKeyStorePassword();
     ByteBuffer trustStore = requests.getTrustStore();
+    String trustStorePass = requests.getTrustStorePassword();
+    
     if (user == null) {
       throw new IOException("Submitter user is null");
     }
@@ -860,8 +863,16 @@ public class ContainerManagerImpl extends CompositeService implements
           "supplied is either null or empty");
     }
     
-    context.getCertificateLocalizationService().materializeCertificates(user,
-        keyStore, trustStore);
+
+    // ApplicationMasters will also call startContainers() through NMClient
+    // In that case there will be no password set for keystore and truststore
+    // Only RM will set these values when launching AM container through the
+    // AMLauncher
+    if (keyStorePass != null && !keyStorePass.isEmpty()
+        && trustStorePass != null && !trustStorePass.isEmpty()) {
+      context.getCertificateLocalizationService().materializeCertificates(user,
+          keyStore, keyStorePass, trustStore, trustStorePass);
+    }
   }
   
   private ContainerManagerApplicationProto buildAppProto(ApplicationId appId,

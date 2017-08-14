@@ -1,14 +1,20 @@
 package org.apache.hadoop.crypto;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.PrivilegedAction;
@@ -19,10 +25,13 @@ import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 
-/**
- * Created by antonis on 1/13/17.
- */
 public class TestHopsSSLConfiguration {
+    private final Log LOG = LogFactory.getLog(TestHopsSSLConfiguration.class);
+    private final String BASEDIR =
+        System.getProperty("test.build.dir", "target/test-dir") + "/" +
+            TestHopsSSLConfiguration.class.getSimpleName();
+    private File baseDirFile;
+    
     Configuration conf;
     HopsSSLSocketFactory hopsFactory;
     final List<String> filesToPurge = new ArrayList<>();
@@ -31,11 +40,17 @@ public class TestHopsSSLConfiguration {
     public void setUp() {
         conf = new Configuration();
         hopsFactory = new HopsSSLSocketFactory();
+        baseDirFile = new File(BASEDIR);
+        baseDirFile.mkdirs();
+        
         filesToPurge.clear();
     }
 
     @After
     public void tearDown() throws IOException {
+        if (baseDirFile.exists()) {
+            FileUtils.deleteQuietly(baseDirFile);
+        }
         purgeFiles();
     }
 
@@ -75,6 +90,8 @@ public class TestHopsSSLConfiguration {
             .getValue(), "/tmp");
         String kstore = touchFile("/tmp/project__user__kstore.jks");
         String tstore = touchFile("/tmp/project__user__tstore.jks");
+        String password = "a_strong_password";
+        hopsFactory.setPaswordFromHopsworks(password);
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("superuser");
@@ -89,13 +106,13 @@ public class TestHopsSSLConfiguration {
 
         assertEquals(kstore,
                 conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals("adminpw",
+        assertEquals(password,
                 conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals("adminpw",
+        assertEquals(password,
                 conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
         assertEquals(tstore,
                 conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals("adminpw",
+        assertEquals(password,
                 conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
 
@@ -104,6 +121,9 @@ public class TestHopsSSLConfiguration {
         String cwd = System.getProperty("user.dir");
         touchFile(Paths.get(cwd, "k_certificate").toString());
         touchFile(Paths.get(cwd, "t_certificate").toString());
+        final String password = "a_strong_password";
+        
+        
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("superuser");
@@ -111,20 +131,21 @@ public class TestHopsSSLConfiguration {
             @Override
             public Object run() {
                 hopsFactory.setConf(conf);
+                hopsFactory.setPaswordFromHopsworks(password);
                 hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
         });
-
+        
         assertEquals("k_certificate",
                 conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals("adminpw",
+        assertEquals(password,
                 conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals("adminpw",
+        assertEquals(password,
                 conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
         assertEquals("t_certificate",
                 conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals("adminpw",
+        assertEquals(password,
                 conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
 
@@ -139,6 +160,7 @@ public class TestHopsSSLConfiguration {
             .toString();
         String tstore = Paths.get(tmp, "project__user__tstore.jks")
             .toString();
+        String password = "a_strong_password";
         touchFile(kstore);
         touchFile(tstore);
         String hostname = NetUtils.getLocalHostname();
@@ -153,6 +175,7 @@ public class TestHopsSSLConfiguration {
             .getValue(), "/tmp/" + hostname + "__kstore.jks");
         conf.set(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY
             .getValue(), "/tmp/" + hostname + "__tstore.jks");
+        hopsFactory.setPaswordFromHopsworks(password);
         UserGroupInformation ugi = UserGroupInformation
             .createRemoteUser("project__user");
         final Set<String> superusers = new HashSet<>(1);
@@ -168,13 +191,13 @@ public class TestHopsSSLConfiguration {
         
         assertEquals(kstore, conf.get(HopsSSLSocketFactory.CryptoKeys
             .KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals("adminpw", conf.get(HopsSSLSocketFactory.CryptoKeys
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
             .KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals("adminpw", conf.get(HopsSSLSocketFactory.CryptoKeys
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
             .KEY_PASSWORD_KEY.getValue()));
         assertEquals(tstore, conf.get(HopsSSLSocketFactory.CryptoKeys
             .TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals("adminpw", conf.get(HopsSSLSocketFactory.CryptoKeys
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
             .TRUST_STORE_PASSWORD_KEY.getValue()));
     }
     
@@ -189,6 +212,7 @@ public class TestHopsSSLConfiguration {
         String tstore = "/tmp/" + hostname + "__tstore.jks";
         touchFile(tstore);
 
+        createServerSSLConfig(pass, pass, conf);
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("glassfish");
@@ -223,7 +247,10 @@ public class TestHopsSSLConfiguration {
 
         touchFile(kstore);
         touchFile(tstore);
-
+        String password = "a_strong_password";
+        
+        createServerSSLConfig(password, password, conf);
+    
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("glassfish");
@@ -237,12 +264,40 @@ public class TestHopsSSLConfiguration {
         });
 
         assertEquals(kstore, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals("adminpw", conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals("adminpw", conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
+            .KEY_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
+            .KEY_PASSWORD_KEY.getValue()));
         assertEquals(tstore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals("adminpw", conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
+            .TRUST_STORE_PASSWORD_KEY.getValue()));
     }
-
+    
+    private void createServerSSLConfig(String keyStorePassword,
+        String trustStorePassword, Configuration conf) throws IOException {
+        
+        Configuration sslConf = new Configuration(false);
+        
+        File sslConfFile = new File(Paths.get(BASEDIR, "ssl-server.xml")
+            .toString());
+        conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFile.getAbsolutePath());
+        filesToPurge.add(sslConfFile.toString());
+        sslConf.set(
+            FileBasedKeyStoresFactory.resolvePropertyName(
+                SSLFactory.Mode.SERVER,
+                FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY),
+            keyStorePassword);
+        sslConf.set(
+            FileBasedKeyStoresFactory.resolvePropertyName(
+                SSLFactory.Mode.SERVER,
+                FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY),
+            trustStorePassword);
+        
+        try (FileWriter fw = new FileWriter(sslConfFile, false)) {
+            sslConf.writeXml(fw);
+        }
+    }
+    
     @Test
     public void testHostCertificateWithSuperuser() throws Exception {
         String hostname = NetUtils.getLocalHostname();

@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.hops.security.HopsUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -58,6 +59,7 @@ import org.apache.hadoop.yarn.client.api.NMClient;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy.ContainerManagementProtocolProxyData;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
+import org.codehaus.jettison.json.JSONException;
 
 /**
  * <p>
@@ -97,6 +99,8 @@ public class NMClientImpl extends NMClient {
   //enabled by default
   private final AtomicBoolean cleanupRunningContainers = new AtomicBoolean(true);
   private ContainerManagementProtocolProxy cmProxy;
+  
+  private String certificatePassword = null;
 
   public NMClientImpl() {
     super(NMClientImpl.class.getName());
@@ -245,11 +249,30 @@ public class NMClientImpl extends NMClient {
     Path kStorePath = Paths.get("k_certificate");
     Path tStorePath = Paths.get("t_certificate");
     
-    ByteBuffer kStore = ByteBuffer.wrap(Files.readAllBytes(kStorePath));
+    byte[] keyStoreBin = Files.readAllBytes(kStorePath);
+    ByteBuffer kStore = ByteBuffer.wrap(keyStoreBin);
     ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
+    String password = getPasswordFromHopsworks(user, keyStoreBin);
     
     request.setKeyStore(kStore);
+    request.setKeyStorePassword(password);
     request.setTrustStore(tStore);
+    request.setTrustStorePassword(password);
+  }
+  
+  private String getPasswordFromHopsworks(String username, byte[] keyStore)
+      throws IOException {
+    if (null != certificatePassword) {
+      return certificatePassword;
+    }
+    
+    try {
+      certificatePassword = HopsUtil
+          .getCertificatePasswordFromHopsworks(keyStore, username, getConfig());
+      return certificatePassword;
+    } catch (JSONException ex) {
+      throw new IOException(ex);
+    }
   }
   
   @Override

@@ -154,7 +154,9 @@ public class AMLauncher implements Runnable {
       CryptoMaterial material = rmContext
           .getCertificateLocalizationService().getMaterialLocation(user);
       request.setKeyStore(material.getKeyStoreMem());
+      request.setKeyStorePassword(material.getKeyStorePass());
       request.setTrustStore(material.getTrustStoreMem());
+      request.setTrustStorePassword(material.getTrustStorePass());
     } catch (InterruptedException | ExecutionException e) {
       throw new YarnException("Execution of CertificateMaterializer " +
           "interrupted", e);

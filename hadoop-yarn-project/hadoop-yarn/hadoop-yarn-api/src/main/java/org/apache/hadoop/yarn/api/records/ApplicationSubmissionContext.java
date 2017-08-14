@@ -547,9 +547,25 @@ public abstract class ApplicationSubmissionContext {
   
   @Public
   @Unstable
+  public abstract String getKeyStorePassword();
+  
+  @Public
+  @Unstable
+  public abstract void setKeyStorePassword(String password);
+  
+  @Public
+  @Unstable
   public abstract ByteBuffer getTrustStore();
   
   @Public
   @Unstable
   public abstract void setTrustStore(ByteBuffer trustStore);
+  
+  @Public
+  @Unstable
+  public abstract String getTrustStorePassword();
+  
+  @Public
+  @Unstable
+  public abstract void setTrustStorePassword(String password);
 }

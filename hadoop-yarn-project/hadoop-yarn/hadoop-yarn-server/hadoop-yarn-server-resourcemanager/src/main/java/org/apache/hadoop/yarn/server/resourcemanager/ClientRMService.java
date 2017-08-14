@@ -591,11 +591,15 @@ public class ClientRMService extends AbstractService implements
         .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
   
       ByteBuffer kstore = submissionContext.getKeyStore();
+      String kstorePass = submissionContext.getKeyStorePassword();
       ByteBuffer tstore = submissionContext.getTrustStore();
+      String tstorePass = submissionContext.getTrustStorePassword();
+      
       try {
-        if (kstore == null || tstore == null) {
+        if (kstore == null || tstore == null
+            || kstorePass.isEmpty() || tstorePass.isEmpty()) {
           throw new IOException("RPC TLS is enabled but either keystore or " +
-              "truststore is null");
+              "truststore is null or no password provided");
         }
         if (kstore.capacity() == 0 || tstore.capacity() == 0) {
           throw new IOException("RPC TLS is enabled but either keystore or " +
@@ -603,7 +607,7 @@ public class ClientRMService extends AbstractService implements
         }
         
         rmContext.getCertificateLocalizationService().materializeCertificates
-            (username, kstore, tstore);
+            (username, kstore, kstorePass, tstore, tstorePass);
       } catch (IOException ex) {
         LOG.error(ex, ex);
         RMAuditLogger.logFailure(user, AuditConstants.SUBMIT_APP_REQUEST,
