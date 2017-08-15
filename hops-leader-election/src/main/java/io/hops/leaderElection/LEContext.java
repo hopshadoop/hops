@@ -33,7 +33,7 @@ public class LEContext {
   protected long id;
   protected boolean init_phase;
   protected int max_missed_hb_threshold;
-  protected String rpc_address;
+  protected String rpc_addresses;
   protected String http_address;
   protected SortedActiveNodeList memberShip;
   protected long time_period_increment;
@@ -50,7 +50,7 @@ public class LEContext {
     id = context.id;
     init_phase = context.init_phase;
     max_missed_hb_threshold = context.max_missed_hb_threshold;
-    rpc_address = context.rpc_address;
+    rpc_addresses = context.rpc_addresses;
     http_address = context.http_address;
     time_period_increment = context.time_period_increment;
     nextTimeTakeStrongerLocks = context.nextTimeTakeStrongerLocks;
@@ -85,7 +85,7 @@ public class LEContext {
     context.max_missed_hb_threshold = 2;
     context.memberShip = null;
     context.http_address = null;
-    context.rpc_address = null;
+    context.rpc_addresses = null;
     context.time_period_increment = 0;
     context.nextTimeTakeStrongerLocks = false;
     return context;

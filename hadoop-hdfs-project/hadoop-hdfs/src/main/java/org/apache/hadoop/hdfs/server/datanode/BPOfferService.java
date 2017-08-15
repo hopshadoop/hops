@@ -53,11 +53,9 @@ import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -118,13 +116,13 @@ class BPOfferService implements Runnable {
   private volatile long lastBlockReport = 0;
   private boolean resetBlockReportTime = true;
   private BPServiceActor blkReportHander = null;
-  private List<ActiveNode> nnList = new CopyOnWriteArrayList<>();
-  private List<InetSocketAddress> blackListNN =
-      new CopyOnWriteArrayList<>();
-  private Object nnListSync = new Object();
+  private List<ActiveNode> nnList = Collections.synchronizedList(new ArrayList<ActiveNode>());
+  private List<InetSocketAddress> blackListNN = Collections.synchronizedList(new ArrayList<InetSocketAddress>());
+//  private Object nnListSync = new Object();
   private volatile int rpcRoundRobinIndex = 0;
       // you have bunch of NNs, which one to send the incremental block report
   private volatile int refreshNNRoundRobinIndex = 0;
+  private final ExecutorService executor;
       //in a heart beat only one actor should talk to name node and get the updated list of NNs
   //how to stop actors from communicating with all the NN at the same time for same RPC?
   //for that we will use a separate RR which will be incremented after Delta time (heartbeat time)
@@ -148,11 +146,12 @@ class BPOfferService implements Runnable {
     for (InetSocketAddress addr : nnAddrs) {
       this.bpServices.add(new BPServiceActor(addr, this));
       nnList.add(new ActiveNodePBImpl(0, "", addr.getAddress().getHostAddress(),
-          addr.getPort(), ""));
+          addr.getPort(), "", addr.getAddress().getHostAddress(), addr.getPort()));
     }
 
     dnConf = dn.getDnConf();
 
+    executor = Executors.newFixedThreadPool(dnConf.iBRDispatherTPSize);
   }
 
   void refreshNNList(ArrayList<InetSocketAddress> addrs) throws IOException {
@@ -162,11 +161,10 @@ class BPOfferService implements Runnable {
     }
     Set<InetSocketAddress> newAddrs = Sets.newHashSet(addrs);
 
-
     SetView<InetSocketAddress> deadNNs = Sets.difference(oldAddrs, newAddrs);
     SetView<InetSocketAddress> newNNs = Sets.difference(newAddrs, oldAddrs);
 
-    // stop the dead threads 
+    // stop the dead threads
     if (deadNNs.size() != 0) {
       for (InetSocketAddress deadNN : deadNNs) {
         BPServiceActor deadActor = stopAnActor(deadNN);
@@ -262,7 +260,7 @@ class BPOfferService implements Runnable {
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
             ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, delHint);
 
-    notifyNamenodeBlockImmediatelyInt(bInfo);
+    notifyNamenodeBlockImmediatelyInt(bInfo, true);
   }
 
   private void checkBlock(ExtendedBlock block) {
@@ -291,7 +289,7 @@ class BPOfferService implements Runnable {
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
             BlockStatus.RECEIVING_BLOCK, null);
 
-    notifyNamenodeBlockImmediatelyInt(bInfo);
+    notifyNamenodeBlockImmediatelyInt(bInfo, false);
   }
 
   //This must be called only by blockPoolManager
@@ -403,10 +401,8 @@ class BPOfferService implements Runnable {
     
     // remove from nnList
     for (ActiveNode ann : nnList) {
-      if (ann.getIpAddress().equals(actor.getNNSocketAddress())) {
-        synchronized (nnListSync){
+      if (ann.getRpcServerAddressForDatanodes().equals(actor.getNNSocketAddress())) {
           nnList.remove(ann);
-        }
         break;
       }
     }
@@ -607,8 +603,7 @@ class BPOfferService implements Runnable {
     BPServiceActor actor = getAnActor(address);
     if (actor != null) {
       actor.stop();
-      actor
-          .join(); //[S] hmm to join, or not to join ? how long does it take to kill a BPServiceActor thread
+//      actor.join();
       return actor;
     } else {
       return null;
@@ -651,15 +646,7 @@ class BPOfferService implements Runnable {
           lastDeletedReport = startTime;
         }
 
-        DatanodeCommand cmd = blockReport();
-        if (cmd != null) {
-          blkReportHander.processCommand(new DatanodeCommand[]{cmd});
-        }
-        // Now safe to start scanning the block pool.
-        // If it has already been started, this is a no-op.
-        if (dn.blockScanner != null) {
-          dn.blockScanner.addBlockPool(getBlockPoolId());
-        }
+        startBRThread();
 
         //
         // There is no work to do;  sleep until hearbeat timer elapses, 
@@ -667,7 +654,7 @@ class BPOfferService implements Runnable {
         //
         long waitTime = 1000;
         synchronized (pendingIncrementalBR) {
-          if (waitTime > 0 && pendingReceivedRequests == 0) {
+          if (pendingReceivedRequests == 0) {
             try {
               pendingIncrementalBR.wait(waitTime);
             } catch (InterruptedException ie) {
@@ -676,9 +663,10 @@ class BPOfferService implements Runnable {
           }
         } // synchronized
 
-        forwardRRIndex();//after every 1000ms increment the refreshNNRoundRobinIndex
+        forwardRRIndex();
+
       } catch (Exception re) {
-        LOG.warn("Exception in whirlingLikeASufi", re);
+        LOG.warn("Exception in BPOfferService. NNs: "+Arrays.toString(nnList.toArray()), re);
         try {
           long sleepTime = 1000;
           Thread.sleep(sleepTime);
@@ -689,50 +677,95 @@ class BPOfferService implements Runnable {
     } // while (shouldRun())
   } // offerService
 
+  AtomicInteger brThreadCounter = new AtomicInteger(0);
+  private void startBRThread(){
+   if(brThreadCounter.get()==0){
+     brThreadCounter.incrementAndGet();
+     executor.submit(new BRDispatcher());
+   }
+  }
+
+  private class BRDispatcher implements Callable{
+    /**
+     * Computes a result, or throws an exception if unable to do so.
+     *
+     * @return computed result
+     * @throws Exception if unable to compute a result
+     */
+    @Override
+    public Object call() throws Exception {
+      try {
+        DatanodeCommand cmd = blockReport();
+        if (cmd != null) {
+          blkReportHander.processCommand(new DatanodeCommand[]{cmd});
+        }
+        // Now safe to start scanning the block pool.
+        // If it has already been started, this is a no-op.
+        if (dn.blockScanner != null) {
+          dn.blockScanner.addBlockPool(getBlockPoolId());
+        }
+        return null;
+      }finally {
+        brThreadCounter.decrementAndGet();
+      }
+    }
+  }
   /**
    * Report received blocks and delete hints to the Namenode
    *
    * @throws IOException
    */
   private void reportReceivedDeletedBlocks() throws IOException {
+    executor.submit(new IncrementailBRDispatcher());
+  }
 
-    // check if there are newly received blocks
-    ReceivedDeletedBlockInfo[] receivedAndDeletedBlockArray = null;
-    synchronized (pendingIncrementalBR) {
-      int numBlocks = pendingIncrementalBR.size();
-      if (numBlocks > 0) {
-        //
-        // Send newly-received and deleted blockids to namenode
-        //
-        receivedAndDeletedBlockArray = pendingIncrementalBR.values()
-            .toArray(new ReceivedDeletedBlockInfo[numBlocks]);
+  public class IncrementailBRDispatcher implements Callable{
+    @Override
+    public Object call() throws Exception {
+      // check if there are newly received blocks
+      ReceivedDeletedBlockInfo[] receivedAndDeletedBlockArray = null;
+      synchronized (pendingIncrementalBR) {
+        int numBlocks = pendingIncrementalBR.size();
+        if (numBlocks > 0) {
+          //
+          // Send newly-received and deleted blockids to namenode
+          //
+          receivedAndDeletedBlockArray = pendingIncrementalBR.values()
+                  .toArray(new ReceivedDeletedBlockInfo[numBlocks]);
+        }
+        pendingIncrementalBR.clear();
       }
-      pendingIncrementalBR.clear();
-    }
-    if (receivedAndDeletedBlockArray != null) {
-      StorageReceivedDeletedBlocks[] report =
-          {new StorageReceivedDeletedBlocks(bpRegistration.getStorageID(),
-              receivedAndDeletedBlockArray)};
-      boolean success = false;
-      try {
-        blockReceivedAndDeletedWithRetry(report);
-        success = true;
-      } finally {
-        synchronized (pendingIncrementalBR) {
-          if (!success) {
-            // If we didn't succeed in sending the report, put all of the
-            // blocks back onto our queue, but only in the case where we didn't
-            // put something newer in the meantime.
-            for (ReceivedDeletedBlockInfo rdbi : receivedAndDeletedBlockArray) {
-              if (!pendingIncrementalBR
-                  .containsKey(rdbi.getBlock().getBlockId())) {
-                pendingIncrementalBR.put(rdbi.getBlock().getBlockId(), rdbi);
+      if (receivedAndDeletedBlockArray != null) {
+        StorageReceivedDeletedBlocks[] report =
+                {new StorageReceivedDeletedBlocks(bpRegistration.getStorageID(),
+                        receivedAndDeletedBlockArray)};
+        boolean success = false;
+        try {
+          try {
+            long time = System.currentTimeMillis();
+            blockReceivedAndDeletedWithRetry(report);
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+          success = true;
+        } finally {
+          synchronized (pendingIncrementalBR) {
+            if (!success) {
+              // If we didn't succeed in sending the report, put all of the
+              // blocks back onto our queue, but only in the case where we didn't
+              // put something newer in the meantime.
+              for (ReceivedDeletedBlockInfo rdbi : receivedAndDeletedBlockArray) {
+                if (!pendingIncrementalBR
+                        .containsKey(rdbi.getBlock().getBlockId())) {
+                  pendingIncrementalBR.put(rdbi.getBlock().getBlockId(), rdbi);
+                }
               }
             }
+            pendingReceivedRequests = pendingIncrementalBR.size();
           }
-          pendingReceivedRequests = pendingIncrementalBR.size();
         }
       }
+      return null;
     }
   }
 
@@ -741,11 +774,13 @@ class BPOfferService implements Runnable {
    * till namenode is informed before responding with success to the
    * client? For now we don't.
    */
-  void notifyNamenodeBlockImmediatelyInt(ReceivedDeletedBlockInfo bInfo) {
+  void notifyNamenodeBlockImmediatelyInt(ReceivedDeletedBlockInfo bInfo, boolean now) {
     synchronized (pendingIncrementalBR) {
       pendingIncrementalBR.put(bInfo.getBlock().getBlockId(), bInfo);
       pendingReceivedRequests++;
-      pendingIncrementalBR.notifyAll();
+      if(now) {
+        pendingIncrementalBR.notifyAll();
+      }
     }
   }
 
@@ -785,12 +820,12 @@ class BPOfferService implements Runnable {
 
       ActiveNode an = nextNNForBlkReport(bReport.getNumberOfBlocks());
       if (an != null) {
-        blkReportHander = getAnActor(an.getInetSocketAddress());
+        blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
         if (blkReportHander == null || !blkReportHander.isInitialized()) {
           return null; //no one is ready to handle the request, return now without changing the values of lastBlockReport. it will be retried in next cycle
         }
       } else {
-        LOG.warn("Unable to send block report");
+        LOG.warn("Unable to send block report. Current namenodes are: "+ Arrays.toString(nnList.toArray()));
         return null;
       }
 
@@ -874,46 +909,36 @@ class BPOfferService implements Runnable {
     }
   }
 
-  void updateNNList(SortedActiveNodeList list) throws IOException {
-    ArrayList<InetSocketAddress> nnAddresses =
-        new ArrayList<>();
+  synchronized void updateNNList(SortedActiveNodeList list) throws IOException {
+    long time  = System.currentTimeMillis();
+    ArrayList<InetSocketAddress> nnAddresses = new ArrayList<>();
     for (ActiveNode ann : list.getActiveNodes()) {
-      InetSocketAddress socketAddress =
-          new InetSocketAddress(ann.getIpAddress(), ann.getPort());
-      nnAddresses.add(socketAddress);
+      nnAddresses.add(ann.getRpcServerAddressForDatanodes());
     }
 
     refreshNNList(nnAddresses);
 
     if (list.getLeader() != null) {
-      bpServiceToActive = getAnActor(list.getLeader().getInetSocketAddress());
+      bpServiceToActive = getAnActor(list.getLeader().getRpcServerAddressForDatanodes());
     }
 
-    synchronized (nnListSync) {
-        nnList.clear();
-        nnList.addAll(list.getActiveNodes());
-        blackListNN.clear();
-    }
+    nnList.clear();
+    nnList.addAll(list.getActiveNodes());
+    blackListNN.clear();
+    LOG.debug("After Checking DN connection with NNs. "+Arrays.toString(nnList.toArray())+" Update Time: "+(System.currentTimeMillis()-time));
   }
 
+
+  long lastupdate = System.currentTimeMillis();
   synchronized boolean canUpdateNNList(InetSocketAddress address) {
     if (nnList == null || nnList.size() == 0) {
-      return true; // for edge case, any one can update. after that actors will take trun in updating the nnlist
+      return true;
     }
 
-    if (refreshNNRoundRobinIndex >= nnList.size() ||
-        refreshNNRoundRobinIndex < 0) {
-      refreshNNRoundRobinIndex = 0;
-    }
-    
-    try{  //shitty code as result of avoiding synchronized code blocks
-      ActiveNode an = nnList.get(refreshNNRoundRobinIndex);
-      if (an != null && an.getInetSocketAddress().equals(address)) {
-        return true;
-      } else {
-        return false;
-      }
-    }catch (IndexOutOfBoundsException e){
+    if( (System.currentTimeMillis() - lastupdate ) > 2000 ){
+      lastupdate = System.currentTimeMillis();
+      return  true;
+    }else{
       return false;
     }
   }
@@ -992,8 +1017,7 @@ class BPOfferService implements Runnable {
     BPServiceActor actor = null;
     final int MAX_RPC_RETRIES = nnList.size();
 
-    for (int i = 0; i <= MAX_RPC_RETRIES;
-         i++) { // min value of MAX_RPC_RETRIES is 0
+    for (int i = 0; i <= MAX_RPC_RETRIES; i++) { // min value of MAX_RPC_RETRIES is 0
       try {
         actor = nextNNForNonBlkReportRPC();
         if (actor != null) {
@@ -1031,26 +1055,24 @@ class BPOfferService implements Runnable {
     return null;
   }
 
-  private BPServiceActor nextNNForNonBlkReportRPC() {
+  private synchronized BPServiceActor nextNNForNonBlkReportRPC() {
     if (nnList == null || nnList.isEmpty()) {
       return null;
     }
 
-    synchronized (nnListSync){
-      for (int i = 0; i < 10; i++) {
-        try {
-          rpcRoundRobinIndex = ++rpcRoundRobinIndex % nnList.size();
-          ActiveNode ann = nnList.get(rpcRoundRobinIndex);
-          if (!this.blackListNN.contains(ann.getInetSocketAddress())) {
-            BPServiceActor actor = getAnActor(ann.getInetSocketAddress());
-            if (actor != null) {
-              return actor;
-            }
+    for (int i = 0; i < 10; i++) {
+      try {
+        rpcRoundRobinIndex = ++rpcRoundRobinIndex % nnList.size();
+        ActiveNode ann = nnList.get(rpcRoundRobinIndex);
+        if (!this.blackListNN.contains(ann.getRpcServerAddressForDatanodes())) {
+          BPServiceActor actor = getAnActor(ann.getRpcServerAddressForDatanodes());
+          if (actor != null) {
+            return actor;
           }
-        } catch (Exception e) {
-          //any kind of exception try again
-          continue;
         }
+      } catch (Exception e) {
+        //any kind of exception try again
+        continue;
       }
     }
     return null;
@@ -1061,36 +1083,48 @@ class BPOfferService implements Runnable {
       return null;
     }
 
-    ActiveNode ann = null;
-    if (nnList.size() > 0) {
-      ActiveNode leader = nnList.get(0);
-      BPServiceActor leaderActor =
-              this.getAnActor(leader.getInetSocketAddress());
-      if (leaderActor != null) {
-        try {
-          ann = leaderActor.nextNNForBlkReport(noOfBlks);
-        } catch (BRLoadBalancingException e) {
-          LOG.warn(e);
-        }
+    ActiveNode annToBR = null;
+    BPServiceActor leaderActor = getLeaderActor();
+    if (leaderActor != null) {
+      try {
+        annToBR = leaderActor.nextNNForBlkReport(noOfBlks);
+      } catch (BRLoadBalancingException e) {
+        LOG.warn(e);
       }
     }
-    return ann;
+    return annToBR;
+  }
+
+  private BPServiceActor getLeaderActor() {
+    if (nnList.size() > 0) {
+      ActiveNode leaderNode = null;
+      for (ActiveNode an : nnList) {
+        if (leaderNode == null) {
+          leaderNode = an;
+        }
+
+        if (leaderNode.getId() > an.getId()) {
+          leaderNode = an;
+        }
+      }
+      BPServiceActor leaderActor = this.getAnActor(leaderNode.getRpcServerAddressForDatanodes());
+      return leaderActor;
+    }
+    return null;
   }
   
-  private void forwardRRIndex() {
-    synchronized (nnListSync) {
-      if (nnList != null && !nnList.isEmpty()) {
-        // watch out for black listed NN
-        for (int i = 0; i < 10; i++) {
-          refreshNNRoundRobinIndex = ++refreshNNRoundRobinIndex % nnList.size();
-          ActiveNode ann = nnList.get(refreshNNRoundRobinIndex);
-          if (!this.blackListNN.contains(ann.getInetSocketAddress())) {
-            return;
-          }
+  private synchronized  void forwardRRIndex() {
+    if (nnList != null && !nnList.isEmpty()) {
+      // watch out for black listed NN
+      for (int i = 0; i < 10; i++) {
+        refreshNNRoundRobinIndex = ++refreshNNRoundRobinIndex % nnList.size();
+        ActiveNode ann = nnList.get(refreshNNRoundRobinIndex);
+        if (!this.blackListNN.contains(ann.getRpcServerAddressForDatanodes())) {
+          return;
         }
-      } else {
-        refreshNNRoundRobinIndex = -1;
       }
+    } else {
+      refreshNNRoundRobinIndex = -1;
     }
   }
 }

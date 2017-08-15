@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import io.hops.erasure_coding.MockEncodingManager;
 import io.hops.erasure_coding.MockRepairManager;
 import io.hops.exception.StorageException;
+import io.hops.log.NDCWrapper;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.election.dal.HdfsLeDescriptorDataAccess;
@@ -83,6 +84,7 @@ import java.net.URISyntaxException;
 import java.nio.channels.FileChannel;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.logging.Level;
@@ -90,18 +92,7 @@ import java.util.logging.Logger;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCKREPORT_INITIAL_DELAY_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_IPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HOSTS;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.hdfs.server.common.Util.fileAsURI;
 
 /**
@@ -643,6 +634,7 @@ public class MiniDFSCluster {
 
 
     // Setting the configuration for Storage
+    conf.set(DFSConfigKeys.DFS_NDC_ENABLED_KEY, "true");
     HdfsStorageFactory.resetDALInitialized();
     HdfsStorageFactory.setConfiguration(conf);
     if (format) {
@@ -800,6 +792,7 @@ public class MiniDFSCluster {
         "127.0.0.1:" + nnConf.getHttpPort());
     nameNodeConf
         .set(DFS_NAMENODE_RPC_ADDRESS_KEY, "127.0.0.1:" + nnConf.getIpcPort());
+    nameNodeConf.set(DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, "localhost:0");
 
     // Format and clean out DataNode directories
     if (format) {

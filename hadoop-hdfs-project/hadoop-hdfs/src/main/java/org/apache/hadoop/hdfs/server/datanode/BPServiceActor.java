@@ -464,8 +464,8 @@ class BPServiceActor implements Runnable {
     } catch (Throwable ex) {
       LOG.warn("Unexpected exception in block pool " + this, ex);
     } finally {
-      LOG.warn("Ending block pool service for: " + this);
       cleanUp(); //cean up and return. if the nn comes back online then it will be restarted
+      LOG.warn("Ended block pool service for: " + this);
     }
   }
 

@@ -86,8 +86,8 @@ public abstract class ConfiguredRMFailoverHAProxyProvider<T>
     try {
 
       final InetSocketAddress rmAddress = rmProxy
-          //.getRMAddress(conf, protocol, leader.getIpAddress(),
-          //    leader.getPort());
+          //.getRMAddress(conf, protocol, leader.getRpcServerIpAddress(),
+          //    leader.getRpcServerPort());
           .getRMAddress(conf, protocol, leader.getHttpAddress());
       LOG.info("creating proxy from active nodes " + currentRMId + " " +
           rmAddress.getPort());

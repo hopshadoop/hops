@@ -30,7 +30,7 @@ public class ActiveRMPBImpl extends ActiveNodePBImpl implements ActiveRM {
 
   public ActiveRMPBImpl(long id, String hostname, String ipAddress, int port,
       String httpAddress, long load) {
-    super(id, hostname, ipAddress, port, httpAddress);
+    super(id, hostname, ipAddress, port, httpAddress,"",0);
     maybeInitBuilder();
     builder.setExtension(GroupMembership.load, load);
   }
@@ -51,6 +51,6 @@ public class ActiveRMPBImpl extends ActiveNodePBImpl implements ActiveRM {
       return false;
     }
     ActiveRM that = (ActiveRM) obj;
-    return this.getInetSocketAddress().equals(that.getInetSocketAddress());
+    return this.getRpcServerAddressForClients().equals(that.getRpcServerAddressForClients());
   }
 }

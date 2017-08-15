@@ -1170,13 +1170,19 @@ public class NameNode {
     int leIncrement = conf.getInt(DFSConfigKeys.DFS_LEADER_TP_INCREMENT_KEY,
         DFSConfigKeys.DFS_LEADER_TP_INCREMENT_DEFAULT);
 
+    String rpcAddresses = "";
+    rpcAddresses = rpcServer.getRpcAddress().getAddress().getHostAddress() + ":" +rpcServer.getRpcAddress().getPort()+",";
+    if(rpcServer.getServiceRpcAddress() != null){
+      rpcAddresses = rpcAddresses + rpcServer.getServiceRpcAddress().getAddress().getHostAddress() + ":" +
+              rpcServer.getServiceRpcAddress().getPort();
+    }
+
     leaderElection =
         new LeaderElection(new HdfsLeDescriptorFactory(), leadercheckInterval,
             missedHeartBeatThreshold, leIncrement,
             httpServer.getHttpAddress().getAddress().getHostAddress() + ":" +
                 httpServer.getHttpAddress().getPort(),
-            rpcServer.getRpcAddress().getAddress().getHostAddress() + ":" +
-                rpcServer.getRpcAddress().getPort());
+            rpcAddresses);
     leaderElection.start();
 
     try {

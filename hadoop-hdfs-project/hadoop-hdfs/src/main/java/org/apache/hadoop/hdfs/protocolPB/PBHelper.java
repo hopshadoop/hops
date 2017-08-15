@@ -940,7 +940,8 @@ public class PBHelper {
     return new FsServerDefaults(fs.getBlockSize(), fs.getBytesPerChecksum(),
         fs.getWritePacketSize(), (short) fs.getReplication(),
         fs.getFileBufferSize(), fs.getEncryptDataTransfer(),
-        fs.getTrashInterval(), PBHelper.convert(fs.getChecksumType()));
+        fs.getTrashInterval(), PBHelper.convert(fs.getChecksumType()),
+        fs.getQuotaEnabled());
   }
 
   public static FsServerDefaultsProto convert(FsServerDefaults fs) {
@@ -955,7 +956,8 @@ public class PBHelper {
         .setFileBufferSize(fs.getFileBufferSize())
         .setEncryptDataTransfer(fs.getEncryptDataTransfer())
         .setTrashInterval(fs.getTrashInterval())
-        .setChecksumType(PBHelper.convert(fs.getChecksumType())).build();
+        .setChecksumType(PBHelper.convert(fs.getChecksumType()))
+        .setQuotaEnabled(fs.getQuotaEnabled()).build();
   }
 
   public static FsPermissionProto convert(FsPermission p) {
@@ -1313,19 +1315,20 @@ public class PBHelper {
 
   public static ActiveNode convert(ActiveNodeProto p) {
     ActiveNode an =
-        new ActiveNodePBImpl(p.getId(), p.getHostname(), p.getIpAddress(),
-            p.getPort(), p.getHttpAddress());
+        new ActiveNodePBImpl(p.getId(), p.getRpcHostname(), p.getRpcIpAddress(),
+            p.getRpcPort(), p.getHttpAddress(), p.getServiceIpAddress(), p.getServicePort());
     return an;
   }
 
   public static ActiveNodeProto convert(ActiveNode p) {
     ActiveNodeProto.Builder anp = ActiveNodeProto.newBuilder();
     anp.setId(p.getId());
-    anp.setHostname(p.getHostname());
-    anp.setIpAddress(p.getIpAddress());
-    anp.setPort(p.getPort());
+    anp.setRpcHostname(p.getHostname());
+    anp.setRpcIpAddress(p.getRpcServerIpAddress());
+    anp.setRpcPort(p.getRpcServerPort());
     anp.setHttpAddress(p.getHttpAddress());
-
+    anp.setServiceIpAddress(p.getServiceRpcIpAddress());
+    anp.setServicePort(p.getServiceRpcPort());
     return anp.build();
   }
 

@@ -23,12 +23,14 @@ import com.google.common.collect.Maps;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -137,8 +139,8 @@ class BlockPoolManager {
   
   void refreshNamenodes(Configuration conf) throws IOException {
     synchronized (refreshNamenodesLock) {
-      List<InetSocketAddress> namenodes =
-          DFSUtil.getNameNodesRPCAddresses(conf);
+//      List<InetSocketAddress> namenodes = DFSUtil.getNameNodesRPCAddresses(conf);
+      List<InetSocketAddress> namenodes = DFSUtil.getNameNodesServiceRpcAddresses(conf);
       offerServices.add(createBPOS(namenodes));
       startAll();
     }

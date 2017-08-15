@@ -295,7 +295,12 @@ public class QuotaUpdateManager {
    * @param iterator
    *     Ids to be updates sorted from the leaves to the root of the subtree
    */
-  void addPrioritizedUpdates(Iterator<Integer> iterator) {
-    prioritizedUpdates.add(iterator);
+  void addPrioritizedUpdates(Iterator<Integer> iterator) throws QuotaUpdateException {
+      if(namesystem.isLeader()) {
+        prioritizedUpdates.add(iterator);
+      } else {
+        throw  new QuotaUpdateException("Non leader name" +
+                "node cannot prioritize quota updates for inodes");
+      }
   }
 }

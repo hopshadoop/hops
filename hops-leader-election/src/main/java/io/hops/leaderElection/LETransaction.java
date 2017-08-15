@@ -173,7 +173,7 @@ public class LETransaction {
         long oldId = context.id;
         context.id = getNewNamenondeID();
         LeDescriptor newDescriptor = leFactory
-            .getNewDescriptor(context.id, 0/*counter*/, context.rpc_address,
+            .getNewDescriptor(context.id, 0/*counter*/, context.rpc_addresses,
                 context.http_address);
         EntityManager.add(newDescriptor);
         if (oldId != LeaderElection.LEADER_INITIALIZATION_ID) {
@@ -336,16 +336,26 @@ public class LETransaction {
   private void makeSortedActiveNodeList(List<LeDescriptor> nns) {
     List<ActiveNode> activeNameNodeList = new ArrayList<ActiveNode>();
     for (LeDescriptor l : nns) {
-      String hostNameNPort = l.getHostName();
-      StringTokenizer st = new StringTokenizer(hostNameNPort, ":");
-      String intermediaryHostName = st.nextToken();
-      int port = Integer.parseInt(st.nextToken());
-      st = new StringTokenizer(intermediaryHostName, "/");
-      String hostName = st.nextToken();
+      // comma separated list. First address is RPC address and the
+      // second address is Server IPC address
+      String[] hostName =  {"", ""};
+      int [] port = {0,0};
+      String hostNameNPort = l.getRpcAddresses();
+      StringTokenizer st = new StringTokenizer(hostNameNPort, ",");
+      for(int i = 0; i < 2; i++){
+        if(st.hasMoreTokens()) {
+          String address = st.nextToken();
+          StringTokenizer st2 = new StringTokenizer(address, ":");
+          String intermediaryHostName = st2.nextToken();
+          port[i] = Integer.parseInt(st2.nextToken());
+          StringTokenizer st3 = new StringTokenizer(intermediaryHostName, "/");
+          hostName[i] = st3.nextToken();
+        }
+      }
       String httpAddress = l.getHttpAddress();
       ActiveNode ann =
-          new ActiveNodePBImpl(l.getId(), l.getHostName(), hostName, port,
-              httpAddress);
+          new ActiveNodePBImpl(l.getId(), l.getRpcAddresses(), hostName[0], port[0],
+              httpAddress, hostName[1], port[1]);
       activeNameNodeList.add(ann);
     }
 

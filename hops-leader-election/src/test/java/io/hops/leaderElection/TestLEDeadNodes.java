@@ -133,7 +133,7 @@ public class TestLEDeadNodes {
     activesNNs = nnList.get(newLeaderId).getActiveNameNodes().getActiveNodes();
     for (ActiveNode ann : activesNNs) {
       assertFalse("previous is stil in active nn",
-          ann.getInetSocketAddress().equals(isaList.get(leaderId)));
+          ann.getRpcServerAddressForClients().equals(isaList.get(leaderId)));
     }
 
     //stop NN last alive NN
@@ -152,7 +152,7 @@ public class TestLEDeadNodes {
         activesNNs.size() == 8);
     for (ActiveNode ann : activesNNs) {
       assertFalse("killed nn is stil in active nn",
-          ann.getInetSocketAddress().equals(isaList.get(tokill)));
+          ann.getRpcServerAddressForClients().equals(isaList.get(tokill)));
     }
 
   }

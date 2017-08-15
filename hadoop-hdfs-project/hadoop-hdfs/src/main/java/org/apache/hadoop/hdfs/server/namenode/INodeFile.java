@@ -138,7 +138,7 @@ public class INodeFile extends INode implements BlockCollection {
 
     if(len <= FSNamesystem.dbInMemorySmallFileMaxSize()){
       fida = (InMemoryInodeDataAccess) HdfsStorageFactory.getDataAccess(InMemoryInodeDataAccess.class);
-      fid = new FileInodeData(getId(), data, FileInodeData.Type.InmemoryFile);
+      fid = new FileInodeData(getId(), data, data.length, FileInodeData.Type.InmemoryFile);
     } else {
       if( len <= FSNamesystem.dbOnDiskSmallFileMaxSize()){
         fida = (SmallOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(SmallOnDiskInodeDataAccess.class);
@@ -150,7 +150,7 @@ public class INodeFile extends INode implements BlockCollection {
         StorageException up = new StorageException("The data is too large to be stored in the database. Requested data size is : "+len);
         throw up;
       }
-      fid = new FileInodeData(getId(), data, FileInodeData.Type.OnDiskFile);
+      fid = new FileInodeData(getId(), data, data.length, FileInodeData.Type.OnDiskFile);
     }
 
     fida.add(fid);
@@ -176,7 +176,11 @@ public class INodeFile extends INode implements BlockCollection {
       throw up;
     }
 
-    fid = (FileInodeData) fida.get(getId());
+    if(fida instanceof  LargeOnDiskInodeDataAccess) {
+      fid = (FileInodeData) (((LargeOnDiskInodeDataAccess)fida).get(getId(),(int)getSize()));
+    }else{
+      fid = (FileInodeData) fida.get(getId());
+    }
     FSNamesystem.LOG.debug("Stuffed Inode:  Read file data from the database. Data length is :" + fid.getInodeData().length);
     return fid.getInodeData();
   }
@@ -202,7 +206,7 @@ public class INodeFile extends INode implements BlockCollection {
       IllegalStateException up = new IllegalStateException("Can not delete file. It is not stored in the database");
       throw up;
     }
-    fida.delete(new FileInodeData(getId(),null, fileType));
+    fida.delete(new FileInodeData(getId(),null, (int)getSize(), fileType));
     FSNamesystem.LOG.debug("Stuffed Inode:  File data for Inode Id: "+getId()+" is deleted");
   }
   /**

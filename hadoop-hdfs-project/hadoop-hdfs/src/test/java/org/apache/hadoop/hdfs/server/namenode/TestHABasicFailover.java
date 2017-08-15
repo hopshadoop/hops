@@ -29,6 +29,7 @@ import org.junit.After;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
@@ -180,7 +181,8 @@ public class TestHABasicFailover extends junit.framework.TestCase {
       NameNode namenode) {
     boolean result = true;
     for (DataNode datanode : datanodes) {
-      result = result & datanode.isConnectedToNN(namenode.getNameNodeAddress());
+      result = result & (datanode.isConnectedToNN(namenode.getNameNodeAddress())
+              || datanode.isConnectedToNN(namenode.getServiceRpcAddress()));
     }
     return result;
   }

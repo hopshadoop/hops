@@ -83,7 +83,7 @@ public class TestBlockReportLoadBalancing1 {
 
     List<ActiveNode> list = new ArrayList<>();
     for (int i = 0; i < NN_COUNT; i++) {
-      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000");
+      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000", "", 0);
       list.add(anode);
     }
 
@@ -140,7 +140,7 @@ public class TestBlockReportLoadBalancing1 {
 
     List<ActiveNode> list = new ArrayList<>();
     for (int i = 0; i < NN_COUNT; i++) {
-      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000");
+      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000","",0);
       list.add(anode);
     }
 
@@ -181,7 +181,7 @@ public class TestBlockReportLoadBalancing1 {
 
     // add more namenodes 
     for (int i = NN_COUNT; i < 2 * NN_COUNT; i++) {
-      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000");
+      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000","",0);
       list.add(anode);
     }
     nnList = new SortedActiveNodeListPBImpl(list);
@@ -217,7 +217,7 @@ public class TestBlockReportLoadBalancing1 {
 
     List<ActiveNode> list = new ArrayList<>();
     for (int i = 0; i < NN_COUNT; i++) {
-      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000");
+      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000", "", 0);
       list.add(anode);
     }
 

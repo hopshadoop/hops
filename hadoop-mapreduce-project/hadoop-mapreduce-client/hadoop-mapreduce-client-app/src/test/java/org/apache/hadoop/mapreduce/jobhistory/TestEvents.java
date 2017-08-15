@@ -53,13 +53,13 @@ public class TestEvents {
     TaskAttemptID taskAttemptId = new TaskAttemptID(tid, 3);
     Counters counters = new Counters();
     TaskAttemptFinishedEvent test = new TaskAttemptFinishedEvent(taskAttemptId,
-        TaskType.REDUCE, "TEST", 123L, "RAKNAME", "HOSTNAME", "STATUS",
+        TaskType.REDUCE, "TEST", 123L, "RAKNAME", "RPC_ADDRESSES", "STATUS",
         counters);
     assertEquals(test.getAttemptId().toString(), taskAttemptId.toString());
 
     assertEquals(test.getCounters(), counters);
     assertEquals(test.getFinishTime(), 123L);
-    assertEquals(test.getHostname(), "HOSTNAME");
+    assertEquals(test.getHostname(), "RPC_ADDRESSES");
     assertEquals(test.getRackName(), "RAKNAME");
     assertEquals(test.getState(), "STATUS");
     assertEquals(test.getTaskId(), tid);

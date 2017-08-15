@@ -812,8 +812,23 @@ public class BlockManager {
     machines[0] = phantomDatanode;
     */
 
+    DatanodeInfo randomDatanode =  datanodeManager.getRandomDN();
     DatanodeInfo[] machines = new DatanodeInfo[1];
-    machines[0] = datanodeManager.getRandomDN();
+    if(randomDatanode != null){
+      machines[0] = datanodeManager.getRandomDN();
+    }
+    else{
+      DatanodeID phantomDatanodID = new DatanodeID(
+              namesystem.getNameNode().getServiceRpcAddress().getAddress().getHostAddress(),
+              namesystem.getNameNode().getServiceRpcAddress().getAddress().getCanonicalHostName(),
+              namesystem.getBlockPoolId(),
+              DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
+              DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+              DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
+      DatanodeInfo phantomDatanode = new DatanodeInfo(phantomDatanodID);
+      machines[0] = phantomDatanode;
+    }
+
     LocatedBlock locatedBlock  = new LocatedBlock(eb, machines, 0, false);
     locatedBlock.setData(data);
     results.add(locatedBlock);

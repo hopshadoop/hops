@@ -1242,7 +1242,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
     String attemptStartTime = line.get("START_TIME");
     String attemptFinishTime = line.get("FINISH_TIME");
 
-    String hostName = line.get("HOSTNAME");
+    String hostName = line.get("RPC_ADDRESSES");
 
     String counters = line.get("COUNTERS");
 
@@ -1393,7 +1393,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
 
     String counters = line.get("COUNTERS");
 
-    String hostName = line.get("HOSTNAME");
+    String hostName = line.get("RPC_ADDRESSES");
 
     if (hostName != null && !hostNames.contains(hostName)) {
       hostNames.add(hostName);

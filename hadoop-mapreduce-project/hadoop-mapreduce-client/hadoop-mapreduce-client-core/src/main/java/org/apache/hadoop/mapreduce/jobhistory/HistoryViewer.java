@@ -601,7 +601,7 @@ public class HistoryViewer {
       for (JobHistoryParser.TaskInfo task : tasks.values()) {
         Map<TaskAttemptID, JobHistoryParser.TaskAttemptInfo> attempts = 
           task.getAllTaskAttempts();
-        //allHosts.put(task.getHo(Keys.HOSTNAME), "");
+        //allHosts.put(task.getHo(Keys.RPC_ADDRESSES), "");
         for (JobHistoryParser.TaskAttemptInfo attempt : attempts.values()) {
           long startTime = attempt.getStartTime(); 
           long finishTime = attempt.getFinishTime();
