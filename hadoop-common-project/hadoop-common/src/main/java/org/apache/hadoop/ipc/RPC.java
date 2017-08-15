@@ -709,6 +709,7 @@ public class RPC {
     private Object instance = null;
     private String bindAddress = "0.0.0.0";
     private int port = 0;
+    private String name = "";
     private int numHandlers = 1;
     private int numReaders = -1;
     private int queueSizePerHandler = -1;
@@ -742,6 +743,11 @@ public class RPC {
     /** Default: 0 */
     public Builder setPort(int port) {
       this.port = port;
+      return this;
+    }
+
+    public Builder setName(String name){
+      this.name = name;
       return this;
     }
     

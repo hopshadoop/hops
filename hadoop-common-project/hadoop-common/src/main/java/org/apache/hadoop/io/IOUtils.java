@@ -204,7 +204,7 @@ public class IOUtils {
     while (toRead > 0) {
       int ret = in.read(buf, off, toRead);
       if (ret < 0) {
-        throw new IOException( "Premature EOF from inputStream");
+        throw new IOException( "Premature EOF from inputStream. Read: "+off+" Expected: "+len);
       }
       toRead -= ret;
       off += ret;

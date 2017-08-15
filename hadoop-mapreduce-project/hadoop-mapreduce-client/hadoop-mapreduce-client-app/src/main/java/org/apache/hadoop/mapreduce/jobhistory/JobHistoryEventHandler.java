@@ -930,7 +930,7 @@ public class JobHistoryEventHandler extends AbstractService
         tEvent.addEventInfo("FINISH_TIME", tauce.getFinishTime());
         tEvent.addEventInfo("ERROR", tauce.getError());
         tEvent.addEventInfo("STATUS", tauce.getTaskStatus());
-        tEvent.addEventInfo("HOSTNAME", tauce.getHostname());
+        tEvent.addEventInfo("RPC_ADDRESSES", tauce.getHostname());
         tEvent.addEventInfo("PORT", tauce.getPort());
         tEvent.addEventInfo("RACK_NAME", tauce.getRackName());
         tEvent.addEventInfo("SHUFFLE_FINISH_TIME", tauce.getFinishTime());
@@ -952,7 +952,7 @@ public class JobHistoryEventHandler extends AbstractService
         tEvent.addEventInfo("MAP_FINISH_TIME", mafe.getMapFinishTime());
         tEvent.addEventInfo("COUNTERS_GROUPS",
                 countersToJSON(mafe.getCounters()));
-        tEvent.addEventInfo("HOSTNAME", mafe.getHostname());
+        tEvent.addEventInfo("RPC_ADDRESSES", mafe.getHostname());
         tEvent.addEventInfo("PORT", mafe.getPort());
         tEvent.addEventInfo("RACK_NAME", mafe.getRackName());
         tEvent.addEventInfo("ATTEMPT_ID", mafe.getAttemptId() == null ?
@@ -974,7 +974,7 @@ public class JobHistoryEventHandler extends AbstractService
         tEvent.addEventInfo("SORT_FINISH_TIME", rafe.getSortFinishTime());
         tEvent.addEventInfo("COUNTERS_GROUPS",
                 countersToJSON(rafe.getCounters()));
-        tEvent.addEventInfo("HOSTNAME", rafe.getHostname());
+        tEvent.addEventInfo("RPC_ADDRESSES", rafe.getHostname());
         tEvent.addEventInfo("PORT", rafe.getPort());
         tEvent.addEventInfo("RACK_NAME", rafe.getRackName());
         tEntity.addEvent(tEvent);
@@ -993,7 +993,7 @@ public class JobHistoryEventHandler extends AbstractService
         tEvent.addEventInfo("STATE", tafe.getState());
         tEvent.addEventInfo("COUNTERS_GROUPS",
                 countersToJSON(tafe.getCounters()));
-        tEvent.addEventInfo("HOSTNAME", tafe.getHostname());
+        tEvent.addEventInfo("RPC_ADDRESSES", tafe.getHostname());
         tEntity.addEvent(tEvent);
         tEntity.setEntityId(tafe.getTaskId().toString());
         tEntity.setEntityType(MAPREDUCE_TASK_ENTITY_TYPE);

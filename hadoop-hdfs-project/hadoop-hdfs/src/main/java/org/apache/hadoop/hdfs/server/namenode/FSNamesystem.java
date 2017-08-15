@@ -487,7 +487,8 @@ public class FSNamesystem
           conf.getBoolean(DFS_ENCRYPT_DATA_TRANSFER_KEY,
               DFS_ENCRYPT_DATA_TRANSFER_DEFAULT),
           conf.getLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT),
-          checksumType);
+          checksumType, conf.getBoolean(DFS_NAMENODE_QUOTA_ENABLED_KEY,
+              DFS_NAMENODE_QUOTA_ENABLED_DEFAULT));
 
       this.maxFsObjects = conf.getLong(DFS_NAMENODE_MAX_OBJECTS_KEY,
           DFS_NAMENODE_MAX_OBJECTS_DEFAULT);
@@ -1904,7 +1905,7 @@ public class FSNamesystem
         file.convertToUnderConstruction(leaseHolder, clientMachine, clientNode);
     Lease lease = leaseManager.addLease(cons.getClientName(), src);
     if(cons.isFileStoredInDB()){
-      LOG.debug("Stuffed Inode:  prepareFileFowWrite stored in database. " +
+      LOG.debug("Stuffed Inode:  prepareFileForWrite stored in database. " +
           "Returning phantom block");
       return blockManager.createPhantomLocatedBlocks(cons,cons.getFileDataInDB(),true,false).getLocatedBlocks().get(0);
     } else {
@@ -6706,6 +6707,15 @@ public class FSNamesystem
     if (pathInode.isFile()) {
       return deleteWithTransaction(path, recursive);
     } else {
+      //if quota is enabled then only the leader namenode can delete the directory.
+      //this is because before the deletion is done the quota manager has to apply all the outstanding
+      //quota updates for the directory. The current design of the quota manager is not distributed.
+      //HopsFS clients send the delete operations to the leader namenode if quota is enabled
+      if(!isLeader()){
+        throw new QuotaUpdateException("Unable to delete the file "+path+" because Quota is enabled and I am not the leader");
+      }
+
+
       //sub tree operation
       try {
         subtreeRoot = lockSubtreeAndCheckPathPermission(path, false, null,

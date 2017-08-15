@@ -2649,7 +2649,7 @@ public abstract class Server {
   private class Handler extends Thread {
     public Handler(int instanceNumber) {
       this.setDaemon(true);
-      this.setName("IPC Server handler "+ instanceNumber + " on " + port);
+      this.setName(threadNamePrefix+" IPC "+ instanceNumber);
     }
 
     @Override
@@ -3140,6 +3140,11 @@ public abstract class Server {
    */
   public synchronized InetSocketAddress getListenerAddress() {
     return listener.getAddress();
+  }
+
+  protected String threadNamePrefix;
+  public void setThreadNamePrefix(String threadNamePrefix){
+    this.threadNamePrefix = threadNamePrefix;
   }
   
   /** 

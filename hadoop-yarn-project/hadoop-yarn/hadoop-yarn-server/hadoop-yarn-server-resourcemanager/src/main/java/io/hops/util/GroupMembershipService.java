@@ -335,10 +335,10 @@ public class GroupMembershipService extends CompositeService
     for (ActiveNode node : nnList.getSortedActiveNodes()) {
       if (loads.get(node.getHostname()) == null) {
         rmList.add(new ActiveRMPBImpl(node.getId(), node.getHostname(), node.
-            getIpAddress(), node.getPort(), node.getHttpAddress(), 0));
+                getRpcServerIpAddress(), node.getRpcServerPort(), node.getHttpAddress(), 0));
       } else {
         rmList.add(new ActiveRMPBImpl(node.getId(), node.getHostname(), node.
-            getIpAddress(), node.getPort(), node.getHttpAddress(), loads.
+                getRpcServerIpAddress(), node.getRpcServerPort(), node.getHttpAddress(), loads.
             get(node.getHostname()).getLoad()));
       }
     }

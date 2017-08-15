@@ -227,7 +227,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final boolean DFS_LEGACY_CONTENT_SUMMARY_ENABLE_DEFAULT = false;
   
   public static final String DFS_NDC_ENABLED_KEY = "dfs.ndc.enable";
-  public static final boolean DFS_NDC_ENABLED_DEFAULT = true;
+  public static final boolean DFS_NDC_ENABLED_DEFAULT = false;
 
   public static final String DFS_LEGACY_SET_QUOTA_ENABLE_KEY =
       "dfs.namenode.legacy-set-quota.enable";
@@ -292,23 +292,30 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
 
   public static final String DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY =
           "dfs.db.ondisk.small.file.max.size";
-  public static final int DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT = 4*1024; // 4KB
+  public static final int DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT = 2000;
 
   public static final String DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_KEY =
           "dfs.db.ondisk.medium.file.max.size";
-  public static final int DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT = 8*1024; // 8KB
+  public static final int DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT = 4000;
 
   public static final String DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY =
           "dfs.db.ondisk.large.file.max.size";
-  public static final int DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT = 32*1024; // 32KB
+  public static final int DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT = 64*1024;
 
   public static final String DFS_DB_FILE_MAX_SIZE_KEY =
           "dfs.db.file.max.size";
-  public static final int DFS_DB_FILE_MAX_SIZE_DEFAULT = DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT;
+  public static final int DFS_DB_FILE_MAX_SIZE_DEFAULT = 64 * 1024;
 
   public static final String DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY =
           "dfs.db.inmemory.file.max.size";
   public static final int DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT = 1*1024; // 1KB
+
+  public static final String DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_KEY =
+          "dfs.dn.incremental.br.thread.pool.size";
+  public static final int DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_DEFAULT = 256;
+
+  public static final String DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_KEY = "dsf.client.delay.before.file.close";
+  public static final int DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_DEFAULT = 0;
 
   public static final String DFS_BLOCK_SIZE_KEY = "dfs.blocksize";
   public static final long DFS_BLOCK_SIZE_DEFAULT = 64 * 1024 * 1024;
@@ -507,7 +514,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_DEFAULT = "2.0.0-SNAPSHOT";
   
   public static final String DFS_LIST_LIMIT = "dfs.ls.limit";
-  public static final int DFS_LIST_LIMIT_DEFAULT = 1000;
+  public static final int DFS_LIST_LIMIT_DEFAULT = Integer.MAX_VALUE; //1000; [HopsFS] Jira Hops-45
   public static final String DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY =
       "dfs.datanode.failed.volumes.tolerated";
   public static final int DFS_DATANODE_FAILED_VOLUMES_TOLERATED_DEFAULT = 0;

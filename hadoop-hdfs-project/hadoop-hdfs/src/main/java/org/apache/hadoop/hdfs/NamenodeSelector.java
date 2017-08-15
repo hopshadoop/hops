@@ -86,7 +86,7 @@ public class NamenodeSelector {
 
     @Override
     public String toString() {
-      return "[RPC handle connected to " + namenode.getInetSocketAddress() +
+      return "[RPC handle connected to " + namenode.getRpcServerAddressForClients() +
           "] ";
     }
 
@@ -126,7 +126,7 @@ public class NamenodeSelector {
     this.defaultUri = null;
     ActiveNode dummyActiveNamenode =
         new ActiveNodePBImpl(1, "localhost", "127.0.0.1", 9999,
-            "0.0.0.0:50070");
+            "0.0.0.0:50070", "", 0);
     this.nnList.add(
         new NamenodeSelector.NamenodeHandle(namenode, dummyActiveNamenode));
     this.conf = conf;
@@ -163,7 +163,8 @@ public class NamenodeSelector {
   }
 
   private void updateNamenodesList() throws IOException{
-    if(namenodeListUpdateTimePeriod>0 && System.currentTimeMillis()-lastUpdate> namenodeListUpdateTimePeriod){
+    if((namenodeListUpdateTimePeriod>0 && System.currentTimeMillis()-lastUpdate> namenodeListUpdateTimePeriod) ||
+            nnList.size() == blackListedNamenodes.size()){
       lastUpdate = System.currentTimeMillis();
       namenodeClientsUpdate();
     }
@@ -239,8 +240,7 @@ public class NamenodeSelector {
     NamenodeSelector.NamenodeHandle handle = getNextNNBasedOnPolicy();
     if (handle == null || handle.getRPCHandle() == null) {
       //update the list right now
-      throw new NoAliveNamenodeException(
-          " Started an asynchronous update of the namenode list. ");
+      throw new NoAliveNamenodeException( "There are no alive namenodes");
     }
     return handle;
   }
@@ -429,13 +429,13 @@ public class NamenodeSelector {
     Set<InetSocketAddress> oldClients = Sets.newHashSet();
     for (NamenodeSelector.NamenodeHandle namenode : nnList) {
       ActiveNode ann = namenode.getNamenode();
-      oldClients.add(ann.getInetSocketAddress());
+      oldClients.add(ann.getRpcServerAddressForClients());
     }
 
     //new list
     Set<InetSocketAddress> updatedClients = Sets.newHashSet();
     for (ActiveNode ann : anl.getActiveNodes()) {
-      updatedClients.add(ann.getInetSocketAddress());
+      updatedClients.add(ann.getRpcServerAddressForClients());
     }
 
 
@@ -505,7 +505,7 @@ public class NamenodeSelector {
   protected NamenodeSelector.NamenodeHandle getNamenodeHandle(
       InetSocketAddress address) {
     for (NamenodeSelector.NamenodeHandle handle : nnList) {
-      if (handle.getNamenode().getInetSocketAddress().equals(address)) {
+      if (handle.getNamenode().getRpcServerAddressForClients().equals(address)) {
         return handle;
       }
     }

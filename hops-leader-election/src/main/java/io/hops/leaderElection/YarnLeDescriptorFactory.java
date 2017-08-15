@@ -44,7 +44,7 @@ public class YarnLeDescriptorFactory extends LeDescriptorFactory {
   @Override
   public LeDescriptor cloneDescriptor(LeDescriptor desc) {
     return new YarnLeDescriptor(desc.getId(), desc.getCounter(),
-        desc.getHostName(), desc.getHttpAddress());
+        desc.getRpcAddresses(), desc.getHttpAddress());
   }
 
   @Override

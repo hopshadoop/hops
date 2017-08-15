@@ -22,6 +22,7 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.protobuf.BlockingService;
 import org.apache.commons.cli.CommandLine;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocolPB.ClientDatanodeProtocolTranslatorPB;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -62,11 +64,10 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
+
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
 
 @InterfaceAudience.Private
 public class DFSUtil {
@@ -589,15 +590,23 @@ public class DFSUtil {
       Configuration conf) throws IOException {
     List<InetSocketAddress> addresses = getNameNodesRPCAddresses(conf,
         DFSConfigKeys.DFS_NAMENODES_SERVICE_RPC_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY);
+        DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY);
     if (addresses.isEmpty()) {
       addresses = getNameNodesRPCAddresses(conf);
     }
 
     if (addresses.isEmpty()) {
+      String defaultAddress = getFSDefaultNameAsHostPortString(conf);
+      if (defaultAddress != null) {
+        URI uri = DFSUtil.createHDFSUri(defaultAddress);
+        addresses.add(new InetSocketAddress(uri.getHost(), uri.getPort()));
+      }
+    }
+
+    if (addresses.isEmpty()) {
       throw new IOException("Incorrect configuration: namenode address " +
-          DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY + " or " +
-          DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY + " is not configured.");
+          DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY + " or " +
+          DFS_NAMENODE_RPC_ADDRESS_KEY + " is not configured.");
     }
     return addresses;
   }
@@ -606,7 +615,7 @@ public class DFSUtil {
       Configuration conf) {
     return getNameNodesRPCAddresses(conf,
         DFSConfigKeys.DFS_NAMENODES_RPC_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY);
+        DFS_NAMENODE_RPC_ADDRESS_KEY);
   }
 
   private static List<InetSocketAddress> getNameNodesRPCAddresses(
@@ -621,7 +630,7 @@ public class DFSUtil {
   public static List<URI> getNameNodesRPCAddressesAsURIs(Configuration conf) {
     return getNameNodesRPCAddressesAsURIs(conf,
         DFSConfigKeys.DFS_NAMENODES_RPC_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY);
+        DFS_NAMENODE_RPC_ADDRESS_KEY);
   }
 
   private static List<URI> getNameNodesRPCAddressesAsURIs(Configuration conf,
@@ -661,10 +670,10 @@ public class DFSUtil {
       }
     }
 
-    String defaultAddress = getFSDefaultNameAsHostPortString(conf);
-    if (defaultAddress != null) {
-      namenodesSet.add(defaultAddress);
-    }
+//    String defaultAddress = getFSDefaultNameAsHostPortString(conf);
+//    if (defaultAddress != null) {
+//      namenodesSet.add(defaultAddress);
+//    }
 
     String singleNameNode = conf.get(singleKey);
     if (singleNameNode != null && !singleNameNode.isEmpty()) {
@@ -700,8 +709,8 @@ public class DFSUtil {
   public static List<URI> getNsServiceRpcUris(Configuration conf)
       throws URISyntaxException {
     return getNameNodesRPCAddressesAsURIs(conf,
-        DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY);
+        DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
+        DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY);
   }
 
   /**
@@ -749,3 +758,4 @@ public class DFSUtil {
     }
   }
 }
+

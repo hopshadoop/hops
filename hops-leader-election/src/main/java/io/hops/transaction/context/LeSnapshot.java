@@ -40,14 +40,14 @@ public abstract class LeSnapshot extends BaseEntityContext<Long, LeDescriptor> {
   @Override
   public void update(LeDescriptor desc) throws TransactionContextException {
     super.update(desc);
-    log("added-le-desc", "id", desc.getId(), "hostName", desc.getHostName(),
+    log("added-le-desc", "id", desc.getId(), "hostName", desc.getRpcAddresses(),
         "counter", desc.getCounter());
   }
 
   @Override
   public void remove(LeDescriptor desc) throws TransactionContextException {
     super.remove(desc);
-    log("removed-le-desc", "id", desc.getId(), "hostName", desc.getHostName(),
+    log("removed-le-desc", "id", desc.getId(), "hostName", desc.getRpcAddresses(),
         "counter", desc.getCounter());
   }
 

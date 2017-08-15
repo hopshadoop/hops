@@ -248,6 +248,9 @@ public class DFSClient implements java.io.Closeable {
     final int dbFileMaxSize;
     final boolean storeSmallFilesInDB;
     final int dfsClientInitialWaitOnRetry;
+    //small delay before closing the file ensures that incremental block reporst are processed by the
+    //namenodes before the file close operation.
+    final int delayBeforeClose;
     //only for testing
     final boolean hdfsClientEmulationForSF;
 
@@ -325,6 +328,9 @@ public class DFSClient implements java.io.Closeable {
               DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_DEFAULT);
 
       hdfsClientEmulationForSF = conf.getBoolean("hdfsClientEmulationForSF",false);
+
+      delayBeforeClose = conf.getInt(DFSConfigKeys.DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_KEY,
+              DFSConfigKeys.DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_DEFAULT);
     }
 
     private DataChecksum.Type getChecksumType(Configuration conf) {
@@ -1843,7 +1849,12 @@ public class DFSClient implements java.io.Closeable {
         return namenode.delete(src, true);
       }
     };
-    return (Boolean) doClientActionWithRetry(handler, "delete");
+
+    if(getServerDefaults().getQuotaEnabled()){
+      return (Boolean) doClientActionOnLeader(handler, "delete");
+    } else {
+      return (Boolean) doClientActionWithRetry(handler, "delete");
+    }
   }
 
   /**
@@ -1864,7 +1875,11 @@ public class DFSClient implements java.io.Closeable {
           return namenode.delete(src, recursive);
         }
       };
-      return (Boolean) doClientActionWithRetry(handler, "delete");
+      if(getServerDefaults().getQuotaEnabled()){
+        return (Boolean) doClientActionOnLeader(handler, "delete");
+      } else {
+        return (Boolean) doClientActionWithRetry(handler, "delete");
+      }
     } catch (RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
           FileNotFoundException.class, SafeModeException.class,

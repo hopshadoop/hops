@@ -1741,4 +1741,33 @@ public class TestFileCreation {
       }
     }
   }
+
+  @Test
+  public void testNotReplicatedYetException() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
+      conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_MIN_KEY, 1);
+      conf.set(DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, "localhost:0");
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      FSDataOutputStream out = dfs.create(new Path("/file"));
+      byte[] buffer =new byte[BLOCK_SIZE * 4];
+      out.write(buffer);
+      out.close();
+
+
+
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
 }
+

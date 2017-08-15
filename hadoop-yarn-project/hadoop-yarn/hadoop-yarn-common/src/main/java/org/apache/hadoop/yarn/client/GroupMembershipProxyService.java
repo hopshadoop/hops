@@ -109,12 +109,11 @@ public class GroupMembershipProxyService implements Closeable {
                   @Override
                   public LiveRMsResponse run() {
                     try {
-                      GroupMembership proxy = oldProxies.get(nextNode.
-                              getInetSocketAddress());
+                      GroupMembership proxy = oldProxies.get(nextNode.getRpcServerAddressForClients());
                       if (proxy == null) {
                         proxy = new GroupMembershipPBClientImpl(1,
-                                nextNode.getInetSocketAddress(), conf);
-                        oldProxies.put(nextNode.getInetSocketAddress(), proxy);
+                                nextNode.getRpcServerAddressForClients(), conf);
+                        oldProxies.put(nextNode.getRpcServerAddressForClients(), proxy);
                       }
 
                       return (LiveRMsResponse) proxy.getLiveRMList();

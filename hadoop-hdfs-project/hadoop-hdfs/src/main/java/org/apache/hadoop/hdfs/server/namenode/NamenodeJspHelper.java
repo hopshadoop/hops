@@ -65,14 +65,11 @@ import java.net.URLEncoder;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -180,18 +177,18 @@ class NamenodeJspHelper {
   class LexicographicComparator implements Comparator<ActiveNode> {
     @Override
     public int compare(ActiveNode a, ActiveNode b) {
-        return getCanonicalHostName(a.getIpAddress()).compareToIgnoreCase(getCanonicalHostName(a.getIpAddress()));
+        return getCanonicalHostName(a.getRpcServerIpAddress()).compareToIgnoreCase(getCanonicalHostName(a.getRpcServerIpAddress()));
     }
  }
 
   private static String getAllActiveNNs(SortedActiveNodeList activeNodeList) {
     List<ActiveNode> list = activeNodeList.getActiveNodes();
     String leaderhost = getCanonicalHostName(activeNodeList.getLeader()
-        .getIpAddress());
+        .getRpcServerIpAddress());
     
     Map<String, ActiveNode> activeNodes = new HashMap<>();
     for(ActiveNode node : list){
-      activeNodes.put(getCanonicalHostName(node.getIpAddress()), node);
+      activeNodes.put(getCanonicalHostName(node.getRpcServerIpAddress()), node);
     }
     
     SortedSet<String> keys = new TreeSet<>(activeNodes.keySet());
@@ -559,12 +556,12 @@ class NamenodeJspHelper {
         boolean alive, int nnHttpPort, String nnaddr) throws IOException {
       /*
        * Say the datanode is dn1.hadoop.apache.org with ip 192.168.0.5 we use:
-       * 1) d.getHostName():d.getPort() to display. Domain and port are stripped
+       * 1) d.getHostName():d.getRpcServerPort() to display. Domain and port are stripped
        *    if they are common across the nodes. i.e. "dn1"
        * 2) d.getHost():d.Port() for "title". i.e. "192.168.0.5:50010"
        * 3) d.getHostName():d.getInfoPort() for url.
        *    i.e. "http://dn1.hadoop.apache.org:50075/..."
-       * Note that "d.getHost():d.getPort()" is what DFS clients use to
+       * Note that "d.getHost():d.getRpcServerPort()" is what DFS clients use to
        * interact with datanodes.
        */
 

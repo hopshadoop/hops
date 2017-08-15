@@ -301,8 +301,8 @@ public class KMSClientProvider extends KeyProvider implements CryptoExtension,
      * where :
      * - PROTO = http or https
      * - AUTHORITY = <HOSTS>[:<PORT>]
-     * - HOSTS = <HOSTNAME>[;<HOSTS>]
-     * - HOSTNAME = string
+     * - HOSTS = <RPC_ADDRESSES>[;<HOSTS>]
+     * - RPC_ADDRESSES = string
      * - PORT = integer
      *
      * If multiple hosts are provider, the Factory will create a

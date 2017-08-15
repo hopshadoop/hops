@@ -50,7 +50,7 @@ public class TestHAFileCreation extends junit.framework.TestCase {
   FileSystem fs = null;
   int NN1 = 0, NN2 = 1;
   static int NUM_NAMENODES = 2;
-  static int NUM_DATANODES = 3;
+  static int NUM_DATANODES = 1;
   // 10 seconds timeout default
   long NNDeathTimeout = 10000;
   boolean writeInSameDir = true;
@@ -59,7 +59,7 @@ public class TestHAFileCreation extends junit.framework.TestCase {
   int fileCloseWaitTime = 5000;
   int waitReplicationTimeout = 5 * 60 * 1000;
   Path baseDir = new Path("/testsLoad");
-  Writer[] writers = new Writer[50];
+  Writer[] writers = new Writer[10];
 
   private void setupCluster(int replicationFactor) throws IOException {
     // initialize the cluster with minimum 2 namenodes and minimum 6 datanodes
@@ -125,8 +125,7 @@ public class TestHAFileCreation extends junit.framework.TestCase {
   public void testFailoverWhenLeaderNNCrashesTest1() {
     // Testing with replication factor of 3
     short repFactor = 3;
-    LOG.info(
-        "Running test [testFailoverWhenLeaderNNCrashes()] with replication factor " +
+    LOG.info("Running test [testFailoverWhenLeaderNNCrashes()] with replication factor " +
             repFactor);
     failoverWhenLeaderNNCrashes(repFactor);
   }
