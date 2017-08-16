@@ -1933,7 +1933,7 @@ public class BlockManager {
     }
   
     HashMatchingResult matchingResult;
-    if (namesystem.isInStartupSafeMode()){
+    if (dn.isFirstBlockReport()){
       //For some reason, the first block reports can report matching hashes
       //despite being incorrect. I still don't get why..
       List<Integer> allBucketIds = new ArrayList<>();
