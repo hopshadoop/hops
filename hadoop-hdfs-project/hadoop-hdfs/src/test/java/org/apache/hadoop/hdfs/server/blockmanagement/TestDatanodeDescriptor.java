@@ -151,7 +151,7 @@ public class TestDatanodeDescriptor {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        return dn.removeBlock(blk);
+        return dn.removeReplica(blk);
       }
 
     }.handle();

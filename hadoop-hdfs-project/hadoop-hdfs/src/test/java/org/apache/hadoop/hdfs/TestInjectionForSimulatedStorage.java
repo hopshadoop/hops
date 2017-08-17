@@ -29,6 +29,8 @@ import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportBlock;
 import org.apache.hadoop.util.Time;
 import org.junit.Test;
 
@@ -154,7 +156,7 @@ public class TestInjectionForSimulatedStorage {
       writeFile(cluster.getFileSystem(), testPath, numDataNodes);
       waitForBlockReplication(testFile, dfsClient.getNamenode(), numDataNodes,
           20);
-      Iterable<Block>[] blocksList = cluster.getAllBlockReports(bpid);
+      Iterable<BlockReportBlock>[] blocksList = cluster.getAllBlockReports(bpid);
       
       cluster.shutdown();
       cluster = null;
@@ -173,9 +175,9 @@ public class TestInjectionForSimulatedStorage {
           .format(false).build();
       cluster.waitActive();
       Set<Block> uniqueBlocks = new HashSet<>();
-      for (Iterable<Block> aBlocksList : blocksList) {
-        for (Block b : aBlocksList) {
-          uniqueBlocks.add(new Block(b));
+      for (Iterable<BlockReportBlock> aBlocksList : blocksList) {
+        for (BlockReportBlock b : aBlocksList) {
+          uniqueBlocks.add(new Block(b.getBlockId(), b.getLength(), b.getGenerationStamp()));
         }
       }
       // Insert all the blocks in the first data node

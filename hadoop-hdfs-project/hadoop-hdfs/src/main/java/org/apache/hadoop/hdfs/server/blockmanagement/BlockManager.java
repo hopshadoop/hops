@@ -51,8 +51,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs.BlockReportIterator;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -73,6 +71,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
@@ -291,6 +290,10 @@ public class BlockManager {
   public BlockManager(final Namesystem namesystem, final FSClusterStats stats,
       final Configuration conf) throws IOException {
     this.namesystem = namesystem;
+    int numBuckets = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
+        DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
+    HashBuckets.initialize(numBuckets);
+    
     datanodeManager = new DatanodeManager(this, namesystem, conf);
     corruptReplicas = new CorruptReplicasMap(datanodeManager);
     heartbeatManager = datanodeManager.getHeartbeatManager();
@@ -515,9 +518,7 @@ public class BlockManager {
     Collection<DatanodeDescriptor> corruptNodes =
         corruptReplicas.getNodes(getBlockInfo(block));
 
-    for (Iterator<DatanodeDescriptor> jt = blocksMap.nodeIterator(block);
-         jt.hasNext(); ) {
-      DatanodeDescriptor node = jt.next();
+    for (DatanodeDescriptor node : blocksMap.nodeList(block)){
       String state = "";
       if (corruptNodes != null && corruptNodes.contains(node)) {
         state = "(corrupt)";
@@ -744,9 +745,8 @@ public class BlockManager {
       throws StorageException, TransactionContextException {
     ArrayList<String> machineSet =
         new ArrayList<>(blocksMap.numNodes(block));
-    for (Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(block);
-         it.hasNext(); ) {
-      String storageID = it.next().getStorageID();
+    for (DatanodeDescriptor node : blocksMap.nodeList(block)){
+      String storageID = node.getStorageID();
       // filter invalidate replicas
       if (!invalidateBlocks.contains(storageID, block)) {
         machineSet.add(storageID);
@@ -864,9 +864,7 @@ public class BlockManager {
     final DatanodeDescriptor[] machines = new DatanodeDescriptor[numMachines];
     int j = 0;
     if (numMachines > 0) {
-      for (Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(blk);
-           it.hasNext(); ) {
-        final DatanodeDescriptor d = it.next();
+      for (final DatanodeDescriptor d : blocksMap.nodeList(blk)){
         final boolean replicaCorrupt = corruptReplicas.isReplicaCorrupt(blk, d);
         if (isCorrupt || (!isCorrupt && !replicaCorrupt)) {
           machines[j++] = d;
@@ -1074,7 +1072,7 @@ public class BlockManager {
   /**
    * Remove the blocks associated to the given datanode.
    */
-  void removeBlocksAssociatedTo(final DatanodeDescriptor node)
+  void datanodeRemoved(final DatanodeDescriptor node)
       throws IOException {
     final Iterator<BlockInfo> it = node.getBlockIterator();
     while (it.hasNext()) {
@@ -1110,9 +1108,7 @@ public class BlockManager {
   private void addToInvalidates(Block b)
       throws StorageException, TransactionContextException {
     StringBuilder datanodes = new StringBuilder();
-    for (Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(b);
-         it.hasNext(); ) {
-      DatanodeDescriptor node = it.next();
+    for (DatanodeDescriptor node : blocksMap.nodeList(b)){
       BlockInfo temp = getBlockInfo(b);
       invalidateBlocks.add(temp, node, false);
       datanodes.append(node).append(" ");
@@ -1603,11 +1599,10 @@ public class BlockManager {
     int decommissioned = 0;
     int corrupt = 0;
     int excess = 0;
-    Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(block);
+    List<DatanodeDescriptor> datanodes = blocksMap.nodeList(block);
     Collection<DatanodeDescriptor> nodesCorrupt =
         corruptReplicas.getNodes(getBlockInfo(block));
-    while (it.hasNext()) {
-      DatanodeDescriptor node = it.next();
+    for(DatanodeDescriptor node : datanodes) {
       if ((nodesCorrupt != null) && (nodesCorrupt.contains(node))) {
         corrupt++;
       } else if (node.isDecommissionInProgress() || node.isDecommissioned()) {
@@ -1746,7 +1741,7 @@ public class BlockManager {
    * Update the (machine-->blocklist) and (block-->machinelist) maps.
    */
   public void processReport(final DatanodeID nodeID, final String poolId,
-      final BlockListAsLongs newReport) throws IOException {
+      final BlockReport newReport) throws IOException {
     final long startTime = Time.now(); //after acquiring write lock
     final DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
     if (node == null || !node.isAlive) {
@@ -1785,7 +1780,7 @@ public class BlockManager {
       metrics.addBlockReport((int) (endTime - startTime));
     }
     blockLog.info("BLOCK* processReport: from " + nodeID + ", blocks: " +
-        newReport.getNumberOfBlocks() + ", processing time: " +
+        newReport.getNumBlocks() + ", processing time: " +
         (endTime - startTime) + " msecs");
   }
 
@@ -1854,7 +1849,7 @@ public class BlockManager {
   }
 
   private void processReport(final DatanodeDescriptor node,
-      final BlockListAsLongs report) throws IOException {
+      final BlockReport report) throws IOException {
     // Normal case:
     // Modify the (block-->datanode) map, according to the difference
     // between the old and new block report.
@@ -1907,7 +1902,7 @@ public class BlockManager {
   }
 
   private void reportDiff(final DatanodeDescriptor dn,
-      final BlockListAsLongs newReport, final Collection<BlockInfo> toAdd,
+      final BlockReport newReport, final Collection<BlockInfo> toAdd,
       // add to DatanodeDescriptor
       final Collection<Long> toRemove,
       // remove from DatanodeDescriptor
@@ -1927,10 +1922,10 @@ public class BlockManager {
     final Set<Long> safeBlocks = new HashSet<>(allMachineBlocks);
 
     try {
-      final int numOfReportedBlks = newReport.getNumberOfBlocks();
+      final int numReportedBlocks = newReport.getNumBlocks();
       final Collection subTasks = new ArrayList<Callable>();
 
-      Slicer.slice(numOfReportedBlks, processReportBatchSize,
+      Slicer.slice(numReportedBlocks, processReportBatchSize,
           new Slicer.OperationHandler() {
             @Override
             public void handle(final int startIndex, final int endIndex) throws Exception {
@@ -2792,9 +2787,7 @@ public class BlockManager {
         new ArrayList<>();
     Collection<DatanodeDescriptor> corruptNodes =
         corruptReplicas.getNodes(getBlockInfo(block));
-    for (Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(block);
-         it.hasNext(); ) {
-      DatanodeDescriptor cur = it.next();
+    for (DatanodeDescriptor cur : blocksMap.nodeList(block)){
       if (cur.areBlockContentsStale()) {
         LOG.info("BLOCK* processOverReplicatedBlock: " +
             "Postponing processing of over-replicated " +
@@ -2906,7 +2899,7 @@ public class BlockManager {
       //
       // The 'excessblocks' tracks blocks until we get confirmation
       // that the datanode has deleted them; the only way we remove them
-      // is when we get a "removeBlock" message.
+      // is when we get a "removeReplica" message.
       //
       // The 'invalidate' list is used to inform the datanode the block
       // should be deleted.  Items are removed from the invalidate list
@@ -2934,7 +2927,7 @@ public class BlockManager {
    * Modify (block-->datanode) map. Possibly generate replication tasks, if the
    * removed block is still valid.
    */
-  public void removeStoredBlock(Block block, DatanodeDescriptor node)
+  private void removeStoredBlock(Block block, DatanodeDescriptor node)
       throws IOException {
     if (blockLog.isDebugEnabled()) {
       blockLog.debug("BLOCK* removeStoredBlock: " + block + " from " + node);
@@ -3245,12 +3238,11 @@ public class BlockManager {
     int corrupt = 0;
     int excess = 0;
     int stale = 0;
-    Iterator<DatanodeDescriptor> nodeIter = blocksMap.nodeIterator(b);
+    List<DatanodeDescriptor> nodes = blocksMap.nodeList(b);
 
     Collection<DatanodeDescriptor> nodesCorrupt =
         corruptReplicas.getNodes(getBlockInfo(b));
-    while (nodeIter.hasNext()) {
-      DatanodeDescriptor node = nodeIter.next();
+    for(DatanodeDescriptor node : nodes) {
       if ((nodesCorrupt != null) && (nodesCorrupt.contains(node))) {
         corrupt++;
       } else if (node.isDecommissionInProgress() || node.isDecommissioned()) {
@@ -3287,10 +3279,9 @@ public class BlockManager {
     }
     // else proceed with fast case
     int live = 0;
-    Iterator<DatanodeDescriptor> nodeIter = blocksMap.nodeIterator(b);
+    List<DatanodeDescriptor> nodes = blocksMap.nodeList(b);
     Collection<DatanodeDescriptor> nodesCorrupt = corruptReplicas.getNodes(b);
-    while (nodeIter.hasNext()) {
-      DatanodeDescriptor node = nodeIter.next();
+    for(DatanodeDescriptor node : nodes) {
       if ((nodesCorrupt == null) || (!nodesCorrupt.contains(node))) {
         live++;
       }
@@ -3303,10 +3294,9 @@ public class BlockManager {
     int curReplicas = num.liveReplicas();
     int curExpectedReplicas = getReplication(block);
     BlockCollection bc = blocksMap.getBlockCollection(block);
-    Iterator<DatanodeDescriptor> nodeIter = blocksMap.nodeIterator(block);
+    List<DatanodeDescriptor> nodes = blocksMap.nodeList(block);
     StringBuilder nodeList = new StringBuilder();
-    while (nodeIter.hasNext()) {
-      DatanodeDescriptor node = nodeIter.next();
+    for (DatanodeDescriptor node : nodes){
       nodeList.append(node);
       nodeList.append(" ");
     }
@@ -3473,13 +3463,15 @@ public class BlockManager {
 
   public DatanodeDescriptor[] getNodes(BlockInfo block)
       throws StorageException, TransactionContextException {
-    DatanodeDescriptor[] nodes =
+    DatanodeDescriptor[] toReturn =
         new DatanodeDescriptor[block.numNodes(datanodeManager)];
-    Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(block);
-    for (int i = 0; it != null && it.hasNext(); i++) {
-      nodes[i] = it.next();
+    List<DatanodeDescriptor> nodes = blocksMap.nodeList(block);
+    if (nodes != null){
+      for (int i = 0; i < nodes.size() ; i++){
+        toReturn[i] = nodes.get(i);
+      }
     }
-    return nodes;
+    return toReturn;
   }
 
   public int getTotalBlocks() throws IOException {
@@ -3589,9 +3581,7 @@ public class BlockManager {
         corruptReplicas.getNodes(getBlockInfo(b));
     int numExpectedReplicas = getReplication(b);
     String rackName = null;
-    for (Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(b);
-         it.hasNext(); ) {
-      DatanodeDescriptor cur = it.next();
+    for (DatanodeDescriptor cur : blocksMap.nodeList(b)) {
       if (!cur.isDecommissionInProgress() && !cur.isDecommissioned()) {
         if ((corruptNodes == null) || !corruptNodes.contains(cur)) {
           if (numExpectedReplicas == 1 || (numExpectedReplicas > 1 &&
@@ -3639,9 +3629,9 @@ public class BlockManager {
   /**
    * @return an iterator of the datanodes.
    */
-  public Iterator<DatanodeDescriptor> datanodeIterator(final Block block)
+  public List<DatanodeDescriptor> datanodeList(final Block block)
       throws StorageException, TransactionContextException {
-    return blocksMap.nodeIterator(block);
+    return blocksMap.nodeList(block);
   }
 
   public int numCorruptReplicas(Block block)

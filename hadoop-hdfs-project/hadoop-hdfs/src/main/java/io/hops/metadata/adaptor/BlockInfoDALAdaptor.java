@@ -151,6 +151,9 @@ public class BlockInfoDALAdaptor extends
         blockInfo =
             new org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo(b,
                 dalClass.getInodeId());
+      } else {
+        // Unexpected UC Block state
+        return null;
       }
 
       blockInfo.setINodeIdNoPersistance(dalClass.getInodeId());

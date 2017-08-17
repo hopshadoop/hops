@@ -106,7 +106,7 @@ public class ReplicaContext
   @Override
   Replica cloneEntity(Replica hopReplica, int inodeId) {
     return new Replica(hopReplica.getStorageId(), hopReplica.getBlockId(),
-         inodeId);
+         inodeId, hopReplica.getBucketId());
   }
 
   @Override

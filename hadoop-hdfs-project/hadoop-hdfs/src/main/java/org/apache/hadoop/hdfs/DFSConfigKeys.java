@@ -817,4 +817,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final boolean DFS_ENCRYPT_DATA_TRANSFER_DEFAULT = false;
   public static final String DFS_DATA_ENCRYPTION_ALGORITHM_KEY =
       "dfs.encrypt.data.transfer.algorithm";
+  
+  // Hash bucket config
+  public static final String DFS_NUM_BUCKETS_KEY = "dfs.defaults.blockreport" +
+      ".numbuckets";
+  public static final int DFS_NUM_BUCKETS_DEFAULT = 3;
 }
