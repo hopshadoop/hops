@@ -53,7 +53,7 @@ How to Create an Archive
   sections.
 
   -r indicates the desired replication factor; if this optional argument is
-  not specified, a replication factor of 10 will be used.
+  not specified, a replication factor of 3 will be used.
 
   If you just want to archive a single directory /foo/bar then you can just use
 
@@ -157,6 +157,6 @@ Hadoop Archives and MapReduce
   Using Hadoop Archives in MapReduce is as easy as specifying a different input
   filesystem than the default file system. If you have a hadoop archive stored
   in HDFS in /user/zoo/foo.har then for using this archive for MapReduce input,
-  all you need to specify the input directory as har:///user/zoo/foo.har. Since
+  all you need is to specify the input directory as har:///user/zoo/foo.har. Since
   Hadoop Archives is exposed as a file system MapReduce will be able to use all
   the logical input files in Hadoop Archives as input.

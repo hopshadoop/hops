@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.client.api.async.impl;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -38,6 +39,7 @@ import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.UpdatedContainer;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
 import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
@@ -66,13 +68,41 @@ extends AMRMClientAsync<T> {
   private volatile float progress;
   
   private volatile Throwable savedException;
-  
+
+  /**
+   *
+   * @param intervalMs heartbeat interval in milliseconds between AM and RM
+   * @param callbackHandler callback handler that processes responses from
+   *                        the <code>ResourceManager</code>
+   */
+  public AMRMClientAsyncImpl(
+      int intervalMs, AbstractCallbackHandler callbackHandler) {
+    this(new AMRMClientImpl<T>(), intervalMs, callbackHandler);
+  }
+
+  public AMRMClientAsyncImpl(AMRMClient<T> client, int intervalMs,
+      AbstractCallbackHandler callbackHandler) {
+    super(client, intervalMs, callbackHandler);
+    heartbeatThread = new HeartbeatThread();
+    handlerThread = new CallbackHandlerThread();
+    responseQueue = new LinkedBlockingQueue<>();
+    keepRunning = true;
+    savedException = null;
+  }
+
+  /**
+   *
+   * @deprecated Use {@link #AMRMClientAsyncImpl(int,
+   *             AMRMClientAsync.AbstractCallbackHandler)} instead.
+   */
+  @Deprecated
   public AMRMClientAsyncImpl(int intervalMs, CallbackHandler callbackHandler) {
     this(new AMRMClientImpl<T>(), intervalMs, callbackHandler);
   }
-  
+
   @Private
   @VisibleForTesting
+  @Deprecated
   public AMRMClientAsyncImpl(AMRMClient<T> client, int intervalMs,
       CallbackHandler callbackHandler) {
     super(client, intervalMs, callbackHandler);
@@ -82,7 +112,7 @@ extends AMRMClientAsync<T> {
     keepRunning = true;
     savedException = null;
   }
-    
+
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
@@ -175,6 +205,12 @@ extends AMRMClientAsync<T> {
    */
   public void removeContainerRequest(T req) {
     client.removeContainerRequest(req);
+  }
+
+  @Override
+  public void requestContainerResourceChange(
+      Container container, Resource capability) {
+    client.requestContainerResourceChange(container, capability);
   }
 
   /**
@@ -298,6 +334,17 @@ extends AMRMClientAsync<T> {
               response.getCompletedContainersStatuses();
           if (!completed.isEmpty()) {
             handler.onContainersCompleted(completed);
+          }
+
+          if (handler instanceof AMRMClientAsync.AbstractCallbackHandler) {
+            // RM side of the implementation guarantees that there are
+            // no duplications between increased and decreased containers
+            List<UpdatedContainer> changed = new ArrayList<>();
+            changed.addAll(response.getUpdatedContainers());
+            if (!changed.isEmpty()) {
+              ((AMRMClientAsync.AbstractCallbackHandler) handler)
+                  .onContainersUpdated(changed);
+            }
           }
 
           List<Container> allocated = response.getAllocatedContainers();

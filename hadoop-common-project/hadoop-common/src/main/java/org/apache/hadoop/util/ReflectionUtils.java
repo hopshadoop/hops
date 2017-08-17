@@ -263,7 +263,7 @@ public class ReflectionUtils {
   /**
    * Allocate a buffer for each thread that tries to clone objects.
    */
-  private static ThreadLocal<CopyInCopyOutBuffer> cloneBuffers
+  private static final ThreadLocal<CopyInCopyOutBuffer> CLONE_BUFFERS
       = new ThreadLocal<CopyInCopyOutBuffer>() {
       @Override
       protected synchronized CopyInCopyOutBuffer initialValue() {
@@ -288,7 +288,7 @@ public class ReflectionUtils {
   @SuppressWarnings("unchecked")
   public static <T> T copy(Configuration conf, 
                                 T src, T dst) throws IOException {
-    CopyInCopyOutBuffer buffer = cloneBuffers.get();
+    CopyInCopyOutBuffer buffer = CLONE_BUFFERS.get();
     buffer.outBuffer.reset();
     SerializationFactory factory = getFactory(conf);
     Class<T> cls = (Class<T>) src.getClass();
@@ -305,7 +305,7 @@ public class ReflectionUtils {
   @Deprecated
   public static void cloneWritableInto(Writable dst, 
                                        Writable src) throws IOException {
-    CopyInCopyOutBuffer buffer = cloneBuffers.get();
+    CopyInCopyOutBuffer buffer = CLONE_BUFFERS.get();
     buffer.outBuffer.reset();
     src.write(buffer.outBuffer);
     buffer.moveData();

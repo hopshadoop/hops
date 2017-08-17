@@ -28,6 +28,7 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderFactory;
 import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.log4j.PropertyConfigurator;
@@ -39,9 +40,9 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
-import java.util.List;
 
 @InterfaceAudience.Private
 public class KMSWebApp implements ServletContextListener {
@@ -121,9 +122,11 @@ public class KMSWebApp implements ServletContextListener {
       }
       kmsConf = KMSConfiguration.getKMSConf();
       initLogging(confDir);
+      UserGroupInformation.setConfiguration(kmsConf);
       LOG.info("-------------------------------------------------------------");
       LOG.info("  Java runtime version : {}", System.getProperty(
           "java.runtime.version"));
+      LOG.info("  User: {}", System.getProperty("user.name"));
       LOG.info("  KMS Hadoop Version: " + VersionInfo.getVersion());
       LOG.info("-------------------------------------------------------------");
 
@@ -215,6 +218,11 @@ public class KMSWebApp implements ServletContextListener {
 
   @Override
   public void contextDestroyed(ServletContextEvent sce) {
+    try {
+      keyProviderCryptoExtension.close();
+    } catch (IOException ioe) {
+      LOG.error("Error closing KeyProviderCryptoExtension", ioe);
+    }
     kmsAudit.shutdown();
     kmsAcls.stopReloader();
     jmxReporter.stop();

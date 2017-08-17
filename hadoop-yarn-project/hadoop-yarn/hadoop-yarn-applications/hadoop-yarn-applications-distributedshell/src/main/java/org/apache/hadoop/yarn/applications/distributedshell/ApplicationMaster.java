@@ -30,10 +30,12 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -85,7 +87,9 @@ import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.URL;
+import org.apache.hadoop.yarn.api.records.UpdatedContainer;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEntity;
+import org.apache.hadoop.yarn.api.records.timeline.TimelineEntityGroupId;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse;
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
@@ -97,9 +101,11 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.log4j.LogManager;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.sun.jersey.api.client.ClientHandlerException;
 
 /**
  * An ApplicationMaster for executing shell commands on a set of launched
@@ -180,6 +186,8 @@ public class ApplicationMaster {
     DS_APP_ATTEMPT, DS_CONTAINER
   }
 
+  private static final String YARN_SHELL_ID = "YARN_SHELL_ID";
+
   // Configuration
   private Configuration conf;
 
@@ -214,7 +222,7 @@ public class ApplicationMaster {
   @VisibleForTesting
   protected int numTotalContainers = 1;
   // Memory to request for the container on which the shell command will run
-  private int containerMemory = 10;
+  private long containerMemory = 10;
   // VirtualCores to request for the container on which the shell command will run
   private int containerVirtualCores = 1;
   // GPUs to request for the container
@@ -275,9 +283,18 @@ public class ApplicationMaster {
   // Timeline Client
   @VisibleForTesting
   TimelineClient timelineClient;
+  static final String CONTAINER_ENTITY_GROUP_ID = "CONTAINERS";
+  static final String APPID_TIMELINE_FILTER_NAME = "appId";
+  static final String USER_TIMELINE_FILTER_NAME = "user";
 
   private final String linux_bash_command = "bash";
   private final String windows_command = "cmd /c";
+
+  private int yarnShellIdCounter = 1;
+
+  @VisibleForTesting
+  protected final Set<ContainerId> launchedContainers =
+      Collections.newSetFromMap(new ConcurrentHashMap<ContainerId, Boolean>());
 
   /**
    * @param args Command line args
@@ -400,13 +417,13 @@ public class ApplicationMaster {
     if (!envs.containsKey(Environment.CONTAINER_ID.name())) {
       if (cliParser.hasOption("app_attempt_id")) {
         String appIdStr = cliParser.getOptionValue("app_attempt_id", "");
-        appAttemptID = ConverterUtils.toApplicationAttemptId(appIdStr);
+        appAttemptID = ApplicationAttemptId.fromString(appIdStr);
       } else {
         throw new IllegalArgumentException(
             "Application Attempt Id not set in the environment");
       }
     } else {
-      ContainerId containerId = ConverterUtils.toContainerId(envs
+      ContainerId containerId = ContainerId.fromString(envs
           .get(Environment.CONTAINER_ID.name()));
       appAttemptID = containerId.getApplicationAttemptId();
     }
@@ -552,7 +569,8 @@ public class ApplicationMaster {
     appSubmitterUgi.addCredentials(credentials);
 
 
-    AMRMClientAsync.CallbackHandler allocListener = new RMCallbackHandler();
+    AMRMClientAsync.AbstractCallbackHandler allocListener =
+        new RMCallbackHandler();
     amRMClient = AMRMClientAsync.createAMRMClientAsync(1000, allocListener);
     amRMClient.init(conf);
     amRMClient.start();
@@ -582,11 +600,11 @@ public class ApplicationMaster {
             appMasterTrackingUrl);
     // Dump out information about cluster capability as seen by the
     // resource manager
-    int maxMem = response.getMaximumResourceCapability().getMemory();
-    LOG.info("Max mem capabililty of resources in this cluster " + maxMem);
+    long maxMem = response.getMaximumResourceCapability().getMemorySize();
+    LOG.info("Max mem capability of resources in this cluster " + maxMem);
     
     int maxVCores = response.getMaximumResourceCapability().getVirtualCores();
-    LOG.info("Max vcores capabililty of resources in this cluster " + maxVCores);
+    LOG.info("Max vcores capability of resources in this cluster " + maxVCores);
 
     int maxGPUs = response.getMaximumResourceCapability().getGPUs();
     LOG.info("Max gpus capability of resources in this cluster " + maxGPUs);
@@ -618,7 +636,11 @@ public class ApplicationMaster {
         response.getContainersFromPreviousAttempts();
     LOG.info(appAttemptID + " received " + previousAMRunningContainers.size()
       + " previous attempts' running containers on AM registration.");
+    for(Container container: previousAMRunningContainers) {
+      launchedContainers.add(container.getId());
+    }
     numAllocatedContainers.addAndGet(previousAMRunningContainers.size());
+
 
     int numTotalContainersToRequest =
         numTotalContainers - previousAMRunningContainers.size();
@@ -733,8 +755,9 @@ public class ApplicationMaster {
 
     return success;
   }
-  
-  private class RMCallbackHandler implements AMRMClientAsync.CallbackHandler {
+
+  @VisibleForTesting
+  class RMCallbackHandler extends AMRMClientAsync.AbstractCallbackHandler {
     @SuppressWarnings("unchecked")
     @Override
     public void onContainersCompleted(List<ContainerStatus> completedContainers) {
@@ -749,6 +772,14 @@ public class ApplicationMaster {
 
         // non complete containers should not be here
         assert (containerStatus.getState() == ContainerState.COMPLETE);
+        // ignore containers we know nothing about - probably from a previous
+        // attempt
+        if (!launchedContainers.contains(containerStatus.getContainerId())) {
+          LOG.info("Ignoring completed status of "
+              + containerStatus.getContainerId()
+              + "; unknown container(probably launched by previous attempt)");
+          continue;
+        }
 
         // increment counters for completed/failed containers
         int exitStatus = containerStatus.getExitStatus();
@@ -802,13 +833,16 @@ public class ApplicationMaster {
           + allocatedContainers.size());
       numAllocatedContainers.addAndGet(allocatedContainers.size());
       for (Container allocatedContainer : allocatedContainers) {
+        String yarnShellId = Integer.toString(yarnShellIdCounter);
+        yarnShellIdCounter++;
         LOG.info("Launching shell command on a new container."
             + ", containerId=" + allocatedContainer.getId()
+            + ", yarnShellId=" + yarnShellId
             + ", containerNode=" + allocatedContainer.getNodeId().getHost()
             + ":" + allocatedContainer.getNodeId().getPort()
             + ", containerNodeURI=" + allocatedContainer.getNodeHttpAddress()
             + ", containerResourceMemory"
-            + allocatedContainer.getResource().getMemory()
+            + allocatedContainer.getResource().getMemorySize()
             + ", containerResourceVirtualCores"
             + allocatedContainer.getResource().getVirtualCores()
             + ", containerResourceGPUs"
@@ -816,17 +850,21 @@ public class ApplicationMaster {
         // + ", containerToken"
         // +allocatedContainer.getContainerToken().getIdentifier().toString());
 
-        LaunchContainerRunnable runnableLaunchContainer =
-            new LaunchContainerRunnable(allocatedContainer, containerListener);
-        Thread launchThread = new Thread(runnableLaunchContainer);
+        Thread launchThread = createLaunchContainerThread(allocatedContainer,
+            yarnShellId);
 
         // launch and start the container on a separate thread to keep
         // the main thread unblocked
         // as all containers may not be allocated at one go.
         launchThreads.add(launchThread);
+        launchedContainers.add(allocatedContainer.getId());
         launchThread.start();
       }
     }
+
+    @Override
+    public void onContainersUpdated(
+        List<UpdatedContainer> containers) {}
 
     @Override
     public void onShutdownRequest() {
@@ -846,14 +884,14 @@ public class ApplicationMaster {
 
     @Override
     public void onError(Throwable e) {
+      LOG.error("Error in RMCallbackHandler: ", e);
       done = true;
       amRMClient.stop();
     }
   }
 
   @VisibleForTesting
-  static class NMCallbackHandler
-    implements NMClientAsync.CallbackHandler {
+  static class NMCallbackHandler extends NMClientAsync.AbstractCallbackHandler {
 
     private ConcurrentMap<ContainerId, Container> containers =
         new ConcurrentHashMap<ContainerId, Container>();
@@ -895,11 +933,15 @@ public class ApplicationMaster {
         applicationMaster.nmClientAsync.getContainerStatusAsync(containerId, container.getNodeId());
       }
       if(applicationMaster.timelineClient != null) {
-        ApplicationMaster.publishContainerStartEvent(
+        applicationMaster.publishContainerStartEvent(
             applicationMaster.timelineClient, container,
             applicationMaster.domainId, applicationMaster.appSubmitterUgi);
       }
     }
+
+    @Override
+    public void onContainerResourceIncreased(
+        ContainerId containerId, Resource resource) {}
 
     @Override
     public void onStartContainerError(ContainerId containerId, Throwable t) {
@@ -920,6 +962,11 @@ public class ApplicationMaster {
       LOG.error("Failed to stop Container " + containerId);
       containers.remove(containerId);
     }
+
+    @Override
+    public void onIncreaseContainerResourceError(
+        ContainerId containerId, Throwable t) {}
+
   }
 
   /**
@@ -929,7 +976,8 @@ public class ApplicationMaster {
   private class LaunchContainerRunnable implements Runnable {
 
     // Allocated container
-    Container container;
+    private Container container;
+    private String shellId;
 
     NMCallbackHandler containerListener;
 
@@ -937,10 +985,11 @@ public class ApplicationMaster {
      * @param lcontainer Allocated container
      * @param containerListener Callback handler of the container
      */
-    public LaunchContainerRunnable(
-        Container lcontainer, NMCallbackHandler containerListener) {
+    public LaunchContainerRunnable(Container lcontainer,
+        NMCallbackHandler containerListener, String shellId) {
       this.container = lcontainer;
       this.containerListener = containerListener;
+      this.shellId = shellId;
     }
 
     @Override
@@ -951,7 +1000,7 @@ public class ApplicationMaster {
      */
     public void run() {
       LOG.info("Setting up container launch container for containerid="
-          + container.getId());
+          + container.getId() + " with shellid=" + shellId);
 
       // Set the local resources
       Map<String, LocalResource> localResources = new HashMap<String, LocalResource>();
@@ -984,8 +1033,7 @@ public class ApplicationMaster {
 
         URL yarnUrl = null;
         try {
-          yarnUrl = ConverterUtils.getYarnUrlFromURI(
-            new URI(renamedScriptPath.toString()));
+          yarnUrl = URL.fromURI(new URI(renamedScriptPath.toString()));
         } catch (URISyntaxException e) {
           LOG.error("Error when trying to use shell script path specified"
               + " in env, path=" + renamedScriptPath, e);
@@ -1040,8 +1088,11 @@ public class ApplicationMaster {
       // download anyfiles in the distributed file-system. The tokens are
       // otherwise also useful in cases, for e.g., when one is running a
       // "hadoop dfs" command inside the distributed shell.
+      Map<String, String> myShellEnv = new HashMap<String, String>(shellEnv);
+      myShellEnv.put(YARN_SHELL_ID, shellId);
       ContainerLaunchContext ctx = ContainerLaunchContext.newInstance(
-        localResources, shellEnv, commands, null, allTokens.duplicate(), null);
+        localResources, myShellEnv, commands, null, allTokens.duplicate(),
+          null);
       containerListener.addContainer(container.getId(), container);
       nmClientAsync.startContainerAsync(container, ctx);
     }
@@ -1097,15 +1148,17 @@ public class ApplicationMaster {
       org.apache.commons.io.IOUtils.closeQuietly(ds);
     }
   }
-  
-  private static void publishContainerStartEvent(
-      final TimelineClient timelineClient, Container container, String domainId,
-      UserGroupInformation ugi) {
+
+  private void publishContainerStartEvent(
+      final TimelineClient timelineClient, final Container container,
+      String domainId, UserGroupInformation ugi) {
     final TimelineEntity entity = new TimelineEntity();
     entity.setEntityId(container.getId().toString());
     entity.setEntityType(DSEntity.DS_CONTAINER.toString());
     entity.setDomainId(domainId);
-    entity.addPrimaryFilter("user", ugi.getShortUserName());
+    entity.addPrimaryFilter(USER_TIMELINE_FILTER_NAME, ugi.getShortUserName());
+    entity.addPrimaryFilter(APPID_TIMELINE_FILTER_NAME, container.getId()
+        .getApplicationAttemptId().getApplicationId().toString());
     TimelineEvent event = new TimelineEvent();
     event.setTimestamp(System.currentTimeMillis());
     event.setEventType(DSEvent.DS_CONTAINER_START.toString());
@@ -1114,27 +1167,28 @@ public class ApplicationMaster {
     entity.addEvent(event);
 
     try {
-      ugi.doAs(new PrivilegedExceptionAction<TimelinePutResponse>() {
-        @Override
-        public TimelinePutResponse run() throws Exception {
-          return timelineClient.putEntities(entity);
-        }
-      });
-    } catch (Exception e) {
+      processTimelineResponseErrors(
+          putContainerEntity(timelineClient,
+              container.getId().getApplicationAttemptId(),
+              entity));
+    } catch (YarnException | IOException | ClientHandlerException e) {
       LOG.error("Container start event could not be published for "
-          + container.getId().toString(),
-          e instanceof UndeclaredThrowableException ? e.getCause() : e);
+          + container.getId().toString(), e);
     }
   }
 
-  private static void publishContainerEndEvent(
+  @VisibleForTesting
+  void publishContainerEndEvent(
       final TimelineClient timelineClient, ContainerStatus container,
       String domainId, UserGroupInformation ugi) {
     final TimelineEntity entity = new TimelineEntity();
     entity.setEntityId(container.getContainerId().toString());
     entity.setEntityType(DSEntity.DS_CONTAINER.toString());
     entity.setDomainId(domainId);
-    entity.addPrimaryFilter("user", ugi.getShortUserName());
+    entity.addPrimaryFilter(USER_TIMELINE_FILTER_NAME, ugi.getShortUserName());
+    entity.addPrimaryFilter(APPID_TIMELINE_FILTER_NAME,
+        container.getContainerId().getApplicationAttemptId()
+            .getApplicationId().toString());
     TimelineEvent event = new TimelineEvent();
     event.setTimestamp(System.currentTimeMillis());
     event.setEventType(DSEvent.DS_CONTAINER_END.toString());
@@ -1142,32 +1196,94 @@ public class ApplicationMaster {
     event.addEventInfo("Exit Status", container.getExitStatus());
     entity.addEvent(event);
     try {
-      timelineClient.putEntities(entity);
-    } catch (YarnException | IOException e) {
+      processTimelineResponseErrors(
+          putContainerEntity(timelineClient,
+              container.getContainerId().getApplicationAttemptId(),
+              entity));
+    } catch (YarnException | IOException | ClientHandlerException e) {
       LOG.error("Container end event could not be published for "
           + container.getContainerId().toString(), e);
     }
   }
 
-  private static void publishApplicationAttemptEvent(
+  private TimelinePutResponse putContainerEntity(
+      TimelineClient timelineClient, ApplicationAttemptId currAttemptId,
+      TimelineEntity entity)
+      throws YarnException, IOException {
+    if (TimelineUtils.timelineServiceV1_5Enabled(conf)) {
+      TimelineEntityGroupId groupId = TimelineEntityGroupId.newInstance(
+          currAttemptId.getApplicationId(),
+          CONTAINER_ENTITY_GROUP_ID);
+      return timelineClient.putEntities(currAttemptId, groupId, entity);
+    } else {
+      return timelineClient.putEntities(entity);
+    }
+  }
+
+  private void publishApplicationAttemptEvent(
       final TimelineClient timelineClient, String appAttemptId,
       DSEvent appEvent, String domainId, UserGroupInformation ugi) {
     final TimelineEntity entity = new TimelineEntity();
     entity.setEntityId(appAttemptId);
     entity.setEntityType(DSEntity.DS_APP_ATTEMPT.toString());
     entity.setDomainId(domainId);
-    entity.addPrimaryFilter("user", ugi.getShortUserName());
+    entity.addPrimaryFilter(USER_TIMELINE_FILTER_NAME, ugi.getShortUserName());
     TimelineEvent event = new TimelineEvent();
     event.setEventType(appEvent.toString());
     event.setTimestamp(System.currentTimeMillis());
     entity.addEvent(event);
     try {
-      timelineClient.putEntities(entity);
-    } catch (YarnException | IOException e) {
+      TimelinePutResponse response = timelineClient.putEntities(entity);
+      processTimelineResponseErrors(response);
+    } catch (YarnException | IOException | ClientHandlerException e) {
       LOG.error("App Attempt "
           + (appEvent.equals(DSEvent.DS_APP_ATTEMPT_START) ? "start" : "end")
           + " event could not be published for "
           + appAttemptId.toString(), e);
     }
+  }
+
+  private TimelinePutResponse processTimelineResponseErrors(
+      TimelinePutResponse response) {
+    List<TimelinePutResponse.TimelinePutError> errors = response.getErrors();
+    if (errors.size() == 0) {
+      LOG.debug("Timeline entities are successfully put");
+    } else {
+      for (TimelinePutResponse.TimelinePutError error : errors) {
+        LOG.error(
+            "Error when publishing entity [" + error.getEntityType() + ","
+                + error.getEntityId() + "], server side error code: "
+                + error.getErrorCode());
+      }
+    }
+    return response;
+  }
+
+  RMCallbackHandler getRMCallbackHandler() {
+    return new RMCallbackHandler();
+  }
+
+  @VisibleForTesting
+  void setAmRMClient(AMRMClientAsync client) {
+    this.amRMClient = client;
+  }
+
+  @VisibleForTesting
+  int getNumCompletedContainers() {
+    return numCompletedContainers.get();
+  }
+
+  @VisibleForTesting
+  boolean getDone() {
+    return done;
+  }
+
+  @VisibleForTesting
+  Thread createLaunchContainerThread(Container allocatedContainer,
+      String shellId) {
+    LaunchContainerRunnable runnableLaunchContainer =
+        new LaunchContainerRunnable(allocatedContainer, containerListener,
+            shellId);
+    return new Thread(runnableLaunchContainer);
   }
 }

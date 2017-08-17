@@ -33,6 +33,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.util.NodeHealthScriptRunner;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -56,7 +57,6 @@ import org.apache.hadoop.yarn.webapp.WebServicesTestUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
@@ -92,11 +92,14 @@ public class TestNMWebServicesApps extends JerseyTestBase {
       TestNMWebServicesApps.class.getSimpleName() + "LogDir");
 
   private Injector injector = Guice.createInjector(new ServletModule() {
+
     @Override
     protected void configureServlets() {
       conf.set(YarnConfiguration.NM_LOCAL_DIRS, testRootDir.getAbsolutePath());
       conf.set(YarnConfiguration.NM_LOG_DIRS, testLogDir.getAbsolutePath());
-      NodeHealthCheckerService healthChecker = new NodeHealthCheckerService();
+      LocalDirsHandlerService dirsHandler = new LocalDirsHandlerService();
+      NodeHealthCheckerService healthChecker = new NodeHealthCheckerService(
+          NodeManager.getNodeHealthScriptRunner(conf), dirsHandler);
       healthChecker.init(conf);
       dirsHandler = healthChecker.getDiskHandler();
       aclsManager = new ApplicationACLsManager(conf);
@@ -567,11 +570,14 @@ public class TestNMWebServicesApps extends JerseyTestBase {
       String type = exception.getString("exception");
       String classname = exception.getString("javaClassName");
       WebServicesTestUtils.checkStringMatch("exception message",
-          "For input string: \"foo\"", message);
+          "java.lang.IllegalArgumentException: Invalid ApplicationId prefix: "
+              + "app_foo_0000. The valid ApplicationId should start with prefix"
+              + " application",
+          message);
       WebServicesTestUtils.checkStringMatch("exception type",
-          "NumberFormatException", type);
+          "BadRequestException", type);
       WebServicesTestUtils.checkStringMatch("exception classname",
-          "java.lang.NumberFormatException", classname);
+          "org.apache.hadoop.yarn.webapp.BadRequestException", classname);
     }
   }
 

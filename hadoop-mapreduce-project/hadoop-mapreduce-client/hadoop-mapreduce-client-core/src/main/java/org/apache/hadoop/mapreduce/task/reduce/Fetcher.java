@@ -263,7 +263,7 @@ class Fetcher<K,V> extends Thread {
     DataInputStream input = null;
 
     try {
-      setupConnectionsWithRetry(host, remaining, url);
+      setupConnectionsWithRetry(url);
       if (stopped) {
         abortConnect(host, remaining);
       } else {
@@ -335,6 +335,7 @@ class Fetcher<K,V> extends Thread {
         try {
           failedTasks = copyMapOutput(host, input, remaining, fetchRetryEnabled);
         } catch (IOException e) {
+          IOUtils.cleanup(LOG, input);
           //
           // Setup connection again if disconnected by NM
           connection.disconnect();
@@ -373,9 +374,8 @@ class Fetcher<K,V> extends Thread {
     }
   }
 
-  private void setupConnectionsWithRetry(MapHost host,
-      Set<TaskAttemptID> remaining, URL url) throws IOException {
-    openConnectionWithRetry(host, remaining, url);
+  private void setupConnectionsWithRetry(URL url) throws IOException {
+    openConnectionWithRetry(url);
     if (stopped) {
       return;
     }
@@ -395,8 +395,7 @@ class Fetcher<K,V> extends Thread {
     verifyConnection(url, msgToEncode, encHash);
   }
 
-  private void openConnectionWithRetry(MapHost host,
-      Set<TaskAttemptID> remaining, URL url) throws IOException {
+  private void openConnectionWithRetry(URL url) throws IOException {
     long startTime = Time.monotonicNow();
     boolean shouldWait = true;
     while (shouldWait) {
@@ -448,7 +447,7 @@ class Fetcher<K,V> extends Thread {
     LOG.debug("url="+msgToEncode+";encHash="+encHash+";replyHash="+replyHash);
     // verify that replyHash is HMac of encHash
     SecureShuffleUtils.verifyReply(replyHash, encHash, shuffleSecretKey);
-    LOG.info("for url="+msgToEncode+" sent hash and received reply");
+    LOG.debug("for url="+msgToEncode+" sent hash and received reply");
   }
 
   private void setupShuffleConnection(String encHash) {

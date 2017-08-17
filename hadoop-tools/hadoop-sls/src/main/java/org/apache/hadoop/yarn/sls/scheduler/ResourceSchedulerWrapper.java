@@ -19,8 +19,9 @@ package org.apache.hadoop.yarn.sls.scheduler;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,11 +53,13 @@ import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.UpdateContainerRequest;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
@@ -67,6 +70,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnSched
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedContainerChangeRequest;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppReport;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
@@ -201,15 +205,16 @@ public class ResourceSchedulerWrapper
 
   @Override
   public Allocation allocate(ApplicationAttemptId attemptId,
-                             List<ResourceRequest> resourceRequests,
-                             List<ContainerId> containerIds,
-                             List<String> strings, List<String> strings2) {
+      List<ResourceRequest> resourceRequests, List<ContainerId> containerIds,
+      List<String> strings, List<String> strings2,
+      List<UpdateContainerRequest> increaseRequests,
+      List<UpdateContainerRequest> decreaseRequests) {
     if (metricsON) {
       final Timer.Context context = schedulerAllocateTimer.time();
       Allocation allocation = null;
       try {
         allocation = scheduler.allocate(attemptId, resourceRequests,
-                containerIds, strings, strings2);
+                containerIds, strings, strings2, null, null);
         return allocation;
       } finally {
         context.stop();
@@ -223,7 +228,7 @@ public class ResourceSchedulerWrapper
       }
     } else {
       return scheduler.allocate(attemptId,
-              resourceRequests, containerIds, strings, strings2);
+              resourceRequests, containerIds, strings, strings2, null, null);
     }
   }
 
@@ -262,7 +267,7 @@ public class ResourceSchedulerWrapper
           // should have one container which is AM container
           RMContainer rmc = app.getLiveContainers().iterator().next();
           updateQueueMetrics(queue,
-                  rmc.getContainer().getResource().getMemory(),
+                  rmc.getContainer().getResource().getMemorySize(),
                   rmc.getContainer().getResource().getVirtualCores());
         }
       }
@@ -318,7 +323,7 @@ public class ResourceSchedulerWrapper
         if (status.getExitStatus() == ContainerExitStatus.SUCCESS) {
           for (RMContainer rmc : app.getLiveContainers()) {
             if (rmc.getContainerId() == containerId) {
-              releasedMemory += rmc.getContainer().getResource().getMemory();
+              releasedMemory += rmc.getContainer().getResource().getMemorySize();
               releasedVCores += rmc.getContainer()
                       .getResource().getVirtualCores();
               break;
@@ -327,7 +332,7 @@ public class ResourceSchedulerWrapper
         } else if (status.getExitStatus() == ContainerExitStatus.ABORTED) {
           if (preemptionContainerMap.containsKey(containerId)) {
             Resource preResource = preemptionContainerMap.get(containerId);
-            releasedMemory += preResource.getMemory();
+            releasedMemory += preResource.getMemorySize();
             releasedVCores += preResource.getVirtualCores();
             preemptionContainerMap.remove(containerId);
           }
@@ -418,9 +423,9 @@ public class ResourceSchedulerWrapper
             "counter.queue." + queueName + ".pending.cores",
             "counter.queue." + queueName + ".allocated.memory",
             "counter.queue." + queueName + ".allocated.cores"};
-    int values[] = new int[]{pendingResource.getMemory(),
+    long values[] = new long[]{pendingResource.getMemorySize(),
             pendingResource.getVirtualCores(),
-            allocatedResource.getMemory(), allocatedResource.getVirtualCores()};
+            allocatedResource.getMemorySize(), allocatedResource.getVirtualCores()};
     for (int i = names.length - 1; i >= 0; i --) {
       if (! counterMap.containsKey(names[i])) {
         metrics.counter(names[i]);
@@ -488,8 +493,9 @@ public class ResourceSchedulerWrapper
             TimeUnit.MILLISECONDS);
 
     // application running information
-    jobRuntimeLogBW = new BufferedWriter(
-            new FileWriter(metricsOutputDir + "/jobruntime.csv"));
+    jobRuntimeLogBW =
+        new BufferedWriter(new OutputStreamWriter(new FileOutputStream(
+            metricsOutputDir + "/jobruntime.csv"), "UTF-8"));
     jobRuntimeLogBW.write("JobID,real_start_time,real_end_time," +
             "simulate_start_time,simulate_end_time" + EOL);
     jobRuntimeLogBW.flush();
@@ -525,11 +531,11 @@ public class ResourceSchedulerWrapper
 
   private void registerClusterResourceMetrics() {
     metrics.register("variable.cluster.allocated.memory",
-      new Gauge<Integer>() {
+      new Gauge<Long>() {
         @Override
-        public Integer getValue() {
+        public Long getValue() {
           if(scheduler == null || scheduler.getRootQueueMetrics() == null) {
-            return 0;
+            return 0L;
           } else {
             return scheduler.getRootQueueMetrics().getAllocatedMB();
           }
@@ -549,11 +555,11 @@ public class ResourceSchedulerWrapper
       }
     );
     metrics.register("variable.cluster.available.memory",
-      new Gauge<Integer>() {
+      new Gauge<Long>() {
         @Override
-        public Integer getValue() {
+        public Long getValue() {
           if(scheduler == null || scheduler.getRootQueueMetrics() == null) {
-            return 0;
+            return 0L;
           } else {
             return scheduler.getRootQueueMetrics().getAvailableMB();
           }
@@ -693,8 +699,9 @@ public class ResourceSchedulerWrapper
     private boolean firstLine = true;
     public MetricsLogRunnable() {
       try {
-        metricsLogBW = new BufferedWriter(
-                new FileWriter(metricsOutputDir + "/realtimetrack.json"));
+        metricsLogBW =
+            new BufferedWriter(new OutputStreamWriter(new FileOutputStream(
+                metricsOutputDir + "/realtimetrack.json"), "UTF-8"));
         metricsLogBW.write("[");
       } catch (IOException e) {
         e.printStackTrace();
@@ -742,7 +749,7 @@ public class ResourceSchedulerWrapper
   }
 
   private void updateQueueMetrics(String queue,
-                                  int releasedMemory, int releasedVCores) {
+                                  long releasedMemory, int releasedVCores) {
     // update queue counters
     SortedMap<String, Counter> counterMap = metrics.getCounters();
     if (releasedMemory != 0) {
@@ -813,6 +820,14 @@ public class ResourceSchedulerWrapper
     ((AbstractYarnScheduler<SchedulerApplicationAttempt, SchedulerNode>)
         scheduler).init(conf);
     super.serviceInit(conf);
+    initScheduler(conf);
+  }
+
+  private synchronized void initScheduler(Configuration configuration) throws
+  IOException {
+    this.applications =
+        new ConcurrentHashMap<ApplicationId,
+        SchedulerApplication<SchedulerApplicationAttempt>>();
   }
 
   @SuppressWarnings("unchecked")
@@ -929,7 +944,7 @@ public class ResourceSchedulerWrapper
   @LimitedPrivate("yarn")
   @Unstable
   public Resource getClusterResource() {
-    return null;
+    return super.getClusterResource();
   }
 
   @Override
@@ -946,9 +961,26 @@ public class ResourceSchedulerWrapper
   }
 
   @Override
-  protected void completedContainer(RMContainer rmContainer,
+  protected void completedContainerInternal(RMContainer rmContainer,
       ContainerStatus containerStatus, RMContainerEventType event) {
     // do nothing
   }
+
+  @Override
+  public Priority checkAndGetApplicationPriority(Priority priority,
+      String user, String queueName, ApplicationId applicationId)
+      throws YarnException {
+    // TODO Dummy implementation.
+    return Priority.newInstance(0);
+  }
+
+  @Override
+  protected void decreaseContainer(
+      SchedContainerChangeRequest decreaseRequest,
+      SchedulerApplicationAttempt attempt) {
+    // TODO Auto-generated method stub
+    
+  }
+
 }
 

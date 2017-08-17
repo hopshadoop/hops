@@ -32,6 +32,7 @@ import java.net.HttpCookie;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 
@@ -73,7 +74,11 @@ public class TestWebAppProxyServlet {
 
   private static Server server;
   private static int originalPort = 0;
+  private static int numberOfHeaders = 0;
+  private static final String UNKNOWN_HEADER = "Unknown-Header";
+  private static boolean hasUnknownHeader = false;
   Configuration configuration = new Configuration();
+
 
   /**
    * Simple http server. Server should send answer with status 200
@@ -90,6 +95,9 @@ public class TestWebAppProxyServlet {
     originalPort = server.getConnectors()[0].getLocalPort();
     LOG.info("Running embedded servlet container at: http://localhost:"
         + originalPort);
+    // This property needs to be set otherwise CORS Headers will be dropped
+    // by HttpUrlConnection
+    System.setProperty("sun.net.http.allowRestrictedHeaders", "true");
   }
 
   @SuppressWarnings("serial")
@@ -98,6 +106,18 @@ public class TestWebAppProxyServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
         throws ServletException, IOException {
+      int numHeaders = 0;
+      hasUnknownHeader = false;
+      @SuppressWarnings("unchecked")
+      Enumeration<String> names = req.getHeaderNames();
+      while(names.hasMoreElements()) {
+        String headerName = names.nextElement();
+        if (headerName.equals(UNKNOWN_HEADER)) {
+          hasUnknownHeader = true;
+        }
+        ++numHeaders;
+      }
+      numberOfHeaders = numHeaders;
       resp.setStatus(HttpServletResponse.SC_OK);
     }
 
@@ -119,7 +139,6 @@ public class TestWebAppProxyServlet {
 
   @Test(timeout=5000)
   public void testWebAppProxyServlet() throws Exception {
-
     configuration.set(YarnConfiguration.PROXY_ADDRESS, "localhost:9090");
     // overriding num of web server threads, see HttpServer.HTTP_MAXTHREADS 
     configuration.setInt("hadoop.http.max.threads", 5);
@@ -132,6 +151,13 @@ public class TestWebAppProxyServlet {
 
     // wrong url
     try {
+      // wrong url without app ID
+      URL emptyUrl = new URL("http://localhost:" + proxyPort + "/proxy");
+      HttpURLConnection emptyProxyConn = (HttpURLConnection) emptyUrl
+          .openConnection();
+      emptyProxyConn.connect();;
+      assertEquals(HttpURLConnection.HTTP_NOT_FOUND, emptyProxyConn.getResponseCode());
+
       // wrong url. Set wrong app ID
       URL wrongUrl = new URL("http://localhost:" + proxyPort + "/proxy/app");
       HttpURLConnection proxyConn = (HttpURLConnection) wrongUrl
@@ -140,6 +166,7 @@ public class TestWebAppProxyServlet {
       proxyConn.connect();
       assertEquals(HttpURLConnection.HTTP_INTERNAL_ERROR,
           proxyConn.getResponseCode());
+
       // set true Application ID in url
       URL url = new URL("http://localhost:" + proxyPort + "/proxy/application_00_0");
       proxyConn = (HttpURLConnection) url.openConnection();
@@ -194,7 +221,6 @@ public class TestWebAppProxyServlet {
       LOG.info("ProxyConn.getHeaderField(): " +  proxyConn.getHeaderField(ProxyUtils.LOCATION));
       assertEquals("http://localhost:" + originalPort
           + "/foo/bar/test/tez?a=b&x=y&h=p#main", proxyConn.getURL().toString());
-
     } finally {
       proxy.close();
     }
@@ -258,6 +284,43 @@ public class TestWebAppProxyServlet {
     }
   }
 
+  @Test(timeout=5000)
+  public void testWebAppProxyPassThroughHeaders() throws Exception {
+    Configuration configuration = new Configuration();
+    configuration.set(YarnConfiguration.PROXY_ADDRESS, "localhost:9091");
+    configuration.setInt("hadoop.http.max.threads", 5);
+    WebAppProxyServerForTest proxy = new WebAppProxyServerForTest();
+    proxy.init(configuration);
+    proxy.start();
+
+    int proxyPort = proxy.proxy.proxyServer.getConnectorAddress(0).getPort();
+
+    try {
+      URL url = new URL("http://localhost:" + proxyPort + "/proxy/application_00_1");
+      HttpURLConnection proxyConn = (HttpURLConnection) url.openConnection();
+      // set headers
+      proxyConn.addRequestProperty("Origin", "http://www.someurl.com");
+      proxyConn.addRequestProperty("Access-Control-Request-Method", "GET");
+      proxyConn.addRequestProperty(
+          "Access-Control-Request-Headers", "Authorization");
+      proxyConn.addRequestProperty(UNKNOWN_HEADER, "unknown");
+      // Verify if four headers mentioned above have been added
+      assertEquals(proxyConn.getRequestProperties().size(), 4);
+      proxyConn.connect();
+      assertEquals(HttpURLConnection.HTTP_OK, proxyConn.getResponseCode());
+      // Verify if number of headers received by end server is 8.
+      // Eight headers include Accept, Host, Connection, User-Agent, Cookie,
+      // Origin, Access-Control-Request-Method and
+      // Access-Control-Request-Headers. Pls note that Unknown-Header is dropped
+      // by proxy as it is not in the list of allowed headers.
+      assertEquals(numberOfHeaders, 8);
+      assertFalse(hasUnknownHeader);
+    } finally {
+      proxy.close();
+    }
+  }
+
+
   /**
    * Test main method of WebAppProxyServer
    */
@@ -288,6 +351,47 @@ public class TestWebAppProxyServlet {
       // wrong application Id
       assertEquals(HttpURLConnection.HTTP_INTERNAL_ERROR,
           proxyConn.getResponseCode());
+    } finally {
+      if (mainServer != null) {
+        mainServer.stop();
+      }
+    }
+  }
+
+  /**
+   * Test header injections are not done.
+   */
+  @Test(timeout=5000)
+  public void testWebAppProxyServerHeaderInjection() throws Exception {
+    WebAppProxyServer mainServer = null;
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.PROXY_ADDRESS, "localhost:9099");
+    try {
+      mainServer = WebAppProxyServer.startServer(conf);
+      int counter = 20;
+
+      URL wrongUrl = new URL(
+          "http://localhost:9099/proxy/%C4%8D%C4%8ASomeCustomInjectedHeader:%20"
+          + "injected_headerVal_1484290871375_0113/");
+      HttpURLConnection proxyConn = null;
+      while (counter > 0) {
+        counter--;
+        try {
+          proxyConn = (HttpURLConnection) wrongUrl.openConnection();
+          proxyConn.connect();
+          proxyConn.getResponseCode();
+          // server started ok
+          counter = 0;
+        } catch (Exception e) {
+          Thread.sleep(100);
+        }
+      }
+      assertNotNull(proxyConn);
+      // wrong application Id
+      assertEquals(HttpURLConnection.HTTP_INTERNAL_ERROR,
+          proxyConn.getResponseCode());
+      assertTrue("Header injection happened",
+          proxyConn.getHeaderField("SomeCustomInjectedHeader") == null);
     } finally {
       if (mainServer != null) {
         mainServer.stop();

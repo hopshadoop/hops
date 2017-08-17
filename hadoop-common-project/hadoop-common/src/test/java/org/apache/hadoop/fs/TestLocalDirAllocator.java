@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Shell;
 
 import org.junit.runner.RunWith;
@@ -299,6 +300,46 @@ public class TestLocalDirAllocator {
     }
   }
 
+  /*
+   * Test when mapred.local.dir not configured and called
+   * getLocalPathForWrite
+   */
+  @Test
+  public void testShouldNotthrowNPE() throws Exception {
+    Configuration conf1 = new Configuration();
+    try {
+      dirAllocator.getLocalPathForWrite("/test", conf1);
+      fail("Exception not thrown when " + CONTEXT + " is not set");
+    } catch (IOException e) {
+      assertEquals(CONTEXT + " not configured", e.getMessage());
+    } catch (NullPointerException e) {
+      fail("Lack of configuration should not have thrown a NPE.");
+    }
+
+    String  NEW_CONTEXT = CONTEXT + ".new";
+    conf1.set(NEW_CONTEXT, "");
+    LocalDirAllocator newDirAllocator = new LocalDirAllocator(NEW_CONTEXT);
+    try {
+      newDirAllocator.getLocalPathForWrite("/test", conf1);
+      fail("Exception not thrown when " + NEW_CONTEXT +
+          " is set to empty string");
+    } catch (IOException e) {
+      assertTrue(e instanceof DiskErrorException);
+    } catch (NullPointerException e) {
+      fail("Wrong configuration should not have thrown a NPE.");
+    }
+
+    try {
+      newDirAllocator.getLocalPathToRead("/test", conf1);
+      fail("Exception not thrown when " + NEW_CONTEXT +
+          " is set to empty string");
+    } catch (IOException e) {
+      assertTrue(e instanceof DiskErrorException);
+    } catch (NullPointerException e) {
+      fail("Wrong configuration should not have thrown a NPE.");
+    }
+  }
+
   /** Test no side effect files are left over. After creating a temp
    * temp file, remove both the temp file and its parent. Verify that
    * no files or directories are left over as can happen when File objects
@@ -414,6 +455,23 @@ public class TestLocalDirAllocator {
       assertFalse(LocalDirAllocator.isContextValid(contextCfgItemName));
     } finally {
       rmBufferDirs();
+    }
+  }
+
+  /**
+   * Test to check the LocalDirAllocation for the invalid path HADOOP-8437
+   *
+   * @throws Exception
+   */
+  @Test(timeout = 30000)
+  public void testGetLocalPathForWriteForInvalidPaths() throws Exception {
+    conf.set(CONTEXT, " ");
+    try {
+      dirAllocator.getLocalPathForWrite("/test", conf);
+      fail("not throwing the exception");
+    } catch (IOException e) {
+      assertEquals("Incorrect exception message",
+          "No space available in any of the local directories.", e.getMessage());
     }
   }
 

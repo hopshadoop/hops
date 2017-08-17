@@ -34,6 +34,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
@@ -54,7 +55,6 @@ public class TestHarFileSystem {
    * {@link HarFileSystem}. Either because there is a default implementation
    * already available or because it is not relevant.
    */
-  @SuppressWarnings("deprecation")
   private interface MustNotImplement {
     public BlockLocation[] getFileBlockLocations(Path p, long start, long len);
     public long getLength(Path f);
@@ -112,6 +112,7 @@ public class TestHarFileSystem {
     public short getReplication(Path src);
     public void processDeleteOnExit();
     public ContentSummary getContentSummary(Path f);
+    public QuotaUsage getQuotaUsage(Path f);
     public FsStatus getStatus();
     public FileStatus[] listStatus(Path f, PathFilter filter);
     public FileStatus[] listStatus(Path[] files);
@@ -205,6 +206,22 @@ public class TestHarFileSystem {
     public AclStatus getAclStatus(Path path) throws IOException;
 
     public void access(Path path, FsAction mode) throws IOException;
+
+    public void setStoragePolicy(Path src, String policyName)
+        throws IOException;
+
+    public void unsetStoragePolicy(Path src) throws IOException;
+
+    public BlockStoragePolicySpi getStoragePolicy(final Path src)
+        throws IOException;
+
+    public Collection<? extends BlockStoragePolicySpi> getAllStoragePolicies()
+        throws IOException;
+
+    public Path getTrashRoot(Path path) throws IOException;
+
+    public Collection<FileStatus> getTrashRoots(boolean allUsers) throws IOException;
+    StorageStatistics getStorageStatistics();
   }
 
   @Test

@@ -12,24 +12,10 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-* [Hadoop Cluster Setup](#Hadoop_Cluster_Setup)
-    * [Purpose](#Purpose)
-    * [Prerequisites](#Prerequisites)
-    * [Installation](#Installation)
-    * [Configuring Hadoop in Non-Secure Mode](#Configuring_Hadoop_in_Non-Secure_Mode)
-        * [Configuring Environment of Hadoop Daemons](#Configuring_Environment_of_Hadoop_Daemons)
-        * [Configuring the Hadoop Daemons](#Configuring_the_Hadoop_Daemons)
-    * [Monitoring Health of NodeManagers](#Monitoring_Health_of_NodeManagers)
-    * [Slaves File](#Slaves_File)
-    * [Hadoop Rack Awareness](#Hadoop_Rack_Awareness)
-    * [Logging](#Logging)
-    * [Operating the Hadoop Cluster](#Operating_the_Hadoop_Cluster)
-        * [Hadoop Startup](#Hadoop_Startup)
-        * [Hadoop Shutdown](#Hadoop_Shutdown)
-    * [Web Interfaces](#Web_Interfaces)
-
 Hadoop Cluster Setup
 ====================
+
+<!-- MACRO{toc|fromDepth=0|toDepth=3} -->
 
 Purpose
 -------
@@ -49,7 +35,7 @@ Installation
 
 Installing a Hadoop cluster typically involves unpacking the software on all the machines in the cluster or installing it via a packaging system as appropriate for your operating system. It is important to divide up the hardware into functions.
 
-Typically one machine in the cluster is designated as the NameNode and another machine the as ResourceManager, exclusively. These are the masters. Other services (such as Web App Proxy Server and MapReduce Job History server) are usually run either on dedicated hardware or on shared infrastrucutre, depending upon the load.
+Typically one machine in the cluster is designated as the NameNode and another machine as the ResourceManager, exclusively. These are the masters. Other services (such as Web App Proxy Server and MapReduce Job History server) are usually run either on dedicated hardware or on shared infrastructure, depending upon the load.
 
 The rest of the machines in the cluster act as both DataNode and NodeManager. These are the slaves.
 
@@ -66,7 +52,7 @@ Additionally, you can control the Hadoop scripts found in the bin/ directory of 
 
 To configure the Hadoop cluster you will need to configure the `environment` in which the Hadoop daemons execute as well as the `configuration parameters` for the Hadoop daemons.
 
-HDFS daemons are NameNode, SecondaryNameNode, and DataNode. YARN damones are ResourceManager, NodeManager, and WebAppProxy. If MapReduce is to be used, then the MapReduce Job History Server will also be running. For large installations, these are generally running on separate hosts.
+HDFS daemons are NameNode, SecondaryNameNode, and DataNode. YARN daemons are ResourceManager, NodeManager, and WebAppProxy. If MapReduce is to be used, then the MapReduce Job History Server will also be running. For large installations, these are generally running on separate hosts.
 
 ### Configuring Environment of Hadoop Daemons
 
@@ -222,7 +208,7 @@ The following parameters can be used to control the node health monitoring scrip
 |:---- |:---- |:---- |
 | `yarn.nodemanager.health-checker.script.path` | Node health script | Script to check for node's health status. |
 | `yarn.nodemanager.health-checker.script.opts` | Node health script options | Options for script to check for node's health status. |
-| `yarn.nodemanager.health-checker.script.interval-ms` | Node health script interval | Time interval for running health script. |
+| `yarn.nodemanager.health-checker.interval-ms` | Node health script interval | Time interval for running health script. |
 | `yarn.nodemanager.health-checker.script.timeout-ms` | Node health script timeout interval | Timeout for health script execution. |
 
 The health checker script is not supposed to give ERROR if only some of the local disks become bad. NodeManager has the ability to periodically check the health of the local disks (specifically checks nodemanager-local-dirs and nodemanager-log-dirs) and after reaching the threshold of number of bad directories based on the value set for the config property yarn.nodemanager.disk-health-checker.min-healthy-disks, the whole node is marked unhealthy and this info is sent to resource manager also. The boot disk is either raided or a failure in the boot disk is identified by the health checker script.

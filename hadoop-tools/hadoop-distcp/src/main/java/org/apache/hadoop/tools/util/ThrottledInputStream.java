@@ -18,13 +18,10 @@
 
 package org.apache.hadoop.tools.util;
 
-import java.io.IOException;
-import java.io.InputStream;
-
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.PositionedReadable;
 
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * The ThrottleInputStream provides bandwidth throttling on a specified
@@ -87,6 +84,9 @@ public class ThrottledInputStream extends InputStream {
   /** {@inheritDoc} */
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
+    if (len == 0) {
+      return 0;
+    }
     throttle();
     int readLen = rawStream.read(b, off, len);
     if (readLen != -1) {

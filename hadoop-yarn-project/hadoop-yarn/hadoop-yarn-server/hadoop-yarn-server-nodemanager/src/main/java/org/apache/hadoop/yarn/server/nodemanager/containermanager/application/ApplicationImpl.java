@@ -20,8 +20,8 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.application;
 
 import java.io.IOException;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -37,7 +37,6 @@ import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.LogAggregationContext;
 import org.apache.hadoop.yarn.event.Dispatcher;
-import org.apache.hadoop.yarn.logaggregation.ContainerLogsRetentionPolicy;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.NodeManager;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.AuxServicesEvent;
@@ -52,7 +51,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppFinishedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppStartedEvent;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
-import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
+import org.apache.hadoop.yarn.state.InvalidStateTransitionException;
 import org.apache.hadoop.yarn.state.MultipleArcTransition;
 import org.apache.hadoop.yarn.state.SingleArcTransition;
 import org.apache.hadoop.yarn.state.StateMachine;
@@ -81,7 +80,7 @@ public class ApplicationImpl implements Application {
   private LogAggregationContext logAggregationContext;
 
   Map<ContainerId, Container> containers =
-      new HashMap<ContainerId, Container>();
+      new ConcurrentHashMap<>();
 
   public ApplicationImpl(Dispatcher dispatcher, String user, ApplicationId appId,
       Credentials credentials, Context context) {
@@ -211,18 +210,18 @@ public class ApplicationImpl implements Application {
                   ApplicationEventType.APPLICATION_LOG_HANDLING_FINISHED,
                   ApplicationEventType.APPLICATION_INITED,
                   ApplicationEventType.FINISH_APPLICATION))
-           
+
            // Transitions from FINISHED state
            .addTransition(ApplicationState.FINISHED,
                ApplicationState.FINISHED,
-               ApplicationEventType.APPLICATION_LOG_HANDLING_FINISHED,
+               EnumSet.of(
+                   ApplicationEventType.APPLICATION_LOG_HANDLING_FINISHED,
+                   ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED),
                new AppLogsAggregatedTransition())
            .addTransition(ApplicationState.FINISHED, ApplicationState.FINISHED,
                EnumSet.of(
                   ApplicationEventType.APPLICATION_LOG_HANDLING_INITED,
-                  ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED,
                   ApplicationEventType.FINISH_APPLICATION))
-               
            // create the topology tables
            .installTopology();
 
@@ -245,8 +244,8 @@ public class ApplicationImpl implements Application {
       app.logAggregationContext = initEvent.getLogAggregationContext();
       app.dispatcher.getEventHandler().handle(
           new LogHandlerAppStartedEvent(app.appId, app.user,
-              app.credentials, ContainerLogsRetentionPolicy.ALL_CONTAINERS,
-              app.applicationACLs, app.logAggregationContext)); 
+              app.credentials, app.applicationACLs,
+              app.logAggregationContext));
     }
   }
 
@@ -473,7 +472,7 @@ public class ApplicationImpl implements Application {
       try {
         // queue event requesting init of the same app
         newState = stateMachine.doTransition(event.getType(), event);
-      } catch (InvalidStateTransitonException e) {
+      } catch (InvalidStateTransitionException e) {
         LOG.warn("Can't handle this event at current state", e);
       }
       if (oldState != newState) {

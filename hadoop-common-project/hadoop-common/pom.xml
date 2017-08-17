@@ -20,12 +20,12 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project-dist</artifactId>
-    <version>2.7.3</version>
+    <version>2.8.2</version>
     <relativePath>../../hadoop-project-dist</relativePath>
   </parent>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-common</artifactId>
-  <version>2.7.3</version>
+  <version>2.8.2</version>
   <description>Apache Hadoop Common</description>
   <name>Apache Hadoop Common</name>
   <packaging>jar</packaging>
@@ -33,6 +33,7 @@
   <properties>
     <hadoop.component>common</hadoop.component>
     <is.hadoop.component>true</is.hadoop.component>
+    <is.hadoop.common.component>true</is.hadoop.common.component>
     <wsce.config.dir>../etc/hadoop</wsce.config.dir>
     <wsce.config.file>wsce-site.xml</wsce.config.file>
   </properties>
@@ -104,6 +105,11 @@
       <scope>compile</scope>
     </dependency>
 
+    <dependency>
+      <groupId>org.mortbay.jetty</groupId>
+      <artifactId>jetty-sslengine</artifactId>
+      <scope>compile</scope>
+    </dependency>
     <dependency>
       <groupId>javax.servlet.jsp</groupId>
       <artifactId>jsp-api</artifactId>
@@ -238,10 +244,15 @@
       <artifactId>jsr305</artifactId>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.sshd</groupId>
+      <artifactId>sshd-core</artifactId>
+      <scope>test</scope>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.htrace</groupId>
-      <artifactId>htrace-core</artifactId>
+      <artifactId>htrace-core4</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
@@ -461,23 +472,6 @@
             </configuration>
           </execution>
           <execution>
-            <id>copy-test-tarballs</id>
-            <phase>process-test-resources</phase>
-            <goals>
-              <goal>run</goal>
-            </goals>
-            <configuration>
-              <target>
-                <copy toDir="${test.cache.data}">
-                  <fileset dir="${basedir}/src/test/java/org/apache/hadoop/fs">
-                    <include name="test-untar.tar"/>
-                    <include name="test-untar.tgz"/>
-                  </fileset>
-                </copy>
-              </target>
-            </configuration>
-          </execution>
-          <execution>
             <phase>pre-site</phase>
             <goals>
               <goal>run</goal>
@@ -491,15 +485,14 @@
           </execution>
         </executions>
       </plugin>
+
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
         <configuration>
           <excludes>
-            <exclude>CHANGES.txt</exclude>
             <exclude>.idea/**</exclude>
             <exclude>src/main/conf/*</exclude>
-            <exclude>src/main/docs/**</exclude>
             <exclude>dev-support/jdiff/**</exclude>
             <exclude>src/main/native/*</exclude>
             <exclude>src/main/native/config/*</exclude>
@@ -512,12 +505,13 @@
             <exclude>src/main/native/src/org/apache/hadoop/io/compress/lz4/lz4hc.h</exclude>
             <exclude>src/main/native/src/org/apache/hadoop/io/compress/lz4/lz4hc.c</exclude>
             <exclude>src/main/native/src/org/apache/hadoop/io/compress/lz4/lz4hc_encoder.h</exclude>
-            <exclude>src/test/java/org/apache/hadoop/fs/test-untar.tgz</exclude>
+            <exclude>src/test/resources/test-untar.tgz</exclude>
             <exclude>src/test/resources/test.har/_SUCCESS</exclude>
             <exclude>src/test/resources/test.har/_index</exclude>
             <exclude>src/test/resources/test.har/_masterindex</exclude>
             <exclude>src/test/resources/test.har/part-0</exclude>
             <exclude>src/test/resources/javakeystoreprovider.password</exclude>
+            <exclude>dev-support/jdiff-workaround.patch</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -637,7 +631,7 @@
                 <goals><goal>run</goal></goals>
                 <configuration>
                   <target>
-                    <exec executable="sh" failonerror="true" dir="${project.build.directory}/native">
+                    <exec executable="${shell-executable}" failonerror="true" dir="${project.build.directory}/native">
                       <arg value="-c"/>
                       <arg value="[ x$SKIPTESTS = xtrue ] || ${project.build.directory}/native/test_bulk_crc32"/>
                       <env key="SKIPTESTS" value="${skipTests}"/>
@@ -682,6 +676,9 @@
         <require.openssl>false</require.openssl>
         <runningWithNative>true</runningWithNative>
         <bundle.openssl.in.bin>false</bundle.openssl.in.bin>
+        <require.isal>false</require.isal>
+        <isal.prefix></isal.prefix>
+        <isal.lib></isal.lib>
       </properties>
       <build>
         <plugins>
@@ -783,6 +780,9 @@
                     <argument>/p:CustomOpensslLib=${openssl.lib}</argument>
                     <argument>/p:CustomOpensslInclude=${openssl.include}</argument>
                     <argument>/p:RequireOpenssl=${require.openssl}</argument>
+                    <argument>/p:RequireIsal=${require.isal}</argument>
+                    <argument>/p:CustomIsalPrefix=${isal.prefix}</argument>
+                    <argument>/p:CustomIsalLib=${isal.lib}</argument>
                   </arguments>
                 </configuration>
               </execution>
@@ -796,15 +796,118 @@
       <build>
         <plugins>
           <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>create-parallel-tests-dirs</id>
+                <phase>test-compile</phase>
+                <configuration>
+                  <target>
+                    <script language="javascript"><![CDATA[
+                      var baseDirs = [
+                          "${test.build.data}",
+                          "${test.build.dir}",
+                          "${hadoop.tmp.dir}" ];
+                      for (var i in baseDirs) {
+                        for (var j = 1; j <= ${testsThreadCount}; ++j) {
+                          var mkdir = project.createTask("mkdir");
+                          mkdir.setDir(new java.io.File(baseDirs[i], j));
+                          mkdir.perform();
+                        }
+                      }
+                    ]]></script>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <forkCount>${testsThreadCount}</forkCount>
-              <argLine>-Xmx1024m -XX:+HeapDumpOnOutOfMemoryError -DminiClusterDedicatedDirs=true</argLine>
+              <reuseForks>false</reuseForks>
+              <argLine>${maven-surefire-plugin.argLine} -DminiClusterDedicatedDirs=true</argLine>
+              <systemPropertyVariables>
+                <test.build.data>${test.build.data}/${surefire.forkNumber}</test.build.data>
+                <test.build.dir>${test.build.dir}/${surefire.forkNumber}</test.build.dir>
+                <hadoop.tmp.dir>${hadoop.tmp.dir}/${surefire.forkNumber}</hadoop.tmp.dir>
+
+                <!-- Due to a Maven quirk, setting this to just -->
+                <!-- surefire.forkNumber won't do the parameter substitution. -->
+                <!-- Putting a prefix in front of it like "fork-" makes it -->
+                <!-- work. -->
+                <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
+              </systemPropertyVariables>
             </configuration>
           </plugin>
         </plugins>
       </build>
     </profile>
+
+    <profile>
+      <id>releasedocs</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <executions>
+                <execution>
+                    <id>releasedocs</id>
+                    <phase>pre-site</phase>
+                    <goals>
+                        <goal>exec</goal>
+                    </goals>
+                    <configuration>
+                        <executable>${basedir}/../../dev-support/bin/releasedocmaker</executable>
+                        <requiresOnline>true</requiresOnline>
+                        <arguments>
+                            <argument>--index</argument>
+                            <argument>--license</argument>
+                            <argument>--outputdir</argument>
+                            <argument>${basedir}/src/site/markdown/release</argument>
+                            <argument>--project</argument>
+                            <argument>HADOOP</argument>
+                            <argument>--project</argument>
+                            <argument>HDFS</argument>
+                            <argument>--project</argument>
+                            <argument>MAPREDUCE</argument>
+                            <argument>--project</argument>
+                            <argument>YARN</argument>
+                            <argument>--projecttitle</argument>
+                            <argument>"Apache Hadoop"</argument>
+                            <argument>--usetoday</argument>
+                            <argument>--version</argument>
+                            <argument>${project.version}</argument>
+                        </arguments>
+                    </configuration>
+                </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <artifactId>maven-clean-plugin</artifactId>
+            <configuration>
+              <filesets>
+                <fileset>
+                  <directory>src/site/markdown/release</directory>
+                    <includes>
+                      <include>${project.version}</include>
+                    </includes>
+                  <followSymlinks>false</followSymlinks>
+                </fileset>
+              </filesets>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
   </profiles>
 </project>

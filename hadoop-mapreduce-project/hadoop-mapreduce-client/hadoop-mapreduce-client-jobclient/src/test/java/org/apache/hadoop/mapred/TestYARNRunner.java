@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.mapred;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
@@ -37,8 +41,6 @@ import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import java.util.Map;
-
-import junit.framework.TestCase;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -88,6 +90,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.YarnClusterMetrics;
@@ -112,7 +115,7 @@ import org.mockito.stubbing.Answer;
  * Test YarnRunner and make sure the client side plugin works
  * fine
  */
-public class TestYARNRunner extends TestCase {
+public class TestYARNRunner {
   private static final Log LOG = LogFactory.getLog(TestYARNRunner.class);
   private static final RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
 
@@ -554,6 +557,22 @@ public class TestYARNRunner extends TestCase {
   }
 
   @Test
+  public void testNodeLabelExp() throws Exception {
+    JobConf jobConf = new JobConf();
+
+    jobConf.set(MRJobConfig.JOB_NODE_LABEL_EXP, "GPU");
+    jobConf.set(MRJobConfig.AM_NODE_LABEL_EXP, "highMem");
+
+    YARNRunner yarnRunner = new YARNRunner(jobConf);
+    ApplicationSubmissionContext appSubCtx =
+        buildSubmitContext(yarnRunner, jobConf);
+
+    assertEquals(appSubCtx.getNodeLabelExpression(), "GPU");
+    assertEquals(appSubCtx.getAMContainerResourceRequest()
+        .getNodeLabelExpression(), "highMem");
+  }
+
+  @Test
   public void testAMStandardEnvWithDefaultLibPath() throws Exception {
     testAMStandardEnv(false);
   }
@@ -613,6 +632,30 @@ public class TestYARNRunner extends TestCase {
     String shell = env.get(Environment.SHELL.name());
     assertNotNull("SHELL not set", shell);
     assertEquals("Bad SHELL setting", USER_SHELL, shell);
+  }
+
+  @Test
+  public void testJobPriority() throws Exception {
+    JobConf jobConf = new JobConf();
+
+    jobConf.set(MRJobConfig.PRIORITY, "LOW");
+
+    YARNRunner yarnRunner = new YARNRunner(jobConf);
+    ApplicationSubmissionContext appSubCtx = buildSubmitContext(yarnRunner,
+        jobConf);
+
+    // 2 corresponds to LOW
+    assertEquals(appSubCtx.getPriority(), Priority.newInstance(2));
+
+    // Set an integer explicitly
+    jobConf.set(MRJobConfig.PRIORITY, "12");
+
+    yarnRunner = new YARNRunner(jobConf);
+    appSubCtx = buildSubmitContext(yarnRunner,
+        jobConf);
+
+    // Verify whether 12 is set to submission context
+    assertEquals(appSubCtx.getPriority(), Priority.newInstance(12));
   }
 
   private ApplicationSubmissionContext buildSubmitContext(

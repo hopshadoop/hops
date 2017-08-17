@@ -27,16 +27,23 @@ public class RMAppMetrics {
   final long memorySeconds;
   final long vcoreSeconds;
   final long gpuSeconds;
+  private final long preemptedMemorySeconds;
+  private final long preemptedVcoreSeconds;
+  private final long preemptedGPUSeconds;
 
   public RMAppMetrics(Resource resourcePreempted,
       int numNonAMContainersPreempted, int numAMContainersPreempted,
-      long memorySeconds, long vcoreSeconds, long gpuSeconds) {
+      long memorySeconds, long vcoreSeconds, long gpuSeconds, long preemptedMemorySeconds,
+      long preemptedVcoreSeconds, long preemptedGPUSeconds) {
     this.resourcePreempted = resourcePreempted;
     this.numNonAMContainersPreempted = numNonAMContainersPreempted;
     this.numAMContainersPreempted = numAMContainersPreempted;
     this.memorySeconds = memorySeconds;
     this.vcoreSeconds = vcoreSeconds;
     this.gpuSeconds = gpuSeconds;
+    this.preemptedMemorySeconds = preemptedMemorySeconds;
+    this.preemptedVcoreSeconds = preemptedVcoreSeconds;
+    this.preemptedGPUSeconds = preemptedGPUSeconds;
   }
 
   public Resource getResourcePreempted() {
@@ -58,6 +65,19 @@ public class RMAppMetrics {
   public long getVcoreSeconds() {
     return vcoreSeconds;
   }
-  
+
   public long getGPUSeconds() { return gpuSeconds; }
+
+  public long getPreemptedMemorySeconds() {
+    return preemptedMemorySeconds;
+  }
+
+  public long getPreemptedVcoreSeconds() {
+    return preemptedVcoreSeconds;
+  }
+
+  public long getPreemptedGPUSeconds() {
+    return preemptedGPUSeconds;
+  }
+
 }

@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.Date;
@@ -32,7 +33,6 @@ import java.util.Map;
 
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
-import org.apache.commons.io.Charsets;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -209,7 +209,7 @@ public abstract class KeyProvider {
     protected byte[] serialize() throws IOException {
       ByteArrayOutputStream buffer = new ByteArrayOutputStream();
       JsonWriter writer = new JsonWriter(
-          new OutputStreamWriter(buffer, Charsets.UTF_8));
+          new OutputStreamWriter(buffer, StandardCharsets.UTF_8));
       try {
         writer.beginObject();
         if (cipher != null) {
@@ -252,8 +252,9 @@ public abstract class KeyProvider {
       int versions = 0;
       String description = null;
       Map<String, String> attributes = null;
-      JsonReader reader = new JsonReader(new InputStreamReader
-        (new ByteArrayInputStream(bytes), Charsets.UTF_8));
+      JsonReader reader =
+          new JsonReader(new InputStreamReader(new ByteArrayInputStream(bytes),
+              StandardCharsets.UTF_8));
       try {
         reader.beginObject();
         while (reader.hasNext()) {
@@ -606,5 +607,37 @@ public abstract class KeyProvider {
       }
     }
     throw new IOException("Can't find KeyProvider for key " + keyName);
+  }
+
+  /**
+   * Does this provider require a password? This means that a password is
+   * required for normal operation, and it has not been found through normal
+   * means. If true, the password should be provided by the caller using
+   * setPassword().
+   * @return Whether or not the provider requires a password
+   * @throws IOException
+   */
+  public boolean needsPassword() throws IOException {
+    return false;
+  }
+
+  /**
+   * If a password for the provider is needed, but is not provided, this will
+   * return a warning and instructions for supplying said password to the
+   * provider.
+   * @return A warning and instructions for supplying the password
+   */
+  public String noPasswordWarning() {
+    return null;
+  }
+
+  /**
+   * If a password for the provider is needed, but is not provided, this will
+   * return an error message and instructions for supplying said password to
+   * the provider.
+   * @return An error message and instructions for supplying the password
+   */
+  public String noPasswordError() {
+    return null;
   }
 }

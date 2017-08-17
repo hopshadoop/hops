@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 public abstract class RolloverSignerSecretProvider
     extends SignerSecretProvider {
 
-  private static Logger LOG = LoggerFactory.getLogger(
+  static Logger LOG = LoggerFactory.getLogger(
     RolloverSignerSecretProvider.class);
   /**
    * Stores the currently valid secrets.  The current secret is the 0th element
@@ -61,7 +61,7 @@ public abstract class RolloverSignerSecretProvider
    * @param config configuration properties
    * @param servletContext servlet context
    * @param tokenValidity The amount of time a token is valid for
-   * @throws Exception
+   * @throws Exception thrown if an error occurred
    */
   @Override
   public void init(Properties config, ServletContext servletContext,

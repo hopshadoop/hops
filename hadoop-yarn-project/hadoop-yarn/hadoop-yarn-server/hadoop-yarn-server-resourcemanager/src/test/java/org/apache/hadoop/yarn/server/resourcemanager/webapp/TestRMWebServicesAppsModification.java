@@ -22,7 +22,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,24 +50,20 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import com.sun.jersey.api.client.config.DefaultClientConfig;
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authentication.server.PseudoAuthenticationHandler;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.QueueACL;
+import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
@@ -72,12 +75,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairSchedulerConfiguration;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppPriority;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppState;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ApplicationSubmissionContextInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.CredentialsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.LocalResourceInfo;
-import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.*;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.JerseyTestBase;
 import org.apache.hadoop.yarn.webapp.WebServicesTestUtils;
@@ -105,17 +108,20 @@ import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.ClientResponse.Status;
 import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.api.client.filter.LoggingFilter;
 import com.sun.jersey.api.json.JSONJAXBContext;
 import com.sun.jersey.api.json.JSONMarshaller;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.test.framework.WebAppDescriptor;
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @RunWith(Parameterized.class)
 public class TestRMWebServicesAppsModification extends JerseyTestBase {
-
-  private final Log LOG = LogFactory.getLog(TestRMWebServicesAppsModification.class);
-
   private static MockRM rm;
 
   private static final int CONTAINER_MB = 1024;
@@ -174,25 +180,24 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
     @Override
     protected void configureServlets() {
       try {
+        configureScheduler();
+        bind(JAXBContextResolver.class);
+        bind(RMWebServices.class);
+        bind(GenericExceptionHandler.class);
+        conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
+            YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
         RMStorageFactory.setConfiguration(conf);
         YarnAPIStorageFactory.setConfiguration(conf);
         DBUtility.InitializeDB();
+        rm = new MockRM(conf);
+        bind(ResourceManager.class).toInstance(rm);
+        if (setAuthFilter) {
+          filter("/*").through(TestRMCustomAuthFilter.class);
+        }
+        serve("/*").with(GuiceContainer.class);
       } catch (IOException ex) {
-        LOG.error(ex, ex);
+        Logger.getLogger(TestRMWebServicesAppsModification.class.getName()).log(Level.SEVERE, null, ex);
       }
-      configureScheduler();
-      bind(JAXBContextResolver.class);
-      bind(RMWebServices.class);
-      bind(GenericExceptionHandler.class);
-      conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
-        YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
-
-      rm = new MockRM(conf);
-      bind(ResourceManager.class).toInstance(rm);
-      if (setAuthFilter) {
-        filter("/*").through(TestRMCustomAuthFilter.class);
-      }
-      serve("/*").with(GuiceContainer.class);
     }
   }
 
@@ -369,6 +374,7 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
         { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML };
     MediaType[] contentTypes =
         { MediaType.APPLICATION_JSON_TYPE, MediaType.APPLICATION_XML_TYPE };
+    String diagnostic = "message1";
     for (String mediaType : mediaTypes) {
       for (MediaType contentType : contentTypes) {
         RMApp app = rm.submitApp(CONTAINER_MB, "", webserviceUserName);
@@ -376,6 +382,7 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
 
         AppState targetState =
             new AppState(YarnApplicationState.KILLED.toString());
+        targetState.setDiagnostics(diagnostic);
 
         Object entity;
         if (contentType.equals(MediaType.APPLICATION_JSON_TYPE)) {
@@ -430,6 +437,8 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
             } else {
               verifyAppStateXML(response, RMAppState.KILLED);
             }
+            assertTrue("Diagnostic message is incorrect",
+                app.getDiagnostics().toString().contains(diagnostic));
             break;
           }
         }
@@ -583,17 +592,21 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
     amNodeManager.nodeHeartbeat(true);
     String[] testAppIds = { "application_1391705042196_0001", "random_string" };
-    for (String testAppId : testAppIds) {
+    for (int i = 0; i < testAppIds.length; i++) {
       AppState info = new AppState("KILLED");
       ClientResponse response =
-          this.constructWebResource("apps", testAppId, "state")
+          this.constructWebResource("apps", testAppIds[i], "state")
             .accept(MediaType.APPLICATION_XML)
             .entity(info, MediaType.APPLICATION_XML).put(ClientResponse.class);
       if (!isAuthenticationEnabled()) {
         assertEquals(Status.UNAUTHORIZED, response.getClientResponseStatus());
         continue;
       }
-      assertEquals(Status.NOT_FOUND, response.getClientResponseStatus());
+      if (i == 0) {
+        assertEquals(Status.NOT_FOUND, response.getClientResponseStatus());
+      } else {
+        assertEquals(Status.BAD_REQUEST, response.getClientResponseStatus());
+      }
     }
     rm.stop();
   }
@@ -775,10 +788,10 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
     ApplicationSubmissionContextInfo appInfo = new ApplicationSubmissionContextInfo();
     appInfo.setApplicationId(appId);
     appInfo.setApplicationName(appName);
-    appInfo.setPriority(3);
     appInfo.setMaxAppAttempts(2);
     appInfo.setQueue(queueName);
     appInfo.setApplicationType(appType);
+    appInfo.setPriority(0);
     HashMap<String, LocalResourceInfo> lr =  new HashMap<>();
     LocalResourceInfo y = new LocalResourceInfo();
     y.setUrl(new URI("http://www.test.com/file.txt"));
@@ -819,7 +832,7 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
 
     RMApp app =
         rm.getRMContext().getRMApps()
-          .get(ConverterUtils.toApplicationId(appId));
+          .get(ApplicationId.fromString(appId));
     assertEquals(appName, app.getName());
     assertEquals(webserviceUserName, app.getUser());
     assertEquals(2, app.getMaxAppAttempts());
@@ -837,8 +850,7 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
     Map<String, LocalResource> appLRs = ctx.getLocalResources();
     assertTrue(appLRs.containsKey(lrKey));
     LocalResource exampleLR = appLRs.get(lrKey);
-    assertEquals(ConverterUtils.getYarnUrlFromURI(y.getUrl()),
-      exampleLR.getResource());
+    assertEquals(URL.fromURI(y.getUrl()), exampleLR.getResource());
     assertEquals(y.getSize(), exampleLR.getSize());
     assertEquals(y.getTimestamp(), exampleLR.getTimestamp());
     assertEquals(y.getType(), exampleLR.getType());
@@ -986,6 +998,91 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
   }
 
   @Test(timeout = 90000)
+  public void testUpdateAppPriority() throws Exception {
+    client().addFilter(new LoggingFilter(System.out));
+
+    if (!(rm.getResourceScheduler() instanceof CapacityScheduler)) {
+      // till the fair scheduler modifications for priority is completed
+      return;
+    }
+
+    // default root queue allows anyone to have admin acl
+    CapacitySchedulerConfiguration csconf =
+        new CapacitySchedulerConfiguration();
+    String[] queues = { "default", "test" };
+    csconf.setQueues("root", queues);
+    csconf.setCapacity("root.default", 50.0f);
+    csconf.setCapacity("root.test", 50.0f);
+    csconf.setAcl("root", QueueACL.ADMINISTER_QUEUE, "someuser");
+    csconf.setAcl("root.default", QueueACL.ADMINISTER_QUEUE, "someuser");
+    csconf.setAcl("root.test", QueueACL.ADMINISTER_QUEUE, "someuser");
+    rm.start();
+    rm.getResourceScheduler().reinitialize(csconf, rm.getRMContext());
+    CapacityScheduler cs = (CapacityScheduler) rm.getResourceScheduler();
+    Configuration conf = new Configuration();
+    conf.setInt(YarnConfiguration.MAX_CLUSTER_LEVEL_APPLICATION_PRIORITY, 10);
+    cs.setClusterMaxPriority(conf);
+    
+    MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
+    String[] mediaTypes =
+        { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML };
+    MediaType[] contentTypes =
+        { MediaType.APPLICATION_JSON_TYPE, MediaType.APPLICATION_XML_TYPE };
+    for (String mediaType : mediaTypes) {
+      for (MediaType contentType : contentTypes) {
+        RMApp app = rm.submitApp(CONTAINER_MB, "", webserviceUserName);
+        amNodeManager.nodeHeartbeat(true);
+        int modifiedPriority = 8;
+        AppPriority priority = new AppPriority(modifiedPriority);
+        Object entity;
+        if (contentType.equals(MediaType.APPLICATION_JSON_TYPE)) {
+          entity = appPriorityToJSON(priority);
+        } else {
+          entity = priority;
+        }
+        ClientResponse response = this
+            .constructWebResource("apps", app.getApplicationId().toString(),
+                "priority")
+            .entity(entity, contentType).accept(mediaType)
+            .put(ClientResponse.class);
+
+        if (!isAuthenticationEnabled()) {
+          assertEquals(Status.UNAUTHORIZED, response.getClientResponseStatus());
+          continue;
+        }
+        assertEquals(Status.OK, response.getClientResponseStatus());
+        if (mediaType.equals(MediaType.APPLICATION_JSON)) {
+          verifyAppPriorityJson(response, modifiedPriority);
+        } else {
+          verifyAppPriorityXML(response, modifiedPriority);
+        }
+
+        response = this
+            .constructWebResource("apps", app.getApplicationId().toString(),
+                "priority")
+            .accept(mediaType).get(ClientResponse.class);
+        assertEquals(Status.OK, response.getClientResponseStatus());
+        if (mediaType.equals(MediaType.APPLICATION_JSON)) {
+          verifyAppPriorityJson(response, modifiedPriority);
+        } else {
+          verifyAppPriorityXML(response, modifiedPriority);
+        }
+
+        // check unauthorized
+        app = rm.submitApp(CONTAINER_MB, "", "someuser");
+        amNodeManager.nodeHeartbeat(true);
+        response = this
+            .constructWebResource("apps", app.getApplicationId().toString(),
+                "priority")
+            .entity(entity, contentType).accept(mediaType)
+            .put(ClientResponse.class);
+        assertEquals(Status.FORBIDDEN, response.getClientResponseStatus());
+      }
+    }
+    rm.stop();
+  }
+
+//  @Test(timeout = 90000)
   public void testAppMove() throws Exception {
 
     client().addFilter(new LoggingFilter(System.out));
@@ -1003,9 +1100,9 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
     csconf.setAcl("root", QueueACL.ADMINISTER_QUEUE, "someuser");
     csconf.setAcl("root.default", QueueACL.ADMINISTER_QUEUE, "someuser");
     csconf.setAcl("root.test", QueueACL.ADMINISTER_QUEUE, "someuser");
+
     rm.start();
     rm.getResourceScheduler().reinitialize(csconf, rm.getRMContext());
-    
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
     String[] mediaTypes =
         { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML };
@@ -1065,12 +1162,46 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
     rm.stop();
   }
 
+  protected static String appPriorityToJSON(AppPriority targetPriority)
+      throws Exception {
+    StringWriter sw = new StringWriter();
+    JSONJAXBContext ctx = new JSONJAXBContext(AppPriority.class);
+    JSONMarshaller jm = ctx.createJSONMarshaller();
+    jm.marshallToJSON(targetPriority, sw);
+    return sw.toString();
+  }
+
   protected static String appQueueToJSON(AppQueue targetQueue) throws Exception {
     StringWriter sw = new StringWriter();
     JSONJAXBContext ctx = new JSONJAXBContext(AppQueue.class);
     JSONMarshaller jm = ctx.createJSONMarshaller();
     jm.marshallToJSON(targetQueue, sw);
     return sw.toString();
+  }
+ protected static void verifyAppPriorityJson(ClientResponse response,
+      int expectedPriority) throws JSONException {
+    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    JSONObject json = response.getEntity(JSONObject.class);
+    assertEquals("incorrect number of elements", 1, json.length());
+    int responsePriority = json.getInt("priority");
+    assertEquals(expectedPriority, responsePriority);
+  }
+
+  protected static void verifyAppPriorityXML(ClientResponse response,
+      int expectedPriority)
+          throws ParserConfigurationException, IOException, SAXException {
+    assertEquals(MediaType.APPLICATION_XML_TYPE, response.getType());
+    String xml = response.getEntity(String.class);
+    DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    DocumentBuilder db = dbf.newDocumentBuilder();
+    InputSource is = new InputSource();
+    is.setCharacterStream(new StringReader(xml));
+    Document dom = db.parse(is);
+    NodeList nodes = dom.getElementsByTagName("applicationpriority");
+    assertEquals("incorrect number of elements", 1, nodes.getLength());
+    Element element = (Element) nodes.item(0);
+    int responsePriority = WebServicesTestUtils.getXmlInt(element, "priority");
+    assertEquals(expectedPriority, responsePriority);
   }
 
   protected static void

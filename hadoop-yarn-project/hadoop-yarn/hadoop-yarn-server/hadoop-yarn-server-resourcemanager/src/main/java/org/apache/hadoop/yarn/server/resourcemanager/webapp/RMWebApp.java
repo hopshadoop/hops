@@ -68,6 +68,9 @@ public class RMWebApp extends WebApp implements YarnWebParams {
     route(pajoin("/appattempt", APPLICATION_ATTEMPT_ID), RmController.class,
       "appattempt");
     route(pajoin("/container", CONTAINER_ID), RmController.class, "container");
+    route("/errors-and-warnings", RmController.class, "errorsAndWarnings");
+    route(pajoin("/logaggregationstatus", APPLICATION_ID),
+      RmController.class, "logaggregationstatus");
   }
 
   @Override
@@ -117,8 +120,7 @@ public class RMWebApp extends WebApp implements YarnWebParams {
   }
 
   public String getHAZookeeperConnectionState() {
-    return rm.getRMContext().getRMAdminService()
-      .getHAZookeeperConnectionState();
+    return getRMContext().getHAZookeeperConnectionState();
   }
 
   public RMContext getRMContext() {

@@ -29,11 +29,13 @@ import java.util.Set;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.NodeLabelPBImpl;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdProto;
 import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesResponse;
-
 import org.apache.hadoop.yarn.proto.YarnProtos.LabelsToNodeIdsProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.NodeLabelProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetLabelsToNodesResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetLabelsToNodesResponseProtoOrBuilder;
 
@@ -69,8 +71,9 @@ public class GetLabelsToNodesResponsePBImpl extends
         NodeId node = new NodeIdPBImpl(n);
         setNodes.add(node);
       }
-      if(!setNodes.isEmpty()) {
-        this.labelsToNodes.put(c.getNodeLabels(), setNodes);
+      if (!setNodes.isEmpty()) {
+        this.labelsToNodes
+            .put(c.getNodeLabels(), setNodes);
       }
     }
   }
@@ -110,7 +113,8 @@ public class GetLabelsToNodesResponsePBImpl extends
                   nodeProtoSet.add(convertToProtoFormat(n));
                 }
                 return LabelsToNodeIdsProto.newBuilder()
-                    .setNodeLabels(now.getKey()).addAllNodeId(nodeProtoSet)
+                    .setNodeLabels(now.getKey())
+                    .addAllNodeId(nodeProtoSet)
                     .build();
               }
 

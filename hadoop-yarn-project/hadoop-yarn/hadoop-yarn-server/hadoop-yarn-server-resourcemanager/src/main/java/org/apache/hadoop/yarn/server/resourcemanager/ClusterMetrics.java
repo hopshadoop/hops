@@ -40,10 +40,12 @@ public class ClusterMetrics {
   private static AtomicBoolean isInitialized = new AtomicBoolean(false);
   
   @Metric("# of active NMs") MutableGaugeInt numActiveNMs;
+  @Metric("# of decommissioning NMs") MutableGaugeInt numDecommissioningNMs;
   @Metric("# of decommissioned NMs") MutableGaugeInt numDecommissionedNMs;
   @Metric("# of lost NMs") MutableGaugeInt numLostNMs;
   @Metric("# of unhealthy NMs") MutableGaugeInt numUnhealthyNMs;
   @Metric("# of Rebooted NMs") MutableGaugeInt numRebootedNMs;
+  @Metric("# of Shutdown NMs") MutableGaugeInt numShutdownNMs;
   @Metric("AM container launch delay") MutableRate aMLaunchDelay;
   @Metric("AM register delay") MutableRate aMRegisterDelay;
 
@@ -85,7 +87,24 @@ public class ClusterMetrics {
   public int getNumActiveNMs() {
     return numActiveNMs.value();
   }
-  
+
+  // Decommissioning NMs
+  public int getNumDecommissioningNMs() {
+    return numDecommissioningNMs.value();
+  }
+
+  public void incrDecommissioningNMs() {
+    numDecommissioningNMs.incr();
+  }
+
+  public void setDecommissioningNMs(int num) {
+    numDecommissioningNMs.set(num);
+  }
+
+  public void decrDecommissioningNMs() {
+    numDecommissioningNMs.decr();
+  }
+
   //Decommisioned NMs
   public int getNumDecommisionedNMs() {
     return numDecommissionedNMs.value();
@@ -140,6 +159,19 @@ public class ClusterMetrics {
   
   public void decrNumRebootedNMs() {
     numRebootedNMs.decr();
+  }
+
+  // Shutdown NMs
+  public int getNumShutdownNMs() {
+    return numShutdownNMs.value();
+  }
+
+  public void incrNumShutdownNMs() {
+    numShutdownNMs.incr();
+  }
+
+  public void decrNumShutdownNMs() {
+    numShutdownNMs.decr();
   }
 
   public void incrNumActiveNodes() {

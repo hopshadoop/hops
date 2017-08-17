@@ -25,14 +25,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceResponse;
 import org.junit.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersResponse;
@@ -191,7 +194,7 @@ public class NodeManager implements ContainerManagementProtocol {
 
       ContainerStatus containerStatus =
           BuilderUtils.newContainerStatus(container.getId(),
-            ContainerState.NEW, "", -1000);
+            ContainerState.NEW, "", -1000, container.getResource());
       applicationContainers.add(container);
       containerStatusMap.put(container, containerStatus);
       Resources.subtractFrom(available, tokenId.getResource());
@@ -211,12 +214,12 @@ public class NodeManager implements ContainerManagementProtocol {
 
   synchronized public void checkResourceUsage() {
     LOG.info("Checking resource usage for " + containerManagerAddress);
-    Assert.assertEquals(available.getMemory(), 
+    Assert.assertEquals(available.getMemorySize(),
         resourceManager.getResourceScheduler().getNodeReport(
-            this.nodeId).getAvailableResource().getMemory());
-    Assert.assertEquals(used.getMemory(), 
+            this.nodeId).getAvailableResource().getMemorySize());
+    Assert.assertEquals(used.getMemorySize(),
         resourceManager.getResourceScheduler().getNodeReport(
-            this.nodeId).getUsedResource().getMemory());
+            this.nodeId).getUsedResource().getMemorySize());
   }
   
   @Override
@@ -295,7 +298,14 @@ public class NodeManager implements ContainerManagementProtocol {
     return GetContainerStatusesResponse.newInstance(statuses, null);
   }
 
-  public static org.apache.hadoop.yarn.server.api.records.NodeStatus 
+  @Override
+  public IncreaseContainersResourceResponse increaseContainersResource(
+      IncreaseContainersResourceRequest request)
+          throws YarnException, IOException {
+    return null;
+  }
+
+  public static org.apache.hadoop.yarn.server.api.records.NodeStatus
   createNodeStatus(NodeId nodeId, List<ContainerStatus> containers) {
     RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
     org.apache.hadoop.yarn.server.api.records.NodeStatus nodeStatus = 
@@ -307,5 +317,11 @@ public class NodeManager implements ContainerManagementProtocol {
     nodeHealthStatus.setIsNodeHealthy(true);
     nodeStatus.setNodeHealthStatus(nodeHealthStatus);
     return nodeStatus;
+  }
+
+  @Override
+  public synchronized SignalContainerResponse signalToContainer(
+      SignalContainerRequest request) throws YarnException, IOException {
+    throw new YarnException("Not supported yet!");
   }
 }

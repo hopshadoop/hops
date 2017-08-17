@@ -25,12 +25,13 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.permission.FsPermission;
 import static org.apache.hadoop.fs.FileSystemTestHelper.*;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.*;
 import static org.junit.Assert.*;
 
 public class TestChecksumFileSystem {
-  static final String TEST_ROOT_DIR
-    = System.getProperty("test.build.data","build/test/data/work-dir/localfs");
+  static final String TEST_ROOT_DIR =
+      GenericTestUtils.getTempPath("work-dir/localfs");
 
   static LocalFileSystem localFs;
 
@@ -230,7 +231,6 @@ public class TestChecksumFileSystem {
     verifyRename(srcPath, dstPath, false);
   }
 
-
   void verifyRename(Path srcPath, Path dstPath, boolean dstIsDir)
       throws Exception { 
     localFs.delete(srcPath,true);
@@ -260,7 +260,7 @@ public class TestChecksumFileSystem {
     assertTrue(localFs.rename(srcPath, dstPath));
     assertTrue(localFs.exists(localFs.getChecksumFile(realDstPath)));
   }
-  
+
   @Test
   public void testSetPermissionCrc() throws Exception {
     FileSystem rawFs = localFs.getRawFileSystem();

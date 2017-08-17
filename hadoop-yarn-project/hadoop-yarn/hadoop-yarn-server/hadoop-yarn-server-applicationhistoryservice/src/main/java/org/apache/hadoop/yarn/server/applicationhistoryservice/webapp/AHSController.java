@@ -56,4 +56,8 @@ public class AHSController extends Controller {
   public void logs() {
     render(AHSLogsPage.class);
   }
+
+  public void errorsAndWarnings() {
+    render(AHSErrorsAndWarningsPage.class);
+  }
 }

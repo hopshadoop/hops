@@ -23,6 +23,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -31,6 +33,7 @@ import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.QueueState;
+import org.apache.hadoop.yarn.api.records.QueueStatistics;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
@@ -38,9 +41,14 @@ import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceWeights;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+import com.google.common.base.Preconditions;
+
 @Private
 @Unstable
 public abstract class FSQueue implements Queue, Schedulable {
+  private static final Log LOG = LogFactory.getLog(
+      FSQueue.class.getName());
+
   private Resource fairShare = Resources.createResource(0, 0);
   private Resource steadyFairShare = Resources.createResource(0, 0);
   private final String name;
@@ -124,18 +132,18 @@ public abstract class FSQueue implements Queue, Schedulable {
     QueueInfo queueInfo = recordFactory.newRecordInstance(QueueInfo.class);
     queueInfo.setQueueName(getQueueName());
 
-    if (scheduler.getClusterResource().getMemory() == 0) {
+    if (scheduler.getClusterResource().getMemorySize() == 0) {
       queueInfo.setCapacity(0.0f);
     } else {
-      queueInfo.setCapacity((float) getFairShare().getMemory() /
-          scheduler.getClusterResource().getMemory());
+      queueInfo.setCapacity((float) getFairShare().getMemorySize() /
+          scheduler.getClusterResource().getMemorySize());
     }
 
-    if (getFairShare().getMemory() == 0) {
+    if (getFairShare().getMemorySize() == 0) {
       queueInfo.setCurrentCapacity(0.0f);
     } else {
-      queueInfo.setCurrentCapacity((float) getResourceUsage().getMemory() /
-          getFairShare().getMemory());
+      queueInfo.setCurrentCapacity((float) getResourceUsage().getMemorySize() /
+          getFairShare().getMemorySize());
     }
 
     ArrayList<QueueInfo> childQueueInfos = new ArrayList<QueueInfo>();
@@ -147,7 +155,29 @@ public abstract class FSQueue implements Queue, Schedulable {
     }
     queueInfo.setChildQueues(childQueueInfos);
     queueInfo.setQueueState(QueueState.RUNNING);
+    queueInfo.setQueueStatistics(getQueueStatistics());
     return queueInfo;
+  }
+
+  public QueueStatistics getQueueStatistics() {
+    QueueStatistics stats =
+        recordFactory.newRecordInstance(QueueStatistics.class);
+    stats.setNumAppsSubmitted(getMetrics().getAppsSubmitted());
+    stats.setNumAppsRunning(getMetrics().getAppsRunning());
+    stats.setNumAppsPending(getMetrics().getAppsPending());
+    stats.setNumAppsCompleted(getMetrics().getAppsCompleted());
+    stats.setNumAppsKilled(getMetrics().getAppsKilled());
+    stats.setNumAppsFailed(getMetrics().getAppsFailed());
+    stats.setNumActiveUsers(getMetrics().getActiveUsers());
+    stats.setAvailableMemoryMB(getMetrics().getAvailableMB());
+    stats.setAllocatedMemoryMB(getMetrics().getAllocatedMB());
+    stats.setPendingMemoryMB(getMetrics().getPendingMB());
+    stats.setReservedMemoryMB(getMetrics().getReservedMB());
+    stats.setAvailableVCores(getMetrics().getAvailableVirtualCores());
+    stats.setAllocatedVCores(getMetrics().getAllocatedVirtualCores());
+    stats.setPendingVCores(getMetrics().getPendingVirtualCores());
+    stats.setReservedVCores(getMetrics().getReservedVirtualCores());
+    return stats;
   }
   
   @Override
@@ -164,6 +194,9 @@ public abstract class FSQueue implements Queue, Schedulable {
   public void setFairShare(Resource fairShare) {
     this.fairShare = fairShare;
     metrics.setFairShare(fairShare);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("The updated fairShare for " + getName() + " is " + fairShare);
+    }
   }
 
   /** Get the steady fair share assigned to this Schedulable. */
@@ -202,6 +235,28 @@ public abstract class FSQueue implements Queue, Schedulable {
 
   public void setFairSharePreemptionThreshold(float fairSharePreemptionThreshold) {
     this.fairSharePreemptionThreshold = fairSharePreemptionThreshold;
+  }
+
+  /**
+   * Recursively check if the queue can be preempted based on whether the
+   * resource usage is greater than fair share.
+   *
+   * @return true if the queue can be preempted
+   */
+  public boolean canBePreempted() {
+    if (parent == null || parent.policy.checkIfUsageOverFairShare(
+        getResourceUsage(), getFairShare())) {
+      return true;
+    } else {
+      // recursively find one queue which can be preempted
+      for (FSQueue queue: getChildQueues()) {
+        if (queue.canBePreempted()) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -290,5 +345,42 @@ public abstract class FSQueue implements Queue, Schedulable {
   public String getDefaultNodeLabelExpression() {
     // TODO, add implementation for FS
     return null;
+  }
+  
+  @Override
+  public void incPendingResource(String nodeLabel, Resource resourceToInc) {
+  }
+  
+  @Override
+  public void decPendingResource(String nodeLabel, Resource resourceToDec) {
+  }
+
+  @Override
+  public void incReservedResource(String nodeLabel, Resource resourceToInc) {
+  }
+
+  @Override
+  public void decReservedResource(String nodeLabel, Resource resourceToDec) {
+  }
+
+  @Override
+  public Priority getDefaultApplicationPriority() {
+    // TODO add implementation for FSParentQueue
+    return null;
+  }
+
+  public boolean fitsInMaxShare(Resource additionalResource) {
+    Resource usagePlusAddition =
+        Resources.add(getResourceUsage(), additionalResource);
+
+    if (!Resources.fitsIn(usagePlusAddition, getMaxShare())) {
+      return false;
+    }
+
+    FSQueue parentQueue = getParent();
+    if (parentQueue != null) {
+      return parentQueue.fitsInMaxShare(additionalResource);
+    }
+    return true;
   }
 }

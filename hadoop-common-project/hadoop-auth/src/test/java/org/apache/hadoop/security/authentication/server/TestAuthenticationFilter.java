@@ -18,11 +18,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.net.HttpCookie;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
 
@@ -35,7 +34,6 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
 import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.authentication.util.Signer;
@@ -53,6 +51,7 @@ import static org.junit.Assert.assertThat;
 public class TestAuthenticationFilter {
 
   private static final long TOKEN_VALIDITY_SEC = 1000;
+  private static final long TOKEN_MAX_INACTIVE_INTERVAL = 1000;
 
   @Test
   public void testGetConfiguration() throws Exception {
@@ -595,7 +594,7 @@ public class TestAuthenticationFilter {
     HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
     FilterChain chain = Mockito.mock(FilterChain.class);
 
-    final HashMap<String, String> cookieMap = new HashMap<String, String>();
+    final Map<String, String> cookieMap = new HashMap<String, String>();
     Mockito.doAnswer(new Answer<Object>() {
       @Override
       public Object answer(InvocationOnMock invocation) throws Throwable {
@@ -644,7 +643,7 @@ public class TestAuthenticationFilter {
     }
   }
 
-  private static void parseCookieMap(String cookieHeader, HashMap<String,
+  private static void parseCookieMap(String cookieHeader, Map<String,
           String> cookieMap) {
     List<HttpCookie> cookies = HttpCookie.parse(cookieHeader);
     for (HttpCookie cookie : cookies) {
@@ -761,7 +760,7 @@ public class TestAuthenticationFilter {
 
       FilterChain chain = Mockito.mock(FilterChain.class);
 
-      final HashMap<String, String> cookieMap = new HashMap<String, String>();
+      final Map<String, String> cookieMap = new HashMap<String, String>();
       Mockito.doAnswer(
         new Answer<Object>() {
           @Override
@@ -844,13 +843,284 @@ public class TestAuthenticationFilter {
     }
   }
 
+  @Test
+  public void
+  testDoFilterAuthenticationAuthorized() throws Exception {
+    // Both expired period and MaxInActiveInterval are not reached.
+    long maxInactives = System.currentTimeMillis()
+        + TOKEN_MAX_INACTIVE_INTERVAL;
+    long expires = System.currentTimeMillis() + TOKEN_VALIDITY_SEC;
+    boolean authorized = true;
+    _testDoFilterAuthenticationMaxInactiveInterval(maxInactives,
+                                                   expires,
+                                                   authorized);
+  }
+
+  @Test
+  public void
+  testDoFilterAuthenticationUnauthorizedExpired() throws Exception {
+    // Expired period is reached, MaxInActiveInterval is not reached.
+    long maxInactives = System.currentTimeMillis()
+        + TOKEN_MAX_INACTIVE_INTERVAL;
+    long expires = System.currentTimeMillis() - TOKEN_VALIDITY_SEC;
+    boolean authorized = false;
+    _testDoFilterAuthenticationMaxInactiveInterval(maxInactives,
+                                                   expires,
+                                                   authorized);
+  }
+
+  @Test
+  public void
+  testDoFilterAuthenticationUnauthorizedInactived() throws Exception {
+    // Expired period is not reached, MaxInActiveInterval is reached.
+    long maxInactives = System.currentTimeMillis()
+        - TOKEN_MAX_INACTIVE_INTERVAL;
+    long expires = System.currentTimeMillis() + TOKEN_VALIDITY_SEC;
+    boolean authorized = false;
+    _testDoFilterAuthenticationMaxInactiveInterval(maxInactives,
+                                                   expires,
+                                                   authorized);
+  }
+
+  @Test
+  public void
+  testDoFilterAuthenticationUnauthorizedInactivedExpired()
+      throws Exception {
+    // Both expired period and MaxInActiveInterval is reached.
+    long maxInactives = System.currentTimeMillis()
+        - TOKEN_MAX_INACTIVE_INTERVAL;
+    long expires = System.currentTimeMillis() - TOKEN_VALIDITY_SEC;
+    boolean authorized = false;
+    _testDoFilterAuthenticationMaxInactiveInterval(maxInactives,
+                                                   expires,
+                                                   authorized);
+  }
+
+  @Test
+  public void testTokenWithValidActivityInterval() throws Exception {
+    // Provide token containing valid maxInactive value.
+    // The token is active.
+    // The server has maxInactiveInterval configured to -1.(disabled)
+    // The server shall authorize the access, but should not drop a new cookie
+    long maxInactives = System.currentTimeMillis()
+        + TOKEN_MAX_INACTIVE_INTERVAL;
+    long expires = System.currentTimeMillis() + TOKEN_VALIDITY_SEC;
+    _testDoFilterAuthenticationMaxInactiveInterval(
+        maxInactives,
+        -1,
+        expires,
+        true, //authorized
+        false //newCookie
+        );
+    // Provide token containing valid maxInactive value.
+    // The token is active.
+    // The server has maxInactiveInterval configured to value
+    // greater than 0.(enabled)
+    // The server shall authorize the access and drop a new cookie
+    // with renewed activity interval
+    maxInactives = System.currentTimeMillis()
+        + TOKEN_MAX_INACTIVE_INTERVAL;
+    expires = System.currentTimeMillis() + TOKEN_VALIDITY_SEC;
+    _testDoFilterAuthenticationMaxInactiveInterval(
+        maxInactives,
+        TOKEN_MAX_INACTIVE_INTERVAL,
+        expires,
+        true, //authorized
+        true //newCookie
+        );
+  }
+
+  @Test
+  public void testTokenWithExpiredActivityIntervaln() throws Exception {
+    // Provide token containing invalid maxInactive value.
+    // The token is inactive.
+    // The server has maxInactiveInterval configured to -1.(disabled)
+    // The server should deny access and expire the token.
+    long maxInactives = System.currentTimeMillis()
+        - TOKEN_MAX_INACTIVE_INTERVAL;
+    long expires = System.currentTimeMillis() + TOKEN_VALIDITY_SEC;
+    _testDoFilterAuthenticationMaxInactiveInterval(
+        maxInactives,
+        -1,
+        expires,
+        false, //authorized
+        false //newCookie
+        );
+    // Provide token containing invalid maxInactive value.
+    // The token is inactive.
+    // The server has maxInactiveInterval configured to value
+    // greater than 0.(enabled)
+    // The server should deny access and expire the token.
+    maxInactives = System.currentTimeMillis()
+        + TOKEN_MAX_INACTIVE_INTERVAL;
+    expires = System.currentTimeMillis() + TOKEN_VALIDITY_SEC;
+    _testDoFilterAuthenticationMaxInactiveInterval(
+        maxInactives,
+        -1,
+        expires,
+        true, //authorized
+        false //newCookie
+        );
+  }
+
+  @Test
+  public void testTokenWithNoActivityIntervals()
+      throws Exception {
+    // Provide token which does not contain maxInactive value.
+    // The server has maxInactiveInterval configured to -1.
+    // The server shall authorize the access, but should not drop a new cookie
+    long expires = System.currentTimeMillis() + TOKEN_VALIDITY_SEC;
+    _testDoFilterAuthenticationMaxInactiveInterval(
+        -1,
+        -1,
+        expires,
+        true, //authorized
+        false //newCookie
+        );
+    // Provide token which does not contain  maxInactive value.
+    // The server has maxInactiveInterval to some value
+    // The server shall authorize the access and drop a new cookie
+    // with renewed activity interval
+    expires = System.currentTimeMillis() + TOKEN_VALIDITY_SEC;
+    _testDoFilterAuthenticationMaxInactiveInterval(
+        -1,
+        TOKEN_MAX_INACTIVE_INTERVAL,
+        expires,
+        true, //authorized
+        true //newCookie
+        );
+  }
+
+  private void
+  _testDoFilterAuthenticationMaxInactiveInterval(long maxInactivesInToken,
+                                                 long expires,
+                                                 boolean authorized)
+                                                     throws Exception {
+    _testDoFilterAuthenticationMaxInactiveInterval(maxInactivesInToken,
+        TOKEN_MAX_INACTIVE_INTERVAL, expires, authorized, true);
+  }
+
+  private void
+  _testDoFilterAuthenticationMaxInactiveInterval(long maxInactivesInToken,
+                                                 long maxInactivesOnServer,
+                                                 long expires,
+                                                 boolean authorized,
+                                                 boolean newCookie)
+                                                     throws Exception {
+    String secret = "secret";
+    AuthenticationFilter filter = new AuthenticationFilter();
+    try {
+      FilterConfig config = Mockito.mock(FilterConfig.class);
+      Mockito.when(config.getInitParameter("management.operation.return")).
+        thenReturn("true");
+      Mockito.when(config.getInitParameter(
+          AuthenticationFilter.AUTH_TYPE)).thenReturn(
+              DummyAuthenticationHandler.class.getName());
+      Mockito.when(config.getInitParameter(
+          AuthenticationFilter.SIGNATURE_SECRET)).thenReturn(secret);
+      Mockito.when(config.getInitParameter(
+          AuthenticationFilter.AUTH_TOKEN_MAX_INACTIVE_INTERVAL)).thenReturn(
+              Long.toString(maxInactivesOnServer));
+      Mockito.when(config.getInitParameterNames()).thenReturn(
+        new Vector<String>(
+          Arrays.asList(AuthenticationFilter.AUTH_TYPE,
+                        AuthenticationFilter.SIGNATURE_SECRET,
+                        AuthenticationFilter.AUTH_TOKEN_MAX_INACTIVE_INTERVAL,
+                        "management.operation.return")).elements());
+      getMockedServletContextWithStringSigner(config);
+      filter.init(config);
+
+      HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+      Mockito.when(request.getRequestURL()).thenReturn(
+          new StringBuffer("http://foo:8080/bar"));
+
+      AuthenticationToken token = new AuthenticationToken("u", "p",
+          DummyAuthenticationHandler.TYPE);
+      token.setMaxInactives(maxInactivesInToken);
+      token.setExpires(expires);
+
+      SignerSecretProvider secretProvider =
+          StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+      Properties secretProviderProps = new Properties();
+      secretProviderProps.setProperty(
+          AuthenticationFilter.SIGNATURE_SECRET, secret);
+      secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+      Signer signer = new Signer(secretProvider);
+      String tokenSigned = signer.sign(token.toString());
+
+      Cookie cookie = new Cookie(AuthenticatedURL.AUTH_COOKIE, tokenSigned);
+      Mockito.when(request.getCookies()).thenReturn(new Cookie[]{cookie});
+      HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
+      Mockito.when(response.containsHeader("WWW-Authenticate"))
+      .thenReturn(true);
+      FilterChain chain = Mockito.mock(FilterChain.class);
+
+      if (authorized) {
+        verifyAuthorized(filter, request, response, chain, newCookie);
+      } else {
+        verifyUnauthorized(filter, request, response, chain);
+      }
+    } finally {
+      filter.destroy();
+    }
+  }
+
+  private static void verifyAuthorized(AuthenticationFilter filter,
+                                       HttpServletRequest request,
+                                       HttpServletResponse response,
+                                       FilterChain chain,
+                                       boolean newCookie) throws
+                                                          Exception {
+    final Map<String, String> cookieMap = new HashMap<>();
+    Mockito.doAnswer(new Answer<Object>() {
+      @Override
+      public Object answer(InvocationOnMock invocation) throws Throwable {
+        String cookieHeader = (String) invocation.getArguments()[1];
+        parseCookieMap(cookieHeader, cookieMap);
+        return null;
+      }
+    }).when(response).addHeader(Mockito.eq("Set-Cookie"), Mockito.anyString());
+
+    filter.doFilter(request, response, chain);
+
+    if (newCookie) {
+      // a new cookie should be dropped when maxInactiveInterval is enabled
+      String v = cookieMap.get(AuthenticatedURL.AUTH_COOKIE);
+      Assert.assertNotNull("cookie missing", v);
+      Assert.assertTrue(v.contains("u=") && v.contains("p=") && v.contains
+          ("t=") && v.contains("i=") && v.contains("e=")
+          && v.contains("s="));
+      Mockito.verify(chain).doFilter(Mockito.any(ServletRequest.class),
+          Mockito.any(ServletResponse.class));
+
+      SignerSecretProvider secretProvider =
+          StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+      Properties secretProviderProps = new Properties();
+      secretProviderProps.setProperty(
+          AuthenticationFilter.SIGNATURE_SECRET, "secret");
+      secretProvider.init(secretProviderProps, null, TOKEN_VALIDITY_SEC);
+      Signer signer = new Signer(secretProvider);
+      String value = signer.verifyAndExtract(v);
+      AuthenticationToken token = AuthenticationToken.parse(value);
+      assertThat(token.getMaxInactives(), not(0L));
+      assertThat(token.getExpires(), not(0L));
+      Assert.assertFalse("Token is expired.", token.isExpired());
+    } else {
+      //make sure that no auth cookie is dropped.
+      //For unauthorized response, auth cookie is dropped with empty value
+      Assert.assertTrue("cookie is present",
+          !cookieMap.containsKey(AuthenticatedURL.AUTH_COOKIE));
+    }
+  }
+
   private static void verifyUnauthorized(AuthenticationFilter filter,
                                          HttpServletRequest request,
                                          HttpServletResponse response,
                                          FilterChain chain) throws
                                                             IOException,
                                                             ServletException {
-    final HashMap<String, String> cookieMap = new HashMap<String, String>();
+    //For unauthorized response, a cookie is dropped with empty string as value
+    final Map<String, String> cookieMap = new HashMap<String, String>();
     Mockito.doAnswer(new Answer<Object>() {
       @Override
       public Object answer(InvocationOnMock invocation) throws Throwable {

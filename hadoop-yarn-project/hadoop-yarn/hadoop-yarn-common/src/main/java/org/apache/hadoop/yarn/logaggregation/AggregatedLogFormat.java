@@ -70,7 +70,6 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.LogAggregationContext;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Times;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -168,17 +167,20 @@ public class AggregatedLogFormat {
     private final Set<String> alreadyUploadedLogFiles;
     private Set<String> allExistingFileMeta = new HashSet<String>();
     private final boolean appFinished;
+    private final boolean containerFinished;
     // TODO Maybe add a version string here. Instead of changing the version of
     // the entire k-v format
 
     public LogValue(List<String> rootLogDirs, ContainerId containerId,
         String user) {
-      this(rootLogDirs, containerId, user, null, new HashSet<String>(), true);
+      this(rootLogDirs, containerId, user, null, new HashSet<String>(), true,
+          true);
     }
 
     public LogValue(List<String> rootLogDirs, ContainerId containerId,
         String user, LogAggregationContext logAggregationContext,
-        Set<String> alreadyUploadedLogFiles, boolean appFinished) {
+        Set<String> alreadyUploadedLogFiles, boolean appFinished,
+        boolean containerFinished) {
       this.rootLogDirs = new ArrayList<String>(rootLogDirs);
       this.containerId = containerId;
       this.user = user;
@@ -188,19 +190,17 @@ public class AggregatedLogFormat {
       this.logAggregationContext = logAggregationContext;
       this.alreadyUploadedLogFiles = alreadyUploadedLogFiles;
       this.appFinished = appFinished;
+      this.containerFinished = containerFinished;
     }
 
     private Set<File> getPendingLogFilesToUploadForThisContainer() {
       Set<File> pendingUploadFiles = new HashSet<File>();
       for (String rootLogDir : this.rootLogDirs) {
-        File appLogDir =
-            new File(rootLogDir, 
-                ConverterUtils.toString(
-                    this.containerId.getApplicationAttemptId().
-                        getApplicationId())
-                );
+        File appLogDir = new File(rootLogDir,
+            this.containerId.getApplicationAttemptId().
+                getApplicationId().toString());
         File containerLogDir =
-            new File(appLogDir, ConverterUtils.toString(this.containerId));
+            new File(appLogDir, this.containerId.toString());
 
         if (!containerLogDir.isDirectory()) {
           continue; // ContainerDir may have been deleted by the user.
@@ -297,28 +297,39 @@ public class AggregatedLogFormat {
         this.allExistingFileMeta.add(getLogFileMetaData(logFile));
       }
 
+      Set<File> fileCandidates = new HashSet<File>(candidates);
       if (this.logAggregationContext != null && candidates.size() > 0) {
-        filterFiles(
-          this.appFinished ? this.logAggregationContext.getIncludePattern()
+        fileCandidates = getFileCandidates(fileCandidates, this.appFinished);
+        if (!this.appFinished && this.containerFinished) {
+          Set<File> addition = new HashSet<File>(candidates);
+          addition = getFileCandidates(addition, true);
+          fileCandidates.addAll(addition);
+        }
+      }
+      return fileCandidates;
+    }
+
+    private Set<File> getFileCandidates(Set<File> candidates,
+        boolean useRegularPattern) {
+      filterFiles(
+          useRegularPattern ? this.logAggregationContext.getIncludePattern()
               : this.logAggregationContext.getRolledLogsIncludePattern(),
           candidates, false);
 
-        filterFiles(
-          this.appFinished ? this.logAggregationContext.getExcludePattern()
+      filterFiles(
+          useRegularPattern ? this.logAggregationContext.getExcludePattern()
               : this.logAggregationContext.getRolledLogsExcludePattern(),
           candidates, true);
 
-        Iterable<File> mask =
-            Iterables.filter(candidates, new Predicate<File>() {
-              @Override
-              public boolean apply(File next) {
-                return !alreadyUploadedLogFiles
+      Iterable<File> mask =
+          Iterables.filter(candidates, new Predicate<File>() {
+            @Override
+            public boolean apply(File next) {
+              return !alreadyUploadedLogFiles
                   .contains(getLogFileMetaData(next));
-              }
-            });
-        candidates = Sets.newHashSet(mask);
-      }
-      return candidates;
+            }
+          });
+      return Sets.newHashSet(mask);
     }
 
     private void filterFiles(String pattern, Set<File> candidates,
@@ -366,20 +377,29 @@ public class AggregatedLogFormat {
    * The writer that writes out the aggregated logs.
    */
   @Private
-  public static class LogWriter {
+  public static class LogWriter implements AutoCloseable {
 
-    private final FSDataOutputStream fsDataOStream;
-    private final TFile.Writer writer;
+    private FSDataOutputStream fsDataOStream;
+    private TFile.Writer writer;
     private FileContext fc;
 
-    public LogWriter(final Configuration conf, final Path remoteAppLogFile,
-        UserGroupInformation userUgi) throws IOException {
+    /**
+     * Initialize the LogWriter.
+     * Must be called just after the instance is created.
+     * @param conf Configuration
+     * @param remoteAppLogFile remote log file path
+     * @param userUgi Ugi of the user
+     * @throws IOException Failed to initialize
+     */
+    public void initialize(final Configuration conf,
+                           final Path remoteAppLogFile,
+                           UserGroupInformation userUgi) throws IOException {
       try {
         this.fsDataOStream =
             userUgi.doAs(new PrivilegedExceptionAction<FSDataOutputStream>() {
               @Override
               public FSDataOutputStream run() throws Exception {
-                fc = FileContext.getFileContext(conf);
+                fc = FileContext.getFileContext(remoteAppLogFile.toUri(), conf);
                 fc.setUMask(APP_LOG_FILE_UMASK);
                 return fc.create(
                     remoteAppLogFile,
@@ -407,34 +427,34 @@ public class AggregatedLogFormat {
     }
 
     private void writeVersion() throws IOException {
-      DataOutputStream out = this.writer.prepareAppendKey(-1);
-      VERSION_KEY.write(out);
-      out.close();
-      out = this.writer.prepareAppendValue(-1);
-      out.writeInt(VERSION);
-      out.close();
+      try (DataOutputStream out = this.writer.prepareAppendKey(-1)) {
+        VERSION_KEY.write(out);
+      }
+      try (DataOutputStream out = this.writer.prepareAppendValue(-1)) {
+        out.writeInt(VERSION);
+      }
     }
 
     public void writeApplicationOwner(String user) throws IOException {
-      DataOutputStream out = this.writer.prepareAppendKey(-1);
-      APPLICATION_OWNER_KEY.write(out);
-      out.close();
-      out = this.writer.prepareAppendValue(-1);
-      out.writeUTF(user);
-      out.close();
+      try (DataOutputStream out = this.writer.prepareAppendKey(-1)) {
+        APPLICATION_OWNER_KEY.write(out);
+      }
+      try (DataOutputStream out = this.writer.prepareAppendValue(-1)) {
+        out.writeUTF(user);
+      }
     }
 
     public void writeApplicationACLs(Map<ApplicationAccessType, String> appAcls)
         throws IOException {
-      DataOutputStream out = this.writer.prepareAppendKey(-1);
-      APPLICATION_ACL_KEY.write(out);
-      out.close();
-      out = this.writer.prepareAppendValue(-1);
-      for (Entry<ApplicationAccessType, String> entry : appAcls.entrySet()) {
-        out.writeUTF(entry.getKey().toString());
-        out.writeUTF(entry.getValue());
+      try (DataOutputStream out = this.writer.prepareAppendKey(-1)) {
+        APPLICATION_ACL_KEY.write(out);
       }
-      out.close();
+      try (DataOutputStream out = this.writer.prepareAppendValue(-1)) {
+        for (Entry<ApplicationAccessType, String> entry : appAcls.entrySet()) {
+          out.writeUTF(entry.getKey().toString());
+          out.writeUTF(entry.getValue());
+        }
+      }
     }
 
     public void append(LogKey logKey, LogValue logValue) throws IOException {
@@ -443,21 +463,25 @@ public class AggregatedLogFormat {
       if (pendingUploadFiles.size() == 0) {
         return;
       }
-      DataOutputStream out = this.writer.prepareAppendKey(-1);
-      logKey.write(out);
-      out.close();
-      out = this.writer.prepareAppendValue(-1);
-      logValue.write(out, pendingUploadFiles);
-      out.close();
+      try (DataOutputStream out = this.writer.prepareAppendKey(-1)) {
+        logKey.write(out);
+      }
+      try (DataOutputStream out = this.writer.prepareAppendValue(-1)) {
+        logValue.write(out, pendingUploadFiles);
+      }
     }
 
+    @Override
     public void close() {
       try {
-        this.writer.close();
-      } catch (IOException e) {
+        if (writer != null) {
+          writer.close();
+        }
+      } catch (Exception e) {
         LOG.warn("Exception closing writer", e);
+      } finally {
+        IOUtils.closeStream(this.fsDataOStream);
       }
-      IOUtils.closeStream(fsDataOStream);
     }
   }
 
@@ -471,7 +495,8 @@ public class AggregatedLogFormat {
 
     public LogReader(Configuration conf, Path remoteAppLogFile)
         throws IOException {
-      FileContext fileContext = FileContext.getFileContext(conf);
+      FileContext fileContext =
+          FileContext.getFileContext(remoteAppLogFile.toUri(), conf);
       this.fsDataIStream = fileContext.open(remoteAppLogFile);
       reader =
           new TFile.Reader(this.fsDataIStream, fileContext.getFileStatus(
@@ -488,18 +513,23 @@ public class AggregatedLogFormat {
      * @throws IOException
      */
     public String getApplicationOwner() throws IOException {
-      TFile.Reader.Scanner ownerScanner = reader.createScanner();
-      LogKey key = new LogKey();
-      while (!ownerScanner.atEnd()) {
-        TFile.Reader.Scanner.Entry entry = ownerScanner.entry();
-        key.readFields(entry.getKeyStream());
-        if (key.toString().equals(APPLICATION_OWNER_KEY.toString())) {
-          DataInputStream valueStream = entry.getValueStream();
-          return valueStream.readUTF();
+      TFile.Reader.Scanner ownerScanner = null;
+      try {
+        ownerScanner = reader.createScanner();
+        LogKey key = new LogKey();
+        while (!ownerScanner.atEnd()) {
+          TFile.Reader.Scanner.Entry entry = ownerScanner.entry();
+          key.readFields(entry.getKeyStream());
+          if (key.toString().equals(APPLICATION_OWNER_KEY.toString())) {
+            DataInputStream valueStream = entry.getValueStream();
+            return valueStream.readUTF();
+          }
+          ownerScanner.advance();
         }
-        ownerScanner.advance();
+        return null;
+      } finally {
+        IOUtils.cleanup(LOG, ownerScanner);
       }
-      return null;
     }
 
     /**
@@ -512,38 +542,42 @@ public class AggregatedLogFormat {
     public Map<ApplicationAccessType, String> getApplicationAcls()
         throws IOException {
       // TODO Seek directly to the key once a comparator is specified.
-      TFile.Reader.Scanner aclScanner = reader.createScanner();
-      LogKey key = new LogKey();
-      Map<ApplicationAccessType, String> acls =
-          new HashMap<ApplicationAccessType, String>();
-      while (!aclScanner.atEnd()) {
-        TFile.Reader.Scanner.Entry entry = aclScanner.entry();
-        key.readFields(entry.getKeyStream());
-        if (key.toString().equals(APPLICATION_ACL_KEY.toString())) {
-          DataInputStream valueStream = entry.getValueStream();
-          while (true) {
-            String appAccessOp = null;
-            String aclString = null;
-            try {
-              appAccessOp = valueStream.readUTF();
-            } catch (EOFException e) {
-              // Valid end of stream.
-              break;
+      TFile.Reader.Scanner aclScanner = null;
+      try {
+        aclScanner = reader.createScanner();
+        LogKey key = new LogKey();
+        Map<ApplicationAccessType, String> acls =
+            new HashMap<ApplicationAccessType, String>();
+        while (!aclScanner.atEnd()) {
+          TFile.Reader.Scanner.Entry entry = aclScanner.entry();
+          key.readFields(entry.getKeyStream());
+          if (key.toString().equals(APPLICATION_ACL_KEY.toString())) {
+            DataInputStream valueStream = entry.getValueStream();
+            while (true) {
+              String appAccessOp = null;
+              String aclString = null;
+              try {
+                appAccessOp = valueStream.readUTF();
+              } catch (EOFException e) {
+                // Valid end of stream.
+                break;
+              }
+              try {
+                aclString = valueStream.readUTF();
+              } catch (EOFException e) {
+                throw new YarnRuntimeException("Error reading ACLs", e);
+              }
+              acls.put(ApplicationAccessType.valueOf(appAccessOp), aclString);
             }
-            try {
-              aclString = valueStream.readUTF();
-            } catch (EOFException e) {
-              throw new YarnRuntimeException("Error reading ACLs", e);
-            }
-            acls.put(ApplicationAccessType.valueOf(appAccessOp), aclString);
           }
-
+          aclScanner.advance();
         }
-        aclScanner.advance();
+        return acls;
+      } finally {
+        IOUtils.cleanup(LOG, aclScanner);
       }
-      return acls;
     }
-    
+
     /**
      * Read the next key and return the value-stream.
      * 
@@ -742,6 +776,60 @@ public class AggregatedLogFormat {
         DataInputStream valueStream, PrintStream out)
           throws IOException {
       readAContainerLogsForALogType(valueStream, out, -1);
+    }
+
+    /**
+     * Keep calling this till you get a {@link EOFException} for getting logs of
+     * the specific types for a single container.
+     * @param valueStream
+     * @param out
+     * @param logUploadedTime
+     * @param logType
+     * @throws IOException
+     */
+    public static int readContainerLogsForALogType(
+        DataInputStream valueStream, PrintStream out, long logUploadedTime,
+        List<String> logType) throws IOException {
+      byte[] buf = new byte[65535];
+
+      String fileType = valueStream.readUTF();
+      String fileLengthStr = valueStream.readUTF();
+      long fileLength = Long.parseLong(fileLengthStr);
+      if (logType.contains(fileType)) {
+        out.print("LogType:");
+        out.println(fileType);
+        if (logUploadedTime != -1) {
+          out.print("Log Upload Time:");
+          out.println(Times.format(logUploadedTime));
+        }
+        out.print("LogLength:");
+        out.println(fileLengthStr);
+        out.println("Log Contents:");
+
+        long curRead = 0;
+        long pendingRead = fileLength - curRead;
+        int toRead = pendingRead > buf.length ? buf.length : (int) pendingRead;
+        int len = valueStream.read(buf, 0, toRead);
+        while (len != -1 && curRead < fileLength) {
+          out.write(buf, 0, len);
+          curRead += len;
+
+          pendingRead = fileLength - curRead;
+          toRead = pendingRead > buf.length ? buf.length : (int) pendingRead;
+          len = valueStream.read(buf, 0, toRead);
+        }
+        out.println("End of LogType:" + fileType);
+        out.println("");
+        return 0;
+      } else {
+        long totalSkipped = 0;
+        long currSkipped = 0;
+        while (currSkipped != -1 && totalSkipped < fileLength) {
+          currSkipped = valueStream.skip(fileLength - totalSkipped);
+          totalSkipped += currSkipped;
+        }
+        return -1;
+      }
     }
 
     public void close() {

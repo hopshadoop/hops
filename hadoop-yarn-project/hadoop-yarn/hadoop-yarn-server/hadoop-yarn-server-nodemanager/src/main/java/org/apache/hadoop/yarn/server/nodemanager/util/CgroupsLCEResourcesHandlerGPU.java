@@ -32,6 +32,7 @@ import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -54,11 +55,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Shell;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.privileged.PrivilegedOperation;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.ResourceCalculatorPlugin;
 import org.apache.hadoop.yarn.util.SystemClock;
@@ -126,11 +127,12 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
   Clock clock;
   
   private float yarnProcessors;
+  int nodeVCores;
 
   private String executablePath;
   
   public CgroupsLCEResourcesHandlerGPU() {
-    this.controllerPaths = new HashMap<>();
+    this.controllerPaths = new HashMap<String, String>();
     clock = new SystemClock();
     
   }
@@ -211,10 +213,12 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
     }
     
     initializeControllerPaths();
+
+    nodeVCores = NodeManagerHardwareUtils.getVCores(plugin, conf);
     
     // cap overall usage to the number of cores allocated to YARN
-    yarnProcessors = NodeManagerHardwareUtils.getContainersCores(plugin, conf);
-    int systemProcessors = plugin.getNumProcessors();
+    yarnProcessors = NodeManagerHardwareUtils.getContainersCPUs(plugin, conf);
+    int systemProcessors = NodeManagerHardwareUtils.getNodeCPUs(plugin, conf);
     if (systemProcessors != (int) yarnProcessors) {
       LOG.info("YARN containers restricted to " + yarnProcessors + " cores");
       int[] limits = getOverallLimits(yarnProcessors);
@@ -354,7 +358,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
                 " rwm");
       }
     }
-  }
+}
   
   private void updateCgroup(String controller, String groupName, String param,
       String value) throws IOException {
@@ -417,7 +421,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
     } catch (IOException e) {
       e.printStackTrace();
     }
-  }
+}
   
   /*
    * Utility routine to print first line from cgroup tasks file
@@ -550,7 +554,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
       LinkedList<String> cgroupGPUDenyEntries = createCgroupDeviceEntry
           (deniedDevices);
       for(String deviceEntry: cgroupGPUDenyEntries) {
-        updateCgroupDevice(CONTROLLER_DEVICES, containerName, DEVICES_DENY,
+        updateCgroup(CONTROLLER_DEVICES, containerName, DEVICES_DENY,
             deviceEntry);
       }
     }
@@ -586,13 +590,13 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
     
     if (isCpuWeightEnabled()) {
       sb.append(pathForCgroup(CONTROLLER_CPU, containerName) + "/tasks");
-      sb.append("%");
+      sb.append(PrivilegedOperation.LINUX_FILE_PATH_SEPARATOR);
     }
 
     sb.append(pathForCgroup(CONTROLLER_DEVICES, containerName) + "/tasks");
-    sb.append("%");
-    
-    if (sb.charAt(sb.length() - 1) == '%') {
+    sb.append(PrivilegedOperation.LINUX_FILE_PATH_SEPARATOR);
+
+    if (sb.charAt(sb.length() - 1) == PrivilegedOperation.LINUX_FILE_PATH_SEPARATOR) {
       sb.deleteCharAt(sb.length() - 1);
     }
     
@@ -759,6 +763,10 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
   
   @VisibleForTesting
   GPUAllocator getGPUAllocator() { return gpuAllocator; }
+
+  Map<String, String> getControllerPaths() {
+    return Collections.unmodifiableMap(controllerPaths);
+  }
   
   @VisibleForTesting
   String[] getDefaultWhiteListEntries() {

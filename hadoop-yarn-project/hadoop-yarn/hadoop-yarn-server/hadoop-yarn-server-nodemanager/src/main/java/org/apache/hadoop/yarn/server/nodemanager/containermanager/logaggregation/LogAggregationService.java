@@ -52,13 +52,15 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
-import org.apache.hadoop.yarn.logaggregation.ContainerLogsRetentionPolicy;
 import org.apache.hadoop.yarn.logaggregation.LogAggregationUtils;
+import org.apache.hadoop.yarn.server.api.ContainerLogContext;
+import org.apache.hadoop.yarn.server.api.ContainerType;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.LogHandler;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppFinishedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppStartedEvent;
@@ -159,10 +161,13 @@ public class LogAggregationService extends AbstractService implements
    
   private void stopAggregators() {
     threadPool.shutdown();
+    boolean supervised = getConfig().getBoolean(
+        YarnConfiguration.NM_RECOVERY_SUPERVISED,
+        YarnConfiguration.DEFAULT_NM_RECOVERY_SUPERVISED);
     // if recovery on restart is supported then leave outstanding aggregations
     // to the next restart
     boolean shouldAbort = context.getNMStateStore().canRecover()
-        && !context.getDecommissioned();
+        && !context.getDecommissioned() && supervised;
     // politely ask to finish
     for (AppLogAggregator aggregator : appLogAggregators.values()) {
       if (shouldAbort) {
@@ -190,8 +195,7 @@ public class LogAggregationService extends AbstractService implements
   }
 
   protected FileSystem getFileSystem(Configuration conf) throws IOException {
-    
-    return FileSystem.get(conf);
+    return this.remoteRootLogDir.getFileSystem(conf);
   }
 
   void verifyAndCreateRemoteLogDir(Configuration conf) {
@@ -257,6 +261,21 @@ public class LogAggregationService extends AbstractService implements
                 remoteFS.getWorkingDirectory());
         remoteFS.mkdirs(qualified, new FsPermission(TLDIR_PERMISSIONS));
         remoteFS.setPermission(qualified, new FsPermission(TLDIR_PERMISSIONS));
+
+        UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+        String primaryGroupName = null;
+        try {
+          primaryGroupName = loginUser.getPrimaryGroupName();
+        } catch (IOException e) {
+          LOG.warn("No primary group found. The remote root log directory" +
+              " will be created with the HDFS superuser being its group " +
+              "owner. JobHistoryServer may be unable to read the directory.");
+        }
+        // set owner on the remote directory only if the primary group exists
+        if (primaryGroupName != null) {
+          remoteFS.setOwner(qualified,
+              loginUser.getShortUserName(), primaryGroupName);
+        }
       } catch (IOException e) {
         throw new YarnRuntimeException("Failed to create remoteLogDir ["
             + this.remoteRootLogDir + "]", e);
@@ -366,13 +385,12 @@ public class LogAggregationService extends AbstractService implements
 
   @SuppressWarnings("unchecked")
   private void initApp(final ApplicationId appId, String user,
-      Credentials credentials, ContainerLogsRetentionPolicy logRetentionPolicy,
-      Map<ApplicationAccessType, String> appAcls,
+      Credentials credentials, Map<ApplicationAccessType, String> appAcls,
       LogAggregationContext logAggregationContext) {
     ApplicationEvent eventResponse;
     try {
       verifyAndCreateRemoteLogDir(getConfig());
-      initAppAggregator(appId, user, credentials, logRetentionPolicy, appAcls,
+      initAppAggregator(appId, user, credentials, appAcls,
           logAggregationContext);
       eventResponse = new ApplicationEvent(appId,
           ApplicationEventType.APPLICATION_LOG_HANDLING_INITED);
@@ -394,8 +412,7 @@ public class LogAggregationService extends AbstractService implements
 
 
   protected void initAppAggregator(final ApplicationId appId, String user,
-      Credentials credentials, ContainerLogsRetentionPolicy logRetentionPolicy,
-      Map<ApplicationAccessType, String> appAcls,
+      Credentials credentials, Map<ApplicationAccessType, String> appAcls,
       LogAggregationContext logAggregationContext) {
 
     // Get user's FileSystem credentials
@@ -409,7 +426,7 @@ public class LogAggregationService extends AbstractService implements
     final AppLogAggregator appLogAggregator =
         new AppLogAggregatorImpl(this.dispatcher, this.deletionService,
             getConfig(), appId, userUgi, this.nodeId, dirsHandler,
-            getRemoteNodeLogFileForApp(appId, user), logRetentionPolicy,
+            getRemoteNodeLogFileForApp(appId, user),
             appAcls, logAggregationContext, this.context,
             getLocalFileContext(getConfig()));
     if (this.appLogAggregators.putIfAbsent(appId, appLogAggregator) != null) {
@@ -427,6 +444,9 @@ public class LogAggregationService extends AbstractService implements
       } else {
         appDirException = (YarnRuntimeException)e;
       }
+      appLogAggregators.remove(appId);
+      closeFileSystems(userUgi);
+      throw appDirException;
     }
 
     // TODO Get the user configuration for the list of containers that need log
@@ -444,10 +464,6 @@ public class LogAggregationService extends AbstractService implements
       }
     };
     this.threadPool.execute(aggregatorWrapper);
-
-    if (appDirException != null) {
-      throw appDirException;
-    }
   }
 
   protected void closeFileSystems(final UserGroupInformation userUgi) {
@@ -468,7 +484,6 @@ public class LogAggregationService extends AbstractService implements
 
     // A container is complete. Put this containers' logs up for aggregation if
     // this containers' logs are needed.
-
     AppLogAggregator aggregator = this.appLogAggregators.get(
         containerId.getApplicationAttemptId().getApplicationId());
     if (aggregator == null) {
@@ -476,9 +491,19 @@ public class LogAggregationService extends AbstractService implements
           + ", did it fail to start?");
       return;
     }
-    aggregator.startContainerLogAggregation(containerId, exitCode == 0);
+    Container container = context.getContainers().get(containerId);
+    if (null == container) {
+      LOG.warn("Log aggregation cannot be started for " + containerId
+          + ", as its an absent container");
+      return;
+    }
+    ContainerType containerType =
+        container.getContainerTokenIdentifier().getContainerType();
+    aggregator.startContainerLogAggregation(
+        new ContainerLogContext(containerId, containerType, exitCode));
   }
 
+  @SuppressWarnings("unchecked")
   private void stopApp(ApplicationId appId) {
 
     // App is complete. Finish up any containers' pending log aggregation and
@@ -488,6 +513,9 @@ public class LogAggregationService extends AbstractService implements
     if (aggregator == null) {
       LOG.warn("Log aggregation is not initialized for " + appId
           + ", did it fail to start?");
+      this.dispatcher.getEventHandler().handle(
+          new ApplicationEvent(appId,
+              ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED));
       return;
     }
     aggregator.finishLogAggregation();
@@ -501,7 +529,6 @@ public class LogAggregationService extends AbstractService implements
             (LogHandlerAppStartedEvent) event;
         initApp(appStartEvent.getApplicationId(), appStartEvent.getUser(),
             appStartEvent.getCredentials(),
-            appStartEvent.getLogRetentionPolicy(),
             appStartEvent.getApplicationAcls(),
             appStartEvent.getLogAggregationContext());
         break;

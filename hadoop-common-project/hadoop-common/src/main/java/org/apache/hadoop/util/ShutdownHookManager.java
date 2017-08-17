@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.util;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -26,6 +27,11 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -42,24 +48,53 @@ public class ShutdownHookManager {
   private static final ShutdownHookManager MGR = new ShutdownHookManager();
 
   private static final Log LOG = LogFactory.getLog(ShutdownHookManager.class);
+  private static final long TIMEOUT_DEFAULT = 10;
+  private static final TimeUnit TIME_UNIT_DEFAULT = TimeUnit.SECONDS;
 
+  private static final ExecutorService EXECUTOR =
+      Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
+          .setDaemon(true).build());
   static {
-    Runtime.getRuntime().addShutdownHook(
-      new Thread() {
-        @Override
-        public void run() {
-          MGR.shutdownInProgress.set(true);
-          for (Runnable hook: MGR.getShutdownHooksInOrder()) {
+    try {
+      Runtime.getRuntime().addShutdownHook(
+        new Thread() {
+          @Override
+          public void run() {
+            MGR.shutdownInProgress.set(true);
+            for (HookEntry entry: MGR.getShutdownHooksInOrder()) {
+              Future<?> future = EXECUTOR.submit(entry.getHook());
+              try {
+                future.get(entry.getTimeout(), entry.getTimeUnit());
+              } catch (TimeoutException ex) {
+                future.cancel(true);
+                LOG.warn("ShutdownHook '" + entry.getHook().getClass().
+                    getSimpleName() + "' timeout, " + ex.toString(), ex);
+              } catch (Throwable ex) {
+                LOG.warn("ShutdownHook '" + entry.getHook().getClass().
+                    getSimpleName() + "' failed, " + ex.toString(), ex);
+              }
+            }
             try {
-              hook.run();
-            } catch (Throwable ex) {
-              LOG.warn("ShutdownHook '" + hook.getClass().getSimpleName() +
-                       "' failed, " + ex.toString(), ex);
+              EXECUTOR.shutdown();
+              if (!EXECUTOR.awaitTermination(TIMEOUT_DEFAULT,
+                  TIME_UNIT_DEFAULT)) {
+                LOG.error("ShutdownHookManger shutdown forcefully.");
+                EXECUTOR.shutdownNow();
+              }
+              LOG.debug("ShutdownHookManger complete shutdown.");
+            } catch (InterruptedException ex) {
+              LOG.error("ShutdownHookManger interrupted while waiting for " +
+                  "termination.", ex);
+              EXECUTOR.shutdownNow();
+              Thread.currentThread().interrupt();
             }
           }
         }
-      }
-    );
+      );
+    } catch (IllegalStateException ex) {
+      // JVM is being shut down. Ignore
+      LOG.warn("Failed to add the ShutdownHook", ex);
+    }
   }
 
   /**
@@ -72,15 +107,24 @@ public class ShutdownHookManager {
   }
 
   /**
-   * Private structure to store ShutdownHook and its priority.
+   * Private structure to store ShutdownHook, its priority and timeout
+   * settings.
    */
-  private static class HookEntry {
-    Runnable hook;
-    int priority;
+  static class HookEntry {
+    private final Runnable hook;
+    private final int priority;
+    private final long timeout;
+    private final TimeUnit unit;
 
-    public HookEntry(Runnable hook, int priority) {
+    HookEntry(Runnable hook, int priority) {
+      this(hook, priority, TIMEOUT_DEFAULT, TIME_UNIT_DEFAULT);
+    }
+
+    HookEntry(Runnable hook, int priority, long timeout, TimeUnit unit) {
       this.hook = hook;
       this.priority = priority;
+      this.timeout = timeout;
+      this.unit = unit;
     }
 
     @Override
@@ -99,10 +143,25 @@ public class ShutdownHookManager {
       return eq;
     }
 
+    Runnable getHook() {
+      return hook;
+    }
+
+    int getPriority() {
+      return priority;
+    }
+
+    long getTimeout() {
+      return timeout;
+    }
+
+    TimeUnit getTimeUnit() {
+      return unit;
+    }
   }
 
-  private Set<HookEntry> hooks =
-    Collections.synchronizedSet(new HashSet<HookEntry>());
+  private final Set<HookEntry> hooks =
+      Collections.synchronizedSet(new HashSet<HookEntry>());
 
   private AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
 
@@ -116,7 +175,7 @@ public class ShutdownHookManager {
    *
    * @return the list of shutdownHooks in order of execution.
    */
-  List<Runnable> getShutdownHooksInOrder() {
+  List<HookEntry> getShutdownHooksInOrder() {
     List<HookEntry> list;
     synchronized (MGR.hooks) {
       list = new ArrayList<HookEntry>(MGR.hooks);
@@ -129,11 +188,7 @@ public class ShutdownHookManager {
         return o2.priority - o1.priority;
       }
     });
-    List<Runnable> ordered = new ArrayList<Runnable>();
-    for (HookEntry entry: list) {
-      ordered.add(entry.hook);
-    }
-    return ordered;
+    return list;
   }
 
   /**
@@ -149,9 +204,34 @@ public class ShutdownHookManager {
       throw new IllegalArgumentException("shutdownHook cannot be NULL");
     }
     if (shutdownInProgress.get()) {
-      throw new IllegalStateException("Shutdown in progress, cannot add a shutdownHook");
+      throw new IllegalStateException("Shutdown in progress, cannot add a " +
+          "shutdownHook");
     }
     hooks.add(new HookEntry(shutdownHook, priority));
+  }
+
+  /**
+   *
+   * Adds a shutdownHook with a priority and timeout the higher the priority
+   * the earlier will run. ShutdownHooks with same priority run
+   * in a non-deterministic order. The shutdown hook will be terminated if it
+   * has not been finished in the specified period of time.
+   *
+   * @param shutdownHook shutdownHook <code>Runnable</code>
+   * @param priority priority of the shutdownHook
+   * @param timeout timeout of the shutdownHook
+   * @param unit unit of the timeout <code>TimeUnit</code>
+   */
+  public void addShutdownHook(Runnable shutdownHook, int priority, long timeout,
+      TimeUnit unit) {
+    if (shutdownHook == null) {
+      throw new IllegalArgumentException("shutdownHook cannot be NULL");
+    }
+    if (shutdownInProgress.get()) {
+      throw new IllegalStateException("Shutdown in progress, cannot add a " +
+          "shutdownHook");
+    }
+    hooks.add(new HookEntry(shutdownHook, priority, timeout, unit));
   }
 
   /**
@@ -163,7 +243,8 @@ public class ShutdownHookManager {
    */
   public boolean removeShutdownHook(Runnable shutdownHook) {
     if (shutdownInProgress.get()) {
-      throw new IllegalStateException("Shutdown in progress, cannot remove a shutdownHook");
+      throw new IllegalStateException("Shutdown in progress, cannot remove a " +
+          "shutdownHook");
     }
     return hooks.remove(new HookEntry(shutdownHook, 0));
   }
@@ -187,4 +268,10 @@ public class ShutdownHookManager {
     return shutdownInProgress.get();
   }
 
+  /**
+   * clear all registered shutdownHooks.
+   */
+  public void clearShutdownHooks() {
+    hooks.clear();
+  }
 }

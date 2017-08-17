@@ -63,7 +63,6 @@ import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.JerseyTestBase;
 import org.apache.hadoop.yarn.webapp.YarnJacksonJaxbJsonProvider;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -501,6 +500,27 @@ public class TestTimelineWebServices extends JerseyTestBase {
     Assert.assertNotNull(entity);
     Assert.assertEquals("test id 1", entity.getEntityId());
     Assert.assertEquals("test type 1", entity.getEntityType());
+  }
+
+  @Test
+  public void testPostIncompleteEntities() throws Exception {
+    TimelineEntities entities = new TimelineEntities();
+    TimelineEntity entity1 = new TimelineEntity();
+    entity1.setEntityId("test id 1");
+    entity1.setEntityType("test type 1");
+    entity1.setStartTime(System.currentTimeMillis());
+    entity1.setDomainId("domain_id_1");
+    entities.addEntity(entity1);
+    // Add an entity with no id or type.
+    entities.addEntity(new TimelineEntity());
+    WebResource r = resource();
+    // One of the entities has no id or type. HTTP 400 will be returned
+    ClientResponse response = r.path("ws").path("v1").path("timeline")
+        .queryParam("user.name", "tester").accept(MediaType.APPLICATION_JSON)
+         .type(MediaType.APPLICATION_JSON).post(ClientResponse.class, entities);
+    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(ClientResponse.Status.BAD_REQUEST,
+        response.getClientResponseStatus());
   }
 
   @Test

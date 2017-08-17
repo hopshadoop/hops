@@ -29,6 +29,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.Schedulable;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.SchedulingPolicy;
 import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
+import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -43,7 +44,8 @@ public class FairSharePolicy extends SchedulingPolicy {
   public static final String NAME = "fair";
   private static final DefaultResourceCalculator RESOURCE_CALCULATOR =
       new DefaultResourceCalculator();
-  private FairShareComparator comparator = new FairShareComparator();
+  private static final FairShareComparator COMPARATOR =
+          new FairShareComparator();
 
   @Override
   public String getName() {
@@ -80,13 +82,13 @@ public class FairSharePolicy extends SchedulingPolicy {
           s1.getResourceUsage(), minShare1);
       boolean s2Needy = Resources.lessThan(RESOURCE_CALCULATOR, null,
           s2.getResourceUsage(), minShare2);
-      minShareRatio1 = (double) s1.getResourceUsage().getMemory()
-          / Resources.max(RESOURCE_CALCULATOR, null, minShare1, ONE).getMemory();
-      minShareRatio2 = (double) s2.getResourceUsage().getMemory()
-          / Resources.max(RESOURCE_CALCULATOR, null, minShare2, ONE).getMemory();
-      useToWeightRatio1 = s1.getResourceUsage().getMemory() /
+      minShareRatio1 = (double) s1.getResourceUsage().getMemorySize()
+          / Resources.max(RESOURCE_CALCULATOR, null, minShare1, ONE).getMemorySize();
+      minShareRatio2 = (double) s2.getResourceUsage().getMemorySize()
+          / Resources.max(RESOURCE_CALCULATOR, null, minShare2, ONE).getMemorySize();
+      useToWeightRatio1 = s1.getResourceUsage().getMemorySize() /
           s1.getWeights().getWeight(ResourceType.MEMORY);
-      useToWeightRatio2 = s2.getResourceUsage().getMemory() /
+      useToWeightRatio2 = s2.getResourceUsage().getMemorySize() /
           s2.getWeights().getWeight(ResourceType.MEMORY);
       int res = 0;
       if (s1Needy && !s2Needy)
@@ -111,16 +113,21 @@ public class FairSharePolicy extends SchedulingPolicy {
 
   @Override
   public Comparator<Schedulable> getComparator() {
-    return comparator;
+    return COMPARATOR;
+  }
+
+  @Override
+  public ResourceCalculator getResourceCalculator() {
+    return RESOURCE_CALCULATOR;
   }
 
   @Override
   public Resource getHeadroom(Resource queueFairShare,
                               Resource queueUsage, Resource maxAvailable) {
-    int queueAvailableMemory = Math.max(
-        queueFairShare.getMemory() - queueUsage.getMemory(), 0);
+    long queueAvailableMemory = Math.max(
+        queueFairShare.getMemorySize() - queueUsage.getMemorySize(), 0);
     Resource headroom = Resources.createResource(
-        Math.min(maxAvailable.getMemory(), queueAvailableMemory),
+        Math.min(maxAvailable.getMemorySize(), queueAvailableMemory),
         maxAvailable.getVirtualCores());
     return headroom;
   }
@@ -145,7 +152,7 @@ public class FairSharePolicy extends SchedulingPolicy {
 
   @Override
   public boolean checkIfAMResourceUsageOverLimit(Resource usage, Resource maxAMResource) {
-    return usage.getMemory() > maxAMResource.getMemory();
+    return usage.getMemorySize() > maxAMResource.getMemorySize();
   }
 
   @Override

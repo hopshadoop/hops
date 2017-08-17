@@ -29,5 +29,5 @@ public interface StateMachine
   public STATE getCurrentState();
   public void setCurrentState(STATE currentState);
   public STATE doTransition(EVENTTYPE eventType, EVENT event)
-        throws InvalidStateTransitonException;
+        throws InvalidStateTransitionException;
 }

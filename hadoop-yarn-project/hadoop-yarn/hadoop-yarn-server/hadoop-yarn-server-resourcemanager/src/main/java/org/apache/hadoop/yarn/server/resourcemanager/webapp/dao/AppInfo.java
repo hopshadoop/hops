@@ -26,8 +26,10 @@ import javax.xml.bind.annotation.XmlTransient;
 
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
+import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.LogAggregationStatus;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
@@ -35,8 +37,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
-import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.util.Times;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
@@ -73,29 +76,43 @@ public class AppInfo {
   protected long clusterId;
   protected String applicationType;
   protected String applicationTags = "";
-  
+  protected int priority;
+
   // these are only allowed if acls allow
   protected long startedTime;
   protected long finishedTime;
   protected long elapsedTime;
   protected String amContainerLogs;
   protected String amHostHttpAddress;
-  protected int allocatedMB;
-  protected int allocatedVCores;
+  private String amRPCAddress;
+  protected long allocatedMB;
+  protected long allocatedVCores;
   protected int allocatedGPUs;
   protected int runningContainers;
   protected long memorySeconds;
   protected long vcoreSeconds;
   protected long gpuSeconds;
-  
+  protected float queueUsagePercentage;
+  protected float clusterUsagePercentage;
+
   // preemption info fields
-  protected int preemptedResourceMB;
-  protected int preemptedResourceVCores;
+  protected long preemptedResourceMB;
+  protected long preemptedResourceVCores;
   protected int preemptedResourceGPUs;
   protected int numNonAMContainerPreempted;
   protected int numAMContainerPreempted;
+  private long preemptedMemorySeconds;
+  private long preemptedVcoreSeconds;
+  private long preemptedGPUSeconds;
 
   protected List<ResourceRequest> resourceRequests;
+
+  protected LogAggregationStatus logAggregationStatus;
+  protected boolean unmanagedApplication;
+  protected String appNodeLabelExpression;
+  protected String amNodeLabelExpression;
+
+  protected ResourcesInfo resourceInfo = null;
 
   public AppInfo() {
   } // JAXB needs this
@@ -129,6 +146,13 @@ public class AppInfo {
       this.user = app.getUser().toString();
       this.name = app.getName().toString();
       this.queue = app.getQueue().toString();
+      this.priority = 0;
+      ApplicationSubmissionContext appSubmissionContext =
+          app.getApplicationSubmissionContext();
+      if (appSubmissionContext.getPriority() != null) {
+        this.priority = appSubmissionContext.getPriority()
+            .getPriority();
+      }
       this.progress = app.getProgress() * 100;
       this.diagnostics = app.getDiagnostics().toString();
       if (diagnostics == null || diagnostics.isEmpty()) {
@@ -144,7 +168,7 @@ public class AppInfo {
         this.finishedTime = app.getFinishTime();
         this.elapsedTime = Times.elapsed(app.getStartTime(),
             app.getFinishTime());
-
+        this.logAggregationStatus = app.getLogAggregationStatusForAppReport();
         RMAppAttempt attempt = app.getCurrentAppAttempt();
         if (attempt != null) {
           Container masterContainer = attempt.getMasterContainer();
@@ -152,23 +176,25 @@ public class AppInfo {
             this.amContainerLogsExist = true;
             this.amContainerLogs = WebAppUtils.getRunningLogURL(
                 schemePrefix + masterContainer.getNodeHttpAddress(),
-                ConverterUtils.toString(masterContainer.getId()),
-                app.getUser());
+                masterContainer.getId().toString(), app.getUser());
             this.amHostHttpAddress = masterContainer.getNodeHttpAddress();
           }
-          
+
+          this.amRPCAddress = getAmRPCAddressFromRMAppAttempt(attempt);
+
           ApplicationResourceUsageReport resourceReport = attempt
               .getApplicationResourceUsageReport();
           if (resourceReport != null) {
             Resource usedResources = resourceReport.getUsedResources();
-            allocatedMB = usedResources.getMemory();
+            allocatedMB = usedResources.getMemorySize();
             allocatedVCores = usedResources.getVirtualCores();
             allocatedGPUs = usedResources.getGPUs();
             runningContainers = resourceReport.getNumUsedContainers();
+            queueUsagePercentage = resourceReport.getQueueUsagePercentage();
+            clusterUsagePercentage = resourceReport.getClusterUsagePercentage();
           }
-          resourceRequests =
-              ((AbstractYarnScheduler) rm.getRMContext().getScheduler())
-                .getPendingResourceRequestsForAttempt(attempt.getAppAttemptId());
+          resourceRequests = rm.getRMContext().getScheduler()
+              .getPendingResourceRequestsForAttempt(attempt.getAppAttemptId());
         }
       }
 
@@ -177,7 +203,7 @@ public class AppInfo {
       numAMContainerPreempted =
           appMetrics.getNumAMContainersPreempted();
       preemptedResourceMB =
-          appMetrics.getResourcePreempted().getMemory();
+          appMetrics.getResourcePreempted().getMemorySize();
       numNonAMContainerPreempted =
           appMetrics.getNumNonAMContainersPreempted();
       preemptedResourceVCores =
@@ -187,6 +213,28 @@ public class AppInfo {
       memorySeconds = appMetrics.getMemorySeconds();
       vcoreSeconds = appMetrics.getVcoreSeconds();
       gpuSeconds = appMetrics.getGPUSeconds();
+      preemptedMemorySeconds = appMetrics.getPreemptedMemorySeconds();
+      preemptedVcoreSeconds = appMetrics.getPreemptedVcoreSeconds();
+      preemptedGPUSeconds = appMetrics.getPreemptedGPUSeconds();
+      unmanagedApplication =
+          appSubmissionContext.getUnmanagedAM();
+      appNodeLabelExpression =
+          app.getApplicationSubmissionContext().getNodeLabelExpression();
+      amNodeLabelExpression = (unmanagedApplication) ? null
+          : app.getAMResourceRequest().getNodeLabelExpression();
+
+      // Setting partition based resource usage of application
+      ResourceScheduler scheduler = rm.getRMContext().getScheduler();
+      if (scheduler instanceof CapacityScheduler) {
+        RMAppAttempt attempt = app.getCurrentAppAttempt();
+        if (null != attempt) {
+          FiCaSchedulerApp ficaAppAttempt = ((CapacityScheduler) scheduler)
+              .getApplicationAttempt(attempt.getAppAttemptId());
+          resourceInfo = null != ficaAppAttempt
+              ? new ResourcesInfo(ficaAppAttempt.getSchedulingResourceUsage())
+              : null;
+        }
+      }
     }
   }
 
@@ -266,6 +314,22 @@ public class AppInfo {
     return this.amHostHttpAddress;
   }
 
+  public String getAmRPCAddress() {
+    return amRPCAddress;
+  }
+
+  static public String getAmRPCAddressFromRMAppAttempt(RMAppAttempt attempt) {
+    String amRPCAddress = null;
+    if (attempt != null) {
+      String amHost = attempt.getHost();
+      int amRpcPort = attempt.getRpcPort();
+      if (!"N/A".equals(amHost) && amRpcPort != -1) {
+        amRPCAddress = amHost + ":" + amRpcPort;
+      }
+    }
+    return amRPCAddress;
+  }
+
   public boolean amContainerLogsExist() {
     return this.amContainerLogsExist;
   }
@@ -286,11 +350,11 @@ public class AppInfo {
     return this.runningContainers;
   }
   
-  public int getAllocatedMB() {
+  public long getAllocatedMB() {
     return this.allocatedMB;
   }
   
-  public int getAllocatedVCores() {
+  public long getAllocatedVCores() {
     return this.allocatedVCores;
   }
   
@@ -298,11 +362,11 @@ public class AppInfo {
     return this.allocatedGPUs;
   }
   
-  public int getPreemptedMB() {
+  public long getPreemptedMB() {
     return preemptedResourceMB;
   }
 
-  public int getPreemptedVCores() {
+  public long getPreemptedVCores() {
     return preemptedResourceVCores;
   }
   
@@ -330,7 +394,43 @@ public class AppInfo {
     return gpuSeconds;
   }
 
+  public long getPreemptedMemorySeconds() {
+    return preemptedMemorySeconds;
+  }
+
+  public long getPreemptedVcoreSeconds() {
+    return preemptedVcoreSeconds;
+  }
+
+  public long getPreemptedGPUSeconds() {
+    return preemptedGPUSeconds;
+  }
+  
   public List<ResourceRequest> getResourceRequests() {
     return this.resourceRequests;
+  }
+
+  public LogAggregationStatus getLogAggregationStatus() {
+    return this.logAggregationStatus;
+  }
+
+  public boolean isUnmanagedApp() {
+    return unmanagedApplication;
+  }
+
+  public int getPriority() {
+    return this.priority;
+  }
+
+  public String getAppNodeLabelExpression() {
+    return this.appNodeLabelExpression;
+  }
+
+  public String getAmNodeLabelExpression() {
+    return this.amNodeLabelExpression;
+  }
+
+  public ResourcesInfo getResourceInfo() {
+    return resourceInfo;
   }
 }

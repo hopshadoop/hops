@@ -26,6 +26,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.util.LineReader;
 import org.apache.hadoop.util.Progressable;
 
+import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -713,7 +714,6 @@ public class HarFileSystem extends FileSystem {
     throw new IOException("Har: create not allowed.");
   }
 
-  @SuppressWarnings("deprecation")
   @Override
   public FSDataOutputStream createNonRecursive(Path f, boolean overwrite,
       int bufferSize, short replication, long blockSize, Progressable progress)
@@ -968,6 +968,9 @@ public class HarFileSystem extends FileSystem {
       @Override
       public synchronized int read(byte[] b, int offset, int len) 
         throws IOException {
+        if (len == 0) {
+          return 0;
+        }
         int newlen = len;
         int ret = -1;
         if (position + len > end) {
@@ -1054,15 +1057,14 @@ public class HarFileSystem extends FileSystem {
       @Override
       public void readFully(long pos, byte[] b, int offset, int length) 
       throws IOException {
+        validatePositionedReadArgs(pos, b, offset, length);
+        if (length == 0) {
+          return;
+        }
         if (start + length + pos > end) {
-          throw new IOException("Not enough bytes to read.");
+          throw new EOFException("Not enough bytes to read.");
         }
         underLyingStream.readFully(pos + start, b, offset, length);
-      }
-      
-      @Override
-      public void readFully(long pos, byte[] b) throws IOException {
-          readFully(pos, b, 0, b.length);
       }
 
       @Override

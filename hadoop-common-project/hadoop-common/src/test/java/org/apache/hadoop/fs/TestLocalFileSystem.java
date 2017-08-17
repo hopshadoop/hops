@@ -19,8 +19,9 @@ package org.apache.hadoop.fs;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem.Statistics;
-import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.util.StringUtils;
 
 import static org.apache.hadoop.fs.FileSystemTestHelper.*;
 
@@ -44,10 +45,10 @@ import org.mockito.internal.util.reflection.Whitebox;
  * This class tests the local file system via the FileSystem abstraction.
  */
 public class TestLocalFileSystem {
-  private static final String TEST_ROOT_DIR
-    = System.getProperty("test.build.data","build/test/data") + "/work-dir/localfs";
+  private static final File base =
+      GenericTestUtils.getTestDir("work-dir/localfs");
 
-  private final File base = new File(TEST_ROOT_DIR);
+  private static final String TEST_ROOT_DIR = base.getAbsolutePath();
   private final Path TEST_PATH = new Path(TEST_ROOT_DIR, "test-file");
   private Configuration conf;
   private LocalFileSystem fileSys;
@@ -71,6 +72,7 @@ public class TestLocalFileSystem {
     FileUtil.setWritable(base, true);
     FileUtil.fullyDelete(base);
     assertTrue(!base.exists());
+    RawLocalFileSystem.useStatIfAvailable();
   }
 
   /**
@@ -376,7 +378,14 @@ public class TestLocalFileSystem {
     assertTrue(dataFileFound);
     assertTrue(checksumFileFound);
   }
-  
+
+  private void checkTimesStatus(Path path,
+    long expectedModTime, long expectedAccTime) throws IOException {
+    FileStatus status = fileSys.getFileStatus(path);
+    assertEquals(expectedModTime, status.getModificationTime());
+    assertEquals(expectedAccTime, status.getAccessTime());
+  }
+
   @Test(timeout = 1000)
   public void testSetTimes() throws Exception {
     Path path = new Path(TEST_ROOT_DIR, "set-times");
@@ -385,15 +394,24 @@ public class TestLocalFileSystem {
     // test only to the nearest second, as the raw FS may not
     // support millisecond timestamps
     long newModTime = 12345000;
+    long newAccTime = 23456000;
 
     FileStatus status = fileSys.getFileStatus(path);
     assertTrue("check we're actually changing something", newModTime != status.getModificationTime());
-    long accessTime = status.getAccessTime();
+    assertTrue("check we're actually changing something", newAccTime != status.getAccessTime());
+
+    fileSys.setTimes(path, newModTime, newAccTime);
+    checkTimesStatus(path, newModTime, newAccTime);
+
+    newModTime = 34567000;
 
     fileSys.setTimes(path, newModTime, -1);
-    status = fileSys.getFileStatus(path);
-    assertEquals(newModTime, status.getModificationTime());
-    assertEquals(accessTime, status.getAccessTime());
+    checkTimesStatus(path, newModTime, newAccTime);
+
+    newAccTime = 45678000;
+
+    fileSys.setTimes(path, -1, newAccTime);
+    checkTimesStatus(path, newModTime, newAccTime);
   }
 
   /**

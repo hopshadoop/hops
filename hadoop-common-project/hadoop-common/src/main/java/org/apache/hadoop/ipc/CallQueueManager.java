@@ -19,6 +19,7 @@
 package org.apache.hadoop.ipc;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -26,52 +27,78 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 
 /**
  * Abstracts queue operations for different blocking queues.
  */
 public class CallQueueManager<E> {
   public static final Log LOG = LogFactory.getLog(CallQueueManager.class);
+  // Number of checkpoints for empty queue.
+  private static final int CHECKPOINT_NUM = 20;
+  // Interval to check empty queue.
+  private static final long CHECKPOINT_INTERVAL_MS = 10;
 
   @SuppressWarnings("unchecked")
   static <E> Class<? extends BlockingQueue<E>> convertQueueClass(
-      Class<?> queneClass, Class<E> elementClass) {
-    return (Class<? extends BlockingQueue<E>>)queneClass;
+      Class<?> queueClass, Class<E> elementClass) {
+    return (Class<? extends BlockingQueue<E>>)queueClass;
   }
-  
+
+  @SuppressWarnings("unchecked")
+  static Class<? extends RpcScheduler> convertSchedulerClass(
+      Class<?> schedulerClass) {
+    return (Class<? extends RpcScheduler>)schedulerClass;
+  }
+
+  private final boolean clientBackOffEnabled;
+
   // Atomic refs point to active callQueue
   // We have two so we can better control swapping
   private final AtomicReference<BlockingQueue<E>> putRef;
   private final AtomicReference<BlockingQueue<E>> takeRef;
 
+  private RpcScheduler scheduler;
+
   public CallQueueManager(Class<? extends BlockingQueue<E>> backingClass,
-      int maxQueueSize, String namespace, Configuration conf) {
+                          Class<? extends RpcScheduler> schedulerClass,
+      boolean clientBackOffEnabled, int maxQueueSize, String namespace,
+      Configuration conf) {
+    int priorityLevels = parseNumLevels(namespace, conf);
+    this.scheduler = createScheduler(schedulerClass, priorityLevels,
+        namespace, conf);
     BlockingQueue<E> bq = createCallQueueInstance(backingClass,
-      maxQueueSize, namespace, conf);
+        priorityLevels, maxQueueSize, namespace, conf);
+    this.clientBackOffEnabled = clientBackOffEnabled;
     this.putRef = new AtomicReference<BlockingQueue<E>>(bq);
     this.takeRef = new AtomicReference<BlockingQueue<E>>(bq);
-    LOG.info("Using callQueue " + backingClass);
+    LOG.info("Using callQueue: " + backingClass + " queueCapacity: " +
+        maxQueueSize + " scheduler: " + schedulerClass);
   }
 
-  private <T extends BlockingQueue<E>> T createCallQueueInstance(
-      Class<T> theClass, int maxLen, String ns, Configuration conf) {
-
-    // Used for custom, configurable callqueues
+  private static <T extends RpcScheduler> T createScheduler(
+      Class<T> theClass, int priorityLevels, String ns, Configuration conf) {
+    // Used for custom, configurable scheduler
     try {
-      Constructor<T> ctor = theClass.getDeclaredConstructor(int.class, String.class,
-        Configuration.class);
-      return ctor.newInstance(maxLen, ns, conf);
+      Constructor<T> ctor = theClass.getDeclaredConstructor(int.class,
+          String.class, Configuration.class);
+      return ctor.newInstance(priorityLevels, ns, conf);
     } catch (RuntimeException e) {
       throw e;
+    } catch (InvocationTargetException e) {
+      throw new RuntimeException(theClass.getName()
+          + " could not be constructed.", e.getCause());
     } catch (Exception e) {
     }
 
-    // Used for LinkedBlockingQueue, ArrayBlockingQueue, etc
     try {
       Constructor<T> ctor = theClass.getDeclaredConstructor(int.class);
-      return ctor.newInstance(maxLen);
+      return ctor.newInstance(priorityLevels);
     } catch (RuntimeException e) {
       throw e;
+    } catch (InvocationTargetException e) {
+      throw new RuntimeException(theClass.getName()
+          + " could not be constructed.", e.getCause());
     } catch (Exception e) {
     }
 
@@ -81,12 +108,81 @@ public class CallQueueManager<E> {
       return ctor.newInstance();
     } catch (RuntimeException e) {
       throw e;
+    } catch (InvocationTargetException e) {
+      throw new RuntimeException(theClass.getName()
+          + " could not be constructed.", e.getCause());
+    } catch (Exception e) {
+    }
+
+    // Nothing worked
+    throw new RuntimeException(theClass.getName() +
+        " could not be constructed.");
+  }
+
+  private <T extends BlockingQueue<E>> T createCallQueueInstance(
+      Class<T> theClass, int priorityLevels, int maxLen, String ns,
+      Configuration conf) {
+
+    // Used for custom, configurable callqueues
+    try {
+      Constructor<T> ctor = theClass.getDeclaredConstructor(int.class,
+          int.class, String.class, Configuration.class);
+      return ctor.newInstance(priorityLevels, maxLen, ns, conf);
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (InvocationTargetException e) {
+      throw new RuntimeException(theClass.getName()
+          + " could not be constructed.", e.getCause());
+    } catch (Exception e) {
+    }
+
+    // Used for LinkedBlockingQueue, ArrayBlockingQueue, etc
+    try {
+      Constructor<T> ctor = theClass.getDeclaredConstructor(int.class);
+      return ctor.newInstance(maxLen);
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (InvocationTargetException e) {
+      throw new RuntimeException(theClass.getName()
+          + " could not be constructed.", e.getCause());
+    } catch (Exception e) {
+    }
+
+    // Last attempt
+    try {
+      Constructor<T> ctor = theClass.getDeclaredConstructor();
+      return ctor.newInstance();
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (InvocationTargetException e) {
+      throw new RuntimeException(theClass.getName()
+          + " could not be constructed.", e.getCause());
     } catch (Exception e) {
     }
 
     // Nothing worked
     throw new RuntimeException(theClass.getName() +
       " could not be constructed.");
+  }
+
+  boolean isClientBackoffEnabled() {
+    return clientBackOffEnabled;
+  }
+
+  // Based on policy to determine back off current call
+  boolean shouldBackOff(Schedulable e) {
+    return scheduler.shouldBackOff(e);
+  }
+
+  void addResponseTime(String name, int priorityLevel, int queueTime,
+      int processingTime) {
+    scheduler.addResponseTime(name, priorityLevel, queueTime, processingTime);
+  }
+
+  // This should be only called once per call and cached in the call object
+  // each getPriorityLevel call will increment the counter for the caller
+  int getPriorityLevel(Schedulable e) {
+    return scheduler.getPriorityLevel(e);
   }
 
   /**
@@ -96,6 +192,15 @@ public class CallQueueManager<E> {
    */
   public void put(E e) throws InterruptedException {
     putRef.get().put(e);
+  }
+
+  /**
+   * Insert e into the backing queue.
+   * Return true if e is queued.
+   * Return false if the queue is full.
+   */
+  public boolean offer(E e) throws InterruptedException {
+    return putRef.get().offer(e);
   }
 
   /**
@@ -117,14 +222,46 @@ public class CallQueueManager<E> {
   }
 
   /**
+   * Read the number of levels from the configuration.
+   * This will affect the FairCallQueue's overall capacity.
+   * @throws IllegalArgumentException on invalid queue count
+   */
+  @SuppressWarnings("deprecation")
+  private static int parseNumLevels(String ns, Configuration conf) {
+    // Fair call queue levels (IPC_CALLQUEUE_PRIORITY_LEVELS_KEY)
+    // takes priority over the scheduler level key
+    // (IPC_SCHEDULER_PRIORITY_LEVELS_KEY)
+    int retval = conf.getInt(ns + "." +
+        FairCallQueue.IPC_CALLQUEUE_PRIORITY_LEVELS_KEY, 0);
+    if (retval == 0) { // No FCQ priority level configured
+      retval = conf.getInt(ns + "." +
+          CommonConfigurationKeys.IPC_SCHEDULER_PRIORITY_LEVELS_KEY,
+          CommonConfigurationKeys.IPC_SCHEDULER_PRIORITY_LEVELS_DEFAULT_KEY);
+    } else {
+      LOG.warn(ns + "." + FairCallQueue.IPC_CALLQUEUE_PRIORITY_LEVELS_KEY +
+          " is deprecated. Please use " + ns + "." +
+          CommonConfigurationKeys.IPC_SCHEDULER_PRIORITY_LEVELS_KEY + ".");
+    }
+    if(retval < 1) {
+      throw new IllegalArgumentException("numLevels must be at least 1");
+    }
+    return retval;
+  }
+
+  /**
    * Replaces active queue with the newly requested one and transfers
    * all calls to the newQ before returning.
    */
   public synchronized void swapQueue(
+      Class<? extends RpcScheduler> schedulerClass,
       Class<? extends BlockingQueue<E>> queueClassToUse, int maxSize,
       String ns, Configuration conf) {
-    BlockingQueue<E> newQ = createCallQueueInstance(queueClassToUse, maxSize,
-      ns, conf);
+    int priorityLevels = parseNumLevels(ns, conf);
+    this.scheduler.stop();
+    RpcScheduler newScheduler = createScheduler(schedulerClass, priorityLevels,
+        ns, conf);
+    BlockingQueue<E> newQ = createCallQueueInstance(queueClassToUse,
+        priorityLevels, maxSize, ns, conf);
 
     // Our current queue becomes the old queue
     BlockingQueue<E> oldQ = putRef.get();
@@ -138,23 +275,30 @@ public class CallQueueManager<E> {
     // Swap takeRef to handle new calls
     takeRef.set(newQ);
 
+    this.scheduler = newScheduler;
+
     LOG.info("Old Queue: " + stringRepr(oldQ) + ", " +
       "Replacement: " + stringRepr(newQ));
   }
 
   /**
-   * Checks if queue is empty by checking at two points in time.
+   * Checks if queue is empty by checking at CHECKPOINT_NUM points with
+   * CHECKPOINT_INTERVAL_MS interval.
    * This doesn't mean the queue might not fill up at some point later, but
    * it should decrease the probability that we lose a call this way.
    */
   private boolean queueIsReallyEmpty(BlockingQueue<?> q) {
-    boolean wasEmpty = q.isEmpty();
-    try {
-      Thread.sleep(10);
-    } catch (InterruptedException ie) {
-      return false;
+    for (int i = 0; i < CHECKPOINT_NUM; i++) {
+      try {
+        Thread.sleep(CHECKPOINT_INTERVAL_MS);
+      } catch (InterruptedException ie) {
+        return false;
+      }
+      if (!q.isEmpty()) {
+        return false;
+      }
     }
-    return q.isEmpty() && wasEmpty;
+    return true;
   }
 
   private String stringRepr(Object o) {

@@ -21,6 +21,8 @@ package org.apache.hadoop.fs;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.regex.Pattern;
+
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -51,8 +53,8 @@ import static org.apache.hadoop.fs.FileContextTestHelper.*;
  * </p>
  */
 public abstract class FileContextURIBase {
-  private static final String basePath = System.getProperty("test.build.data",
-  "build/test/data") + "/testContextURI";
+  private static final String basePath =
+      GenericTestUtils.getTempPath("testContextURI");
   private static final Path BASE = new Path(basePath);
 
   // Matches anything containing <, >, :, ", |, ?, *, or anything that ends with
@@ -75,7 +77,9 @@ public abstract class FileContextURIBase {
   public void tearDown() throws Exception {
     // Clean up after test completion
     // No need to clean fc1 as fc1 and fc2 points same location
-    fc2.delete(BASE, true);
+    if (fc2 != null) {
+      fc2.delete(BASE, true);
+    }
   }
 
   @Test

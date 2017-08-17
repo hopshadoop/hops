@@ -68,6 +68,7 @@ import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.YarnClusterMetrics;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineDomain;
@@ -126,7 +127,7 @@ public class Client {
   // Queue for App master
   private String amQueue = "";
   // Amt. of memory resource to request for to run the App Master
-  private int amMemory = 10; 
+  private long amMemory = 100;
   // Amt. of virtual core resource to request for to run the App Master
   private int amVCores = 1;
 
@@ -347,7 +348,7 @@ public class Client {
     appName = cliParser.getOptionValue("appname", "DistributedShell");
     amPriority = Integer.parseInt(cliParser.getOptionValue("priority", "0"));
     amQueue = cliParser.getOptionValue("queue", "default");
-    amMemory = Integer.parseInt(cliParser.getOptionValue("master_memory", "10"));		
+    amMemory = Integer.parseInt(cliParser.getOptionValue("master_memory", "100"));
     amVCores = Integer.parseInt(cliParser.getOptionValue("master_vcores", "1"));
 
     if (amMemory < 0) {
@@ -459,9 +460,9 @@ public class Client {
     for (NodeReport node : clusterNodeReports) {
       LOG.info("Got node report from ASM for"
           + ", nodeId=" + node.getNodeId() 
-          + ", nodeAddress" + node.getHttpAddress()
-          + ", nodeRackName" + node.getRackName()
-          + ", nodeNumContainers" + node.getNumContainers());
+          + ", nodeAddress=" + node.getHttpAddress()
+          + ", nodeRackName=" + node.getRackName()
+          + ", nodeNumContainers=" + node.getNumContainers());
     }
 
     QueueInfo queueInfo = yarnClient.getQueueInfo(this.amQueue);
@@ -493,8 +494,8 @@ public class Client {
     // the required resources from the RM for the app master
     // Memory ask has to be a multiple of min and less than max. 
     // Dump out information about cluster capability as seen by the resource manager
-    int maxMem = appResponse.getMaximumResourceCapability().getMemory();
-    LOG.info("Max mem capabililty of resources in this cluster " + maxMem);
+    long maxMem = appResponse.getMaximumResourceCapability().getMemorySize();
+    LOG.info("Max mem capability of resources in this cluster " + maxMem);
 
     // A resource ask cannot exceed the max. 
     if (amMemory > maxMem) {
@@ -505,7 +506,7 @@ public class Client {
     }				
 
     int maxVCores = appResponse.getMaximumResourceCapability().getVirtualCores();
-    LOG.info("Max virtual cores capabililty of resources in this cluster " + maxVCores);
+    LOG.info("Max virtual cores capability of resources in this cluster " + maxVCores);
     
     if (amVCores > maxVCores) {
       LOG.info("AM virtual cores specified above max threshold of cluster. " 
@@ -829,7 +830,7 @@ public class Client {
     FileStatus scFileStatus = fs.getFileStatus(dst);
     LocalResource scRsrc =
         LocalResource.newInstance(
-            ConverterUtils.getYarnUrlFromURI(dst.toUri()),
+            URL.fromURI(dst.toUri()),
             LocalResourceType.FILE, LocalResourceVisibility.APPLICATION,
             scFileStatus.getLen(), scFileStatus.getModificationTime());
     localResources.put(fileDstPath, scRsrc);

@@ -32,10 +32,12 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.InvalidResourceRequestException;
+import org.apache.hadoop.yarn.exceptions.InvalidLabelResourceRequestException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger.AuditConstants;
@@ -54,6 +56,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 
@@ -170,6 +173,9 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
           .add("memorySeconds", metrics.getMemorySeconds())
           .add("vcoreSeconds", metrics.getVcoreSeconds())
           .add("gpusSeconds", metrics.getGPUSeconds())
+          .add("preemptedMemorySeconds", metrics.getPreemptedMemorySeconds())
+          .add("preemptedVcoreSeconds", metrics.getPreemptedVcoreSeconds())
+          .add("preemptedGPUSeconds", metrics.getPreemptedGPUSeconds())
           .add("preemptedAMContainers", metrics.getNumAMContainersPreempted())
           .add("preemptedNonAMContainers", metrics.getNumNonAMContainersPreempted())
           .add("preemptedResources", metrics.getResourcePreempted())
@@ -281,31 +287,31 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
 
     RMAppImpl application =
         createAndPopulateNewRMApp(submissionContext, submitTime, user, false);
-    ApplicationId appId = submissionContext.getApplicationId();
-
-    if (UserGroupInformation.isSecurityEnabled()) {
-      try {
-        this.rmContext.getDelegationTokenRenewer().addApplicationAsync(appId,
-            parseCredentials(submissionContext),
-            submissionContext.getCancelTokensWhenComplete(),
-            application.getUser());
-      } catch (Exception e) {
-        LOG.warn("Unable to parse credentials.", e);
-        // Sending APP_REJECTED is fine, since we assume that the
-        // RMApp is in NEW state and thus we haven't yet informed the
-        // scheduler about the existence of the application
-        assert application.getState() == RMAppState.NEW;
+    Credentials credentials = null;
+    try {
+      credentials = parseCredentials(submissionContext);
+      if (UserGroupInformation.isSecurityEnabled()) {
+        this.rmContext.getDelegationTokenRenewer()
+            .addApplicationAsync(applicationId, credentials,
+                submissionContext.getCancelTokensWhenComplete(),
+                application.getUser());
+      } else {
+        // Dispatcher is not yet started at this time, so these START events
+        // enqueued should be guaranteed to be first processed when dispatcher
+        // gets started.
         this.rmContext.getDispatcher().getEventHandler()
+            .handle(new RMAppEvent(applicationId, RMAppEventType.START));
+      }
+    } catch (Exception e) {
+      LOG.warn("Unable to parse credentials.", e);
+      // Sending APP_REJECTED is fine, since we assume that the
+      // RMApp is in NEW state and thus we haven't yet informed the
+      // scheduler about the existence of the application
+      assert application.getState() == RMAppState.NEW;
+      this.rmContext.getDispatcher().getEventHandler()
           .handle(new RMAppEvent(applicationId,
               RMAppEventType.APP_REJECTED, e.getMessage()));
-        throw RPCUtil.getRemoteException(e);
-      }
-    } else {
-      // Dispatcher is not yet started at this time, so these START events
-      // enqueued should be guaranteed to be first processed when dispatcher
-      // gets started.
-      this.rmContext.getDispatcher().getEventHandler()
-        .handle(new RMAppEvent(applicationId, RMAppEventType.START));
+      throw RPCUtil.getRemoteException(e);
     }
   }
 
@@ -320,24 +326,86 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
         createAndPopulateNewRMApp(appContext, appState.getSubmitTime(),
             appState.getUser(), true);
 
+    // If null amReq has been returned, check if it is the case that
+    // application has specified node label expression while node label
+    // has been disabled. Reject the recovery of this application if it
+    // is true and give clear message so that user can react properly.
+    if (!appContext.getUnmanagedAM() &&
+        application.getAMResourceRequest() == null &&
+        !YarnConfiguration.areNodeLabelsEnabled(this.conf)) {
+      // check application submission context and see if am resource request
+      // or application itself contains any node label expression.
+      ResourceRequest amReqFromAppContext =
+          appContext.getAMContainerResourceRequest();
+      String labelExp = (amReqFromAppContext != null) ?
+          amReqFromAppContext.getNodeLabelExpression() : null;
+      if (labelExp == null) {
+        labelExp = appContext.getNodeLabelExpression();
+      }
+      if (labelExp != null &&
+          !labelExp.equals(RMNodeLabelsManager.NO_LABEL)) {
+        String message = "Failed to recover application " + appId
+            + ". NodeLabel is not enabled in cluster, but AM resource request "
+            + "contains a label expression.";
+        LOG.warn(message);
+        application.handle(
+            new RMAppEvent(appId, RMAppEventType.APP_REJECTED, message));
+        return;
+      }
+    }
+
     application.handle(new RMAppRecoverEvent(appId, rmState));
   }
 
   private RMAppImpl createAndPopulateNewRMApp(
       ApplicationSubmissionContext submissionContext, long submitTime,
       String user, boolean isRecovery) throws YarnException {
+    // Do queue mapping
+    if (!isRecovery) {
+      if (rmContext.getQueuePlacementManager() != null) {
+        // We only do queue mapping when it's a new application
+        rmContext.getQueuePlacementManager().placeApplication(
+            submissionContext, user);
+      }
+    }
+    
     ApplicationId applicationId = submissionContext.getApplicationId();
-    ResourceRequest amReq =
-        validateAndCreateResourceRequest(submissionContext, isRecovery);
+    ResourceRequest amReq = null;
+    try {
+      amReq = validateAndCreateResourceRequest(submissionContext, isRecovery);
+    } catch (InvalidLabelResourceRequestException e) {
+      // This can happen if the application had been submitted and run
+      // with Node Label enabled but recover with Node Label disabled.
+      // Thus there might be node label expression in the application's
+      // resource requests. If this is the case, create RmAppImpl with
+      // null amReq and reject the application later with clear error
+      // message. So that the application can still be tracked by RM
+      // after recovery and user can see what's going on and react accordingly.
+      if (isRecovery &&
+          !YarnConfiguration.areNodeLabelsEnabled(this.conf)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("AMResourceRequest is not created for " + applicationId
+              + ". NodeLabel is not enabled in cluster, but AM resource "
+              + "request contains a label expression.");
+        }
+      } else {
+        throw e;
+      }
+    }
+
+    // Verify and get the update application priority and set back to
+    // submissionContext
+    Priority appPriority = rmContext.getScheduler()
+        .checkAndGetApplicationPriority(submissionContext.getPriority(), user,
+            submissionContext.getQueue(), applicationId);
+    submissionContext.setPriority(appPriority);
 
     // Create RMApp
-    RMAppImpl application =
-        new RMAppImpl(applicationId, rmContext, this.conf,
-            submissionContext.getApplicationName(), user,
-            submissionContext.getQueue(),
-            submissionContext, this.scheduler, this.masterService,
-            submitTime, submissionContext.getApplicationType(),
-            submissionContext.getApplicationTags(), amReq);
+    RMAppImpl application = new RMAppImpl(applicationId, rmContext, this.conf,
+        submissionContext.getApplicationName(), user,
+        submissionContext.getQueue(), submissionContext, this.scheduler,
+        this.masterService, submitTime, submissionContext.getApplicationType(),
+        submissionContext.getApplicationTags(), amReq);
 
     // Concurrent app submissions with same applicationId will fail here
     // Concurrent app submissions with different applicationIds will not

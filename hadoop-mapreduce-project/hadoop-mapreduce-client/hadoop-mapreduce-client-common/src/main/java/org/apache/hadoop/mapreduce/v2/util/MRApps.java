@@ -68,6 +68,7 @@ import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
+import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.util.Apps;
@@ -404,7 +405,7 @@ public class MRApps extends Apps {
   public static void setClassLoader(ClassLoader classLoader,
       Configuration conf) {
     if (classLoader != null) {
-      LOG.info("Setting classloader " + classLoader.getClass().getName() +
+      LOG.info("Setting classloader " + classLoader +
           " on the configuration and as the thread context classloader");
       conf.setClassLoader(classLoader);
       Thread.currentThread().setContextClassLoader(classLoader);
@@ -608,8 +609,7 @@ public class MRApps extends Apps {
         }
         String linkName = name.toUri().getPath();
         LocalResource orig = localResources.get(linkName);
-        org.apache.hadoop.yarn.api.records.URL url = 
-          ConverterUtils.getYarnUrlFromURI(p.toUri());
+        URL url = URL.fromURI(p.toUri());
         if(orig != null && !orig.getResource().equals(url)) {
           LOG.warn(
               getResourceDescription(orig.getType()) + 
@@ -618,8 +618,8 @@ public class MRApps extends Apps {
               " This will be an error in Hadoop 2.0");
           continue;
         }
-        localResources.put(linkName, LocalResource.newInstance(ConverterUtils
-          .getYarnUrlFromURI(p.toUri()), type, visibilities[i]
+        localResources.put(linkName, LocalResource
+            .newInstance(URL.fromURI(p.toUri()), type, visibilities[i]
             ? LocalResourceVisibility.PUBLIC : LocalResourceVisibility.PRIVATE,
           sizes[i], timestamps[i]));
       }
@@ -761,5 +761,36 @@ public class MRApps extends Apps {
         conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
             MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM);
     return crossPlatform ? env.$$() : env.$();
+  }
+
+  /**
+   * Return lines for system property keys and values per configuration.
+   *
+   * @return the formatted string for the system property lines or null if no
+   * properties are specified.
+   */
+  public static String getSystemPropertiesToLog(Configuration conf) {
+    String key = conf.get(MRJobConfig.MAPREDUCE_JVM_SYSTEM_PROPERTIES_TO_LOG,
+      MRJobConfig.DEFAULT_MAPREDUCE_JVM_SYSTEM_PROPERTIES_TO_LOG);
+    if (key != null) {
+      key = key.trim(); // trim leading and trailing whitespace from the config
+      if (!key.isEmpty()) {
+        String[] props = key.split(",");
+        if (props.length > 0) {
+          StringBuilder sb = new StringBuilder();
+          sb.append("\n/************************************************************\n");
+          sb.append("[system properties]\n");
+          for (String prop: props) {
+            prop = prop.trim(); // trim leading and trailing whitespace
+            if (!prop.isEmpty()) {
+              sb.append(prop).append(": ").append(System.getProperty(prop)).append('\n');
+            }
+          }
+          sb.append("************************************************************/");
+          return sb.toString();
+        }
+      }
+    }
+    return null;
   }
 }

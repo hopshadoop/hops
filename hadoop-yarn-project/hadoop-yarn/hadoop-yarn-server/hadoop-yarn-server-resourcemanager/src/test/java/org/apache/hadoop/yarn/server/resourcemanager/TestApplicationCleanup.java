@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -30,6 +29,7 @@ import java.util.Map;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
+import java.io.File;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -78,7 +78,7 @@ public class TestApplicationCleanup {
   private YarnConfiguration conf;
   private FileSystem fs;
   private Path tmpDir;
-
+  
   @Before
   public void setup() throws UnknownHostException, IOException {
     Logger rootLogger = LogManager.getRootLogger();
@@ -263,7 +263,8 @@ public class TestApplicationCleanup {
     ArrayList<ContainerStatus> containerStatusList =
         new ArrayList<ContainerStatus>();
     containerStatusList.add(BuilderUtils.newContainerStatus(conts.get(0)
-      .getId(), ContainerState.RUNNING, "nothing", 0));
+      .getId(), ContainerState.RUNNING, "nothing", 0,
+          conts.get(0).getResource()));
     containerStatuses.put(app.getApplicationId(), containerStatusList);
 
     NodeHeartbeatResponse resp = nm1.nodeHeartbeat(containerStatuses, true);
@@ -276,7 +277,8 @@ public class TestApplicationCleanup {
     containerStatuses.clear();
     containerStatusList.clear();
     containerStatusList.add(BuilderUtils.newContainerStatus(conts.get(0)
-      .getId(), ContainerState.RUNNING, "nothing", 0));
+      .getId(), ContainerState.RUNNING, "nothing", 0,
+          conts.get(0).getResource()));
     containerStatuses.put(app.getApplicationId(), containerStatusList);
 
     resp = nm1.nodeHeartbeat(containerStatuses, true);
@@ -338,7 +340,7 @@ public class TestApplicationCleanup {
   }
   
   @SuppressWarnings("resource")
-  @Test (timeout = 60000)
+  @Test (timeout = 6000000)
   public void testAppCleanupWhenRMRestartedAfterAppFinished() throws Exception {
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 1);
 
@@ -413,9 +415,10 @@ public class TestApplicationCleanup {
     // nm1/nm2 register to rm2, and do a heartbeat
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
     nm1.registerNode(Arrays.asList(NMContainerStatus.newInstance(
-      ContainerId.newContainerId(am0.getApplicationAttemptId(), 1),
-      ContainerState.COMPLETE, Resource.newInstance(1024, 1), "", 0,
-      Priority.newInstance(0), 1234)), Arrays.asList(app0.getApplicationId()));
+        ContainerId.newContainerId(am0.getApplicationAttemptId(), 1), 0,
+        ContainerState.COMPLETE, Resource.newInstance(1024, 1), "", 0,
+        Priority.newInstance(0), 1234)),
+        Arrays.asList(app0.getApplicationId()));
     nm2.setResourceTrackerService(rm2.getResourceTrackerService());
     nm2.registerNode(Arrays.asList(app0.getApplicationId()));
 
@@ -483,9 +486,11 @@ public class TestApplicationCleanup {
   @Test (timeout = 60000)
   public void testAppCleanupWhenNMReconnects() throws Exception {
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 1);
+    MemoryRMStateStore memStore = new MemoryRMStateStore();
+    memStore.init(conf);
 
     // start RM
-    MockRM rm1 = new MockRM(conf);
+    MockRM rm1 = new MockRM(conf, memStore);
     rm1.start();
     MockNM nm1 =
         new MockNM("127.0.0.1:1234", 15120, rm1.getResourceTrackerService());
@@ -521,9 +526,11 @@ public class TestApplicationCleanup {
   @Test(timeout = 60000)
   public void testProcessingNMContainerStatusesOnNMRestart() throws Exception {
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 1);
+    MemoryRMStateStore memStore = new MemoryRMStateStore();
+    memStore.init(conf);
 
     // 1. Start the cluster-RM,NM,Submit app with 1024MB,Launch & register AM
-    MockRM rm1 = new MockRM(conf);
+    MockRM rm1 = new MockRM(conf, memStore);
     rm1.start();
     int nmMemory = 8192;
     int amMemory = 1024;
@@ -553,7 +560,7 @@ public class TestApplicationCleanup {
     // 4. Verify Memory Usage by cluster, it should be 3072. AM memory +
     // requested memory. 1024 + 2048=3072
     ResourceScheduler rs = rm1.getRMContext().getScheduler();
-    int allocatedMB = rs.getRootQueueMetrics().getAllocatedMB();
+    long allocatedMB = rs.getRootQueueMetrics().getAllocatedMB();
     Assert.assertEquals(amMemory + containerMemory, allocatedMB);
 
     // 5. Re-register NM by sending completed container status
@@ -617,7 +624,7 @@ public class TestApplicationCleanup {
       int memory) {
     ContainerId containerId = ContainerId.newContainerId(appAttemptId, id);
     NMContainerStatus containerReport =
-        NMContainerStatus.newInstance(containerId, containerState,
+        NMContainerStatus.newInstance(containerId, 0, containerState,
             Resource.newInstance(memory, 1), "recover container", 0,
             Priority.newInstance(0), 0);
     return containerReport;

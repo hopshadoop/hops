@@ -23,12 +23,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.io.Charsets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -203,9 +203,8 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
    * Integer, e.g. 4294967294 maps to -2 and 4294967295 maps to -1.
    */
   private static Integer parseId(final String idStr) {
-    Long longVal = Long.parseLong(idStr);
-    int intVal = longVal.intValue();
-    return Integer.valueOf(intVal);
+    long longVal = Long.parseLong(idStr);
+    return Integer.valueOf((int)longVal);
   }
   
   /**
@@ -583,7 +582,7 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
     Map<Integer, Integer> gidMapping = new HashMap<Integer, Integer>();
     
     BufferedReader in = new BufferedReader(new InputStreamReader(
-        new FileInputStream(staticMapFile), Charsets.UTF_8));
+        new FileInputStream(staticMapFile), StandardCharsets.UTF_8));
     
     try {
       String line = null;
@@ -605,8 +604,8 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
         // We know the line is fine to parse without error checking like this
         // since it matched the regex above.
         String firstComponent = lineMatcher.group(1);
-        int remoteId = parseId(lineMatcher.group(2));
-        int localId = parseId(lineMatcher.group(3));
+        Integer remoteId = parseId(lineMatcher.group(2));
+        Integer localId = parseId(lineMatcher.group(3));
         if (firstComponent.equals("uid")) {
           uidMapping.put(localId, remoteId);
         } else {

@@ -87,7 +87,7 @@ public class MetricsAsserts {
    * Call getMetrics on source and get a record builder mock to verify
    * @param source  the metrics source
    * @param all     if true, return all metrics even if not changed
-   * @return the record builder mock to verify
+   * @return the record builder mock to verifyÏ
    */
   public static MetricsRecordBuilder getMetrics(MetricsSource source,
                                                 boolean all) {
@@ -232,6 +232,13 @@ public class MetricsAsserts {
   public static long getLongCounter(String name, MetricsRecordBuilder rb) {
     ArgumentCaptor<Long> captor = ArgumentCaptor.forClass(Long.class);
     verify(rb, atLeast(0)).addCounter(eqName(info(name, "")), captor.capture());
+    checkCaptured(captor, name);
+    return captor.getValue();
+  }
+
+  public static String getStringMetric(String name, MetricsRecordBuilder rb) {
+    ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+    verify(rb, atLeast(0)).tag(eqName(info(name, "")), captor.capture());
     checkCaptured(captor, name);
     return captor.getValue();
   }

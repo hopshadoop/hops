@@ -17,16 +17,17 @@
  */
 package org.apache.hadoop.yarn.client;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.Service.STATE;
+import org.apache.hadoop.yarn.api.records.DecommissionType;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
@@ -77,7 +78,6 @@ public class TestResourceManagerAdministrationProtocolPBClientImpl {
     RMStorageFactory.setConfiguration(configuration);
     YarnAPIStorageFactory.setConfiguration(configuration);
     DBUtility.InitializeDB();
-
     resourceManager = new ResourceManager() {
       @Override
       protected void doSecureLogin() throws IOException {
@@ -126,8 +126,8 @@ public class TestResourceManagerAdministrationProtocolPBClientImpl {
   @Test
   public void testRefreshNodes() throws Exception {
     resourceManager.getClientRMService();
-    RefreshNodesRequest request = recordFactory
-            .newRecordInstance(RefreshNodesRequest.class);
+    RefreshNodesRequest request = RefreshNodesRequest
+        .newInstance(DecommissionType.NORMAL);
     RefreshNodesResponse response = client.refreshNodes(request);
     assertNotNull(response);
   }

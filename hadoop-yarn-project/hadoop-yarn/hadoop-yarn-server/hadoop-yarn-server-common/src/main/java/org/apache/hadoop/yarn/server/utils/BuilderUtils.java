@@ -56,15 +56,17 @@ import org.apache.hadoop.yarn.api.records.PreemptionMessage;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.ResourceUtilization;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.yarn.server.api.ContainerType;
 
 /**
  * Builder utilities to construct various objects.
@@ -111,7 +113,7 @@ public class BuilderUtils {
   public static LocalResource newLocalResource(URI uri,
       LocalResourceType type, LocalResourceVisibility visibility, long size,
       long timestamp, boolean shouldBeUploadedToSharedCache) {
-    return newLocalResource(ConverterUtils.getYarnUrlFromURI(uri), type,
+    return newLocalResource(URL.fromURI(uri), type,
         visibility, size, timestamp, shouldBeUploadedToSharedCache);
   }
 
@@ -154,12 +156,14 @@ public class BuilderUtils {
     return cId;
   }
 
-  public static Token newContainerToken(ContainerId cId, String host,
-      int port, String user, Resource r, long expiryTime, int masterKeyId,
-      byte[] password, long rmIdentifier) throws IOException {
+  public static Token newContainerToken(ContainerId cId, int containerVersion,
+      String host, int port, String user, Resource r, long expiryTime,
+      int masterKeyId, byte[] password, long rmIdentifier) throws IOException {
     ContainerTokenIdentifier identifier =
-        new ContainerTokenIdentifier(cId, host + ":" + port, user, r,
-          expiryTime, masterKeyId, rmIdentifier, Priority.newInstance(0), 0);
+        new ContainerTokenIdentifier(cId, containerVersion, host + ":" + port,
+            user, r, expiryTime, masterKeyId, rmIdentifier,
+            Priority.newInstance(0), 0, null, CommonNodeLabelsManager.NO_LABEL,
+            ContainerType.TASK);
     return newContainerToken(BuilderUtils.newNodeId(host, port), password,
         identifier);
   }
@@ -180,11 +184,21 @@ public class BuilderUtils {
     return newNodeReport(nodeId, nodeState, httpAddress, rackName, used,
         capability, numContainers, healthReport, lastHealthReportTime, null);
   }
-  
+
   public static NodeReport newNodeReport(NodeId nodeId, NodeState nodeState,
       String httpAddress, String rackName, Resource used, Resource capability,
       int numContainers, String healthReport, long lastHealthReportTime,
       Set<String> nodeLabels) {
+    return newNodeReport(nodeId, nodeState, httpAddress, rackName, used,
+        capability, numContainers, healthReport, lastHealthReportTime,
+        nodeLabels, null, null);
+  }
+
+  public static NodeReport newNodeReport(NodeId nodeId, NodeState nodeState,
+      String httpAddress, String rackName, Resource used, Resource capability,
+      int numContainers, String healthReport, long lastHealthReportTime,
+      Set<String> nodeLabels, ResourceUtilization containersUtilization,
+      ResourceUtilization nodeUtilization) {
     NodeReport nodeReport = recordFactory.newRecordInstance(NodeReport.class);
     nodeReport.setNodeId(nodeId);
     nodeReport.setNodeState(nodeState);
@@ -196,17 +210,21 @@ public class BuilderUtils {
     nodeReport.setHealthReport(healthReport);
     nodeReport.setLastHealthReportTime(lastHealthReportTime);
     nodeReport.setNodeLabels(nodeLabels);
+    nodeReport.setAggregatedContainersUtilization(containersUtilization);
+    nodeReport.setNodeUtilization(nodeUtilization);
     return nodeReport;
   }
 
   public static ContainerStatus newContainerStatus(ContainerId containerId,
-      ContainerState containerState, String diagnostics, int exitStatus) {
+      ContainerState containerState, String diagnostics, int exitStatus,
+      Resource capability) {
     ContainerStatus containerStatus = recordFactory
       .newRecordInstance(ContainerStatus.class);
     containerStatus.setState(containerState);
     containerStatus.setContainerId(containerId);
     containerStatus.setDiagnostics(diagnostics);
     containerStatus.setExitStatus(exitStatus);
+    containerStatus.setCapability(capability);
     return containerStatus;
   }
 
@@ -306,6 +324,18 @@ public class BuilderUtils {
     return request;
   }
 
+  public static ResourceRequest newResourceRequest(Priority priority,
+      String hostName, Resource capability, int numContainers, String label) {
+    ResourceRequest request =
+        recordFactory.newRecordInstance(ResourceRequest.class);
+    request.setPriority(priority);
+    request.setResourceName(hostName);
+    request.setCapability(capability);
+    request.setNumContainers(numContainers);
+    request.setNodeLabelExpression(label);
+    return request;
+  }
+
   public static ResourceRequest newResourceRequest(ResourceRequest r) {
     ResourceRequest request = recordFactory
         .newRecordInstance(ResourceRequest.class);
@@ -313,6 +343,7 @@ public class BuilderUtils {
     request.setResourceName(r.getResourceName());
     request.setCapability(r.getCapability());
     request.setNumContainers(r.getNumContainers());
+    request.setNodeLabelExpression(r.getNodeLabelExpression());
     return request;
   }
 
@@ -323,7 +354,8 @@ public class BuilderUtils {
       String url, long startTime, long finishTime,
       FinalApplicationStatus finalStatus,
       ApplicationResourceUsageReport appResources, String origTrackingUrl,
-      float progress, String appType, Token amRmToken, Set<String> tags) {
+      float progress, String appType, Token amRmToken, Set<String> tags,
+      Priority priority) {
     ApplicationReport report = recordFactory
         .newRecordInstance(ApplicationReport.class);
     report.setApplicationId(applicationId);
@@ -346,6 +378,7 @@ public class BuilderUtils {
     report.setApplicationType(appType);
     report.setAMRMToken(amRmToken);
     report.setApplicationTags(tags);
+    report.setPriority(priority);
     return report;
   }
   
@@ -382,7 +415,8 @@ public class BuilderUtils {
   public static ApplicationResourceUsageReport newApplicationResourceUsageReport(
       int numUsedContainers, int numReservedContainers, Resource usedResources,
       Resource reservedResources, Resource neededResources, long memorySeconds, 
-      long vcoreSeconds, long gpuSeconds) {
+      long vcoreSeconds, long gpuSeconds, long preemptedMemorySeconds,
+      long preemptedVcoreSeconds, long preemptedGPUSeconds) {
     ApplicationResourceUsageReport report =
         recordFactory.newRecordInstance(ApplicationResourceUsageReport.class);
     report.setNumUsedContainers(numUsedContainers);
@@ -393,20 +427,23 @@ public class BuilderUtils {
     report.setMemorySeconds(memorySeconds);
     report.setVcoreSeconds(vcoreSeconds);
     report.setGPUSeconds(gpuSeconds);
+    report.setPreemptedMemorySeconds(preemptedMemorySeconds);
+    report.setPreemptedVcoreSeconds(preemptedVcoreSeconds);
+	report.setPreemptedGPUSeconds(preemptedGPUSeconds);
     return report;
   }
 
-  public static Resource newResource(int memory, int vCores) {
+  public static Resource newResource(long memory, int vCores) {
     Resource resource = recordFactory.newRecordInstance(Resource.class);
-    resource.setMemory(memory);
+    resource.setMemorySize(memory);
     resource.setVirtualCores(vCores);
     resource.setGPUs(0);
     return resource;
   }
   
-  public static Resource newResource(int memory, int vCores, int gpus) {
+  public static Resource newResource(long memory, int vCores, int gpus) {
     Resource resource = recordFactory.newRecordInstance(Resource.class);
-    resource.setMemory(memory);
+    resource.setMemorySize(memory);
     resource.setVirtualCores(vCores);
     resource.setGPUs(gpus);
     return resource;

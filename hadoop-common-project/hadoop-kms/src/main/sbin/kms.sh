@@ -26,6 +26,14 @@ while [ -h "${PRG}" ]; do
   fi
 done
 
+function hadoop_escape() {
+      # Escape special chars for the later sed which saves the text as xml attribute
+      local ret
+      ret=$(sed 's/[\/&]/\\&/g' <<< "$1" | sed 's/&/\&amp;/g' | sed 's/"/\\\&quot;/g' \
+          | sed "s/'/\\\\\&apos;/g" | sed 's/</\\\&lt;/g' | sed 's/>/\\\&gt;/g')
+      echo "$ret"
+}
+
 BASEDIR=`dirname ${PRG}`
 BASEDIR=`cd ${BASEDIR}/..;pwd`
 
@@ -50,13 +58,15 @@ KMS_SSL_TRUSTSTORE_PASS=`echo $CATALINA_OPTS | grep -o 'trustStorePassword=[^ ]*
 CATALINA_OPTS_DISP=`echo ${CATALINA_OPTS} | sed -e 's/trustStorePassword=[^ ]*/trustStorePassword=***/'`
 print "Using   CATALINA_OPTS:       ${CATALINA_OPTS_DISP}"
 
-catalina_opts="-Dkms.home.dir=${KMS_HOME}";
+catalina_opts="-Dproc_kms"
+catalina_opts="${catalina_opts} -Dkms.home.dir=${KMS_HOME}";
 catalina_opts="${catalina_opts} -Dkms.config.dir=${KMS_CONFIG}";
 catalina_opts="${catalina_opts} -Dkms.log.dir=${KMS_LOG}";
 catalina_opts="${catalina_opts} -Dkms.temp.dir=${KMS_TEMP}";
 catalina_opts="${catalina_opts} -Dkms.admin.port=${KMS_ADMIN_PORT}";
 catalina_opts="${catalina_opts} -Dkms.http.port=${KMS_HTTP_PORT}";
 catalina_opts="${catalina_opts} -Dkms.max.threads=${KMS_MAX_THREADS}";
+catalina_opts="${catalina_opts} -Dkms.max.http.header.size=${KMS_MAX_HTTP_HEADER_SIZE}";
 catalina_opts="${catalina_opts} -Dkms.ssl.keystore.file=${KMS_SSL_KEYSTORE_FILE}";
 catalina_opts="${catalina_opts} -Djava.library.path=${JAVA_LIBRARY_PATH}";
 
@@ -75,9 +85,11 @@ fi
 if [ ! "${KMS_SSL_KEYSTORE_PASS}" = "" ] || [ ! "${KMS_SSL_TRUSTSTORE_PASS}" = "" ]; then
   # Set a KEYSTORE_PASS if not already set
   KMS_SSL_KEYSTORE_PASS=${KMS_SSL_KEYSTORE_PASS:-password}
+  KMS_SSL_KEYSTORE_PASS_ESCAPED=$(hadoop_escape "$KMS_SSL_KEYSTORE_PASS")
+  KMS_SSL_TRUSTSTORE_PASS_ESCAPED=$(hadoop_escape "$KMS_SSL_TRUSTSTORE_PASS")
   cat ${CATALINA_BASE}/conf/ssl-server.xml.conf \
-    | sed 's/_kms_ssl_keystore_pass_/'${KMS_SSL_KEYSTORE_PASS}'/g' \
-    | sed 's/_kms_ssl_truststore_pass_/'${KMS_SSL_TRUSTSTORE_PASS}'/g' > ${CATALINA_BASE}/conf/ssl-server.xml
+    | sed 's/"_kms_ssl_keystore_pass_"/'"\"${KMS_SSL_KEYSTORE_PASS_ESCAPED}\""'/g' \
+    | sed 's/"_kms_ssl_truststore_pass_"/'"\"${KMS_SSL_TRUSTSTORE_PASS_ESCAPED}\""'/g' > ${CATALINA_BASE}/conf/ssl-server.xml
 fi 
 
 exec ${KMS_CATALINA_HOME}/bin/catalina.sh "$@"

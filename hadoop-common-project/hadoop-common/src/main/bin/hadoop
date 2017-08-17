@@ -40,8 +40,8 @@ function print_usage(){
   echo "  distcp <srcurl> <desturl> copy file or directories recursively"
   echo "  archive -archiveName NAME -p <parent path> <src>* <dest> create a hadoop archive"
   echo "  classpath            prints the class path needed to get the"
-  echo "  credential           interact with credential providers"
   echo "                       Hadoop jar and the required libraries"
+  echo "  credential           interact with credential providers"
   echo "  daemonlog            get/set the log level for each daemon"
   echo "  trace                view and modify Hadoop tracing settings"
   echo ""
@@ -128,7 +128,7 @@ case $COMMAND in
         CLASS=org.apache.hadoop.util.Classpath
       else
         # No need to bother starting up a JVM for this simple case.
-        if $cygwin; then
+        if [ "$cygwin" = true ]; then
           CLASSPATH=$(cygpath -p -w "$CLASSPATH" 2>/dev/null)
         fi
         echo $CLASSPATH
@@ -143,7 +143,7 @@ case $COMMAND in
     fi
 
     # cygwin path translation
-    if $cygwin; then
+    if [ "$cygwin" = true ]; then
       CLASSPATH=$(cygpath -p -w "$CLASSPATH" 2>/dev/null)
       HADOOP_LOG_DIR=$(cygpath -w "$HADOOP_LOG_DIR" 2>/dev/null)
       HADOOP_PREFIX=$(cygpath -w "$HADOOP_PREFIX" 2>/dev/null)

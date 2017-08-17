@@ -33,6 +33,8 @@ import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMDelegatedNodeLabelsUpdater;
+import org.apache.hadoop.yarn.server.resourcemanager.placement.PlacementManager;
 import org.apache.hadoop.yarn.server.resourcemanager.quota.ContainersLogsService;
 import org.apache.hadoop.yarn.server.resourcemanager.quota.QuotaService;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.NullRMStateStore;
@@ -70,8 +72,8 @@ public class RMActiveServiceContext {
   private final ConcurrentMap<NodeId, RMNode> nodes =
       new ConcurrentHashMap<NodeId, RMNode>();
 
-  private final ConcurrentMap<String, RMNode> inactiveNodes =
-      new ConcurrentHashMap<String, RMNode>();
+  private final ConcurrentMap<NodeId, RMNode> inactiveNodes =
+      new ConcurrentHashMap<NodeId, RMNode>();
 
   private final ConcurrentMap<ApplicationId, ByteBuffer> systemCredentials =
       new ConcurrentHashMap<ApplicationId, ByteBuffer>();
@@ -97,15 +99,17 @@ public class RMActiveServiceContext {
   private ResourceTrackerService resourceTrackerService;
   private ApplicationMasterService applicationMasterService;
   private RMNodeLabelsManager nodeLabelManager;
+  private RMDelegatedNodeLabelsUpdater rmDelegatedNodeLabelsUpdater;
   private long epoch;
   private Clock systemClock = new SystemClock();
   private long schedulerRecoveryStartTime = 0;
   private long schedulerRecoveryWaitTime = 0;
   private boolean printLog = true;
   private boolean isSchedulerReady = false;
+  private PlacementManager queuePlacementManager = null;
 
   public RMActiveServiceContext() {
-
+    queuePlacementManager = new PlacementManager();
   }
 
   @Private
@@ -185,7 +189,7 @@ public class RMActiveServiceContext {
 
   @Private
   @Unstable
-  public ConcurrentMap<String, RMNode> getInactiveRMNodes() {
+  public ConcurrentMap<NodeId, RMNode> getInactiveRMNodes() {
     return this.inactiveNodes;
   }
 
@@ -418,6 +422,19 @@ public class RMActiveServiceContext {
 
   @Private
   @Unstable
+  public RMDelegatedNodeLabelsUpdater getRMDelegatedNodeLabelsUpdater() {
+    return rmDelegatedNodeLabelsUpdater;
+  }
+
+  @Private
+  @Unstable
+  public void setRMDelegatedNodeLabelsUpdater(
+      RMDelegatedNodeLabelsUpdater nodeLablesUpdater) {
+    rmDelegatedNodeLabelsUpdater = nodeLablesUpdater;
+  }
+
+  @Private
+  @Unstable
   public void setSchedulerRecoveryStartAndWaitTime(long waitTime) {
     this.schedulerRecoveryStartTime = systemClock.getTime();
     this.schedulerRecoveryWaitTime = waitTime;
@@ -451,5 +468,17 @@ public class RMActiveServiceContext {
   @Unstable
   public ConcurrentMap<ApplicationId, ByteBuffer> getSystemCredentialsForApps() {
     return systemCredentials;
+  }
+  
+  @Private
+  @Unstable
+  public PlacementManager getQueuePlacementManager() {
+    return queuePlacementManager;
+  }
+  
+  @Private
+  @Unstable
+  public void setQueuePlacementManager(PlacementManager placementMgr) {
+    this.queuePlacementManager = placementMgr;
   }
 }

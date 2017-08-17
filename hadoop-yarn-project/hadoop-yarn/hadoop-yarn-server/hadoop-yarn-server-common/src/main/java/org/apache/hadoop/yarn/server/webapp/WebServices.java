@@ -29,6 +29,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.WebApplicationException;
 
+import org.apache.commons.lang.math.LongRange;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.util.StringUtils;
@@ -75,7 +76,6 @@ public class WebServices {
       String startedEnd, String finishBegin, String finishEnd,
       Set<String> applicationTypes) {
     UserGroupInformation callerUGI = getUser(req);
-    boolean checkStart = false;
     boolean checkEnd = false;
     boolean checkAppTypes = false;
     boolean checkAppStates = false;
@@ -95,14 +95,12 @@ public class WebServices {
     }
 
     if (startedBegin != null && !startedBegin.isEmpty()) {
-      checkStart = true;
       sBegin = Long.parseLong(startedBegin);
       if (sBegin < 0) {
         throw new BadRequestException("startedTimeBegin must be greater than 0");
       }
     }
     if (startedEnd != null && !startedEnd.isEmpty()) {
-      checkStart = true;
       sEnd = Long.parseLong(startedEnd);
       if (sEnd < 0) {
         throw new BadRequestException("startedTimeEnd must be greater than 0");
@@ -151,6 +149,7 @@ public class WebServices {
     final GetApplicationsRequest request =
         GetApplicationsRequest.newInstance();
     request.setLimit(countNum);
+    request.setStartRange(new LongRange(sBegin, sEnd));
     try {
       if (callerUGI == null) {
         // TODO: the request should take the params like what RMWebServices does
@@ -167,6 +166,9 @@ public class WebServices {
       }
     } catch (Exception e) {
       rewrapAndThrowException(e);
+    }
+    if (appReports == null) {
+      return allApps;
     }
     for (ApplicationReport appReport : appReports) {
 
@@ -198,10 +200,6 @@ public class WebServices {
         continue;
       }
 
-      if (checkStart
-          && (appReport.getStartTime() < sBegin || appReport.getStartTime() > sEnd)) {
-        continue;
-      }
       if (checkEnd
           && (appReport.getFinishTime() < fBegin || appReport.getFinishTime() > fEnd)) {
         continue;
@@ -271,6 +269,9 @@ public class WebServices {
       rewrapAndThrowException(e);
     }
     AppAttemptsInfo appAttemptsInfo = new AppAttemptsInfo();
+    if (appAttemptReports == null) {
+      return appAttemptsInfo;
+    }
     for (ApplicationAttemptReport appAttemptReport : appAttemptReports) {
       AppAttemptInfo appAttemptInfo = new AppAttemptInfo(appAttemptReport);
       appAttemptsInfo.add(appAttemptInfo);
@@ -341,6 +342,9 @@ public class WebServices {
       rewrapAndThrowException(e);
     }
     ContainersInfo containersInfo = new ContainersInfo();
+    if (containerReports == null) {
+      return containersInfo;
+    }
     for (ContainerReport containerReport : containerReports) {
       ContainerInfo containerInfo = new ContainerInfo(containerReport);
       containersInfo.add(containerInfo);
@@ -425,7 +429,12 @@ public class WebServices {
     if (appId == null || appId.isEmpty()) {
       throw new NotFoundException("appId, " + appId + ", is empty or null");
     }
-    ApplicationId aid = ConverterUtils.toApplicationId(appId);
+    ApplicationId aid = null;
+    try {
+      aid = ApplicationId.fromString(appId);
+    } catch (Exception e) {
+      throw new BadRequestException(e);
+    }
     if (aid == null) {
       throw new NotFoundException("appId is null");
     }
@@ -438,8 +447,12 @@ public class WebServices {
       throw new NotFoundException("appAttemptId, " + appAttemptId
           + ", is empty or null");
     }
-    ApplicationAttemptId aaid =
-        ConverterUtils.toApplicationAttemptId(appAttemptId);
+    ApplicationAttemptId aaid = null;
+    try {
+      aaid = ApplicationAttemptId.fromString(appAttemptId);
+    } catch (Exception e) {
+      throw new BadRequestException(e);
+    }
     if (aaid == null) {
       throw new NotFoundException("appAttemptId is null");
     }
@@ -451,7 +464,12 @@ public class WebServices {
       throw new NotFoundException("containerId, " + containerId
           + ", is empty or null");
     }
-    ContainerId cid = ConverterUtils.toContainerId(containerId);
+    ContainerId cid = null;
+    try {
+      cid = ContainerId.fromString(containerId);
+    } catch (Exception e) {
+      throw new BadRequestException(e);
+    }
     if (cid == null) {
       throw new NotFoundException("containerId is null");
     }

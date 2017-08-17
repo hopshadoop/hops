@@ -15,6 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/* FreeBSD protects the getline() prototype. See getline(3) for more */
+#ifdef __FreeBSD__
+#define _WITH_GETLINE
+#endif
+
 #include <pwd.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -25,6 +31,7 @@ enum command {
   LAUNCH_CONTAINER = 1,
   SIGNAL_CONTAINER = 2,
   DELETE_AS_USER = 3,
+  LAUNCH_DOCKER_CONTAINER = 4
 };
 
 enum errorcodes {
@@ -54,7 +61,28 @@ enum errorcodes {
   INVALID_CONFIG_FILE =  24,
   SETSID_OPER_FAILED = 25,
   WRITE_PIDFILE_FAILED = 26,
-  WRITE_CGROUP_FAILED = 27
+  WRITE_CGROUP_FAILED = 27,
+  TRAFFIC_CONTROL_EXECUTION_FAILED = 28,
+  DOCKER_RUN_FAILED=29,
+  ERROR_OPENING_FILE = 30,
+  ERROR_READING_FILE = 31,
+  FEATURE_DISABLED = 32,
+  ERROR_SANITIZING_DOCKER_COMMAND = 33
+};
+
+enum operations {
+  CHECK_SETUP = 1,
+  MOUNT_CGROUPS = 2,
+  TRAFFIC_CONTROL_MODIFY_STATE = 3,
+  TRAFFIC_CONTROL_READ_STATE = 4,
+  TRAFFIC_CONTROL_READ_STATS = 5,
+  RUN_AS_USER_INITIALIZE_CONTAINER = 6,
+  RUN_AS_USER_LAUNCH_CONTAINER = 7,
+  RUN_AS_USER_SIGNAL_CONTAINER = 8,
+  RUN_AS_USER_DELETE = 9,
+  RUN_AS_USER_LAUNCH_DOCKER_CONTAINER = 10,
+  RUN_DOCKER = 11,
+  WRITE_DEVICES = 12
 };
 
 #define NM_GROUP_KEY "yarn.nodemanager.linux-container-executor.group"
@@ -66,6 +94,9 @@ enum errorcodes {
 #define MIN_USERID_KEY "min.user.id"
 #define BANNED_USERS_KEY "banned.users"
 #define ALLOWED_SYSTEM_USERS_KEY "allowed.system.users"
+#define DOCKER_BINARY_KEY "docker.binary"
+#define DOCKER_SUPPORT_ENABLED_KEY "feature.docker.enabled"
+#define TC_SUPPORT_ENABLED_KEY "feature.tc.enabled"
 #define TMP_DIR "tmp"
 
 extern struct passwd *user_detail;
@@ -75,9 +106,14 @@ extern FILE *LOGFILE;
 // the log file for error messages
 extern FILE *ERRORFILE;
 
-
 // get the executable's filename
-char* get_executable();
+char* get_executable(char *argv0);
+
+//function used to load the configurations present in the secure config
+void read_executor_config(const char* file_name);
+
+//Lookup nodemanager group from container executor configuration.
+char *get_nodemanager_group();
 
 /**
  * Check the permissions on the container-executor to make sure that security is
@@ -91,10 +127,24 @@ char* get_executable();
  */
 int check_executor_permissions(char *executable_file);
 
+//function used to load the configurations present in the secure config.
+void read_executor_config(const char* file_name);
+
+//function used to free executor configuration data
+void free_executor_configurations();
+
 // initialize the application directory
 int initialize_app(const char *user, const char *app_id,
                    const char *credentials, char* const* local_dirs,
                    char* const* log_dirs, char* const* args);
+
+int launch_docker_container_as_user(const char * user, const char *app_id,
+                              const char *container_id, const char *work_dir,
+                              const char *script_name, const char *cred_file,
+                              const char *pid_file, char* const* local_dirs,
+                              char* const* log_dirs,
+                              const char *command_file,const char *resources_key,
+                              char* const* resources_values);
 
 /*
  * Function used to launch a container as the provided user. It does the following :
@@ -138,7 +188,7 @@ int signal_container_as_user(const char *user, int pid, int sig);
 // delete a directory (or file) recursively as the user. The directory
 // could optionally be relative to the baseDir set of directories (if the same
 // directory appears on multiple disk volumes, the disk volumes should be passed
-// as the baseDirs). If baseDirs is not specified, then dir_to_be_deleted is 
+// as the baseDirs). If baseDirs is not specified, then dir_to_be_deleted is
 // assumed as the absolute path
 int delete_as_user(const char *user,
                    const char *dir_to_be_deleted,
@@ -204,10 +254,46 @@ int change_user(uid_t user, gid_t group);
 
 int mount_cgroup(const char *pair, const char *hierarchy);
 
-int write_device_entry_to_cgroup_devices(const char *path, const char *value);
+int write_device_entry_to_cgroup_devices(const char *value, const char *path);
 
-int check_dir(char* npath, mode_t st_mode, mode_t desired,
+int check_dir(const char* npath, mode_t st_mode, mode_t desired,
    int finalComponent);
 
-int create_validate_dir(char* npath, mode_t perm, char* path,
+int create_validate_dir(const char* npath, mode_t perm, const char* path,
    int finalComponent);
+
+/** Check if tc (traffic control) support is enabled in configuration. */
+int is_tc_support_enabled();
+
+/** Check if docker support is enabled in configuration. */
+int is_docker_support_enabled();
+
+/**
+ * Run a batch of tc commands that modify interface configuration
+ */
+int traffic_control_modify_state(char *command_file);
+
+/**
+ * Run a batch of tc commands that read interface configuration. Output is
+ * written to standard output and it is expected to be read and parsed by the
+ * calling process.
+ */
+int traffic_control_read_state(char *command_file);
+
+/**
+ * Run a batch of tc commands that read interface stats. Output is
+ * written to standard output and it is expected to be read and parsed by the
+ * calling process.
+ */
+int traffic_control_read_stats(char *command_file);
+
+
+/**
+ * Run a docker command passing the command file as an argument
+ */
+int run_docker(const char *command_file);
+
+/**
+ * Sanitize docker commands. Returns NULL if there was any failure.
+*/
+char* sanitize_docker_command(const char *line);

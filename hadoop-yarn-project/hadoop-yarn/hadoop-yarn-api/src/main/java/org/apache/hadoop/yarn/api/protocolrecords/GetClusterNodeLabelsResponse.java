@@ -18,27 +18,60 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
+import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.util.Records;
 
 @Public
 @Evolving
 public abstract class GetClusterNodeLabelsResponse {
+  /**
+   * Creates a new instance.
+   *
+   * @param labels Node labels
+   * @return response
+   * @deprecated Use {@link #newInstance(List)} instead.
+   */
+  @Deprecated
   public static GetClusterNodeLabelsResponse newInstance(Set<String> labels) {
-    GetClusterNodeLabelsResponse request =
-        Records.newRecord(GetClusterNodeLabelsResponse.class);
-    request.setNodeLabels(labels);
-    return request;
+    List<NodeLabel> list = new ArrayList<>();
+    for (String label : labels) {
+      list.add(NodeLabel.newInstance(label));
+    }
+    return newInstance(list);
   }
 
-  @Public
-  @Evolving
+  public static GetClusterNodeLabelsResponse newInstance(List<NodeLabel> labels) {
+    GetClusterNodeLabelsResponse response =
+        Records.newRecord(GetClusterNodeLabelsResponse.class);
+    response.setNodeLabelList(labels);
+    return response;
+  }
+
+  public abstract void setNodeLabelList(List<NodeLabel> labels);
+
+  public abstract List<NodeLabel> getNodeLabelList();
+
+  /**
+   * Set node labels to the response.
+   *
+   * @param labels Node labels
+   * @deprecated Use {@link #setNodeLabelList(List)} instead.
+   */
+  @Deprecated
   public abstract void setNodeLabels(Set<String> labels);
 
-  @Public
-  @Evolving
+  /**
+   * Get node labels of the response.
+   *
+   * @return Node labels
+   * @deprecated Use {@link #getNodeLabelList()} instead.
+   */
+  @Deprecated
   public abstract Set<String> getNodeLabels();
 }

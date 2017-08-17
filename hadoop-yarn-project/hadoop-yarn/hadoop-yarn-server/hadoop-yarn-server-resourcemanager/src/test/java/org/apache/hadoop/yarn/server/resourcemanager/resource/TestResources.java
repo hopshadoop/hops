@@ -22,7 +22,7 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 public class TestResources {
-  @Test(timeout=1000)
+  @Test(timeout=10000)
   public void testFitsIn() {
     assertTrue(fitsIn(createResource(1, 1, 1), createResource(2, 2, 2)));
     assertTrue(fitsIn(createResource(2, 2, 2), createResource(2, 2, 2)));
@@ -34,7 +34,7 @@ public class TestResources {
     assertFalse(fitsIn(createResource(1, 1, 1), createResource(1, 1, 0)));
   }
   
-  @Test(timeout=1000)
+  @Test(timeout=10000)
   public void testComponentwiseMin() {
     assertEquals(createResource(1, 1, 1),
         componentwiseMin(createResource(1, 1, 1), createResource(2, 2, 2)));

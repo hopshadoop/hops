@@ -21,19 +21,15 @@ package org.apache.hadoop.yarn.server.resourcemanager.reservation;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
-import java.util.Set;
-import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.hadoop.yarn.api.records.ReservationRequest;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.util.Records;
+import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.PlanningException;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
@@ -41,14 +37,14 @@ import com.google.gson.stream.JsonWriter;
 
 /**
  * This is a run length encoded sparse data structure that maintains resource
- * allocations over time
+ * allocations over time.
  */
 public class RLESparseResourceAllocation {
 
   private static final int THRESHOLD = 100;
-  private static final Resource ZERO_RESOURCE = Resource.newInstance(0, 0);
+  private static final Resource ZERO_RESOURCE = Resources.none();
 
-  private TreeMap<Long, Resource> cumulativeCapacity =
+  private NavigableMap<Long, Resource> cumulativeCapacity =
       new TreeMap<Long, Resource>();
 
   private final ReentrantReadWriteLock readWriteLock =
@@ -57,84 +53,42 @@ public class RLESparseResourceAllocation {
   private final Lock writeLock = readWriteLock.writeLock();
 
   private final ResourceCalculator resourceCalculator;
-  private final Resource minAlloc;
 
-  public RLESparseResourceAllocation(ResourceCalculator resourceCalculator,
-      Resource minAlloc) {
+  public RLESparseResourceAllocation(ResourceCalculator resourceCalculator) {
     this.resourceCalculator = resourceCalculator;
-    this.minAlloc = minAlloc;
   }
 
-  private boolean isSameAsPrevious(Long key, Resource capacity) {
-    Entry<Long, Resource> previous = cumulativeCapacity.lowerEntry(key);
-    return (previous != null && previous.getValue().equals(capacity));
-  }
-
-  private boolean isSameAsNext(Long key, Resource capacity) {
-    Entry<Long, Resource> next = cumulativeCapacity.higherEntry(key);
-    return (next != null && next.getValue().equals(capacity));
+  public RLESparseResourceAllocation(NavigableMap<Long, Resource> out,
+      ResourceCalculator resourceCalculator) {
+    // miss check for repeated entries
+    this.cumulativeCapacity = out;
+    this.resourceCalculator = resourceCalculator;
   }
 
   /**
-   * Add a resource for the specified interval
-   * 
+   * Add a resource for the specified interval.
+   *
    * @param reservationInterval the interval for which the resource is to be
    *          added
-   * @param capacity the resource to be added
+   * @param totCap the resource to be added
    * @return true if addition is successful, false otherwise
    */
   public boolean addInterval(ReservationInterval reservationInterval,
-      ReservationRequest capacity) {
-    Resource totCap =
-        Resources.multiply(capacity.getCapability(),
-            (float) capacity.getNumContainers());
+      Resource totCap) {
     if (totCap.equals(ZERO_RESOURCE)) {
       return true;
     }
     writeLock.lock();
     try {
-      long startKey = reservationInterval.getStartTime();
-      long endKey = reservationInterval.getEndTime();
-      NavigableMap<Long, Resource> ticks =
-          cumulativeCapacity.headMap(endKey, false);
-      if (ticks != null && !ticks.isEmpty()) {
-        Resource updatedCapacity = Resource.newInstance(0, 0);
-        Entry<Long, Resource> lowEntry = ticks.floorEntry(startKey);
-        if (lowEntry == null) {
-          // This is the earliest starting interval
-          cumulativeCapacity.put(startKey, totCap);
-        } else {
-          updatedCapacity = Resources.add(lowEntry.getValue(), totCap);
-          // Add a new tick only if the updated value is different
-          // from the previous tick
-          if ((startKey == lowEntry.getKey())
-              && (isSameAsPrevious(lowEntry.getKey(), updatedCapacity))) {
-            cumulativeCapacity.remove(lowEntry.getKey());
-          } else {
-            cumulativeCapacity.put(startKey, updatedCapacity);
-          }
-        }
-        // Increase all the capacities of overlapping intervals
-        Set<Entry<Long, Resource>> overlapSet =
-            ticks.tailMap(startKey, false).entrySet();
-        for (Entry<Long, Resource> entry : overlapSet) {
-          updatedCapacity = Resources.add(entry.getValue(), totCap);
-          entry.setValue(updatedCapacity);
-        }
-      } else {
-        // This is the first interval to be added
-        cumulativeCapacity.put(startKey, totCap);
-      }
-      Resource nextTick = cumulativeCapacity.get(endKey);
-      if (nextTick != null) {
-        // If there is overlap, remove the duplicate entry
-        if (isSameAsPrevious(endKey, nextTick)) {
-          cumulativeCapacity.remove(endKey);
-        }
-      } else {
-        // Decrease capacity as this is end of the interval
-        cumulativeCapacity.put(endKey, Resources.subtract(cumulativeCapacity
-            .floorEntry(endKey).getValue(), totCap));
+      NavigableMap<Long, Resource> addInt = new TreeMap<Long, Resource>();
+      addInt.put(reservationInterval.getStartTime(), totCap);
+      addInt.put(reservationInterval.getEndTime(), ZERO_RESOURCE);
+      try {
+        cumulativeCapacity =
+            merge(resourceCalculator, totCap, cumulativeCapacity, addInt,
+                Long.MIN_VALUE, Long.MAX_VALUE, RLEOperator.add);
+      } catch (PlanningException e) {
+        // never happens for add
       }
       return true;
     } finally {
@@ -143,77 +97,30 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Add multiple resources for the specified interval
-   * 
-   * @param reservationInterval the interval for which the resource is to be
-   *          added
-   * @param ReservationRequests the resources to be added
-   * @param clusterResource the total resources in the cluster
-   * @return true if addition is successful, false otherwise
-   */
-  public boolean addCompositeInterval(ReservationInterval reservationInterval,
-      List<ReservationRequest> ReservationRequests, Resource clusterResource) {
-    ReservationRequest aggregateReservationRequest =
-        Records.newRecord(ReservationRequest.class);
-    Resource capacity = Resource.newInstance(0, 0);
-    for (ReservationRequest ReservationRequest : ReservationRequests) {
-      Resources.addTo(capacity, Resources.multiply(
-          ReservationRequest.getCapability(),
-          ReservationRequest.getNumContainers()));
-    }
-    aggregateReservationRequest.setNumContainers((int) Math.ceil(Resources
-        .divide(resourceCalculator, clusterResource, capacity, minAlloc)));
-    aggregateReservationRequest.setCapability(minAlloc);
-
-    return addInterval(reservationInterval, aggregateReservationRequest);
-  }
-
-  /**
-   * Removes a resource for the specified interval
-   * 
+   * Removes a resource for the specified interval.
+   *
    * @param reservationInterval the interval for which the resource is to be
    *          removed
-   * @param capacity the resource to be removed
+   * @param totCap the resource to be removed
    * @return true if removal is successful, false otherwise
    */
   public boolean removeInterval(ReservationInterval reservationInterval,
-      ReservationRequest capacity) {
-    Resource totCap =
-        Resources.multiply(capacity.getCapability(),
-            (float) capacity.getNumContainers());
+      Resource totCap) {
     if (totCap.equals(ZERO_RESOURCE)) {
       return true;
     }
     writeLock.lock();
     try {
-      long startKey = reservationInterval.getStartTime();
-      long endKey = reservationInterval.getEndTime();
-      // update the start key
-      NavigableMap<Long, Resource> ticks =
-          cumulativeCapacity.headMap(endKey, false);
-      // Decrease all the capacities of overlapping intervals
-      SortedMap<Long, Resource> overlapSet = ticks.tailMap(startKey);
-      if (overlapSet != null && !overlapSet.isEmpty()) {
-        Resource updatedCapacity = Resource.newInstance(0, 0);
-        long currentKey = -1;
-        for (Iterator<Entry<Long, Resource>> overlapEntries =
-            overlapSet.entrySet().iterator(); overlapEntries.hasNext();) {
-          Entry<Long, Resource> entry = overlapEntries.next();
-          currentKey = entry.getKey();
-          updatedCapacity = Resources.subtract(entry.getValue(), totCap);
-          // update each entry between start and end key
-          cumulativeCapacity.put(currentKey, updatedCapacity);
-        }
-        // Remove the first overlap entry if it is same as previous after
-        // updation
-        Long firstKey = overlapSet.firstKey();
-        if (isSameAsPrevious(firstKey, overlapSet.get(firstKey))) {
-          cumulativeCapacity.remove(firstKey);
-        }
-        // Remove the next entry if it is same as end entry after updation
-        if ((currentKey != -1) && (isSameAsNext(currentKey, updatedCapacity))) {
-          cumulativeCapacity.remove(cumulativeCapacity.higherKey(currentKey));
-        }
+
+      NavigableMap<Long, Resource> removeInt = new TreeMap<Long, Resource>();
+      removeInt.put(reservationInterval.getStartTime(), totCap);
+      removeInt.put(reservationInterval.getEndTime(), ZERO_RESOURCE);
+      try {
+        cumulativeCapacity =
+            merge(resourceCalculator, totCap, cumulativeCapacity, removeInt,
+                Long.MIN_VALUE, Long.MAX_VALUE, RLEOperator.subtract);
+      } catch (PlanningException e) {
+        // never happens for subtract
       }
       return true;
     } finally {
@@ -223,9 +130,8 @@ public class RLESparseResourceAllocation {
 
   /**
    * Returns the capacity, i.e. total resources allocated at the specified point
-   * of time
-   * 
-   * @param tick the time (UTC in ms) at which the capacity is requested
+   * of time.
+   *
    * @return the resources allocated at the specified time
    */
   public Resource getCapacityAtTime(long tick) {
@@ -242,8 +148,8 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Get the timestamp of the earliest resource allocation
-   * 
+   * Get the timestamp of the earliest resource allocation.
+   *
    * @return the timestamp of the first resource allocation
    */
   public long getEarliestStartTime() {
@@ -260,17 +166,24 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Get the timestamp of the latest resource allocation
-   * 
+   * Get the timestamp of the latest non-null resource allocation.
+   *
    * @return the timestamp of the last resource allocation
    */
-  public long getLatestEndTime() {
+  public long getLatestNonNullTime() {
     readLock.lock();
     try {
       if (cumulativeCapacity.isEmpty()) {
         return -1;
       } else {
-        return cumulativeCapacity.lastKey();
+        // the last entry might contain null (to terminate
+        // the sequence)... return previous one.
+        Entry<Long, Resource> last = cumulativeCapacity.lastEntry();
+        if (last.getValue() == null) {
+          return cumulativeCapacity.floorKey(last.getKey() - 1);
+        } else {
+          return last.getKey();
+        }
       }
     } finally {
       readLock.unlock();
@@ -278,8 +191,8 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Returns true if there are no non-zero entries
-   * 
+   * Returns true if there are no non-zero entries.
+   *
    * @return true if there are no allocations or false otherwise
    */
   public boolean isEmpty() {
@@ -288,9 +201,11 @@ public class RLESparseResourceAllocation {
       if (cumulativeCapacity.isEmpty()) {
         return true;
       }
-      // Deletion leaves a single zero entry so check for that
-      if (cumulativeCapacity.size() == 1) {
-        return cumulativeCapacity.firstEntry().getValue().equals(ZERO_RESOURCE);
+      // Deletion leaves a single zero entry with a null at the end so check for
+      // that
+      if (cumulativeCapacity.size() == 2) {
+        return cumulativeCapacity.firstEntry().getValue().equals(ZERO_RESOURCE)
+            && cumulativeCapacity.lastEntry().getValue() == null;
       }
       return false;
     } finally {
@@ -321,8 +236,8 @@ public class RLESparseResourceAllocation {
 
   /**
    * Returns the JSON string representation of the current resources allocated
-   * over time
-   * 
+   * over time.
+   *
    * @return the JSON string representation of the current resources allocated
    *         over time
    */
@@ -345,6 +260,277 @@ public class RLESparseResourceAllocation {
     } finally {
       readLock.unlock();
     }
+  }
+
+  /**
+   * Returns the representation of the current resources allocated over time as
+   * an interval map (in the defined non-null range).
+   *
+   * @return the representation of the current resources allocated over time as
+   *         an interval map.
+   */
+  public Map<ReservationInterval, Resource> toIntervalMap() {
+
+    readLock.lock();
+    try {
+      Map<ReservationInterval, Resource> allocations =
+          new TreeMap<ReservationInterval, Resource>();
+
+      // Empty
+      if (isEmpty()) {
+        return allocations;
+      }
+
+      Map.Entry<Long, Resource> lastEntry = null;
+      for (Map.Entry<Long, Resource> entry : cumulativeCapacity.entrySet()) {
+
+        if (lastEntry != null && entry.getValue() != null) {
+          ReservationInterval interval =
+              new ReservationInterval(lastEntry.getKey(), entry.getKey());
+          Resource resource = lastEntry.getValue();
+
+          allocations.put(interval, resource);
+        }
+
+        lastEntry = entry;
+      }
+      return allocations;
+    } finally {
+      readLock.unlock();
+    }
+  }
+
+  public NavigableMap<Long, Resource> getCumulative() {
+    readLock.lock();
+    try {
+      return cumulativeCapacity;
+    } finally {
+      readLock.unlock();
+    }
+  }
+
+  /**
+   * Merges the range start to end of two {@code RLESparseResourceAllocation}
+   * using a given {@code RLEOperator}.
+   *
+   * @param resCalc the resource calculator
+   * @param clusterResource the total cluster resources (for DRF)
+   * @param a the left operand
+   * @param b the right operand
+   * @param operator the operator to be applied during merge
+   * @param start the start-time of the range to be considered
+   * @param end the end-time of the range to be considered
+   * @return the a merged RLESparseResourceAllocation, produced by applying
+   *         "operator" to "a" and "b"
+   * @throws PlanningException in case the operator is subtractTestPositive and
+   *           the result would contain a negative value
+   */
+  public static RLESparseResourceAllocation merge(ResourceCalculator resCalc,
+      Resource clusterResource, RLESparseResourceAllocation a,
+      RLESparseResourceAllocation b, RLEOperator operator, long start, long end)
+      throws PlanningException {
+    NavigableMap<Long, Resource> cumA =
+        a.getRangeOverlapping(start, end).getCumulative();
+    NavigableMap<Long, Resource> cumB =
+        b.getRangeOverlapping(start, end).getCumulative();
+    NavigableMap<Long, Resource> out =
+        merge(resCalc, clusterResource, cumA, cumB, start, end, operator);
+    return new RLESparseResourceAllocation(out, resCalc);
+  }
+
+  private static NavigableMap<Long, Resource> merge(ResourceCalculator resCalc,
+      Resource clusterResource, NavigableMap<Long, Resource> a,
+      NavigableMap<Long, Resource> b, long start, long end,
+      RLEOperator operator) throws PlanningException {
+
+    // handle special cases of empty input
+    if (a == null || a.isEmpty()) {
+      if (operator == RLEOperator.subtract
+          || operator == RLEOperator.subtractTestNonNegative) {
+        return negate(operator, b);
+      } else {
+        return b;
+      }
+    }
+    if (b == null || b.isEmpty()) {
+      return a;
+    }
+
+    // define iterators and support variables
+    Iterator<Entry<Long, Resource>> aIt = a.entrySet().iterator();
+    Iterator<Entry<Long, Resource>> bIt = b.entrySet().iterator();
+    Entry<Long, Resource> curA = aIt.next();
+    Entry<Long, Resource> curB = bIt.next();
+    Entry<Long, Resource> lastA = null;
+    Entry<Long, Resource> lastB = null;
+    boolean aIsDone = false;
+    boolean bIsDone = false;
+
+    TreeMap<Long, Resource> out = new TreeMap<Long, Resource>();
+
+    while (!(curA.equals(lastA) && curB.equals(lastB))) {
+
+      Resource outRes;
+      long time = -1;
+
+      // curA is smaller than curB
+      if (bIsDone || (curA.getKey() < curB.getKey() && !aIsDone)) {
+        outRes = combineValue(operator, resCalc, clusterResource, curA, lastB);
+        time = (curA.getKey() < start) ? start : curA.getKey();
+        lastA = curA;
+        if (aIt.hasNext()) {
+          curA = aIt.next();
+        } else {
+          aIsDone = true;
+        }
+
+      } else {
+        // curB is smaller than curA
+        if (aIsDone || (curA.getKey() > curB.getKey() && !bIsDone)) {
+          outRes =
+              combineValue(operator, resCalc, clusterResource, lastA, curB);
+          time = (curB.getKey() < start) ? start : curB.getKey();
+          lastB = curB;
+          if (bIt.hasNext()) {
+            curB = bIt.next();
+          } else {
+            bIsDone = true;
+          }
+
+        } else {
+          // curA is equal to curB
+          outRes = combineValue(operator, resCalc, clusterResource, curA, curB);
+          time = (curA.getKey() < start) ? start : curA.getKey();
+          lastA = curA;
+          if (aIt.hasNext()) {
+            curA = aIt.next();
+          } else {
+            aIsDone = true;
+          }
+          lastB = curB;
+          if (bIt.hasNext()) {
+            curB = bIt.next();
+          } else {
+            bIsDone = true;
+          }
+        }
+      }
+
+      // add to out if not redundant
+      addIfNeeded(out, time, outRes);
+    }
+    addIfNeeded(out, end, null);
+
+    return out;
+  }
+
+  private static NavigableMap<Long, Resource> negate(RLEOperator operator,
+      NavigableMap<Long, Resource> a) throws PlanningException {
+
+    TreeMap<Long, Resource> out = new TreeMap<Long, Resource>();
+    for (Entry<Long, Resource> e : a.entrySet()) {
+      Resource val = Resources.negate(e.getValue());
+      // test for negative value and throws
+      if (operator == RLEOperator.subtractTestNonNegative
+          && (Resources.fitsIn(val, ZERO_RESOURCE) &&
+              !Resources.equals(val, ZERO_RESOURCE))) {
+        throw new PlanningException(
+            "RLESparseResourceAllocation: merge failed as the "
+                + "resulting RLESparseResourceAllocation would be negative");
+      }
+      out.put(e.getKey(), val);
+    }
+
+    return out;
+  }
+
+  private static void addIfNeeded(TreeMap<Long, Resource> out, long time,
+      Resource outRes) {
+
+    if (out.isEmpty() || (out.lastEntry() != null && outRes == null)
+        || !Resources.equals(out.lastEntry().getValue(), outRes)) {
+      out.put(time, outRes);
+    }
+
+  }
+
+  private static Resource combineValue(RLEOperator op,
+      ResourceCalculator resCalc, Resource clusterResource,
+      Entry<Long, Resource> eA, Entry<Long, Resource> eB)
+      throws PlanningException {
+
+    // deal with nulls
+    if (eA == null || eA.getValue() == null) {
+      if (eB == null || eB.getValue() == null) {
+        return null;
+      }
+      if (op == RLEOperator.subtract) {
+        return Resources.negate(eB.getValue());
+      } else {
+        return eB.getValue();
+      }
+    }
+    if (eB == null || eB.getValue() == null) {
+      return eA.getValue();
+    }
+
+    Resource a = eA.getValue();
+    Resource b = eB.getValue();
+    switch (op) {
+    case add:
+      return Resources.add(a, b);
+    case subtract:
+      return Resources.subtract(a, b);
+    case subtractTestNonNegative:
+      if (!Resources.fitsIn(b, a)) {
+        throw new PlanningException(
+            "RLESparseResourceAllocation: merge failed as the "
+                + "resulting RLESparseResourceAllocation would be negative");
+      } else {
+        return Resources.subtract(a, b);
+      }
+    case min:
+      return Resources.min(resCalc, clusterResource, a, b);
+    case max:
+      return Resources.max(resCalc, clusterResource, a, b);
+    default:
+      return null;
+    }
+
+  }
+
+  public RLESparseResourceAllocation getRangeOverlapping(long start, long end) {
+    readLock.lock();
+    try {
+      NavigableMap<Long, Resource> a = this.getCumulative();
+
+      if (a != null && !a.isEmpty()) {
+        // include the portion of previous entry that overlaps start
+        if (start > a.firstKey()) {
+          long previous = a.floorKey(start);
+          a = a.tailMap(previous, true);
+        }
+
+        if (end < a.lastKey()) {
+          a = a.headMap(end, true);
+        }
+
+      }
+      RLESparseResourceAllocation ret =
+          new RLESparseResourceAllocation(a, resourceCalculator);
+      return ret;
+    } finally {
+      readLock.unlock();
+    }
+
+  }
+
+  /**
+   * The set of operators that can be applied to two
+   * {@code RLESparseResourceAllocation} during a merge operation.
+   */
+  public enum RLEOperator {
+    add, subtract, min, max, subtractTestNonNegative
   }
 
 }

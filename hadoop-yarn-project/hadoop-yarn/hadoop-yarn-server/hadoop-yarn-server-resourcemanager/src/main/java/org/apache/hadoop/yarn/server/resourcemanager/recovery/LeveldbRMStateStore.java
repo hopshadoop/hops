@@ -27,6 +27,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -42,6 +43,7 @@ import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.VersionProto;
@@ -49,6 +51,7 @@ import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.AMRM
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.EpochProto;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationAttemptStateDataProto;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationStateDataProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.ReservationAllocationStateProto;
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
 import org.apache.hadoop.yarn.server.records.Version;
 import org.apache.hadoop.yarn.server.records.impl.pb.VersionPBImpl;
@@ -72,6 +75,9 @@ import org.iq80.leveldb.WriteBatch;
 
 import com.google.common.annotations.VisibleForTesting;
 
+/**
+ * Changes from 1.0 to 1.1, Addition of ReservationSystem state.
+ */
 public class LeveldbRMStateStore extends RMStateStore {
 
   public static final Log LOG =
@@ -87,9 +93,11 @@ public class LeveldbRMStateStore extends RMStateStore {
       RM_DT_SECRET_MANAGER_ROOT + SEPARATOR + "RMDTSequentialNumber";
   private static final String RM_APP_KEY_PREFIX =
       RM_APP_ROOT + SEPARATOR + ApplicationId.appIdStrPrefix;
+  private static final String RM_RESERVATION_KEY_PREFIX =
+      RESERVATION_SYSTEM_ROOT + SEPARATOR;
 
   private static final Version CURRENT_VERSION_INFO = Version
-      .newInstance(1, 0);
+      .newInstance(1, 1);
 
   private DB db;
   private Timer compactionTimer;
@@ -115,6 +123,12 @@ public class LeveldbRMStateStore extends RMStateStore {
 
   private String getRMDTTokenNodeKey(RMDelegationTokenIdentifier tokenId) {
     return RM_DT_TOKEN_KEY_PREFIX + tokenId.getSequenceNumber();
+  }
+
+  private String getReservationNodeKey(String planName,
+      String reservationId) {
+    return RESERVATION_SYSTEM_ROOT + SEPARATOR + planName + SEPARATOR
+        + reservationId;
   }
 
   @Override
@@ -200,6 +214,11 @@ public class LeveldbRMStateStore extends RMStateStore {
     return db == null;
   }
 
+  @VisibleForTesting
+  DB getDatabase() {
+    return db;
+  }
+
   @Override
   protected Version loadVersion() throws Exception {
     Version version = null;
@@ -257,8 +276,53 @@ public class LeveldbRMStateStore extends RMStateStore {
      loadRMDTSecretManagerState(rmState);
      loadRMApps(rmState);
      loadAMRMTokenSecretManagerState(rmState);
+    loadReservationState(rmState);
     return rmState;
    }
+
+  private void loadReservationState(RMState rmState) throws IOException {
+    int numReservations = 0;
+    LeveldbIterator iter = null;
+    try {
+      iter = new LeveldbIterator(db);
+      iter.seek(bytes(RM_RESERVATION_KEY_PREFIX));
+      while (iter.hasNext()) {
+        Entry<byte[],byte[]> entry = iter.next();
+        String key = asString(entry.getKey());
+        if (!key.startsWith(RM_RESERVATION_KEY_PREFIX)) {
+          break;
+        }
+
+        String planReservationString =
+            key.substring(RM_RESERVATION_KEY_PREFIX.length());
+        String[] parts = planReservationString.split(SEPARATOR);
+        if (parts.length != 2) {
+          LOG.warn("Incorrect reservation state key " + key);
+          continue;
+        }
+        String planName = parts[0];
+        String reservationName = parts[1];
+        ReservationAllocationStateProto allocationState =
+            ReservationAllocationStateProto.parseFrom(entry.getValue());
+        if (!rmState.getReservationState().containsKey(planName)) {
+          rmState.getReservationState().put(planName,
+              new HashMap<ReservationId, ReservationAllocationStateProto>());
+        }
+        ReservationId reservationId =
+            ReservationId.parseReservationId(reservationName);
+        rmState.getReservationState().get(planName).put(reservationId,
+            allocationState);
+        numReservations++;
+      }
+    } catch (DBException e) {
+      throw new IOException(e);
+    } finally {
+      if (iter != null) {
+        iter.close();
+      }
+    }
+    LOG.info("Recovered " + numReservations + " reservations");
+  }
 
   private void loadRMDTSecretManagerState(RMState state) throws IOException {
     int numKeys = loadRMDTSecretManagerKeys(state);
@@ -443,7 +507,7 @@ public class LeveldbRMStateStore extends RMStateStore {
 
   private ApplicationStateData createApplicationState(String appIdStr,
       byte[] data) throws IOException {
-    ApplicationId appId = ConverterUtils.toApplicationId(appIdStr);
+    ApplicationId appId = ApplicationId.fromString(appIdStr);
     ApplicationStateDataPBImpl appState =
         new ApplicationStateDataPBImpl(
             ApplicationStateDataProto.parseFrom(data));
@@ -473,8 +537,7 @@ public class LeveldbRMStateStore extends RMStateStore {
 
   private ApplicationAttemptStateData createAttemptState(String itemName,
       byte[] data) throws IOException {
-    ApplicationAttemptId attemptId =
-        ConverterUtils.toApplicationAttemptId(itemName);
+    ApplicationAttemptId attemptId = ApplicationAttemptId.fromString(itemName);
     ApplicationAttemptStateDataPBImpl attemptState =
         new ApplicationAttemptStateDataPBImpl(
             ApplicationAttemptStateDataProto.parseFrom(data));
@@ -571,7 +634,51 @@ public class LeveldbRMStateStore extends RMStateStore {
       throw new IOException(e);
     }
   }
-  
+
+  @Override
+  protected void storeReservationState(
+      ReservationAllocationStateProto reservationAllocation, String planName,
+      String reservationIdName) throws Exception {
+    try {
+      WriteBatch batch = db.createWriteBatch();
+      try {
+        String key = getReservationNodeKey(planName, reservationIdName);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Storing state for reservation " + reservationIdName
+              + " plan " + planName + " at " + key);
+        }
+        batch.put(bytes(key), reservationAllocation.toByteArray());
+        db.write(batch);
+      } finally {
+        batch.close();
+      }
+    } catch (DBException e) {
+      throw new IOException(e);
+    }
+  }
+
+  @Override
+  protected void removeReservationState(String planName,
+      String reservationIdName) throws Exception {
+    try {
+      WriteBatch batch = db.createWriteBatch();
+      try {
+        String reservationKey =
+            getReservationNodeKey(planName, reservationIdName);
+        batch.delete(bytes(reservationKey));
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Removing state for reservation " + reservationIdName
+              + " plan " + planName + " at " + reservationKey);
+        }
+        db.write(batch);
+      } finally {
+        batch.close();
+      }
+    } catch (DBException e) {
+      throw new IOException(e);
+    }
+  }
+
   private void storeOrUpdateRMDT(RMDelegationTokenIdentifier tokenId,
       Long renewDate, boolean isUpdate) throws IOException {
     String tokenKey = getRMDTTokenNodeKey(tokenId);
@@ -686,6 +793,18 @@ public class LeveldbRMStateStore extends RMStateStore {
     fs.delete(root, true);
   }
 
+  @Override
+  public synchronized void removeApplication(ApplicationId removeAppId)
+      throws IOException {
+    String appKey = getApplicationNodeKey(removeAppId);
+    LOG.info("Removing state for app " + removeAppId);
+    try {
+      db.delete(bytes(appKey));
+    } catch (DBException e) {
+      throw new IOException(e);
+    }
+  }
+
   @VisibleForTesting
   int getNumEntriesInDatabase() throws IOException {
     int numEntries = 0;
@@ -694,7 +813,7 @@ public class LeveldbRMStateStore extends RMStateStore {
       iter = new LeveldbIterator(db);
       iter.seekToFirst();
       while (iter.hasNext()) {
-        Entry<byte[],byte[]> entry = iter.next();
+        Entry<byte[], byte[]> entry = iter.next();
         LOG.info("entry: " + asString(entry.getKey()));
         ++numEntries;
       }

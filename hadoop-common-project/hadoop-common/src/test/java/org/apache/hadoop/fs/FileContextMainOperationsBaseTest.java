@@ -29,11 +29,15 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.Options.CreateOpts;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.fs.FileContextTestHelper.*;
 import static org.apache.hadoop.fs.CreateFlag.*;
@@ -58,6 +62,9 @@ import static org.apache.hadoop.fs.CreateFlag.*;
  * </p>
  */
 public abstract class FileContextMainOperationsBaseTest  {
+
+  protected static final Logger LOG =
+      LoggerFactory.getLogger(FileContextMainOperationsBaseTest.class);
   
   private static String TEST_DIR_AAA2 = "test/hadoop2/aaa";
   private static String TEST_DIR_AAA = "test/hadoop/aaa";
@@ -99,8 +106,7 @@ public abstract class FileContextMainOperationsBaseTest  {
   
   @Before
   public void setUp() throws Exception {
-    File testBuildData = new File(System.getProperty("test.build.data",
-            "build/test/data"), RandomStringUtils.randomAlphanumeric(10));
+    File testBuildData = GenericTestUtils.getRandomizedTestDir();
     Path rootPath = new Path(testBuildData.getAbsolutePath(), 
             "root-uri");
     localFsRootPath = rootPath.makeQualified(LocalFileSystem.NAME, null);
@@ -109,9 +115,21 @@ public abstract class FileContextMainOperationsBaseTest  {
   
   @After
   public void tearDown() throws Exception {
-    boolean del = fc.delete(new Path(fileContextTestHelper.getAbsoluteTestRootPath(fc), new Path("test")), true);
-    assertTrue(del);
-    fc.delete(localFsRootPath, true);
+    if (fc != null) {
+      final Path testRoot = fileContextTestHelper.getAbsoluteTestRootPath(fc);
+      LOG.info("Deleting test root path {}", testRoot);
+      try {
+        fc.delete(testRoot, true);
+      } catch (Exception e) {
+        LOG.error("Error when deleting test root path " + testRoot, e);
+      }
+
+      try {
+        fc.delete(localFsRootPath, true);
+      } catch (Exception e) {
+        LOG.error("Error when deleting localFsRootPath " + localFsRootPath, e);
+      }
+    }
   }
   
   
@@ -249,8 +267,14 @@ public abstract class FileContextMainOperationsBaseTest  {
     } catch (IOException e) {
       // expected
     }
-    Assert.assertFalse(exists(fc, testSubDir));
-    
+
+    try {
+      Assert.assertFalse(exists(fc, testSubDir));
+    } catch (AccessControlException e) {
+      // Expected : HDFS-11132 Checks on paths under file may be rejected by
+      // file missing execute permission.
+    }
+
     Path testDeepSubDir = getTestRootPath(fc, "test/hadoop/file/deep/sub/dir");
     try {
       fc.mkdir(testDeepSubDir, FsPermission.getDefault(), true);
@@ -258,8 +282,14 @@ public abstract class FileContextMainOperationsBaseTest  {
     } catch (IOException e) {
       // expected
     }
-    Assert.assertFalse(exists(fc, testDeepSubDir));
-    
+
+    try {
+      Assert.assertFalse(exists(fc, testDeepSubDir));
+    } catch (AccessControlException e) {
+      // Expected : HDFS-11132 Checks on paths under file may be rejected by
+      // file missing execute permission.
+    }
+
   }
   
   @Test
@@ -1166,7 +1196,7 @@ public abstract class FileContextMainOperationsBaseTest  {
         fc.createSymlink(file, link, false);
         Assert.fail("Created a symlink on a file system that "+
                     "does not support symlinks.");
-      } catch (IOException e) {
+      } catch (UnsupportedOperationException e) {
         // Expected
       }
       createFile(file);
@@ -1249,7 +1279,7 @@ public abstract class FileContextMainOperationsBaseTest  {
     byte[] bb = new byte[(int)len];
     FSDataInputStream fsdis = fc.open(path);
     try {
-      fsdis.read(bb);
+      fsdis.readFully(bb);
     } finally {
       fsdis.close();
     }
@@ -1310,7 +1340,7 @@ public abstract class FileContextMainOperationsBaseTest  {
     byte[] bb = new byte[data.length];
     FSDataInputStream fsdis = fc.open(path);
     try {
-      fsdis.read(bb);
+      fsdis.readFully(bb);
     } finally {
       fsdis.close();
     }

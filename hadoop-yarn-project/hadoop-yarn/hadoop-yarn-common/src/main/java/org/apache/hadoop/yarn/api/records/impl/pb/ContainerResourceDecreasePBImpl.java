@@ -26,6 +26,7 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceDecreaseProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceDecreaseProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 
+@Deprecated
 public class ContainerResourceDecreasePBImpl extends ContainerResourceDecrease {
   ContainerResourceDecreaseProto proto = ContainerResourceDecreaseProto
       .getDefaultInstance();

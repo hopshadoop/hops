@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -48,6 +49,7 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT;
+
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RpcClientException;
 import org.apache.hadoop.ipc.RpcServerException;
@@ -57,6 +59,9 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.ShutdownHookManager;
+
+import com.google.common.base.Preconditions;
+import org.apache.htrace.core.Tracer;
 
 /**
  * The FileContext class provides an interface to the application writer for
@@ -170,7 +175,7 @@ import org.apache.hadoop.util.ShutdownHookManager;
  */
 
 @InterfaceAudience.Public
-@InterfaceStability.Evolving /*Evolving for a release,to be changed to Stable */
+@InterfaceStability.Stable
 public class FileContext {
   
   public static final Log LOG = LogFactory.getLog(FileContext.class);
@@ -228,12 +233,14 @@ public class FileContext {
   private final Configuration conf;
   private final UserGroupInformation ugi;
   final boolean resolveSymlinks;
+  private final Tracer tracer;
 
   private FileContext(final AbstractFileSystem defFs,
     final FsPermission theUmask, final Configuration aConf) {
     defaultFS = defFs;
-    umask = FsPermission.getUMask(aConf);
+    umask = theUmask;
     conf = aConf;
+    tracer = FsTracer.get(aConf);
     try {
       ugi = UserGroupInformation.getCurrentUser();
     } catch (IOException e) {
@@ -271,6 +278,7 @@ public class FileContext {
    * has been deliberately declared private.
    */
   Path fixRelativePart(Path p) {
+    Preconditions.checkNotNull(p, "path cannot be null");
     if (p.isUriPathAbsolute()) {
       return p;
     } else {
@@ -307,7 +315,7 @@ public class FileContext {
    * 
    * @throws UnsupportedFileSystemException If the file system for
    *           <code>absOrFqPath</code> is not supported.
-   * @throws IOExcepton If the file system for <code>absOrFqPath</code> could
+   * @throws IOException If the file system for <code>absOrFqPath</code> could
    *         not be instantiated.
    */
   protected AbstractFileSystem getFSofPath(final Path absOrFqPath)
@@ -763,7 +771,7 @@ public class FileContext {
       @Override
       public Boolean next(final AbstractFileSystem fs, final Path p) 
         throws IOException, UnresolvedLinkException {
-        return Boolean.valueOf(fs.delete(p, recursive));
+        return fs.delete(p, recursive);
       }
     }.resolve(this, absF);
   }
@@ -897,7 +905,7 @@ public class FileContext {
       @Override
       public Boolean next(final AbstractFileSystem fs, final Path p) 
         throws IOException, UnresolvedLinkException {
-        return Boolean.valueOf(fs.setReplication(p, replication));
+        return fs.setReplication(p, replication);
       }
     }.resolve(this, absF);
   }
@@ -2573,5 +2581,178 @@ public class FileContext {
         return fs.listXAttrs(p);
       }
     }.resolve(this, absF);
+  }
+
+  /**
+   * Create a snapshot with a default name.
+   *
+   * @param path The directory where snapshots will be taken.
+   * @return the snapshot path.
+   *
+   * @throws IOException If an I/O error occurred
+   *
+   * <p>Exceptions applicable to file systems accessed over RPC:
+   * @throws RpcClientException If an exception occurred in the RPC client
+   * @throws RpcServerException If an exception occurred in the RPC server
+   * @throws UnexpectedServerException If server implementation throws
+   *           undeclared exception to RPC server
+   */
+  public final Path createSnapshot(Path path) throws IOException {
+    return createSnapshot(path, null);
+  }
+
+  /**
+   * Create a snapshot.
+   *
+   * @param path The directory where snapshots will be taken.
+   * @param snapshotName The name of the snapshot
+   * @return the snapshot path.
+   *
+   * @throws IOException If an I/O error occurred
+   *
+   * <p>Exceptions applicable to file systems accessed over RPC:
+   * @throws RpcClientException If an exception occurred in the RPC client
+   * @throws RpcServerException If an exception occurred in the RPC server
+   * @throws UnexpectedServerException If server implementation throws
+   *           undeclared exception to RPC server
+   */
+  public Path createSnapshot(final Path path, final String snapshotName)
+      throws IOException {
+    final Path absF = fixRelativePart(path);
+    return new FSLinkResolver<Path>() {
+
+      @Override
+      public Path next(final AbstractFileSystem fs, final Path p)
+          throws IOException {
+        return fs.createSnapshot(p, snapshotName);
+      }
+    }.resolve(this, absF);
+  }
+
+  /**
+   * Rename a snapshot.
+   *
+   * @param path The directory path where the snapshot was taken
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
+   *
+   * @throws IOException If an I/O error occurred
+   *
+   * <p>Exceptions applicable to file systems accessed over RPC:
+   * @throws RpcClientException If an exception occurred in the RPC client
+   * @throws RpcServerException If an exception occurred in the RPC server
+   * @throws UnexpectedServerException If server implementation throws
+   *           undeclared exception to RPC server
+   */
+  public void renameSnapshot(final Path path, final String snapshotOldName,
+      final String snapshotNewName) throws IOException {
+    final Path absF = fixRelativePart(path);
+    new FSLinkResolver<Void>() {
+      @Override
+      public Void next(final AbstractFileSystem fs, final Path p)
+          throws IOException {
+        fs.renameSnapshot(p, snapshotOldName, snapshotNewName);
+        return null;
+      }
+    }.resolve(this, absF);
+  }
+
+  /**
+   * Delete a snapshot of a directory.
+   *
+   * @param path The directory that the to-be-deleted snapshot belongs to
+   * @param snapshotName The name of the snapshot
+   *
+   * @throws IOException If an I/O error occurred
+   *
+   * <p>Exceptions applicable to file systems accessed over RPC:
+   * @throws RpcClientException If an exception occurred in the RPC client
+   * @throws RpcServerException If an exception occurred in the RPC server
+   * @throws UnexpectedServerException If server implementation throws
+   *           undeclared exception to RPC server
+   */
+  public void deleteSnapshot(final Path path, final String snapshotName)
+      throws IOException {
+    final Path absF = fixRelativePart(path);
+    new FSLinkResolver<Void>() {
+      @Override
+      public Void next(final AbstractFileSystem fs, final Path p)
+          throws IOException {
+        fs.deleteSnapshot(p, snapshotName);
+        return null;
+      }
+    }.resolve(this, absF);
+  }
+
+  /**
+   * Set the storage policy for a given file or directory.
+   *
+   * @param path file or directory path.
+   * @param policyName the name of the target storage policy. The list
+   *                   of supported Storage policies can be retrieved
+   *                   via {@link #getAllStoragePolicies}.
+   */
+  public void setStoragePolicy(final Path path, final String policyName)
+      throws IOException {
+    final Path absF = fixRelativePart(path);
+    new FSLinkResolver<Void>() {
+      @Override
+      public Void next(final AbstractFileSystem fs, final Path p)
+          throws IOException {
+        fs.setStoragePolicy(path, policyName);
+        return null;
+      }
+    }.resolve(this, absF);
+  }
+
+  /**
+   * Unset the storage policy set for a given file or directory.
+   * @param src file or directory path.
+   * @throws IOException
+   */
+  public void unsetStoragePolicy(final Path src) throws IOException {
+    final Path absF = fixRelativePart(src);
+    new FSLinkResolver<Void>() {
+      @Override
+      public Void next(final AbstractFileSystem fs, final Path p)
+          throws IOException {
+        fs.unsetStoragePolicy(src);
+        return null;
+      }
+    }.resolve(this, absF);
+  }
+
+  /**
+   * Query the effective storage policy ID for the given file or directory.
+   *
+   * @param path file or directory path.
+   * @return storage policy for give file.
+   * @throws IOException
+   */
+  public BlockStoragePolicySpi getStoragePolicy(Path path) throws IOException {
+    final Path absF = fixRelativePart(path);
+    return new FSLinkResolver<BlockStoragePolicySpi>() {
+      @Override
+      public BlockStoragePolicySpi next(final AbstractFileSystem fs,
+          final Path p)
+          throws IOException {
+        return fs.getStoragePolicy(p);
+      }
+    }.resolve(this, absF);
+  }
+
+  /**
+   * Retrieve all the storage policies supported by this file system.
+   *
+   * @return all storage policies supported by this filesystem.
+   * @throws IOException
+   */
+  public Collection<? extends BlockStoragePolicySpi> getAllStoragePolicies()
+      throws IOException {
+    return defaultFS.getAllStoragePolicies();
+  }
+
+  Tracer getTracer() {
+    return tracer;
   }
 }

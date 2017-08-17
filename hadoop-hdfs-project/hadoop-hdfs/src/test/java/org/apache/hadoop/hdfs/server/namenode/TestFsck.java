@@ -103,7 +103,7 @@ public class TestFsck {
   static final Pattern getfileinfoPattern = Pattern.compile("allowed=.*?\\s" +
           "ugi=.*?\\s" +
           "ip=/\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\s" +
-          "cmd=getfileinfo\\ssrc=\\/\\sdst=null\\s" +
+          "cmd=getFileInfo\\ssrc=\\/\\sdst=null\\s" +
           "perm=null");
   
   static final Pattern numCorruptBlocksPattern =
@@ -214,7 +214,7 @@ public class TestFsck {
     BufferedReader reader = new BufferedReader(new FileReader(auditLogFile));
     String line = reader.readLine();
     assertNotNull(line);
-    assertTrue("Expected getfileinfo event not found in audit log",
+     assertTrue("Expected getfileinfo event not found in audit log",
         getfileinfoPattern.matcher(line).matches());
     line = reader.readLine();
     assertNotNull(line);

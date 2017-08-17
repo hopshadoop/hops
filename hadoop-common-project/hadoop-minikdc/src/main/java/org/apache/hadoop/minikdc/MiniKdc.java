@@ -17,7 +17,6 @@
  */
 
 package org.apache.hadoop.minikdc;
-import org.apache.commons.io.Charsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.text.StrSubstitutor;
@@ -41,6 +40,7 @@ import org.apache.directory.server.kerberos.kdc.KdcServer;
 import org.apache.directory.server.kerberos.shared.crypto.encryption.KerberosKeyFactory;
 import org.apache.directory.server.kerberos.shared.keytab.Keytab;
 import org.apache.directory.server.kerberos.shared.keytab.KeytabEntry;
+import org.apache.directory.server.protocol.shared.transport.AbstractTransport;
 import org.apache.directory.server.protocol.shared.transport.TcpTransport;
 import org.apache.directory.server.protocol.shared.transport.UdpTransport;
 import org.apache.directory.server.xdbm.Index;
@@ -63,8 +63,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.lang.reflect.Method;
-import java.net.InetAddress;
-import java.net.ServerSocket;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -135,7 +135,8 @@ public class MiniKdc {
     Properties userConf = new Properties();
     InputStreamReader r = null;
     try {
-      r = new InputStreamReader(new FileInputStream(file), Charsets.UTF_8);
+      r = new InputStreamReader(new FileInputStream(file),
+          StandardCharsets.UTF_8);
       userConf.load(r);
     } finally {
       if (r != null) {
@@ -264,12 +265,6 @@ public class MiniKdc {
     LOG.info("---------------------------------------------------------------");
     this.conf = conf;
     port = Integer.parseInt(conf.getProperty(KDC_PORT));
-    if (port == 0) {
-      ServerSocket ss = new ServerSocket(0, 1, InetAddress.getByName
-              (conf.getProperty(KDC_BIND_ADDRESS)));
-      port = ss.getLocalPort();
-      ss.close();
-    }
     String orgName= conf.getProperty(ORG_NAME);
     String orgDomain = conf.getProperty(ORG_DOMAIN);
     realm = orgName.toUpperCase(Locale.ENGLISH) + "."
@@ -432,15 +427,23 @@ public class MiniKdc {
 
     // transport
     String transport = conf.getProperty(TRANSPORT);
+    AbstractTransport absTransport;
     if (transport.trim().equals("TCP")) {
-      kdc.addTransports(new TcpTransport(bindAddress, port, 3, 50));
+      absTransport = new TcpTransport(bindAddress, port, 3, 50);
     } else if (transport.trim().equals("UDP")) {
-      kdc.addTransports(new UdpTransport(port));
+      absTransport = new UdpTransport(port);
     } else {
       throw new IllegalArgumentException("Invalid transport: " + transport);
     }
+    kdc.addTransports(absTransport);
     kdc.setServiceName(conf.getProperty(INSTANCE));
     kdc.start();
+    // if using ephemeral port, update port number for binding
+    if (port == 0) {
+      InetSocketAddress addr =
+          (InetSocketAddress)absTransport.getAcceptor().getLocalAddress();
+      port = addr.getPort();
+    }
 
     StringBuilder sb = new StringBuilder();
     InputStream is2 = cl.getResourceAsStream("minikdc-krb5.conf");
@@ -448,7 +451,8 @@ public class MiniKdc {
     BufferedReader r = null;
 
     try {
-      r = new BufferedReader(new InputStreamReader(is2, Charsets.UTF_8));
+      r = new BufferedReader(
+          new InputStreamReader(is2, StandardCharsets.UTF_8));
       String line = r.readLine();
 
       while (line != null) {

@@ -47,6 +47,7 @@ public class AppInfo {
   protected String host;
   protected int rpcPort;
   protected YarnApplicationState appState;
+  protected int runningContainers;
   protected float progress;
   protected String diagnosticsInfo;
   protected String originalTrackingUrl;
@@ -57,6 +58,12 @@ public class AppInfo {
   protected long finishedTime;
   protected long elapsedTime;
   protected String applicationTags;
+  protected int priority;
+  private long allocatedCpuVcores;
+  private long allocatedMemoryMB;
+  protected boolean unmanagedApplication;
+  private String appNodeLabelExpression;
+  private String amNodeLabelExpression;
 
   public AppInfo() {
     // JAXB needs this
@@ -82,10 +89,27 @@ public class AppInfo {
     finishedTime = app.getFinishTime();
     elapsedTime = Times.elapsed(startedTime, finishedTime);
     finalAppStatus = app.getFinalApplicationStatus();
+    priority = 0;
+    if (app.getPriority() != null) {
+      priority = app.getPriority().getPriority();
+    }
+    if (app.getApplicationResourceUsageReport() != null) {
+      runningContainers = app.getApplicationResourceUsageReport()
+          .getNumUsedContainers();
+      if (app.getApplicationResourceUsageReport().getUsedResources() != null) {
+        allocatedCpuVcores = app.getApplicationResourceUsageReport()
+            .getUsedResources().getVirtualCores();
+        allocatedMemoryMB = app.getApplicationResourceUsageReport()
+            .getUsedResources().getMemorySize();
+      }
+    }
     progress = app.getProgress() * 100; // in percent
     if (app.getApplicationTags() != null && !app.getApplicationTags().isEmpty()) {
       this.applicationTags = CSV_JOINER.join(app.getApplicationTags());
     }
+    unmanagedApplication = app.isUnmanagedApp();
+    appNodeLabelExpression = app.getAppNodeLabelExpression();
+    amNodeLabelExpression = app.getAmNodeLabelExpression();
   }
 
   public String getAppId() {
@@ -122,6 +146,18 @@ public class AppInfo {
 
   public YarnApplicationState getAppState() {
     return appState;
+  }
+
+  public int getRunningContainers() {
+    return runningContainers;
+  }
+
+  public long getAllocatedCpuVcores() {
+    return allocatedCpuVcores;
+  }
+
+  public long getAllocatedMemoryMB() {
+    return allocatedMemoryMB;
   }
 
   public float getProgress() {
@@ -162,5 +198,21 @@ public class AppInfo {
 
   public String getApplicationTags() {
     return applicationTags;
+  }
+
+  public boolean isUnmanagedApp() {
+    return unmanagedApplication;
+  }
+
+  public int getPriority() {
+    return priority;
+  }
+
+  public String getAppNodeLabelExpression() {
+    return appNodeLabelExpression;
+  }
+
+  public String getAmNodeLabelExpression() {
+    return amNodeLabelExpression;
   }
 }

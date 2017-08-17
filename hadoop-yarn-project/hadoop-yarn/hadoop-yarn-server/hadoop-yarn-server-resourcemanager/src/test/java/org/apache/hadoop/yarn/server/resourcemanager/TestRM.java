@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import com.google.common.base.Supplier;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.Before;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -28,7 +31,6 @@ import org.junit.*;
 
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 
 import java.util.ArrayList;
@@ -50,7 +52,6 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -66,8 +67,6 @@ import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
-import org.apache.hadoop.yarn.server.resourcemanager.TestRMRestart.TestSecurityMockRM;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
@@ -83,8 +82,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.mockito.ArgumentMatcher;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class TestRM extends ParameterizedSchedulerTestBase {
@@ -121,7 +118,7 @@ public class TestRM extends ParameterizedSchedulerTestBase {
     
     GetNewApplicationResponse resp = rm.getNewAppId();
     assert (resp.getApplicationId().getId() != 0);    
-    assert (resp.getMaximumResourceCapability().getMemory() > 0);    
+    assert (resp.getMaximumResourceCapability().getMemorySize() > 0);
     rm.stop();
   }
   
@@ -226,8 +223,6 @@ public class TestRM extends ParameterizedSchedulerTestBase {
     CapacityScheduler cs = (CapacityScheduler) rm.getResourceScheduler();
     cs.getApplicationAttempt(attempt.getAppAttemptId()).getNewContainerId();
 
-    // kick the scheduling
-    nm1.nodeHeartbeat(true);
     MockAM am = MockRM.launchAM(app, rm, nm1);
     // am container Id not equal to 1.
     Assert.assertTrue(
@@ -605,7 +600,7 @@ public class TestRM extends ParameterizedSchedulerTestBase {
       }
     };*/
 
-    MockRM rm = new MockRM(conf) {
+    final MockRM rm = new MockRM(conf) {
       @Override
       protected Dispatcher createDispatcher() {
         return new AsyncDispatcher() {
@@ -635,8 +630,8 @@ public class TestRM extends ParameterizedSchedulerTestBase {
     Assume.assumeFalse(rm.getResourceScheduler() instanceof FairScheduler);
     // test metrics
     QueueMetrics metrics = rm.getResourceScheduler().getRootQueueMetrics();
-    int appsKilled = metrics.getAppsKilled();
-    int appsSubmitted = metrics.getAppsSubmitted();
+    final int appsKilled = metrics.getAppsKilled();
+    final int appsSubmitted = metrics.getAppsSubmitted();
 
     rm.start();
     
@@ -674,6 +669,14 @@ public class TestRM extends ParameterizedSchedulerTestBase {
     rm.waitForState(application.getApplicationId(), RMAppState.KILLED);
 
     // test metrics
+    GenericTestUtils.waitFor(new Supplier<Boolean>() {
+      @Override
+      public Boolean get() {
+        QueueMetrics metrics = rm.getResourceScheduler().getRootQueueMetrics();
+        return appsKilled + 1 == metrics.getAppsKilled()
+            && appsSubmitted + 1 == metrics.getAppsSubmitted();
+      }
+    }, 100, 10000);
     metrics = rm.getResourceScheduler().getRootQueueMetrics();
     Assert.assertEquals(appsKilled + 1, metrics.getAppsKilled());
     Assert.assertEquals(appsSubmitted + 1, metrics.getAppsSubmitted());

@@ -71,6 +71,7 @@ import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Collection;
 
 /****************************************************************
  * An abstract base class for a fairly generic filesystem.  It
@@ -104,6 +105,8 @@ public abstract class FileSystem extends Configured implements Closeable {
    * Priority of the FileSystem shutdown hook.
    */
   public static final int SHUTDOWN_HOOK_PRIORITY = 10;
+  
+  public static final String TRASH_PREFIX = ".Trash";
 
   /** FileSystem cache */
   static final Cache CACHE = new Cache();
@@ -3394,4 +3397,53 @@ public abstract class FileSystem extends Configured implements Closeable {
   public static void enableSymlinks() {
     symlinksEnabled = true;
   }
+ 
+  /**
+   * Get the root directory of Trash for current user when the path specified
+   * is deleted.
+   *
+   * @param path the trash root of the path to be determined.
+   * @return the default implementation returns "/user/$USER/.Trash".
+   */
+  public Path getTrashRoot(Path path) {
+    return this.makeQualified(new Path(getHomeDirectory().toUri().getPath(),
+        TRASH_PREFIX));
+  }
+
+  /**
+   * Get all the trash roots for current user or all users.
+   *
+   * @param allUsers return trash roots for all users if true.
+   * @return all the trash root directories.
+   * Default FileSystem returns .Trash under users' home directories if
+   *         /user/$USER/.Trash exists.
+   */
+  public Collection<FileStatus> getTrashRoots(boolean allUsers) {
+    Path userHome = new Path(getHomeDirectory().toUri().getPath());
+    List<FileStatus> ret = new ArrayList<>();
+    try {
+      if (!allUsers) {
+        Path userTrash = new Path(userHome, TRASH_PREFIX);
+        if (exists(userTrash)) {
+          ret.add(getFileStatus(userTrash));
+        }
+      } else {
+        Path homeParent = userHome.getParent();
+        if (exists(homeParent)) {
+          FileStatus[] candidates = listStatus(homeParent);
+          for (FileStatus candidate : candidates) {
+            Path userTrash = new Path(candidate.getPath(), TRASH_PREFIX);
+            if (exists(userTrash)) {
+              candidate.setPath(userTrash);
+              ret.add(candidate);
+            }
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOG.warn("Cannot get all trash roots", e);
+    }
+    return ret;
+  }
+
 }

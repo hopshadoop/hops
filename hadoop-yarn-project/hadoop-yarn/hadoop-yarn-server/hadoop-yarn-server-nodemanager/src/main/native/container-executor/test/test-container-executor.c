@@ -18,6 +18,7 @@
 #include "configuration.h"
 #include "container-executor.h"
 
+#include <inttypes.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -28,7 +29,19 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-#define TEST_ROOT "/tmp/test-container-executor"
+#ifdef __APPLE__
+#include <CoreFoundation/CFString.h>
+#include <CoreFoundation/CFPreferences.h>
+
+#define TMPDIR "/private/tmp"
+#define RELTMPDIR "../.."
+#else
+#define RELTMPDIR ".."
+#define TMPDIR "/tmp"
+#endif
+
+#define TEST_ROOT TMPDIR "/test-container-executor"
+
 #define DONT_TOUCH_FILE "dont-touch-me"
 #define NM_LOCAL_DIRS       TEST_ROOT "/local-1%" TEST_ROOT "/local-2%" \
                TEST_ROOT "/local-3%" TEST_ROOT "/local-4%" TEST_ROOT "/local-5"
@@ -73,17 +86,17 @@ void run(const char *cmd) {
   } else {
     int status = 0;
     if (waitpid(child, &status, 0) <= 0) {
-      printf("FAIL: failed waiting for child process %s pid %d - %s\n", 
-	     cmd, child, strerror(errno));
+      printf("FAIL: failed waiting for child process %s pid %" PRId64 " - %s\n",
+	     cmd, (int64_t)child, strerror(errno));
       exit(1);
     }
     if (!WIFEXITED(status)) {
-      printf("FAIL: process %s pid %d did not exit\n", cmd, child);
+      printf("FAIL: process %s pid %" PRId64 " did not exit\n", cmd, (int64_t)child);
       exit(1);
     }
     if (WEXITSTATUS(status) != 0) {
-      printf("FAIL: process %s pid %d exited with error status %d\n", cmd, 
-	     child, WEXITSTATUS(status));
+      printf("FAIL: process %s pid %" PRId64 " exited with error status %d\n", cmd,
+	     (int64_t)child, WEXITSTATUS(status));
       exit(1);
     }
   }
@@ -144,17 +157,18 @@ void check_pid_file(const char* pid_file, pid_t mypid) {
   }
 
   char myPidBuf[33];
-  snprintf(myPidBuf, 33, "%d", mypid);
+  snprintf(myPidBuf, 33, "%" PRId64, (int64_t)(mypid + 1));
   if (strncmp(pidBuf, myPidBuf, strlen(myPidBuf)) != 0) {
     printf("FAIL: failed to find matching pid in pid file\n");
-    printf("FAIL: Expected pid %d : Got %.*s", mypid, (int)bytes, pidBuf);
+    printf("FAIL: Expected pid %" PRId64 " : Got %.*s", (int64_t)mypid,
+      (int)bytes, pidBuf);
     exit(1);
   }
 }
 
 void test_get_user_directory() {
-  char *user_dir = get_user_directory("/tmp", "user");
-  char *expected = "/tmp/usercache/user";
+  char *user_dir = get_user_directory(TMPDIR, "user");
+  char *expected = TMPDIR "/usercache/user";
   if (strcmp(user_dir, expected) != 0) {
     printf("test_get_user_directory expected %s got %s\n", expected, user_dir);
     exit(1);
@@ -163,8 +177,8 @@ void test_get_user_directory() {
 }
 
 void test_get_app_directory() {
-  char *expected = "/tmp/usercache/user/appcache/app_200906101234_0001";
-  char *app_dir = (char *) get_app_directory("/tmp", "user",
+  char *expected = TMPDIR "/usercache/user/appcache/app_200906101234_0001";
+  char *app_dir = (char *) get_app_directory(TMPDIR, "user",
       "app_200906101234_0001");
   if (strcmp(app_dir, expected) != 0) {
     printf("test_get_app_directory expected %s got %s\n", expected, app_dir);
@@ -174,9 +188,9 @@ void test_get_app_directory() {
 }
 
 void test_get_container_directory() {
-  char *container_dir = get_container_work_directory("/tmp", "owen", "app_1",
+  char *container_dir = get_container_work_directory(TMPDIR, "owen", "app_1",
 						 "container_1");
-  char *expected = "/tmp/usercache/owen/appcache/app_1/container_1";
+  char *expected = TMPDIR"/usercache/owen/appcache/app_1/container_1";
   if (strcmp(container_dir, expected) != 0) {
     printf("Fail get_container_work_directory got %s expected %s\n",
 	   container_dir, expected);
@@ -186,9 +200,9 @@ void test_get_container_directory() {
 }
 
 void test_get_container_launcher_file() {
-  char *expected_file = ("/tmp/usercache/user/appcache/app_200906101234_0001"
+  char *expected_file = (TMPDIR"/usercache/user/appcache/app_200906101234_0001"
 			 "/launch_container.sh");
-  char *app_dir = get_app_directory("/tmp", "user",
+  char *app_dir = get_app_directory(TMPDIR, "user",
                                     "app_200906101234_0001");
   char *container_file =  get_container_launcher_file(app_dir);
   if (strcmp(container_file, expected_file) != 0) {
@@ -210,15 +224,15 @@ void test_get_app_log_dir() {
   free(logdir);
 }
 
-void test_check_user() {
+void test_check_user(int expectedFailure) {
   printf("\nTesting test_check_user\n");
   struct passwd *user = check_user(username);
-  if (user == NULL) {
+  if (user == NULL && !expectedFailure) {
     printf("FAIL: failed check for user %s\n", username);
     exit(1);
   }
   free(user);
-  if (check_user("lp") != NULL) {
+  if (check_user("lp") != NULL && !expectedFailure) {
     printf("FAIL: failed check for system user lp\n");
     exit(1);
   }
@@ -226,7 +240,7 @@ void test_check_user() {
     printf("FAIL: failed check for system user root\n");
     exit(1);
   }
-  if (check_user("daemon") == NULL) {
+  if (check_user("daemon") == NULL && !expectedFailure) {
     printf("FAIL: failed check for whitelisted system user daemon\n");
     exit(1);
   }
@@ -238,8 +252,9 @@ void test_resolve_config_path() {
     printf("FAIL: failed to resolve config_name on an absolute path name: /bin/ls\n");
     exit(1);
   }
-  if (strcmp(resolve_config_path("../bin/ls", "/bin/ls"), "/bin/ls") != 0) {
-    printf("FAIL: failed to resolve config_name on a relative path name: ../bin/ls (relative to /bin/ls)");
+  if (strcmp(resolve_config_path(RELTMPDIR TEST_ROOT, TEST_ROOT), TEST_ROOT) != 0) {
+    printf("FAIL: failed to resolve config_name on a relative path name: "
+           RELTMPDIR TEST_ROOT " (relative to " TEST_ROOT ")");
     exit(1);
   }
 }
@@ -262,9 +277,9 @@ void test_delete_container() {
     exit(1);
   }
   char* app_dir = get_app_directory(TEST_ROOT "/local-2", yarn_username, "app_1");
-  char* dont_touch = get_app_directory(TEST_ROOT "/local-2", yarn_username, 
+  char* dont_touch = get_app_directory(TEST_ROOT "/local-2", yarn_username,
                                        DONT_TOUCH_FILE);
-  char* container_dir = get_container_work_directory(TEST_ROOT "/local-2", 
+  char* container_dir = get_container_work_directory(TEST_ROOT "/local-2",
 					      yarn_username, "app_1", "container_1");
   char buffer[100000];
   sprintf(buffer, "mkdir -p %s/who/let/the/dogs/out/who/who", container_dir);
@@ -324,9 +339,9 @@ void test_delete_container() {
 
 void test_delete_app() {
   char* app_dir = get_app_directory(TEST_ROOT "/local-2", yarn_username, "app_2");
-  char* dont_touch = get_app_directory(TEST_ROOT "/local-2", yarn_username, 
+  char* dont_touch = get_app_directory(TEST_ROOT "/local-2", yarn_username,
                                        DONT_TOUCH_FILE);
-  char* container_dir = get_container_work_directory(TEST_ROOT "/local-2", 
+  char* container_dir = get_container_work_directory(TEST_ROOT "/local-2",
 					      yarn_username, "app_2", "container_1");
   char buffer[100000];
   sprintf(buffer, "mkdir -p %s/who/let/the/dogs/out/who/who", container_dir);
@@ -452,16 +467,16 @@ void run_test_in_child(const char* test_name, void (*func)()) {
   } else {
     int status = 0;
     if (waitpid(child, &status, 0) == -1) {
-      printf("FAIL: waitpid %d failed - %s\n", child, strerror(errno));
+      printf("FAIL: waitpid %" PRId64 " failed - %s\n", (int64_t)child, strerror(errno));
       exit(1);
     }
     if (!WIFEXITED(status)) {
-      printf("FAIL: child %d didn't exit - %d\n", child, status);
+      printf("FAIL: child %" PRId64 " didn't exit - %d\n", (int64_t)child, status);
       exit(1);
     }
     if (WEXITSTATUS(status) != 0) {
-      printf("FAIL: child %d exited with bad status %d\n",
-	     child, WEXITSTATUS(status));
+      printf("FAIL: child %" PRId64 " exited with bad status %d\n",
+	     (int64_t)child, WEXITSTATUS(status));
       exit(1);
     }
   }
@@ -483,8 +498,8 @@ void test_signal_container_group() {
     sleep(3600);
     exit(0);
   }
-  printf("Child container launched as %d\n", child);
-  // there's a race condition for child calling change_user and us 
+  printf("Child container launched as %" PRId64 "\n", (int64_t)child);
+  // there's a race condition for child calling change_user and us
   // calling signal_container_as_user, hence sleeping
   sleep(3);
   if (signal_container_as_user(yarn_username, child, SIGKILL) != 0) {
@@ -500,7 +515,7 @@ void test_signal_container_group() {
     exit(1);
   }
   if (WTERMSIG(status) != SIGKILL) {
-    printf("FAIL: child was killed with %d instead of %d\n", 
+    printf("FAIL: child was killed with %d instead of %d\n",
 	   WTERMSIG(status), SIGKILL);
     exit(1);
   }
@@ -546,7 +561,7 @@ void test_init_app() {
   fflush(stderr);
   pid_t child = fork();
   if (child == -1) {
-    printf("FAIL: failed to fork process for init_app - %s\n", 
+    printf("FAIL: failed to fork process for init_app - %s\n",
 	   strerror(errno));
     exit(1);
   } else if (child == 0) {
@@ -561,7 +576,7 @@ void test_init_app() {
   }
   int status = 0;
   if (waitpid(child, &status, 0) <= 0) {
-    printf("FAIL: failed waiting for process %d - %s\n", child, 
+    printf("FAIL: failed waiting for process %" PRId64 " - %s\n", (int64_t)child,
 	   strerror(errno));
     exit(1);
   }
@@ -592,6 +607,18 @@ void test_init_app() {
     exit(1);
   }
   free(app_dir);
+}
+
+void test_write_as_root() {
+
+  char * cgroups_devices = TEST_ROOT "/cgroup-devices.txt";
+  close(creat(cgroups_devices, O_RDWR));
+  int exitcode = write_device_entry_to_cgroup_devices("a *:* rwm", cgroups_devices);
+  if(exitcode == -1) {
+  printf("FAIL: can't write to cgroup\n", strerror(errno));
+  exit(1);
+  }
+ return exitcode;
 }
 
 void test_run_container() {
@@ -628,7 +655,7 @@ void test_run_container() {
     printf("FAIL: failed to seteuid back to user - %s\n", strerror(errno));
     exit(1);
   }
-  if (fprintf(script, "#!/bin/bash\n"
+  if (fprintf(script, "#!/usr/bin/env bash\n"
                      "touch foobar\n"
                      "exit 0") < 0) {
     printf("FAIL: fprintf failed - %s\n", strerror(errno));
@@ -640,17 +667,17 @@ void test_run_container() {
   }
   fflush(stdout);
   fflush(stderr);
-  char* container_dir = get_container_work_directory(TEST_ROOT "/local-1", 
+  char* container_dir = get_container_work_directory(TEST_ROOT "/local-1",
 					      yarn_username, "app_4", "container_1");
   const char * pid_file = TEST_ROOT "/pid.txt";
 
   pid_t child = fork();
   if (child == -1) {
-    printf("FAIL: failed to fork process for init_app - %s\n", 
+    printf("FAIL: failed to fork process for init_app - %s\n",
 	   strerror(errno));
     exit(1);
   } else if (child == 0) {
-    if (launch_container_as_user(yarn_username, "app_4", "container_1", 
+    if (launch_container_as_user(yarn_username, "app_4", "container_1",
           container_dir, script_name, TEST_ROOT "/creds.txt", pid_file,
           local_dirs, log_dirs,
           "cgroups", cgroups_pids) != 0) {
@@ -662,7 +689,7 @@ void test_run_container() {
   }
   int status = 0;
   if (waitpid(child, &status, 0) <= 0) {
-    printf("FAIL: failed waiting for process %d - %s\n", child, 
+    printf("FAIL: failed waiting for process %" PRId64 " - %s\n", (int64_t)child,
 	   strerror(errno));
     exit(1);
   }
@@ -698,13 +725,44 @@ void test_run_container() {
   check_pid_file(cgroups_pids[1], child);
 }
 
+void test_sanitize_docker_command() {
+
+  char *input[] = {
+    "run --name=cname --user=nobody -d --workdir=/yarn/local/cdir --privileged --rm --device=/sys/fs/cgroup/device:/sys/fs/cgroup/device --detach=true --cgroup-parent=/sys/fs/cgroup/cpu/yarn/cid --net=host --cap-drop=ALL --cap-add=SYS_CHROOT --cap-add=MKNOD --cap-add=SETFCAP --cap-add=SETPCAP --cap-add=FSETID --cap-add=CHOWN --cap-add=AUDIT_WRITE --cap-add=SETGID --cap-add=NET_RAW --cap-add=FOWNER --cap-add=SETUID --cap-add=DAC_OVERRIDE --cap-add=KILL --cap-add=NET_BIND_SERVICE -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v /yarn/local/cdir:/yarn/local/cdir -v /yarn/local/usercache/test/:/yarn/local/usercache/test/ ubuntu bash /yarn/local/usercache/test/appcache/aid/cid/launch_container.sh",
+    "run --name=$CID --user=nobody -d --workdir=/yarn/local/cdir --privileged --rm --device=/sys/fs/cgroup/device:/sys/fs/cgroup/device --detach=true --cgroup-parent=/sys/fs/cgroup/cpu/yarn/cid --net=host --cap-drop=ALL --cap-add=SYS_CHROOT --cap-add=MKNOD --cap-add=SETFCAP --cap-add=SETPCAP --cap-add=FSETID --cap-add=CHOWN --cap-add=AUDIT_WRITE --cap-add=SETGID --cap-add=NET_RAW --cap-add=FOWNER --cap-add=SETUID --cap-add=DAC_OVERRIDE --cap-add=KILL --cap-add=NET_BIND_SERVICE -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v /yarn/local/cdir:/yarn/local/cdir -v /yarn/local/usercache/test/:/yarn/local/usercache/test/ ubuntu bash /yarn/local/usercache/test/appcache/aid/cid/launch_container.sh",
+    "run --name=cname --user=nobody -d --workdir=/yarn/local/cdir --privileged --rm --device=/sys/fs/cgroup/device:/sys/fs/cgroup/device --detach=true --cgroup-parent=/sys/fs/cgroup/cpu/yarn/cid --net=host --cap-drop=ALL --cap-add=SYS_CHROOT --cap-add=MKNOD --cap-add=SETFCAP --cap-add=SETPCAP --cap-add=FSETID --cap-add=CHOWN --cap-add=AUDIT_WRITE --cap-add=SETGID --cap-add=NET_RAW --cap-add=FOWNER --cap-add=SETUID --cap-add=DAC_OVERRIDE --cap-add=KILL --cap-add=NET_BIND_SERVICE -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v /yarn/local/cdir:/yarn/local/cdir -v /yarn/local/usercache/test/:/yarn/local/usercache/test/ ubuntu || touch /tmp/file # bash /yarn/local/usercache/test/appcache/aid/cid/launch_container.sh",
+    "run --name=cname --user=nobody -d --workdir=/yarn/local/cdir --privileged --rm --device=/sys/fs/cgroup/device:/sys/fs/cgroup/device --detach=true --cgroup-parent=/sys/fs/cgroup/cpu/yarn/cid --net=host --cap-drop=ALL --cap-add=SYS_CHROOT --cap-add=MKNOD --cap-add=SETFCAP --cap-add=SETPCAP --cap-add=FSETID --cap-add=CHOWN --cap-add=AUDIT_WRITE --cap-add=SETGID --cap-add=NET_RAW --cap-add=FOWNER --cap-add=SETUID --cap-add=DAC_OVERRIDE --cap-add=KILL --cap-add=NET_BIND_SERVICE -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v /yarn/local/cdir:/yarn/local/cdir -v /yarn/local/usercache/test/:/yarn/local/usercache/test/ ubuntu' || touch /tmp/file # bash /yarn/local/usercache/test/appcache/aid/cid/launch_container.sh",
+    "run ''''''''"
+  };
+  char *expected_output[] = {
+      "run --name='cname' --user='nobody' -d --workdir='/yarn/local/cdir' --privileged --rm --device='/sys/fs/cgroup/device:/sys/fs/cgroup/device' --detach='true' --cgroup-parent='/sys/fs/cgroup/cpu/yarn/cid' --net='host' --cap-drop='ALL' --cap-add='SYS_CHROOT' --cap-add='MKNOD' --cap-add='SETFCAP' --cap-add='SETPCAP' --cap-add='FSETID' --cap-add='CHOWN' --cap-add='AUDIT_WRITE' --cap-add='SETGID' --cap-add='NET_RAW' --cap-add='FOWNER' --cap-add='SETUID' --cap-add='DAC_OVERRIDE' --cap-add='KILL' --cap-add='NET_BIND_SERVICE' -v '/sys/fs/cgroup:/sys/fs/cgroup:ro' -v '/yarn/local/cdir:/yarn/local/cdir' -v '/yarn/local/usercache/test/:/yarn/local/usercache/test/' 'ubuntu' 'bash' '/yarn/local/usercache/test/appcache/aid/cid/launch_container.sh' ",
+      "run --name='$CID' --user='nobody' -d --workdir='/yarn/local/cdir' --privileged --rm --device='/sys/fs/cgroup/device:/sys/fs/cgroup/device' --detach='true' --cgroup-parent='/sys/fs/cgroup/cpu/yarn/cid' --net='host' --cap-drop='ALL' --cap-add='SYS_CHROOT' --cap-add='MKNOD' --cap-add='SETFCAP' --cap-add='SETPCAP' --cap-add='FSETID' --cap-add='CHOWN' --cap-add='AUDIT_WRITE' --cap-add='SETGID' --cap-add='NET_RAW' --cap-add='FOWNER' --cap-add='SETUID' --cap-add='DAC_OVERRIDE' --cap-add='KILL' --cap-add='NET_BIND_SERVICE' -v '/sys/fs/cgroup:/sys/fs/cgroup:ro' -v '/yarn/local/cdir:/yarn/local/cdir' -v '/yarn/local/usercache/test/:/yarn/local/usercache/test/' 'ubuntu' 'bash' '/yarn/local/usercache/test/appcache/aid/cid/launch_container.sh' ",
+      "run --name='cname' --user='nobody' -d --workdir='/yarn/local/cdir' --privileged --rm --device='/sys/fs/cgroup/device:/sys/fs/cgroup/device' --detach='true' --cgroup-parent='/sys/fs/cgroup/cpu/yarn/cid' --net='host' --cap-drop='ALL' --cap-add='SYS_CHROOT' --cap-add='MKNOD' --cap-add='SETFCAP' --cap-add='SETPCAP' --cap-add='FSETID' --cap-add='CHOWN' --cap-add='AUDIT_WRITE' --cap-add='SETGID' --cap-add='NET_RAW' --cap-add='FOWNER' --cap-add='SETUID' --cap-add='DAC_OVERRIDE' --cap-add='KILL' --cap-add='NET_BIND_SERVICE' -v '/sys/fs/cgroup:/sys/fs/cgroup:ro' -v '/yarn/local/cdir:/yarn/local/cdir' -v '/yarn/local/usercache/test/:/yarn/local/usercache/test/' 'ubuntu' '||' 'touch' '/tmp/file' '#' 'bash' '/yarn/local/usercache/test/appcache/aid/cid/launch_container.sh' ",
+      "run --name='cname' --user='nobody' -d --workdir='/yarn/local/cdir' --privileged --rm --device='/sys/fs/cgroup/device:/sys/fs/cgroup/device' --detach='true' --cgroup-parent='/sys/fs/cgroup/cpu/yarn/cid' --net='host' --cap-drop='ALL' --cap-add='SYS_CHROOT' --cap-add='MKNOD' --cap-add='SETFCAP' --cap-add='SETPCAP' --cap-add='FSETID' --cap-add='CHOWN' --cap-add='AUDIT_WRITE' --cap-add='SETGID' --cap-add='NET_RAW' --cap-add='FOWNER' --cap-add='SETUID' --cap-add='DAC_OVERRIDE' --cap-add='KILL' --cap-add='NET_BIND_SERVICE' -v '/sys/fs/cgroup:/sys/fs/cgroup:ro' -v '/yarn/local/cdir:/yarn/local/cdir' -v '/yarn/local/usercache/test/:/yarn/local/usercache/test/' 'ubuntu'\"'\"'' '||' 'touch' '/tmp/file' '#' 'bash' '/yarn/local/usercache/test/appcache/aid/cid/launch_container.sh' ",
+      "run ''\"'\"''\"'\"''\"'\"''\"'\"''\"'\"''\"'\"''\"'\"''\"'\"'' ",
+  };
+
+  int input_size = sizeof(input) / sizeof(char *);
+  int i = 0;
+  for(i = 0;  i < input_size; i++) {
+    char *command = (char *) calloc(strlen(input[i]), sizeof(char));
+    strncpy(command, input[i], strlen(input[i]));
+    char *op = sanitize_docker_command(command);
+    if(strncmp(expected_output[i], op, strlen(expected_output[i])) != 0) {
+      printf("FAIL: expected output %s does not match actual output '%s'\n", expected_output[i], op);
+      exit(1);
+    }
+    free(command);
+  }
+}
+
 // This test is expected to be executed either by a regular
 // user or by root. If executed by a regular user it doesn't
 // test all the functions that would depend on changing the
 // effective user id. If executed by a super-user everything
 // gets tested. Here are different ways of execing the test binary:
 // 1. regular user assuming user == yarn user
-//    $ test-container-executor     
+//    $ test-container-executor
 // 2. regular user with a given yarn user
 //    $ test-container-executor yarn_user
 // 3. super user with a given user and assuming user == yarn user
@@ -712,14 +770,16 @@ void test_run_container() {
 // 4. super user with a given user and a given yarn user
 //    # test-container-executor user yarn_user
 int main(int argc, char **argv) {
+  int ret;
   LOGFILE = stdout;
   ERRORFILE = stderr;
 
+  printf("Attempting to clean up from any previous runs\n");
   // clean up any junk from previous run
   if (system("chmod -R u=rwx " TEST_ROOT "; rm -fr " TEST_ROOT)) {
     exit(1);
   }
-  
+
   if (mkdirs(TEST_ROOT "/logs/userlogs", 0755) != 0) {
     exit(1);
   }
@@ -727,7 +787,10 @@ int main(int argc, char **argv) {
   if (write_config_file(TEST_ROOT "/test.cfg", 1) != 0) {
     exit(1);
   }
-  read_config(TEST_ROOT "/test.cfg");
+
+  printf("\nOur executable is %s\n",get_executable(argv[0]));
+
+  read_executor_config(TEST_ROOT "/test.cfg");
 
   local_dirs = extract_values(strdup(NM_LOCAL_DIRS));
   log_dirs = extract_values(strdup(NM_LOG_DIRS));
@@ -751,6 +814,9 @@ int main(int argc, char **argv) {
   }
 
   printf("\nStarting tests\n");
+
+  printf("\nTesting cgroup writing()\n");
+  test_write_as_root();
 
   printf("\nTesting resolve_config_path()\n");
   test_resolve_config_path();
@@ -778,11 +844,40 @@ int main(int argc, char **argv) {
   printf("\nTesting delete_app()\n");
   test_delete_app();
 
-  test_check_user();
+  printf("\nTesting sanitize docker commands()\n");
+  test_sanitize_docker_command();
+
+  test_check_user(0);
+
+#ifdef __APPLE__
+   printf("OS X: disabling CrashReporter\n");
+  /*
+   * disable the "unexpectedly quit" dialog box
+   * because we know we're going to make our container
+   * do exactly that.
+   */
+  CFStringRef crashType      = CFSTR("DialogType");
+  CFStringRef crashModeNone  = CFSTR("None");
+  CFStringRef crashAppID     = CFSTR("com.apple.CrashReporter");
+  CFStringRef crashOldMode   = CFPreferencesCopyAppValue(CFSTR("DialogType"), CFSTR("com.apple.CrashReporter"));
+
+  CFPreferencesSetAppValue(crashType, crashModeNone, crashAppID);
+  CFPreferencesAppSynchronize(crashAppID);
+#endif
 
   // the tests that change user need to be run in a subshell, so that
   // when they change user they don't give up our privs
   run_test_in_child("test_signal_container_group", test_signal_container_group);
+
+#ifdef __APPLE__
+  /*
+   * put the "unexpectedly quit" dialog back
+   */
+
+  CFPreferencesSetAppValue(crashType, crashOldMode, crashAppID);
+  CFPreferencesAppSynchronize(crashAppID);
+  printf("OS X: CrashReporter re-enabled\n");
+#endif
 
   // init app and run container can't be run if you aren't testing as root
   if (getuid() == 0) {
@@ -792,24 +887,41 @@ int main(int argc, char **argv) {
     test_run_container();
   }
 
-  seteuid(0);
+  /*
+   * try to seteuid(0).  if it doesn't work, carry on anyway.
+   * we're going to capture the return value to get rid of a 
+   * compiler warning.
+   */
+  ret=seteuid(0);
+  ret++;
   // test_delete_user must run as root since that's how we use the delete_as_user
   test_delete_user();
-  free_configurations();
+  free_executor_configurations();
 
   printf("\nTrying banned default user()\n");
   if (write_config_file(TEST_ROOT "/test.cfg", 0) != 0) {
     exit(1);
   }
 
-  read_config(TEST_ROOT "/test.cfg");
+  read_executor_config(TEST_ROOT "/test.cfg");
+#ifdef __APPLE__
+  username = "_uucp";
+  test_check_user(1);
+
+  username = "_networkd";
+  test_check_user(1);
+#else
   username = "bin";
-  test_check_user();
+  test_check_user(1);
+
+  username = "sys";
+  test_check_user(1);
+#endif
 
   run("rm -fr " TEST_ROOT);
   printf("\nFinished tests\n");
 
   free(current_username);
-  free_configurations();
+  free_executor_configurations();
   return 0;
 }

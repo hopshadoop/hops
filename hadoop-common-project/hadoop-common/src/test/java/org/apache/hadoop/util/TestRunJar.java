@@ -32,6 +32,7 @@ import java.util.zip.ZipEntry;
 import junit.framework.TestCase;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,14 +42,13 @@ public class TestRunJar extends TestCase {
 
   private static final String TEST_JAR_NAME="test-runjar.jar";
   private static final String TEST_JAR_2_NAME = "test-runjar2.jar";
+  private static final long MOCKED_NOW = 1_460_389_972_000L;
+  private static final long MOCKED_NOW_PLUS_TWO_SEC = MOCKED_NOW + 2_000;
 
   @Override
   @Before
-  protected void setUp()
-      throws Exception {
-    TEST_ROOT_DIR =
-        new File(System.getProperty("test.build.data", "/tmp"), getClass()
-            .getSimpleName());
+  protected void setUp() throws Exception {
+    TEST_ROOT_DIR = GenericTestUtils.getTestDir(getClass().getSimpleName());
     if (!TEST_ROOT_DIR.exists()) {
       TEST_ROOT_DIR.mkdirs();
     }
@@ -70,9 +70,13 @@ public class TestRunJar extends TestCase {
     File jarFile = new File(TEST_ROOT_DIR, TEST_JAR_NAME);
     JarOutputStream jstream =
         new JarOutputStream(new FileOutputStream(jarFile));
-    jstream.putNextEntry(new ZipEntry("foobar.txt"));
+    ZipEntry zipEntry1 = new ZipEntry("foobar.txt");
+    zipEntry1.setTime(MOCKED_NOW);
+    jstream.putNextEntry(zipEntry1);
     jstream.closeEntry();
-    jstream.putNextEntry(new ZipEntry("foobaz.txt"));
+    ZipEntry zipEntry2 = new ZipEntry("foobaz.txt");
+    zipEntry2.setTime(MOCKED_NOW_PLUS_TWO_SEC);
+    jstream.putNextEntry(zipEntry2);
     jstream.closeEntry();
     jstream.close();
   }
@@ -113,6 +117,19 @@ public class TestRunJar extends TestCase {
     assertTrue("foobaz unpacked",
                new File(unjarDir, "foobaz.txt").exists());
 
+  }
+
+  public void testUnJarDoesNotLooseLastModify() throws Exception {
+    File unjarDir = new File(TEST_ROOT_DIR, "unjar-lastmod");
+    assertFalse("unjar dir shouldn't exist at test start",
+            new File(unjarDir, "foobar.txt").exists());
+
+    // Unjar everything
+    RunJar.unJar(new File(TEST_ROOT_DIR, TEST_JAR_NAME),
+            unjarDir);
+
+    assertEquals("Last modify time was lost during unJar", MOCKED_NOW, new File(unjarDir, "foobar.txt").lastModified());
+    assertEquals("Last modify time was lost during unJar", MOCKED_NOW_PLUS_TWO_SEC, new File(unjarDir, "foobaz.txt").lastModified());
   }
 
   /**

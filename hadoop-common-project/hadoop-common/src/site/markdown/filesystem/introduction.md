@@ -14,6 +14,8 @@
 
 # Introduction
 
+<!-- MACRO{toc|fromDepth=1|toDepth=2} -->
+
 This document defines the required behaviors of a Hadoop-compatible filesystem
 for implementors and maintainers of the Hadoop filesystem, and for users of
 the Hadoop FileSystem APIs
@@ -28,10 +30,10 @@ are places where HDFS diverges from the expected behaviour of a POSIX
 filesystem.
 
 The behaviour of other Hadoop filesystems are not as rigorously tested.
-The bundled S3 FileSystem makes Amazon's S3 Object Store ("blobstore")
+The bundled S3N and S3A FileSystem clients make Amazon's S3 Object Store ("blobstore")
 accessible through the FileSystem API. The Swift FileSystem driver provides similar
 functionality for the OpenStack Swift blobstore. The Azure object storage
-FileSystem in branch-1-win talks to Microsoft's Azure equivalent. All of these
+FileSystem talks to Microsoft's Azure equivalent. All of these
 bind to object stores, which do have different behaviors, especially regarding
 consistency guarantees, and atomicity of operations.
 
@@ -57,7 +59,7 @@ By making each aspect of the contract tests configurable, it is possible to
 declare how a filesystem diverges from parts of the standard contract.
 This is information which can be conveyed to users of the filesystem.
 
-### Naming
+## Naming
 
 This document follows RFC 2119 rules regarding the use of MUST, MUST NOT, MAY,
 and SHALL. MUST NOT is treated as normative.
@@ -139,7 +141,7 @@ The failure modes when a user lacks security permissions are not specified.
 
 ### Networking Assumptions
 
-This document assumes this all network operations succeed. All statements
+This document assumes that all network operations succeed. All statements
 can be assumed to be qualified as *"assuming the operation does not fail due
 to a network availability problem"*
 
@@ -301,7 +303,7 @@ does not hold on blob stores]
 1. Directory list operations are fast for directories with few entries, but may
 incur a cost that is `O(entries)`. Hadoop 2 added iterative listing to
 handle the challenge of listing directories with millions of entries without
-buffering -at the cost of consistency.
+buffering at the cost of consistency.
 
 1. A `close()` of an `OutputStream` is fast, irrespective of whether or not
 the file operation has succeeded or not.
@@ -315,8 +317,8 @@ This specification refers to *Object Stores* in places, often using the
 term *Blobstore*. Hadoop does provide FileSystem client classes for some of these
 even though they violate many of the requirements. This is why, although
 Hadoop can read and write data in an object store, the two which Hadoop ships
-with direct support for &mdash;Amazon S3 and OpenStack Swift&mdash cannot
-be used as direct replacement for HDFS.
+with direct support for &mdash; Amazon S3 and OpenStack Swift &mdash; cannot
+be used as direct replacements for HDFS.
 
 *What is an Object Store?*
 
@@ -356,10 +358,10 @@ are current with respect to the files within that directory.
 as are `delete()` operations. Object store FileSystem clients implement these
 as operations on the individual objects whose names match the directory prefix.
 As a result, the changes take place a file at a time, and are not atomic. If
-an operation fails part way through the process, the the state of the object store
+an operation fails part way through the process, then the state of the object store
 reflects the partially completed operation.  Note also that client code
 assumes that these operations are `O(1)` &mdash;in an object store they are
-more likely to be be `O(child-entries)`.
+more likely to be `O(child-entries)`.
 
 1. **Durability**. Hadoop assumes that `OutputStream` implementations write data
 to their (persistent) storage on a `flush()` operation. Object store implementations
@@ -371,7 +373,107 @@ a time proportional to the quantity of data to upload, and inversely proportiona
 to the network bandwidth. It may also fail &mdash;a failure that is better
 escalated than ignored.
 
+1. **Authorization**. Hadoop uses the `FileStatus` class to
+represent core metadata of files and directories, including the owner, group and
+permissions.  Object stores might not have a viable way to persist this
+metadata, so they might need to populate `FileStatus` with stub values.  Even if
+the object store persists this metadata, it still might not be feasible for the
+object store to enforce file authorization in the same way as a traditional file
+system.  If the object store cannot persist this metadata, then the recommended
+convention is:
+    * File owner is reported as the current user.
+    * File group also is reported as the current user.
+    * Directory permissions are reported as 777.
+    * File permissions are reported as 666.
+    * File system APIs that set ownership and permissions execute successfully
+      without error, but they are no-ops.
+
 Object stores with these characteristics, can not be used as a direct replacement
 for HDFS. In terms of this specification, their implementations of the
 specified operations do not match those required. They are considered supported
 by the Hadoop development community, but not to the same extent as HDFS.
+
+#### Timestamps
+
+
+`FileStatus` entries have a modification time and an access time.
+
+1. The exact behavior as to when these timestamps are set and whether or not they are valid
+varies between filesystems, and potentially between individual installations of a filesystem.
+1. The granularity of the timestamps is again, specific to both a filesystem
+and potentially individual installations.
+
+The HDFS filesystem does not update the modification time while it is being written to.
+
+Specifically
+
+* `FileSystem.create()` creation: a zero-byte file is listed; the modification time is
+  set to the current time as seen on the NameNode.
+* Writes to a file via the output stream returned in the `create()` call: the modification
+  time *does not change*.
+* When `OutputStream.close()` is called, all remaining data is written, the file closed and
+  the NameNode updated with the final size of the file. The modification time is set to
+  the time the file was closed.
+* Opening a file for appends via an `append()` operation does not change the modification
+  time of the file until the `close()` call is made on the output stream.
+* `FileSystem.setTimes()` can be used to explicitly set the time on a file.
+* When a file is renamed, its modification time is not changed, but the source
+  and destination directories have their modification times updated.
+* The rarely used operations:  `FileSystem.concat()`, `createSnapshot()`,
+ `createSymlink()` and `truncate()` all update the modification time.
+* The access time granularity is set in milliseconds `dfs.namenode.access.time.precision`;
+  the default granularity is 1 hour. If the precision is set to zero, access times
+  are not recorded.
+* If a modification or access time is not set, the value of that `FileStatus`
+field is 0.
+
+Other filesystems may have different behaviors. In particular,
+
+* Access times may or may not be supported; even if the underlying FS may support access times,
+  the option it is often disabled for performance reasons.
+* The granularity of the timestamps is an implementation-specific detail.
+
+
+Object stores have an even vaguer view of time, which can be summarized as
+"it varies".
+
+ * The timestamp granularity is likely to be 1 second, that being the granularity
+   of timestamps returned in HTTP HEAD and GET requests.
+ * Access times are likely to be unset. That is, `FileStatus.getAccessTime() == 0`.
+ * The modification timestamp for a newly created file MAY be that of the
+  `create()` call, or the actual time which the PUT request was initiated.
+   This may be in the  `FileSystem.create()` call, the final
+   `OutputStream.close()` operation, some period in between.
+ * The modification time may not be updated in the `close()` call.
+ * The timestamp is likely to be in UTC or the TZ of the object store. If the
+   client is in a different timezone, the timestamp of objects may be ahead or
+   behind that of the client.
+ * Object stores with cached metadata databases (for example: AWS S3 with
+   an in-memory or a DynamoDB metadata store) may have timestamps generated
+   from the local system clock, rather than that of the service.
+   This is an optimization to avoid round-trip calls to the object stores.
+ + A file's modification time is often the same as its creation time.
+ + The `FileSystem.setTimes()` operation to set file timestamps *may* be ignored.
+ * `FileSystem.chmod()` may update modification times (example: Azure `wasb://`).
+ * If `FileSystem.append()` is supported, the changes and modification time
+   are likely to only become visible after the output stream is closed.
+ * Out-of-band operations to data in object stores (that is: direct requests
+   to object stores which bypass the Hadoop FileSystem APIs), may result
+   in different timestamps being stored and/or returned.
+ * As the notion of a directory structure is often simulated, the timestamps
+   of directories *may* be artificially generated &mdash;perhaps using the current
+   system time.
+ * As `rename()` operations are often implemented as a COPY + DELETE, the
+   timestamps of renamed objects may become that of the time the rename of an
+   object was started, rather than the timestamp of the source object.
+ * The exact timestamp behavior may vary between different object store installations,
+   even with the same timestore client.
+
+Finally, note that the Apache Hadoop project cannot make any guarantees about
+whether the timestamp behavior of a remote object store will remain consistent
+over time: they are third-party services, usually accessed via third-party libraries.
+
+The best strategy here is "experiment with the exact endpoint you intend to work with".
+Furthermore, if you intend to use any caching/consistency layer, test with that
+feature enabled. Retest after updates to Hadoop releases, and endpoint object
+store updates.

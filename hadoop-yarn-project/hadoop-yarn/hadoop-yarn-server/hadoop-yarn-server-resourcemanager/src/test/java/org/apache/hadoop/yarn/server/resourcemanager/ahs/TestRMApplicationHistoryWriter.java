@@ -18,19 +18,19 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import java.io.IOException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.junit.Assert;
 
 import org.apache.hadoop.conf.Configuration;
@@ -90,7 +90,6 @@ public class TestRMApplicationHistoryWriter {
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
-
     writer = new RMApplicationHistoryWriter() {
 
       @Override

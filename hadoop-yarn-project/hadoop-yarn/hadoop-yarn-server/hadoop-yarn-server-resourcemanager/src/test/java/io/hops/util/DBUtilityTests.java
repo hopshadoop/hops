@@ -17,7 +17,6 @@ package io.hops.util;
 
 import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
 import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
 import io.hops.metadata.yarn.dal.PendingEventDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
@@ -32,6 +31,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import io.hops.metadata.yarn.dal.RMNodeApplicationsDataAccess;
 
 /**
  *
@@ -181,8 +181,8 @@ public class DBUtilityTests {
       public Object performTask() throws IOException {
         connector.beginTransaction();
         connector.readCommitted();
-        FinishedApplicationsDataAccess DA = (FinishedApplicationsDataAccess) YarnAPIStorageFactory.
-                getDataAccess(FinishedApplicationsDataAccess.class);
+        RMNodeApplicationsDataAccess DA = (RMNodeApplicationsDataAccess) YarnAPIStorageFactory.
+                getDataAccess(RMNodeApplicationsDataAccess.class);
          Map<String, List<ContainerId>> res = DA.getAll();
         connector.commit();
         return res;

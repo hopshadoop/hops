@@ -66,6 +66,21 @@ public class XFrameOptionsFilter implements Filter {
     }
   }
 
+  /**
+   * Constructs a mapping of configuration properties to be used for filter
+   * initialization.  The mapping includes all properties that start with the
+   * specified configuration prefix.  Property names in the mapping are trimmed
+   * to remove the configuration prefix.
+   *
+   * @param conf configuration to read
+   * @param confPrefix configuration prefix
+   * @return mapping of configuration properties to be used for filter
+   *     initialization
+   */
+  public static Map<String, String> getFilterParams(Configuration conf,
+      String confPrefix) {
+    return conf.getPropsWithPrefix(confPrefix);
+  }
 
   /**
    * This wrapper allows the rest of the filter pipeline to

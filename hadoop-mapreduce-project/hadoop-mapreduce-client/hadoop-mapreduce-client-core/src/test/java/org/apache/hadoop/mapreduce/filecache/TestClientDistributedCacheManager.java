@@ -29,6 +29,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
@@ -43,13 +44,21 @@ public class TestClientDistributedCacheManager {
   private static final Log LOG = LogFactory.getLog(
       TestClientDistributedCacheManager.class);
   
-  private static final String TEST_ROOT_DIR = 
-      new File(System.getProperty("test.build.data", "/tmp")).toURI()
-      .toString().replace(' ', '+');
-  
+  private static final Path TEST_ROOT_DIR = new Path(
+      System.getProperty("test.build.data",
+          System.getProperty("java.io.tmpdir")),
+      TestClientDistributedCacheManager.class.getSimpleName());
+
+  private static final Path TEST_VISIBILITY_PARENT_DIR =
+      new Path(TEST_ROOT_DIR, "TestCacheVisibility_Parent");
+
+  private static final Path TEST_VISIBILITY_CHILD_DIR =
+      new Path(TEST_VISIBILITY_PARENT_DIR, "TestCacheVisibility_Child");
+
   private FileSystem fs;
   private Path firstCacheFile;
   private Path secondCacheFile;
+  private Path thirdCacheFile;
   private Configuration conf;
   
   @Before
@@ -58,17 +67,17 @@ public class TestClientDistributedCacheManager {
     fs = FileSystem.get(conf);
     firstCacheFile = new Path(TEST_ROOT_DIR, "firstcachefile");
     secondCacheFile = new Path(TEST_ROOT_DIR, "secondcachefile");
+    thirdCacheFile = new Path(TEST_VISIBILITY_CHILD_DIR,"thirdCachefile");
     createTempFile(firstCacheFile, conf);
     createTempFile(secondCacheFile, conf);
+    createTempFile(thirdCacheFile, conf);
   }
   
   @After
   public void tearDown() throws IOException {
-    if (!fs.delete(firstCacheFile, false)) {
-      LOG.warn("Failed to delete firstcachefile");
-    }
-    if (!fs.delete(secondCacheFile, false)) {
-      LOG.warn("Failed to delete secondcachefile");
+    if (fs.delete(TEST_ROOT_DIR, true)) {
+      LOG.warn("Failed to delete test root dir and its content under "
+          + TEST_ROOT_DIR);
     }
   }
   
@@ -93,6 +102,25 @@ public class TestClientDistributedCacheManager {
     Assert.assertEquals(expected, jobConf.get(MRJobConfig.CACHE_FILE_TIMESTAMPS));
   }
   
+  @Test
+  public void testDetermineCacheVisibilities() throws IOException {
+    fs.setWorkingDirectory(TEST_VISIBILITY_CHILD_DIR);
+    fs.setPermission(TEST_VISIBILITY_CHILD_DIR,
+        new FsPermission((short)00777));
+    fs.setPermission(TEST_VISIBILITY_PARENT_DIR,
+        new FsPermission((short)00700));
+    Job job = Job.getInstance(conf);
+    Path relativePath = new Path("thirdCachefile");
+    job.addCacheFile(relativePath.toUri());
+    Configuration jobConf = job.getConfiguration();
+
+    Map<URI, FileStatus> statCache = new HashMap<URI, FileStatus>();
+    ClientDistributedCacheManager.
+        determineCacheVisibilities(jobConf, statCache);
+    Assert.assertFalse(jobConf.
+               getBoolean(MRJobConfig.CACHE_FILE_VISIBILITIES,true));
+  }
+
   @SuppressWarnings("deprecation")
   void createTempFile(Path p, Configuration conf) throws IOException {
     SequenceFile.Writer writer = null;

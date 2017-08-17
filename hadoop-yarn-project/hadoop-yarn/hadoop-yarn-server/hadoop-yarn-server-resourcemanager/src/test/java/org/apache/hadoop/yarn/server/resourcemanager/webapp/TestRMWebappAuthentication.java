@@ -31,15 +31,13 @@ import java.util.Collection;
 
 import javax.ws.rs.core.MediaType;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.KerberosTestUtils;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
@@ -55,6 +53,9 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
 import com.sun.jersey.api.client.ClientResponse.Status;
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 
 /* Just a simple test class to ensure that the RM handles the static web user
  * correctly for secure and un-secure modes
@@ -101,7 +102,7 @@ public class TestRMWebappAuthentication {
         { 2, kerberosConf } });
   }
 
-  public TestRMWebappAuthentication(int run, Configuration conf) {
+  public TestRMWebappAuthentication(int run, Configuration conf) throws IOException {
     super();
     setupAndStartRM(conf);
   }
@@ -109,9 +110,6 @@ public class TestRMWebappAuthentication {
   @BeforeClass
   public static void setUp() {
     try {
-      RMStorageFactory.setConfiguration(simpleConf);
-      YarnAPIStorageFactory.setConfiguration(simpleConf);
-      DBUtility.InitializeDB();
       testMiniKDC = new MiniKdc(MiniKdc.createConf(), testRootDir);
       setupKDC();
     } catch (Exception e) {
@@ -139,7 +137,10 @@ public class TestRMWebappAuthentication {
     return testMiniKDC;
   }
 
-  private static void setupAndStartRM(Configuration conf) {
+  private static void setupAndStartRM(Configuration conf) throws IOException {
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
     UserGroupInformation.setConfiguration(conf);
     rm = new MockRM(conf);
   }
@@ -242,11 +243,11 @@ public class TestRMWebappAuthentication {
     assertEquals(Status.ACCEPTED.getStatusCode(), conn.getResponseCode());
     boolean appExists =
         rm.getRMContext().getRMApps()
-          .containsKey(ConverterUtils.toApplicationId(appid));
+          .containsKey(ApplicationId.fromString(appid));
     assertTrue(appExists);
     RMApp actualApp =
         rm.getRMContext().getRMApps()
-          .get(ConverterUtils.toApplicationId(appid));
+          .get(ApplicationId.fromString(appid));
     String owner = actualApp.getUser();
     assertEquals(
       rm.getConfig().get(CommonConfigurationKeys.HADOOP_HTTP_STATIC_USER,
@@ -265,11 +266,11 @@ public class TestRMWebappAuthentication {
     conn.getInputStream();
     appExists =
         rm.getRMContext().getRMApps()
-          .containsKey(ConverterUtils.toApplicationId(appid));
+          .containsKey(ApplicationId.fromString(appid));
     assertTrue(appExists);
     actualApp =
         rm.getRMContext().getRMApps()
-          .get(ConverterUtils.toApplicationId(appid));
+          .get(ApplicationId.fromString(appid));
     owner = actualApp.getUser();
     assertEquals("client", owner);
 

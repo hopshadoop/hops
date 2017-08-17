@@ -86,7 +86,7 @@ import org.apache.hadoop.util.StringInterner;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
-import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
+import org.apache.hadoop.yarn.state.InvalidStateTransitionException;
 import org.apache.hadoop.yarn.state.MultipleArcTransition;
 import org.apache.hadoop.yarn.state.SingleArcTransition;
 import org.apache.hadoop.yarn.state.StateMachine;
@@ -259,6 +259,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
     // d. TA processes TA_KILL event and sends T_ATTEMPT_KILLED to the task.
     .addTransition(TaskStateInternal.KILLED, TaskStateInternal.KILLED,
         EnumSet.of(TaskEventType.T_KILL,
+                   TaskEventType.T_SCHEDULE,
                    TaskEventType.T_ATTEMPT_KILLED,
                    TaskEventType.T_ADD_SPEC_ATTEMPT))
 
@@ -652,7 +653,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
       TaskStateInternal oldState = getInternalState();
       try {
         stateMachine.doTransition(event.getType(), event);
-      } catch (InvalidStateTransitonException e) {
+      } catch (InvalidStateTransitionException e) {
         LOG.error("Can't handle this event at current state for "
             + this.taskId, e);
         internalError(event.getType());
@@ -1068,9 +1069,21 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
             TaskAttemptCompletionEventStatus.FAILED);
         // we don't need a new event if we already have a spare
         task.inProgressAttempts.remove(taskAttemptId);
-        if (task.inProgressAttempts.size() == 0
-            && task.successfulAttempt == null) {
-          task.addAndScheduleAttempt(Avataar.VIRGIN);
+        if (task.successfulAttempt == null) {
+          boolean shouldAddNewAttempt = true;
+          if (task.inProgressAttempts.size() > 0) {
+            // if not all of the inProgressAttempts are hanging for resource
+            for (TaskAttemptId attemptId : task.inProgressAttempts) {
+              if (((TaskAttemptImpl) task.getAttempt(attemptId))
+                  .isContainerAssigned()) {
+                shouldAddNewAttempt = false;
+                break;
+              }
+            }
+          }
+          if (shouldAddNewAttempt) {
+            task.addAndScheduleAttempt(Avataar.VIRGIN);
+          }
         }
       } else {
         task.handleTaskAttemptCompletion(
@@ -1091,7 +1104,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
             taskFailedEvent));
         } else {
           LOG.debug("Not generating HistoryFinish event since start event not" +
-          		" generated for task: " + task.getID());
+              " generated for task: " + task.getID());
         }
         task.eventHandler.handle(
             new JobTaskEvent(task.taskId, TaskState.FAILED));

@@ -85,13 +85,21 @@ public class TestQueueMetrics {
     
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
-    
+
     metrics.allocateResources(user, 3, Resources.createResource(2*GB, 2, 2), true);
     checkResources(queueSource, 6*GB, 6, 6, 3, 3, 0, 100*GB, 100, 100, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-  
+
     metrics.releaseResources(user, 1, Resources.createResource(2*GB, 2, 2));
     checkResources(queueSource, 4*GB, 4, 4, 2, 3, 1, 100*GB, 100, 100, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-    
+
+    metrics.incrPendingResources(user, 0, Resources.createResource(2 * GB, 2, 2));
+    checkResources(queueSource, 4 * GB, 4, 4, 2, 3, 1, 100 * GB, 100, 100, 9 * GB, 9, 9, 2,
+        0, 0, 0, 0);
+
+    metrics.decrPendingResources(user, 0, Resources.createResource(2 * GB, 2, 2));
+    checkResources(queueSource, 4 * GB, 4, 4, 2, 3, 1, 100 * GB, 100, 100, 9 * GB, 9, 9, 2,
+        0, 0, 0, 0);
+
     metrics.finishAppAttempt(
         app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
@@ -202,7 +210,54 @@ public class TestQueueMetrics {
     checkApps(queueSource, 1, 0, 0, 1, 0, 0, true);
     checkApps(userSource, 1, 0, 0, 1, 0, 0, true);
   }
-  
+
+
+  @Test public void testNodeTypeMetrics() {
+    String parentQueueName = "root";
+    String leafQueueName = "root.leaf";
+    String user = "alice";
+
+    QueueMetrics parentMetrics =
+      QueueMetrics.forQueue(ms, parentQueueName, null, true, conf);
+    Queue parentQueue = make(stub(Queue.class).returning(parentMetrics).
+        from.getMetrics());
+    QueueMetrics metrics =
+      QueueMetrics.forQueue(ms, leafQueueName, parentQueue, true, conf);
+    MetricsSource parentQueueSource = queueSource(ms, parentQueueName);
+    MetricsSource queueSource = queueSource(ms, leafQueueName);
+    //AppSchedulingInfo app = mockApp(user);
+
+    metrics.submitApp(user);
+    MetricsSource userSource = userSource(ms, leafQueueName, user);
+    MetricsSource parentUserSource = userSource(ms, parentQueueName, user);
+
+    metrics.incrNodeTypeAggregations(user, NodeType.NODE_LOCAL);
+    checkAggregatedNodeTypes(queueSource,1L,0L,0L);
+    checkAggregatedNodeTypes(parentQueueSource,1L,0L,0L);
+    checkAggregatedNodeTypes(userSource,1L,0L,0L);
+    checkAggregatedNodeTypes(parentUserSource,1L,0L,0L);
+
+    metrics.incrNodeTypeAggregations(user, NodeType.RACK_LOCAL);
+    checkAggregatedNodeTypes(queueSource,1L,1L,0L);
+    checkAggregatedNodeTypes(parentQueueSource,1L,1L,0L);
+    checkAggregatedNodeTypes(userSource,1L,1L,0L);
+    checkAggregatedNodeTypes(parentUserSource,1L,1L,0L);
+
+    metrics.incrNodeTypeAggregations(user, NodeType.OFF_SWITCH);
+    checkAggregatedNodeTypes(queueSource,1L,1L,1L);
+    checkAggregatedNodeTypes(parentQueueSource,1L,1L,1L);
+    checkAggregatedNodeTypes(userSource,1L,1L,1L);
+    checkAggregatedNodeTypes(parentUserSource,1L,1L,1L);
+
+    metrics.incrNodeTypeAggregations(user, NodeType.OFF_SWITCH);
+    checkAggregatedNodeTypes(queueSource,1L,1L,2L);
+    checkAggregatedNodeTypes(parentQueueSource,1L,1L,2L);
+    checkAggregatedNodeTypes(userSource,1L,1L,2L);
+    checkAggregatedNodeTypes(parentUserSource,1L,1L,2L);
+
+  }
+
+
   @Test public void testTwoLevelWithUserMetrics() {
     String parentQueueName = "root";
     String leafQueueName = "root.leaf";
@@ -355,12 +410,12 @@ public class TestQueueMetrics {
     assertCounter("AppsFailed", failed, rb);
     assertCounter("AppsKilled", killed, rb);
   }
-  
-  public static void checkResources(MetricsSource source, int allocatedMB,
+
+  public static void checkResources(MetricsSource source, long allocatedMB,
       int allocatedCores, int allocatedGPUs, int allocCtnrs, long aggreAllocCtnrs,
-      long aggreReleasedCtnrs, int availableMB, int availableCores, int availableGPUs, int pendingMB,
-      int pendingCores, int pendingGPUs, int pendingCtnrs, int reservedMB, int reservedCores,
-      int reservedGPUs, int reservedCtnrs) {
+      long aggreReleasedCtnrs, long availableMB, int availableCores, int availableGPUs, long pendingMB,
+      int pendingCores, int pendingGPUs, int pendingCtnrs, long reservedMB, int reservedCores, int reservedGPUs,
+      int reservedCtnrs) {
     MetricsRecordBuilder rb = getMetrics(source);
     assertGauge("AllocatedMB", allocatedMB, rb);
     assertGauge("AllocatedVCores", allocatedCores, rb);
@@ -380,7 +435,15 @@ public class TestQueueMetrics {
     assertGauge("ReservedGPUs", reservedGPUs, rb);
     assertGauge("ReservedContainers", reservedCtnrs, rb);
   }
-  
+
+  public static void checkAggregatedNodeTypes(MetricsSource source,
+      long nodeLocal, long rackLocal, long offSwitch) {
+    MetricsRecordBuilder rb = getMetrics(source);
+    assertCounter("AggregateNodeLocalContainersAllocated", nodeLocal, rb);
+    assertCounter("AggregateRackLocalContainersAllocated", rackLocal, rb);
+    assertCounter("AggregateOffSwitchContainersAllocated", offSwitch, rb);
+  }
+
   private static AppSchedulingInfo mockApp(String user) {
     AppSchedulingInfo app = mock(AppSchedulingInfo.class);
     when(app.getUser()).thenReturn(user);

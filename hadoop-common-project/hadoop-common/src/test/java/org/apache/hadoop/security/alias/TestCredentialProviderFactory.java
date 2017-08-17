@@ -23,6 +23,8 @@ import java.net.URI;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -32,22 +34,34 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.ProviderUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class TestCredentialProviderFactory {
-  
+  public static final Log LOG = LogFactory.getLog(TestCredentialProviderFactory.class);
+
+  @Rule
+  public final TestName test = new TestName();
+
+  @Before
+  public void announce() {
+    LOG.info("Running test " + test.getMethodName());
+  }
+
   private static char[] chars = { 'a', 'b', 'c', 'd', 'e', 'f', 'g',
   'h', 'j', 'k', 'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
   'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K',
   'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
   '2', '3', '4', '5', '6', '7', '8', '9',};
 
-  private static final File tmpDir =
-      new File(System.getProperty("test.build.data", "/tmp"), "creds");
+  private static final File tmpDir = GenericTestUtils.getTestDir("creds");
 
   @Test
   public void testFactory() throws Exception {
@@ -199,7 +213,7 @@ public class TestCredentialProviderFactory {
     Path path = ProviderUtils.unnestUri(new URI(ourUrl));
     FileSystem fs = path.getFileSystem(conf);
     FileStatus s = fs.getFileStatus(path);
-    assertTrue(s.getPermission().toString().equals("rwx------"));
+    assertTrue(s.getPermission().toString().equals("rw-------"));
     assertTrue(file + " should exist", file.isFile());
 
     // check permission retention after explicit change
@@ -221,7 +235,8 @@ public class TestCredentialProviderFactory {
     Path path = ProviderUtils.unnestUri(new URI(ourUrl));
     FileSystem fs = path.getFileSystem(conf);
     FileStatus s = fs.getFileStatus(path);
-    assertTrue("Unexpected permissions: " + s.getPermission().toString(), s.getPermission().toString().equals("rwx------"));
+    assertTrue("Unexpected permissions: " + s.getPermission().toString(),
+        s.getPermission().toString().equals("rw-------"));
     assertTrue(file + " should exist", file.isFile());
 
     // check permission retention after explicit change

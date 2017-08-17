@@ -19,7 +19,6 @@ import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
 import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
 import io.hops.metadata.yarn.dal.PendingEventDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
@@ -28,7 +27,7 @@ import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.ContainerId;
 import io.hops.metadata.yarn.entity.ContainerStatus;
-import io.hops.metadata.yarn.entity.FinishedApplications;
+import io.hops.metadata.yarn.entity.RMNodeApplication;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.RMNode;
@@ -37,7 +36,7 @@ import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.streaming.ContainerIdToCleanEvent;
 import io.hops.streaming.ContainerStatusEvent;
 import io.hops.streaming.DBEvent;
-import io.hops.streaming.FinishedApplicationsEvent;
+import io.hops.streaming.RMNodeApplicationsEvent;
 import io.hops.streaming.NextHeartBeatEvent;
 import io.hops.streaming.PendingEventEvent;
 import io.hops.streaming.RMNodeEvent;
@@ -55,6 +54,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import io.hops.metadata.yarn.dal.RMNodeApplicationsDataAccess;
 
 public class testStreaming {
 
@@ -64,10 +64,6 @@ public class testStreaming {
   public static void setUp() throws Exception {
     conf = new YarnConfiguration();
     // Set configuration options
-    conf.set(YarnConfiguration.EVENT_RT_CONFIG_PATH,
-            "target/test-classes/RT_EventAPIConfig.ini");
-    conf.set(YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
-            "target/test-classes/RM_EventAPIConfig.ini");
     conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
@@ -251,10 +247,10 @@ public class testStreaming {
         connector.beginTransaction();
         connector.writeLock();
 
-        FinishedApplicationsDataAccess DA
-                = (FinishedApplicationsDataAccess) RMStorageFactory
-                .getDataAccess(FinishedApplicationsDataAccess.class);
-        DA.add(new FinishedApplications("rmnodeId", "applicationId"));
+        RMNodeApplicationsDataAccess DA
+                = (RMNodeApplicationsDataAccess) RMStorageFactory
+                .getDataAccess(RMNodeApplicationsDataAccess.class);
+        DA.add(new RMNodeApplication("rmnodeId", "applicationId", RMNodeApplication.RMNodeApplicationStatus.FINISHED));
 
         connector.commit();
         return null;
@@ -264,7 +260,7 @@ public class testStreaming {
     Thread.sleep(1000);
     Assert.assertEquals(DBEvent.receivedEvents.size(), 1);
     event = DBEvent.receivedEvents.take();
-    Assert.assertTrue(event instanceof FinishedApplicationsEvent);
+    Assert.assertTrue(event instanceof RMNodeApplicationsEvent);
   }
 
 }

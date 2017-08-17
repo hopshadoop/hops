@@ -47,7 +47,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineDomain;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineDomains;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
@@ -61,7 +60,6 @@ import org.apache.hadoop.yarn.server.timeline.NameValuePair;
 import org.apache.hadoop.yarn.server.timeline.TimelineDataManager;
 import org.apache.hadoop.yarn.server.timeline.TimelineReader.Field;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineAbout;
-import org.apache.hadoop.yarn.util.YarnVersionInfo;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.hadoop.yarn.webapp.BadRequestException;
 import org.apache.hadoop.yarn.webapp.ForbiddenException;
@@ -129,9 +127,9 @@ public class TimelineWebServices {
           getUser(req));
     } catch (NumberFormatException e) {
       throw new BadRequestException(
-          "windowStart, windowEnd or limit is not a numeric value.");
+        "windowStart, windowEnd, fromTs or limit is not a numeric value: " + e);
     } catch (IllegalArgumentException e) {
-      throw new BadRequestException("requested invalid field.");
+      throw new BadRequestException("requested invalid field: " + e);
     } catch (Exception e) {
       LOG.error("Error getting entities", e);
       throw new WebApplicationException(e,
@@ -160,8 +158,7 @@ public class TimelineWebServices {
           parseFieldsStr(fields, ","),
           getUser(req));
     } catch (IllegalArgumentException e) {
-      throw new BadRequestException(
-          "requested invalid field.");
+      throw new BadRequestException(e);
     } catch (Exception e) {
       LOG.error("Error getting entity", e);
       throw new WebApplicationException(e,
@@ -201,8 +198,9 @@ public class TimelineWebServices {
           parseLongStr(limit),
           getUser(req));
     } catch (NumberFormatException e) {
-      throw new BadRequestException(
-          "windowStart, windowEnd or limit is not a numeric value.");
+      throw (BadRequestException)new BadRequestException(
+          "windowStart, windowEnd or limit is not a numeric value.")
+          .initCause(e);
     } catch (Exception e) {
       LOG.error("Error getting entity timelines", e);
       throw new WebApplicationException(e,
@@ -229,6 +227,8 @@ public class TimelineWebServices {
     }
     try {
       return timelineDataManager.postEntities(entities, callerUGI);
+    } catch (BadRequestException bre) {
+      throw bre;
     } catch (Exception e) {
       LOG.error("Error putting entities", e);
       throw new WebApplicationException(e,

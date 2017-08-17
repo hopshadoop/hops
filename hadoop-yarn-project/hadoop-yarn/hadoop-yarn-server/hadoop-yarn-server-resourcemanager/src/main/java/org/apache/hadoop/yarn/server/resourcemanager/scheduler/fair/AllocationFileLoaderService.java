@@ -39,6 +39,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.records.QueueACL;
+import org.apache.hadoop.yarn.api.records.ReservationACL;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceWeights;
 import org.apache.hadoop.yarn.util.Clock;
@@ -202,7 +203,8 @@ public class AllocationFileLoaderService extends AbstractService {
    * @throws SAXException if config file is malformed.
    */
   public synchronized void reloadAllocations() throws IOException,
-      ParserConfigurationException, SAXException, AllocationConfigurationException {
+      ParserConfigurationException, SAXException,
+      AllocationConfigurationException {
     if (allocFile == null) {
       return;
     }
@@ -222,9 +224,12 @@ public class AllocationFileLoaderService extends AbstractService {
         new HashMap<String, Float>();
     Map<String, Map<QueueACL, AccessControlList>> queueAcls =
         new HashMap<String, Map<QueueACL, AccessControlList>>();
+    Map<String, Map<ReservationACL, AccessControlList>> reservationAcls =
+            new HashMap<String, Map<ReservationACL, AccessControlList>>();
     Set<String> reservableQueues = new HashSet<String>();
     int userMaxAppsDefault = Integer.MAX_VALUE;
     int queueMaxAppsDefault = Integer.MAX_VALUE;
+    Resource queueMaxResourcesDefault = Resources.unbounded();
     float queueMaxAMShareDefault = 0.5f;
     long defaultFairSharePreemptionTimeout = Long.MAX_VALUE;
     long defaultMinSharePreemptionTimeout = Long.MAX_VALUE;
@@ -282,6 +287,11 @@ public class AllocationFileLoaderService extends AbstractService {
               userMaxApps.put(userName, val);
             }
           }
+        } else if ("queueMaxResourcesDefault".equals(element.getTagName())) {
+          String text = ((Text)element.getFirstChild()).getData().trim();
+          Resource val =
+              FairSchedulerConfiguration.parseResourceConfigValue(text);
+          queueMaxResourcesDefault = val;
         } else if ("userMaxAppsDefault".equals(element.getTagName())) {
           String text = ((Text)element.getFirstChild()).getData().trim();
           int val = Integer.parseInt(text);
@@ -352,8 +362,8 @@ public class AllocationFileLoaderService extends AbstractService {
       loadQueue(parent, element, minQueueResources, maxQueueResources,
           queueMaxApps, userMaxApps, queueMaxAMShares, queueWeights,
           queuePolicies, minSharePreemptionTimeouts, fairSharePreemptionTimeouts,
-          fairSharePreemptionThresholds, queueAcls, configuredQueues,
-          reservableQueues);
+          fairSharePreemptionThresholds, queueAcls, reservationAcls,
+          configuredQueues, reservableQueues);
     }
 
     // Load placement policy and pass it configured queues
@@ -398,12 +408,12 @@ public class AllocationFileLoaderService extends AbstractService {
     AllocationConfiguration info = new AllocationConfiguration(minQueueResources,
         maxQueueResources, queueMaxApps, userMaxApps, queueWeights,
         queueMaxAMShares, userMaxAppsDefault, queueMaxAppsDefault,
-        queueMaxAMShareDefault, queuePolicies, defaultSchedPolicy,
-        minSharePreemptionTimeouts, fairSharePreemptionTimeouts,
-        fairSharePreemptionThresholds, queueAcls,
-        newPlacementPolicy, configuredQueues, globalReservationQueueConfig,
-        reservableQueues);
-    
+        queueMaxResourcesDefault, queueMaxAMShareDefault, queuePolicies,
+        defaultSchedPolicy, minSharePreemptionTimeouts,
+        fairSharePreemptionTimeouts, fairSharePreemptionThresholds, queueAcls,
+        reservationAcls, newPlacementPolicy, configuredQueues,
+        globalReservationQueueConfig, reservableQueues);
+
     lastSuccessfulReload = clock.getTime();
     lastReloadAttemptFailed = false;
 
@@ -423,14 +433,21 @@ public class AllocationFileLoaderService extends AbstractService {
       Map<String, Long> fairSharePreemptionTimeouts,
       Map<String, Float> fairSharePreemptionThresholds,
       Map<String, Map<QueueACL, AccessControlList>> queueAcls,
+      Map<String, Map<ReservationACL, AccessControlList>> resAcls,
       Map<FSQueueType, Set<String>> configuredQueues,
       Set<String> reservableQueues)
       throws AllocationConfigurationException {
-    String queueName = element.getAttribute("name");
+    String queueName = element.getAttribute("name").trim();
 
     if (queueName.contains(".")) {
       throw new AllocationConfigurationException("Bad fair scheduler config "
           + "file: queue name (" + queueName + ") shouldn't contain period.");
+    }
+
+    if (queueName.isEmpty()) {
+      throw new AllocationConfigurationException("Bad fair scheduler config "
+          + "file: queue name shouldn't be empty or "
+          + "consist only of whitespace.");
     }
 
     if (parentName != null) {
@@ -438,6 +455,7 @@ public class AllocationFileLoaderService extends AbstractService {
     }
     Map<QueueACL, AccessControlList> acls =
         new HashMap<QueueACL, AccessControlList>();
+    Map<ReservationACL, AccessControlList> racls = new HashMap<>();
     NodeList fields = element.getChildNodes();
     boolean isLeaf = true;
 
@@ -491,6 +509,18 @@ public class AllocationFileLoaderService extends AbstractService {
       } else if ("aclAdministerApps".equals(field.getTagName())) {
         String text = ((Text)field.getFirstChild()).getData();
         acls.put(QueueACL.ADMINISTER_QUEUE, new AccessControlList(text));
+      } else if ("aclAdministerReservations".equals(field.getTagName())) {
+        String text = ((Text)field.getFirstChild()).getData();
+        racls.put(ReservationACL.ADMINISTER_RESERVATIONS,
+                new AccessControlList(text));
+      } else if ("aclListReservations".equals(field.getTagName())) {
+        String text = ((Text)field.getFirstChild()).getData();
+        racls.put(ReservationACL.LIST_RESERVATIONS, new AccessControlList(
+                text));
+      } else if ("aclSubmitReservations".equals(field.getTagName())) {
+        String text = ((Text)field.getFirstChild()).getData();
+        racls.put(ReservationACL.SUBMIT_RESERVATIONS,
+                new AccessControlList(text));
       } else if ("reservation".equals(field.getTagName())) {
         isLeaf = false;
         reservableQueues.add(queueName);
@@ -501,7 +531,7 @@ public class AllocationFileLoaderService extends AbstractService {
             queueMaxApps, userMaxApps, queueMaxAMShares, queueWeights,
             queuePolicies, minSharePreemptionTimeouts,
             fairSharePreemptionTimeouts, fairSharePreemptionThresholds,
-            queueAcls, configuredQueues, reservableQueues);
+            queueAcls, resAcls, configuredQueues, reservableQueues);
         isLeaf = false;
       }
     }
@@ -522,6 +552,7 @@ public class AllocationFileLoaderService extends AbstractService {
       configuredQueues.get(FSQueueType.PARENT).add(queueName);
     }
     queueAcls.put(queueName, acls);
+    resAcls.put(queueName, racls);
     if (maxQueueResources.containsKey(queueName) &&
         minQueueResources.containsKey(queueName)
         && !Resources.fitsIn(minQueueResources.get(queueName),

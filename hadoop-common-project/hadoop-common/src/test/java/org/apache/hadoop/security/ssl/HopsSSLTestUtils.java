@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.junit.After;
 import org.junit.Rule;
 import org.junit.rules.ExpectedException;
@@ -103,9 +104,11 @@ public class HopsSSLTestUtils {
         conf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
         conf.set(SSLFactory.SSL_ENABLED_PROTOCOLS, "TLSv1.2,TLSv1.1,TLSv1");
         conf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
+        String user = UserGroupInformation.getCurrentUser().getUserName();
+        conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + user, "*");
 
         Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(serverKeyStore.toString(),
-                passwd, passwd, serverTrustStore.toString(), passwd);
+                passwd, passwd, serverTrustStore.toString(), passwd, "");
         Path sslServerPath = Paths.get(outDir, "ssl-server.xml");
         filesToPurge.add(sslServerPath);
         File sslServer = new File(sslServerPath.toUri());

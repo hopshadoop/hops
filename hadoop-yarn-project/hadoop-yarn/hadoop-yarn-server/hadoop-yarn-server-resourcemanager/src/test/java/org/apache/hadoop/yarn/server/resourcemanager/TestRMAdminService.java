@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import java.io.DataOutputStream;
@@ -25,9 +26,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.security.AccessControlException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import io.hops.util.DBUtility;
@@ -41,21 +42,32 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.GroupMappingServiceProvider;
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
+import org.apache.hadoop.yarn.api.records.DecommissionType;
+import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshAdminAclsRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshClusterMaxPriorityRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshNodesRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshNodesResourcesRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshQueuesRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshServiceAclsRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshSuperUserGroupsConfigurationRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshUserToGroupsMappingsRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.RemoveFromClusterNodeLabelsRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.ReplaceLabelsOnNodeRequest;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
+import org.apache.hadoop.yarn.server.resourcemanager.resource.DynamicResourceConfiguration;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration;
 import org.junit.After;
@@ -63,6 +75,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplNotDist;
 
 public class TestRMAdminService {
 
@@ -75,6 +90,8 @@ public class TestRMAdminService {
   static {
     YarnConfiguration.addDefaultResource(
         YarnConfiguration.CS_CONFIGURATION_FILE);
+    YarnConfiguration.addDefaultResource(
+        YarnConfiguration.DR_CONFIGURATION_FILE);
   }
 
   @Before
@@ -166,6 +183,239 @@ public class TestRMAdminService {
   }
 
   @Test
+  public void testAdminRefreshNodesWithoutConfiguration()
+      throws IOException, YarnException {
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
+
+    // upload default configurations
+    uploadDefaultConfiguration();
+
+    try {
+      rm = new MockRM(configuration);
+      rm.init(configuration);
+      rm.start();
+    } catch (Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    try {
+      rm.adminService
+          .refreshNodesResources(RefreshNodesResourcesRequest.newInstance());
+    } catch (Exception ex) {
+      fail("Should not get any exceptions even when no configurations "
+          + "are done for node resources refresh");
+    }
+  }
+
+  @Test
+  public void testRefreshNodesResourceWithFileSystemBasedConfigurationProvider()
+      throws IOException, YarnException {
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
+
+    //upload default configurations
+    uploadDefaultConfiguration();
+
+    try {
+      rm = new MockRM(configuration);
+      rm.init(configuration);
+      rm.start();
+      rm.registerNode("h1:1234", 5120);
+    } catch(Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    NodeId nid = NodeId.fromString("h1:1234");
+    RMNode ni = rm.getRMContext().getRMNodes().get(nid);
+    Resource resource = ni.getTotalCapability();
+    Assert.assertEquals("<memory:5120, vCores:5, gpus:0>", resource.toString());
+
+    DynamicResourceConfiguration drConf =
+        new DynamicResourceConfiguration();
+    drConf.set("yarn.resource.dynamic.nodes", "h1:1234");
+    drConf.set("yarn.resource.dynamic.h1:1234.vcores", "4");
+    drConf.set("yarn.resource.dynamic.h1:1234.memory", "4096");
+    uploadConfiguration(drConf, "dynamic-resources.xml");
+
+    rm.adminService.refreshNodesResources(
+        RefreshNodesResourcesRequest.newInstance());
+    rm.drainEvents();
+
+    RMNode niAfter = rm.getRMContext().getRMNodes().get(nid);
+    Resource resourceAfter = niAfter.getTotalCapability();
+    Assert.assertEquals("<memory:4096, vCores:4, gpus:0>", resourceAfter.toString());
+  }
+
+  @Test
+  public void testRefreshNodesResourceWithResourceReturnInRegistration()
+      throws IOException, YarnException {
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
+
+    //upload default configurations
+    uploadDefaultConfiguration();
+
+    MockNM nm = null;
+    try {
+      rm = new MockRM(configuration);
+      rm.init(configuration);
+      rm.start();
+      nm = rm.registerNode("h1:1234", 2048, 2);
+    } catch(Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    NodeId nid = NodeId.fromString("h1:1234");
+    RMNode ni = rm.getRMContext().getRMNodes().get(nid);
+    Resource resource = ni.getTotalCapability();
+    Assert.assertEquals("<memory:2048, vCores:2, gpus:0>", resource.toString());
+
+    DynamicResourceConfiguration drConf =
+        new DynamicResourceConfiguration();
+    drConf.set("yarn.resource.dynamic.nodes", "h1:1234");
+    drConf.set("yarn.resource.dynamic.h1:1234.vcores", "4");
+    drConf.set("yarn.resource.dynamic.h1:1234.memory", "4096");
+    uploadConfiguration(drConf, "dynamic-resources.xml");
+
+    rm.adminService.refreshNodesResources(
+        RefreshNodesResourcesRequest.newInstance());
+
+    try {
+      // register the same node again with original resource.
+      // validate this will get new resource back;
+      nm.registerNode();
+    } catch (Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    RMNode niAfter = rm.getRMContext().getRMNodes().get(nid);
+    Resource resourceAfter = niAfter.getTotalCapability();
+    Assert.assertEquals("<memory:4096, vCores:4, gpus:0>", resourceAfter.toString());
+
+    Assert.assertEquals(4096, nm.getMemory());
+    Assert.assertEquals(4, nm.getvCores());
+  }
+
+  @Test
+  public void testRefreshNodesResourceWithResourceReturnInHeartbeat()
+      throws IOException, YarnException {
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
+
+    //upload default configurations
+    uploadDefaultConfiguration();
+
+    MockNM nm = null;
+    try {
+      rm = new MockRM(configuration);
+      rm.init(configuration);
+      rm.start();
+      nm = rm.registerNode("h1:1234", 2048, 2);
+    } catch(Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    NodeId nid = NodeId.fromString("h1:1234");
+    RMNode ni = rm.getRMContext().getRMNodes().get(nid);
+    Resource resource = ni.getTotalCapability();
+    Assert.assertEquals("<memory:2048, vCores:2, gpus:0>", resource.toString());
+
+    DynamicResourceConfiguration drConf =
+        new DynamicResourceConfiguration();
+    drConf.set("yarn.resource.dynamic.nodes", "h1:1234");
+    drConf.set("yarn.resource.dynamic.h1:1234.vcores", "4");
+    drConf.set("yarn.resource.dynamic.h1:1234.memory", "4096");
+    uploadConfiguration(drConf, "dynamic-resources.xml");
+
+    rm.adminService.refreshNodesResources(
+        RefreshNodesResourcesRequest.newInstance());
+
+    try {
+      // NM-RM heartbeat, validate that this will get new resource back.
+      nm.nodeHeartbeat(true);
+    } catch (Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    RMNode niAfter = rm.getRMContext().getRMNodes().get(nid);
+    Resource resourceAfter = niAfter.getTotalCapability();
+    Assert.assertEquals("<memory:4096, vCores:4, gpus:0>", resourceAfter.toString());
+
+    Assert.assertEquals(4096, nm.getMemory());
+    Assert.assertEquals(4, nm.getvCores());
+  }
+
+  @Test
+  public void testResourcePersistentForNMRegistrationWithNewResource()
+      throws IOException, YarnException, InterruptedException {
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
+
+    //upload default configurations
+    uploadDefaultConfiguration();
+
+    try {
+      rm = new MockRM(configuration);
+      rm.init(configuration);
+      rm.start();
+      rm.registerNode("h1:1234", 5120);
+    } catch(Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    NodeId nid = NodeId.fromString("h1:1234");
+    RMNode ni = rm.getRMContext().getRMNodes().get(nid);
+    Resource resource = ni.getTotalCapability();
+    Assert.assertEquals("<memory:5120, vCores:5, gpus:0>", resource.toString());
+
+    DynamicResourceConfiguration drConf =
+        new DynamicResourceConfiguration();
+    drConf.set("yarn.resource.dynamic.nodes", "h1:1234");
+    drConf.set("yarn.resource.dynamic.h1:1234.vcores", "6");
+    drConf.set("yarn.resource.dynamic.h1:1234.memory", "4096");
+    uploadConfiguration(drConf, "dynamic-resources.xml");
+
+    rm.adminService.refreshNodesResources(
+        RefreshNodesResourcesRequest.newInstance());
+
+    try {
+      // register the same node again with a different resource.
+      // validate this won't work as resource cached in RM side.
+      rm.registerNode("h1:1234", 8192, 8);
+    } catch (Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    RMNode niAfter = rm.getRMContext().getRMNodes().get(nid);
+    Resource resourceAfter = niAfter.getTotalCapability();
+    Assert.assertEquals("<memory:4096, vCores:6, gpus:0>", resourceAfter.toString());
+
+    // Replace original dr file with an empty dr file, and validate node
+    // registration with new resources will take effective now.
+    deleteOnRemoteFileSystem("dynamic-resources.xml");
+    DynamicResourceConfiguration emptyDRConf =
+        new DynamicResourceConfiguration();
+
+    uploadConfiguration(emptyDRConf, "dynamic-resources.xml");
+    rm.adminService.refreshNodesResources(
+        RefreshNodesResourcesRequest.newInstance());
+    try {
+      // register the same node third time, this time the register resource
+      // should work.
+      rm.registerNode("h1:1234", 8192, 8);
+    } catch (Exception ex) {
+      fail("Should not get any exceptions");
+    }
+    Thread.sleep(500);
+    niAfter = rm.getRMContext().getRMNodes().get(nid);
+    resourceAfter = niAfter.getTotalCapability();
+    // new resource in registration should take effective as we empty
+    // dynamic resource file already.
+    Assert.assertEquals("<memory:8192, vCores:8, gpus:0>", resourceAfter.toString());
+  }
+
+  @Test
   public void testAdminAclsWithLocalConfigurationProvider() {
     rm = new MockRM(configuration);
     rm.init(configuration);
@@ -208,8 +458,8 @@ public class TestRMAdminService {
         rm.adminService.getAccessControlList().getAclString().trim();
 
     Assert.assertTrue(!aclStringAfter.equals(aclStringBefore));
-    Assert.assertEquals(aclStringAfter, "world:anyone:rwcda,"
-        + UserGroupInformation.getCurrentUser().getShortUserName());
+    Assert.assertEquals(aclStringAfter, "world:anyone:rwcda," +
+        UserGroupInformation.getCurrentUser().getShortUserName());
   }
 
   @Test
@@ -468,7 +718,8 @@ public class TestRMAdminService {
     rm.start();
 
     try {
-      rm.adminService.refreshNodes(RefreshNodesRequest.newInstance());
+      rm.adminService.refreshNodes(RefreshNodesRequest
+          .newInstance(DecommissionType.NORMAL));
     } catch (Exception ex) {
       fail("Using localConfigurationProvider. Should not get any exception.");
     }
@@ -509,7 +760,8 @@ public class TestRMAdminService {
         + "/excludeHosts");
     uploadConfiguration(yarnConf, YarnConfiguration.YARN_SITE_CONFIGURATION_FILE);
 
-    rm.adminService.refreshNodes(RefreshNodesRequest.newInstance());
+    rm.adminService.refreshNodes(RefreshNodesRequest
+        .newInstance(DecommissionType.NORMAL));
     Set<String> excludeHosts =
         rm.getNodesListManager().getHostsReader().getExcludedHosts();
     Assert.assertTrue(excludeHosts.size() == 1);
@@ -699,8 +951,8 @@ public class TestRMAdminService {
       String aclStringAfter =
           resourceManager.adminService.getAccessControlList()
               .getAclString().trim();
-      Assert.assertEquals(aclStringAfter, "world:anyone:rwcda,"
-          + UserGroupInformation.getCurrentUser().getShortUserName());
+      Assert.assertEquals(aclStringAfter, "world:anyone:rwcda," +
+          UserGroupInformation.getCurrentUser().getShortUserName());
 
       // validate values for queue configuration
       CapacityScheduler cs =
@@ -787,7 +1039,7 @@ public class TestRMAdminService {
       fail("Should not get any exceptions");
     }
 
-    Assert.assertEquals(daemonUser + "xyz," + daemonUser,
+    assertEquals(daemonUser + "xyz," + daemonUser,
         rm.adminService.getAccessControlList().getAclString().trim());
 
     yarnConf = new YarnConfiguration();
@@ -803,9 +1055,203 @@ public class TestRMAdminService {
       throw e;
     }
 
-    Assert.assertEquals(daemonUser + "abc," + daemonUser,
+    assertEquals(daemonUser + "abc," + daemonUser,
         rm.adminService.getAccessControlList().getAclString().trim());
-  }  
+  }
+
+  @Test
+  public void testModifyLabelsOnNodesWithDistributedConfigurationDisabled()
+      throws IOException, YarnException {
+    // create RM and set it's ACTIVE
+    MockRM rm = new MockRM();
+    ((RMContextImpl) rm.getRMContext())
+        .setHAServiceState(HAServiceState.ACTIVE);
+    RMNodeLabelsManager labelMgr = rm.rmContext.getNodeLabelManager();
+
+    // by default, distributed configuration for node label is disabled, this
+    // should pass
+    labelMgr.addToCluserNodeLabelsWithDefaultExclusivity(ImmutableSet.of("x", "y"));
+    rm.adminService.replaceLabelsOnNode(ReplaceLabelsOnNodeRequest
+        .newInstance(ImmutableMap.of(NodeId.newInstance("host", 0),
+            (Set<String>) ImmutableSet.of("x"))));
+    rm.close();
+  }
+
+  @Test(expected = YarnException.class)
+  public void testModifyLabelsOnNodesWithCentralizedConfigurationDisabled()
+      throws IOException, YarnException {
+    // create RM and set it's ACTIVE, and set distributed node label
+    // configuration to true
+    MockRM rm = new MockRM();
+    rm.adminService.isCentralizedNodeLabelConfiguration = false;
+
+    ((RMContextImpl) rm.getRMContext())
+        .setHAServiceState(HAServiceState.ACTIVE);
+    RMNodeLabelsManager labelMgr = rm.rmContext.getNodeLabelManager();
+
+    // by default, distributed configuration for node label is disabled, this
+    // should pass
+    labelMgr.addToCluserNodeLabelsWithDefaultExclusivity(ImmutableSet.of("x", "y"));
+    rm.adminService.replaceLabelsOnNode(ReplaceLabelsOnNodeRequest
+        .newInstance(ImmutableMap.of(NodeId.newInstance("host", 0),
+            (Set<String>) ImmutableSet.of("x"))));
+    rm.close();
+  }
+
+  @Test
+  public void testModifyLabelsOnUnknownNodes() throws IOException,
+      YarnException {
+    // create RM and set it's ACTIVE, and set distributed node label
+    // configuration to true
+    rm = new MockRM();
+
+    ((RMContextImpl) rm.getRMContext())
+        .setHAServiceState(HAServiceState.ACTIVE);
+    Map<NodeId, RMNode> rmNodes = rm.getRMContext().getRMNodes();
+    rmNodes.put(NodeId.newInstance("host1", 1111),
+        new RMNodeImplNotDist(null, rm.getRMContext(), "host1", 0, 0, null, null,
+                null));
+    rmNodes.put(NodeId.newInstance("host2", 2222),
+            new RMNodeImplNotDist(null, rm.getRMContext(), "host2", 0, 0, null, null,
+                null));
+    rmNodes.put(NodeId.newInstance("host3", 3333),
+            new RMNodeImplNotDist(null, rm.getRMContext(), "host3", 0, 0, null, null,
+                null));
+    Map<NodeId, RMNode> rmInactiveNodes = rm.getRMContext()
+        .getInactiveRMNodes();
+    rmInactiveNodes.put(NodeId.newInstance("host4", 4444),
+        new RMNodeImplNotDist(null, rm.getRMContext(), "host4", 0, 0, null, null,
+                null));
+    RMNodeLabelsManager labelMgr = rm.rmContext.getNodeLabelManager();
+
+    // by default, distributed configuration for node label is disabled, this
+    // should pass
+    labelMgr.addToCluserNodeLabelsWithDefaultExclusivity(ImmutableSet.of("x",
+        "y"));
+    // replace known node
+    ReplaceLabelsOnNodeRequest request1 = ReplaceLabelsOnNodeRequest
+        .newInstance(ImmutableMap.of(NodeId.newInstance("host1", 1111),
+            (Set<String>) ImmutableSet.of("x")));
+    request1.setFailOnUnknownNodes(true);
+    try {
+      rm.adminService.replaceLabelsOnNode(request1);
+    } catch (Exception ex) {
+      fail("should not fail on known node");
+    }
+
+    // replace known node with wildcard port
+    ReplaceLabelsOnNodeRequest request2 = ReplaceLabelsOnNodeRequest
+        .newInstance(ImmutableMap.of(NodeId.newInstance("host1", 0),
+            (Set<String>) ImmutableSet.of("x")));
+    request2.setFailOnUnknownNodes(true);
+    try {
+      rm.adminService.replaceLabelsOnNode(request2);
+    } catch (Exception ex) {
+      fail("should not fail on known node");
+    }
+
+    // replace unknown node
+    ReplaceLabelsOnNodeRequest request3 = ReplaceLabelsOnNodeRequest
+        .newInstance(ImmutableMap.of(NodeId.newInstance("host5", 0),
+            (Set<String>) ImmutableSet.of("x")));
+    request3.setFailOnUnknownNodes(true);
+    try {
+      rm.adminService.replaceLabelsOnNode(request3);
+      fail("Should fail on unknown node");
+    } catch (Exception ex) {
+    }
+
+    // replace known node but wrong port
+    ReplaceLabelsOnNodeRequest request4 = ReplaceLabelsOnNodeRequest
+        .newInstance(ImmutableMap.of(NodeId.newInstance("host2", 1111),
+            (Set<String>) ImmutableSet.of("x")));
+    request4.setFailOnUnknownNodes(true);
+    try {
+      rm.adminService.replaceLabelsOnNode(request4);
+      fail("Should fail on node with wrong port");
+    } catch (Exception ex) {
+    }
+
+    // replace non-exist node but not check
+    ReplaceLabelsOnNodeRequest request5 = ReplaceLabelsOnNodeRequest
+        .newInstance(ImmutableMap.of(NodeId.newInstance("host5", 0),
+            (Set<String>) ImmutableSet.of("x")));
+    request5.setFailOnUnknownNodes(false);
+    try {
+      rm.adminService.replaceLabelsOnNode(request5);
+    } catch (Exception ex) {
+      fail("Should not fail on unknown node when "
+          + "fail-on-unkown-nodes is set false");
+    }
+
+    // replace on inactive node
+    ReplaceLabelsOnNodeRequest request6 = ReplaceLabelsOnNodeRequest
+        .newInstance(ImmutableMap.of(NodeId.newInstance("host4", 0),
+            (Set<String>) ImmutableSet.of("x")));
+    request6.setFailOnUnknownNodes(true);
+    try {
+      rm.adminService.replaceLabelsOnNode(request6);
+    } catch (Exception ex) {
+      fail("should not fail on inactive node");
+    }
+
+    rm.close();
+  }
+
+  @Test
+  public void testRemoveClusterNodeLabelsWithCentralizedConfigurationDisabled()
+      throws IOException, YarnException {
+    // create RM and set it's ACTIVE
+    MockRM rm = new MockRM();
+    ((RMContextImpl) rm.getRMContext())
+        .setHAServiceState(HAServiceState.ACTIVE);
+    RMNodeLabelsManager labelMgr = rm.rmContext.getNodeLabelManager();
+    rm.adminService.isCentralizedNodeLabelConfiguration = false;
+
+    // by default, distributed configuration for node label is disabled, this
+    // should pass
+    labelMgr.addToCluserNodeLabelsWithDefaultExclusivity(ImmutableSet.of("x", "y"));
+    rm.adminService
+        .removeFromClusterNodeLabels(RemoveFromClusterNodeLabelsRequest
+            .newInstance((Set<String>) ImmutableSet.of("x")));
+
+    Set<String> clusterNodeLabels = labelMgr.getClusterNodeLabelNames();
+    assertEquals(1,clusterNodeLabels.size());
+    rm.close();
+  }
+
+  @Test(timeout = 30000)
+  public void testAdminRefreshClusterMaxPriority() throws Exception,
+      YarnException {
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
+
+    uploadDefaultConfiguration();
+    YarnConfiguration yarnConf = new YarnConfiguration();
+    yarnConf.set(YarnConfiguration.MAX_CLUSTER_LEVEL_APPLICATION_PRIORITY, "5");
+    uploadConfiguration(yarnConf, "yarn-site.xml");
+
+    rm = new MockRM(configuration);
+    rm.init(configuration);
+    rm.start();
+
+    CapacityScheduler cs = (CapacityScheduler) rm.getRMContext().getScheduler();
+    Assert.assertEquals(5, cs.getMaxClusterLevelAppPriority().getPriority());
+
+    yarnConf = new YarnConfiguration();
+    yarnConf
+        .set(YarnConfiguration.MAX_CLUSTER_LEVEL_APPLICATION_PRIORITY, "10");
+    uploadConfiguration(yarnConf, "yarn-site.xml");
+
+    try {
+      rm.adminService
+          .refreshClusterMaxPriority(RefreshClusterMaxPriorityRequest
+              .newInstance());
+      Assert.assertEquals(10, cs.getMaxClusterLevelAppPriority().getPriority());
+    } catch (Exception ex) {
+      fail("Could not refresh cluster max priority.");
+    }
+  }
 
   private String writeConfigurationXML(Configuration conf, String confXMLName)
       throws IOException {
@@ -839,6 +1285,11 @@ public class TestRMAdminService {
     String csConfFile = writeConfigurationXML(conf, confFileName);
     // upload the file into Remote File System
     uploadToRemoteFileSystem(new Path(csConfFile));
+  }
+
+  private void deleteOnRemoteFileSystem(String fileName)
+      throws IOException {
+    fs.delete(new Path(workingPath, fileName));
   }
 
   private void uploadDefaultConfiguration() throws IOException {
