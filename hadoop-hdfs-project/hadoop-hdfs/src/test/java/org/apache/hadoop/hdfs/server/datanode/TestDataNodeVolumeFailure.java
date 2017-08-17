@@ -151,8 +151,7 @@ public class TestDataNodeVolumeFailure {
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(bpid);
     final StorageBlockReport[] report =
         {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-            DataNodeTestUtils.getFSDataset(dn).getBlockReport(bpid)
-                .getBlockListAsLongs())};
+            DataNodeTestUtils.getFSDataset(dn).getBlockReport(bpid))};
     cluster.getNameNodeRpc().blockReport(dnR, bpid, report);
 
     // verify number of blocks and files...

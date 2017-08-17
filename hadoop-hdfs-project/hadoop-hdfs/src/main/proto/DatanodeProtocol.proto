@@ -204,9 +204,34 @@ message BlockReportRequestProto {
  * Report of blocks in a storage
  */
 message StorageBlockReportProto {
-  required DatanodeStorageProto storage = 1; // Storage
-  repeated uint64 blocks = 2 [packed = true];
+  required DatanodeStorageProto storage = 1;
+  required BlockReportProto report = 2;
 }
+
+message BlockReportBlockProto {
+  enum BlockReportBlockStateProto {
+    FINALIZED = 1;
+    RBW = 2;
+    RUR = 3;
+    RWR = 4;
+    TEMPORARY = 5;
+  }
+  required uint64 blockId = 1;
+  required uint64 generationStamp = 2;
+  required uint64 length = 3;
+  required BlockReportBlockStateProto state = 4;
+}
+
+message BlockReportBucketProto {
+  repeated BlockReportBlockProto blocks = 1;
+}
+
+message BlockReportProto {
+  repeated BlockReportBucketProto buckets = 1;
+  repeated sint64 hashes = 2;
+}
+
+
 
 /**
  * cmd - Command from namenode to the datanode
@@ -221,9 +246,12 @@ message BlockReportResponseProto {
  */
 message ReceivedDeletedBlockInfoProto {
   enum BlockStatus {
-    RECEIVING = 1; // block being created
-    RECEIVED = 2; // block creation complete
-    DELETED = 3;
+    CREATING = 1;
+    APPENDING = 2;
+    RECOVERING_APPEND = 3;
+    RECEIVED = 4;
+    UPDATE_RECOVERED = 5;
+    DELETED = 6;
   }
 
   required BlockProto block = 1;

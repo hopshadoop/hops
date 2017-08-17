@@ -20,11 +20,12 @@ package org.apache.hadoop.hdfs.server.datanode;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetFactory;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportBlock;
 import org.apache.hadoop.util.DataChecksum;
 import org.junit.Before;
 import org.junit.Test;
@@ -165,37 +166,37 @@ public class TestSimulatedFSDataset {
   @Test
   public void testGetBlockReport() throws IOException {
     SimulatedFSDataset fsdataset = getSimulatedFSDataset();
-    BlockListAsLongs blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(0, blockReport.getNumberOfBlocks());
+    BlockReport blockReport = fsdataset.getBlockReport(bpid);
+    assertEquals(0, blockReport.getNumBlocks());
     addSomeBlocks(fsdataset);
     blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
-    for (Block b : blockReport) {
+    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    for (BlockReportBlock b : blockReport) {
       assertNotNull(b);
-      assertEquals(blockIdToLen(b.getBlockId()), b.getNumBytes());
+      assertEquals(blockIdToLen(b.getBlockId()), b.getLength());
     }
   }
   
   @Test
   public void testInjectionEmpty() throws IOException {
     SimulatedFSDataset fsdataset = getSimulatedFSDataset();
-    BlockListAsLongs blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(0, blockReport.getNumberOfBlocks());
+    BlockReport blockReport = fsdataset.getBlockReport(bpid);
+    assertEquals(0, blockReport.getNumBlocks());
     int bytesAdded = addSomeBlocks(fsdataset);
     blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
-    for (Block b : blockReport) {
+    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    for (BlockReportBlock b : blockReport) {
       assertNotNull(b);
-      assertEquals(blockIdToLen(b.getBlockId()), b.getNumBytes());
+      assertEquals(blockIdToLen(b.getBlockId()), b.getLength());
     }
     
     // Inject blocks into an empty fsdataset
     //  - injecting the blocks we got above.
     SimulatedFSDataset sfsdataset = getSimulatedFSDataset();
-    sfsdataset.injectBlocks(bpid, blockReport);
+    sfsdataset.injectBlocks(bpid, blockReport.blockIterable());
     blockReport = sfsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
-    for (Block b : blockReport) {
+    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    for (Block b : blockReport.blockIterable()) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getNumBytes());
       assertEquals(blockIdToLen(b.getBlockId()),
@@ -209,14 +210,14 @@ public class TestSimulatedFSDataset {
   @Test
   public void testInjectionNonEmpty() throws IOException {
     SimulatedFSDataset fsdataset = getSimulatedFSDataset();
-    BlockListAsLongs blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(0, blockReport.getNumberOfBlocks());
+    BlockReport blockReport = fsdataset.getBlockReport(bpid);
+    assertEquals(0, blockReport.getNumBlocks());
     int bytesAdded = addSomeBlocks(fsdataset);
     blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
-    for (Block b : blockReport) {
+    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    for (BlockReportBlock b : blockReport) {
       assertNotNull(b);
-      assertEquals(blockIdToLen(b.getBlockId()), b.getNumBytes());
+      assertEquals(blockIdToLen(b.getBlockId()), b.getLength());
     }
     fsdataset = null;
     
@@ -227,13 +228,13 @@ public class TestSimulatedFSDataset {
     // the ones we are going to inject.
     bytesAdded += addSomeBlocks(sfsdataset, NUMBLOCKS + 1);
     sfsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
+    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
     sfsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
-    sfsdataset.injectBlocks(bpid, blockReport);
+    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    sfsdataset.injectBlocks(bpid, blockReport.blockIterable());
     blockReport = sfsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS * 2, blockReport.getNumberOfBlocks());
-    for (Block b : blockReport) {
+    assertEquals(NUMBLOCKS * 2, blockReport.getNumBlocks());
+    for (Block b : blockReport.blockIterable()) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getNumBytes());
       assertEquals(blockIdToLen(b.getBlockId()),
@@ -249,7 +250,7 @@ public class TestSimulatedFSDataset {
     try {
       sfsdataset = getSimulatedFSDataset();
       sfsdataset.addBlockPool(bpid, conf);
-      sfsdataset.injectBlocks(bpid, blockReport);
+      sfsdataset.injectBlocks(bpid, blockReport.blockIterable());
       assertTrue("Expected an IO exception", false);
     } catch (IOException e) {
       // ok - as expected

@@ -96,7 +96,9 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStatistics;
+import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
 import org.apache.hadoop.hdfs.server.blockmanagement.MutableBlockCollection;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.Storage;
@@ -2058,7 +2060,6 @@ public class FSNamesystem
 
   LocatedBlock appendFile(final String src, final String holder,
                           final String clientMachine) throws IOException {
-
     try{
       return appendFileHopFS(src, holder, clientMachine);
     } catch(HDFSClientAppendToDBFileException e){
@@ -2114,9 +2115,10 @@ public class FSNamesystem
                 INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH,
                 src)).add(lf.getBlockLock())
                 .add(lf.getLeaseLock(LockType.WRITE, holder))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
-                lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
-                    BLK.IV, BLK.PE));
+                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
+                    BLK.IV, BLK.PE))
+                .add(lf.getLastBlockHashBucketsLock());
             // Always needs to be read. Erasure coding might have been
             // enabled earlier and we don't want to end up in an inconsistent
             // state.
@@ -2141,9 +2143,25 @@ public class FSNamesystem
                       !holder.contains("HopsFS")) {
                 throw new HDFSClientAppendToDBFileException("HDFS can not directly append to a file stored in the database");
               }
-
-
-              return appendFileInt(src, holder, clientMachine);
+              
+              LocatedBlock locatedBlock =
+                  appendFileInt(src, holder, clientMachine);
+             
+              if (locatedBlock != null && !locatedBlock.isPhantomBlock()) {
+                for (DatanodeInfo datanodeInfo : locatedBlock.getLocations()) {
+                  int sId = blockManager.getDatanodeManager().getDatanode
+                      (datanodeInfo).getSId();
+                  BlockInfo blockInfo =
+                      EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+                          locatedBlock.getBlock().getBlockId(), target.getId());
+                  Block undoBlock = new Block(blockInfo);
+                  undoBlock.setGenerationStampNoPersistance(undoBlock
+                      .getGenerationStamp() - 1);
+                  HashBuckets.getInstance().undoHash(sId, HdfsServerConstants
+                      .ReplicaState.FINALIZED, undoBlock);
+                }
+              }
+              return locatedBlock;
             } catch (AccessControlException e) {
               logAuditEvent(false, "append", src);
               throw e;
@@ -4490,7 +4508,8 @@ public class FSNamesystem
       }
     }
 
-    private void adjustBlockTotals(int deltaSafe, int deltaTotal) {
+    private void adjustBlockTotals(int deltaSafe, int deltaTotal)
+        throws IOException {
       //FIXME ?!
     }
 
@@ -5134,6 +5153,15 @@ public class FSNamesystem
         descriptors[i] = dm.getDatanode(newNodes[i]);
       }
     }
+ 
+    //Undo previous hashes
+//    DatanodeDescriptor[] expectedLocations = blockInfo.getExpectedLocations(dm);
+//    for (DatanodeDescriptor previousLocation : expectedLocations){
+//        HashBuckets.getInstance().undoHash(previousLocation.getSId(),
+//            HdfsServerConstants.ReplicaState.FINALIZED, oldBlock.getLocalBlock());
+//    }
+    
+  
     blockInfo.setExpectedLocations(descriptors);
   }
 
