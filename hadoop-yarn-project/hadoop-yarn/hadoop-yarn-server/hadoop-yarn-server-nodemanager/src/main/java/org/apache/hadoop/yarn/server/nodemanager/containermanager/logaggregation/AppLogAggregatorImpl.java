@@ -320,8 +320,10 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
     logAggregationTimes++;
     String diagnosticMessage = "";
     boolean logAggregationSucceedInThisCycle = true;
-    try (LogWriter writer = new LogWriter()){
+    LogWriter writer = null;
+    try {
       try {
+        writer = new LogWriter();
         writer.initialize(this.conf, this.remoteNodeTmpLogFileForApp,
             this.userUgi);
         // Write ACLs once when the writer is created.
@@ -367,6 +369,11 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
         cleanupOldLogTimes++;
       }
 
+      if (writer != null) {
+        writer.close();
+        writer = null;
+      }
+      
       long currentTime = System.currentTimeMillis();
       final Path renamedPath = this.rollingMonitorInterval <= 0
               ? remoteNodeLogFileForApp : new Path(
@@ -407,6 +414,10 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
         logAggregationSucceedInThisCycle = false;
       }
     } finally {
+      if (writer != null) {
+        writer.close();
+      }
+      
       sendLogAggregationReport(logAggregationSucceedInThisCycle,
           diagnosticMessage, appFinished);
     }
