@@ -103,7 +103,7 @@ public class TestFsck {
   static final Pattern getfileinfoPattern = Pattern.compile("allowed=.*?\\s" +
           "ugi=.*?\\s" +
           "ip=/\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\s" +
-          "cmd=getFileInfo\\ssrc=\\/\\sdst=null\\s" +
+          "cmd=getfileinfo\\ssrc=\\/\\sdst=null\\s" +
           "perm=null");
   
   static final Pattern numCorruptBlocksPattern =
