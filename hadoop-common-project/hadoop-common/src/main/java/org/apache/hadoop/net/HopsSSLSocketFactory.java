@@ -15,6 +15,8 @@
  */
 package org.apache.hadoop.net;
 
+import com.google.common.annotations.VisibleForTesting;
+import io.hops.security.HopsUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configurable;
@@ -24,11 +26,15 @@ import org.apache.hadoop.ipc.RpcSSLEngineAbstr;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 import org.apache.hadoop.security.ssl.CryptoMaterial;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
+import org.apache.hadoop.security.ssl.SSLFactory;
+import org.codehaus.jettison.json.JSONException;
 
 import javax.net.SocketFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -41,6 +47,9 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
 
     public static final String FORCE_CONFIGURE = "client.rpc.ssl.force.configure";
     public static final boolean DEFAULT_FORCE_CONFIGURE = false;
+  
+    public static final String HOPSWORKS_REST_ENDPOINT_KEY =
+        "client.hopsworks.rest.endpoint";
     
     private static final String KEY_STORE_FILEPATH_DEFAULT = "client.keystore.jks";
     private static final String KEY_STORE_PASSWORD_DEFAULT = "";
@@ -49,8 +58,8 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     private static final String TRUST_STORE_PASSWORD_DEFAULT = "";
     private static final String SOCKET_ENABLED_PROTOCOL_DEFAULT = "TLSv1";
     
-    private static final String KEYSTORE_SUFFIX = "__kstore.jks";
-    private static final String TRUSTSTORE_SUFFIX = "__tstore.jks";
+    public static final String KEYSTORE_SUFFIX = "__kstore.jks";
+    public static final String TRUSTSTORE_SUFFIX = "__tstore.jks";
     private static final String PASSPHRASE = "adminpw";
     private static final String SOCKET_FACTORY_NAME = HopsSSLSocketFactory
         .class.getCanonicalName();
@@ -62,6 +71,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     
     // Hopsworks project specific username pattern - projectName__username
     public static final String USERNAME_PATTERN = "\\w*__\\w*";
+    private String cryptoPassword = null;
   
     private final Log LOG = LogFactory.getLog(HopsSSLSocketFactory.class);
 
@@ -119,6 +129,25 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
       this.conf = conf;
     }
   
+    // ONLY for testing
+    @VisibleForTesting
+    public void setPaswordFromHopsworks(String password) {
+      this.cryptoPassword = password;
+    }
+    
+    public String getPasswordFromHopsworks(String username, String
+        keystorePath) throws JSONException, IOException {
+      
+      if (null != cryptoPassword) {
+        return cryptoPassword;
+      }
+      
+      cryptoPassword = HopsUtil
+          .getCertificatePasswordFromHopsworks(keystorePath, username, conf);
+          
+      return cryptoPassword;
+    }
+    
     public void configureCryptoMaterial(CertificateLocalization
         certificateLocalization, Set<String> proxySuperusers) {
         try {
@@ -141,8 +170,12 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
             if (LOG.isDebugEnabled()) {
               LOG.debug("Crypto material found in NM localized directory");
             }
-            setTlsConfiguration("k_certificate",
-                "t_certificate", conf);
+            
+            String password = getPasswordFromHopsworks(username, localized
+                .toString());
+            setTlsConfiguration("k_certificate", password, "t_certificate",
+                password, conf);
+            
           } else {
             if (username.matches(USERNAME_PATTERN) ||
                 !proxySuperusers.contains(username)) {
@@ -155,15 +188,38 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
                     .CLIENT_MATERIALIZE_DIR.getDefaultValue());
                 
                 // Client from HopsWorks is trying to create a SecureSocket
-                // The crypto material should be in the CERT_MATERIALIZED_DIR
-                //Path pathToCert = Paths.get(CERT_MATERIALIZED_DIR, username);
+                // The crypto material should be in hopsworksMaterialzieDir
                 File fd = Paths.get(hopsworksMaterializeDir, username +
                     KEYSTORE_SUFFIX).toFile();
                 if (fd.exists()) {
                   if (LOG.isDebugEnabled()) {
                     LOG.debug("Crypto material exists found in " + hopsworksMaterializeDir);
                   }
-                  configureTlsClient(hopsworksMaterializeDir, username, conf);
+                  
+                  // If certificateMaterializer is not null
+                  // make the REST call otherwise take the material from the
+                  // service. In a testing env, RM is located at the same
+                  // machine as Hopsworks so it follows this execution path
+                  // but we don't want to make the REST call
+                  
+                  String password;
+                  
+                  if (null != certificateLocalization) {
+                    CryptoMaterial material = certificateLocalization
+                        .getMaterialLocation(username);
+                    password = material.getKeyStorePass();
+                  } else {
+                    password = getPasswordFromHopsworks(username, fd
+                        .toString());
+                  }
+                  
+                  setTlsConfiguration(Paths.get(hopsworksMaterializeDir,
+                      username + KEYSTORE_SUFFIX).toString(),
+                      password,
+                      Paths.get(hopsworksMaterializeDir, username +
+                          TRUSTSTORE_SUFFIX).toString(),
+                      password,
+                      conf);
                 } else {
                   // Fallback to /tmp directory
                   // In the future certificates should not exist there
@@ -187,7 +243,10 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
                             "CertificateLocalizationService");
                       }
                       setTlsConfiguration(material.getKeyStoreLocation(),
-                          material.getTrustStoreLocation(), conf);
+                          material.getKeyStorePass(),
+                          material.getTrustStoreLocation(),
+                          material.getTrustStorePass(),
+                          conf);
                     }
                   }
                 }
@@ -213,8 +272,30 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
                   if (LOG.isDebugEnabled()) {
                     LOG.debug("Found crypto material with the hostname");
                   }
-                  configureTlsClient(serviceCertificateDir,
-                      localHostname, conf);
+  
+                  String prefix = Paths.get(serviceCertificateDir,
+                      localHostname).toString();
+                  String kstoreFile = prefix + KEYSTORE_SUFFIX;
+                  String tstoreFile = prefix + TRUSTSTORE_SUFFIX;
+                  String kstorePass, tstorePass;
+                  
+                  if (null != certificateLocalization) {
+                    // Socket factory has been called from RM or NM
+                    // In any other case, ie Hopsworks,
+                    // CertificateLocalizationService would be null
+                    kstorePass = certificateLocalization
+                        .getSuperKeystorePass();
+                    tstorePass = certificateLocalization
+                        .getSuperTruststorePass();
+                  } else {
+                    LOG.debug("*** Called setTlsConfiguration for superuser " +
+                        "but no passwords provided ***");
+                    String[] keystore_truststore = readSuperPasswordFromFile(conf);
+                    kstorePass = keystore_truststore[0];
+                    tstorePass = keystore_truststore[1];
+                  }
+                  setTlsConfiguration(kstoreFile, kstorePass, tstoreFile,
+                      tstorePass, conf);
                 }
               }
             }
@@ -235,7 +316,45 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
         conf.setBoolean(FORCE_CONFIGURE, false);
     }
     
-    public static void configureTlsClient(String filePrefix, String username, Configuration conf) {
+    private String[] readSuperPasswordFromFile(Configuration conf) {
+      Configuration sslConf = new Configuration(false);
+      String sslConfResource = conf.get(SSLFactory.SSL_SERVER_CONF_KEY,
+          "ssl-server.xml");
+      
+      File sslConfFile = new File(sslConfResource);
+      FileInputStream sslConfIn = null;
+      String[] keystore_truststore = new String[2];
+      
+      try {
+        try {
+          sslConfIn = new FileInputStream(sslConfFile);
+          sslConf.addResource(sslConfIn);
+        } catch (IOException ex) {
+          sslConf.addResource(sslConfResource);
+        }
+        
+        keystore_truststore[0] = sslConf.get(
+            FileBasedKeyStoresFactory
+                .resolvePropertyName(SSLFactory.Mode.SERVER,
+                    FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
+        keystore_truststore[1] = sslConf.get(
+            FileBasedKeyStoresFactory
+                .resolvePropertyName(SSLFactory.Mode.SERVER,
+                    FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
+      } finally {
+        if (null != sslConfIn) {
+          try {
+            sslConfIn.close();
+          } catch (IOException ex) {
+            LOG.warn("Error closing file", ex);
+          }
+        }
+      }
+      return keystore_truststore;
+    }
+    
+    public static void configureTlsClient(String filePrefix, String username,
+        Configuration conf) {
         String pref = Paths.get(filePrefix, username).toString();
         setTlsConfiguration(pref + KEYSTORE_SUFFIX, pref +
             TRUSTSTORE_SUFFIX, conf);
@@ -254,13 +373,18 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
           SOCKET_FACTORY_NAME);
     }
     
-    private static void setTlsConfiguration(String kstorePath, String
-        tstorePath, Configuration conf) {
+    private static void setTlsConfiguration(String kstorePath, String tstorePath,
+        Configuration conf) {
+      setTlsConfiguration(kstorePath, PASSPHRASE, tstorePath, PASSPHRASE, conf);
+    }
+    
+    public static void setTlsConfiguration(String kstorePath, String
+        kstorePass, String tstorePath, String tstorePass, Configuration conf) {
         conf.set(CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(), kstorePath);
-        conf.set(CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue(), PASSPHRASE);
-        conf.set(CryptoKeys.KEY_PASSWORD_KEY.getValue(), PASSPHRASE);
+        conf.set(CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue(), kstorePass);
+        conf.set(CryptoKeys.KEY_PASSWORD_KEY.getValue(), kstorePass);
         conf.set(CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue(), tstorePath);
-        conf.set(CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue(), PASSPHRASE);
+        conf.set(CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue(), tstorePass);
         conf.set(CommonConfigurationKeys.HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_KEY,
             SOCKET_FACTORY_NAME);
     }
@@ -268,7 +392,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     private boolean isCryptoMaterialSet(Configuration conf, String username) {
         for (CryptoKeys key : CryptoKeys.values()) {
             String propValue = conf.get(key.getValue(), key.getDefaultValue());
-            if (key.getDefaultValue().equals(propValue)
+            if (checkForDefaultInProperty(key, propValue)
                     || !checkUsernameInProperty(username, propValue, key.getType())) {
                 return false;
             }
@@ -311,6 +435,16 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
         return true;
     }
 
+    private boolean checkForDefaultInProperty(CryptoKeys key, String propValue) {
+      if (key.getType() != PropType.LITERAL) {
+        if (key.getDefaultValue().equals(propValue)) {
+          return true;
+        }
+      }
+      
+      return false;
+    }
+    
     @Override
     public Configuration getConf() {
         return conf;

@@ -40,6 +40,10 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.sun.jersey</groupId>
+      <artifactId>jersey-client</artifactId>
+    </dependency>
+    <dependency>
       <groupId>io.hops</groupId>
       <artifactId>hadoop-annotations</artifactId>
       <scope>compile</scope>

@@ -25,6 +25,8 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 import org.apache.hadoop.security.ssl.CryptoMaterial;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -74,6 +76,8 @@ public class CertificateLocalizationService extends AbstractService
       "/tmp");
   private final String LOCALIZATION_DIR = "certLoc";
   private Path materializeDir;
+  private String superKeystorePass;
+  private String superTruststorePass;
   
   private final Map<StorageKey, CryptoMaterial> materialLocation =
       new ConcurrentHashMap<>();
@@ -106,6 +110,8 @@ public class CertificateLocalizationService extends AbstractService
     // TODO Get the localization directory from conf, for the moment is a
     // random UUID
     
+    parseSuperuserPasswords(conf);
+    
     super.serviceInit(conf);
   }
   
@@ -130,6 +136,30 @@ public class CertificateLocalizationService extends AbstractService
     LOG.debug("Initialized at dir: " + materializeDir.toString());
     
     super.serviceStart();
+  }
+  
+  private void parseSuperuserPasswords(Configuration conf) {
+    Configuration sslConf = new Configuration(false);
+    sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY,
+        "ssl-server.xml"));
+    superKeystorePass = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
+    superTruststorePass = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
+  }
+  
+  // This method is accessible only from RM or NM. In any other case
+  // CertificateLocalizationService is null
+  public String getSuperKeystorePass() {
+    return superKeystorePass;
+  }
+  
+  // This method is accessible only from RM or NM. In any other case
+  // CertificateLocalizationService is null
+  public String getSuperTruststorePass() {
+    return superTruststorePass;
   }
   
   public void transitionToActive() {
@@ -255,7 +285,8 @@ public class CertificateLocalizationService extends AbstractService
   
   @Override
   public void materializeCertificates(String username,
-      ByteBuffer keyStore, ByteBuffer trustStore) throws IOException {
+      ByteBuffer keyStore, String keyStorePass,
+      ByteBuffer trustStore, String trustStorePass) throws IOException {
     StorageKey key = new StorageKey(username);
     CryptoMaterial material = materialLocation.get(key);
     if (null != material) {
@@ -264,7 +295,7 @@ public class CertificateLocalizationService extends AbstractService
     }
   
     Future<CryptoMaterial> future = execPool.submit(new Materializer(key,
-        keyStore, trustStore));
+        keyStore, keyStorePass, trustStore, trustStorePass));
     futures.put(key, future);
     // Put the CryptoMaterial lazily in the materialLocation map
   
@@ -336,7 +367,8 @@ public class CertificateLocalizationService extends AbstractService
     
     try {
       materializeCertificates(request.getUsername(), request.getKeystore(),
-          request.getTruststore());
+          request.getKeystorePassword(), request.getTruststore(),
+          request.getTruststorePassword());
       response.setSuccess(true);
     } catch (IOException ex) {
       response.setSuccess(false);
@@ -401,12 +433,17 @@ public class CertificateLocalizationService extends AbstractService
   private class Materializer implements Callable<CryptoMaterial> {
     private final StorageKey key;
     private final ByteBuffer kstore;
+    private final String kstorePass;
     private final ByteBuffer tstore;
+    private final String tstorePass;
     
-    private Materializer(StorageKey key, ByteBuffer kstore, ByteBuffer tstore) {
+    private Materializer(StorageKey key, ByteBuffer kstore, String kstorePass,
+        ByteBuffer tstore, String tstorePass) {
       this.key = key;
       this.kstore = kstore;
+      this.kstorePass = kstorePass;
       this.tstore = tstore;
+      this.tstorePass = tstorePass;
     }
     
     @Override
@@ -430,7 +467,7 @@ public class CertificateLocalizationService extends AbstractService
       tstoreChannel.close();
       
       CryptoMaterial material = new CryptoMaterial(kstoreFile.getAbsolutePath(),
-          tstoreFile.getAbsolutePath(), kstore, tstore);
+          tstoreFile.getAbsolutePath(), kstore, kstorePass, tstore, tstorePass);
       materialLocation.put(key, material);
       futures.remove(key);
 
@@ -439,7 +476,9 @@ public class CertificateLocalizationService extends AbstractService
             (MaterializeCryptoKeysRequest.class);
         request.setUsername(key.getUsername());
         request.setKeystore(kstore);
+        request.setKeystorePassword(kstorePass);
         request.setTruststore(tstore);
+        request.setTruststorePassword(tstorePass);
         evtQueue.add(new CertificateLocalizationEvent(request));
       }
 

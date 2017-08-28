@@ -86,9 +86,25 @@ public abstract class StartContainersRequest {
   
   @Public
   @InterfaceStability.Unstable
+  public abstract String getKeyStorePassword();
+  
+  @Public
+  @InterfaceStability.Unstable
+  public abstract void setKeyStorePassword(String password);
+  
+  @Public
+  @InterfaceStability.Unstable
   public abstract ByteBuffer getTrustStore();
   
   @Public
   @InterfaceStability.Unstable
   public abstract void setTrustStore(ByteBuffer trustStore);
+  
+  @Public
+  @InterfaceStability.Unstable
+  public abstract String getTrustStorePassword();
+  
+  @Public
+  @InterfaceStability.Unstable
+  public abstract void setTrustStorePassword(String password);
 }

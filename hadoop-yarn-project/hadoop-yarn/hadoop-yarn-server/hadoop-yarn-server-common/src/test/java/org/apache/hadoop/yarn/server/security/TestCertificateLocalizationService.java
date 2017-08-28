@@ -24,6 +24,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -76,7 +77,8 @@ public class TestCertificateLocalizationService {
   }
   
   private void verifyMaterialExistOrNot(CertificateLocalizationService certLocSrv,
-      String username, boolean exist) throws Exception {
+      String username, String kstorePass, String tstorePass, boolean exist)
+      throws Exception {
     
     String certLoc = certLocSrv.getMaterializeDirectory().toString();
     String expectedKPath = Paths.get(certLoc, username, username + "__kstore" +
@@ -92,6 +94,8 @@ public class TestCertificateLocalizationService {
       assertEquals(expectedTPath, material.getTrustStoreLocation());
       assertTrue(kfd.exists());
       assertTrue(tfd.exists());
+      assertEquals(kstorePass, material.getKeyStorePass());
+      assertEquals(tstorePass, material.getTrustStorePass());
     } else {
       CryptoMaterial material = null;
       try {
@@ -140,19 +144,27 @@ public class TestCertificateLocalizationService {
     String username = "Dr.Who";
     ByteBuffer kstore = ByteBuffer.wrap("some bytes".getBytes());
     ByteBuffer tstore = ByteBuffer.wrap("some bytes".getBytes());
-    certSyncLeader.materializeCertificates(username, kstore, tstore);
+    String kstorePass = "kstorePass";
+    String tstorePass = "tstorePass";
+    
+    certSyncLeader.materializeCertificates(username, kstore, kstorePass, tstore,
+        tstorePass);
     
     TimeUnit.SECONDS.sleep(2);
     
-    verifyMaterialExistOrNot(certSyncSlave, username, exist);
-    verifyMaterialExistOrNot(certSyncSlave2, username, exist);
+    verifyMaterialExistOrNot(certSyncSlave, username, kstorePass, tstorePass,
+        exist);
+    verifyMaterialExistOrNot(certSyncSlave2, username, kstorePass,
+        tstorePass, exist);
     
     certSyncLeader.removeMaterial(username);
     
     TimeUnit.SECONDS.sleep(2);
     
-    verifyMaterialExistOrNot(certSyncSlave, username, doesNotExist);
-    verifyMaterialExistOrNot(certSyncSlave2, username, doesNotExist);
+    verifyMaterialExistOrNot(certSyncSlave, username, kstorePass,
+        tstorePass, doesNotExist);
+    verifyMaterialExistOrNot(certSyncSlave2, username, kstorePass, tstorePass,
+        doesNotExist);
     
     LOG.info("Switching roles");
     // Switch roles
@@ -160,17 +172,24 @@ public class TestCertificateLocalizationService {
     certSyncLeader.transitionToStandby();
     
     username = "Amy";
-    certSyncSlave.materializeCertificates(username, kstore, tstore);
+    kstorePass = "kstorePass2";
+    tstorePass = "tstorePass2";
+    certSyncSlave.materializeCertificates(username, kstore, kstorePass, tstore,
+        tstorePass);
     
     TimeUnit.SECONDS.sleep(2);
-    verifyMaterialExistOrNot(certSyncLeader, username, exist);
-    verifyMaterialExistOrNot(certSyncSlave2, username, exist);
+    verifyMaterialExistOrNot(certSyncLeader, username, kstorePass,
+        tstorePass, exist);
+    verifyMaterialExistOrNot(certSyncSlave2, username, kstorePass,
+        tstorePass, exist);
     
     certSyncSlave.removeMaterial(username);
     TimeUnit.SECONDS.sleep(2);
     
-    verifyMaterialExistOrNot(certSyncLeader, username, doesNotExist);
-    verifyMaterialExistOrNot(certSyncSlave2, username, doesNotExist);
+    verifyMaterialExistOrNot(certSyncLeader, username, kstorePass, tstorePass,
+        doesNotExist);
+    verifyMaterialExistOrNot(certSyncSlave2, username, kstorePass, tstorePass,
+        doesNotExist);
     
     certSyncSlave.serviceStop();
     certSyncLeader.serviceStop();
@@ -201,8 +220,10 @@ public class TestCertificateLocalizationService {
     ByteBuffer bft = ByteBuffer.wrap(randomT);
     String username = "Dr.Who";
     String applicationId = "tardis";
+    String keyStorePass = "keyStorePass";
+    String trustStorePass = "trustStorePass";
     
-    certLocSrv.materializeCertificates(username, bfk, bft);
+    certLocSrv.materializeCertificates(username, bfk, keyStorePass, bft, trustStorePass);
   
     CryptoMaterial cryptoMaterial = certLocSrv
         .getMaterialLocation(username);
@@ -218,6 +239,8 @@ public class TestCertificateLocalizationService {
     cryptoMaterial = certLocSrv.getMaterialLocation(username);
     assertEquals(expectedKPath, cryptoMaterial.getKeyStoreLocation());
     assertEquals(expectedTPath, cryptoMaterial.getTrustStoreLocation());
+    assertEquals(keyStorePass, cryptoMaterial.getKeyStorePass());
+    assertEquals(trustStorePass, cryptoMaterial.getTrustStorePass());
     
     certLocSrv.removeMaterial(username);
     File kfd = new File(expectedKPath);
@@ -237,8 +260,11 @@ public class TestCertificateLocalizationService {
     ByteBuffer bft = ByteBuffer.wrap(randomT);
     String username = "Dr.Who";
     String applicationId = "tardis";
+    String keyStorePass0 = "keyStorePass0";
+    String trustStorePass0 = "trustStorePass0";
   
-    certLocSrv.materializeCertificates(username, bfk, bft);
+    certLocSrv.materializeCertificates(username, bfk, keyStorePass0, bft,
+        trustStorePass0);
   
     CryptoMaterial cryptoMaterial = certLocSrv
         .getMaterialLocation(username);
@@ -257,7 +283,8 @@ public class TestCertificateLocalizationService {
     
     // Make a second materialize certificates call which happen when a second
     // application is launched
-    certLocSrv.materializeCertificates(username, bfk, bft);
+    certLocSrv.materializeCertificates(username, bfk, keyStorePass0, bft,
+        trustStorePass0);
     cryptoMaterial = certLocSrv.getMaterialLocation(username);
     assertEquals(2, cryptoMaterial.getRequestedApplications());
     

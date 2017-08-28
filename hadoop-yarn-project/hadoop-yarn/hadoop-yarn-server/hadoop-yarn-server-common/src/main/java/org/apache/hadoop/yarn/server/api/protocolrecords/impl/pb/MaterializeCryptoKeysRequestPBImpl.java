@@ -107,6 +107,24 @@ public class MaterializeCryptoKeysRequestPBImpl extends
   }
   
   @Override
+  public String getKeystorePassword() {
+    YarnServerCommonServiceProtos.MaterializeCryptoKeysRequestProtoOrBuilder p =
+        viaProto ? proto : builder;
+    
+    return (p.hasKeystorePassword()) ? p.getKeystorePassword() : null;
+  }
+  
+  @Override
+  public void setKeystorePassword(String password) {
+    maybeInitBuilder();
+    if (password == null) {
+      builder.clearKeystorePassword();
+      return;
+    }
+    builder.setKeystorePassword(password);
+  }
+  
+  @Override
   public ByteBuffer getTruststore() {
     YarnServerCommonServiceProtos.MaterializeCryptoKeysRequestProtoOrBuilder p =
         viaProto ? proto : builder;
@@ -126,5 +144,23 @@ public class MaterializeCryptoKeysRequestPBImpl extends
       return;
     }
     builder.setTruststore(ProtoUtils.convertToProtoFormat(truststore));
+  }
+  
+  @Override
+  public String getTruststorePassword() {
+    YarnServerCommonServiceProtos.MaterializeCryptoKeysRequestProtoOrBuilder p =
+        viaProto ? proto : builder;
+    
+    return (p.hasTruststorePassword()) ? p.getTruststorePassword() : null;
+  }
+  
+  @Override
+  public void setTruststorePassword(String password) {
+    maybeInitBuilder();
+    if (password == null) {
+      builder.clearTruststorePassword();
+      return;
+    }
+    builder.setTruststorePassword(password);
   }
 }

@@ -24,11 +24,16 @@ import java.util.concurrent.ExecutionException;
 
 public interface CertificateLocalization {
   void materializeCertificates(String username,
-      ByteBuffer keyStore, ByteBuffer trustStore) throws IOException;
+      ByteBuffer keyStore, String keyStorePassword,
+      ByteBuffer trustStore, String trustStorePassword) throws IOException;
   
   void removeMaterial(String username)
     throws InterruptedException, ExecutionException;
   
   CryptoMaterial getMaterialLocation(String username)
       throws FileNotFoundException, InterruptedException, ExecutionException;
+  
+  String getSuperKeystorePass();
+  
+  String getSuperTruststorePass();
 }
