@@ -35,6 +35,7 @@ import static org.apache.hadoop.test.MockitoMaker.stub;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,8 +66,18 @@ public class TestDataDirs {
 
     List<File> dirs = DataNode.getDataDirsFromURIs(uris, fs, normalPerm);
 
-    verify(fs, times(2)).setPermission(any(Path.class), eq(normalPerm));
-    verify(fs, times(6)).getFileStatus(any(Path.class));
-    assertEquals("number of valid data dirs", dirs.size(), 1);
+    /*
+    File#exists is mocked to return false. That means that when DataNode
+    #getDataDirsFromURIs is called the DiskChecker#checkDirs will call
+    mkdirsWithExistsAndPermissionCheck() which will create the file will call
+     FileSystem#setPermission uris.size() times.
+     
+     Also, since the files will be created by
+     mkdirsWithExistsAndPermissionCheck() with the specified permissions,
+     the FileSystem#getFileStatus will never be invoked
+     */
+    verify(fs, times(3)).setPermission(any(Path.class), eq(normalPerm));
+    verify(fs, never()).getFileStatus(any(Path.class));
+    assertEquals("number of valid data dirs", dirs.size(), 3);
   }
 }
