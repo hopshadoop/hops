@@ -67,6 +67,7 @@ public class ApplicationImpl implements Application {
 
   final Dispatcher dispatcher;
   final String user;
+  final String userFolder;
   final ApplicationId appId;
   final Credentials credentials;
   Map<ApplicationAccessType, String> applicationACLs;
@@ -83,9 +84,10 @@ public class ApplicationImpl implements Application {
       new ConcurrentHashMap<>();
 
   public ApplicationImpl(Dispatcher dispatcher, String user, ApplicationId appId,
-      Credentials credentials, Context context) {
+      Credentials credentials, Context context, String userFolder) {
     this.dispatcher = dispatcher;
     this.user = user;
+    this.userFolder = userFolder;
     this.appId = appId;
     this.credentials = credentials;
     this.aclsManager = context.getApplicationACLsManager();
@@ -101,6 +103,11 @@ public class ApplicationImpl implements Application {
     return user.toString();
   }
 
+  @Override
+  public String getUserFolder() {
+    return userFolder;
+  }
+  
   @Override
   public ApplicationId getAppId() {
     return appId;
@@ -245,7 +252,7 @@ public class ApplicationImpl implements Application {
       app.dispatcher.getEventHandler().handle(
           new LogHandlerAppStartedEvent(app.appId, app.user,
               app.credentials, app.applicationACLs,
-              app.logAggregationContext));
+              app.logAggregationContext, app.userFolder));
     }
   }
 

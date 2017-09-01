@@ -136,21 +136,22 @@ public class DockerContainerExecutor extends ContainerExecutor {
     String user = ctx.getUser();
     String appId = ctx.getAppId();
     String locId = ctx.getLocId();
+    String userFolder = ctx.getUserFolder();
     LocalDirsHandlerService dirsHandler = ctx.getDirsHandler();
     List<String> localDirs = dirsHandler.getLocalDirs();
     List<String> logDirs = dirsHandler.getLogDirs();
 
     ContainerLocalizer localizer =
       new ContainerLocalizer(lfs, user, appId, locId, getPaths(localDirs),
-        RecordFactoryProvider.getRecordFactory(getConf()));
+        RecordFactoryProvider.getRecordFactory(getConf()), user);
 
-    createUserLocalDirs(localDirs, user);
-    createUserCacheDirs(localDirs, user);
-    createAppDirs(localDirs, user, appId);
+    createUserLocalDirs(localDirs, user, userFolder);
+    createUserCacheDirs(localDirs, user, userFolder);
+    createAppDirs(localDirs, user, appId, userFolder);
     createAppLogDirs(appId, logDirs, user);
 
     // randomly choose the local directory
-    Path appStorageDir = getWorkingDir(localDirs, user, appId);
+    Path appStorageDir = getWorkingDir(localDirs, user, appId, userFolder);
 
     String tokenFn =
       String.format(ContainerLocalizer.TOKEN_FILE_NAME_FMT, locId);
@@ -175,6 +176,7 @@ public class DockerContainerExecutor extends ContainerExecutor {
     Path nmPrivateContainerScriptPath = ctx.getNmPrivateContainerScriptPath();
     Path nmPrivateTokensPath = ctx.getNmPrivateTokensPath();
     String userName = ctx.getUser();
+    String userFolder = ctx.getUserFolder();
     Path containerWorkDir = ctx.getContainerWorkDir();
     List<String> localDirs = ctx.getLocalDirs();
     List<String> logDirs = ctx.getLogDirs();
@@ -205,7 +207,7 @@ public class DockerContainerExecutor extends ContainerExecutor {
         containerId.getApplicationAttemptId().getApplicationId().toString();
     for (String sLocalDir : localDirs) {
       Path usersdir = new Path(sLocalDir, ContainerLocalizer.USERCACHE);
-      Path userdir = new Path(usersdir, userName);
+      Path userdir = new Path(usersdir, userFolder);
       Path appCacheDir = new Path(userdir, ContainerLocalizer.APPCACHE);
       Path appDir = new Path(appCacheDir, appIdStr);
       Path containerDir = new Path(appDir, containerIdStr);
@@ -619,14 +621,14 @@ public class DockerContainerExecutor extends ContainerExecutor {
    * <li>$local.dir/usercache/$user</li>
    * </ul>
    */
-  void createUserLocalDirs(List<String> localDirs, String user)
+  void createUserLocalDirs(List<String> localDirs, String user, String userFolder)
     throws IOException {
     boolean userDirStatus = false;
     FsPermission userperms = new FsPermission(USER_PERM);
     for (String localDir : localDirs) {
       // create $local.dir/usercache/$user and its immediate parent
       try {
-        createDir(getUserCacheDir(new Path(localDir), user), userperms, true,
+        createDir(getUserCacheDir(new Path(localDir), userFolder), userperms, true,
           user);
       } catch (IOException e) {
         LOG.warn("Unable to create the user directory : " + localDir, e);
@@ -649,7 +651,7 @@ public class DockerContainerExecutor extends ContainerExecutor {
    * <li>$local.dir/usercache/$user/filecache</li>
    * </ul>
    */
-  void createUserCacheDirs(List<String> localDirs, String user)
+  void createUserCacheDirs(List<String> localDirs, String user, String userFolder)
     throws IOException {
     LOG.info("Initializing user " + user);
 
@@ -661,7 +663,7 @@ public class DockerContainerExecutor extends ContainerExecutor {
     for (String localDir : localDirs) {
       // create $local.dir/usercache/$user/appcache
       Path localDirPath = new Path(localDir);
-      final Path appDir = getAppcacheDir(localDirPath, user);
+      final Path appDir = getAppcacheDir(localDirPath, userFolder);
       try {
         createDir(appDir, appCachePerms, true, user);
         appcacheDirStatus = true;
@@ -669,7 +671,7 @@ public class DockerContainerExecutor extends ContainerExecutor {
         LOG.warn("Unable to create app cache directory : " + appDir, e);
       }
       // create $local.dir/usercache/$user/filecache
-      final Path distDir = getFileCacheDir(localDirPath, user);
+      final Path distDir = getFileCacheDir(localDirPath, userFolder);
       try {
         createDir(distDir, fileperms, true, user);
         distributedCacheDirStatus = true;
@@ -696,12 +698,12 @@ public class DockerContainerExecutor extends ContainerExecutor {
    * </ul>
    * @param localDirs
    */
-  void createAppDirs(List<String> localDirs, String user, String appId)
+  void createAppDirs(List<String> localDirs, String user, String appId, String userFolder)
     throws IOException {
     boolean initAppDirStatus = false;
     FsPermission appperms = new FsPermission(APPDIR_PERM);
     for (String localDir : localDirs) {
-      Path fullAppDir = getApplicationDir(new Path(localDir), user, appId);
+      Path fullAppDir = getApplicationDir(new Path(localDir), userFolder, appId);
       // create $local.dir/usercache/$user/appcache/$appId
       try {
         createDir(fullAppDir, appperms, true, user);
@@ -777,26 +779,26 @@ public class DockerContainerExecutor extends ContainerExecutor {
     return lfs.getFsStatus(base).getRemaining();
   }
 
-  private Path getApplicationDir(Path base, String user, String appId) {
-    return new Path(getAppcacheDir(base, user), appId);
+  private Path getApplicationDir(Path base, String userFolder, String appId) {
+    return new Path(getAppcacheDir(base, userFolder), appId);
   }
 
-  private Path getUserCacheDir(Path base, String user) {
-    return new Path(new Path(base, ContainerLocalizer.USERCACHE), user);
+  private Path getUserCacheDir(Path base, String userFolder) {
+    return new Path(new Path(base, ContainerLocalizer.USERCACHE), userFolder);
   }
 
-  private Path getAppcacheDir(Path base, String user) {
-    return new Path(getUserCacheDir(base, user),
+  private Path getAppcacheDir(Path base, String userFolder) {
+    return new Path(getUserCacheDir(base, userFolder),
         ContainerLocalizer.APPCACHE);
   }
 
-  private Path getFileCacheDir(Path base, String user) {
-    return new Path(getUserCacheDir(base, user),
+  private Path getFileCacheDir(Path base, String userFolder) {
+    return new Path(getUserCacheDir(base, userFolder),
         ContainerLocalizer.FILECACHE);
   }
 
   protected Path getWorkingDir(List<String> localDirs, String user,
-    String appId) throws IOException {
+    String appId, String userFolder) throws IOException {
     Path appStorageDir = null;
     long totalAvailable = 0L;
     long[] availableOnDisk = new long[localDirs.size()];
@@ -807,7 +809,7 @@ public class DockerContainerExecutor extends ContainerExecutor {
     // firstly calculate the sum of all available space on these directories
     for (String localDir : localDirs) {
       Path curBase = getApplicationDir(new Path(localDir),
-        user, appId);
+        userFolder, appId);
       long space = 0L;
       try {
         space = getDiskFreeSpace(curBase);
@@ -839,7 +841,7 @@ public class DockerContainerExecutor extends ContainerExecutor {
       randomPosition -= availableOnDisk[dir++];
     }
     appStorageDir = getApplicationDir(new Path(localDirs.get(dir)),
-      user, appId);
+      userFolder, appId);
 
     return appStorageDir;
   }

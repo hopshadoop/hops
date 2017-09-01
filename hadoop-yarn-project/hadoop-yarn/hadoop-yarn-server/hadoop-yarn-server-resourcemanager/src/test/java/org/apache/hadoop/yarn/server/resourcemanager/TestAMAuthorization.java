@@ -223,7 +223,7 @@ public class TestAMAuthorization {
     final YarnRPC rpc = YarnRPC.create(conf);
 
     UserGroupInformation currentUser = UserGroupInformation
-        .createRemoteUser(applicationAttemptId.toString());
+        .createRemoteUser(applicationAttemptId.toString(), false);
     Credentials credentials = containerManager.getContainerCredentials();
     final InetSocketAddress rmBindAddress =
         rm.getApplicationMasterService().getBindAddress();
@@ -284,7 +284,7 @@ public class TestAMAuthorization {
         YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
 
     UserGroupInformation currentUser = UserGroupInformation
-        .createRemoteUser(applicationAttemptId.toString());
+        .createRemoteUser(applicationAttemptId.toString(), false);
 
     // First try contacting NM without tokens
     ApplicationMasterProtocol client = currentUser

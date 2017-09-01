@@ -90,7 +90,7 @@ public class ContainerLogsUtils {
    * Finds the log file with the given filename for the given container.
    */
   public static File getContainerLogFile(ContainerId containerId,
-      String fileName, String remoteUser, Context context) throws YarnException {
+      String fileName, String remoteUser, Context context, String userFolder) throws YarnException {
     Container container = context.getContainers().get(containerId);
     
     Application application = getApplicationForContainer(containerId, context);
@@ -102,7 +102,7 @@ public class ContainerLogsUtils {
     try {
       LocalDirsHandlerService dirsHandler = context.getLocalDirsHandler();
       String relativeContainerLogDir = ContainerLaunch.getRelativeContainerLogDir(
-          application.getAppId().toString(), containerId.toString());
+          application.getAppId().toString(), containerId.toString(), userFolder);
       Path logPath = dirsHandler.getLogPathToRead(
           relativeContainerLogDir + Path.SEPARATOR + fileName);
       URI logPathURI = new File(logPath.toString()).toURI();

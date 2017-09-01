@@ -100,6 +100,7 @@ public class TestContainerLogsPage {
     // Add an application and the corresponding containers
     RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(conf);
     String user = "nobody";
+    String userFolder = "nobodysFolder";
     long clusterTimeStamp = 1234;
     ApplicationId appId = BuilderUtils.newApplicationId(recordFactory,
         clusterTimeStamp, 1);
@@ -114,7 +115,7 @@ public class TestContainerLogsPage {
 
     MockContainer container =
         new MockContainer(appAttemptId, new AsyncDispatcher(), conf, user,
-            appId, 1);
+            appId, 1, userFolder);
     container.setState(ContainerState.RUNNING);
     nmContext.getContainers().put(container1, container);   
     List<File> files = null;
@@ -161,6 +162,7 @@ public class TestContainerLogsPage {
         new ApplicationACLsManager(conf), new NMNullStateStoreService());
     // Add an application and the corresponding containers
     String user = "nobody";
+    String userFolder = "nobodysFolder";
     long clusterTimeStamp = 1234;
     ApplicationId appId = BuilderUtils.newApplicationId(
         clusterTimeStamp, 1);
@@ -175,18 +177,18 @@ public class TestContainerLogsPage {
 
     MockContainer container =
         new MockContainer(appAttemptId, new AsyncDispatcher(), conf, user,
-            appId, 1);
+            appId, 1, userFolder);
     container.setState(ContainerState.RUNNING);
     nmContext.getContainers().put(containerId, container);
     File containerLogDir = new File(absLogDir,
         ContainerLaunch.getRelativeContainerLogDir(appId.toString(),
-            containerId.toString()));
+            containerId.toString(), userFolder));
     containerLogDir.mkdirs();
     String fileName = "fileName";
     File containerLogFile = new File(containerLogDir, fileName);
     containerLogFile.createNewFile();
     File file = ContainerLogsUtils.getContainerLogFile(containerId,
-        fileName, user, nmContext);
+        fileName, user, nmContext, userFolder);
     Assert.assertEquals(containerLogFile.toURI().toString(),
         file.toURI().toString());
     FileUtil.fullyDelete(absLogDir);
@@ -198,6 +200,7 @@ public class TestContainerLogsPage {
     // only if it is enabled.
     assumeTrue(NativeIO.isAvailable());
     String user = "randomUser" + System.currentTimeMillis();
+    String userFolder = user + "Folder";
     File absLogDir = null, appDir = null, containerDir = null, syslog = null;
     try {
       // target log directory
@@ -227,6 +230,7 @@ public class TestContainerLogsPage {
       // Making sure that application returns a random user. This is required
       // for SecureIOUtils' file owner check.
       when(app.getUser()).thenReturn(user);
+      when(app.getUserFolder()).thenReturn(userFolder);
 
       ApplicationAttemptId appAttemptId =
           BuilderUtils.newApplicationAttemptId(appId, 1);
@@ -236,7 +240,9 @@ public class TestContainerLogsPage {
       // Testing secure read access for log files
 
       // Creating application and container directory and syslog file.
-      appDir = new File(absLogDir, appId.toString());
+      File userDir = new File(absLogDir, userFolder);
+      userDir.mkdir();
+      appDir = new File(userDir, appId.toString());
       appDir.mkdir();
       containerDir = new File(appDir, container1.toString());
       containerDir.mkdir();
@@ -258,7 +264,7 @@ public class TestContainerLogsPage {
       when(context.getLocalDirsHandler()).thenReturn(dirsHandler);
 
       MockContainer container = new MockContainer(appAttemptId,
-        new AsyncDispatcher(), conf, user, appId, 1);
+        new AsyncDispatcher(), conf, user, appId, 1, userFolder);
       container.setState(ContainerState.RUNNING);
       context.getContainers().put(container1, container);
 
@@ -349,9 +355,9 @@ public class TestContainerLogsPage {
     containers.put(containerId, container);
     
     LocalDirsHandlerService localDirs = mock(LocalDirsHandlerService.class);
-    when(localDirs.getLogPathToRead("appId" + Path.SEPARATOR + "containerId" +
-      Path.SEPARATOR + "fileName"))
-      .thenReturn(new Path("F:/nmlogs/appId/containerId/fileName"));
+    when(localDirs.getLogPathToRead("userFolder" + Path.SEPARATOR + "appId"
+            + Path.SEPARATOR + "containerId" + Path.SEPARATOR + "fileName"))
+            .thenReturn(new Path("F:/nmlogs/appId/containerId/fileName"));
     
     NMContext context = mock(NMContext.class);
     when(context.getLocalDirsHandler()).thenReturn(localDirs);
@@ -359,7 +365,7 @@ public class TestContainerLogsPage {
     when(context.getContainers()).thenReturn(containers);
     
     File logFile = ContainerLogsUtils.getContainerLogFile(containerId,
-      "fileName", null, context);
+      "fileName", null, context, "userFolder");
       
     Assert.assertTrue("logFile lost drive letter " +
       logFile,

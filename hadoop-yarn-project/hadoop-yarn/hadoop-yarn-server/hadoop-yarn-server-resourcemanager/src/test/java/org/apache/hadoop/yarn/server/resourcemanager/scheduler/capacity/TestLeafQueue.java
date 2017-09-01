@@ -3314,7 +3314,8 @@ public class TestLeafQueue {
     RMNodeLabelsManager nlm = mock(RMNodeLabelsManager.class);
     when(nlm.getResourceByLabel((String)any(), (Resource)any())).thenReturn(res);
     when(rmContext.getNodeLabelManager()).thenReturn(nlm);
-
+    when(rmContext.getUserFolderHashAlgo()).thenReturn(
+            YarnConfiguration.DEFAULT_USER_FOLDER_ALGO);
     // Queue "test" consumes 100% of the cluster, so its capacity and absolute
     // capacity are both 1.0f.
     Queue queue = createQueue("test", null, 1.0f, 1.0f);

@@ -47,6 +47,7 @@ public class MockContainer implements Container {
   private ContainerId id;
   private ContainerState state;
   private String user;
+  private String userFolder;
   private ContainerLaunchContext launchContext;
   private final Map<Path, List<String>> resource =
       new HashMap<Path, List<String>>();
@@ -55,9 +56,10 @@ public class MockContainer implements Container {
 
   public MockContainer(ApplicationAttemptId appAttemptId,
       Dispatcher dispatcher, Configuration conf, String user,
-      ApplicationId appId, int uniqId) throws IOException{
+      ApplicationId appId, int uniqId, String userFolder) throws IOException{
 
     this.user = user;
+    this.userFolder = userFolder;
     this.recordFactory = RecordFactoryProvider.getRecordFactory(conf);
     this.id = BuilderUtils.newContainerId(recordFactory, appId, appAttemptId,
         uniqId);
@@ -79,6 +81,11 @@ public class MockContainer implements Container {
   @Override
   public String getUser() {
     return user;
+  }
+  
+  @Override
+  public String getUserFolder() {
+    return userFolder;
   }
 
   @Override

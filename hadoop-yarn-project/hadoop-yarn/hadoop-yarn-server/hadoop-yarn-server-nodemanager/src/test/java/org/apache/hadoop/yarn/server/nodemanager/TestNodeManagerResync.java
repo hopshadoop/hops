@@ -106,6 +106,7 @@ public class TestNodeManagerResync {
   static final RecordFactory recordFactory = RecordFactoryProvider
       .getRecordFactory(null);
   static final String user = "nobody";
+  static final String userFolder = "nobodysFolder";
   private FileContext localFS;
   private CyclicBarrier syncBarrier;
   private CyclicBarrier updateBarrier;
@@ -864,7 +865,7 @@ public class TestNodeManagerResync {
       return TestContainerManager.createContainerToken(
           cId, DUMMY_RM_IDENTIFIER,
           getNMContext().getNodeId(), user, resource,
-          getNMContext().getContainerTokenSecretManager(), null);
+          getNMContext().getContainerTokenSecretManager(), null, userFolder);
     }
   }
 

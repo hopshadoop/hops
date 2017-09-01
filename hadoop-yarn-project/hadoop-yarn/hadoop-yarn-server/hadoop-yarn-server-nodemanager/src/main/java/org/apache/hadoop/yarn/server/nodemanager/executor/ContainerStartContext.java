@@ -41,6 +41,7 @@ public final class ContainerStartContext {
   private final Path nmPrivateContainerScriptPath;
   private final Path nmPrivateTokensPath;
   private final String user;
+  private final String userFolder;
   private final String appId;
   private final Path containerWorkDir;
   private final List<String> localDirs;
@@ -52,6 +53,7 @@ public final class ContainerStartContext {
     private Path nmPrivateContainerScriptPath;
     private Path nmPrivateTokensPath;
     private String user;
+    private String userFolder;
     private String appId;
     private Path containerWorkDir;
     private List<String> localDirs;
@@ -107,6 +109,11 @@ public final class ContainerStartContext {
       return this;
     }
 
+    public Builder setUserFolder(String userFolder) {
+      this.userFolder = userFolder;
+      return this;
+    }
+
     public ContainerStartContext build() {
       return new ContainerStartContext(this);
     }
@@ -118,6 +125,7 @@ public final class ContainerStartContext {
     this.nmPrivateContainerScriptPath = builder.nmPrivateContainerScriptPath;
     this.nmPrivateTokensPath = builder.nmPrivateTokensPath;
     this.user = builder.user;
+    this.userFolder = builder.userFolder;
     this.appId = builder.appId;
     this.containerWorkDir = builder.containerWorkDir;
     this.localDirs = builder.localDirs;
@@ -146,6 +154,10 @@ public final class ContainerStartContext {
 
   public String getUser() {
     return this.user;
+  }
+
+  public String getUserFolder() {
+    return this.userFolder;
   }
 
   public String getAppId() {

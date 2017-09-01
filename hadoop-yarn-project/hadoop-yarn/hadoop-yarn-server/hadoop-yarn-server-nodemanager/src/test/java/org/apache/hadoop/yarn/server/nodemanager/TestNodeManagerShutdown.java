@@ -84,6 +84,7 @@ public class TestNodeManagerShutdown {
   static final RecordFactory recordFactory = RecordFactoryProvider
       .getRecordFactory(null);
   static final String user = "nobody";
+  static final String userFolder = "nobodysFolder";
   private FileContext localFS;
   private ContainerId cId;
   private NodeManager nm;
@@ -219,7 +220,7 @@ public class TestNodeManagerShutdown {
     final InetSocketAddress containerManagerBindAddress =
         NetUtils.createSocketAddrForHost("127.0.0.1", port);
     UserGroupInformation currentUser = UserGroupInformation
-        .createRemoteUser(cId.toString());
+        .createRemoteUser(cId.toString(), false);
     org.apache.hadoop.security.token.Token<NMTokenIdentifier> nmToken =
         ConverterUtils.convertFromYarn(
           nm.getNMContext().getNMTokenSecretManager()
@@ -242,7 +243,7 @@ public class TestNodeManagerShutdown {
     StartContainerRequest scRequest =
         StartContainerRequest.newInstance(containerLaunchContext,
           TestContainerManager.createContainerToken(cId, 0,
-            nodeId, user, nm.getNMContext().getContainerTokenSecretManager()));
+            nodeId, user, nm.getNMContext().getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =

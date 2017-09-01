@@ -204,7 +204,8 @@ public class LocalDirsHandlerService extends AbstractService {
     }
     FsPermission perm = new FsPermission((short)0755);
     boolean createSucceeded = localDirs.createNonExistentDirs(localFs, perm);
-    createSucceeded &= logDirs.createNonExistentDirs(localFs, perm);
+    FsPermission permSec = new FsPermission((short)0733);
+    createSucceeded &= logDirs.createNonExistentDirs(localFs, permSec);
     if (!createSucceeded) {
       updateDirsAfterTest();
     }

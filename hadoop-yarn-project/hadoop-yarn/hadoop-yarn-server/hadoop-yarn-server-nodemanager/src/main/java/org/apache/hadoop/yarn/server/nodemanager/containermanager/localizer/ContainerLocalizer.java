@@ -95,6 +95,7 @@ public class ContainerLocalizer {
       new FsPermission((short) 0755);
 
   private final String user;
+  private final String userFolder;
   private final String appId;
   private final List<Path> localDirs;
   private final String localizerId;
@@ -106,7 +107,7 @@ public class ContainerLocalizer {
 
   public ContainerLocalizer(FileContext lfs, String user, String appId,
       String localizerId, List<Path> localDirs,
-      RecordFactory recordFactory) throws IOException {
+      RecordFactory recordFactory, String userFolder) throws IOException {
     if (null == user) {
       throw new IOException("Cannot initialize for null user");
     }
@@ -115,6 +116,7 @@ public class ContainerLocalizer {
     }
     this.lfs = lfs;
     this.user = user;
+    this.userFolder = userFolder;
     this.appId = appId;
     this.localDirs = localDirs;
     this.localizerId = localizerId;
@@ -136,7 +138,7 @@ public class ContainerLocalizer {
   public void runLocalization(final InetSocketAddress nmAddr)
       throws IOException, InterruptedException {
     // load credentials
-    initDirs(conf, user, appId, lfs, localDirs);
+    initDirs(conf, user, appId, lfs, localDirs, userFolder);
     final Credentials creds = new Credentials();
     DataInputStream credFile = null;
     try {
@@ -366,10 +368,11 @@ public class ContainerLocalizer {
    */
   public static void buildMainArgs(List<String> command,
       String user, String appId, String locId,
-      InetSocketAddress nmAddr, List<String> localDirs) {
+      InetSocketAddress nmAddr, List<String> localDirs, String userFolder) {
     
     command.add(ContainerLocalizer.class.getName());
     command.add(user);
+    command.add(userFolder);
     command.add(appId);
     command.add(locId);
     command.add(nmAddr.getHostName());
@@ -381,7 +384,7 @@ public class ContainerLocalizer {
 
   public static void main(String[] argv) throws Throwable {
     Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
-    // usage: $0 user appId locId host port app_log_dir user_dir [user_dir]*
+    // usage: $0 user userFolder appId locId host port app_log_dir user_dir [user_dir]*
     // let $x = $x/usercache for $local.dir
     // MKDIR $x/$user/appcache/$appid
     // MKDIR $x/$user/appcache/$appid/output
@@ -389,11 +392,12 @@ public class ContainerLocalizer {
     // LOAD $x/$user/appcache/$appid/appTokens
     try {
       String user = argv[0];
-      String appId = argv[1];
-      String locId = argv[2];
+      String userFolder = argv[1];
+      String appId = argv[2];
+      String locId = argv[3];
       InetSocketAddress nmAddr =
-          new InetSocketAddress(argv[3], Integer.parseInt(argv[4]));
-      String[] sLocaldirs = Arrays.copyOfRange(argv, 5, argv.length);
+          new InetSocketAddress(argv[4], Integer.parseInt(argv[5]));
+      String[] sLocaldirs = Arrays.copyOfRange(argv, 6, argv.length);
       ArrayList<Path> localDirs = new ArrayList<Path>(sLocaldirs.length);
       for (String sLocaldir : sLocaldirs) {
         localDirs.add(new Path(sLocaldir));
@@ -409,7 +413,7 @@ public class ContainerLocalizer {
       ContainerLocalizer localizer =
           new ContainerLocalizer(FileContext.getLocalFSFileContext(), user,
               appId, locId, localDirs,
-              RecordFactoryProvider.getRecordFactory(null));
+              RecordFactoryProvider.getRecordFactory(null), userFolder);
       localizer.runLocalization(nmAddr);
       return;
     } catch (Throwable e) {
@@ -422,7 +426,7 @@ public class ContainerLocalizer {
   }
 
   private static void initDirs(Configuration conf, String user, String appId,
-      FileContext lfs, List<Path> localDirs) throws IOException {
+      FileContext lfs, List<Path> localDirs, String userFolder) throws IOException {
     if (null == localDirs || 0 == localDirs.size()) {
       throw new IOException("Cannot initialize without local dirs");
     }
@@ -431,7 +435,7 @@ public class ContainerLocalizer {
     for (int i = 0, n = localDirs.size(); i < n; ++i) {
       // $x/usercache/$user
       Path base = lfs.makeQualified(
-          new Path(new Path(localDirs.get(i), USERCACHE), user));
+          new Path(new Path(localDirs.get(i), USERCACHE), userFolder));
       // $x/usercache/$user/filecache
       Path userFileCacheDir = new Path(base, FILECACHE);
       usersFileCacheDirs[i] = userFileCacheDir.toString();

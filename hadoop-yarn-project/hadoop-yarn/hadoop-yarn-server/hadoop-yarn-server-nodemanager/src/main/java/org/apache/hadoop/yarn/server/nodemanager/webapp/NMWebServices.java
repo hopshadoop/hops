@@ -226,7 +226,8 @@ public class NMWebServices {
     File logFile = null;
     try {
       logFile = ContainerLogsUtils.getContainerLogFile(
-          containerId, filename, request.getRemoteUser(), nmContext);
+          containerId, filename, request.getRemoteUser(), nmContext,
+          nmContext.getApplications().get(containerId.getApplicationAttemptId().getApplicationId()).getUserFolder());
     } catch (NotFoundException ex) {
       return Response.status(Status.NOT_FOUND).entity(ex.getMessage()).build();
     } catch (YarnException ex) {

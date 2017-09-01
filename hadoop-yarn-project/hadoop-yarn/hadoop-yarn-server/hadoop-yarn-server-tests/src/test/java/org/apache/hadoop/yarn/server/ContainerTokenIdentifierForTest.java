@@ -88,7 +88,8 @@ public class ContainerTokenIdentifierForTest extends ContainerTokenIdentifier {
     }
     builder.setNmHostAddr(identifier.getNmHostAddress());
     builder.setAppSubmitter(identifier.getApplicationSubmitter());
-    
+    builder.setAppSubmitterFolder(identifier.getApplicationSubmitterFolder());
+
     ResourcePBImpl resource = (ResourcePBImpl)identifier.getResource();
     if (resource != null) {
       builder.setResource(resource.getProto());

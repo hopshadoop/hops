@@ -151,6 +151,7 @@ public class TestLinuxContainerExecutor {
 
   private LinuxContainerExecutor exec = null;
   private String appSubmitter = null;
+  private String appSubmitterFolder = null;
   private LocalDirsHandlerService dirsHandler;
   private Configuration conf;
   private FileContext files;
@@ -199,6 +200,7 @@ public class TestLinuxContainerExecutor {
       }
     }
 
+    appSubmitterFolder = appSubmitter + "Folder";
   }
 
   @After
@@ -337,6 +339,7 @@ public class TestLinuxContainerExecutor {
         .setContainerWorkDir(workDir)
         .setLocalDirs(dirsHandler.getLocalDirs())
         .setLogDirs(dirsHandler.getLogDirs())
+        .setUserFolder(appSubmitterFolder)
         .build());
   }
 
@@ -363,7 +366,7 @@ public class TestLinuxContainerExecutor {
       @Override
       public void buildMainArgs(List<String> command, String user,
           String appId, String locId, InetSocketAddress nmAddr,
-          List<String> localDirs) {
+          List<String> localDirs, String userFolder) {
         MockContainerLocalizer.buildMainArgs(command, user, appId, locId,
           nmAddr, localDirs);
       }
@@ -377,6 +380,7 @@ public class TestLinuxContainerExecutor {
         .setAppId(appId)
         .setLocId(locId)
         .setDirsHandler(dirsHandler)
+        .setUserFolder(appSubmitterFolder)
         .build());
 
     String locId2 = "container_01_02";
@@ -393,6 +397,7 @@ public class TestLinuxContainerExecutor {
             .setAppId(appId)
             .setLocId(locId2)
             .setDirsHandler(dirsHandler)
+            .setUserFolder(appSubmitterFolder)
             .build());
 
 

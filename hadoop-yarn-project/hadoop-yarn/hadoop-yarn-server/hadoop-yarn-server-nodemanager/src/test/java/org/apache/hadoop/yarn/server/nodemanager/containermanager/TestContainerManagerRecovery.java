@@ -581,11 +581,11 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
       ContainerLaunchContext clc, LogAggregationContext logAggregationContext)
           throws Exception {
     UserGroupInformation user = UserGroupInformation.createRemoteUser(
-        cid.getApplicationAttemptId().toString());
+        cid.getApplicationAttemptId().toString(), false);
     StartContainerRequest scReq = StartContainerRequest.newInstance(
         clc, TestContainerManager.createContainerToken(cid, 0,
             context.getNodeId(), user.getShortUserName(),
-            context.getContainerTokenSecretManager(), logAggregationContext));
+            context.getContainerTokenSecretManager(), logAggregationContext, user.getShortUserName() + "Folder"));
     final List<StartContainerRequest> scReqList =
         new ArrayList<StartContainerRequest>();
     scReqList.add(scReq);
@@ -613,7 +613,7 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
     // add increase request
     Token containerToken = TestContainerManager.createContainerToken(
         cid, 0, context.getNodeId(), user.getShortUserName(),
-        capability, context.getContainerTokenSecretManager(), null);
+        capability, context.getContainerTokenSecretManager(), null, userFolder);
     increaseTokens.add(containerToken);
     final IncreaseContainersResourceRequest increaseRequest =
         IncreaseContainersResourceRequest.newInstance(increaseTokens);

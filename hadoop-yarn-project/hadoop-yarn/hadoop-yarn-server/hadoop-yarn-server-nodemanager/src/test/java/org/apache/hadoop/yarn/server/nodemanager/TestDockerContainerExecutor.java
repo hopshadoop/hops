@@ -70,6 +70,7 @@ public class TestDockerContainerExecutor {
   private String yarnImage;
 
   private String appSubmitter;
+  private String appSubmitterFolder;
   private String dockerUrl;
   private String testImage = "centos:latest";
   private String dockerExec;
@@ -120,6 +121,7 @@ public class TestDockerContainerExecutor {
     if (appSubmitter == null || appSubmitter.isEmpty()) {
       appSubmitter = "nobody";
     }
+    appSubmitterFolder = appSubmitter + "Folder";
     shellExec(dockerExec + " pull " + testImage);
 
   }
@@ -189,6 +191,7 @@ public class TestDockerContainerExecutor {
         .setContainerWorkDir(workDir)
         .setLocalDirs(dirsHandler.getLocalDirs())
         .setLogDirs(dirsHandler.getLogDirs())
+        .setUserFolder(appSubmitterFolder)
         .build());
   }
 

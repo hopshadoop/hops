@@ -108,6 +108,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
   private final Configuration conf;
   private final DeletionService delService;
   private final UserGroupInformation userUgi;
+  private final String userFolder;
   private final Path remoteNodeLogFileForApp;
   private final Path remoteNodeTmpLogFileForApp;
 
@@ -141,13 +142,14 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
       LocalDirsHandlerService dirsHandler, Path remoteNodeLogFileForApp,
       Map<ApplicationAccessType, String> appAcls,
       LogAggregationContext logAggregationContext, Context context,
-      FileContext lfs) {
+      FileContext lfs, String userFolder) {
     this.dispatcher = dispatcher;
     this.conf = conf;
     this.delService = deletionService;
     this.appId = appId;
     this.applicationId = appId.toString();
     this.userUgi = userUgi;
+    this.userFolder = userFolder;
     this.dirsHandler = dirsHandler;
     this.remoteNodeLogFileForApp = remoteNodeLogFileForApp;
     this.remoteNodeTmpLogFileForApp = getRemoteNodeTmpLogFileForApp();
@@ -341,7 +343,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
           if (containerLogAggregators.containsKey(container)) {
             aggregator = containerLogAggregators.get(container);
           } else {
-            aggregator = new ContainerLogAggregator(container);
+            aggregator = new ContainerLogAggregator(container, userFolder);
             containerLogAggregators.put(container, aggregator);
           }
           Set<Path> uploadedFilePathsInThisCycle =
@@ -559,7 +561,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
     // Remove the local app-log-dirs
     List<Path> localAppLogDirs = new ArrayList<Path>();
     for (String rootLogDir : dirsHandler.getLogDirsForCleanup()) {
-      Path logPath = new Path(rootLogDir, applicationId);
+      Path logPath = new Path(rootLogDir, userFolder +  Path.SEPARATOR + applicationId);
       try {
         // check if log dir exists
         lfs.getFileStatus(logPath);
@@ -638,11 +640,13 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
 
   private class ContainerLogAggregator {
     private final ContainerId containerId;
+    private final String userFolder;
     private Set<String> uploadedFileMeta =
         new HashSet<String>();
     
-    public ContainerLogAggregator(ContainerId containerId) {
+    public ContainerLogAggregator(ContainerId containerId, String userFolder) {
       this.containerId = containerId;
+      this.userFolder = userFolder;
     }
 
     public Set<Path> doContainerLogAggregation(LogWriter writer,
@@ -654,7 +658,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
       final LogValue logValue =
           new LogValue(dirsHandler.getLogDirsForRead(), containerId,
               userUgi.getShortUserName(), logAggregationContext,
-              this.uploadedFileMeta, appFinished, containerFinished);
+              this.uploadedFileMeta, appFinished, containerFinished, userFolder);
       try {
         writer.append(logKey, logValue);
       } catch (Exception e) {

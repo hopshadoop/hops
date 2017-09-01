@@ -130,7 +130,8 @@ public class TestAggregatedLogsBlock {
     FileUtil.fullyDelete(new File("target/logs"));
     Configuration configuration = getConfiguration();
 
-    writeLogs("target/logs/logs/application_0_0001/container_0_0001_01_000001");
+    String user = UserGroupInformation.getCurrentUser().getShortUserName();
+    writeLogs("target/logs/logs/" + user + "/application_0_0001/container_0_0001_01_000001");
 
     writeLog(configuration, "admin");
 
@@ -286,7 +287,8 @@ public class TestAggregatedLogsBlock {
 
       writer.append(new AggregatedLogFormat.LogKey("container_0_0001_01_000001"),
           new AggregatedLogFormat.LogValue(rootLogDirs, containerId,
-              UserGroupInformation.getCurrentUser().getShortUserName()));
+              UserGroupInformation.getCurrentUser().getShortUserName(), UserGroupInformation.getCurrentUser().
+              getShortUserName()));
     }
   }
 

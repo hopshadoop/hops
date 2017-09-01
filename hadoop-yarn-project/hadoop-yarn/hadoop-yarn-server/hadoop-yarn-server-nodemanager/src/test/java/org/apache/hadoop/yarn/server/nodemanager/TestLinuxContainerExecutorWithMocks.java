@@ -155,6 +155,7 @@ public class TestLinuxContainerExecutorWithMocks {
   @Test
   public void testContainerLaunch() throws IOException {
     String appSubmitter = "nobody";
+    String appSubmitterFolder = "nobodysFolder";
     String cmd = String.valueOf(
         PrivilegedOperation.RunAsUserCommand.LAUNCH_CONTAINER.getValue());
     String appId = "APP_ID";
@@ -186,10 +187,11 @@ public class TestLinuxContainerExecutorWithMocks {
         .setContainerWorkDir(workDir)
         .setLocalDirs(dirsHandler.getLocalDirs())
         .setLogDirs(dirsHandler.getLogDirs())
+        .setUserFolder(appSubmitterFolder)
         .build());
     assertEquals(0, ret);
     assertEquals(Arrays.asList(YarnConfiguration.DEFAULT_NM_NONSECURE_MODE_LOCAL_USER,
-        appSubmitter, cmd, appId, containerId,
+        appSubmitterFolder, cmd, appId, containerId,
         workDir.toString(), "/bin/echo", "/dev/null", pidFile.toString(),
         StringUtils.join(PrivilegedOperation.LINUX_FILE_PATH_SEPARATOR,
             dirsHandler.getLocalDirs()),
@@ -227,7 +229,7 @@ public class TestLinuxContainerExecutorWithMocks {
     assertEquals("addSchedPriority should be empty", 0, command.size());
   }
   
-  @Test (timeout = 5000)
+  @Test(timeout = 5000)
   public void testStartLocalizer() throws IOException {
 
   
@@ -242,12 +244,13 @@ public class TestLinuxContainerExecutorWithMocks {
           .setAppId("application_0")
           .setLocId("12345")
           .setDirsHandler(dirsHandler)
+          .setUserFolder("testFolder")
           .build());
 
       List<String> result=readMockParams();
-      Assert.assertEquals(result.size(), 18);
+      Assert.assertEquals(result.size(), 19);
       Assert.assertEquals(result.get(0), YarnConfiguration.DEFAULT_NM_NONSECURE_MODE_LOCAL_USER);
-      Assert.assertEquals(result.get(1), "test");
+      Assert.assertEquals(result.get(1), "testFolder");
       Assert.assertEquals(result.get(2), "0" );
       Assert.assertEquals(result.get(3),"application_0" );
       Assert.assertEquals(result.get(4), "/bin/nmPrivateCTokensPath");
@@ -255,10 +258,11 @@ public class TestLinuxContainerExecutorWithMocks {
       Assert.assertEquals(result.get(11), "-Xmx256m" );
       Assert.assertEquals(result.get(12),"org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ContainerLocalizer" );
       Assert.assertEquals(result.get(13), "test");
-      Assert.assertEquals(result.get(14), "application_0");
-      Assert.assertEquals(result.get(15),"12345" );
-      Assert.assertEquals(result.get(16),"localhost" );
-      Assert.assertEquals(result.get(17),"8040" );
+      Assert.assertEquals(result.get(14), "testFolder");
+      Assert.assertEquals(result.get(15), "application_0");
+      Assert.assertEquals(result.get(16), "12345");
+      Assert.assertEquals(result.get(17), "localhost");
+      Assert.assertEquals(result.get(18), "8040");
 
     } catch (InterruptedException e) {
       LOG.error("Error:"+e.getMessage(),e);
@@ -304,6 +308,7 @@ public class TestLinuxContainerExecutorWithMocks {
     mockExec.setConf(conf);
 
     String appSubmitter = "nobody";
+    String appSubmitterFolder = "nobodysFolder";
     String cmd = String
         .valueOf(PrivilegedOperation.RunAsUserCommand.LAUNCH_CONTAINER.getValue());
     String appId = "APP_ID";
@@ -351,11 +356,12 @@ public class TestLinuxContainerExecutorWithMocks {
         .setContainerWorkDir(workDir)
         .setLocalDirs(dirsHandler.getLocalDirs())
         .setLogDirs(dirsHandler.getLogDirs())
+        .setUserFolder(appSubmitterFolder)
         .build());
 
     Assert.assertNotSame(0, ret);
     assertEquals(Arrays.asList(YarnConfiguration.DEFAULT_NM_NONSECURE_MODE_LOCAL_USER,
-        appSubmitter, cmd, appId, containerId,
+        appSubmitterFolder, cmd, appId, containerId,
         workDir.toString(), "/bin/echo", "/dev/null", pidFile.toString(),
         StringUtils.join(PrivilegedOperation.LINUX_FILE_PATH_SEPARATOR,
             dirsHandler.getLocalDirs()),

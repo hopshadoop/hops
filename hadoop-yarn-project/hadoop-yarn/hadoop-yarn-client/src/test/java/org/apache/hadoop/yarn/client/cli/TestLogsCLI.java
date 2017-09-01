@@ -176,7 +176,7 @@ public class TestLogsCLI {
     Assert.assertEquals(appReportStr, sysOutStream.toString());
   }
   
-  @Test (timeout = 15000)
+  @Test(timeout = 15000)
   public void testFetchApplictionLogs() throws Exception {
     String remoteLogRootDir = "target/logs/";
     Configuration configuration = new Configuration();
@@ -204,8 +204,9 @@ public class TestLogsCLI {
       fs.delete(rootLogDirPath, true);
     }
     assertTrue(fs.mkdirs(rootLogDirPath));
-
-    Path appLogsDir = new Path(rootLogDirPath, appId.toString());
+    Path userDir = new Path(rootLogDirPath, UserGroupInformation.getCurrentUser().getShortUserName());
+    assertTrue(fs.mkdirs(userDir));
+    Path appLogsDir = new Path(userDir, appId.toString());
     if (fs.exists(appLogsDir)) {
       fs.delete(appLogsDir, true);
     }
@@ -400,7 +401,7 @@ public class TestLogsCLI {
       writer.writeApplicationACLs(appAcls);
       writer.append(new AggregatedLogFormat.LogKey(containerId),
           new AggregatedLogFormat.LogValue(rootLogDirs, containerId,
-              UserGroupInformation.getCurrentUser().getShortUserName()));
+              UserGroupInformation.getCurrentUser().getShortUserName(), UserGroupInformation.getCurrentUser().getShortUserName()));
     }
   }
 
@@ -423,7 +424,7 @@ public class TestLogsCLI {
       out.close();
       out = writer.getWriter().prepareAppendValue(-1);
       new AggregatedLogFormat.LogValue(rootLogDirs, containerId,
-          UserGroupInformation.getCurrentUser().getShortUserName()).write(out,
+          UserGroupInformation.getCurrentUser().getShortUserName(), UserGroupInformation.getCurrentUser().getShortUserName()).write(out,
           new HashSet<File>());
       out.close();
     }

@@ -180,12 +180,13 @@ public class ContainerLaunch implements Callable<Integer> {
       }
 
       final String user = container.getUser();
+      final String userFolder = container.getUserFolder();
       // /////////////////////////// Variable expansion
       // Before the container script gets written out.
       List<String> newCmds = new ArrayList<String>(command.size());
       String appIdStr = app.getAppId().toString();
       String relativeContainerLogDir = ContainerLaunch
-          .getRelativeContainerLogDir(appIdStr, containerIdStr);
+          .getRelativeContainerLogDir(appIdStr, containerIdStr, userFolder);
       Path containerLogDir =
           dirsHandler.getLogPathForWrite(relativeContainerLogDir, false);
       for (String str : command) {
@@ -224,7 +225,7 @@ public class ContainerLaunch implements Callable<Integer> {
       // Select the working directory for the container
       Path containerWorkDir =
           dirsHandler.getLocalPathForWrite(ContainerLocalizer.USERCACHE
-              + Path.SEPARATOR + user + Path.SEPARATOR
+              + Path.SEPARATOR + userFolder + Path.SEPARATOR
               + ContainerLocalizer.APPCACHE + Path.SEPARATOR + appIdStr
               + Path.SEPARATOR + containerIdStr,
               LocalDirAllocator.SIZE_UNKNOWN, false);
@@ -253,7 +254,7 @@ public class ContainerLaunch implements Callable<Integer> {
         List<Path> appDirs = new ArrayList<Path>(localDirs.size());
         for (String localDir : localDirs) {
           Path usersdir = new Path(localDir, ContainerLocalizer.USERCACHE);
-          Path userdir = new Path(usersdir, user);
+          Path userdir = new Path(usersdir, userFolder);
           Path appsdir = new Path(userdir, ContainerLocalizer.APPCACHE);
           appDirs.add(new Path(appsdir, appIdStr));
         }
@@ -312,6 +313,7 @@ public class ContainerLaunch implements Callable<Integer> {
             .setContainerWorkDir(containerWorkDir)
             .setLocalDirs(localDirs)
             .setLogDirs(logDirs)
+            .setUserFolder(userFolder)
             .build());
       }
     } catch (Throwable e) {
@@ -595,8 +597,8 @@ public class ContainerLaunch implements Callable<Integer> {
   }
 
   public static String getRelativeContainerLogDir(String appIdStr,
-      String containerIdStr) {
-    return appIdStr + Path.SEPARATOR + containerIdStr;
+      String containerIdStr, String userFolder) {
+    return userFolder + Path.SEPARATOR + appIdStr + Path.SEPARATOR + containerIdStr;
   }
 
   private String getContainerPrivateDir(String appIdStr, String containerIdStr) {

@@ -2618,4 +2618,8 @@ public class YarnConfiguration extends Configuration {
   public static void main(String[] args) throws Exception {
     new YarnConfiguration(new Configuration()).writeXml(System.out);
   }
+ 
+  public static String USER_FOLDER_ALGO = YARN_PREFIX + "userfolder.algo";
+  public static String DEFAULT_USER_FOLDER_ALGO = "SHA-256";
+  
 }

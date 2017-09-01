@@ -182,6 +182,7 @@ public class ShuffleHandler extends AuxiliaryService {
   private ReadaheadPool readaheadPool = ReadaheadPool.getInstance();
 
   private Map<String,String> userRsrc;
+  private Map<String,String> userFolderRsrc;
   private JobTokenSecretManager secretManager;
 
   private DB stateDb = null;
@@ -442,6 +443,7 @@ public class ShuffleHandler extends AuxiliaryService {
   public void initializeApplication(ApplicationInitializationContext context) {
 
     String user = context.getUser();
+    String userFolder = context.getUserFolder();
     ApplicationId appId = context.getApplicationId();
     ByteBuffer secret = context.getApplicationDataForService();
     // TODO these bytes should be versioned
@@ -449,7 +451,7 @@ public class ShuffleHandler extends AuxiliaryService {
       Token<JobTokenIdentifier> jt = deserializeServiceData(secret);
        // TODO: Once SHuffle is out of NM, this can use MR APIs
       JobID jobId = new JobID(Long.toString(appId.getClusterTimestamp()), appId.getId());
-      recordJobShuffleInfo(jobId, user, jt);
+      recordJobShuffleInfo(jobId, user, jt, userFolder);
     } catch (IOException e) {
       LOG.error("Error during initApp", e);
       // TODO add API to AuxiliaryServices to report failures
@@ -513,6 +515,7 @@ public class ShuffleHandler extends AuxiliaryService {
   protected void serviceStart() throws Exception {
     Configuration conf = getConfig();
     userRsrc = new ConcurrentHashMap<String,String>();
+    userFolderRsrc = new ConcurrentHashMap<String,String>();
     secretManager = new JobTokenSecretManager();
     recoverState(conf);
     ServerBootstrap bootstrap = new ServerBootstrap(selector);
@@ -701,8 +704,9 @@ public class ShuffleHandler extends AuxiliaryService {
   }
 
   private void addJobToken(JobID jobId, String user,
-      Token<JobTokenIdentifier> jobToken) {
+      Token<JobTokenIdentifier> jobToken, String userFolder) {
     userRsrc.put(jobId.toString(), user);
+    userFolderRsrc.put(jobId.toString(), userFolder);
     secretManager.addTokenForJob(jobId.toString(), jobToken);
     LOG.info("Added token for " + jobId.toString());
   }
@@ -718,16 +722,17 @@ public class ShuffleHandler extends AuxiliaryService {
 
     JobShuffleInfoProto proto = JobShuffleInfoProto.parseFrom(data);
     String user = proto.getUser();
+    String userFolder = proto.getUserFolder();
     TokenProto tokenProto = proto.getJobToken();
     Token<JobTokenIdentifier> jobToken = new Token<JobTokenIdentifier>(
         tokenProto.getIdentifier().toByteArray(),
         tokenProto.getPassword().toByteArray(),
         new Text(tokenProto.getKind()), new Text(tokenProto.getService()));
-    addJobToken(jobId, user, jobToken);
+    addJobToken(jobId, user, jobToken, userFolder);
   }
 
   private void recordJobShuffleInfo(JobID jobId, String user,
-      Token<JobTokenIdentifier> jobToken) throws IOException {
+      Token<JobTokenIdentifier> jobToken, String userFolder) throws IOException {
     if (stateDb != null) {
       TokenProto tokenProto = TokenProto.newBuilder()
           .setIdentifier(ByteString.copyFrom(jobToken.getIdentifier()))
@@ -736,20 +741,21 @@ public class ShuffleHandler extends AuxiliaryService {
           .setService(jobToken.getService().toString())
           .build();
       JobShuffleInfoProto proto = JobShuffleInfoProto.newBuilder()
-          .setUser(user).setJobToken(tokenProto).build();
+          .setUser(user).setJobToken(tokenProto).setUserFolder(userFolder).build();
       try {
         stateDb.put(bytes(jobId.toString()), proto.toByteArray());
       } catch (DBException e) {
         throw new IOException("Error storing " + jobId, e);
       }
     }
-    addJobToken(jobId, user, jobToken);
+    addJobToken(jobId, user, jobToken, userFolder);
   }
 
   private void removeJobShuffleInfo(JobID jobId) throws IOException {
     String jobIdStr = jobId.toString();
     secretManager.removeTokenForJob(jobIdStr);
     userRsrc.remove(jobIdStr);
+    userFolderRsrc.remove(jobIdStr);
     if (stateDb != null) {
       try {
         stateDb.delete(bytes(jobIdStr));
@@ -966,11 +972,12 @@ public class ShuffleHandler extends AuxiliaryService {
           (TimeoutHandler)pipeline.get(TIMEOUT_HANDLER);
       timeoutHandler.setEnabledTimeout(false);
       String user = userRsrc.get(jobId);
+      String userFolder = userFolderRsrc.get(jobId);
 
       // $x/$user/appcache/$appId/output/$mapId
       // TODO: Once Shuffle is out of NM, this can use MR APIs to convert
       // between App and Job
-      String outputBasePathStr = getBaseLocation(jobId, user);
+      String outputBasePathStr = getBaseLocation(jobId, user, userFolder);
 
       try {
         populateHeaders(mapIds, outputBasePathStr, user, reduceId, request,
@@ -1051,13 +1058,13 @@ public class ShuffleHandler extends AuxiliaryService {
       return sb.toString();
     }
 
-    private String getBaseLocation(String jobId, String user) {
+    private String getBaseLocation(String jobId, String user, String userFolder) {
       final JobID jobID = JobID.forName(jobId);
       final ApplicationId appID =
           ApplicationId.newInstance(Long.parseLong(jobID.getJtIdentifier()),
             jobID.getId());
       final String baseStr =
-          ContainerLocalizer.USERCACHE + "/" + user + "/"
+          ContainerLocalizer.USERCACHE + "/" + userFolder + "/"
               + ContainerLocalizer.APPCACHE + "/"
               + appID.toString() + "/output" + "/";
       return baseStr;

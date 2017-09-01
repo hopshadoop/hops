@@ -656,7 +656,7 @@ public class TestSchedulerUtils {
     final YarnRPC rpc = YarnRPC.create(conf);
 
     UserGroupInformation currentUser = 
-        UserGroupInformation.createRemoteUser(applicationAttemptId.toString());
+        UserGroupInformation.createRemoteUser(applicationAttemptId.toString(), false);
     Credentials credentials = containerManager.getContainerCredentials();
     final InetSocketAddress rmBindAddress =
         rm.getApplicationMasterService().getBindAddress();

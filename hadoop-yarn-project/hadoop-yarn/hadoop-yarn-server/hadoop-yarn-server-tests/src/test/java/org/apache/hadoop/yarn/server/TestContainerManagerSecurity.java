@@ -204,6 +204,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
      */
     YarnRPC rpc = YarnRPC.create(conf);
     String user = "test";
+    String userFolder = "testFolder";
     Resource r = Resource.newInstance(1024, 1);
 
     ApplicationId appId = ApplicationId.newInstance(1, 1);
@@ -225,7 +226,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
     
     org.apache.hadoop.yarn.api.records.Token validContainerToken =
         containerTokenSecretManager.createContainerToken(validContainerId,
-            0, validNode, user, r, Priority.newInstance(10), 1234);
+            0, validNode, user, r, Priority.newInstance(10), 1234, userFolder);
     ContainerTokenIdentifier identifier =
         BuilderUtils.newContainerTokenIdentifier(validContainerToken);
     Assert.assertEquals(Priority.newInstance(10), identifier.getPriority());
@@ -282,7 +283,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
         4 * 60 * 1000);
     validContainerToken =
         containerTokenSecretManager.createContainerToken(validContainerId,
-            0, validNode, user, r, Priority.newInstance(0), 0);
+            0, validNode, user, r, Priority.newInstance(0), 0, userFolder);
     Assert.assertTrue(testStartContainer(rpc, validAppAttemptId, validNode,
       validContainerToken, validNMToken, false).isEmpty());
     Assert.assertTrue(nmTokenSecretManagerNM
@@ -298,7 +299,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
 
     org.apache.hadoop.yarn.api.records.Token validContainerToken2 =
         containerTokenSecretManager.createContainerToken(validContainerId2,
-            0, validNode, user, r, Priority.newInstance(0), 0);
+            0, validNode, user, r, Priority.newInstance(0), 0, userFolder);
     
     org.apache.hadoop.yarn.api.records.Token validNMToken2 =
         nmTokenSecretManagerRM.createNMToken(validAppAttemptId2, validNode, user);
@@ -385,7 +386,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
     org.apache.hadoop.yarn.api.records.Token newContainerToken =
         containerTokenSecretManager.createContainerToken(
           ContainerId.newContainerId(attempt2, 1), 0, validNode, user, r,
-            Priority.newInstance(0), 0);
+            Priority.newInstance(0), 0, userFolder);
     Assert.assertTrue(testStartContainer(rpc, attempt2, validNode,
       newContainerToken, attempt1NMToken, false).isEmpty());
   }
@@ -626,6 +627,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
     NMTokenSecretManagerInNM nmTokenSecretManagerInNM =
         nm.getNMContext().getNMTokenSecretManager();
     String user = "test";
+    String userFolder = "testFolder";
     
     waitForNMToReceiveNMTokenKey(nmTokenSecretManagerInNM, nm);
 
@@ -644,7 +646,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
     
     Token containerToken = 
         containerTokenSecretManager.createContainerToken(
-            cId, 0, nodeId, user, r, Priority.newInstance(0), 0);
+            cId, 0, nodeId, user, r, Priority.newInstance(0), 0, userFolder);
     
     ContainerTokenIdentifier containerTokenIdentifier = 
         getContainerTokenIdentifierFromToken(containerToken);
@@ -678,7 +680,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
     // Creating modified containerToken
     Token containerToken2 =
         tamperedContainerTokenSecretManager.createContainerToken(cId2, 0,
-            nodeId, user, r, Priority.newInstance(0), 0);
+            nodeId, user, r, Priority.newInstance(0), 0, userFolder);
     
     StringBuilder sb = new StringBuilder("Given Container ");
     sb.append(cId2);
@@ -721,6 +723,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
     NMTokenSecretManagerInNM nmTokenSecretManagerInNM =
         nm.getNMContext().getNMTokenSecretManager();
     String user = "test";
+    String userFolder = "testFolder";
 
     waitForNMToReceiveNMTokenKey(nmTokenSecretManagerInNM, nm);
 
@@ -737,7 +740,7 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
     Resource r = Resource.newInstance(1230, 2);
     Token containerToken =
         containerTokenSecretManager.createContainerToken(cId, 0, nodeId, user,
-            r, Priority.newInstance(0), 0);
+            r, Priority.newInstance(0), 0, userFolder);
     
     ContainerTokenIdentifier containerTokenIdentifier =
         new ContainerTokenIdentifier();

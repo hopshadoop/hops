@@ -29,21 +29,23 @@ public class LogHandlerAppStartedEvent extends LogHandlerEvent {
 
   private final ApplicationId applicationId;
   private final String user;
+  private final String userFolder;
   private final Credentials credentials;
   private final Map<ApplicationAccessType, String> appAcls;
   private final LogAggregationContext logAggregationContext;
 
   public LogHandlerAppStartedEvent(ApplicationId appId, String user,
-      Credentials credentials, Map<ApplicationAccessType, String> appAcls) {
-    this(appId, user, credentials, appAcls, null);
+      Credentials credentials, Map<ApplicationAccessType, String> appAcls, String userFolder) {
+    this(appId, user, credentials, appAcls, null, userFolder);
   }
 
   public LogHandlerAppStartedEvent(ApplicationId appId, String user,
       Credentials credentials, Map<ApplicationAccessType, String> appAcls,
-      LogAggregationContext logAggregationContext) {
+      LogAggregationContext logAggregationContext, String userFolder) {
     super(LogHandlerEventType.APPLICATION_STARTED);
     this.applicationId = appId;
     this.user = user;
+    this.userFolder = userFolder;
     this.credentials = credentials;
     this.appAcls = appAcls;
     this.logAggregationContext = logAggregationContext;
@@ -61,6 +63,10 @@ public class LogHandlerAppStartedEvent extends LogHandlerEvent {
     return this.user;
   }
 
+  public String getUserFolder() {
+    return this.userFolder;
+  }
+  
   public Map<ApplicationAccessType, String> getApplicationAcls() {
     return this.appAcls;
   }

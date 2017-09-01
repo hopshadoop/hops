@@ -96,7 +96,7 @@ public class TestContainerResourceIncreaseRPC {
       ContainerTokenIdentifier containerTokenIdentifier =
           new ContainerTokenIdentifier(containerId, "localhost", "user",
               resource, System.currentTimeMillis() + 10000, 42, 42,
-                  Priority.newInstance(0), 0);
+                  Priority.newInstance(0), 0, "userFolder");
       Token containerToken =
           TestRPC.newContainerToken(nodeId, "password".getBytes(),
               containerTokenIdentifier);

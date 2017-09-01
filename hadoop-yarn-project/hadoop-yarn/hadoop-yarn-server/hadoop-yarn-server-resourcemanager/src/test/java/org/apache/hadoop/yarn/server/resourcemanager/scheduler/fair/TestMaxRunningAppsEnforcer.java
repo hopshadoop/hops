@@ -65,6 +65,8 @@ public class TestMaxRunningAppsEnforcer {
     appNum = 0;
     rmContext = mock(RMContext.class);
     when(rmContext.getEpoch()).thenReturn(0L);
+    when(rmContext.getUserFolderHashAlgo()).thenReturn("SHA-256");
+    when(rmContext.getSeed()).thenReturn(new byte[16]);
   }
   
   private FSAppAttempt addApp(FSLeafQueue queue, String user) {

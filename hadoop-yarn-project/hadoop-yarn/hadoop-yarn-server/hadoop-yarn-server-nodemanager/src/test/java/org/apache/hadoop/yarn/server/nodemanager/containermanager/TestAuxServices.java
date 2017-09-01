@@ -170,11 +170,11 @@ public class TestAuxServices {
     buf.putInt(65);
     buf.flip();
     AuxServicesEvent event = new AuxServicesEvent(
-        AuxServicesEventType.APPLICATION_INIT, "user0", appId1, "Asrv", buf);
+        AuxServicesEventType.APPLICATION_INIT, "user0", appId1, "Asrv", buf, "user0Folder");
     aux.handle(event);
     ApplicationId appId2 = ApplicationId.newInstance(0, 66);
     event = new AuxServicesEvent(
-        AuxServicesEventType.APPLICATION_STOP, "user0", appId2, "Bsrv", null);
+        AuxServicesEventType.APPLICATION_STOP, "user0", appId2, "Bsrv", null, "user0Folder");
     // verify all services got the stop event 
     aux.handle(event);
     Collection<AuxiliaryService> servs = aux.getServices();
@@ -193,7 +193,7 @@ public class TestAuxServices {
     ApplicationAttemptId attemptId = ApplicationAttemptId.newInstance(appId1, 1);
     ContainerTokenIdentifier cti = new ContainerTokenIdentifier(
         ContainerId.newContainerId(attemptId, 1), "", "",
-        Resource.newInstance(1, 1), 0,0,0, Priority.newInstance(0), 0);
+        Resource.newInstance(1, 1), 0,0,0, Priority.newInstance(0), 0, "");
     Context context = mock(Context.class);
     Container container = new ContainerImpl(null, null, null, null,
         null, cti, context);

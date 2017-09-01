@@ -347,7 +347,7 @@ public class TestNMLeveldbStateStoreService {
     ContainerTokenIdentifier containerTokenId =
         new ContainerTokenIdentifier(containerId, "host", "user",
             containerRsrc, 9876543210L, 42, 2468, Priority.newInstance(7),
-            13579);
+            13579, "userFolder");
     Token containerToken = Token.newInstance(containerTokenId.getBytes(),
         ContainerTokenIdentifier.KIND.toString(), "password".getBytes(),
         "tokenservice");

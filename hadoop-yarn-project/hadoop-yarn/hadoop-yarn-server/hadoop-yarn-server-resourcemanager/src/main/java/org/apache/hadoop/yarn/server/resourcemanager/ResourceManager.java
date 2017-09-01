@@ -123,6 +123,7 @@ import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
@@ -325,6 +326,12 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     rmContext.setYarnConfiguration(conf);
     
+    byte[] seed = new byte[16];
+    new Random().nextBytes(seed);
+    rmContext.setSeed(seed);
+
+    rmContext.setUserFolderHashAlgo(conf.get(YarnConfiguration.USER_FOLDER_ALGO,
+        YarnConfiguration.DEFAULT_USER_FOLDER_ALGO));
     createAndInitSchedulerServices();
 
     webAppAddress = WebAppUtils.getWebAppBindURL(this.conf,
@@ -1525,9 +1532,16 @@ LOG.info("+");
     // recover applications
     rmAppManager.recover(state);
 
+    recoverSalt();
+    
     setSchedulerRecoveryStartAndWaitTime(state, conf);
   }
 
+  private void recoverSalt() throws IOException{
+    byte[] seed = DBUtility.verifySalt(rmContext.getSeed());
+    rmContext.setSeed(seed);
+  }
+  
   public static void main(String argv[]) {
     Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
     StringUtils.startupShutdownMessage(ResourceManager.class, argv, LOG);

@@ -152,7 +152,7 @@ public class TestAMRMTokens {
       // Create a client to the RM.
       UserGroupInformation currentUser =
           UserGroupInformation
-            .createRemoteUser(applicationAttemptId.toString());
+            .createRemoteUser(applicationAttemptId.toString(), false);
       Credentials credentials = containerManager.getContainerCredentials();
       final InetSocketAddress rmBindAddress =
           rm.getApplicationMasterService().getBindAddress();
@@ -273,7 +273,7 @@ public class TestAMRMTokens {
       // Create a client to the RM.
       UserGroupInformation currentUser =
           UserGroupInformation
-            .createRemoteUser(applicationAttemptId.toString());
+            .createRemoteUser(applicationAttemptId.toString(),false);
       Credentials credentials = containerManager.getContainerCredentials();
       final InetSocketAddress rmBindAddress =
           rm.getApplicationMasterService().getBindAddress();

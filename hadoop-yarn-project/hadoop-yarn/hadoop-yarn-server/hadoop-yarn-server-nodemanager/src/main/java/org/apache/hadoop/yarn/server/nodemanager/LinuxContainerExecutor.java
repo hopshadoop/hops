@@ -220,6 +220,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     String user = ctx.getUser();
     String appId = ctx.getAppId();
     String locId = ctx.getLocId();
+    String userFolder = ctx.getUserFolder();
     LocalDirsHandlerService dirsHandler = ctx.getDirsHandler();
     List<String> localDirs = dirsHandler.getLocalDirs();
     List<String> logDirs = dirsHandler.getLogDirs();
@@ -233,7 +234,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     addSchedPriorityCommand(prefixCommands);
     initializeContainerOp.appendArgs(
         runAsUser,
-        user,
+        userFolder,
         Integer.toString(
             PrivilegedOperation.RunAsUserCommand.INITIALIZE_CONTAINER
                 .getValue()),
@@ -258,7 +259,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
 
     List<String> localizerArgs = new ArrayList<>();
 
-    buildMainArgs(localizerArgs, user, appId, locId, nmAddr, localDirs);
+    buildMainArgs(localizerArgs, user, appId, locId, nmAddr, localDirs, userFolder);
     initializeContainerOp.appendArgs(localizerArgs);
 
     try {
@@ -286,9 +287,9 @@ public class LinuxContainerExecutor extends ContainerExecutor {
   
   @VisibleForTesting
   public void buildMainArgs(List<String> command, String user, String appId,
-      String locId, InetSocketAddress nmAddr, List<String> localDirs) {
+      String locId, InetSocketAddress nmAddr, List<String> localDirs, String userFolder) {
     ContainerLocalizer.buildMainArgs(command, user, appId, locId, nmAddr,
-      localDirs);
+      localDirs, userFolder);
   }
 
   @Override
@@ -298,6 +299,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     Path nmPrivateTokensPath = ctx.getNmPrivateTokensPath();
     String user = ctx.getUser();
     String appId = ctx.getAppId();
+    String userFolder = ctx.getUserFolder();
     Path containerWorkDir = ctx.getContainerWorkDir();
     List<String> localDirs = ctx.getLocalDirs();
     List<String> logDirs = ctx.getLogDirs();
@@ -377,7 +379,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
 
         builder.setExecutionAttribute(LOCALIZED_RESOURCES, localizedResources)
             .setExecutionAttribute(RUN_AS_USER, runAsUser)
-            .setExecutionAttribute(USER, user)
+            .setExecutionAttribute(USER, userFolder)
             .setExecutionAttribute(APPID, appId)
             .setExecutionAttribute(CONTAINER_ID_STR, containerIdStr)
             .setExecutionAttribute(CONTAINER_WORK_DIR, containerWorkDir)

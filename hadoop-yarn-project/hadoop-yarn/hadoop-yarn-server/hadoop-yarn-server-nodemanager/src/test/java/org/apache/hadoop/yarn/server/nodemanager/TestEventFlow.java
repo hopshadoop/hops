@@ -143,11 +143,12 @@ public class TestEventFlow {
     ContainerId cID = ContainerId.newContainerId(applicationAttemptId, 0);
 
     String user = "testing";
+    String userFolder = "testingFolder";
     StartContainerRequest scRequest =
         StartContainerRequest.newInstance(launchContext,
           TestContainerManager.createContainerToken(cID,
             SIMULATED_RM_IDENTIFIER, context.getNodeId(), user,
-            context.getContainerTokenSecretManager()));
+            context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =

@@ -63,6 +63,7 @@ public class NonAggregatingLogHandler extends AbstractService implements
   private final Dispatcher dispatcher;
   private final DeletionService delService;
   private final Map<ApplicationId, String> appOwners;
+  private final Map<ApplicationId, String> appOwnersFolder;
 
   private final LocalDirsHandlerService dirsHandler;
   private final NMStateStoreService stateStore;
@@ -78,6 +79,7 @@ public class NonAggregatingLogHandler extends AbstractService implements
     this.dirsHandler = dirsHandler;
     this.stateStore = stateStore;
     this.appOwners = new ConcurrentHashMap<ApplicationId, String>();
+    this.appOwnersFolder = new ConcurrentHashMap<ApplicationId, String>();
   }
 
   @Override
@@ -130,8 +132,7 @@ public class NonAggregatingLogHandler extends AbstractService implements
           LOG.debug("Scheduling deletion of " + appId + " logs in "
               + deleteDelayMsec + " msec");
         }
-        LogDeleterRunnable logDeleter =
-            new LogDeleterRunnable(proto.getUser(), appId);
+        LogDeleterRunnable logDeleter = new LogDeleterRunnable(proto.getUser(), appId, proto.getUserFolder());
         try {
           sched.schedule(logDeleter, deleteDelayMsec, TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException e) {
@@ -152,6 +153,7 @@ public class NonAggregatingLogHandler extends AbstractService implements
             (LogHandlerAppStartedEvent) event;
         this.appOwners.put(appStartedEvent.getApplicationId(),
             appStartedEvent.getUser());
+        this.appOwnersFolder.put(appStartedEvent.getApplicationId(), appStartedEvent.getUserFolder());
         this.dispatcher.getEventHandler().handle(
             new ApplicationEvent(appStartedEvent.getApplicationId(),
                 ApplicationEventType.APPLICATION_LOG_HANDLING_INITED));
@@ -168,6 +170,7 @@ public class NonAggregatingLogHandler extends AbstractService implements
             + appId + ", with delay of "
             + this.deleteDelaySeconds + " seconds");
         String user = appOwners.remove(appId);
+        String userFolder = appOwnersFolder.remove(appId);
         if (user == null) {
           LOG.error("Unable to locate user for " + appId);
           // send LOG_HANDLING_FAILED out
@@ -176,12 +179,13 @@ public class NonAggregatingLogHandler extends AbstractService implements
                   ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED));
           break;
         }
-        LogDeleterRunnable logDeleter = new LogDeleterRunnable(user, appId);
+        LogDeleterRunnable logDeleter = new LogDeleterRunnable(user, appId, userFolder);
         long deletionTimestamp = System.currentTimeMillis()
             + this.deleteDelaySeconds * 1000;
         LogDeleterProto deleterProto = LogDeleterProto.newBuilder()
             .setUser(user)
             .setDeletionTime(deletionTimestamp)
+            .setUserFolder(userFolder)
             .build();
         try {
           stateStore.storeLogDeleter(appId, deleterProto);
@@ -216,10 +220,12 @@ public class NonAggregatingLogHandler extends AbstractService implements
   class LogDeleterRunnable implements Runnable {
     private String user;
     private ApplicationId applicationId;
+    private String userFolder;
 
-    public LogDeleterRunnable(String user, ApplicationId applicationId) {
+    public LogDeleterRunnable(String user, ApplicationId applicationId, String userFolder) {
       this.user = user;
       this.applicationId = applicationId;
+      this.userFolder = userFolder;
     }
 
     @Override
@@ -228,7 +234,8 @@ public class NonAggregatingLogHandler extends AbstractService implements
       List<Path> localAppLogDirs = new ArrayList<Path>();
       FileContext lfs = getLocalFileContext(getConfig());
       for (String rootLogDir : dirsHandler.getLogDirsForCleanup()) {
-        Path logDir = new Path(rootLogDir, applicationId.toString());
+        Path userLogDir = new Path(rootLogDir, userFolder);
+        Path logDir = new Path(userLogDir, applicationId.toString());
         try {
           lfs.getFileStatus(logDir);
           localAppLogDirs.add(logDir);

@@ -591,7 +591,7 @@ public class MRApp extends MRAppMaster {
         ContainerTokenIdentifier containerTokenIdentifier =
             new ContainerTokenIdentifier(cId, nodeId.toString(), "user",
             resource, System.currentTimeMillis() + 10000, 42, 42,
-            Priority.newInstance(0), 0);
+            Priority.newInstance(0), 0, "userFolder");
         Token containerToken = newContainerToken(nodeId, "password".getBytes(),
               containerTokenIdentifier);
         Container container = Container.newInstance(cId, nodeId,

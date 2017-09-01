@@ -91,6 +91,7 @@ public class TestContainerLocalizer {
   static final FsPermission USERCACHE_DIR_PERM = new FsPermission((short) 0755);
 
   static final String appUser = "yak";
+  static final String appUserFolder = "yakFolder";
   static final String appId = "app_RM_0";
   static final String containerId = "container_0";
   static final InetSocketAddress nmAddr =
@@ -179,7 +180,7 @@ public class TestContainerLocalizer {
     // run localization
     localizer.runLocalization(nmAddr);
     for (Path p : localDirs) {
-      Path base = new Path(new Path(p, ContainerLocalizer.USERCACHE), appUser);
+      Path base = new Path(new Path(p, ContainerLocalizer.USERCACHE), appUserFolder);
       Path privcache = new Path(base, ContainerLocalizer.FILECACHE);
       // $x/usercache/$user/filecache
       verify(spylfs).mkdir(eq(privcache), eq(CACHE_DIR_PERM), eq(false));
@@ -290,7 +291,7 @@ public class TestContainerLocalizer {
     }
     RecordFactory mockRF = getMockLocalizerRecordFactory();
     ContainerLocalizer concreteLoc = new ContainerLocalizer(lfs, appUser,
-        appId, containerId, localDirs, mockRF);
+        appId, containerId, localDirs, mockRF, appUserFolder);
     ContainerLocalizer localizer = spy(concreteLoc);
 
     // return credential stream instead of opening local file
@@ -451,7 +452,7 @@ static DataInputBuffer createFakeCredentials(Random r, int nTok)
     RecordFactory recordFactory = mock(RecordFactory.class);
     ContainerLocalizer localizer = new ContainerLocalizer(lfs,
         UserGroupInformation.getCurrentUser().getUserName(), "application_01",
-        "container_01", new ArrayList<Path>(), recordFactory);
+        "container_01", new ArrayList<Path>(), recordFactory, UserGroupInformation.getCurrentUser().getUserName());
     LocalResource rsrc = mock(LocalResource.class);
     when(rsrc.getVisibility()).thenReturn(LocalResourceVisibility.PRIVATE);
     Path destDirPath = new Path(fileCacheDir, "0/0/85");

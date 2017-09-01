@@ -138,7 +138,7 @@ public class TestNodeManagerReboot {
         StartContainerRequest.newInstance(containerLaunchContext,
           TestContainerManager.createContainerToken(
             cId, 0, nodeId, destinationFile, nm.getNMContext()
-              .getContainerTokenSecretManager()));
+              .getContainerTokenSecretManager(), destinationFile));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     final StartContainersRequest allRequests =
@@ -146,7 +146,7 @@ public class TestNodeManagerReboot {
 
     final UserGroupInformation currentUser =
         UserGroupInformation.createRemoteUser(cId.getApplicationAttemptId()
-          .toString());
+          .toString(), false);
     NMTokenIdentifier nmIdentifier =
         new NMTokenIdentifier(cId.getApplicationAttemptId(), nodeId, user, 123);
     currentUser.addTokenIdentifier(nmIdentifier);

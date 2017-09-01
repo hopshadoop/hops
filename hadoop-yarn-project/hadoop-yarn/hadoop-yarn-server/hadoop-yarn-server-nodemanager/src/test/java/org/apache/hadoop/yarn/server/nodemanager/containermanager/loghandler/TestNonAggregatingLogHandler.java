@@ -150,17 +150,19 @@ public class TestNonAggregatingLogHandler {
     logHandler.init(conf);
     logHandler.start();
 
-    logHandler.handle(new LogHandlerAppStartedEvent(appId, user, null, null));
+    logHandler.handle(new LogHandlerAppStartedEvent(appId, user, null, null, user));
 
     logHandler.handle(new LogHandlerContainerFinishedEvent(container11, 0));
 
     logHandler.handle(new LogHandlerAppFinishedEvent(appId));
 
     Path[] localAppLogDirs = new Path[2];
+    Path userLogDir = new Path(localLogDirs[0].getAbsolutePath(), user);
     localAppLogDirs[0] =
-        new Path(localLogDirs[0].getAbsolutePath(), appId.toString());
+ new Path(userLogDir, appId.toString());
+    userLogDir = new Path(localLogDirs[1].getAbsolutePath(), user);
     localAppLogDirs[1] =
-        new Path(localLogDirs[1].getAbsolutePath(), appId.toString());
+ new Path(userLogDir, appId.toString());
 
     testDeletionServiceCall(mockDelService, user, 5000, localAppLogDirs);
     logHandler.close();
@@ -190,7 +192,7 @@ public class TestNonAggregatingLogHandler {
     logHandler.init(conf);
     logHandler.start();
 
-    logHandler.handle(new LogHandlerAppStartedEvent(appId, user, null, null));
+    logHandler.handle(new LogHandlerAppStartedEvent(appId, user, null, null, user));
 
     logHandler.handle(new LogHandlerContainerFinishedEvent(container11, 0));
 
@@ -360,7 +362,7 @@ public class TestNonAggregatingLogHandler {
     logHandler.init(conf);
     logHandler.start();
 
-    logHandler.handle(new LogHandlerAppStartedEvent(appId, user, null, null));
+    logHandler.handle(new LogHandlerAppStartedEvent(appId, user, null, null, user));
     logHandler.handle(new LogHandlerContainerFinishedEvent(container11, 0));
     logHandler.handle(new LogHandlerAppFinishedEvent(appId));
 
@@ -440,8 +442,9 @@ public class TestNonAggregatingLogHandler {
     }
     Path[] localAppLogDirPaths = new Path[localLogDirs.length];
     for (int i = 0; i < localAppLogDirPaths.length; i++) {
+      Path userFold = new Path(localLogDirs[i].getAbsolutePath(), user);
       localAppLogDirPaths[i] =
-          new Path(localLogDirs[i].getAbsolutePath(), appId.toString());
+          new Path(userFold, appId.toString());
     }
     final List<String> localLogDirPaths =
         new ArrayList<String>(localLogDirs.length);
@@ -460,7 +463,7 @@ public class TestNonAggregatingLogHandler {
     doReturn(localLogDirPaths).when(dirsHandler).getLogDirsForCleanup();
 
     logHandler.handle(new LogHandlerAppStartedEvent(appId, user, null,
-        appAcls));
+        appAcls, user));
 
     // test case where some dirs have the log dir to delete
     // mock some dirs throwing various exceptions

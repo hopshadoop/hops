@@ -130,7 +130,7 @@ public class DummyContainerManager extends ContainerManagerImpl {
     ApplicationAttemptId appAttemptId =
         ApplicationAttemptId.newInstance(appId, 1);
     UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(appAttemptId.toString());
+        UserGroupInformation.createRemoteUser(appAttemptId.toString(), false);
     ugi.addTokenIdentifier(new NMTokenIdentifier(appAttemptId, getContext()
       .getNodeId(), "testuser", getContext().getNMTokenSecretManager().getCurrentKey()
       .getKeyId()));

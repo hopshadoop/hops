@@ -108,7 +108,7 @@ public class TestContainer {
   public void testLocalizationRequest() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(7, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(7, 314159265358979L, 4344, "yak", "yakFolder");
       assertEquals(ContainerState.NEW, wc.c.getContainerState());
       wc.initContainer();
 
@@ -134,7 +134,7 @@ public class TestContainer {
   public void testLocalizationLaunch() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(8, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(8, 314159265358979L, 4344, "yak", "yakFolder");
       assertEquals(ContainerState.NEW, wc.c.getContainerState());
       wc.initContainer();
       Map<Path, List<String>> localPaths = wc.localizeResources();
@@ -171,7 +171,7 @@ public class TestContainer {
   public void testExternalKill() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(13, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(13, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       int running = metrics.getRunningContainers();
@@ -201,7 +201,7 @@ public class TestContainer {
   public void testCleanupOnFailure() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(10, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(10, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       wc.launchContainer();
@@ -224,7 +224,7 @@ public class TestContainer {
   public void testCleanupOnSuccess() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(11, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(11, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       int running = metrics.getRunningContainers();
@@ -254,7 +254,7 @@ public class TestContainer {
   public void testInitWhileDone() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(6, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(6, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       wc.launchContainer();
@@ -284,7 +284,7 @@ public class TestContainer {
   public void testLocalizationFailureAtDone() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(6, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(6, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       wc.launchContainer();
@@ -312,7 +312,7 @@ public class TestContainer {
   public void testCleanupOnKillRequest() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(12, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(12, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       wc.launchContainer();
@@ -334,7 +334,7 @@ public class TestContainer {
   public void testKillOnNew() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(13, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(13, 314159265358979L, 4344, "yak", "yakFolder");
       assertEquals(ContainerState.NEW, wc.c.getContainerState());
       int killed = metrics.getKilledContainers();
       wc.killContainer();
@@ -356,7 +356,7 @@ public class TestContainer {
   public void testKillOnLocalizing() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(14, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(14, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       assertEquals(ContainerState.LOCALIZING, wc.c.getContainerState());
       wc.killContainer();
@@ -380,7 +380,7 @@ public class TestContainer {
   public void testKillOnLocalizationFailed() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(15, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(15, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.failLocalizeResources(wc.getLocalResourceCount());
       assertEquals(ContainerState.LOCALIZATION_FAILED, wc.c.getContainerState());
@@ -405,7 +405,7 @@ public class TestContainer {
       throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(17, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(17, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       assertEquals(ContainerState.LOCALIZED, wc.c.getContainerState());
@@ -436,7 +436,7 @@ public class TestContainer {
       throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(17, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(17, 314159265358979L, 4344, "yak", "yarkFolder");
       wc.initContainer();
       wc.localizeResources();
       assertEquals(ContainerState.LOCALIZED, wc.c.getContainerState());
@@ -464,7 +464,7 @@ public class TestContainer {
       throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(17, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(17, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       assertEquals(ContainerState.LOCALIZED, wc.c.getContainerState());
@@ -491,7 +491,7 @@ public class TestContainer {
   public void testKillOnLocalizedWhenContainerLaunched() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(17, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(17, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       assertEquals(ContainerState.LOCALIZED, wc.c.getContainerState());
@@ -516,7 +516,7 @@ public class TestContainer {
   public void testResourceLocalizedOnLocalizationFailed() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(16, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(16, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       int failCount = wc.getLocalResourceCount()/2;
       if (failCount == 0) {
@@ -541,7 +541,7 @@ public class TestContainer {
   public void testResourceFailedOnLocalizationFailed() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(16, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(16, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       
       Iterator<String> lRsrcKeys = wc.localResources.keySet().iterator();
@@ -565,7 +565,7 @@ public class TestContainer {
   public void testResourceFailedOnKilling() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(16, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(16, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       
       Iterator<String> lRsrcKeys = wc.localResources.keySet().iterator();
@@ -591,7 +591,7 @@ public class TestContainer {
   public void testServiceData() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(9, 314159265358979L, 4344, "yak", false, true);
+      wc = new WrappedContainer(9, 314159265358979L, 4344, "yak", false, true, "yakFolder");
       assertEquals(ContainerState.NEW, wc.c.getContainerState());
       wc.initContainer();
       
@@ -631,7 +631,7 @@ public class TestContainer {
   public void testLaunchAfterKillRequest() throws Exception {
     WrappedContainer wc = null;
     try {
-      wc = new WrappedContainer(14, 314159265358979L, 4344, "yak");
+      wc = new WrappedContainer(14, 314159265358979L, 4344, "yak", "yakFolder");
       wc.initContainer();
       wc.localizeResources();
       wc.killContainer();
@@ -789,14 +789,14 @@ public class TestContainer {
     final Map<String, ByteBuffer> serviceData;
     final Context context = mock(Context.class);
 
-    WrappedContainer(int appId, long timestamp, int id, String user)
+    WrappedContainer(int appId, long timestamp, int id, String user, String userFolder)
         throws IOException {
-      this(appId, timestamp, id, user, true, false);
+      this(appId, timestamp, id, user, true, false, userFolder);
     }
 
     @SuppressWarnings("rawtypes")
     WrappedContainer(int appId, long timestamp, int id, String user,
-        boolean withLocalRes, boolean withServiceData) throws IOException {
+        boolean withLocalRes, boolean withServiceData, String userFolder) throws IOException {
       dispatcher = new DrainDispatcher();
       dispatcher.init(new Configuration());
 
@@ -847,7 +847,7 @@ public class TestContainer {
       long currentTime = System.currentTimeMillis();
       ContainerTokenIdentifier identifier = 
           new ContainerTokenIdentifier(cId, "127.0.0.1", user, resource,
-            currentTime + 10000L, 123, currentTime, Priority.newInstance(0), 0);
+            currentTime + 10000L, 123, currentTime, Priority.newInstance(0), 0, userFolder);
       Token token =
           BuilderUtils.newContainerToken(BuilderUtils.newNodeId(host, port),
             "password".getBytes(), identifier);

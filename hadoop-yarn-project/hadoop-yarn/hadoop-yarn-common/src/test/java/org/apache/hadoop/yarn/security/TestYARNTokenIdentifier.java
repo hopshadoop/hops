@@ -144,6 +144,7 @@ public class TestYARNTokenIdentifier {
             1, 1), 1), 1);
     String hostName = "host0";
     String appSubmitter = "usr0";
+    String appSubmitterFolder = "usr0Folder";
     Resource r = Resource.newInstance(1024, 1);
     long expiryTimeStamp = 1000;
     int masterKeyId = 1;
@@ -153,7 +154,7 @@ public class TestYARNTokenIdentifier {
     
     ContainerTokenIdentifier token = new ContainerTokenIdentifier(
         containerID, hostName, appSubmitter, r, expiryTimeStamp,
-        masterKeyId, rmIdentifier, priority, creationTime);
+        masterKeyId, rmIdentifier, priority, creationTime, appSubmitterFolder);
     
     ContainerTokenIdentifier anotherToken = new ContainerTokenIdentifier();
     
@@ -362,6 +363,7 @@ public class TestYARNTokenIdentifier {
             1, 1), 1), 1);
     String hostName = "host0";
     String appSubmitter = "usr0";
+    String appSubmitterFolder = "usr0Folder";
     Resource r = Resource.newInstance(1024, 1);
     long expiryTimeStamp = 1000;
     int masterKeyId = 1;
@@ -372,7 +374,8 @@ public class TestYARNTokenIdentifier {
     ContainerTokenIdentifier token =
         new ContainerTokenIdentifier(containerID, hostName, appSubmitter, r,
             expiryTimeStamp, masterKeyId, rmIdentifier, priority, creationTime,
-            null, CommonNodeLabelsManager.NO_LABEL, ContainerType.APPLICATION_MASTER);
+            null, CommonNodeLabelsManager.NO_LABEL, ContainerType.APPLICATION_MASTER,
+            appSubmitterFolder);
 
     ContainerTokenIdentifier anotherToken = new ContainerTokenIdentifier();
 
@@ -387,7 +390,8 @@ public class TestYARNTokenIdentifier {
     token =
         new ContainerTokenIdentifier(containerID, 0, hostName, appSubmitter, r,
             expiryTimeStamp, masterKeyId, rmIdentifier, priority, creationTime,
-            null, CommonNodeLabelsManager.NO_LABEL, ContainerType.TASK);
+            null, CommonNodeLabelsManager.NO_LABEL, ContainerType.TASK,
+            appSubmitterFolder);
 
     anotherToken = new ContainerTokenIdentifier();
 

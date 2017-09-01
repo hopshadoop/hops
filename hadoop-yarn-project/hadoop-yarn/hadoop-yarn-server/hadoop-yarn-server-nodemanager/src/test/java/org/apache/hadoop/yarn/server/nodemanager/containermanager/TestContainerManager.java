@@ -144,7 +144,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         ApplicationAttemptId appAttemptId =
             ApplicationAttemptId.newInstance(appId, 1);
         UserGroupInformation ugi =
-            UserGroupInformation.createRemoteUser(appAttemptId.toString());
+            UserGroupInformation.createRemoteUser(appAttemptId.toString(), false);
         ugi.addTokenIdentifier(new NMTokenIdentifier(appAttemptId, context
           .getNodeId(), user, context.getNMTokenSecretManager().getCurrentKey()
           .getKeyId()));
@@ -223,7 +223,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         StartContainerRequest.newInstance(
           containerLaunchContext,
           createContainerToken(cId, DUMMY_RM_IDENTIFIER, context.getNodeId(),
-            user, context.getContainerTokenSecretManager()));
+            user, context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -238,7 +238,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
     String appIDStr = appId.toString();
     String containerIDStr = cId.toString();
     File userCacheDir = new File(localDir, ContainerLocalizer.USERCACHE);
-    File userDir = new File(userCacheDir, user);
+    File userDir = new File(userCacheDir, userFolder);
     File appCache = new File(userDir, ContainerLocalizer.APPCACHE);
     File appDir = new File(appCache, appIDStr);
     File containerDir = new File(appDir, containerIDStr);
@@ -315,7 +315,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         StartContainerRequest.newInstance(containerLaunchContext,
           createContainerToken(cId,
             DUMMY_RM_IDENTIFIER, context.getNodeId(), user,
-            context.getContainerTokenSecretManager()));
+            context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -422,7 +422,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         StartContainerRequest.newInstance(
           containerLaunchContext,
           createContainerToken(cId, DUMMY_RM_IDENTIFIER, context.getNodeId(),
-            user, context.getContainerTokenSecretManager()));
+            user, context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -512,7 +512,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         StartContainerRequest.newInstance(
           containerLaunchContext,
           createContainerToken(cId, DUMMY_RM_IDENTIFIER, context.getNodeId(),
-            user, context.getContainerTokenSecretManager()));
+            user, context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -530,7 +530,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
     String appIDStr = appId.toString();
     String containerIDStr = cId.toString();
     File userCacheDir = new File(localDir, ContainerLocalizer.USERCACHE);
-    File userDir = new File(userCacheDir, user);
+    File userDir = new File(userCacheDir, userFolder);
     File appCache = new File(userDir, ContainerLocalizer.APPCACHE);
     File appDir = new File(appCache, appIDStr);
     File containerDir = new File(appDir, containerIDStr);
@@ -597,7 +597,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         StartContainerRequest.newInstance(containerLaunchContext,
           createContainerToken(cId1,
             ResourceManagerConstants.RM_INVALID_IDENTIFIER, context.getNodeId(),
-            user, context.getContainerTokenSecretManager()));
+            user, context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(startRequest1);
     StartContainersRequest allRequests =
@@ -627,7 +627,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         StartContainerRequest.newInstance(containerLaunchContext,
           createContainerToken(cId2,
             DUMMY_RM_IDENTIFIER, context.getNodeId(), user,
-            context.getContainerTokenSecretManager()));
+            context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list2 = new ArrayList<StartContainerRequest>();
     list.add(startRequest2);
     StartContainersRequest allRequests2 =
@@ -661,7 +661,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         identifier = DUMMY_RM_IDENTIFIER;
       Token containerToken =
           createContainerToken(cId, identifier, context.getNodeId(), user,
-            context.getContainerTokenSecretManager());
+            context.getContainerTokenSecretManager(), userFolder);
       StartContainerRequest request =
           StartContainerRequest.newInstance(containerLaunchContext,
             containerToken);
@@ -708,7 +708,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
       }
       Token containerToken =
           createContainerToken(cId, DUMMY_RM_IDENTIFIER, context.getNodeId(),
-            user, context.getContainerTokenSecretManager());
+            user, context.getContainerTokenSecretManager(), userFolder);
       StartContainerRequest request =
           StartContainerRequest.newInstance(containerLaunchContext,
             containerToken);
@@ -773,7 +773,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
     StartContainerRequest scRequest =
         StartContainerRequest.newInstance(containerLaunchContext,
             createContainerToken(cId, DUMMY_RM_IDENTIFIER, context.getNodeId(),
-                user, context.getContainerTokenSecretManager()));
+                user, context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -843,7 +843,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
     String user = "start_container_fail";
     Token containerToken =
         createContainerToken(cId, DUMMY_RM_IDENTIFIER, context.getNodeId(),
-            user, context.getContainerTokenSecretManager());
+            user, context.getContainerTokenSecretManager(), userFolder);
     StartContainerRequest request =
         StartContainerRequest.newInstance(containerLaunchContext,
             containerToken);
@@ -958,7 +958,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
       ContainerId cId = createContainerId(i);
       long identifier = DUMMY_RM_IDENTIFIER;
       Token containerToken = createContainerToken(cId, identifier,
-          context.getNodeId(), user, context.getContainerTokenSecretManager());
+          context.getNodeId(), user, context.getContainerTokenSecretManager(), userFolder);
       StartContainerRequest request = StartContainerRequest.newInstance(
           containerLaunchContext, containerToken);
       list.add(request);
@@ -985,7 +985,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         createContainerToken(cId0, DUMMY_RM_IDENTIFIER,
             context.getNodeId(), user,
                 Resource.newInstance(1234, 3),
-                    context.getContainerTokenSecretManager(), null);
+                    context.getContainerTokenSecretManager(), null, userFolder);
     increaseTokens.add(containerToken);
     // Add increase request for container-7, the request will fail as the
     // container does not exist
@@ -994,7 +994,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         createContainerToken(cId7, DUMMY_RM_IDENTIFIER,
             context.getNodeId(), user,
             Resource.newInstance(1234, 3),
-            context.getContainerTokenSecretManager(), null);
+            context.getContainerTokenSecretManager(), null, userFolder);
     increaseTokens.add(containerToken);
 
     IncreaseContainersResourceRequest increaseRequest =
@@ -1063,7 +1063,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         StartContainerRequest.newInstance(
             containerLaunchContext,
             createContainerToken(cId, DUMMY_RM_IDENTIFIER, context.getNodeId(),
-            user, context.getContainerTokenSecretManager()));
+            user, context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -1081,7 +1081,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         createContainerToken(cId, DUMMY_RM_IDENTIFIER,
             context.getNodeId(), user,
             Resource.newInstance(512, 1),
-            context.getContainerTokenSecretManager(), null);
+            context.getContainerTokenSecretManager(), null, userFolder);
     increaseTokens.add(containerToken);
     IncreaseContainersResourceRequest increaseRequest =
         IncreaseContainersResourceRequest
@@ -1147,7 +1147,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
             containerLaunchContext,
                 createContainerToken(cId, DUMMY_RM_IDENTIFIER,
                     context.getNodeId(), user,
-                        context.getContainerTokenSecretManager()));
+                        context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -1163,7 +1163,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
     Resource targetResource = Resource.newInstance(4096, 2);
     Token containerToken = createContainerToken(cId, DUMMY_RM_IDENTIFIER,
         context.getNodeId(), user, targetResource,
-            context.getContainerTokenSecretManager(), null);
+            context.getContainerTokenSecretManager(), null, userFolder);
     increaseTokens.add(containerToken);
     IncreaseContainersResourceRequest increaseRequest =
         IncreaseContainersResourceRequest.newInstance(increaseTokens);
@@ -1206,31 +1206,32 @@ public class TestContainerManager extends BaseContainerManagerTest {
 
   public static Token createContainerToken(ContainerId cId, long rmIdentifier,
       NodeId nodeId, String user,
-      NMContainerTokenSecretManager containerTokenSecretManager)
+      NMContainerTokenSecretManager containerTokenSecretManager, String userFolder)
       throws IOException {
     return createContainerToken(cId, rmIdentifier, nodeId, user,
-      containerTokenSecretManager, null);
+      containerTokenSecretManager, null, userFolder);
   }
 
   public static Token createContainerToken(ContainerId cId, long rmIdentifier,
       NodeId nodeId, String user,
       NMContainerTokenSecretManager containerTokenSecretManager,
-      LogAggregationContext logAggregationContext)
+      LogAggregationContext logAggregationContext,
+      String userFolder)
       throws IOException {
     Resource r = BuilderUtils.newResource(1024, 1);
     return createContainerToken(cId, rmIdentifier, nodeId, user, r,
-        containerTokenSecretManager, logAggregationContext);
+        containerTokenSecretManager, logAggregationContext, userFolder);
   }
 
   public static Token createContainerToken(ContainerId cId, long rmIdentifier,
       NodeId nodeId, String user, Resource resource,
       NMContainerTokenSecretManager containerTokenSecretManager,
-      LogAggregationContext logAggregationContext)
+      LogAggregationContext logAggregationContext, String userFolder)
       throws IOException {
     ContainerTokenIdentifier containerTokenIdentifier =
         new ContainerTokenIdentifier(cId, nodeId.toString(), user, resource,
           System.currentTimeMillis() + 100000L, 123, rmIdentifier,
-          Priority.newInstance(0), 0, logAggregationContext, null);
+          Priority.newInstance(0), 0, logAggregationContext, null, userFolder);
     return BuilderUtils.newContainerToken(nodeId, containerTokenSecretManager
         .retrievePassword(containerTokenIdentifier),
             containerTokenIdentifier);
@@ -1301,7 +1302,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         StartContainerRequest.newInstance(
             containerLaunchContext,
             createContainerToken(cId, DUMMY_RM_IDENTIFIER, context.getNodeId(),
-            user, context.getContainerTokenSecretManager()));
+            user, context.getContainerTokenSecretManager(), userFolder));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -1360,7 +1361,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
     String user = "start_container_fail";
     Token containerToken =
         createContainerToken(cId, DUMMY_RM_IDENTIFIER, context.getNodeId(),
-            user, context.getContainerTokenSecretManager());
+            user, context.getContainerTokenSecretManager(), userFolder);
     StartContainerRequest request = StartContainerRequest
         .newInstance(spyContainerLaunchContext, containerToken);
 

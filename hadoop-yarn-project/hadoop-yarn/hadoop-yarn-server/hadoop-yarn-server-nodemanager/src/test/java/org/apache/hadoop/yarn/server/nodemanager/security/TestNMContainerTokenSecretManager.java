@@ -60,9 +60,9 @@ public class TestNMContainerTokenSecretManager {
     MasterKey currentKey = keygen.generateKey();
     secretMgr.setMasterKey(currentKey);
     ContainerTokenIdentifier tokenId1 =
-        createContainerTokenId(cid1, nodeId, "user1", secretMgr);
+        createContainerTokenId(cid1, nodeId, "user1", secretMgr, "user1Folder");
     ContainerTokenIdentifier tokenId2 =
-        createContainerTokenId(cid2, nodeId, "user2", secretMgr);
+        createContainerTokenId(cid2, nodeId, "user2", secretMgr, "user2Folder");
     assertNotNull(secretMgr.retrievePassword(tokenId1));
     assertNotNull(secretMgr.retrievePassword(tokenId2));
 
@@ -118,14 +118,14 @@ public class TestNMContainerTokenSecretManager {
 
   private static ContainerTokenIdentifier createContainerTokenId(
       ContainerId cid, NodeId nodeId, String user,
-      NMContainerTokenSecretManager secretMgr) throws IOException {
+      NMContainerTokenSecretManager secretMgr, String userFolder) throws IOException {
     long rmid = cid.getApplicationAttemptId().getApplicationId()
         .getClusterTimestamp();
     ContainerTokenIdentifier ctid = new ContainerTokenIdentifier(cid,
         nodeId.toString(), user, BuilderUtils.newResource(1024, 1),
         System.currentTimeMillis() + 100000L,
         secretMgr.getCurrentKey().getKeyId(), rmid,
-        Priority.newInstance(0), 0);
+        Priority.newInstance(0), 0, userFolder);
     Token token = BuilderUtils.newContainerToken(nodeId,
         secretMgr.createPassword(ctid), ctid);
     return BuilderUtils.newContainerTokenIdentifier(token);

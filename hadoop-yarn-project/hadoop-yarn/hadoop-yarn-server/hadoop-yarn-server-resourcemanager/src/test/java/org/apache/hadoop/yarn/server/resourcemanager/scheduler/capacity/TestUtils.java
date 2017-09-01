@@ -132,6 +132,8 @@ public class TestUtils {
         new DefaultResourceCalculator());
     rmContext.setScheduler(mockScheduler);
 
+    byte[] seed = new byte[16];
+    rmContext.setSeed(seed);
     return rmContext;
   }
   

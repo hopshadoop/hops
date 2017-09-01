@@ -251,6 +251,10 @@ int initialize_user(const char *user, char* const* local_dirs);
  */
 int create_directory_for_user(const char* path);
 
+int create_directory(const char* path);
+
+int chown_directory(const char* path);
+
 int change_user(uid_t user, gid_t group);
 
 int mount_cgroup(const char *pair, const char *hierarchy);

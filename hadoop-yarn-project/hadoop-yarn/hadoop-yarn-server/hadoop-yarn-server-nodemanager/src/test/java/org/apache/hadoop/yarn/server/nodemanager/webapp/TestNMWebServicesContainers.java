@@ -212,10 +212,10 @@ public class TestNMWebServicesContainers extends JerseyTestBase {
     ApplicationAttemptId appAttemptId = BuilderUtils.newApplicationAttemptId(
         app.getAppId(), 1);
     Container container1 = new MockContainer(appAttemptId, dispatcher, conf,
-        app.getUser(), app.getAppId(), 1);
+        app.getUser(), app.getAppId(), 1,  app.getUserFolder());
     ((MockContainer)container1).setState(ContainerState.RUNNING);
     Container container2 = new MockContainer(appAttemptId, dispatcher, conf,
-        app.getUser(), app.getAppId(), 2);
+        app.getUser(), app.getAppId(), 2,  app.getUserFolder());
     ((MockContainer)container2).setState(ContainerState.RUNNING);
     nmContext.getContainers()
         .put(container1.getContainerId(), container1);
