@@ -39,7 +39,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.concurrent.TimeoutException;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
@@ -129,14 +128,12 @@ public class TestNodeCount {
 
             @Override
             public Object performTask() throws StorageException, IOException {
-              final Iterator<DatanodeDescriptor> iter =
-                  bm.blocksMap.nodeIterator(block.getLocalBlock());
               BlockInfo blkInfo = new BlockInfo(block.getLocalBlock(),
                   inodeIdentifier.getInodeId());
               Collection<String> excessDns = bm.excessReplicateMap.get(blkInfo);
               DatanodeDescriptor nonExcessDN = null;
-              while (iter.hasNext()) {
-                DatanodeDescriptor dn = iter.next();
+              for (DatanodeDescriptor dn : bm.blocksMap.nodeList(block
+                  .getLocalBlock())){
                 if (!excessDns.contains(dn.getStorageID())) {
                   nonExcessDN = dn;
                 }

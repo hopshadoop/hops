@@ -133,7 +133,7 @@ public class TestNDBSizer {
     
     final List<Replica> replicas = new LinkedList<>();
     for (int i = 0; i < NUM_REPLICAS; i++) {
-      replicas.add(new Replica(i, i, i));
+      replicas.add(new Replica(i, i, i, i)); //Update bucket id
       if (replicas.size() >= BATCH_SIZE) {
         final int j = i;
         new LightWeightRequestHandler(HDFSOperationType.TEST) {

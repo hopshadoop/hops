@@ -73,8 +73,8 @@ public class ReplicaUnderConstruction extends Replica {
   HdfsServerConstants.ReplicaState state;
 
   public ReplicaUnderConstruction(ReplicaState state, int storageId,
-      long blockId, int inodeId) {
-    super(storageId, blockId, inodeId);
+      long blockId, int inodeId, int bucketId) {
+    super(storageId, blockId, inodeId, bucketId);
     this.state = state;
   }
 

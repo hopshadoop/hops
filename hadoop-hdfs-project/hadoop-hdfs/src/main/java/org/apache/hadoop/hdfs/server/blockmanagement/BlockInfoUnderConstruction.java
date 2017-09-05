@@ -273,8 +273,8 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     }
     ReplicaUnderConstruction replica =
         new ReplicaUnderConstruction(rState, storageId, getBlockId(),
-            getInodeId());
-    add(replica);
+            getInodeId(), HashBuckets.getInstance().getBucketForBlock(this));
+    update(replica);
   }
 
   private boolean hasExpectedReplicaIn(int storageId)

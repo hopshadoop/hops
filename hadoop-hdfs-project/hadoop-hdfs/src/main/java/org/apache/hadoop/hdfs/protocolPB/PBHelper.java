@@ -105,6 +105,10 @@ import org.apache.hadoop.hdfs.server.protocol.BalancerBandwidthCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportBlock;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportBlockState;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportBucket;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
@@ -796,13 +800,22 @@ public class PBHelper {
 
     ReceivedDeletedBlockInfoProto.BlockStatus status;
     switch (receivedDeletedBlockInfo.getStatus()) {
-      case RECEIVING_BLOCK:
-        status = ReceivedDeletedBlockInfoProto.BlockStatus.RECEIVING;
+      case CREATING:
+        status = ReceivedDeletedBlockInfoProto.BlockStatus.CREATING;
         break;
-      case RECEIVED_BLOCK:
+      case APPENDING:
+        status = ReceivedDeletedBlockInfoProto.BlockStatus.APPENDING;
+        break;
+      case RECOVERING_APPEND:
+        status = ReceivedDeletedBlockInfoProto.BlockStatus.RECOVERING_APPEND;
+        break;
+      case RECEIVED:
         status = ReceivedDeletedBlockInfoProto.BlockStatus.RECEIVED;
         break;
-      case DELETED_BLOCK:
+      case UPDATE_RECOVERED:
+        status = ReceivedDeletedBlockInfoProto.BlockStatus.UPDATE_RECOVERED;
+        break;
+      case DELETED:
         status = ReceivedDeletedBlockInfoProto.BlockStatus.DELETED;
         break;
       default:
@@ -823,14 +836,23 @@ public class PBHelper {
       ReceivedDeletedBlockInfoProto proto) {
     ReceivedDeletedBlockInfo.BlockStatus status = null;
     switch (proto.getStatus()) {
-      case RECEIVING:
-        status = BlockStatus.RECEIVING_BLOCK;
+      case CREATING:
+        status = BlockStatus.CREATING;
+        break;
+      case APPENDING:
+        status = BlockStatus.APPENDING;
+        break;
+      case RECOVERING_APPEND:
+        status = BlockStatus.RECOVERING_APPEND;
         break;
       case RECEIVED:
-        status = BlockStatus.RECEIVED_BLOCK;
+        status = BlockStatus.RECEIVED;
+        break;
+      case UPDATE_RECOVERED:
+        status = BlockStatus.UPDATE_RECOVERED;
         break;
       case DELETED:
-        status = BlockStatus.DELETED_BLOCK;
+        status = BlockStatus.DELETED;
         break;
     }
     return new ReceivedDeletedBlockInfo(PBHelper.convert(proto.getBlock()),
@@ -1448,5 +1470,108 @@ public class PBHelper {
     responseProto.setData(ByteString.copyFrom(data));
     return responseProto.build();
   }
-
+  
+  public static DatanodeProtocolProtos.BlockReportProto convert(BlockReport report) {
+   
+    List<DatanodeProtocolProtos.BlockReportBucketProto> bucketProtos = new
+        ArrayList<>();
+    for (BlockReportBucket bucket : report.getBuckets()){
+  
+      DatanodeProtocolProtos.BlockReportBucketProto.Builder bucketBuilder =
+          DatanodeProtocolProtos.BlockReportBucketProto.newBuilder();
+      for (BlockReportBlock block : bucket.getBlocks()){
+        bucketBuilder.addBlocks(
+            DatanodeProtocolProtos.BlockReportBlockProto.newBuilder()
+                .setBlockId(block.getBlockId())
+                .setGenerationStamp(block.getGenerationStamp())
+                .setLength(block.getLength())
+                .setState(convert(block.getState())));
+      }
+      bucketProtos.add(bucketBuilder.build());
+    }
+  
+    List<Long> hashes = new ArrayList<>();
+    for (long hash : report.getHashes()){
+      hashes.add(hash);
+    }
+    
+    return DatanodeProtocolProtos.BlockReportProto.newBuilder()
+        .addAllBuckets(bucketProtos)
+        .addAllHashes(hashes)
+        .build();
+  }
+  
+  private static DatanodeProtocolProtos.BlockReportBlockProto.BlockReportBlockStateProto convert(BlockReportBlockState
+      state){
+    switch (state){
+      case FINALIZED:
+        return DatanodeProtocolProtos.BlockReportBlockProto
+            .BlockReportBlockStateProto.FINALIZED;
+      case RBW:
+        return DatanodeProtocolProtos.BlockReportBlockProto
+            .BlockReportBlockStateProto.RBW;
+      case RUR:
+        return DatanodeProtocolProtos.BlockReportBlockProto
+            .BlockReportBlockStateProto.RUR;
+      case RWR:
+        return DatanodeProtocolProtos.BlockReportBlockProto
+            .BlockReportBlockStateProto.RWR;
+      case TEMPORARY:
+        return DatanodeProtocolProtos.BlockReportBlockProto
+            .BlockReportBlockStateProto.TEMPORARY;
+      default:
+        throw new RuntimeException();
+      
+    }
+  }
+  
+  public static BlockReport convert(
+      DatanodeProtocolProtos.BlockReportProto blockReportProto) {
+    int numBuckets = blockReportProto.getBucketsCount();
+    
+    BlockReportBucket[] buckets = new BlockReportBucket[numBuckets];
+    long[] hashes = new long[numBuckets];
+    int numBlocks = 0;
+    
+    for(int i = 0; i < numBuckets ; i ++){
+      DatanodeProtocolProtos.BlockReportBucketProto bucketProto = blockReportProto.getBuckets(i);
+      int numBlocksInBucket = bucketProto.getBlocksCount();
+      
+      numBlocks += numBlocksInBucket;
+      
+      BlockReportBlock[] blocks = new BlockReportBlock[numBlocksInBucket];
+      for (int j = 0; j < numBlocksInBucket; j++){
+        DatanodeProtocolProtos.BlockReportBlockProto blockProto = bucketProto.getBlocks(j);
+        blocks[j] = new BlockReportBlock(blockProto.getBlockId(), blockProto
+            .getGenerationStamp(), blockProto.getLength(), convert(blockProto
+            .getState()));
+      }
+      
+      BlockReportBucket bucket = new BlockReportBucket();
+      bucket.setBlocks(blocks);
+      buckets[i] = bucket;
+      hashes[i] = blockReportProto.getHashes(i);
+    }
+    
+    return new BlockReport(buckets, hashes, numBlocks);
+  }
+  
+  private static BlockReportBlockState convert(
+      DatanodeProtocolProtos.BlockReportBlockProto.BlockReportBlockStateProto state) {
+    switch (state){
+      case FINALIZED:
+        return BlockReportBlockState.FINALIZED;
+      case RBW:
+        return BlockReportBlockState.RBW;
+      case RUR:
+        return BlockReportBlockState.RUR;
+      case RWR:
+        return BlockReportBlockState.RWR;
+      case TEMPORARY:
+        return BlockReportBlockState.TEMPORARY;
+      default:
+        throw new RuntimeException();
+    }
+  }
+  
 }

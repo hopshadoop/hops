@@ -17,7 +17,6 @@
  */
 package io.hops.transaction.context;
 
-import com.google.common.collect.Lists;
 import io.hops.exception.StorageCallPreventedException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -106,7 +105,7 @@ public class ReplicaContext
   @Override
   Replica cloneEntity(Replica hopReplica, int inodeId) {
     return new Replica(hopReplica.getStorageId(), hopReplica.getBlockId(),
-         inodeId);
+         inodeId, hopReplica.getBucketId());
   }
 
   @Override

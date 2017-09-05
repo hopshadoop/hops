@@ -6,35 +6,42 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.hops.transaction.lock;
 
-package org.apache.hadoop.hdfs.server.protocol;
+import io.hops.metadata.hdfs.entity.HashBucket;
+import io.hops.transaction.EntityManager;
 
-/**
- * Block report for a Datanode storage
- */
-public class StorageBlockReport {
-  private final DatanodeStorage storage;
-  private final BlockReport report;
+import java.io.IOException;
+
+public class IndividualHashBucketLock extends Lock {
+  private final int storageId;
+  private final int bucketId;
   
-  public StorageBlockReport(DatanodeStorage storage, BlockReport report) {
-    this.storage = storage;
-    this.report = report;
+  IndividualHashBucketLock(int storageId, int bucketId) {
+    this.storageId = storageId;
+    this.bucketId = bucketId;
   }
-
-  public DatanodeStorage getStorage() {
-    return storage;
+  
+  @Override
+  protected void acquire(TransactionLocks locks) throws IOException {
+    setLockMode(TransactionLockTypes.LockType.WRITE);
+    EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId,
+        storageId,
+        bucketId);
   }
-
-  public BlockReport getReport() {
-    return report;
+  
+  @Override
+  protected Type getType() {
+    return Type.HashBucket;
   }
 }
+
