@@ -50,7 +50,8 @@ static void display_usage(FILE *stream) {
     "Usage: container-executor --checksetup\n"
     "       container-executor --mount-cgroups <hierarchy> "
     "<controller=path>...\n"
-    "Usage container-executor --write-cgroups-devices path value\n" );
+    "       container-executor --write-cgroups-devices path value\n"
+    "       container-executor --create-hierarchy path hierarchy group\n" );
 
   if(is_tc_support_enabled()) {
     strcat(usage_template,
@@ -220,6 +221,9 @@ static void display_feature_disabled_message(const char* name) {
 static struct {
   char *cgroups_hierarchy;
   char *cgroups_path;
+  char *cgroups_group;
+  char *device_entry;
+  char *group;
   char *traffic_control_command_file;
   const char * run_as_user_name;
   const char * yarn_user_name;
@@ -280,8 +284,20 @@ static int validate_arguments(int argc, char **argv , int *operation) {
     optind++;
     cmd_input.cgroups_path = argv[optind++];
     *operation = WRITE_DEVICES;
+    return 0;
   }
 
+  if(strcmp("--create-hierarchy", argv[1]) == 0) {
+    if (argc < 5) {
+      display_usage(stdout);
+      return INVALID_ARGUMENT_NUMBER;
+    }
+    optind++;
+    cmd_input.cgroups_path = argv[optind++];
+    cmd_input.cgroups_hierarchy = argv[optind++];
+    *operation = CREATE_HIERARCHY;
+    return 0;
+  }
 
   if (strcmp("--tc-modify-state", argv[1]) == 0) {
     if(is_tc_support_enabled()) {
@@ -554,8 +570,11 @@ int main(int argc, char **argv) {
     }
     break;
   case WRITE_DEVICES:
-    exit_code = write_device_entry_to_cgroup_devices(argv[optind++], cmd_input.cgroups_path);
-    return exit_code;
+    exit_code = write_device_entry_to_cgroup_devices(cmd_input.cgroups_path, argv[optind++]);
+    break;
+  case CREATE_HIERARCHY:
+    exit_code = create_cgroup_hierarchy(cmd_input.cgroups_path, cmd_input.cgroups_hierarchy, argv[optind++]);
+    break;
   case TRAFFIC_CONTROL_MODIFY_STATE:
     exit_code = traffic_control_modify_state(cmd_input.traffic_control_command_file);
     break;
