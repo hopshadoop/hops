@@ -404,6 +404,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
       } catch (IOException e) {
         e.printStackTrace();
       }
+      return;
     }
 
     String path = pathForCgroup(controller, groupName);
