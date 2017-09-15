@@ -50,11 +50,9 @@ public class GPUAllocator {
       gpuManagementLibrary =
           GPUManagementLibraryLoader.load(GPU_MANAGEMENT_LIBRARY_CLASSNAME);
     } catch(GPUManagementLibraryException | UnsatisfiedLinkError e) {
-      LOG.warn("Could not load GPU management library. Is this NodeManager " +
+      LOG.error("Could not load GPU management library. Is this NodeManager " +
           "supposed to offer its GPUs as a resource? If yes, check " +
-          "installation and make sure hopsnvml-1.0 is present in java.library.path");
-      
-      e.printStackTrace();
+          "installation and make sure hopsnvml-1.0 is present in java.library.path", e);
     }
   }
   
@@ -80,10 +78,10 @@ public class GPUAllocator {
       try {
         initMandatoryDrivers();
         initConfiguredGPUs(numGPUs);
+        initTotalGPUs();
       } catch (IOException ioe) {
-        ioe.printStackTrace();
+        LOG.error("Could not initialize GPUAllocator", ioe);
       }
-      initTotalGPUs();
     }
     return this.initialized;
   }
@@ -163,14 +161,8 @@ public class GPUAllocator {
     }
   }
 
-  //If 3 GPUs exist, the numbering is 195:0 195:1 195:2
   private void initTotalGPUs() {
-    int totalNumGPUs= gpuManagementLibrary.getNumGPUs();
-    while(totalNumGPUs != 0) {
-      totalGPUs.add(new Device(NVIDIA_GPU_MAJOR_DEVICE_NUMBER, totalNumGPUs-1));
-      totalNumGPUs--;
-    }
-    LOG.info("Total GPUs present on machine " + totalGPUs);
+    totalGPUs = new HashSet<>(configuredAvailableGPUs);
   }
   
   /**

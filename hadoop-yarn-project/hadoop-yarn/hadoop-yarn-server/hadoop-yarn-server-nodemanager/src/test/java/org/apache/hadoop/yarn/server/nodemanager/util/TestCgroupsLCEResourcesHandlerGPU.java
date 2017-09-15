@@ -332,8 +332,6 @@ public class TestCgroupsLCEResourcesHandlerGPU {
     Device gpu3 = new Device(195, 3);
     Device gpu4 = new Device(195, 4);
     Device gpu5 = new Device(195, 5);
-    Device gpu6 = new Device(195, 6);
-    Device gpu7 = new Device(195, 7);
 
 
     // setup our handler and call init()
@@ -362,8 +360,6 @@ public class TestCgroupsLCEResourcesHandlerGPU {
     Assert.assertFalse(deniedDevices1.contains(gpu3));
     Assert.assertTrue(deniedDevices1.contains(gpu4));
     Assert.assertTrue(deniedDevices1.contains(gpu5));
-    Assert.assertTrue(deniedDevices1.contains(gpu6));
-    Assert.assertTrue(deniedDevices1.contains(gpu7));
 
     handler.postExecute(id);
 
@@ -377,8 +373,6 @@ public class TestCgroupsLCEResourcesHandlerGPU {
     Assert.assertTrue(deniedDevices2.contains(gpu3));
     Assert.assertTrue(deniedDevices2.contains(gpu4));
     Assert.assertTrue(deniedDevices2.contains(gpu5));
-    Assert.assertTrue(deniedDevices2.contains(gpu6));
-    Assert.assertTrue(deniedDevices2.contains(gpu7));
 
     FileUtils.deleteQuietly(cgroupDir);
   }
