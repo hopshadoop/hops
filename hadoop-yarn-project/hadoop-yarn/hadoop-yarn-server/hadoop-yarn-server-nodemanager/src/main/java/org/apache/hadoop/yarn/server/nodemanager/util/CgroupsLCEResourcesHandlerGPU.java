@@ -396,17 +396,18 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
 
   private void updateCgroupDevice(String controller, String groupName, String param,
                                   String value) {
+    String path = pathForCgroup(controller, groupName);
     //This will only happen during tests
     if(executablePath == null)
     {
       try {
         updateCgroup(controller, groupName, param, value);
       } catch (IOException e) {
-        e.printStackTrace();
+        LOG.error("Unable to set Cgroup " + controller + " at " + path, e);
       }
+      return;
     }
 
-    String path = pathForCgroup(controller, groupName);
     param = controller + "." + param;
 
     String filePath = path + "/" + param;
@@ -419,7 +420,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
     try {
       shExec.execute();
     } catch (IOException e) {
-      e.printStackTrace();
+      LOG.error("Unable to set Cgroup " + controller + " at " + path, e);
     }
 }
   
