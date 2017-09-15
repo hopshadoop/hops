@@ -45,6 +45,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -84,6 +85,8 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
   private float yarnProcessors;
   int nodeVCores;
+
+  private String executablePath;
 
   public CgroupsLCEResourcesHandler() {
     this.controllerPaths = new HashMap<String, String>();
@@ -401,7 +404,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
   @Override
   public void setExecutablePath(String path) {
-
+    this.executablePath = path;
   }
 
   public void postExecute(ContainerId containerId) {
@@ -430,6 +433,27 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
   public void recoverDeviceControlSystem(ContainerId containerId) {
     LOG.info("GPU recovery does not work using CgroupsLCEResourcesHandler, " +
         " use CgroupsLCEResourcesHandlerGPU instead");
+  }
+
+  @Override
+  public void initializeHierarchy(Configuration conf) {
+    if(executablePath != null) {
+
+      String cgroupPath = conf.get(YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH);
+      String hierarchyName = conf.get(YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_HIERARCHY);
+      String group = conf.get(YarnConfiguration.NM_LINUX_CONTAINER_GROUP);
+
+      List<String> command = new ArrayList<>();
+      command.addAll(Arrays.asList(executablePath, "--create-hierarchy", cgroupPath, hierarchyName, group));
+
+      String[] commandArray = command.toArray(new String[command.size()]);
+      Shell.ShellCommandExecutor shExec = new Shell.ShellCommandExecutor(commandArray, null);
+      try {
+        shExec.execute();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
   }
 
   /* We are looking for entries of the form:

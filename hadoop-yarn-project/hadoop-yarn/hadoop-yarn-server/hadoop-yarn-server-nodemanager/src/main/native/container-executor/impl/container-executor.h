@@ -82,7 +82,8 @@ enum operations {
   RUN_AS_USER_DELETE = 9,
   RUN_AS_USER_LAUNCH_DOCKER_CONTAINER = 10,
   RUN_DOCKER = 11,
-  WRITE_DEVICES = 12
+  WRITE_DEVICES = 12,
+  CREATE_HIERARCHY = 13
 };
 
 #define NM_GROUP_KEY "yarn.nodemanager.linux-container-executor.group"
@@ -255,6 +256,8 @@ int change_user(uid_t user, gid_t group);
 int mount_cgroup(const char *pair, const char *hierarchy);
 
 int write_device_entry_to_cgroup_devices(const char *value, const char *path);
+
+int create_cgroup_hierarchy(const char *path, const char *hierarchy, const char *group);
 
 int check_dir(const char* npath, mode_t st_mode, mode_t desired,
    int finalComponent);
