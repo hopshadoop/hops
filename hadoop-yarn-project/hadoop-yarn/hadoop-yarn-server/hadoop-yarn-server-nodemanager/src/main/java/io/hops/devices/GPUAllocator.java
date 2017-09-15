@@ -80,10 +80,10 @@ public class GPUAllocator {
       try {
         initMandatoryDrivers();
         initConfiguredGPUs(numGPUs);
-        initTotalGPUs();
       } catch (IOException ioe) {
         ioe.printStackTrace();
       }
+      initTotalGPUs();
     }
     return this.initialized;
   }
@@ -163,8 +163,14 @@ public class GPUAllocator {
     }
   }
 
+  //If 3 GPUs exist, the numbering is 195:0 195:1 195:2
   private void initTotalGPUs() {
-    totalGPUs = new HashSet<>(configuredAvailableGPUs);
+    int totalNumGPUs= gpuManagementLibrary.getNumGPUs();
+    while(totalNumGPUs != 0) {
+      totalGPUs.add(new Device(NVIDIA_GPU_MAJOR_DEVICE_NUMBER, totalNumGPUs-1));
+      totalNumGPUs--;
+    }
+    LOG.info("Total GPUs present on machine " + totalGPUs);
   }
   
   /**
