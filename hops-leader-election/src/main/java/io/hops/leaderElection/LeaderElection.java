@@ -15,6 +15,7 @@
  */
 package io.hops.leaderElection;
 
+import io.hops.exception.StorageException;
 import io.hops.exception.TransientStorageException;
 import io.hops.leaderElection.LeaderElectionRole.Role;
 import io.hops.leaderElection.exception.LeaderElectionForceAbort;
@@ -46,13 +47,13 @@ public class LeaderElection extends Thread {
 
   public LeaderElection(final LeDescriptorFactory leFactory,
       final long time_period, final int max_missed_hb_threshold,
-      final long time_period_increment, String http_address, String host_name)
+      final long time_period_increment, String http_address, String rpc_addresses)
       throws IOException {
     context = LEContext.initialContext();
     context.init_phase = true;
     context.time_period = time_period;
     context.max_missed_hb_threshold = max_missed_hb_threshold;
-    context.rpc_address = host_name;
+    context.rpc_addresses = rpc_addresses;
     context.http_address = http_address;
     context.time_period_increment = time_period_increment;
     this.leFactory = leFactory;
@@ -91,6 +92,15 @@ public class LeaderElection extends Thread {
             " LeaderElection thread received TransientStorageException. " +
             "sucessfulTx " + sucessfulTx + " failedTx " + failedtx +
             " time period " + context.time_period + " " + te.getMessage(), te);
+        // transaction failed
+        sleepDuration = 0;
+        txFailed = true;
+        failedtx++;
+      } catch (StorageException e) {
+        LOG.error("LE Status: id " + context.id +
+                " LeaderElection thread received StorageException. " +
+                "sucessfulTx " + sucessfulTx + " failedTx " + failedtx +
+                " time period " + context.time_period + " " + e.getMessage(), e);
         // transaction failed
         sleepDuration = 0;
         txFailed = true;
@@ -267,7 +277,7 @@ public class LeaderElection extends Thread {
   }
 
   public synchronized String getRpcAddress() {
-    return context.rpc_address;
+    return context.rpc_addresses;
   }
 
   public synchronized String getHttpAddress() {

@@ -23,12 +23,18 @@ public interface ActiveNode extends Comparable<ActiveNode> {
 
   public long getId();
 
-  public String getIpAddress();
+  public String getRpcServerIpAddress();
 
-  public int getPort();
+  public int getRpcServerPort();
 
-  public InetSocketAddress getInetSocketAddress();
-  
+  public InetSocketAddress getRpcServerAddressForClients();
+
+  public String getServiceRpcIpAddress();
+
+  public int getServiceRpcPort();
+
+  public InetSocketAddress getRpcServerAddressForDatanodes();
+
   public String getHttpAddress();
 
 }

@@ -227,6 +227,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
           getUserMappingService, serviceRpcServer);
 
       serviceRPCAddress = serviceRpcServer.getListenerAddress();
+      serviceRpcServer.setThreadNamePrefix("Service");
       nn.setRpcServiceServerAddress(conf, serviceRPCAddress);
     } else {
       serviceRpcServer = null;
@@ -264,6 +265,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
     // The rpc-server port can be ephemeral... ensure we have the correct info
     clientRpcAddress = clientRpcServer.getListenerAddress();
+    clientRpcServer.setThreadNamePrefix("RPC");
     nn.setRpcServerAddress(conf, clientRpcAddress);
     
     minimumDataNodeVersion =

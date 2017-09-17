@@ -29,19 +29,31 @@ public class ActiveNodePBImpl implements ActiveNode {
   protected ActiveNodeProto.Builder builder = null;
   protected boolean viaProto = false;
 
-  public ActiveNodePBImpl(ActiveNodeProto proto) {
-    this.proto = proto;
-    viaProto = true;
+//  public ActiveNodePBImpl(ActiveNodeProto proto) {
+//    this.proto = proto;
+//    viaProto = true;
+//  }
+
+  public ActiveNodePBImpl(ActiveNodeProto proto){
+    this(proto.getId(),
+            proto.getRpcHostname(),
+            proto.getRpcIpAddress(),
+            proto.getRpcPort(),
+            proto.getHttpAddress(),
+            proto.getServiceIpAddress(),
+            proto.getServicePort());
   }
 
   public ActiveNodePBImpl(long id, String hostname, String ipAddress, int port,
-      String httpAddress) {
+      String httpAddress, String serviceRpcIp, int serviceRpcPort) {
     maybeInitBuilder();
     builder.setId(id);
-    builder.setHostname(hostname);
-    builder.setIpAddress(ipAddress);
-    builder.setPort(port);
+    builder.setRpcHostname(hostname);
+    builder.setRpcIpAddress(ipAddress);
+    builder.setRpcPort(port);
     builder.setHttpAddress(httpAddress);
+    builder.setServiceIpAddress(serviceRpcIp);
+    builder.setServicePort(serviceRpcPort);
   }
 
   public ActiveNodeProto getProto() {
@@ -69,12 +81,12 @@ public class ActiveNodePBImpl implements ActiveNode {
   @Override
   public String getHostname() {
     ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getHostname();
+    return p.getRpcHostname();
   }
 
   public void setHostname(String hostname) {
     maybeInitBuilder();
-    builder.setHostname(hostname);
+    builder.setRpcHostname(hostname);
   }
 
   @Override
@@ -89,25 +101,25 @@ public class ActiveNodePBImpl implements ActiveNode {
   }
 
   @Override
-  public String getIpAddress() {
+  public String getRpcServerIpAddress() {
     ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getIpAddress();
+    return p.getRpcIpAddress();
   }
 
   public void setIpAddress(String ipAddress) {
     maybeInitBuilder();
-    builder.setIpAddress(ipAddress);
+    builder.setRpcIpAddress(ipAddress);
   }
 
   @Override
-  public int getPort() {
+  public int getRpcServerPort() {
     ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getPort();
+    return p.getRpcPort();
   }
 
   public void setPort(int port) {
     maybeInitBuilder();
-    builder.setPort(port);
+    builder.setRpcPort(port);
   }
 
   @Override
@@ -122,9 +134,56 @@ public class ActiveNodePBImpl implements ActiveNode {
   }
 
   @Override
-  public InetSocketAddress getInetSocketAddress() {
+  public String getServiceRpcIpAddress() {
     ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
-    return createSocketAddrForHost(p.getIpAddress(), p.getPort());
+    return p.getServiceIpAddress();
+  }
+
+  public void setServiceRpcIpAddress(String serviceRpcIpAddress) {
+    maybeInitBuilder();
+    builder.setServiceIpAddress(serviceRpcIpAddress);
+  }
+
+  @Override
+  public int getServiceRpcPort() {
+    ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getServicePort();
+  }
+
+  public void setServiceRpcPort(int port) {
+    maybeInitBuilder();
+    builder.setServicePort(port);
+  }
+
+  InetSocketAddress rpcAddressForDatanodes = null;
+  @Override
+  public InetSocketAddress getRpcServerAddressForDatanodes() {
+    if(rpcAddressForDatanodes != null){
+      return rpcAddressForDatanodes;
+    }
+    ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
+    if( p.getServicePort() != 0 && p.getServiceIpAddress() != "") {
+        rpcAddressForDatanodes = createSocketAddrForHost(p.getServiceIpAddress(), p.getServicePort());
+    } else {
+      //fallback
+      rpcAddressForDatanodes = getRpcServerAddressForClients();
+    }
+    return rpcAddressForDatanodes;
+  }
+
+  InetSocketAddress rpcAddressForClients = null;
+  @Override
+  public InetSocketAddress getRpcServerAddressForClients() {
+    if(rpcAddressForClients != null){
+      return rpcAddressForClients;
+    }
+    ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
+    if(p.getRpcPort() != 0 && p.getRpcIpAddress() != "") {
+      rpcAddressForClients = createSocketAddrForHost(p.getRpcIpAddress(), p.getRpcPort());
+    }else{
+      return null;
+    }
+    return rpcAddressForClients;
   }
 
   @Override
@@ -137,13 +196,13 @@ public class ActiveNodePBImpl implements ActiveNode {
       return false;
     }
     ActiveNode that = (ActiveNode) obj;
-    return this.getInetSocketAddress().equals(that.getInetSocketAddress());
+    return this.getRpcServerAddressForClients().equals(that.getRpcServerAddressForClients());
   }
 
   @Override
   public int hashCode() {
     int hash = 7;
-    hash = 89 * hash + this.getInetSocketAddress().hashCode();
+    hash = 89 * hash + this.getRpcServerAddressForClients().hashCode();
     return hash;
   }
 
@@ -154,16 +213,15 @@ public class ActiveNodePBImpl implements ActiveNode {
       return -1;
     } else if (this.getId() == o.getId()) {
       return 0;
-    } else if (this.getId() > o.getId()) {
-      return 1;
     } else {
-      throw new IllegalStateException("I write horrible code");
+      return 1;
     }
   }
 
   @Override
   public String toString() {
-    return "Active NN (" + this.getId() + ") address " + getInetSocketAddress();
+    String msg = "Active NN (" + this.getId() + ") Client's RPC: " + getRpcServerAddressForClients()+ " DataNode's RPC: "+ getRpcServerAddressForDatanodes();
+    return msg;
   }
 
   public static InetSocketAddress createSocketAddrForHost(String host,

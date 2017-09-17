@@ -59,11 +59,9 @@ import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
  * <p>
  * The supported configuration properties are:
  * <ul>
- * <li>kerberos.principal: the Kerberos principal to used by the server. As
- * stated by the Kerberos SPNEGO specification, it should be
- * <code>HTTP/${HOSTNAME}@{REALM}</code>. The realm can be omitted from the
- * principal as the JDK GSS libraries will use the realm name of the configured
- * default realm.
+ * <li>kerberos.principal: the Kerberos principal to used by the server. As stated by the Kerberos SPNEGO
+ * specification, it should be <code>HTTP/${RPC_ADDRESSES}@{REALM}</code>. The realm can be omitted from the
+ * principal as the JDK GSS libraries will use the realm name of the configured default realm.
  * It does not have a default value.</li>
  * <li>kerberos.keytab: the keytab file containing the credentials for the
  * Kerberos principal.

@@ -30,11 +30,13 @@ package hadoop.common;
 
 message ActiveNodeProto {
   optional int64 id = 1;
-  optional string hostname = 2;
-  optional string ipAddress = 3;
-  optional int32 port = 4;
-  optional string httpAddress = 5;
-  extensions 6 to 6;
+  optional string rpcHostname = 2;
+  optional string rpcIpAddress = 3;
+  optional int32 rpcPort = 4;
+  optional string serviceIpAddress = 5;
+  optional int32 servicePort = 6;
+  optional string httpAddress = 7;
+  extensions 8 to 8;
 }
 
 message SortedActiveNodeListProto{

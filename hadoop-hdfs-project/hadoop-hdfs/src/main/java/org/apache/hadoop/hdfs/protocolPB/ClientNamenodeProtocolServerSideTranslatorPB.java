@@ -1006,10 +1006,12 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
     ActiveNodeProtos.ActiveNodeProto.Builder anp =
         ActiveNodeProtos.ActiveNodeProto.newBuilder();
     anp.setId(p.getId());
-    anp.setHostname(p.getHostname());
-    anp.setIpAddress(p.getIpAddress());
-    anp.setPort(p.getPort());
+    anp.setRpcHostname(p.getHostname());
+    anp.setRpcIpAddress(p.getRpcServerIpAddress());
+    anp.setRpcPort(p.getRpcServerPort());
     anp.setHttpAddress(p.getHttpAddress());
+    anp.setServiceIpAddress(p.getServiceRpcIpAddress());
+    anp.setServicePort(p.getServiceRpcPort());
     return anp.build();
   }
 

@@ -20,10 +20,7 @@ import io.hops.leader_election.proto.ActiveNodeProtos.SortedActiveNodeListProto;
 import io.hops.leader_election.proto.ActiveNodeProtos.SortedActiveNodeListProtoOrBuilder;
 
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 //TODO change it to avoid going through the proto when it is not needed
 public class SortedActiveNodeListPBImpl implements SortedActiveNodeList {
@@ -109,7 +106,8 @@ public class SortedActiveNodeListPBImpl implements SortedActiveNodeList {
     SortedActiveNodeListProtoOrBuilder p = viaProto ? proto : builder;
     for (ActiveNodeProto namenodeProto : p.getActiveNodeList()) {
       ActiveNode namenode = new ActiveNodePBImpl(namenodeProto);
-      if (namenode.getInetSocketAddress().equals(address)) {
+      if (namenode.getRpcServerAddressForClients().equals(address) ||
+              namenode.getRpcServerAddressForDatanodes().equals(address)) {
         return namenode;
       }
     }
@@ -118,22 +116,12 @@ public class SortedActiveNodeListPBImpl implements SortedActiveNodeList {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder("Active Namenodes are ");
     if (this.isEmpty()) {
-      sb.append(" EMPTY ");
+      return "No Active NameNodes";
     } else {
-      for (int i = 0; i < this.size(); i++) {
-        ActiveNode ann = this.getSortedActiveNodes().get(i);
-        sb.append("[ id: ").append(ann.getId());
-        InetSocketAddress addr = ann.getInetSocketAddress();
-        sb.append(" addr: ").append(addr.getHostName()).append(":").append(addr.
-            getPort());
-        sb.append(" ] ");
-      }
+      return "Active NameNodes are "+ Arrays.toString(this.getSortedActiveNodes().toArray());
     }
-    return sb.toString();
   }
-
   @Override
   public ActiveNode getLeader() {
     //in our case the node wiht smallest id is the leader

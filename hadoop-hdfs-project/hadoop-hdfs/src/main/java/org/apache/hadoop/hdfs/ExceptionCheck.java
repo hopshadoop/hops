@@ -18,6 +18,7 @@ package org.apache.hadoop.hdfs;
 import io.hops.exception.StorageException;
 import org.apache.hadoop.ipc.RemoteException;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.BindException;
@@ -68,7 +69,8 @@ public class ExceptionCheck {
         e instanceof SocketTimeoutException ||
         e instanceof NoRouteToHostException || (e instanceof IOException &&
         e.getMessage().contains("Failed on local exception")) ||
-        e instanceof NoAliveNamenodeException) {
+        e instanceof NoAliveNamenodeException || (e instanceof EOFException &&
+            e.getMessage().contains("End of File Exception between local host is") )) {
       return true;
     }
 

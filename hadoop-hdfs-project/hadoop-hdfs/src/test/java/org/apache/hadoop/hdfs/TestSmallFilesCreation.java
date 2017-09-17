@@ -9,6 +9,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 
 import static org.junit.Assert.assertFalse;
@@ -34,19 +35,10 @@ public class TestSmallFilesCreation {
   }
 
   static void writeFile(FileSystem fs, String name, int size) throws IOException {
-    FSDataOutputStream os = (FSDataOutputStream) fs.create(new Path(name));
+    FSDataOutputStream os = (FSDataOutputStream) fs.create(new Path(name), (short)1);
     writeData(os, 0, size);
     os.close();
   }
-
-//  static void writeData(FSDataOutputStream os, int size) throws IOException {
-//    byte[] data = new byte[size];
-//    for (int i = 0; i < size; i++) {
-//      byte number = (byte) (i % 128);
-//      data[i] = number;
-//    }
-//    os.write(data);
-//  }
 
   static void writeData(FSDataOutputStream os, int existingSize, int size) throws IOException {
     byte[] data = new byte[size];
@@ -60,77 +52,19 @@ public class TestSmallFilesCreation {
   /**
    * This method reads the file using different read methods.
    */
-  static void readFileUsingMultipleMethods(FileSystem dfs, String file, int size) throws IOException {
+  static void verifyFile(FileSystem dfs, String file, int size) throws IOException {
     //reading one byte at a time.
     FSDataInputStream is = dfs.open(new Path(file));
-    byte[] onebyte = new byte[1];
-    for (int i = 0; i < size; i++) {
-      if (is.read(onebyte, 0, 1) != 1) {
-        fail("failed to read");
-      }
-      byte number = (byte) (i % 128);
-      if (number != onebyte[0]) {
-        fail("Wrong data read");
-      }
-    }
-    //next read should return -1
-    if (is.read(onebyte, 0, 1) != -1) {
-      fail("Read Failed. Expecting End of File.");
-    }
-    is.close();
-    //--------------------------------------------------------------------------
-
-    is = dfs.open(new Path(file));
     byte[] buffer = new byte[size];
-    if (size != is.read(buffer, 0, size)) {
-      fail("Wrong amount of data read from the file");
-    }
+    IOUtils.readFully(is, buffer,0, size );
+    is.close();
     for (int i = 0; i < size; i++) {
       if ((i % 128) != buffer[i]) {
-        fail("Data is corrupted. Expecting: " + i + " got: " + buffer[i] +
+        fail("Data is corrupted. Expecting: " + (i%128) + " got: " + buffer[i] +
                 " index: " +
                 "" + i);
       }
     }
-    if (-1 != is.read(buffer, 0, size)) {
-      fail("Read Failed. Expecting End of File.");
-    }
-    is.close();
-    //--------------------------------------------------------------------------
-
-    ByteBuffer byteBuffer = ByteBuffer.allocate(size);
-    is = dfs.open(new Path(file));
-    if (size != is.read(byteBuffer)) {
-      fail("Wrong amount of data read using read(ByteBuffer) function");
-    }
-    for (int i = 0; i < size; i++) {
-      if ((i % 128) != buffer[i]) {
-        fail("Data is corrupted");
-      }
-    }
-    is.close();
-    //--------------------------------------------------------------------------
-
-    is = dfs.open(new Path(file));
-    is.readFully(0, buffer);
-    for (int i = 0; i < size; i++) {
-      if ((i % 128) != buffer[i]) {
-        fail("Data is corrupted");
-      }
-    }
-    is.close();
-    //--------------------------------------------------------------------------
-
-    is = dfs.open(new Path(file));
-    is.readFully(0, buffer, 0, size);
-    for (int i = 0; i < size; i++) {
-      if ((i % 128) != buffer[i]) {
-        fail("Data is corrupted");
-      }
-    }
-    is.close();
-    //--------------------------------------------------------------------------
-
   }
 
   public static int countDBFiles() throws IOException {
@@ -187,9 +121,9 @@ public class TestSmallFilesCreation {
       @Override
       public Object performTask() throws StorageException, IOException {
         int count = 0;
-        DBFileDataAccess fida;
+        LargeOnDiskInodeDataAccess fida;
         fida = (LargeOnDiskInodeDataAccess) HdfsStorageFactory.getDataAccess(LargeOnDiskInodeDataAccess.class);
-        count += fida.count();
+        count += fida.countUniqueFiles();
         return count;
       }
     };
@@ -222,19 +156,20 @@ public class TestSmallFilesCreation {
       conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
 
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+
       cluster.waitActive();
 
       DistributedFileSystem dfs = cluster.getFileSystem();
 
       writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
 
       writeFile(dfs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
       writeFile(dfs, FILE_NAME3, ONDISK_MEDIUM_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME3, ONDISK_MEDIUM_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME3, ONDISK_MEDIUM_FILE_MAX_SIZE);
       writeFile(dfs, FILE_NAME4, ONDISK_LARGE_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME4, ONDISK_LARGE_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME4, ONDISK_LARGE_FILE_MAX_SIZE);
 
       assertTrue("Expecting 1 in-memory file. Got: " + countInMemoryDBFiles(), countInMemoryDBFiles() == 1);
       assertTrue("Expecting 3 on-disk file(s). Got:" + countAllOnDiskDBFiles(), countAllOnDiskDBFiles() == 3);
@@ -498,10 +433,10 @@ public class TestSmallFilesCreation {
       dfs.rename(new Path(FILE_NAME3), new Path(FILE_NAME3 + "1"));
       dfs.rename(new Path(FILE_NAME4), new Path(FILE_NAME4 + "1"));
 
-      readFileUsingMultipleMethods(dfs, FILE_NAME1 + "1", INMEMORY_SMALL_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME2 + "1", ONDISK_SMALL_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME3 + "1", ONDISK_MEDIUM_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME4 + "1", ONDISK_LARGE_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1 + "1", INMEMORY_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2 + "1", ONDISK_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME3 + "1", ONDISK_MEDIUM_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME4 + "1", ONDISK_LARGE_FILE_MAX_SIZE);
 
       assertTrue("Expecting 1 in-memory file(s). Got: " + countInMemoryDBFiles(), countInMemoryDBFiles() == 1);
       assertTrue("Expecting 3 on-disk file(s). Got:" + countAllOnDiskDBFiles(), countAllOnDiskDBFiles() == 3);
@@ -552,7 +487,7 @@ public class TestSmallFilesCreation {
       assertTrue("Count of db file should be 2", countInMemoryDBFiles() == 2);
       dfs.rename(new Path(FILE_NAME1), new Path(FILE_NAME2), Options.Rename.OVERWRITE);
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
-      readFileUsingMultipleMethods(dfs, FILE_NAME2, INMEMORY_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2, INMEMORY_SMALL_FILE_MAX_SIZE);
 
       // replace in-memory file with on-disk file
       // create on-disk small file
@@ -562,7 +497,7 @@ public class TestSmallFilesCreation {
       dfs.rename(new Path(FILE_NAME1), new Path(FILE_NAME2), Options.Rename.OVERWRITE);
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
       assertTrue("Count of db file should be 1", countAllOnDiskDBFiles() == 1);
-      readFileUsingMultipleMethods(dfs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
 
       //replace on disk file with another ondsik file
       writeFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE);
@@ -571,7 +506,7 @@ public class TestSmallFilesCreation {
       dfs.rename(new Path(FILE_NAME1), new Path(FILE_NAME2), Options.Rename.OVERWRITE);
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
       assertTrue("Count of db file should be 1", countAllOnDiskDBFiles() == 1);
-      readFileUsingMultipleMethods(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
 
     } catch (Exception e) {
       e.printStackTrace();
@@ -739,14 +674,14 @@ public class TestSmallFilesCreation {
 
 
       writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
 
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
 
       FSDataOutputStream out = dfs.append(new Path(FILE_NAME1));
       writeData(out, INMEMORY_SMALL_FILE_MAX_SIZE, ONDISK_SMALL_FILE_MAX_SIZE - INMEMORY_SMALL_FILE_MAX_SIZE);
       out.close();
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, ONDISK_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, ONDISK_SMALL_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
       assertTrue("Count of db file should be 1", countOnDiskSmallDBFiles() == 1);
 
@@ -754,15 +689,15 @@ public class TestSmallFilesCreation {
       out = dfs.append(new Path(FILE_NAME1));
       writeData(out, ONDISK_SMALL_FILE_MAX_SIZE, ONDISK_MEDIUM_FILE_MAX_SIZE - ONDISK_SMALL_FILE_MAX_SIZE);
       out.close();
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, ONDISK_MEDIUM_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, ONDISK_MEDIUM_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
       assertTrue("Count of db file should be 0", countOnDiskSmallDBFiles() == 0);
       assertTrue("Count of db file should be 1", countOnDiskMediumDBFiles() == 1);
 
       out = dfs.append(new Path(FILE_NAME1));
-      writeData(out, ONDISK_LARGE_FILE_MAX_SIZE, ONDISK_LARGE_FILE_MAX_SIZE - ONDISK_MEDIUM_FILE_MAX_SIZE);
+      writeData(out, ONDISK_MEDIUM_FILE_MAX_SIZE, ONDISK_LARGE_FILE_MAX_SIZE - ONDISK_MEDIUM_FILE_MAX_SIZE);
       out.close();
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
       assertTrue("Count of db file should be 0", countOnDiskSmallDBFiles() == 0);
       assertTrue("Count of db file should be 0", countOnDiskMediumDBFiles() == 0);
@@ -773,7 +708,7 @@ public class TestSmallFilesCreation {
       out.close();
       assertTrue("Count of db file should be 0", countDBFiles() == 0);
       assertTrue("Expecting 1 block but foudn " + cluster.getNamesystem().getTotalBlocks(), cluster.getNamesystem().getTotalBlocks() == 1);
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE + 1);
+      verifyFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE + 1);
 
     } catch (Exception e) {
       e.printStackTrace();
@@ -821,7 +756,7 @@ public class TestSmallFilesCreation {
 
       assertTrue("Count of db file should be 0", countDBFiles() == 0);
 
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE + 2 );
+      verifyFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE + 2 );
     } catch (Exception e) {
       e.printStackTrace();
       fail(e.getMessage());
@@ -858,17 +793,21 @@ public class TestSmallFilesCreation {
       DistributedFileSystem dfs = cluster.getFileSystem();
 
 
+
       writeFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE);
+
+      verifyFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE );
+
       assertTrue("Count of db file should be 1", countDBFiles() == 1);
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
 
       FSDataOutputStream out = dfs.append(new Path(FILE_NAME1));
-      writeData(out, ONDISK_LARGE_FILE_MAX_SIZE,  1);
+      writeData(out, ONDISK_LARGE_FILE_MAX_SIZE,  1024);
       out.close();
 
       assertTrue("Count of db file should be 0", countDBFiles() == 0);
 
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE + 1 );
+      verifyFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE + 1024 );
     } catch (Exception e) {
       e.printStackTrace();
       fail(e.getMessage());
@@ -911,7 +850,7 @@ public class TestSmallFilesCreation {
       writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
       writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
       dfs.delete(new Path(FILE_NAME1));
 
@@ -919,7 +858,7 @@ public class TestSmallFilesCreation {
       writeFile(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countOnDiskLargeDBFiles() == 1);
       writeFile(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countOnDiskLargeDBFiles() == 1);
       dfs.delete(new Path(FILE_NAME2));
 
@@ -927,7 +866,7 @@ public class TestSmallFilesCreation {
       writeFile(dfs, FILE_NAME2, ONDISK_MEDIUM_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countOnDiskMediumDBFiles() == 1);
       writeFile(dfs, FILE_NAME2, ONDISK_MEDIUM_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME2, ONDISK_MEDIUM_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2, ONDISK_MEDIUM_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countOnDiskMediumDBFiles() == 1);
       dfs.delete(new Path(FILE_NAME2));
 
@@ -935,7 +874,7 @@ public class TestSmallFilesCreation {
       writeFile(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countOnDiskLargeDBFiles() == 1);
       writeFile(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countOnDiskLargeDBFiles() == 1);
       dfs.delete(new Path(FILE_NAME2));
 
@@ -943,7 +882,7 @@ public class TestSmallFilesCreation {
       writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
       writeFile(dfs, FILE_NAME1, ONDISK_SMALL_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, ONDISK_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, ONDISK_SMALL_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
       assertTrue("Count of db file should be 1", countOnDiskSmallDBFiles() == 1);
       dfs.delete(new Path(FILE_NAME1));
@@ -952,7 +891,7 @@ public class TestSmallFilesCreation {
       writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
       writeFile(dfs, FILE_NAME1, ONDISK_MEDIUM_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, ONDISK_MEDIUM_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, ONDISK_MEDIUM_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
       assertTrue("Count of db file should be 1", countOnDiskMediumDBFiles() == 1);
       dfs.delete(new Path(FILE_NAME1));
@@ -961,7 +900,7 @@ public class TestSmallFilesCreation {
       writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
       writeFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
       assertTrue("Count of db file should be 1", countOnDiskLargeDBFiles() == 1);
       dfs.delete(new Path(FILE_NAME1));
@@ -969,7 +908,7 @@ public class TestSmallFilesCreation {
       writeFile(dfs, FILE_NAME2, ONDISK_LARGE_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 2", countAllOnDiskDBFiles() == 1);
       writeFile(dfs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
-      readFileUsingMultipleMethods(dfs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 0);
       assertTrue("Count of db file should be 0", countOnDiskSmallDBFiles() == 1);
       dfs.delete(new Path(FILE_NAME2));
@@ -1078,7 +1017,7 @@ public class TestSmallFilesCreation {
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
       assertTrue("Expecting 1 block but found " + cluster.getNamesystem().getTotalBlocks(), cluster.getNamesystem().getTotalBlocks() == 1);
 
-      readFileUsingMultipleMethods(hdfsClient, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+      verifyFile(hdfsClient, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
 
 
     } catch (Exception e) {
@@ -1131,7 +1070,43 @@ public class TestSmallFilesCreation {
 
       assertTrue("Count of db file should be 0", countInMemoryDBFiles() == 0);
       assertTrue("Expecting 1 block but found " + cluster.getNamesystem().getTotalBlocks(), cluster.getNamesystem().getTotalBlocks() == 1);
-      readFileUsingMultipleMethods(hdfsClient, FILE_NAME1, ONDISK_SMALL_FILE_MAX_SIZE);
+      verifyFile(hdfsClient, FILE_NAME1, ONDISK_SMALL_FILE_MAX_SIZE);
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.getMessage());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+
+  @Test
+  public void TestSmallFilesWithNoDataNodes() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+
+      final int BLOCK_SIZE = 1024 * 1024;
+      final boolean ENABLE_STORE_SMALL_FILES_IN_DB = true;
+      final int ONDISK_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_MEDIUM_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_LARGE_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT);
+      final int INMEMORY_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT);
+      final String FILE_NAME1 = "/TEST-FLIE1";
+      final String FILE_NAME2 = "/TEST-FLIE2";
+
+      conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, ENABLE_STORE_SMALL_FILES_IN_DB);
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(0).format(true).build();
+      cluster.waitActive();
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+      assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
+      verifyFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
 
     } catch (Exception e) {
       e.printStackTrace();

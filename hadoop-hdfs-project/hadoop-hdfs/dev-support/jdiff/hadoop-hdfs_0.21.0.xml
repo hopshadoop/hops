@@ -5166,7 +5166,7 @@ order written.</p>]]>
              static="false" final="false" visibility="protected"
              deprecated="not deprecated">
       </field>
-      <field name="hostName" type="java.lang.String"
+      <field name="rpcAddresses" type="java.lang.String"
              transient="false" volatile="false"
              static="false" final="false" visibility="protected"
              deprecated="not deprecated">
@@ -11816,7 +11816,7 @@ order written.</p>]]>
  
  @param nodeID id of the data node
  @param networkLocation location of the data node in network
- @param hostName it could be different from host specified for DatanodeID]]>
+ @param rpcAddresses it could be different from host specified for DatanodeID]]>
         </doc>
       </constructor>
       <constructor name="DatanodeDescriptor"

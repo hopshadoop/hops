@@ -180,7 +180,6 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   private boolean syncOrFlushCalled = false;
   private int currentSizeOfSmallFile = 0;
 
-
   private class Packet {
     long seqno;               // sequencenumber of buffer in block
     long offsetInBlock;       // offset in block
@@ -409,12 +408,12 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       long usedInLastBlock = stat.getLen() % blockSize;
       int freeInLastBlock = (int) (blockSize - usedInLastBlock);
 
-      // calculate the amount of free space in the pre-existing 
+      // calculate the amount of free space in the pre-existing
       // last crc chunk
       int usedInCksum = (int) (stat.getLen() % bytesPerChecksum);
       int freeInCksum = bytesPerChecksum - usedInCksum;
 
-      // if there is space in the last block, then we have to 
+      // if there is space in the last block, then we have to
       // append to that block
       if (freeInLastBlock == blockSize) {
         throw new IOException("The last block for file " +
@@ -422,16 +421,16 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       }
 
       if (usedInCksum > 0 && freeInCksum > 0) {
-        // if there is space in the last partial chunk, then 
-        // setup in such a way that the next packet will have only 
+        // if there is space in the last partial chunk, then
+        // setup in such a way that the next packet will have only
         // one chunk that fills up the partial chunk.
         //
         computePacketChunkSize(0, freeInCksum);
         resetChecksumChunk(freeInCksum);
         appendChunk = true;
       } else {
-        // if the remaining space in the block is smaller than 
-        // that expected size of of a packet, then create 
+        // if the remaining space in the block is smaller than
+        // that expected size of of a packet, then create
         // smaller size packet.
         //
         computePacketChunkSize(
@@ -2145,6 +2144,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     }
 
     long localstart = Time.now();
+    long localtimeout = 400;
     boolean fileComplete = false;
     while (!fileComplete) {
       byte data[] = null;
@@ -2169,6 +2169,17 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
           }
         }
       }
+
+      try {
+        if((last != null && last.getNumBytes() > 0)) {
+          // Default delay is 0.
+          // A small delay ensures that the namenodes have processed
+          // the incremental block reports before the complete file request.
+          Thread.sleep(dfsClient.getConf().delayBeforeClose);
+        }
+      } catch (InterruptedException e) {
+      }
+
       fileComplete = dfsClient.complete(src, dfsClient.clientName, last, data);
       if (!fileComplete) {
         if (!dfsClient.clientRunning || (dfsClient.hdfsTimeout > 0 &&
@@ -2181,7 +2192,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
           throw new IOException(msg);
         }
         try {
-          Thread.sleep(400);
+          Thread.sleep(localtimeout);
+          localtimeout*=2;
           if (Time.now() - localstart > 5000) {
             DFSClient.LOG.info("Could not complete " + src + " retrying...");
           }
