@@ -69,7 +69,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
@@ -399,7 +398,7 @@ public class DatanodeManager {
           "DataNode is dead. Removing all replicas for datanode " + nodeInfo +
               " StorageID " + nodeInfo.getStorageID() + " index " +
               nodeInfo.getSId());
-      blockManager.removeBlocksAssociatedTo(nodeInfo);
+      blockManager.datanodeRemoved(nodeInfo);
     }
     networktopology.remove(nodeInfo);
 

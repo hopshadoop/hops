@@ -35,7 +35,6 @@ import org.junit.Assert;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Set;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
@@ -105,9 +104,7 @@ public class BlockManagerTestUtil {
     final Collection<DatanodeDescriptor> corruptNodes =
         getCorruptReplicas(blockManager)
             .getNodes(blockManager.blocksMap.getStoredBlock(b));
-    for (Iterator<DatanodeDescriptor> it =
-             blockManager.blocksMap.nodeIterator(b); it.hasNext(); ) {
-      DatanodeDescriptor cur = it.next();
+    for (DatanodeDescriptor cur : blockManager.blocksMap.nodeList(b)){
       if (!cur.isDecommissionInProgress() && !cur.isDecommissioned()) {
         if ((corruptNodes == null) || !corruptNodes.contains(cur)) {
           String rackName = cur.getNetworkLocation();

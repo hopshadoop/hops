@@ -23,7 +23,6 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
-import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -41,7 +40,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 
 /**
  * This class extends the DatanodeInfo class with ephemeral information (eg
@@ -56,6 +54,38 @@ public class DatanodeDescriptor extends DatanodeInfo {
   // If node is not decommissioning, do not use this object for anything.
   public DecommissioningStatus decommissioningStatus =
       new DecommissioningStatus();
+  
+  public Map<Long,Integer> getAllMachineReplicasInBucket(final int bucketId)
+      throws IOException {
+    LightWeightRequestHandler findReplicasHandler = new
+        LightWeightRequestHandler
+            (HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IN_BUCKET) {
+      @Override
+      public Object performTask() throws IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaDataAccess.class);
+        return da.findBlockAndInodeIdsByStorageIdAndBucketId(getSId(),
+            bucketId);
+      }
+    };
+    return (Map<Long, Integer>) findReplicasHandler.handle();
+  }
+  
+  public Map<Long,Integer> getAllMachineReplicasInBuckets(
+      final List<Integer> mismatchedBuckets) throws IOException {
+    LightWeightRequestHandler findReplicasHandler = new
+        LightWeightRequestHandler
+            (HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IN_BUCKETS) {
+      @Override
+      public Object performTask() throws IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaDataAccess.class);
+        return da.findBlockAndInodeIdsByStorageIdAndBucketIds(getSId(),
+            mismatchedBuckets);
+      }
+    };
+    return (Map<Long,Integer>) findReplicasHandler.handle();
+  }
   
   /**
    * Block and targets pair
@@ -277,7 +307,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * Remove block from the list of blocks belonging to the data-node.
    * Remove datanode from the block.
    */
-  public boolean removeBlock(BlockInfo b)
+  public boolean removeReplica(BlockInfo b)
       throws StorageException, TransactionContextException {
     return b.removeReplica(this) != null;
   }
@@ -367,19 +397,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
       }
     };
     return (Map<Long,Integer>)findBlocksHandler.handle();
-  }
-  
-    public Map<Long,Long> getAllMachineInvalidatedReplicasWithGenStamp() throws IOException {
-    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
-        HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        InvalidateBlockDataAccess da = (InvalidateBlockDataAccess) HdfsStorageFactory
-            .getDataAccess(InvalidateBlockDataAccess.class);
-        return da.findInvalidatedBlockAndGenStampByStorageId(getSId());
-      }
-    };
-    return (Map<Long,Long>)findBlocksHandler.handle();
   }
   
   /**
