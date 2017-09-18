@@ -19,10 +19,14 @@
 package org.apache.hadoop.mapreduce.v2;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang.ArrayUtils;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -36,7 +40,9 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapreduce.*;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import static org.apache.hadoop.mapreduce.v2.TestMRJobs.mrCluster;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
@@ -181,18 +187,31 @@ public class TestMRJobsWithProfiler {
     final Map<TaskAttemptID,Path> taLogDirs = new HashMap<TaskAttemptID,Path>();
     final Pattern taskPattern = Pattern.compile(
         ".*Task:(attempt_"
-      + appIdSuffix + "_[rm]_" + "[0-9]+_[0-9]+).*");
+        + appIdSuffix + "_[rm]_" + "[0-9]+_[0-9]+).*");
+
+    String user = UserGroupInformation.getCurrentUser().getUserName();
+    String userFolder;
+    try {
+      MessageDigest digest = MessageDigest.getInstance(mrCluster.getResourceManager().getRMContext().
+          getUserFolderHashAlgo());
+      byte[] userBytes = user.getBytes(StandardCharsets.UTF_8);
+      byte[] hashBase = ArrayUtils.addAll(userBytes, mrCluster.getResourceManager().getRMContext().getSeed());
+      byte[] hash = digest.digest(hashBase);
+      userFolder = org.apache.commons.codec.binary.Base64.encodeBase64URLSafeString(hash);
+    } catch (NoSuchAlgorithmException ex) {
+      LOG.error("error while creating userFolder random string", ex);
+      throw new Error("error while creating userFolder random string", ex);
+    }
+
     for (String logDir :
          nmConf.getTrimmedStrings(YarnConfiguration.NM_LOG_DIRS))
     {
       // filter out MRAppMaster and create attemptId->logDir map
       //
-      for (FileStatus fileStatus :
-          localFs.globStatus(new Path(logDir
-            + Path.SEPARATOR + appIdStr
-            + Path.SEPARATOR + containerGlob
-            + Path.SEPARATOR + TaskLog.LogName.SYSLOG)))
-      {
+      for (FileStatus fileStatus : localFs.globStatus(new Path(logDir
+          + Path.SEPARATOR + userFolder + Path.SEPARATOR + appIdStr
+          + Path.SEPARATOR + containerGlob
+          + Path.SEPARATOR + TaskLog.LogName.SYSLOG))) {
         final BufferedReader br = new BufferedReader(
           new InputStreamReader(localFs.open(fileStatus.getPath())));
         String line;

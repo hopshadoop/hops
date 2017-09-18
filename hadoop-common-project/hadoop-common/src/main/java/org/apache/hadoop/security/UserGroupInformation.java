@@ -1547,8 +1547,14 @@ public class UserGroupInformation {
     }
 
     private void setUserGroups(String user, String[] groups) {
+      setUserGroups(user, groups, true);
+    }
+    
+    private void setUserGroups(String user, String[] groups, boolean creatHops) {
       userToGroupsMapping.put(user, Arrays.asList(groups));
-      createHopsUser(user, groups);
+      if(creatHops){
+        createHopsUser(user, groups);
+      }
     }
   }
 
@@ -1575,13 +1581,13 @@ public class UserGroupInformation {
   public static UserGroupInformation createUserForTesting(String user, 
                                                           String[] userGroups) {
     ensureInitialized();
-    UserGroupInformation ugi = createRemoteUser(user);
+    UserGroupInformation ugi = createRemoteUser(user, false);
     // make sure that the testing object is setup
     if (!(groups instanceof TestingGroups)) {
       groups = new TestingGroups(groups);
     }
     // add the user groups
-    ((TestingGroups) groups).setUserGroups(ugi.getShortUserName(), userGroups);
+    ((TestingGroups) groups).setUserGroups(ugi.getShortUserName(), userGroups, false);
     return ugi;
   }
 

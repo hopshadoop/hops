@@ -415,7 +415,7 @@ public class TestContainerLauncherImpl {
         1234), "password".getBytes(), new ContainerTokenIdentifier(
         contId, containerManagerAddr, "user",
         Resource.newInstance(1024, 1),
-        currentTime + 10000L, 123, currentTime, Priority.newInstance(0), 0));
+        currentTime + 10000L, 123, currentTime, Priority.newInstance(0), 0, "userFolder"));
   }
 
   private static class ContainerManagerForTest implements ContainerManagementProtocolClient {

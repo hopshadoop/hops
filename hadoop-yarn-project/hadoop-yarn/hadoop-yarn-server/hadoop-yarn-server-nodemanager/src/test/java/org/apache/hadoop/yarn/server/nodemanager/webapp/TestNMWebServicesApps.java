@@ -201,9 +201,9 @@ public class TestNMWebServicesApps extends JerseyTestBase {
     ApplicationAttemptId appAttemptId = BuilderUtils.newApplicationAttemptId(
         app.getAppId(), 1);
     Container container1 = new MockContainer(appAttemptId, dispatcher, conf,
-        app.getUser(), app.getAppId(), 1);
+        app.getUser(), app.getAppId(), 1, app.getUserFolder());
     Container container2 = new MockContainer(appAttemptId, dispatcher, conf,
-        app.getUser(), app.getAppId(), 2);
+        app.getUser(), app.getAppId(), 2, app.getUserFolder());
     nmContext.getContainers()
         .put(container1.getContainerId(), container1);
     nmContext.getContainers()
@@ -270,7 +270,7 @@ public class TestNMWebServicesApps extends JerseyTestBase {
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
     HashMap<String, String> hash = addAppContainers(app);
-    Application app2 = new MockApp("foo", 1234, 2);
+    Application app2 = new MockApp("foo", 1234, 2, "foosFolder");
     nmContext.getApplications().put(app2.getAppId(), app2);
     addAppContainers(app2);
 
@@ -293,7 +293,7 @@ public class TestNMWebServicesApps extends JerseyTestBase {
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
     addAppContainers(app);
-    Application app2 = new MockApp("foo", 1234, 2);
+    Application app2 = new MockApp("foo", 1234, 2, "foosFolder");
     nmContext.getApplications().put(app2.getAppId(), app2);
     addAppContainers(app2);
 
@@ -311,7 +311,7 @@ public class TestNMWebServicesApps extends JerseyTestBase {
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
     addAppContainers(app);
-    Application app2 = new MockApp("foo", 1234, 2);
+    Application app2 = new MockApp("foo", 1234, 2, "foosFolder");
     nmContext.getApplications().put(app2.getAppId(), app2);
     addAppContainers(app2);
 
@@ -348,7 +348,7 @@ public class TestNMWebServicesApps extends JerseyTestBase {
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
     addAppContainers(app);
-    MockApp app2 = new MockApp("foo", 1234, 2);
+    MockApp app2 = new MockApp("foo", 1234, 2, "foosFolder");
     nmContext.getApplications().put(app2.getAppId(), app2);
     HashMap<String, String> hash2 = addAppContainers(app2);
     app2.setState(ApplicationState.RUNNING);
@@ -374,7 +374,7 @@ public class TestNMWebServicesApps extends JerseyTestBase {
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
     addAppContainers(app);
-    Application app2 = new MockApp("foo", 1234, 2);
+    Application app2 = new MockApp("foo", 1234, 2, "foosFolder");
     nmContext.getApplications().put(app2.getAppId(), app2);
     addAppContainers(app2);
 
@@ -393,7 +393,7 @@ public class TestNMWebServicesApps extends JerseyTestBase {
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
     addAppContainers(app);
-    Application app2 = new MockApp("foo", 1234, 2);
+    Application app2 = new MockApp("foo", 1234, 2, "foosFolder");
     nmContext.getApplications().put(app2.getAppId(), app2);
     addAppContainers(app2);
 
@@ -424,7 +424,7 @@ public class TestNMWebServicesApps extends JerseyTestBase {
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
     addAppContainers(app);
-    Application app2 = new MockApp("foo", 1234, 2);
+    Application app2 = new MockApp("foo", 1234, 2, "foosFolder");
     nmContext.getApplications().put(app2.getAppId(), app2);
     addAppContainers(app2);
 
@@ -454,7 +454,7 @@ public class TestNMWebServicesApps extends JerseyTestBase {
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
     addAppContainers(app);
-    Application app2 = new MockApp("foo", 1234, 2);
+    Application app2 = new MockApp("foo", 1234, 2, "foosFolder");
     nmContext.getApplications().put(app2.getAppId(), app2);
     addAppContainers(app2);
 

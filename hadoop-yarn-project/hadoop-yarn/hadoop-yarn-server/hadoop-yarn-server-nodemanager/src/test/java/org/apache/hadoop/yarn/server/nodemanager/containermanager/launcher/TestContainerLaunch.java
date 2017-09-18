@@ -642,13 +642,13 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     List<Path> appDirs = new ArrayList<Path>(localDirs.size());
     for (String localDir : localDirs) {
       Path usersdir = new Path(localDir, ContainerLocalizer.USERCACHE);
-      Path userdir = new Path(usersdir, user);
+      Path userdir = new Path(usersdir, userFolder);
       Path appsdir = new Path(userdir, ContainerLocalizer.APPCACHE);
       appDirs.add(new Path(appsdir, appId.toString()));
     }
     List<String> containerLogDirs = new ArrayList<String>();
     String relativeContainerLogDir = ContainerLaunch
-        .getRelativeContainerLogDir(appId.toString(), cId.toString());
+        .getRelativeContainerLogDir(appId.toString(), cId.toString(), userFolder);
     for(String logDir : logDirs){
       containerLogDirs.add(logDir + Path.SEPARATOR + relativeContainerLogDir);
     }
@@ -936,7 +936,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     ContainerTokenIdentifier containerTokenIdentifier =
         new ContainerTokenIdentifier(cId, context.getNodeId().toString(), user,
           r, System.currentTimeMillis() + 10000L, 123, DUMMY_RM_IDENTIFIER,
-          priority, createTime);
+          priority, createTime, userFolder);
     Token containerToken =
         BuilderUtils.newContainerToken(
           context.getNodeId(),

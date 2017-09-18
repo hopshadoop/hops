@@ -35,18 +35,20 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 public class MockApp implements Application {
 
   final String user;
+  final String userFolder;
   final ApplicationId appId;
   Map<ContainerId, Container> containers = new HashMap<ContainerId, Container>();
   ApplicationState appState;
   Application app;
 
   public MockApp(int uniqId) {
-    this("mockUser", 1234, uniqId);
+    this("mockUser", 1234, uniqId, "mockUserFolder");
   }
 
-  public MockApp(String user, long clusterTimeStamp, int uniqId) {
+  public MockApp(String user, long clusterTimeStamp, int uniqId, String userFolder) {
     super();
     this.user = user;
+    this.userFolder = userFolder;
     // Add an application and the corresponding containers
     RecordFactory recordFactory = RecordFactoryProvider
         .getRecordFactory(new Configuration());
@@ -61,6 +63,10 @@ public class MockApp implements Application {
 
   public String getUser() {
     return user;
+  }
+
+  public String getUserFolder() {
+    return userFolder;
   }
 
   public Map<ContainerId, Container> getContainers() {

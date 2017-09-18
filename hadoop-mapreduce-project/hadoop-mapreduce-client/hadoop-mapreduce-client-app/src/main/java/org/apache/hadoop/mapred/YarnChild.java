@@ -105,7 +105,7 @@ class YarnChild {
 
     // Create TaskUmbilicalProtocol as actual task owner.
     UserGroupInformation taskOwner =
-      UserGroupInformation.createRemoteUser(firstTaskid.getJobID().toString());
+      UserGroupInformation.createRemoteUser(firstTaskid.getJobID().toString(), false);
     Token<JobTokenIdentifier> jt = TokenCache.getJobToken(credentials);
     SecurityUtil.setTokenService(jt, address);
     taskOwner.addToken(jt);

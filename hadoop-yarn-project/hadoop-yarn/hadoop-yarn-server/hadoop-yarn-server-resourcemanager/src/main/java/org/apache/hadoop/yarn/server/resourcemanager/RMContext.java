@@ -157,4 +157,8 @@ public interface RMContext {
   GroupMembershipService getGroupMembershipService();
   
   CertificateLocalizationService getCertificateLocalizationService();
+
+  byte[] getSeed();
+  
+  public String getUserFolderHashAlgo();
 }

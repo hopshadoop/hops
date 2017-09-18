@@ -167,7 +167,7 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
     this.rmContext = rmContext;
     this.appSchedulingInfo = 
         new AppSchedulingInfo(applicationAttemptId, user, queue,  
-            activeUsersManager, rmContext.getEpoch(), attemptResourceUsage);
+            activeUsersManager, rmContext.getEpoch(), attemptResourceUsage, rmContext);
     this.queue = queue;
     this.pendingRelease = new HashSet<ContainerId>();
     this.attemptId = applicationAttemptId;
@@ -513,7 +513,7 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
               container.getNodeId(), getUser(), container.getResource(),
               container.getPriority(), rmContainer.getCreationTime(),
               this.logAggregationContext, rmContainer.getNodeLabelExpression(),
-              containerType));
+              containerType, appSchedulingInfo.getUserFolder()));
       NMToken nmToken =
           rmContext.getNMTokenSecretManager().createAndGetNMToken(getUser(),
               getApplicationAttemptId(), container);

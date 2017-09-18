@@ -50,6 +50,7 @@ import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.util.Shell;
@@ -153,6 +154,7 @@ public class TestDefaultContainerExecutor {
     deleteTmpFiles();
 
     final String user = "somebody";
+    final String userFolder = "somebodysFolder";
     final String appId = "app_12345_123";
     final FsPermission userCachePerm = new FsPermission(
         DefaultContainerExecutor.USER_PERM);
@@ -168,8 +170,8 @@ public class TestDefaultContainerExecutor {
     localDirs.add(new Path(BASE_TMP_PATH, "localDirA").toString());
     localDirs.add(new Path(BASE_TMP_PATH, "localDirB").toString());
     List<String> logDirs = new ArrayList<String>();
-    logDirs.add(new Path(BASE_TMP_PATH, "logDirA").toString());
-    logDirs.add(new Path(BASE_TMP_PATH, "logDirB").toString());
+    logDirs.add(new Path(BASE_TMP_PATH, "logDirA/").toString());
+    logDirs.add(new Path(BASE_TMP_PATH, "logDirB/").toString());
 
     Configuration conf = new Configuration();
     conf.set(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY, "077");
@@ -178,19 +180,19 @@ public class TestDefaultContainerExecutor {
     executor.init();
 
     try {
-      executor.createUserLocalDirs(localDirs, user);
-      executor.createUserCacheDirs(localDirs, user);
-      executor.createAppDirs(localDirs, user, appId);
+      executor.createUserLocalDirs(localDirs, user, userFolder);
+      executor.createUserCacheDirs(localDirs, user, userFolder);
+      executor.createAppDirs(localDirs, user, appId, userFolder);
 
       for (String dir : localDirs) {
         FileStatus stats = lfs.getFileStatus(
-            new Path(new Path(dir, ContainerLocalizer.USERCACHE), user));
+            new Path(new Path(dir, ContainerLocalizer.USERCACHE), userFolder));
         Assert.assertEquals(userCachePerm, stats.getPermission());
       }
 
       for (String dir : localDirs) {
         Path userCachePath = new Path(
-            new Path(dir, ContainerLocalizer.USERCACHE), user);
+            new Path(dir, ContainerLocalizer.USERCACHE), userFolder);
         Path appCachePath = new Path(userCachePath,
             ContainerLocalizer.APPCACHE);
         FileStatus stats = lfs.getFileStatus(appCachePath);
@@ -202,10 +204,11 @@ public class TestDefaultContainerExecutor {
         Assert.assertEquals(appDirPerm, stats.getPermission());
       }
 
-      executor.createAppLogDirs(appId, logDirs, user);
+      executor.createAppLogDirs(appId, logDirs, user, userFolder);
 
       for (String dir : logDirs) {
-        FileStatus stats = lfs.getFileStatus(new Path(dir, appId));
+        Path userFold = new Path(dir, userFolder);
+        FileStatus stats = lfs.getFileStatus(new Path(userFold, appId));
         Assert.assertEquals(logDirPerm, stats.getPermission());
       }
     } finally {
@@ -252,6 +255,7 @@ public class TestDefaultContainerExecutor {
     ).when(mockExec).logOutput(any(String.class));
 
     String appSubmitter = "nobody";
+    String appSubmitterFolder = "nobodysFolder";
     String appId = "APP_ID";
     String containerId = "CONTAINER_ID";
     Container container = mock(Container.class);
@@ -283,10 +287,10 @@ public class TestDefaultContainerExecutor {
 
       when(context.getEnvironment()).thenReturn(env);
 
-      mockExec.createUserLocalDirs(localDirs, appSubmitter);
-      mockExec.createUserCacheDirs(localDirs, appSubmitter);
-      mockExec.createAppDirs(localDirs, appSubmitter, appId);
-      mockExec.createAppLogDirs(appId, logDirs, appSubmitter);
+      mockExec.createUserLocalDirs(localDirs, appSubmitter, appSubmitterFolder);
+      mockExec.createUserCacheDirs(localDirs, appSubmitter, appSubmitterFolder);
+      mockExec.createAppDirs(localDirs, appSubmitter, appId, appSubmitterFolder);
+      mockExec.createAppLogDirs(appId, logDirs, appSubmitter, appSubmitterFolder);
 
       Path scriptPath = new Path("file:///bin/echo");
       Path tokensPath = new Path("file:///dev/null");
@@ -315,6 +319,7 @@ public class TestDefaultContainerExecutor {
           .setContainerWorkDir(workDir)
           .setLocalDirs(localDirs)
           .setLogDirs(logDirs)
+          .setUserFolder(appSubmitterFolder)
           .build());
       Assert.assertNotSame(0, ret);
     } finally {
@@ -400,13 +405,13 @@ public class TestDefaultContainerExecutor {
           @Override
           public ContainerLocalizer createContainerLocalizer(String user,
               String appId, String locId, List<String> localDirs,
-              FileContext localizerFc) throws IOException {
+              FileContext localizerFc, String userFolder) throws IOException {
 
             // Spy on the localizer and make it return valid heart-beat
             // responses even though there is no real NodeManager.
             ContainerLocalizer localizer =
                 super.createContainerLocalizer(user, appId, locId, localDirs,
-                  localizerFc);
+                  localizerFc, userFolder);
             ContainerLocalizer spyLocalizer = spy(localizer);
             LocalizationProtocol nmProxy = mock(LocalizationProtocol.class);
             try {
@@ -432,6 +437,7 @@ public class TestDefaultContainerExecutor {
     mockLfs.mkdir(tokenDir, perms, true);
     Path nmPrivateCTokensPath = new Path(tokenDir, "test.tokens");
     String appSubmitter = "nobody";
+    String appSubmitterFolder = "nobodysFolder";
     String appId = "APP_ID";
     String locId = "LOC_ID";
     
@@ -447,6 +453,7 @@ public class TestDefaultContainerExecutor {
           .setAppId(appId)
           .setLocId(locId)
           .setDirsHandler(dirsHandler)
+          .setUserFolder(appSubmitterFolder)
           .build());
 
     } catch (IOException e) {

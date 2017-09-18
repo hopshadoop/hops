@@ -96,6 +96,7 @@ public class ContainerImpl implements Container {
   private volatile Resource resource;
   private final String user;
   private int version;
+  private final String userFolder;
   private int exitCode = ContainerExitStatus.INVALID;
   private final StringBuilder diagnostics;
   private boolean wasLaunched;
@@ -145,6 +146,7 @@ public class ContainerImpl implements Container {
     this.credentials = creds;
     this.metrics = metrics;
     user = containerTokenIdentifier.getApplicationSubmitter();
+    userFolder = containerTokenIdentifier.getApplicationSubmitterFolder();
     ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     this.readLock = readWriteLock.readLock();
     this.writeLock = readWriteLock.writeLock();
@@ -390,6 +392,16 @@ public class ContainerImpl implements Container {
   }
 
   @Override
+  public String getUserFolder() {
+    this.readLock.lock();
+    try {
+      return this.userFolder;
+    } finally {
+      this.readLock.unlock();
+    }
+  }
+  
+  @Override
   public Map<Path,List<String>> getLocalizedResources() {
     this.readLock.lock();
     try {
@@ -625,7 +637,7 @@ public class ContainerImpl implements Container {
               new AuxServicesEvent(AuxServicesEventType.APPLICATION_INIT,
                   container.user, container.containerId
                       .getApplicationAttemptId().getApplicationId(),
-                  service.getKey().toString(), service.getValue()));
+                  service.getKey().toString(), service.getValue(), container.userFolder));
         }
       }
 

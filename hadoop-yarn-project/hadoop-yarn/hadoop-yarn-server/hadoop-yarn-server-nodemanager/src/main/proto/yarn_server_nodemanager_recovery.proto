@@ -30,6 +30,7 @@ message ContainerManagerApplicationProto {
   optional bytes credentials = 3;
   repeated ApplicationACLMapProto acls = 4;
   optional LogAggregationContextProto log_aggregation_context = 5;
+  optional string userFolder = 6;
 }
 
 message DeletionServiceDeleteTaskProto {
@@ -50,4 +51,5 @@ message LocalizedResourceProto {
 message LogDeleterProto {
   optional string user = 1;
   optional int64 deletionTime = 2;
+  optional string userFolder = 3;
 }

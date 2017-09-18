@@ -107,18 +107,19 @@ public class DefaultContainerExecutor extends ContainerExecutor {
     String user = ctx.getUser();
     String appId = ctx.getAppId();
     String locId = ctx.getLocId();
+    String userFolder = ctx.getUserFolder();
     LocalDirsHandlerService dirsHandler = ctx.getDirsHandler();
 
     List<String> localDirs = dirsHandler.getLocalDirs();
     List<String> logDirs = dirsHandler.getLogDirs();
     
-    createUserLocalDirs(localDirs, user);
-    createUserCacheDirs(localDirs, user);
-    createAppDirs(localDirs, user, appId);
-    createAppLogDirs(appId, logDirs, user);
+    createUserLocalDirs(localDirs, user, userFolder);
+    createUserCacheDirs(localDirs, user, userFolder);
+    createAppDirs(localDirs, user, appId, userFolder);
+    createAppLogDirs(appId, logDirs, user, userFolder);
 
     // randomly choose the local directory
-    Path appStorageDir = getWorkingDir(localDirs, user, appId);
+    Path appStorageDir = getWorkingDir(localDirs, user, appId, userFolder);
 
     String tokenFn = String.format(ContainerLocalizer.TOKEN_FILE_NAME_FMT, locId);
     Path tokenDst = new Path(appStorageDir, tokenFn);
@@ -134,7 +135,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
         + localizerFc.getWorkingDirectory());
 
     ContainerLocalizer localizer =
-        createContainerLocalizer(user, appId, locId, localDirs, localizerFc);
+        createContainerLocalizer(user, appId, locId, localDirs, localizerFc, userFolder);
     // TODO: DO it over RPC for maintaining similarity?
     localizer.runLocalization(nmAddr);
   }
@@ -143,11 +144,11 @@ public class DefaultContainerExecutor extends ContainerExecutor {
   @VisibleForTesting
   protected ContainerLocalizer createContainerLocalizer(String user,
       String appId, String locId, List<String> localDirs,
-      FileContext localizerFc) throws IOException {
+      FileContext localizerFc, String userFolder) throws IOException {
     ContainerLocalizer localizer =
         new ContainerLocalizer(localizerFc, user, appId, locId,
             getPaths(localDirs),
-            RecordFactoryProvider.getRecordFactory(getConf()));
+            RecordFactoryProvider.getRecordFactory(getConf()), userFolder);
     return localizer;
   }
 
@@ -163,6 +164,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
     Path nmPrivateContainerScriptPath = ctx.getNmPrivateContainerScriptPath();
     Path nmPrivateTokensPath = ctx.getNmPrivateTokensPath();
     String user = ctx.getUser();
+    String userFolder = ctx.getUserFolder();
     Path containerWorkDir = ctx.getContainerWorkDir();
     List<String> localDirs = ctx.getLocalDirs();
     List<String> logDirs = ctx.getLogDirs();
@@ -177,7 +179,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
                 getApplicationId().toString();
     for (String sLocalDir : localDirs) {
       Path usersdir = new Path(sLocalDir, ContainerLocalizer.USERCACHE);
-      Path userdir = new Path(usersdir, user);
+      Path userdir = new Path(usersdir, userFolder);
       Path appCacheDir = new Path(userdir, ContainerLocalizer.APPCACHE);
       Path appDir = new Path(appCacheDir, appIdStr);
       Path containerDir = new Path(appDir, containerIdStr);
@@ -185,7 +187,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
     }
 
     // Create the container log-dirs on all disks
-    createContainerLogDirs(appIdStr, containerIdStr, logDirs, user);
+    createContainerLogDirs(appIdStr, containerIdStr, logDirs, user, userFolder);
 
     Path tmpDir = new Path(containerWorkDir,
         YarnConfiguration.DEFAULT_CONTAINER_TEMP_DIR);
@@ -536,26 +538,26 @@ public class DefaultContainerExecutor extends ContainerExecutor {
     return lfs.getFsStatus(base).getRemaining();
   }
 
-  private Path getApplicationDir(Path base, String user, String appId) {
-    return new Path(getAppcacheDir(base, user), appId);
+  private Path getApplicationDir(Path base, String userFolder, String appId) {
+    return new Path(getAppcacheDir(base, userFolder), appId);
   }
 
-  private Path getUserCacheDir(Path base, String user) {
-    return new Path(new Path(base, ContainerLocalizer.USERCACHE), user);
+  private Path getUserCacheDir(Path base, String userFolder) {
+    return new Path(new Path(base, ContainerLocalizer.USERCACHE), userFolder);
   }
 
-  private Path getAppcacheDir(Path base, String user) {
-    return new Path(getUserCacheDir(base, user),
+  private Path getAppcacheDir(Path base, String userFolder) {
+    return new Path(getUserCacheDir(base, userFolder),
         ContainerLocalizer.APPCACHE);
   }
 
-  private Path getFileCacheDir(Path base, String user) {
-    return new Path(getUserCacheDir(base, user),
+  private Path getFileCacheDir(Path base, String userFolder) {
+    return new Path(getUserCacheDir(base, userFolder),
         ContainerLocalizer.FILECACHE);
   }
 
   protected Path getWorkingDir(List<String> localDirs, String user,
-      String appId) throws IOException {
+      String appId, String userFolder) throws IOException {
     Path appStorageDir = null;
     long totalAvailable = 0L;
     long[] availableOnDisk = new long[localDirs.size()];
@@ -566,7 +568,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
     // firstly calculate the sum of all available space on these directories
     for (String localDir : localDirs) {
       Path curBase = getApplicationDir(new Path(localDir),
-          user, appId);
+          userFolder, appId);
       long space = 0L;
       try {
         space = getDiskFreeSpace(curBase);
@@ -598,7 +600,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
       randomPosition -= availableOnDisk[dir++];
     }
     appStorageDir = getApplicationDir(new Path(localDirs.get(dir)),
-        user, appId);
+        userFolder, appId);
 
     return appStorageDir;
   }
@@ -617,14 +619,14 @@ public class DefaultContainerExecutor extends ContainerExecutor {
    * <li>$local.dir/usercache/$user</li>
    * </ul>
    */
-  void createUserLocalDirs(List<String> localDirs, String user)
+  void createUserLocalDirs(List<String> localDirs, String user, String userFolder)
       throws IOException {
     boolean userDirStatus = false;
     FsPermission userperms = new FsPermission(USER_PERM);
     for (String localDir : localDirs) {
       // create $local.dir/usercache/$user and its immediate parent
       try {
-        createDir(getUserCacheDir(new Path(localDir), user), userperms, true, user);
+        createDir(getUserCacheDir(new Path(localDir), userFolder), userperms, true, userFolder);
       } catch (IOException e) {
         LOG.warn("Unable to create the user directory : " + localDir, e);
         continue;
@@ -646,7 +648,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
    * <li>$local.dir/usercache/$user/filecache</li>
    * </ul>
    */
-  void createUserCacheDirs(List<String> localDirs, String user)
+  void createUserCacheDirs(List<String> localDirs, String user, String userFolder)
       throws IOException {
     LOG.info("Initializing user " + user);
 
@@ -658,7 +660,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
     for (String localDir : localDirs) {
       // create $local.dir/usercache/$user/appcache
       Path localDirPath = new Path(localDir);
-      final Path appDir = getAppcacheDir(localDirPath, user);
+      final Path appDir = getAppcacheDir(localDirPath, userFolder);
       try {
         createDir(appDir, appCachePerms, true, user);
         appcacheDirStatus = true;
@@ -666,7 +668,7 @@ public class DefaultContainerExecutor extends ContainerExecutor {
         LOG.warn("Unable to create app cache directory : " + appDir, e);
       }
       // create $local.dir/usercache/$user/filecache
-      final Path distDir = getFileCacheDir(localDirPath, user);
+      final Path distDir = getFileCacheDir(localDirPath, userFolder);
       try {
         createDir(distDir, fileperms, true, user);
         distributedCacheDirStatus = true;
@@ -693,12 +695,12 @@ public class DefaultContainerExecutor extends ContainerExecutor {
    * </ul>
    * @param localDirs 
    */
-  void createAppDirs(List<String> localDirs, String user, String appId)
+  void createAppDirs(List<String> localDirs, String user, String appId, String userFolder)
       throws IOException {
     boolean initAppDirStatus = false;
     FsPermission appperms = new FsPermission(APPDIR_PERM);
     for (String localDir : localDirs) {
-      Path fullAppDir = getApplicationDir(new Path(localDir), user, appId);
+      Path fullAppDir = getApplicationDir(new Path(localDir), userFolder, appId);
       // create $local.dir/usercache/$user/appcache/$appId
       try {
         createDir(fullAppDir, appperms, true, user);
@@ -717,14 +719,14 @@ public class DefaultContainerExecutor extends ContainerExecutor {
   /**
    * Create application log directories on all disks.
    */
-  void createAppLogDirs(String appId, List<String> logDirs, String user)
+  void createAppLogDirs(String appId, List<String> logDirs, String user, String userFolder)
       throws IOException {
 
     boolean appLogDirStatus = false;
     FsPermission appLogDirPerms = new FsPermission(LOGDIR_PERM);
     for (String rootLogDir : logDirs) {
       // create $log.dir/$appid
-      Path appLogDir = new Path(rootLogDir, appId);
+      Path appLogDir = new Path(rootLogDir, userFolder + Path.SEPARATOR + appId);
       try {
         createDir(appLogDir, appLogDirPerms, true, user);
       } catch (IOException e) {
@@ -743,13 +745,14 @@ public class DefaultContainerExecutor extends ContainerExecutor {
    * Create application log directories on all disks.
    */
   void createContainerLogDirs(String appId, String containerId,
-      List<String> logDirs, String user) throws IOException {
+      List<String> logDirs, String user, String userFolder) throws IOException {
 
     boolean containerLogDirStatus = false;
     FsPermission containerLogDirPerms = new FsPermission(LOGDIR_PERM);
     for (String rootLogDir : logDirs) {
       // create $log.dir/$appid/$containerid
-      Path appLogDir = new Path(rootLogDir, appId);
+      Path userLogDir = new Path(rootLogDir, userFolder);
+      Path appLogDir = new Path(userLogDir, appId);
       Path containerLogDir = new Path(appLogDir, containerId);
       try {
         createDir(containerLogDir, containerLogDirPerms, true, user);

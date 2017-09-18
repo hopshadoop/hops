@@ -18,6 +18,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
+import com.sun.tools.javac.util.Convert;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.Security;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.KeySpec;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -31,6 +39,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang.ArrayUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -47,6 +59,8 @@ import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.RMServerUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
 import org.apache.hadoop.yarn.util.resource.Resources;
@@ -66,6 +80,7 @@ public class AppSchedulingInfo {
 
   private final ApplicationId applicationId;
   private final ApplicationAttemptId applicationAttemptId;
+  final String userFolder;
   private final AtomicLong containerIdCounter;
   private final String user;
 
@@ -92,7 +107,7 @@ public class AppSchedulingInfo {
 
   public AppSchedulingInfo(ApplicationAttemptId appAttemptId,
       String user, Queue queue, ActiveUsersManager activeUsersManager,
-      long epoch, ResourceUsage appResourceUsage) {
+      long epoch, ResourceUsage appResourceUsage, RMContext rmContext) {
     this.applicationAttemptId = appAttemptId;
     this.applicationId = appAttemptId.getApplicationId();
     this.queue = queue;
@@ -100,6 +115,16 @@ public class AppSchedulingInfo {
     this.activeUsersManager = activeUsersManager;
     this.containerIdCounter = new AtomicLong(epoch << EPOCH_BIT_SHIFT);
     this.appResourceUsage = appResourceUsage;
+    try {
+      MessageDigest digest = MessageDigest.getInstance(rmContext.getUserFolderHashAlgo());
+      byte[] userBytes = user.getBytes(StandardCharsets.UTF_8);
+      byte[] hashBase = ArrayUtils.addAll(userBytes, rmContext.getSeed());
+      byte[] hash = digest.digest(hashBase);
+      userFolder = Base64.encodeBase64URLSafeString(hash);
+    } catch (NoSuchAlgorithmException ex) {
+      LOG.error("error while creating userFolder random string", ex);
+      throw new Error("error while creating userFolder random string", ex);
+    }
   }
 
   public ApplicationId getApplicationId() {
@@ -120,6 +145,10 @@ public class AppSchedulingInfo {
 
   public synchronized String getQueueName() {
     return queue.getQueueName();
+  }
+
+  public String getUserFolder() {
+    return userFolder;
   }
 
   public synchronized boolean isPending() {

@@ -668,9 +668,10 @@ public class TestShuffleHandler {
     LOG.info(appId.toString());
     String appAttemptId = "attempt_12345_1_m_1_0";
     String user = "randomUser";
+    String userFolder = "randomUserFolder";
     String reducerId = "0";
     List<File> fileMap = new ArrayList<File>();
-    createShuffleHandlerFiles(absLogDir, user, appId.toString(), appAttemptId,
+    createShuffleHandlerFiles(absLogDir, userFolder, appId.toString(), appAttemptId,
         conf, fileMap);
     ShuffleHandler shuffleHandler = new ShuffleHandler() {
 
@@ -701,7 +702,7 @@ public class TestShuffleHandler {
       shuffleHandler
         .initializeApplication(new ApplicationInitializationContext(user,
           appId, ByteBuffer.wrap(outputBuffer.getData(), 0,
-            outputBuffer.getLength())));
+            outputBuffer.getLength()), userFolder));
       URL url =
           new URL(
               "http://127.0.0.1:"
@@ -737,13 +738,13 @@ public class TestShuffleHandler {
     }
   }
 
-  private static void createShuffleHandlerFiles(File logDir, String user,
+  private static void createShuffleHandlerFiles(File logDir, String userFolder,
       String appId, String appAttemptId, Configuration conf,
       List<File> fileMap) throws IOException {
     String attemptDir =
         StringUtils.join(Path.SEPARATOR,
             Arrays.asList(new String[] { logDir.getAbsolutePath(),
-                ContainerLocalizer.USERCACHE, user,
+                ContainerLocalizer.USERCACHE, userFolder,
                 ContainerLocalizer.APPCACHE, appId, "output", appAttemptId }));
     File appAttemptDir = new File(attemptDir);
     appAttemptDir.mkdirs();
@@ -789,6 +790,7 @@ public class TestShuffleHandler {
   @Test
   public void testRecovery() throws IOException {
     final String user = "someuser";
+    final String userFolder = "someuserFolder";
     final ApplicationId appId = ApplicationId.newInstance(12345, 1);
     final JobID jobId = JobID.downgrade(TypeConverter.fromYarn(appId));
     final File tmpDir = new File(System.getProperty("test.build.data",
@@ -814,7 +816,7 @@ public class TestShuffleHandler {
       jt.write(outputBuffer);
       shuffle.initializeApplication(new ApplicationInitializationContext(user,
           appId, ByteBuffer.wrap(outputBuffer.getData(), 0,
-            outputBuffer.getLength())));
+            outputBuffer.getLength()), userFolder));
 
       // verify we are authorized to shuffle
       int rc = getShuffleResponseCode(shuffle, jt);
@@ -857,6 +859,7 @@ public class TestShuffleHandler {
   @Test
   public void testRecoveryFromOtherVersions() throws IOException {
     final String user = "someuser";
+    final String userFolder = "someuserFolder";
     final ApplicationId appId = ApplicationId.newInstance(12345, 1);
     final File tmpDir = new File(System.getProperty("test.build.data",
         System.getProperty("java.io.tmpdir")),
@@ -881,7 +884,7 @@ public class TestShuffleHandler {
       jt.write(outputBuffer);
       shuffle.initializeApplication(new ApplicationInitializationContext(user,
           appId, ByteBuffer.wrap(outputBuffer.getData(), 0,
-              outputBuffer.getLength())));
+              outputBuffer.getLength()), userFolder));
 
       // verify we are authorized to shuffle
       int rc = getShuffleResponseCode(shuffle, jt);
@@ -978,9 +981,10 @@ public class TestShuffleHandler {
     ApplicationId appId = ApplicationId.newInstance(12345, 1);
     String appAttemptId = "attempt_12345_1_m_1_0";
     String user = "randomUser";
+    String userFolder = "randomUserFolder";
     String reducerId = "0";
     List<File> fileMap = new ArrayList<File>();
-    createShuffleHandlerFiles(absLogDir, user, appId.toString(), appAttemptId,
+    createShuffleHandlerFiles(absLogDir, userFolder, appId.toString(), appAttemptId,
         conf, fileMap);
     ShuffleHandler shuffleHandler = new ShuffleHandler() {
       @Override
@@ -1037,7 +1041,7 @@ public class TestShuffleHandler {
       shuffleHandler
           .initializeApplication(new ApplicationInitializationContext(user,
           appId, ByteBuffer.wrap(outputBuffer.getData(), 0,
-          outputBuffer.getLength())));
+          outputBuffer.getLength()), userFolder));
       URL url =
           new URL(
               "http://127.0.0.1:"

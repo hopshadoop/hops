@@ -37,6 +37,7 @@ import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.QueueState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
@@ -70,6 +71,8 @@ public class TestSchedulerApplicationAttempt {
     ApplicationAttemptId appAttId = createAppAttemptId(0, 0);
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getEpoch()).thenReturn(3L);
+    when(rmContext.getUserFolderHashAlgo()).thenReturn("SHA-256");
+    when(rmContext.getSeed()).thenReturn(new byte[16]);
     SchedulerApplicationAttempt app = new SchedulerApplicationAttempt(appAttId,
         user, oldQueue, oldQueue.getActiveUsersManager(), rmContext);
     oldMetrics.submitApp(user);
@@ -193,7 +196,8 @@ public class TestSchedulerApplicationAttempt {
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getEpoch()).thenReturn(3L);
     when(rmContext.getScheduler()).thenReturn(scheduler);
-
+    when(rmContext.getUserFolderHashAlgo()).thenReturn(
+            YarnConfiguration.DEFAULT_USER_FOLDER_ALGO);
     final String user = "user1";
     Queue queue = createQueue("test", null);
     SchedulerApplicationAttempt app =
@@ -239,7 +243,8 @@ public class TestSchedulerApplicationAttempt {
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getEpoch()).thenReturn(3L);
     when(rmContext.getScheduler()).thenReturn(scheduler);
-
+    when(rmContext.getUserFolderHashAlgo()).thenReturn(
+            YarnConfiguration.DEFAULT_USER_FOLDER_ALGO);
     final String user = "user1";
     Queue queue = createQueue("test", null);
     SchedulerApplicationAttempt app = new SchedulerApplicationAttempt(appAttId,
@@ -261,6 +266,8 @@ public class TestSchedulerApplicationAttempt {
     Queue queue = createQueue("test", null);
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getEpoch()).thenReturn(3L);
+    when(rmContext.getUserFolderHashAlgo()).thenReturn("SHA-256");
+    when(rmContext.getSeed()).thenReturn(new byte[16]);
     SchedulerApplicationAttempt app = new SchedulerApplicationAttempt(
         attemptId, "user", queue, queue.getActiveUsersManager(), rmContext);
     Priority priority = Priority.newInstance(1);

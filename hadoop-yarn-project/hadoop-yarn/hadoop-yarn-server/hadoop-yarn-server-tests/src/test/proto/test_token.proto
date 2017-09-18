@@ -45,5 +45,6 @@ message ContainerTokenIdentifierForTestProto {
   optional LogAggregationContextProto logAggregationContext = 10;
   optional string message = 11;
   optional int32 version = 14 [default = 0];
+  optional string appSubmitterFolder = 15;
 }
 

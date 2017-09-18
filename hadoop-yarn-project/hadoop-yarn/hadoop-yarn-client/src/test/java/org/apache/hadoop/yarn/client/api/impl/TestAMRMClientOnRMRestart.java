@@ -382,6 +382,7 @@ public class TestAMRMClientOnRMRestart {
         rm1.getRMContext().getRMApps().get(appAttemptId.getApplicationId())
             .getRMAppAttempt(appAttemptId).getAMRMToken();
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    ugi.getTokenIdentifiers().clear();
     ugi.addTokenIdentifier(token.decodeIdentifier());
 
     AMRMClient<ContainerRequest> amClient = new MyAMRMClientImpl(rm1);
@@ -462,6 +463,7 @@ public class TestAMRMClientOnRMRestart {
     org.apache.hadoop.security.token.Token<AMRMTokenIdentifier> token =
         amrmTokenSecretManagerForRM1.createAndGetAMRMToken(appAttemptId);
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    ugi.getTokenIdentifiers().clear();
     ugi.addTokenIdentifier(token.decodeIdentifier());
 
     AMRMClient<ContainerRequest> amClient = new MyAMRMClientImpl(rm1);

@@ -648,6 +648,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     Path nmPrivateContainerTokensPath = ctx.getNmPrivateContainerTokens();
     InetSocketAddress nmAddr = ctx.getNmAddr();
     String user = ctx.getUser();
+    String userFolder = ctx.getUserFolder();
     String appId = ctx.getAppId();
     String locId = ctx.getLocId();
     LocalDirsHandlerService dirsHandler = ctx.getDirsHandler();
@@ -656,12 +657,12 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
 
     Path classpathJarPrivateDir = dirsHandler.getLocalPathForWrite(
         ResourceLocalizationService.NM_PRIVATE_DIR);
-    createUserLocalDirs(localDirs, user);
-    createUserCacheDirs(localDirs, user);
-    createAppDirs(localDirs, user, appId);
-    createAppLogDirs(appId, logDirs, user);
+    createUserLocalDirs(localDirs, user, userFolder);
+    createUserCacheDirs(localDirs, user, userFolder);
+    createAppDirs(localDirs, user, appId, userFolder);
+    createAppLogDirs(appId, logDirs, user, userFolder);
 
-    Path appStorageDir = getWorkingDir(localDirs, user, appId);
+    Path appStorageDir = getWorkingDir(localDirs, user, appId, userFolder);
 
     String tokenFn = String.format(
         ContainerLocalizer.TOKEN_FILE_NAME_FMT, locId);
@@ -702,7 +703,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     command.addAll(ContainerLocalizer.getJavaOpts(getConf()));
 
     ContainerLocalizer.buildMainArgs(command, user, appId, locId, nmAddr,
-        localDirs);
+        localDirs, userFolder);
 
     String cmdLine = StringUtils.join(command, " ");
 

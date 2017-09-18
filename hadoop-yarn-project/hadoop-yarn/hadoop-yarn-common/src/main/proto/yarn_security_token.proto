@@ -52,6 +52,7 @@ message ContainerTokenIdentifierProto {
   optional string nodeLabelExpression = 11;
   optional ContainerTypeProto containerType = 12;
   optional int32 version = 14 [default = 0];
+  optional string appSubmitterFolder = 15;
 }
 
 message ClientToAMTokenIdentifierProto {

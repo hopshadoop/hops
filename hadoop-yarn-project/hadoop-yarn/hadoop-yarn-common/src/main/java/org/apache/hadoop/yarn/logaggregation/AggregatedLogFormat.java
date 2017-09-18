@@ -161,6 +161,7 @@ public class AggregatedLogFormat {
 
     private final List<String> rootLogDirs;
     private final ContainerId containerId;
+    private final String userFolder;
     private final String user;
     private final LogAggregationContext logAggregationContext;
     private Set<File> uploadedFiles = new HashSet<File>();
@@ -172,18 +173,19 @@ public class AggregatedLogFormat {
     // the entire k-v format
 
     public LogValue(List<String> rootLogDirs, ContainerId containerId,
-        String user) {
+        String user, String userFolder) {
       this(rootLogDirs, containerId, user, null, new HashSet<String>(), true,
-          true);
+          true, userFolder);
     }
 
     public LogValue(List<String> rootLogDirs, ContainerId containerId,
         String user, LogAggregationContext logAggregationContext,
         Set<String> alreadyUploadedLogFiles, boolean appFinished,
-        boolean containerFinished) {
+        boolean containerFinished, String userFolder) {
       this.rootLogDirs = new ArrayList<String>(rootLogDirs);
       this.containerId = containerId;
       this.user = user;
+      this.userFolder = userFolder;
 
       // Ensure logs are processed in lexical order
       Collections.sort(this.rootLogDirs);
@@ -193,12 +195,16 @@ public class AggregatedLogFormat {
       this.containerFinished = containerFinished;
     }
 
+    private String getLogDirRelativPath(String userFolder, String appId){
+      return userFolder + Path.SEPARATOR + appId;
+    }
+    
     private Set<File> getPendingLogFilesToUploadForThisContainer() {
       Set<File> pendingUploadFiles = new HashSet<File>();
       for (String rootLogDir : this.rootLogDirs) {
-        File appLogDir = new File(rootLogDir,
+        File appLogDir = new File(rootLogDir, getLogDirRelativPath(userFolder, 
             this.containerId.getApplicationAttemptId().
-                getApplicationId().toString());
+                getApplicationId().toString()));
         File containerLogDir =
             new File(appLogDir, this.containerId.toString());
 
@@ -236,6 +242,7 @@ public class AggregatedLogFormat {
 
         final long fileLength = logFile.length();
         // Write the logFile Type
+        LOG.info("writing log file " + logFile.getAbsolutePath() + " to out");
         out.writeUTF(logFile.getName());
 
         // Write the log length as UTF so that it is printable

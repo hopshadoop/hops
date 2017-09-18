@@ -233,6 +233,7 @@ public class TestResourceLocalizationService {
       locService.init(conf);
 
       final FsPermission defaultPerm = new FsPermission((short)0755);
+      final FsPermission securePerm = new FsPermission((short)0711);
 
       // verify directory creation
       for (Path p : localDirs) {
@@ -240,7 +241,7 @@ public class TestResourceLocalizationService {
         Path usercache = new Path(p, ContainerLocalizer.USERCACHE);
         verify(spylfs)
           .mkdir(eq(usercache),
-              eq(defaultPerm), eq(true));
+              eq(securePerm), eq(true));
         Path publicCache = new Path(p, ContainerLocalizer.FILECACHE);
         verify(spylfs)
           .mkdir(eq(publicCache),
@@ -294,7 +295,8 @@ public class TestResourceLocalizationService {
       locService.init(conf);
 
       final FsPermission defaultPerm = new FsPermission((short)0755);
-
+      final FsPermission securePerm = new FsPermission((short)0711);
+      
       // verify directory creation
       for (Path p : localDirs) {
         p = new Path((new URI(p.toString())).getPath());
@@ -303,7 +305,7 @@ public class TestResourceLocalizationService {
             .rename(eq(usercache), any(Path.class), any(Options.Rename.class));
         verify(spylfs)
             .mkdir(eq(usercache),
-                eq(defaultPerm), eq(true));
+                eq(securePerm), eq(true));
         Path publicCache = new Path(p, ContainerLocalizer.FILECACHE);
         verify(spylfs)
             .rename(eq(usercache), any(Path.class), any(Options.Rename.class));
@@ -367,11 +369,13 @@ public class TestResourceLocalizationService {
       spyService.start();
 
       final String user = "user0";
+      final String userFolder = "user0Folder";
       // init application
       final Application app = mock(Application.class);
       final ApplicationId appId =
           BuilderUtils.newApplicationId(314159265358979L, 3);
       when(app.getUser()).thenReturn(user);
+      when(app.getUserFolder()).thenReturn(userFolder);
       when(app.getAppId()).thenReturn(appId);
       spyService.handle(new ApplicationLocalizationEvent(
           LocalizationEventType.INIT_APPLICATION_RESOURCES, app));
@@ -389,7 +393,7 @@ public class TestResourceLocalizationService {
               user, appId);
 
       // init container.
-      final Container c = getMockContainer(appId, 42, user);
+      final Container c = getMockContainer(appId, 42, user, userFolder);
       
       // init resources
       Random r = new Random();
@@ -507,6 +511,8 @@ public class TestResourceLocalizationService {
   public void testRecovery() throws Exception {
     final String user1 = "user1";
     final String user2 = "user2";
+    final String user1Folder = "user1Folder";
+    final String user2Folder = "user2Folder";
     final ApplicationId appId1 = ApplicationId.newInstance(1, 1);
     final ApplicationId appId2 = ApplicationId.newInstance(1, 2);
 
@@ -544,9 +550,11 @@ public class TestResourceLocalizationService {
 
       final Application app1 = mock(Application.class);
       when(app1.getUser()).thenReturn(user1);
+      when(app1.getUserFolder()).thenReturn(user1Folder);
       when(app1.getAppId()).thenReturn(appId1);
       final Application app2 = mock(Application.class);
       when(app2.getUser()).thenReturn(user2);
+      when(app2.getUserFolder()).thenReturn(user2Folder);
       when(app2.getAppId()).thenReturn(appId2);
       spyService.handle(new ApplicationLocalizationEvent(
           LocalizationEventType.INIT_APPLICATION_RESOURCES, app1));
@@ -569,8 +577,8 @@ public class TestResourceLocalizationService {
               null, null);
 
       // init containers
-      final Container c1 = getMockContainer(appId1, 1, user1);
-      final Container c2 = getMockContainer(appId2, 2, user2);
+      final Container c1 = getMockContainer(appId1, 1, user1, user1Folder);
+      final Container c2 = getMockContainer(appId2, 2, user2, user2Folder);
 
       // init resources
       Random r = new Random();
@@ -776,7 +784,7 @@ public class TestResourceLocalizationService {
       long seed = r.nextLong();
       System.out.println("SEED: " + seed);
       r.setSeed(seed);
-      final Container c = getMockContainer(appId, 42, "user0");
+      final Container c = getMockContainer(appId, 42, "user0", "user0Folder");
       final LocalResource resource1 = getPrivateMockedResource(r);
       System.out.println("Here 4");
       
@@ -811,7 +819,7 @@ public class TestResourceLocalizationService {
     }
   }
 
-  @Test( timeout = 10000)
+  @Test( timeout = 1000000)
   @SuppressWarnings("unchecked") // mocked generics
   public void testLocalizationHeartbeat() throws Exception {
     List<Path> localDirs = new ArrayList<Path>();
@@ -851,6 +859,7 @@ public class TestResourceLocalizationService {
     doReturn(lfs).when(spyService).getLocalFileContext(isA(Configuration.class));
     FsPermission defaultPermission =
         FsPermission.getDirDefault().applyUMask(lfs.getUMask());
+    final FsPermission securePermission = new FsPermission((short)0711);
     FsPermission nmPermission =
         ResourceLocalizationService.NM_PRIVATE_PERM.applyUMask(lfs.getUMask());
     final Path userDir =
@@ -865,6 +874,9 @@ public class TestResourceLocalizationService {
     final FileStatus fs =
         new FileStatus(0, true, 1, 0, System.currentTimeMillis(), 0,
           defaultPermission, "", "", new Path(sDirs[0]));
+    final FileStatus ufs =
+        new FileStatus(0, true, 1, 0, System.currentTimeMillis(), 0,
+          securePermission, "", "", new Path(sDirs[0]));
     final FileStatus nmFs =
         new FileStatus(0, true, 1, 0, System.currentTimeMillis(), 0,
           nmPermission, "", "", sysDir);
@@ -874,8 +886,10 @@ public class TestResourceLocalizationService {
       public FileStatus answer(InvocationOnMock invocation) throws Throwable {
         Object[] args = invocation.getArguments();
         if (args.length > 0) {
-          if (args[0].equals(userDir) || args[0].equals(fileDir)) {
+          if (args[0].equals(fileDir)) {
             return fs;
+          } else if(args[0].equals(userDir)){
+            return ufs;
           }
         }
         return nmFs;
@@ -891,6 +905,7 @@ public class TestResourceLocalizationService {
       final ApplicationId appId =
           BuilderUtils.newApplicationId(314159265358979L, 3);
       when(app.getUser()).thenReturn("user0");
+      when(app.getUserFolder()).thenReturn("user0Folder");
       when(app.getAppId()).thenReturn(appId);
       spyService.handle(new ApplicationLocalizationEvent(
           LocalizationEventType.INIT_APPLICATION_RESOURCES, app));
@@ -911,7 +926,7 @@ public class TestResourceLocalizationService {
       long seed = r.nextLong();
       System.out.println("SEED: " + seed);
       r.setSeed(seed);
-      final Container c = getMockContainer(appId, 42, "user0");
+      final Container c = getMockContainer(appId, 42, "user0", "user0Folder");
       FSDataOutputStream out =
         new FSDataOutputStream(new DataOutputBuffer(), null);
       doReturn(out).when(spylfs).createInternal(isA(Path.class),
@@ -957,6 +972,7 @@ public class TestResourceLocalizationService {
       assertEquals("user0", context.getUser());
       assertEquals(appStr, context.getAppId());
       assertEquals(ctnrStr, context.getLocId());
+      assertEquals("user0Folder", context.getUserFolder());
 
       // heartbeat from localizer
       LocalResourceStatus rsrc1success = mock(LocalResourceStatus.class);
@@ -997,7 +1013,7 @@ public class TestResourceLocalizationService {
         .thenReturn(Collections.<LocalResourceStatus>emptyList());
 
       String localPath = Path.SEPARATOR + ContainerLocalizer.USERCACHE +
-          Path.SEPARATOR + "user0" + Path.SEPARATOR +
+          Path.SEPARATOR + "user0Folder" + Path.SEPARATOR +
           ContainerLocalizer.FILECACHE;
 
       // First heartbeat
@@ -1156,6 +1172,7 @@ public class TestResourceLocalizationService {
         FsPermission.getDirDefault().applyUMask(lfs.getUMask());
     FsPermission nmPermission =
         ResourceLocalizationService.NM_PRIVATE_PERM.applyUMask(lfs.getUMask());
+    final FsPermission securePermission = new FsPermission((short)0711);
     final Path userDir =
         new Path(sDirs[0].substring("file:".length()),
           ContainerLocalizer.USERCACHE);
@@ -1171,14 +1188,17 @@ public class TestResourceLocalizationService {
     final FileStatus nmFs =
         new FileStatus(0, true, 1, 0, System.currentTimeMillis(), 0,
           nmPermission, "", "", sysDir);
-
+    final FileStatus ufs = new FileStatus(0, true, 1, 0, System.currentTimeMillis(), 0,
+        securePermission, "", "", new Path(sDirs[0]));
     doAnswer(new Answer<FileStatus>() {
       @Override
       public FileStatus answer(InvocationOnMock invocation) throws Throwable {
         Object[] args = invocation.getArguments();
         if (args.length > 0) {
-          if (args[0].equals(userDir) || args[0].equals(fileDir)) {
+          if ( args[0].equals(fileDir)) {
             return fs;
+          } else if (args[0].equals(userDir)){
+            return ufs;
           }
         }
         return nmFs;
@@ -1214,8 +1234,8 @@ public class TestResourceLocalizationService {
       long seed = r.nextLong();
       System.out.println("SEED: " + seed);
       r.setSeed(seed);
-      final Container c1 = getMockContainer(appId, 42, "user0");
-      final Container c2 = getMockContainer(appId, 43, "user0");
+      final Container c1 = getMockContainer(appId, 42, "user0", "user0Folder");
+      final Container c2 = getMockContainer(appId, 43, "user0", "user0Folder");
       FSDataOutputStream out =
         new FSDataOutputStream(new DataOutputBuffer(), null);
       doReturn(out).when(spylfs).createInternal(isA(Path.class),
@@ -1423,18 +1443,20 @@ public class TestResourceLocalizationService {
       spyService.start();
 
       final String user = "user0";
+      final String userFolder = "user0Folder";
       // init application
       final Application app = mock(Application.class);
       final ApplicationId appId =
           BuilderUtils.newApplicationId(314159265358979L, 3);
       when(app.getUser()).thenReturn(user);
+      when(app.getUserFolder()).thenReturn(userFolder);
       when(app.getAppId()).thenReturn(appId);
       spyService.handle(new ApplicationLocalizationEvent(
           LocalizationEventType.INIT_APPLICATION_RESOURCES, app));
       dispatcher.await();
 
       // init container.
-      final Container c = getMockContainer(appId, 42, user);
+      final Container c = getMockContainer(appId, 42, user, userFolder);
 
       // init resources
       Random r = new Random();
@@ -1510,6 +1532,7 @@ public class TestResourceLocalizationService {
       final Application app = mock(Application.class);
       final ApplicationId appId = BuilderUtils.newApplicationId(1234567890L, 3);
       when(app.getUser()).thenReturn("user0");
+      when(app.getUserFolder()).thenReturn("user0Folder");
       when(app.getAppId()).thenReturn(appId);
       when(app.toString()).thenReturn(appId.toString());
       spyService.handle(new ApplicationLocalizationEvent(
@@ -1521,7 +1544,7 @@ public class TestResourceLocalizationService {
       long seed = r.nextLong();
       System.out.println("SEED: " + seed);
       r.setSeed(seed);
-      final Container c = getMockContainer(appId, 46, "user0");
+      final Container c = getMockContainer(appId, 46, "user0", "user0Folder");
       FSDataOutputStream out =
           new FSDataOutputStream(new DataOutputBuffer(), null);
       doReturn(out).when(spylfs).createInternal(isA(Path.class),
@@ -1626,18 +1649,20 @@ public class TestResourceLocalizationService {
       spyService.start();
 
       final String user = "user0";
+      final String userFolder = "user0Folder";
       // init application
       final Application app = mock(Application.class);
       final ApplicationId appId =
           BuilderUtils.newApplicationId(314159265358979L, 3);
       when(app.getUser()).thenReturn(user);
+      when(app.getUserFolder()).thenReturn(userFolder);
       when(app.getAppId()).thenReturn(appId);
       spyService.handle(new ApplicationLocalizationEvent(
           LocalizationEventType.INIT_APPLICATION_RESOURCES, app));
       dispatcher.await();
 
       // init container.
-      final Container c = getMockContainer(appId, 42, user);
+      final Container c = getMockContainer(appId, 42, user, userFolder);
 
       // init resources
       Random r = new Random();
@@ -1735,11 +1760,13 @@ public class TestResourceLocalizationService {
       spyService.start();
 
       final String user = "user0";
+      final String userFolder = "user0Folder";
       // init application
       final Application app = mock(Application.class);
       final ApplicationId appId =
           BuilderUtils.newApplicationId(314159265358979L, 3);
       when(app.getUser()).thenReturn(user);
+      when(app.getUserFolder()).thenReturn(userFolder);
       when(app.getAppId()).thenReturn(appId);
       spyService.handle(new ApplicationLocalizationEvent(
         LocalizationEventType.INIT_APPLICATION_RESOURCES, app));
@@ -1758,7 +1785,7 @@ public class TestResourceLocalizationService {
         .put(LocalResourceVisibility.PUBLIC, Collections.singletonList(pubReq));
 
       // init container.
-      final Container c = getMockContainer(appId, 42, user);
+      final Container c = getMockContainer(appId, 42, user, userFolder);
 
       // first test ioexception
       Mockito
@@ -1827,6 +1854,7 @@ public class TestResourceLocalizationService {
     try {
       dispatcher1 = new DrainDispatcher();
       String user = "testuser";
+      String userFolder = "testuserFolder";
       ApplicationId appId = BuilderUtils.newApplicationId(1, 1);
 
       // creating one local directory
@@ -1879,7 +1907,7 @@ public class TestResourceLocalizationService {
       rls.getPrivateLocalizers().put(
         localizerId1,
         rls.new LocalizerRunner(new LocalizerContext(user, container1
-          .getContainerId(), null), localizerId1));
+          .getContainerId(), null, userFolder), localizerId1));
       LocalizerRunner localizerRunner1 = rls.getLocalizerRunner(localizerId1);
 
       dispatcher1.getEventHandler().handle(
@@ -1894,7 +1922,7 @@ public class TestResourceLocalizationService {
       rls.getPrivateLocalizers().put(
         localizerId2,
         rls.new LocalizerRunner(new LocalizerContext(user, container2
-          .getContainerId(), null), localizerId2));
+          .getContainerId(), null, userFolder), localizerId2));
       LocalizerRunner localizerRunner2 = rls.getLocalizerRunner(localizerId2);
       dispatcher1.getEventHandler().handle(
         createContainerLocalizationEvent(container2,
@@ -2028,7 +2056,7 @@ public class TestResourceLocalizationService {
       rls.getPrivateLocalizers().put(
         localizerId1,
         rls.new LocalizerRunner(new LocalizerContext(user, container1
-          .getContainerId(), null), localizerId1));
+          .getContainerId(), null, user), localizerId1));
 
       // Creating two requests for container
       // 1) Private resource
@@ -2448,12 +2476,13 @@ public class TestResourceLocalizationService {
   }
 
   private static Container getMockContainer(ApplicationId appId, int id,
-      String user) throws IOException {
+      String user, String userFolder) throws IOException {
     Container c = mock(Container.class);
     ApplicationAttemptId appAttemptId =
         BuilderUtils.newApplicationAttemptId(appId, 1);
     ContainerId cId = BuilderUtils.newContainerId(appAttemptId, id);
     when(c.getUser()).thenReturn(user);
+    when(c.getUserFolder()).thenReturn(userFolder);
     when(c.getContainerId()).thenReturn(cId);
     Credentials creds = new Credentials();
     Token<? extends TokenIdentifier> tk = getToken(id);
@@ -2563,16 +2592,18 @@ public class TestResourceLocalizationService {
           nmPermission, "", "", localDirs.get(0));
 
     final String user = "user0";
+    final String userFolder = "user0Folder";
     // init application
     final Application app = mock(Application.class);
     final ApplicationId appId =
         BuilderUtils.newApplicationId(314159265358979L, 3);
     when(app.getUser()).thenReturn(user);
+    when(app.getUserFolder()).thenReturn(userFolder);
     when(app.getAppId()).thenReturn(appId);
     when(app.toString()).thenReturn(appId.toString());
 
     // init container.
-    final Container c = getMockContainer(appId, 42, user);
+    final Container c = getMockContainer(appId, 42, user, userFolder);
 
     // setup local app dirs
     List<String> tmpDirs = mockDirsHandler.getLocalDirs();

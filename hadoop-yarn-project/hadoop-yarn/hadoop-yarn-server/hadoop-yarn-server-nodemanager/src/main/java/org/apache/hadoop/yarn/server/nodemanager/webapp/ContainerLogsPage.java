@@ -105,7 +105,8 @@ public class ContainerLogsPage extends NMView {
           printLogFileDirectory(html, logFiles);
         } else {
           File logFile = ContainerLogsUtils.getContainerLogFile(containerId,
-              $(CONTAINER_LOG_TYPE), request().getRemoteUser(), nmContext);
+              $(CONTAINER_LOG_TYPE), request().getRemoteUser(), nmContext,
+              nmContext.getApplications().get(containerId.getApplicationAttemptId().getApplicationId()).getUserFolder());
           printLogFile(html, logFile);
         }
       } catch (YarnException ex) {

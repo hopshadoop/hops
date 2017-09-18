@@ -179,10 +179,10 @@ public class RMContainerTokenSecretManager extends
    */
   public Token createContainerToken(ContainerId containerId,
       int containerVersion, NodeId nodeId, String appSubmitter,
-      Resource capability, Priority priority, long createTime) {
+      Resource capability, Priority priority, long createTime, String appSubmitterFolder) {
     return createContainerToken(containerId, containerVersion, nodeId,
         appSubmitter, capability, priority, createTime,
-        null, null, ContainerType.TASK);
+        null, null, ContainerType.TASK, appSubmitterFolder);
   }
 
   /**
@@ -204,7 +204,7 @@ public class RMContainerTokenSecretManager extends
       int containerVersion, NodeId nodeId, String appSubmitter,
       Resource capability, Priority priority, long createTime,
       LogAggregationContext logAggregationContext, String nodeLabelExpression,
-      ContainerType containerType) {
+      ContainerType containerType, String appSubmiterFolder) {
     byte[] password;
     ContainerTokenIdentifier tokenIdentifier;
     long expiryTimeStamp =
@@ -218,7 +218,7 @@ public class RMContainerTokenSecretManager extends
               nodeId.toString(), appSubmitter, capability, expiryTimeStamp,
               this.currentMasterKey.getMasterKey().getKeyId(),
               ResourceManager.getClusterTimeStamp(), priority, createTime,
-              logAggregationContext, nodeLabelExpression, containerType);
+              logAggregationContext, nodeLabelExpression, containerType, appSubmiterFolder);
       password = this.createPassword(tokenIdentifier);
 
     } finally {

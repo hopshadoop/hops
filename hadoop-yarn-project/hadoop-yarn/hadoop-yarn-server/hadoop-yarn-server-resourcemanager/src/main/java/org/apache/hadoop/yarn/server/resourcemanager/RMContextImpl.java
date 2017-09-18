@@ -54,6 +54,7 @@ import org.apache.hadoop.yarn.util.Clock;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.util.GroupMembershipService;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.quota.ContainersLogsService;
 import org.apache.hadoop.yarn.server.resourcemanager.quota.QuotaService;
 
@@ -83,6 +84,9 @@ public class RMContextImpl implements RMContext {
   private boolean isDistributed;
   private GroupMembershipService groupMembershipService;
   private CertificateLocalizationService certificateLocalizationService;
+  
+  private byte[] seed;
+  private String userFolderHashAlgo = YarnConfiguration.DEFAULT_USER_FOLDER_ALGO;
   
   /**
    * Default constructor. To be used in conjunction with setter methods for
@@ -546,4 +550,23 @@ public class RMContextImpl implements RMContext {
   public CertificateLocalizationService getCertificateLocalizationService() {
     return certificateLocalizationService;
   }
+
+  @Override
+  public byte[] getSeed() {
+    return seed;
+  }
+
+  public void setSeed(byte[] seed) {
+    this.seed = seed;
+  }
+
+  @Override
+  public String getUserFolderHashAlgo() {
+    return userFolderHashAlgo;
+  }
+
+  public void setUserFolderHashAlgo(String userFolderHashAlgo) {
+    this.userFolderHashAlgo = userFolderHashAlgo;
+  }
+
 }

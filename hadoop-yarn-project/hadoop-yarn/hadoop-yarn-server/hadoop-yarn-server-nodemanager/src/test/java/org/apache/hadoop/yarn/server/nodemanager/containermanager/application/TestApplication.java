@@ -79,7 +79,7 @@ public class TestApplication {
   public void testApplicationInit1() {
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(1, 314159265358979L, "yak", 3);
+      wa = new WrappedApplication(1, 314159265358979L, "yak", 3, "yakFolder");
       wa.initApplication();
       wa.initContainer(1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -109,7 +109,7 @@ public class TestApplication {
   public void testApplicationInit2() {
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(2, 314159265358979L, "yak", 3);
+      wa = new WrappedApplication(2, 314159265358979L, "yak", 3, "yakFolder");
       wa.initApplication();
       wa.initContainer(0);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -145,7 +145,7 @@ public class TestApplication {
   public void testAppRunningAfterContainersComplete() {
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(3, 314159265358979L, "yak", 3);
+      wa = new WrappedApplication(3, 314159265358979L, "yak", 3, "yakFolder");
       wa.initApplication();
       wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -173,7 +173,7 @@ public class TestApplication {
   public void testContainersCompleteDuringAppInit1() {
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(3, 314159265358979L, "yak", 1);
+      wa = new WrappedApplication(3, 314159265358979L, "yak", 1, "yakFolder");
       wa.initApplication();
       wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -197,7 +197,7 @@ public class TestApplication {
   public void testContainersCompleteDuringAppInit2() {
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(3, 314159265358979L, "yak", 3);
+      wa = new WrappedApplication(3, 314159265358979L, "yak", 3, "yakFolder");
       wa.initApplication();
       wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -225,7 +225,7 @@ public class TestApplication {
   public void testAppFinishedOnRunningContainers() {
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(4, 314159265358979L, "yak", 3);
+      wa = new WrappedApplication(4, 314159265358979L, "yak", 3, "yakFolder");
       wa.initApplication();
       wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -300,7 +300,7 @@ public class TestApplication {
   public void testAppFinishedOnCompletedContainers() {
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(5, 314159265358979L, "yak", 3);
+      wa = new WrappedApplication(5, 314159265358979L, "yak", 3, "yakFolder");
       wa.initApplication();
       wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -343,7 +343,7 @@ public class TestApplication {
   public void testStartContainerAfterAppFinished() {
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(5, 314159265358979L, "yak", 3);
+      wa = new WrappedApplication(5, 314159265358979L, "yak", 3, "yakFolder");
       wa.initApplication();
       wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -380,7 +380,7 @@ public class TestApplication {
     // APP_FINISHED on another NM
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(1, 314159265358979L, "yak", 3);
+      wa = new WrappedApplication(1, 314159265358979L, "yak", 3, "yakFolder");
       wa.initApplication();
       wa.initContainer(0);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -419,7 +419,7 @@ public class TestApplication {
   public void testNMTokenSecretManagerCleanup() {
     WrappedApplication wa = null;
     try {
-      wa = new WrappedApplication(1, 314159265358979L, "yak", 1);
+      wa = new WrappedApplication(1, 314159265358979L, "yak", 1, "yakFolder");
       wa.initApplication();
       wa.initContainer(0);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
@@ -480,6 +480,7 @@ public class TestApplication {
     final EventHandler<ContainerEvent> containerBus;
     final EventHandler<LogHandlerEvent> logAggregationBus;
     final String user;
+    final String userFolder;
     final List<Container> containers;
     final Context context;
     final Map<ContainerId, ContainerTokenIdentifier> containerTokenIdentifierMap;
@@ -488,7 +489,7 @@ public class TestApplication {
     final ApplicationId appId;
     final Application app;
 
-    WrappedApplication(int id, long timestamp, String user, int numContainers) {
+    WrappedApplication(int id, long timestamp, String user, int numContainers, String userFolder) {
       Configuration conf = new Configuration();
       
       dispatcher = new DrainDispatcher();
@@ -528,9 +529,10 @@ public class TestApplication {
       context.getContainerTokenSecretManager().setMasterKey(masterKey);
       
       this.user = user;
+      this.userFolder = userFolder;
       this.appId = BuilderUtils.newApplicationId(timestamp, id);
 
-      app = new ApplicationImpl(dispatcher, this.user, appId, null, context);
+      app = new ApplicationImpl(dispatcher, this.user, appId, null, context, this.userFolder);
       containers = new ArrayList<Container>();
       for (int i = 0; i < numContainers; i++) {
         Container container = createMockedContainer(this.appId, i);
@@ -539,7 +541,7 @@ public class TestApplication {
         ContainerTokenIdentifier identifier =
             new ContainerTokenIdentifier(container.getContainerId(), "", "",
               null, currentTime + 2000, masterKey.getKeyId(), currentTime,
-              Priority.newInstance(0), 0);
+              Priority.newInstance(0), 0, "");
         containerTokenIdentifierMap
           .put(identifier.getContainerID(), identifier);
         context.getContainerTokenSecretManager().startContainerSuccessful(

@@ -328,7 +328,7 @@ public class ContainerManagerImpl extends CompositeService implements
 
     LOG.info("Recovering application " + appId);
     ApplicationImpl app = new ApplicationImpl(dispatcher, p.getUser(), appId,
-        creds, context);
+        creds, context, p.getUserFolder());
     context.getApplications().put(appId, app);
     app.handle(new ApplicationInitEvent(appId, acls, logAggregationContext));
   }
@@ -940,7 +940,8 @@ public class ContainerManagerImpl extends CompositeService implements
     ContainerId containerId = containerTokenIdentifier.getContainerID();
     String containerIdStr = containerId.toString();
     String user = containerTokenIdentifier.getApplicationSubmitter();
-
+    String userFolder = containerTokenIdentifier.getApplicationSubmitterFolder();
+    
     LOG.info("Start request for " + containerIdStr + " by user " + user);
 
     ContainerLaunchContext launchContext = request.getContainerLaunchContext();
@@ -988,7 +989,7 @@ public class ContainerManagerImpl extends CompositeService implements
       if (!serviceStopped) {
         // Create the application
         Application application =
-            new ApplicationImpl(dispatcher, user, applicationID, credentials, context);
+            new ApplicationImpl(dispatcher, user, applicationID, credentials, context, userFolder);
         if (null == context.getApplications().putIfAbsent(applicationID,
           application)) {
           LOG.info("Creating a new application reference for app " + applicationID);

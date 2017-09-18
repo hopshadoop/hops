@@ -334,17 +334,17 @@ public class TestNMWebServices extends JerseyTestBase {
     final String filename = "logfile1";
     final String logMessage = "log message\n";
     nmContext.getApplications().put(appId, new ApplicationImpl(null, "user",
-        appId, null, nmContext));
+        appId, null, nmContext, "userFolder"));
     
     MockContainer container = new MockContainer(appAttemptId,
-        new AsyncDispatcher(), new Configuration(), "user", appId, 1);
+        new AsyncDispatcher(), new Configuration(), "user", appId, 1, "userFolder");
     container.setState(ContainerState.RUNNING);
     nmContext.getContainers().put(containerId, container);
     
     // write out log file
     Path path = dirsHandler.getLogPathForWrite(
         ContainerLaunch.getRelativeContainerLogDir(
-            appIdStr, containerIdStr) + "/" + filename, false);
+            appIdStr, containerIdStr, "userFolder") + "/" + filename, false);
     
     File logFile = new File(path.toUri().getPath());
     logFile.deleteOnExit();

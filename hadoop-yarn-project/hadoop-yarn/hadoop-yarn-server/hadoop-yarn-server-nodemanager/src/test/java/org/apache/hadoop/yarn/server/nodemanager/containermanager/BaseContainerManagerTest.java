@@ -119,6 +119,7 @@ public abstract class BaseContainerManagerTest {
   protected ContainerExecutor exec;
   protected DeletionService delSrvc;
   protected String user = "nobody";
+  protected String userFolder = "nobodysFolder";
   protected NodeHealthCheckerService nodeHealthChecker;
   protected LocalDirsHandlerService dirsHandler;
   protected final long DUMMY_RM_IDENTIFIER = 1234;

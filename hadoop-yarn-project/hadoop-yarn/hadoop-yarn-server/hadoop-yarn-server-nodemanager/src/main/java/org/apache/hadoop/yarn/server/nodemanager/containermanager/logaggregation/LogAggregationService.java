@@ -386,12 +386,12 @@ public class LogAggregationService extends AbstractService implements
   @SuppressWarnings("unchecked")
   private void initApp(final ApplicationId appId, String user,
       Credentials credentials, Map<ApplicationAccessType, String> appAcls,
-      LogAggregationContext logAggregationContext) {
+      LogAggregationContext logAggregationContext, String userFolder) {
     ApplicationEvent eventResponse;
     try {
       verifyAndCreateRemoteLogDir(getConfig());
       initAppAggregator(appId, user, credentials, appAcls,
-          logAggregationContext);
+          logAggregationContext, userFolder);
       eventResponse = new ApplicationEvent(appId,
           ApplicationEventType.APPLICATION_LOG_HANDLING_INITED);
     } catch (YarnRuntimeException e) {
@@ -413,7 +413,7 @@ public class LogAggregationService extends AbstractService implements
 
   protected void initAppAggregator(final ApplicationId appId, String user,
       Credentials credentials, Map<ApplicationAccessType, String> appAcls,
-      LogAggregationContext logAggregationContext) {
+      LogAggregationContext logAggregationContext, String userFolder) {
 
     // Get user's FileSystem credentials
     final UserGroupInformation userUgi =
@@ -426,9 +426,9 @@ public class LogAggregationService extends AbstractService implements
     final AppLogAggregator appLogAggregator =
         new AppLogAggregatorImpl(this.dispatcher, this.deletionService,
             getConfig(), appId, userUgi, this.nodeId, dirsHandler,
-            getRemoteNodeLogFileForApp(appId, user),
-            appAcls, logAggregationContext, this.context,
-            getLocalFileContext(getConfig()));
+        getRemoteNodeLogFileForApp(appId, user),
+        appAcls, logAggregationContext, this.context,
+        getLocalFileContext(getConfig()), userFolder);
     if (this.appLogAggregators.putIfAbsent(appId, appLogAggregator) != null) {
       throw new YarnRuntimeException("Duplicate initApp for " + appId);
     }
@@ -530,7 +530,8 @@ public class LogAggregationService extends AbstractService implements
         initApp(appStartEvent.getApplicationId(), appStartEvent.getUser(),
             appStartEvent.getCredentials(),
             appStartEvent.getApplicationAcls(),
-            appStartEvent.getLogAggregationContext());
+            appStartEvent.getLogAggregationContext(),
+            appStartEvent.getUserFolder());
         break;
       case CONTAINER_FINISHED:
         LogHandlerContainerFinishedEvent containerFinishEvent =

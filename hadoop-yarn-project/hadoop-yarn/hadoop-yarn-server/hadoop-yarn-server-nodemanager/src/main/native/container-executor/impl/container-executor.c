@@ -624,12 +624,13 @@ static int create_container_directories(const char* user, const char *app_id,
 
   result = -1;
   // also make the directory for the container logs
-  char *combined_name = malloc(strlen(app_id) + strlen(container_id) + 2);
+  char *combined_name = malloc(strlen(app_id) + strlen(container_id) + 2 + 
+      strlen(user));
   if (combined_name == NULL) {
     fprintf(LOGFILE, "Malloc of combined name failed\n");
     result = -1;
   } else {
-    sprintf(combined_name, "%s/%s", app_id, container_id);
+    sprintf(combined_name, "%s/%s/%s", user, app_id, container_id);
 
     char* const* log_dir_ptr;
     for(log_dir_ptr = log_dir; *log_dir_ptr != NULL; ++log_dir_ptr) {
@@ -871,6 +872,57 @@ int create_directory_for_user(const char* path) {
   return ret;
 }
 
+int create_directory(const char* path) {
+  // set 2750 permissions and group sticky bit
+  mode_t permissions = S_IRWXU | S_IRWXG | S_ISGID;
+  uid_t user = geteuid();
+  gid_t group = getegid();
+  uid_t root = 0;
+  int ret = 0;
+
+  if(getuid() == root) {
+    ret = change_effective_user(root, nm_gid);
+  }
+
+  if (ret == 0) {
+    if (0 == mkdir(path, permissions) || EEXIST == errno) {
+      // need to reassert the group sticky bit
+      if (chmod(path, permissions) != 0) {
+        fprintf(LOGFILE, "Can't chmod %s to add the sticky bit - %s\n",
+                path, strerror(errno));
+        ret = -1;
+      }
+    } else {
+      fprintf(LOGFILE, "Failed to create directory %s - %s\n", path,
+              strerror(errno));
+      ret = -1;
+    }
+  }
+  if (change_effective_user(user, group) != 0) {
+    fprintf(LOGFILE, "Failed to change user to %i - %i\n", user, group);
+
+    ret = -1;
+  }
+  return ret;
+}
+
+int chown_directory(const char* path) {
+  uid_t user = geteuid();
+  uid_t root = 0;
+  int ret = 0;
+  
+  if(getuid() == root) {
+    ret = change_effective_user(root, nm_gid);
+  }
+  
+  if (change_owner(path, user, nm_gid) != 0) {
+    fprintf(LOGFILE, "Failed to chown %s to %d:%d: %s\n", path, user, nm_gid,
+            strerror(errno));
+    ret = -1;
+  }
+  return ret;
+}
+
 /**
  * Open a file as the node manager and return a file descriptor for it.
  * Returns -1 on error
@@ -964,22 +1016,34 @@ int initialize_user(const char *user, char* const* local_dirs) {
   return failed ? INITIALIZE_USER_FAILED : 0;
 }
 
-int create_log_dirs(const char *app_id, char * const * log_dirs) {
+int create_log_dirs(const char *app_id, char * const * log_dirs, 
+        const char *user) {
 
   char* const* log_root;
   char *any_one_app_log_dir = NULL;
   for(log_root=log_dirs; *log_root != NULL; ++log_root) {
-    char *app_log_dir = get_app_log_directory(*log_root, app_id);
+    char *user_log_dir = get_app_log_directory(*log_root, user);
+    if (create_directory(user_log_dir) != 0) {
+      free(user_log_dir);
+      return -1;
+    }
+    char *app_log_dir = get_app_log_directory(user_log_dir, app_id);
     if (app_log_dir == NULL) {
       // try the next one
     } else if (create_directory_for_user(app_log_dir) != 0) {
       free(app_log_dir);
+      free(user_log_dir);
       return -1;
     } else if (any_one_app_log_dir == NULL) {
       any_one_app_log_dir = app_log_dir;
     } else {
       free(app_log_dir);
     }
+    if (chown_directory(user_log_dir) != 0) {
+      free(user_log_dir);
+      return -1;
+    }
+    free(user_log_dir);
   }
 
   if (any_one_app_log_dir == NULL) {
@@ -1045,7 +1109,7 @@ int initialize_app(const char *user, const char *app_id,
   }
 
   // create the log directories for the app on all disks
-  int log_create_result = create_log_dirs(app_id, log_roots);
+  int log_create_result = create_log_dirs(app_id, log_roots, user);
   if (log_create_result != 0) {
     return log_create_result;
   }
@@ -1388,7 +1452,7 @@ int create_local_dirs(const char * user, const char *app_id,
   }
 
   // initializing log dirs
-  int log_create_result = create_log_dirs(app_id, log_dirs);
+  int log_create_result = create_log_dirs(app_id, log_dirs, user);
   if (log_create_result != 0) {
     fprintf(ERRORFILE, "Could not create log dirs");
     fflush(ERRORFILE);

@@ -27,6 +27,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -34,8 +37,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.JarOutputStream;
 import java.util.zip.ZipEntry;
+import org.apache.commons.codec.binary.Base64;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.FailingMapper;
@@ -694,12 +699,27 @@ public class TestMRJobs {
     int numAppMasters = 0;
     int numMapTasks = 0;
 
+    String user = UserGroupInformation.getCurrentUser().getUserName();
+    String userFolder;
+    try {
+      MessageDigest digest = MessageDigest.getInstance(mrCluster.getResourceManager().getRMContext().
+          getUserFolderHashAlgo());
+      byte[] userBytes = user.getBytes(StandardCharsets.UTF_8);
+      byte[] hashBase = ArrayUtils.addAll(userBytes, mrCluster.getResourceManager().getRMContext().getSeed());
+      byte[] hash = digest.digest(hashBase);
+      userFolder = Base64.encodeBase64URLSafeString(hash);
+    } catch (NoSuchAlgorithmException ex) {
+      LOG.error("error while creating userFolder random string", ex);
+      throw new Error("error while creating userFolder random string", ex);
+    }
+
     for (int i = 0; i < NUM_NODE_MGRS; i++) {
       final Configuration nmConf = mrCluster.getNodeManager(i).getConfig();
       for (String logDir :
-               nmConf.getTrimmedStrings(YarnConfiguration.NM_LOG_DIRS)) {
+ nmConf.getTrimmedStrings(YarnConfiguration.NM_LOG_DIRS)) {
+        Path userLogDir = new Path(logDir, userFolder);
         final Path absSyslogGlob =
-            new Path(logDir + Path.SEPARATOR + syslogGlob);
+ new Path(userLogDir + Path.SEPARATOR + syslogGlob);
         LOG.info("Checking for glob: " + absSyslogGlob);
         final FileStatus[] syslogs = localFs.globStatus(absSyslogGlob);
         for (FileStatus slog : syslogs) {
@@ -990,12 +1010,25 @@ public class TestMRJobs {
     int numAppMasters = 0;
     int numMapTasks = 0;
 
+    String user = UserGroupInformation.getCurrentUser().getUserName();
+    String userFolder;
+    try {
+      MessageDigest digest = MessageDigest.getInstance(mrCluster.getResourceManager().getRMContext().
+          getUserFolderHashAlgo());
+      byte[] userBytes = user.getBytes(StandardCharsets.UTF_8);
+      byte[] hashBase = ArrayUtils.addAll(userBytes, mrCluster.getResourceManager().getRMContext().getSeed());
+      byte[] hash = digest.digest(hashBase);
+      userFolder = Base64.encodeBase64URLSafeString(hash);
+    } catch (NoSuchAlgorithmException ex) {
+      LOG.error("error while creating userFolder random string", ex);
+      throw new Error("error while creating userFolder random string", ex);
+    }
+
     for (int i = 0; i < NUM_NODE_MGRS; i++) {
       final Configuration nmConf = mrCluster.getNodeManager(i).getConfig();
-      for (String logDir :
-               nmConf.getTrimmedStrings(YarnConfiguration.NM_LOG_DIRS)) {
-        final Path absSyslogGlob =
-            new Path(logDir + Path.SEPARATOR + syslogGlob);
+      for (String logDir : nmConf.getTrimmedStrings(YarnConfiguration.NM_LOG_DIRS)) {
+        Path userLogFolder = new Path(logDir, userFolder);
+        final Path absSyslogGlob = new Path(userLogFolder + Path.SEPARATOR + syslogGlob);
         LOG.info("Checking for glob: " + absSyslogGlob);
         for (FileStatus syslog : localFs.globStatus(absSyslogGlob)) {
           boolean foundAppMaster = false;

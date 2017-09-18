@@ -43,6 +43,8 @@ public interface Container extends EventHandler<ContainerEvent> {
 
   String getUser();
   
+  String getUserFolder();
+  
   ContainerState getContainerState();
 
   ContainerLaunchContext getLaunchContext();

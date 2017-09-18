@@ -146,7 +146,7 @@ public class TestAggregatedLogFormat {
       LogKey logKey = new LogKey(testContainerId);
       LogValue logValue =
           spy(new LogValue(Collections.singletonList(srcFileRoot.toString()),
-              testContainerId, ugi.getShortUserName()));
+              testContainerId, ugi.getShortUserName(),ugi.getShortUserName()));
 
       final CountDownLatch latch = new CountDownLatch(1);
 
@@ -191,14 +191,15 @@ public class TestAggregatedLogFormat {
 
   private void testReadAcontainerLog(boolean logUploadedTime) throws Exception {
     Configuration conf = new Configuration();
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     File workDir = new File(testWorkDir, "testReadAcontainerLogs1");
     Path remoteAppLogFile =
         new Path(workDir.getAbsolutePath(), "aggregatedLogFile");
     Path srcFileRoot = new Path(workDir.getAbsolutePath(), "srcFiles");
+    Path srcFileUser = new Path(srcFileRoot, ugi.getShortUserName());
     ContainerId testContainerId = TestContainerId.newContainerId(1, 1, 1, 1);
     Path t =
-        new Path(srcFileRoot, testContainerId.getApplicationAttemptId()
-            .getApplicationId().toString());
+ new Path(srcFileUser, testContainerId.getApplicationAttemptId()            .getApplicationId().toString());
     Path srcFilePath = new Path(t, testContainerId.toString());
 
     int numChars = 80000;
@@ -215,13 +216,12 @@ public class TestAggregatedLogFormat {
     writeSrcFile(srcFilePath, "stderr", numChars);
     writeSrcFile(srcFilePath, "stdout", numChars);
 
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     try (LogWriter logWriter = new LogWriter()) {
       logWriter.initialize(conf, remoteAppLogFile, ugi);
       LogKey logKey = new LogKey(testContainerId);
       LogValue logValue =
           new LogValue(Collections.singletonList(srcFileRoot.toString()),
-              testContainerId, ugi.getShortUserName());
+              testContainerId, ugi.getShortUserName(),ugi.getShortUserName());
 
       // When we try to open FileInputStream for stderr, it will throw out an
       // IOException. Skip the log aggregation for stderr.
@@ -280,6 +280,7 @@ public class TestAggregatedLogFormat {
   public void testContainerLogsFileAccess() throws IOException {
     // This test will run only if NativeIO is enabled as SecureIOUtils 
     // require it to be enabled.
+    String randomUser = "randomUser";
     Assume.assumeTrue(NativeIO.isAvailable());
     Configuration conf = new Configuration();
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
@@ -289,6 +290,7 @@ public class TestAggregatedLogFormat {
     Path remoteAppLogFile =
         new Path(workDir.getAbsolutePath(), "aggregatedLogFile");
     Path srcFileRoot = new Path(workDir.getAbsolutePath(), "srcFiles");
+    Path srcFileUser = new Path(srcFileRoot, randomUser);
 
     String data = "Log File content for container : ";
     // Creating files for container1. Log aggregator will try to read log files
@@ -299,8 +301,7 @@ public class TestAggregatedLogFormat {
     ContainerId testContainerId1 =
         ContainerId.newContainerId(applicationAttemptId, 1);
     Path appDir =
-        new Path(srcFileRoot, testContainerId1.getApplicationAttemptId()
-            .getApplicationId().toString());
+ new Path(srcFileUser, testContainerId1.getApplicationAttemptId()            .getApplicationId().toString());
     Path srcFilePath1 = new Path(appDir, testContainerId1.toString());
     String stdout = "stdout";
     String stderr = "stderr";
@@ -314,10 +315,10 @@ public class TestAggregatedLogFormat {
     try (LogWriter logWriter = new LogWriter()) {
       logWriter.initialize(conf, remoteAppLogFile, ugi);
       LogKey logKey = new LogKey(testContainerId1);
-      String randomUser = "randomUser";
+
       LogValue logValue =
           spy(new LogValue(Collections.singletonList(srcFileRoot.toString()),
-              testContainerId1, randomUser));
+              testContainerId1, randomUser, randomUser));
 
       // It is trying simulate a situation where first log file is owned by
       // different user (probably symlink) and second one by the user itself.

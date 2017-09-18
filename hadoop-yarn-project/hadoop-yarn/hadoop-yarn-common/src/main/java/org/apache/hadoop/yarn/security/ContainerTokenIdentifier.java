@@ -62,13 +62,13 @@ public class ContainerTokenIdentifier extends TokenIdentifier {
   public static final Text KIND = new Text("ContainerToken");
 
   private ContainerTokenIdentifierProto proto;
-
+ 
   public ContainerTokenIdentifier(ContainerId containerID,
       String hostName, String appSubmitter, Resource r, long expiryTimeStamp,
-      int masterKeyId, long rmIdentifier, Priority priority, long creationTime) {
+      int masterKeyId, long rmIdentifier, Priority priority, long creationTime, String appSubmitterFolder) {
     this(containerID, hostName, appSubmitter, r, expiryTimeStamp, masterKeyId,
         rmIdentifier, priority, creationTime, null,
-        CommonNodeLabelsManager.NO_LABEL, ContainerType.TASK);
+        CommonNodeLabelsManager.NO_LABEL, ContainerType.TASK, appSubmitterFolder);
   }
 
   /**
@@ -90,36 +90,36 @@ public class ContainerTokenIdentifier extends TokenIdentifier {
   public ContainerTokenIdentifier(ContainerId containerID, String hostName,
       String appSubmitter, Resource r, long expiryTimeStamp, int masterKeyId,
       long rmIdentifier, Priority priority, long creationTime,
-      LogAggregationContext logAggregationContext) {
+      LogAggregationContext logAggregationContext, String appSubmitterFolder) {
     this(containerID, hostName, appSubmitter, r, expiryTimeStamp, masterKeyId,
         rmIdentifier, priority, creationTime, logAggregationContext,
-        CommonNodeLabelsManager.NO_LABEL);
+        CommonNodeLabelsManager.NO_LABEL, appSubmitterFolder);
   }
 
   public ContainerTokenIdentifier(ContainerId containerID, String hostName,
       String appSubmitter, Resource r, long expiryTimeStamp, int masterKeyId,
       long rmIdentifier, Priority priority, long creationTime,
-      LogAggregationContext logAggregationContext, String nodeLabelExpression) {
+      LogAggregationContext logAggregationContext, String nodeLabelExpression, String appSubmitterFolder) {
     this(containerID, hostName, appSubmitter, r, expiryTimeStamp, masterKeyId,
         rmIdentifier, priority, creationTime, logAggregationContext,
-        nodeLabelExpression, ContainerType.TASK);
+        nodeLabelExpression, ContainerType.TASK, appSubmitterFolder);
   }
 
   public ContainerTokenIdentifier(ContainerId containerID, String hostName,
       String appSubmitter, Resource r, long expiryTimeStamp, int masterKeyId,
       long rmIdentifier, Priority priority, long creationTime,
       LogAggregationContext logAggregationContext, String nodeLabelExpression,
-      ContainerType containerType) {
+      ContainerType containerType, String appSubmitterFolder) {
     this(containerID, 0, hostName, appSubmitter, r, expiryTimeStamp,
         masterKeyId, rmIdentifier, priority, creationTime,
-        logAggregationContext, nodeLabelExpression, containerType);
+        logAggregationContext, nodeLabelExpression, containerType, appSubmitterFolder);
   }
 
   public ContainerTokenIdentifier(ContainerId containerID, int containerVersion,
       String hostName, String appSubmitter, Resource r, long expiryTimeStamp,
       int masterKeyId, long rmIdentifier, Priority priority, long creationTime,
       LogAggregationContext logAggregationContext, String nodeLabelExpression,
-      ContainerType containerType) {
+      ContainerType containerType, String appSubmitterFolder) {
     ContainerTokenIdentifierProto.Builder builder =
         ContainerTokenIdentifierProto.newBuilder();
     if (containerID != null) {
@@ -128,6 +128,8 @@ public class ContainerTokenIdentifier extends TokenIdentifier {
     builder.setVersion(containerVersion);
     builder.setNmHostAddr(hostName);
     builder.setAppSubmitter(appSubmitter);
+    builder.setAppSubmitterFolder(appSubmitterFolder);
+    
     if (r != null) {
       builder.setResource(((ResourcePBImpl)r).getProto());
     }
@@ -169,6 +171,10 @@ public class ContainerTokenIdentifier extends TokenIdentifier {
     return proto.getAppSubmitter();
   }
 
+  public String getApplicationSubmitterFolder() {
+    return proto.getAppSubmitterFolder();
+  }
+  
   public String getNmHostAddress() {
     return proto.getNmHostAddr();
   }
@@ -251,7 +257,7 @@ public class ContainerTokenIdentifier extends TokenIdentifier {
       containerId = new ContainerIdPBImpl(proto.getContainerId()).toString();
     }
     return UserGroupInformation.createRemoteUser(
-        containerId);
+        containerId, false);
   }
 
   /**

@@ -159,11 +159,18 @@ public class BuilderUtils {
   public static Token newContainerToken(ContainerId cId, int containerVersion,
       String host, int port, String user, Resource r, long expiryTime,
       int masterKeyId, byte[] password, long rmIdentifier) throws IOException {
+    return newContainerToken(cId, containerVersion, host, port, user, r, expiryTime, 
+        masterKeyId, password, rmIdentifier, user);
+  }
+  
+  public static Token newContainerToken(ContainerId cId, int containerVersion,
+      String host, int port, String user, Resource r, long expiryTime,
+      int masterKeyId, byte[] password, long rmIdentifier, String userFolder) throws IOException {
     ContainerTokenIdentifier identifier =
         new ContainerTokenIdentifier(cId, containerVersion, host + ":" + port,
             user, r, expiryTime, masterKeyId, rmIdentifier,
             Priority.newInstance(0), 0, null, CommonNodeLabelsManager.NO_LABEL,
-            ContainerType.TASK);
+            ContainerType.TASK, userFolder);
     return newContainerToken(BuilderUtils.newNodeId(host, port), password,
         identifier);
   }

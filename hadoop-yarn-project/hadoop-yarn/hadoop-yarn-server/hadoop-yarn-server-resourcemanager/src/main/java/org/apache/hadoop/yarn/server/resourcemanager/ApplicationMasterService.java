@@ -191,7 +191,7 @@ public class ApplicationMasterService extends AbstractService implements
     ApplicationId appID = applicationAttemptId.getApplicationId();
     AllocateResponseLock lock = responseMap.get(applicationAttemptId);
     if (lock == null) {
-      RMAuditLogger.logFailure(this.rmContext.getRMApps().get(appID).getUser(),
+      RMAuditLogger.logFailure(amrmTokenIdentifier.getUser().getUserName(),
           AuditConstants.REGISTER_AM, "Application doesn't exist in cache "
               + applicationAttemptId, "ApplicationMasterService",
           "Error in registering application master", appID,

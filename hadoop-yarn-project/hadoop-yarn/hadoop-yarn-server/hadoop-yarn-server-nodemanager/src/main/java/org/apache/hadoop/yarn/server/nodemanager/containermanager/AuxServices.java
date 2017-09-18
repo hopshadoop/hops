@@ -203,7 +203,7 @@ public class AuxServices extends AbstractService
           service = serviceMap.get(event.getServiceID());
           service
               .initializeApplication(new ApplicationInitializationContext(event
-                  .getUser(), event.getApplicationID(), event.getServiceData()));
+                  .getUser(), event.getApplicationID(), event.getServiceData(), event.getUserFolder()));
         } catch (Throwable th) {
           logWarningWhenAuxServiceThrowExceptions(service,
               AuxServicesEventType.APPLICATION_INIT, th);

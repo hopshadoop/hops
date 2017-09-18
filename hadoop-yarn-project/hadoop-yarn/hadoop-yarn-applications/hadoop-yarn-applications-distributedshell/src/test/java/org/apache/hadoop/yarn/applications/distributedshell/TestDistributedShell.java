@@ -993,17 +993,27 @@ public class TestDistributedShell {
             .get(YarnConfiguration.NM_LOG_DIRS,
                 YarnConfiguration.DEFAULT_NM_LOG_DIRS));
 
-    File[] listOfFiles = logFolder.listFiles();
+    File[] listOfUsersFolder = logFolder.listFiles();
     int currentContainerLogFileIndex = -1;
-    for (int i = listOfFiles.length - 1; i >= 0; i--) {
-      if (listOfFiles[i].listFiles().length == containerNum + 1) {
-        currentContainerLogFileIndex = i;
+    int currentUserLogFileIndex = -1;
+    for (int j = listOfUsersFolder.length - 1; j >= 0; j--) {
+      File[] listOfFiles = listOfUsersFolder[j].listFiles();
+      boolean foundit = false;
+      for (int i = listOfFiles.length - 1; i >= 0; i--) {
+        if (listOfFiles[i].listFiles().length == containerNum + 1) {
+          currentContainerLogFileIndex = i;
+          currentUserLogFileIndex = j;
+          foundit = true;
+          break;
+        }
+      }
+      if (foundit) {
         break;
       }
     }
     Assert.assertTrue(currentContainerLogFileIndex != -1);
-    File[] containerFiles =
-        listOfFiles[currentContainerLogFileIndex].listFiles();
+    File[] containerFiles = listOfUsersFolder[currentUserLogFileIndex].listFiles()[currentContainerLogFileIndex].
+        listFiles();
 
     int numOfWords = 0;
     for (int i = 0; i < containerFiles.length; i++) {

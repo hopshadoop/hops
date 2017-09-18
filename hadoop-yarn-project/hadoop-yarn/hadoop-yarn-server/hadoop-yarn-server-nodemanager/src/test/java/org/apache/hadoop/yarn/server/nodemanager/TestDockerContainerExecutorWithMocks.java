@@ -124,6 +124,7 @@ public class TestDockerContainerExecutorWithMocks {
   //IllegalArgumentException
   public void testContainerLaunchNullImage() throws IOException {
     String appSubmitter = "nobody";
+    String appSubmitterFolder = "nobodysFolder";
     String appId = "APP_ID";
     String containerId = "CONTAINER_ID";
     String testImage = "";
@@ -159,6 +160,7 @@ public class TestDockerContainerExecutorWithMocks {
         .setContainerWorkDir(workDir)
         .setLocalDirs(dirsHandler.getLocalDirs())
         .setLogDirs(dirsHandler.getLogDirs())
+        .setUserFolder(appSubmitterFolder)
         .build());
   }
 
@@ -167,6 +169,7 @@ public class TestDockerContainerExecutorWithMocks {
   //IllegalArgumentException
   public void testContainerLaunchInvalidImage() throws IOException {
     String appSubmitter = "nobody";
+    String appSubmitterFolder = "nobodysFolder";
     String appId = "APP_ID";
     String containerId = "CONTAINER_ID";
     String testImage = "testrepo.com/test-image rm -rf $HADOOP_PREFIX/*";
@@ -203,6 +206,7 @@ public class TestDockerContainerExecutorWithMocks {
             .setContainerWorkDir(workDir)
             .setLocalDirs(dirsHandler.getLocalDirs())
             .setLogDirs(dirsHandler.getLogDirs())
+            .setUserFolder(appSubmitterFolder)
             .build());
   }
 
@@ -211,6 +215,7 @@ public class TestDockerContainerExecutorWithMocks {
   //commands we expected
   public void testContainerLaunch() throws IOException {
     String appSubmitter = "nobody";
+    String appSubmitterFolder = "nobodysFolder";
     String appId = "APP_ID";
     String containerId = "CONTAINER_ID";
     String testImage = "\"sequenceiq/hadoop-docker:2.4.1\"";
@@ -245,6 +250,7 @@ public class TestDockerContainerExecutorWithMocks {
             .setContainerWorkDir(workDir)
             .setLocalDirs(dirsHandler.getLocalDirs())
             .setLogDirs(dirsHandler.getLogDirs())
+            .setUserFolder(appSubmitterFolder)
             .build());
     assertEquals(0, ret);
     //get the script

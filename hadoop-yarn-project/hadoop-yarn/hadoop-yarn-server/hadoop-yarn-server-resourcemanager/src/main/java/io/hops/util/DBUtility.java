@@ -17,6 +17,9 @@ package io.hops.util;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.hops.exception.StorageException;
+import io.hops.metadata.common.entity.ByteArrayVariable;
+import io.hops.metadata.common.entity.Variable;
+import io.hops.metadata.hdfs.dal.VariableDataAccess;
 import io.hops.metadata.yarn.dal.*;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
@@ -597,5 +600,36 @@ long start = System.currentTimeMillis();
       }
     };
     setRMDTMasterKeyHandler.handle();
+  }
+
+  public static byte[] verifySalt(final byte[] salt) throws IOException {
+
+    AsyncLightWeightRequestHandler verifySalt
+        = new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        connector.beginTransaction();
+        connector.writeLock();
+
+        VariableDataAccess<Variable, Variable.Finder> variableDAO = (VariableDataAccess) YarnAPIStorageFactory.
+            getDataAccess(VariableDataAccess.class);
+        Variable var = null;
+        try {
+          var = variableDAO.getVariable(Variable.Finder.Seed);
+        } catch (StorageException ex) {
+          LOG.warn(ex);
+        }
+        if (var == null) {
+          var = new ByteArrayVariable(Variable.Finder.Seed, salt);
+          variableDAO.setVariable(var);
+        }
+
+        connector.commit();
+
+        return var.getBytes();
+      }
+    };
+    byte[] s = (byte[]) verifySalt.handle();
+    return s;
   }
 }

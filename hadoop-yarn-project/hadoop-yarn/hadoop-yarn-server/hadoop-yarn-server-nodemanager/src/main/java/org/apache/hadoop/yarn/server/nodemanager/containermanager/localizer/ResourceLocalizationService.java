@@ -148,6 +148,7 @@ public class ResourceLocalizationService extends CompositeService
   private static final Log LOG = LogFactory.getLog(ResourceLocalizationService.class);
   public static final String NM_PRIVATE_DIR = "nmPrivate";
   public static final FsPermission NM_PRIVATE_PERM = new FsPermission((short) 0700);
+  public static final FsPermission NM_SECURE_PERM = new FsPermission((short) 0711);
 
   private Server server;
   private InetSocketAddress localizationServerAddress;
@@ -473,7 +474,7 @@ public class ResourceLocalizationService extends CompositeService
     LoadingCache<Path,Future<FileStatus>> statCache =
         CacheBuilder.newBuilder().build(FSDownload.createStatusCacheLoader(getConfig()));
     LocalizerContext ctxt = new LocalizerContext(
-        c.getUser(), c.getContainerId(), c.getCredentials(), statCache);
+        c.getUser(), c.getContainerId(), c.getCredentials(), statCache, c.getUserFolder());
     Map<LocalResourceVisibility, Collection<LocalResourceRequest>> rsrcs =
       rsrcReqs.getRequestedResources();
     for (Map.Entry<LocalResourceVisibility, Collection<LocalResourceRequest>> e :
@@ -542,6 +543,7 @@ public class ResourceLocalizationService extends CompositeService
     
     // Delete the container directories
     String userName = c.getUser();
+    String userFolder = c.getUserFolder();
     String containerIDStr = c.toString();
     String appIDStr =
         c.getContainerId().getApplicationAttemptId().getApplicationId()
@@ -555,7 +557,7 @@ public class ResourceLocalizationService extends CompositeService
     for (String localDir : dirsHandler.getLocalDirsForCleanup()) {
       // Delete the user-owned container-dir
       Path usersdir = new Path(localDir, ContainerLocalizer.USERCACHE);
-      Path userdir = new Path(usersdir, userName);
+      Path userdir = new Path(usersdir, userFolder);
       Path allAppsdir = new Path(userdir, ContainerLocalizer.APPCACHE);
       Path appDir = new Path(allAppsdir, appIDStr);
       Path containerDir = new Path(appDir, containerIDStr);
@@ -612,13 +614,14 @@ public class ResourceLocalizationService extends CompositeService
 
     // Delete the application directories
     userName = application.getUser();
+    String userFolder = application.getUserFolder();
     appIDStr = application.toString();
 
     for (String localDir : dirsHandler.getLocalDirsForCleanup()) {
 
       // Delete the user-owned app-dir
       Path usersdir = new Path(localDir, ContainerLocalizer.USERCACHE);
-      Path userdir = new Path(usersdir, userName);
+      Path userdir = new Path(usersdir, userFolder);
       Path allAppsdir = new Path(userdir, ContainerLocalizer.APPCACHE);
       Path appDir = new Path(allAppsdir, appIDStr);
       submitDirForDeletion(userName, appDir);
@@ -651,15 +654,15 @@ public class ResourceLocalizationService extends CompositeService
     }
   }
 
-  private String getUserFileCachePath(String user) {
+  private String getUserFileCachePath(String userFolder) {
     return StringUtils.join(Path.SEPARATOR, Arrays.asList(".",
-      ContainerLocalizer.USERCACHE, user, ContainerLocalizer.FILECACHE));
+      ContainerLocalizer.USERCACHE, userFolder, ContainerLocalizer.FILECACHE));
 
   }
 
-  private String getAppFileCachePath(String user, String appId) {
+  private String getAppFileCachePath(String userFolder, String appId) {
     return StringUtils.join(Path.SEPARATOR, Arrays.asList(".",
-        ContainerLocalizer.USERCACHE, user, ContainerLocalizer.APPCACHE, appId,
+        ContainerLocalizer.USERCACHE, userFolder, ContainerLocalizer.APPCACHE, appId,
         ContainerLocalizer.FILECACHE));
   }
   
@@ -1118,14 +1121,15 @@ public class ResourceLocalizationService extends CompositeService
     private Path getPathForLocalization(LocalResource rsrc,
         LocalResourcesTracker tracker) throws IOException, URISyntaxException {
       String user = context.getUser();
+      String userFolder = context.getUserFolder();
       ApplicationId appId =
           context.getContainerId().getApplicationAttemptId().getApplicationId();
       LocalResourceVisibility vis = rsrc.getVisibility();
       String cacheDirectory = null;
       if (vis == LocalResourceVisibility.PRIVATE) {// PRIVATE Only
-        cacheDirectory = getUserFileCachePath(user);
+        cacheDirectory = getUserFileCachePath(userFolder);
       } else {// APPLICATION ONLY
-        cacheDirectory = getAppFileCachePath(user, appId.toString());
+        cacheDirectory = getAppFileCachePath(userFolder, appId.toString());
       }
       Path dirPath =
           dirsHandler.getLocalPathForWrite(cacheDirectory,
@@ -1160,6 +1164,7 @@ public class ResourceLocalizationService extends CompositeService
                   .getApplicationAttemptId().getApplicationId().toString())
               .setLocId(localizerId)
               .setDirsHandler(dirsHandler)
+              .setUserFolder(context.getUserFolder())
               .build());
         } else {
           throw new IOException("All disks failed. "
@@ -1572,12 +1577,14 @@ public class ResourceLocalizationService extends CompositeService
         FsPermission.getDirDefault().applyUMask(lfs.getUMask());
     FsPermission nmPrivatePermission =
         NM_PRIVATE_PERM.applyUMask(lfs.getUMask());
-
+    FsPermission nmSecurePermission =
+        NM_SECURE_PERM.applyUMask(lfs.getUMask());
+    
     Path userDir = new Path(localDir, ContainerLocalizer.USERCACHE);
     Path fileDir = new Path(localDir, ContainerLocalizer.FILECACHE);
     Path sysDir = new Path(localDir, NM_PRIVATE_DIR);
 
-    localDirPathFsPermissionsMap.put(userDir, defaultPermission);
+    localDirPathFsPermissionsMap.put(userDir, nmSecurePermission);
     localDirPathFsPermissionsMap.put(fileDir, defaultPermission);
     localDirPathFsPermissionsMap.put(sysDir, nmPrivatePermission);
     return localDirPathFsPermissionsMap;
