@@ -363,7 +363,7 @@ public class FSDirectory implements Closeable {
 
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug(
-          "DIR* FSDirectory.removeBlock: " + path + " with " + block +
+          "DIR* FSDirectory.removeReplica: " + path + " with " + block +
               " block is removed from the file system");
     }
 

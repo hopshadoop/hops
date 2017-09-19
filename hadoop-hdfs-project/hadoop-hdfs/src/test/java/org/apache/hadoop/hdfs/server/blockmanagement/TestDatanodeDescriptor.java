@@ -27,6 +27,7 @@ import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -74,6 +75,7 @@ public class TestDatanodeDescriptor {
     HdfsStorageFactory.formatStorage();
 
     BlocksMap blocksMap = new BlocksMap(null);
+    HashBuckets.initialize(DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
 
     DatanodeDescriptor dd = DFSTestUtil.getLocalDatanodeDescriptor();
     assertEquals(0, dd.numBlocks());
@@ -101,9 +103,7 @@ public class TestDatanodeDescriptor {
   }
   
   private boolean addBlock(final BlocksMap blocksMap, final DatanodeDescriptor
-      dn,
-      final
-  BlockInfo blk)
+      dn, final BlockInfo blk)
       throws IOException {
     return (Boolean) new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST) {
@@ -151,7 +151,7 @@ public class TestDatanodeDescriptor {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        return dn.removeBlock(blk);
+        return dn.removeReplica(blk);
       }
 
     }.handle();

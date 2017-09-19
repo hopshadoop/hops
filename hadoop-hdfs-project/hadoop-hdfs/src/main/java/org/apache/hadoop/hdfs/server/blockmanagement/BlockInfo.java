@@ -211,7 +211,7 @@ public class BlockInfo extends Block {
     return getDatanodes(datanodeMgr, replicas);
   }
 
-  List<Replica> getReplicasNoCheck()
+  private List<Replica> getReplicasNoCheck()
       throws StorageException, TransactionContextException {
     List<Replica> replicas = (List<Replica>) EntityManager
         .findList(Replica.Finder.ByBlockIdAndINodeId, getBlockId(),
@@ -224,7 +224,7 @@ public class BlockInfo extends Block {
     return replicas;
   }
 
-  List<Replica> getReplicas(DatanodeManager datanodeMgr)
+  private List<Replica> getReplicas(DatanodeManager datanodeMgr)
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicasNoCheck();
     getDatanodes(datanodeMgr, replicas);
@@ -238,15 +238,15 @@ public class BlockInfo extends Block {
   /**
    * Adds new replica for this block.
    */
-  Replica addReplica(DatanodeDescriptor dn, BlockInfo b)
+  void addReplica(DatanodeDescriptor dn, BlockInfo b )
       throws StorageException, TransactionContextException {
     Replica replica =
-        new Replica(dn.getSId(), getBlockId(), b.getInodeId());
-    add(replica);
-    return replica;
+        new Replica(dn.getSId(), getBlockId(), b.getInodeId(), HashBuckets
+            .getInstance().getBucketForBlock(b));
+    update(replica);
   }
 
-  public void removeAllReplicas()
+   void removeAllReplicas()
       throws StorageException, TransactionContextException {
     for (Replica replica : getReplicasNoCheck()) {
       remove(replica);
@@ -376,12 +376,12 @@ public class BlockInfo extends Block {
     DatanodeDescriptor[] locations = new DatanodeDescriptor[list.size()];
     return list.toArray(locations);
   }
-
-  protected void add(Replica replica)
-      throws StorageException, TransactionContextException {
-    EntityManager.add(replica);
-  }
   
+  protected void update(Replica replica)
+      throws TransactionContextException, StorageException {
+    EntityManager.update(replica);
+  }
+
   protected void remove(Replica replica)
       throws StorageException, TransactionContextException {
     EntityManager.remove(replica);
@@ -433,34 +433,25 @@ public class BlockInfo extends Block {
     setNoPersistance(blkid, len, genStamp);
     save();
   }
-  
-  protected void save() throws StorageException, TransactionContextException {
-    save(this);
-  }
 
-  protected void save(BlockInfo blk)
+  protected void save()
       throws StorageException, TransactionContextException {
-    EntityManager.update(blk);
+    EntityManager.update(this);
   }
 
-  protected void remove() throws StorageException, TransactionContextException {
-    remove(this);
-  }
-
-  protected void remove(BlockInfo blk)
+  protected void remove()
       throws StorageException, TransactionContextException {
-    EntityManager.remove(blk);
+    EntityManager.remove(this);
   }
   
   public static BlockInfo cloneBlock(BlockInfo block) throws StorageException {
-    if (block instanceof BlockInfo) {
-      return new BlockInfo(((BlockInfo) block),
-          ((BlockInfo) block).getInodeId());
-    } else if (block instanceof BlockInfoUnderConstruction) {
-      return new BlockInfoUnderConstruction((BlockInfoUnderConstruction) block,
-          ((BlockInfoUnderConstruction) block).getInodeId());
-    } else {
+    if (block == null){
       throw new StorageException("Unable to create a clone of the Block");
+    }
+    if (block instanceof BlockInfoUnderConstruction){
+      return new BlockInfoUnderConstruction(block, block.getInodeId());
+    } else {
+      return new BlockInfo(block, block.getInodeId());
     }
   }
 
