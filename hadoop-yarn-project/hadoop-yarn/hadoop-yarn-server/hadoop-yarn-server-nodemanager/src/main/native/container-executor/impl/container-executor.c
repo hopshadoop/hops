@@ -2190,19 +2190,18 @@ int create_cgroup_hierarchy(const char* cgroup_path, const char* cgroup_hierarch
   strcat(devicesHierarchyPath, "/devices/");
   strcat(devicesHierarchyPath, cgroup_hierarchy);
 
-  struct stat cpuCgroupDir;
-  struct stat devicesCgroupDir;
+  // create hierarchy as 0750 and chown to Hadoop NM user
+  const mode_t perms = S_IRWXU | S_IRGRP | S_IXGRP;
+  if (mkdirs(cpuHierarchyPath, perms) == 0) {
+      change_owner(cpuHierarchyPath, nm_uid, nm_gid);
+      chown_dir_contents(cpuHierarchyPath, nm_uid, nm_gid);
+  }
 
-  DIR *dp;
-  struct dirent *ep;
-
-  mkdir(cpuHierarchyPath, 0750);
-  chown(cpuHierarchyPath, nm_gid, nm_gid);
-  change_cgroup_ownership(cpuHierarchyPath);
-
-  mkdir(devicesHierarchyPath, 0750);
-  chown(devicesHierarchyPath, nm_gid, nm_gid);
-  change_cgroup_ownership(devicesHierarchyPath);
+  // create hierarchy as 0750 and chown to Hadoop NM user
+  if (mkdirs(devicesHierarchyPath, perms) == 0) {
+      change_owner(devicesHierarchyPath, nm_uid, nm_gid);
+      chown_dir_contents(devicesHierarchyPath, nm_uid, nm_gid);
+  }
 
   // Revert back to the calling user.
   if (change_effective_user(user, group)) {
@@ -2210,29 +2209,6 @@ int create_cgroup_hierarchy(const char* cgroup_path, const char* cgroup_hierarch
   }
 
   return 0;
-}
-
-void change_cgroup_ownership(char *path) {
- DIR *dp;
-  struct dirent *ep;
-
-  char *path_tmp = malloc(strlen(path) + NAME_MAX + 2);
-    if (path_tmp == NULL) {
-      return;
-    }
-
-    char *buf = stpncpy(path_tmp, path, strlen(path));
-    *buf++ = '/';
-
-        dp = opendir(path);
-        if (dp != NULL) {
-          while ((ep = readdir(dp)) != NULL) {
-            stpncpy(buf, ep->d_name, strlen(ep->d_name));
-            buf[strlen(ep->d_name)] = '\0';
-            chown(path_tmp, nm_gid, nm_gid);
-          }
-          closedir(dp);
-        }
 }
 
 static int run_traffic_control(const char *opts[], char *command_file) {
