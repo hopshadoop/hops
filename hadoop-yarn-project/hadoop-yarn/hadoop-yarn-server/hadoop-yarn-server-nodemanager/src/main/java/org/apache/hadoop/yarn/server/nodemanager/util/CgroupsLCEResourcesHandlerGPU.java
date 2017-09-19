@@ -556,7 +556,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
       LinkedList<String> cgroupGPUDenyEntries = createCgroupDeviceEntry
           (deniedDevices);
       for(String deviceEntry: cgroupGPUDenyEntries) {
-        updateCgroup(CONTROLLER_DEVICES, containerName, DEVICES_DENY,
+        updateCgroupDevice(CONTROLLER_DEVICES, containerName, DEVICES_DENY,
             deviceEntry);
       }
     }
