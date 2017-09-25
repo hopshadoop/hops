@@ -28,6 +28,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RpcServerException;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import javax.net.ssl.SSLException;
 import java.io.IOException;
@@ -117,12 +118,13 @@ public class NamenodeSelector {
   protected final Configuration conf;
   private final int namenodeListUpdateTimePeriod;
   private long lastUpdate=0;
+  private final UserGroupInformation effectiveUser;
   Random rand = new Random((UUID.randomUUID()).hashCode());
 
 
   //only for testing
-  NamenodeSelector(Configuration conf, ClientProtocol namenode)
-      throws IOException {
+  NamenodeSelector(Configuration conf, ClientProtocol namenode,
+      UserGroupInformation effectiveUser) throws IOException {
     this.defaultUri = null;
     ActiveNode dummyActiveNamenode =
         new ActiveNodePBImpl(1, "localhost", "127.0.0.1", 9999,
@@ -132,9 +134,11 @@ public class NamenodeSelector {
     this.conf = conf;
     this.policy = NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN;
     this.namenodeListUpdateTimePeriod = -1;
+    this.effectiveUser = effectiveUser;
   }
 
-  public NamenodeSelector(Configuration conf, URI defaultUri) throws IOException {
+  public NamenodeSelector(Configuration conf, URI defaultUri,
+      UserGroupInformation effectiveUser) throws IOException {
     this.defaultUri = defaultUri;
     this.conf = conf;
 
@@ -157,7 +161,8 @@ public class NamenodeSelector {
       policy = NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY;
     }
     LOG.debug("Client's namenode selection policy is " + policy);
-
+    this.effectiveUser = effectiveUser;
+    
     //get the list of Namenodes
     createNamenodeClientsFromConfiguration();
   }
@@ -327,7 +332,8 @@ public class NamenodeSelector {
     if (defaultUri != null) {
       try {
         NameNodeProxies.ProxyAndInfo<ClientProtocol> proxyInfo =
-                NameNodeProxies.createProxy(conf, defaultUri, ClientProtocol.class);
+                NameNodeProxies.createProxy(conf, defaultUri, effectiveUser,
+                    ClientProtocol.class);
         handle = proxyInfo.getProxy();
         if (handle != null) {
           anl = handle.getActiveNamenodesForClient();
@@ -357,7 +363,8 @@ public class NamenodeSelector {
         try {
           LOG.debug("Trying to connect to  " + nn);
           NameNodeProxies.ProxyAndInfo<ClientProtocol> proxyInfo =
-              NameNodeProxies.createProxy(conf, nn, ClientProtocol.class);
+              NameNodeProxies.createProxy(conf, nn, effectiveUser,
+                  ClientProtocol.class);
           handle = proxyInfo.getProxy();
           if (handle != null) {
             anl = handle.getActiveNamenodesForClient();
@@ -485,7 +492,8 @@ public class NamenodeSelector {
     try {
       URI uri = NameNode.getUri(address);
       NameNodeProxies.ProxyAndInfo<ClientProtocol> proxyInfo =
-          NameNodeProxies.createProxy(conf, uri, ClientProtocol.class);
+          NameNodeProxies.createProxy(conf, uri, effectiveUser,
+              ClientProtocol.class);
       ClientProtocol handle = proxyInfo.getProxy();
       nnList.add(new NamenodeSelector.NamenodeHandle(handle, ann));
     } catch (IOException e) {

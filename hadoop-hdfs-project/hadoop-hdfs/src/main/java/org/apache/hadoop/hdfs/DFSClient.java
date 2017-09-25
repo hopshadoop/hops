@@ -455,14 +455,15 @@ public class DFSClient implements java.io.Closeable {
     if (rpcNamenode != null) {
       // This case is used for testing.
       Preconditions.checkArgument(nameNodeUri == null);
-      namenodeSelector = new NamenodeSelector(conf, rpcNamenode);
+      namenodeSelector = new NamenodeSelector(conf, rpcNamenode, this.ugi);
       dtService = null;
     } else {
       Preconditions.checkArgument(nameNodeUri != null, "null URI");
       NameNodeProxies.ProxyAndInfo<ClientProtocol> proxyInfo =
-          NameNodeProxies.createProxy(conf, nameNodeUri, ClientProtocol.class);
+          NameNodeProxies.createProxy(conf, nameNodeUri, this.ugi,
+              ClientProtocol.class);
       this.dtService = proxyInfo.getDelegationTokenService();
-      namenodeSelector = new NamenodeSelector(conf, nameNodeUri);
+      namenodeSelector = new NamenodeSelector(conf, nameNodeUri, this.ugi);
     }
 
     // read directly from the block file if configured.
