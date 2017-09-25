@@ -18,7 +18,6 @@
 package io.hops.transaction.lock;
 
 import io.hops.metadata.hdfs.entity.HashBucket;
-import io.hops.metadata.ndb.dalimpl.hdfs.HashBucketClusterj;
 import io.hops.transaction.EntityManager;
 
 import java.io.IOException;
