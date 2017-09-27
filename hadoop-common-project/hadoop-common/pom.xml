@@ -304,6 +304,11 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>io.hops.metadata</groupId>
+      <artifactId>hops-metadata-dal</artifactId>
+      <type>jar</type>
+    </dependency>
+    <dependency>
       <groupId>com.googlecode.concurrentlinkedhashmap</groupId>
       <artifactId>concurrentlinkedhashmap-lru</artifactId>
       <version>1.4.2</version>

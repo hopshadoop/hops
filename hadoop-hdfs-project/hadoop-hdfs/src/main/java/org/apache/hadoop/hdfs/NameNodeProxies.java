@@ -101,7 +101,13 @@ public class NameNodeProxies {
       return dtService;
     }
   }
-
+  
+  public static <T> ProxyAndInfo<T> createProxy(Configuration conf,
+      URI nameNodeUri, Class<T> xface)
+      throws IOException {
+    return createProxy(conf, nameNodeUri, null, xface);
+  }
+  
   /**
    * Creates the namenode proxy with the passed protocol. This will handle
    * creation of either HA- or non-HA-enabled proxy objects, depending upon
@@ -122,7 +128,8 @@ public class NameNodeProxies {
    */
   @SuppressWarnings("unchecked")
   public static <T> ProxyAndInfo<T> createProxy(Configuration conf,
-      URI nameNodeUri, Class<T> xface) throws IOException {
+      URI nameNodeUri, UserGroupInformation ugi, Class<T> xface)
+      throws IOException {
     Class<FailoverProxyProvider<T>> failoverProxyProviderClass =
         getFailoverProxyProviderClass(conf, nameNodeUri, xface);
 
@@ -130,8 +137,11 @@ public class NameNodeProxies {
       throw new UnsupportedOperationException(
           "HA ConfiguredProxyFailover is " + "not supported");
     }
+    
+    UserGroupInformation effectiveUser = ugi != null ? ugi
+        : UserGroupInformation.getCurrentUser();
     return createNonHAProxy(conf, NameNode.getAddress(nameNodeUri), xface,
-        UserGroupInformation.getCurrentUser(), true);
+        effectiveUser, true);
   }
 
   /**
