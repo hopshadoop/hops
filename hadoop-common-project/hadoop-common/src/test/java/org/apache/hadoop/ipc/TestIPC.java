@@ -75,6 +75,7 @@ import org.apache.hadoop.ipc.Server.Connection;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto;
 import org.apache.hadoop.net.ConnectTimeoutException;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.SSLCertificateException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -776,8 +777,9 @@ public class TestIPC {
       threads[i] = new Thread(new Runnable() {
         @Override
         public void run() {
-          Client client = new Client(LongWritable.class, conf);
+          Client client = null;
           try {
+            client = new Client(LongWritable.class, conf);
             call(client, new LongWritable(Thread.currentThread().getId()),
                 addr, 60000, conf);
           } catch (Throwable e) {
@@ -785,8 +787,10 @@ public class TestIPC {
             failures.incrementAndGet();
             return;
           } finally {
-            callFinishedLatch.countDown();            
-            client.stop();
+            callFinishedLatch.countDown();
+            if (client != null) {
+              client.stop();
+            }
           }
         }
       });
@@ -913,8 +917,9 @@ public class TestIPC {
         threads[i] = new Thread(new Runnable(){
           @Override
           public void run() {
-            Client client = new Client(LongWritable.class, clientConf);
+            Client client = null;
             try {
+              client = new Client(LongWritable.class, clientConf);
               call(client, Thread.currentThread().getId(), addr, clientConf);
               callReturned.countDown();
               Thread.sleep(10000);
@@ -922,7 +927,9 @@ public class TestIPC {
               LOG.error(e);
             } catch (InterruptedException e) {
             } finally {
-              client.stop();
+              if (client != null) {
+                client.stop();
+              }
             }
           }
         });
@@ -1026,7 +1033,7 @@ public class TestIPC {
    * InterruptedException during cleanup
    */
   @Test(timeout=30000)
-  public void testInterrupted() {
+  public void testInterrupted() throws SSLCertificateException {
     Client client = new Client(LongWritable.class, conf);
     Client.getClientExecutor().submit(new Runnable() {
       public void run() {
