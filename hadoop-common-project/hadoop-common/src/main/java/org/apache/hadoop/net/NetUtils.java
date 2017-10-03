@@ -91,7 +91,7 @@ public class NetUtils {
    * @return a socket factory
    */
   public static SocketFactory getSocketFactory(Configuration conf,
-      Class<?> clazz) {
+      Class<?> clazz) throws SSLCertificateException {
 
     SocketFactory factory = null;
 
@@ -115,7 +115,8 @@ public class NetUtils {
    *         the JVM default socket factory if the configuration does not
    *         contain a default socket factory property.
    */
-  public static SocketFactory getDefaultSocketFactory(Configuration conf) {
+  public static SocketFactory getDefaultSocketFactory(Configuration conf)
+    throws SSLCertificateException {
 
     String propValue = conf.get(
         CommonConfigurationKeysPublic.HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_KEY,
@@ -130,7 +131,7 @@ public class NetUtils {
   }
   
   private static void configureCryptoMaterial(SocketFactory factory,
-      Configuration conf) {
+      Configuration conf) throws SSLCertificateException {
     if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
           CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)
         && (factory instanceof HopsSSLSocketFactory)) {

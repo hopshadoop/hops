@@ -88,6 +88,7 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.Rpc
 import org.apache.hadoop.net.ConnectTimeoutException;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.SSLCertificateException;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.SaslRpcClient;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
@@ -1327,7 +1328,8 @@ public class Client implements AutoCloseable {
    * @param valueClass
    * @param conf
    */
-  public Client(Class<? extends Writable> valueClass, Configuration conf) {
+  public Client(Class<? extends Writable> valueClass, Configuration conf)
+    throws SSLCertificateException {
     this(valueClass, conf, NetUtils.getDefaultSocketFactory(conf));
   }
  

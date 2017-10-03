@@ -6,18 +6,22 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.SSLCertificateException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.PrivilegedAction;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +35,9 @@ public class TestHopsSSLConfiguration {
         System.getProperty("test.build.dir", "target/test-dir") + "/" +
             TestHopsSSLConfiguration.class.getSimpleName();
     private File baseDirFile;
+    
+    @Rule
+    public final ExpectedException rule = ExpectedException.none();
     
     Configuration conf;
     HopsSSLSocketFactory hopsFactory;
@@ -95,9 +102,9 @@ public class TestHopsSSLConfiguration {
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("superuser");
-        ugi.doAs(new PrivilegedAction<Object>() {
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
             @Override
-            public Object run() {
+            public Object run() throws SSLCertificateException {
                 hopsFactory.setConf(conf);
                 hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
@@ -127,9 +134,9 @@ public class TestHopsSSLConfiguration {
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("superuser");
-        ugi.doAs(new PrivilegedAction<Object>() {
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
             @Override
-            public Object run() {
+            public Object run() throws SSLCertificateException {
                 hopsFactory.setConf(conf);
                 hopsFactory.setPaswordFromHopsworks(password);
                 hopsFactory.configureCryptoMaterial(null, superusers);
@@ -180,9 +187,9 @@ public class TestHopsSSLConfiguration {
             .createRemoteUser("project__user");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("superuser");
-        ugi.doAs(new PrivilegedAction<Object>() {
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
             @Override
-            public Object run() {
+            public Object run() throws SSLCertificateException {
                 hopsFactory.setConf(conf);
                 hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
@@ -202,6 +209,23 @@ public class TestHopsSSLConfiguration {
     }
     
     @Test
+    public void testConfigurationWithMissingCertificates() throws Exception {
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser
+            ("project__user");
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("superuser");
+        rule.expect(SSLCertificateException.class);
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws SSLCertificateException {
+                hopsFactory.setConf(conf);
+                hopsFactory.configureCryptoMaterial(null, superusers);
+                return null;
+            }
+        });
+    }
+    
+    @Test
     public void testWithNoConfigSuperuser() throws Exception {
         conf.set(HopsSSLSocketFactory.CryptoKeys.SERVICE_CERTS_DIR.getValue()
             , "/tmp");
@@ -216,9 +240,9 @@ public class TestHopsSSLConfiguration {
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("glassfish");
-        ugi.doAs(new PrivilegedAction<Object>() {
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
             @Override
-            public Object run() {
+            public Object run() throws SSLCertificateException {
                 hopsFactory.setConf(conf);
                 hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
@@ -254,9 +278,9 @@ public class TestHopsSSLConfiguration {
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("glassfish");
-        ugi.doAs(new PrivilegedAction<Object>() {
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
             @Override
-            public Object run() {
+            public Object run() throws SSLCertificateException {
                 hopsFactory.setConf(conf);
                 hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
@@ -330,7 +354,7 @@ public class TestHopsSSLConfiguration {
         assertEquals(tstore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
         assertEquals(pass, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
-
+    
     private String touchFile(String file) throws IOException {
         File fd = new File(file);
         fd.createNewFile();
