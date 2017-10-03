@@ -56,6 +56,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -74,7 +75,8 @@ public class CertificateLocalizationService extends AbstractService
   
   private final String SYSTEM_TMP = System.getProperty("java.io.tmpdir",
       "/tmp");
-  private final String LOCALIZATION_DIR = "certLoc";
+  private final String LOCALIZATION_DIR_NAME = "certLoc";
+  private final String LOCALIZATION_DIR;
   private Path materializeDir;
   private String superKeystorePass;
   private String superTruststorePass;
@@ -96,9 +98,14 @@ public class CertificateLocalizationService extends AbstractService
   private Server server;
   private RecordFactory recordFactory;
   
-  public CertificateLocalizationService(boolean isHAEnabled) {
+  public CertificateLocalizationService(boolean isHAEnabled, String prefix) {
     super(CertificateLocalizationService.class.getName());
     this.isHAEnabled = isHAEnabled;
+    if (prefix == null) {
+      Random rand = new Random();
+      prefix = String.valueOf(rand.nextInt());
+    }
+    LOCALIZATION_DIR = prefix + "_" + LOCALIZATION_DIR_NAME;
   }
   
   @Override

@@ -1466,7 +1466,8 @@ LOG.info("+");
         .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
       boolean isHAEnabled = rmContext.isHAEnabled();
       
-      certificateLocalizationService = new CertificateLocalizationService(isHAEnabled);
+      certificateLocalizationService = new CertificateLocalizationService(isHAEnabled,
+          "RM");
       CertificateLocalizationCtx.getInstance().setCertificateLocalization
           (certificateLocalizationService);
       addService(certificateLocalizationService);

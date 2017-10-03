@@ -54,7 +54,7 @@ public class TestCertificateLocalizationService {
   @Before
   public void setUp() throws Exception {
     conf = new Configuration();
-    certLocSrv = new CertificateLocalizationService(false);
+    certLocSrv = new CertificateLocalizationService(false, "test");
     certLocSrv.serviceInit(conf);
     certLocSrv.serviceStart();
   }
@@ -119,7 +119,7 @@ public class TestCertificateLocalizationService {
     boolean doesNotExist = false;
     
     CertificateLocalizationService certSyncLeader = new CertificateLocalizationService
-        (true);
+        (true, "test");
     configure("rm0", conf);
     certSyncLeader.serviceInit(conf);
     certSyncLeader.serviceStart();
@@ -127,7 +127,7 @@ public class TestCertificateLocalizationService {
     
     Configuration conf2 = new Configuration();
     CertificateLocalizationService certSyncSlave = new
-        CertificateLocalizationService(true);
+        CertificateLocalizationService(true, "test");
     configure("rm1", conf2);
     certSyncSlave.serviceInit(conf2);
     certSyncSlave.serviceStart();
@@ -136,7 +136,7 @@ public class TestCertificateLocalizationService {
     Configuration conf3 = new Configuration();
     configure("rm2", conf3);
     CertificateLocalizationService certSyncSlave2 = new
-        CertificateLocalizationService(true);
+        CertificateLocalizationService(true, "test");
     certSyncSlave2.serviceInit(conf3);
     certSyncSlave2.serviceStart();
     certSyncSlave2.transitionToStandby();
