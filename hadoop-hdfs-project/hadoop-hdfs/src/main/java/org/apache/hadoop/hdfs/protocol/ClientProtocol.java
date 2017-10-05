@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
@@ -1346,4 +1347,30 @@ public interface ClientProtocol {
   public LocatedBlock getRepairedBlockLocations(String sourcePath,
       String parityPath, LocatedBlock block, boolean isParity)
       throws IOException;
+
+
+  /**
+   * Checks if the user can access a path.  The mode specifies which access
+   * checks to perform.  If the requested permissions are granted, then the
+   * method returns normally.  If access is denied, then the method throws an
+   * {@link AccessControlException}.
+   * In general, applications should avoid using this method, due to the risk
+   * of
+   * time-of-check/time-of-use race conditions.  The permissions on a file may
+   * change immediately after the access call returns.
+   *
+   * @param path
+   *     Path to check
+   * @param mode
+   *     type of access to check
+   * @throws AccessControlException
+   *     if access is denied
+   * @throws FileNotFoundException
+   *     if the path does not exist
+   * @throws IOException
+   *     see specific implementation
+   */
+  @Idempotent
+  public void checkAccess(String path, FsAction mode) throws IOException;
+
 }

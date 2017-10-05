@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystemContractBaseTest;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.AppendTestUtil;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdfs.web.resources.PutOpParam;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
+import org.junit.Test;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.MediaType;
@@ -409,6 +411,36 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
         WebHdfsFileSystem.LOG.info("GOOD", ioe);
       }
       conn.disconnect();
+    }
+  }
+
+  @Test
+  public void testAccess() throws IOException, InterruptedException {
+    Path p1 = new Path("/pathX");
+    try {
+      UserGroupInformation ugi = UserGroupInformation.createUserForTesting("alpha",
+          new String[]{"beta"});
+      WebHdfsFileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, conf);
+
+      fs.mkdirs(p1);
+      fs.setPermission(p1, new FsPermission((short) 0444));
+      fs.access(p1, FsAction.READ);
+      try {
+        fs.access(p1, FsAction.WRITE);
+        fail("The access call should have failed.");
+      } catch (AccessControlException e) {
+        // expected
+      }
+
+      Path badPath = new Path("/bad");
+      try {
+        fs.access(badPath, FsAction.READ);
+        fail("The access call should have failed");
+      } catch (FileNotFoundException e) {
+        // expected
+      }
+    } finally {
+      fs.delete(p1, true);
     }
   }
 }

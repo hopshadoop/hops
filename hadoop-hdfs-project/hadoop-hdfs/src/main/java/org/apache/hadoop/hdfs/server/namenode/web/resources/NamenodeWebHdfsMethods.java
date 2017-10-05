@@ -25,6 +25,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdfs.web.resources.DelegationParam;
 import org.apache.hadoop.hdfs.web.resources.DeleteOpParam;
 import org.apache.hadoop.hdfs.web.resources.DestinationParam;
 import org.apache.hadoop.hdfs.web.resources.DoAsParam;
+import org.apache.hadoop.hdfs.web.resources.FsActionParam;
 import org.apache.hadoop.hdfs.web.resources.GetOpParam;
 import org.apache.hadoop.hdfs.web.resources.GroupParam;
 import org.apache.hadoop.hdfs.web.resources.HttpOpParam;
@@ -649,10 +651,13 @@ public class NamenodeWebHdfsMethods {
       final RenewerParam renewer,
       @QueryParam(BufferSizeParam.NAME)
       @DefaultValue(BufferSizeParam.DEFAULT)
-      final BufferSizeParam bufferSize)
+      final BufferSizeParam bufferSize,
+      @QueryParam(FsActionParam.NAME)
+      @DefaultValue(FsActionParam.DEFAULT)
+      final FsActionParam fsAction)
       throws IOException, InterruptedException {
     return get(ugi, delegation, username, doAsUser, ROOT, op, offset, length,
-        renewer, bufferSize);
+        renewer, bufferSize, fsAction);
   }
 
   /**
@@ -689,11 +694,14 @@ public class NamenodeWebHdfsMethods {
       final RenewerParam renewer,
       @QueryParam(BufferSizeParam.NAME)
       @DefaultValue(BufferSizeParam.DEFAULT)
-      final BufferSizeParam bufferSize)
+      final BufferSizeParam bufferSize,
+      @QueryParam(FsActionParam.NAME)
+      @DefaultValue(FsActionParam.DEFAULT)
+      final FsActionParam fsAction)
       throws IOException, InterruptedException {
 
     init(ugi, delegation, username, doAsUser, path, op, offset, length, renewer,
-        bufferSize);
+        bufferSize, fsAction);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
@@ -701,7 +709,8 @@ public class NamenodeWebHdfsMethods {
         REMOTE_ADDRESS.set(request.getRemoteAddr());
         try {
           return get(ugi, delegation, username, doAsUser,
-              path.getAbsolutePath(), op, offset, length, renewer, bufferSize);
+              path.getAbsolutePath(), op, offset, length, renewer,
+              bufferSize, fsAction);
         } finally {
           REMOTE_ADDRESS.set(null);
         }
@@ -713,7 +722,8 @@ public class NamenodeWebHdfsMethods {
       final DelegationParam delegation, final UserParam username,
       final DoAsParam doAsUser, final String fullpath, final GetOpParam op,
       final OffsetParam offset, final LengthParam length,
-      final RenewerParam renewer, final BufferSizeParam bufferSize)
+      final RenewerParam renewer, final BufferSizeParam bufferSize, final
+      FsActionParam fsAction)
       throws IOException, URISyntaxException {
     final NameNode namenode = (NameNode) context.getAttribute("name.node");
     final NamenodeProtocols np = namenode.getRpcServer();
@@ -776,6 +786,10 @@ public class NamenodeWebHdfsMethods {
             .toJsonString(org.apache.hadoop.fs.Path.class.getSimpleName(),
                 WebHdfsFileSystem.getHomeDirectoryString(ugi));
         return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
+      }
+      case CHECKACCESS: {
+        np.checkAccess(fullpath, FsAction.getFsAction(fsAction.getValue()));
+        return Response.ok().build();
       }
       default:
         throw new UnsupportedOperationException(op + " is not supported");
