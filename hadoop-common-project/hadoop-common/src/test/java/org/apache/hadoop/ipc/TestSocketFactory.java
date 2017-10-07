@@ -19,6 +19,7 @@ package org.apache.hadoop.ipc;
 
 import static org.junit.Assert.assertSame;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -35,7 +36,7 @@ import org.junit.Test;
 public class TestSocketFactory {
 
   @Test
-  public void testSocketFactoryAsKeyInMap() {
+  public void testSocketFactoryAsKeyInMap() throws IOException {
     Map<SocketFactory, Integer> dummyCache = new HashMap<SocketFactory, Integer>();
     int toBeCached1 = 1;
     int toBeCached2 = 2;

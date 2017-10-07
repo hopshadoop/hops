@@ -147,174 +147,199 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
           
       return cryptoPassword;
     }
-    
-    public void configureCryptoMaterial(CertificateLocalization
-        certificateLocalization, Set<String> proxySuperusers) {
-        try {
-            String username =
-                UserGroupInformation.getCurrentUser().getUserName();
-            String localHostname = NetUtils.getLocalHostname();
-            boolean forceConfigure = conf.getBoolean(FORCE_CONFIGURE,
-                DEFAULT_FORCE_CONFIGURE);
-          
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Current user: " + username + " - Hostname: " + localHostname);
-            }
-          // Application running in a container is trying to create a
-          // SecureSocket. The crypto material should have already been
-          // localized.
-          // KeyStore -> k_certificate
-          // trustStore -> t_certificate
-          File localized = new File("k_certificate");
-          if (localized.exists()) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Crypto material found in NM localized directory");
-            }
-            
-            String password = getPasswordFromHopsworks(username, localized
-                .toString());
-            setTlsConfiguration("k_certificate", password, "t_certificate",
-                password, conf);
-            
-          } else {
-            if (username.matches(USERNAME_PATTERN) ||
-                !proxySuperusers.contains(username)) {
-              // It's a normal user
-              if (!isCryptoMaterialSet(conf, username)
-                  || forceConfigure) {
   
-                String hopsworksMaterializeDir = conf.get(CryptoKeys
-                    .CLIENT_MATERIALIZE_DIR.getValue(), CryptoKeys
-                    .CLIENT_MATERIALIZE_DIR.getDefaultValue());
-                
-                // Client from HopsWorks is trying to create a SecureSocket
-                // The crypto material should be in hopsworksMaterialzieDir
-                File fd = Paths.get(hopsworksMaterializeDir, username +
-                    KEYSTORE_SUFFIX).toFile();
-                if (fd.exists()) {
-                  if (LOG.isDebugEnabled()) {
-                    LOG.debug("Crypto material exists found in " + hopsworksMaterializeDir);
-                  }
-                  
-                  // If certificateMaterializer is not null
-                  // make the REST call otherwise take the material from the
-                  // service. In a testing env, RM is located at the same
-                  // machine as Hopsworks so it follows this execution path
-                  // but we don't want to make the REST call
-                  
-                  String password;
-                  
-                  if (null != certificateLocalization) {
-                    CryptoMaterial material = certificateLocalization
-                        .getMaterialLocation(username);
-                    password = material.getKeyStorePass();
-                  } else {
-                    password = getPasswordFromHopsworks(username, fd
-                        .toString());
-                  }
-                  
-                  setTlsConfiguration(Paths.get(hopsworksMaterializeDir,
-                      username + KEYSTORE_SUFFIX).toString(),
-                      password,
-                      Paths.get(hopsworksMaterializeDir, username +
-                          TRUSTSTORE_SUFFIX).toString(),
-                      password,
-                      conf);
-                } else {
-                  // Fallback to /tmp directory
-                  // In the future certificates should not exist there
-                  fd = Paths.get("/tmp", username + KEYSTORE_SUFFIX)
-                      .toFile();
-                  if (fd.exists()) {
-                    if (LOG.isDebugEnabled()) {
-                      LOG.debug("Crypto material exists in /tmp");
-                    }
-                    configureTlsClient("/tmp", username, conf);
-                  } else {
-                    // Client from other services RM or NM is trying to
-                    // create a SecureSocket. Crypto material is already
-                    // materialized with the CertificateLocalizerDeprecated
-                    if (null != certificateLocalization) {
-                      CryptoMaterial material =
-                          certificateLocalization.getMaterialLocation(username);
-  
-                      if (LOG.isDebugEnabled()) {
-                        LOG.debug("Gotten crypto material from the " +
-                            "CertificateLocalizationService");
-                      }
-                      setTlsConfiguration(material.getKeyStoreLocation(),
-                          material.getKeyStorePass(),
-                          material.getTrustStoreLocation(),
-                          material.getTrustStorePass(),
-                          conf);
-                    }
-                  }
-                }
-              }
-            } else {
-              // It's a superuser
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("It's superuser - force configure: " + forceConfigure);
-              }
-              if ((!isCryptoMaterialSet(conf, username)
-                  && !isHostnameInCryptoMaterial(conf, localHostname))
-                  || forceConfigure) {
-                
-                String serviceCertificateDir = conf.get(CryptoKeys
-                    .SERVICE_CERTS_DIR.getValue(), CryptoKeys
-                    .SERVICE_CERTS_DIR.getDefaultValue());
-                
-                // First check if the hostname keystore exists
-                File fd = new File(
-                    Paths.get(serviceCertificateDir, localHostname +
-                        KEYSTORE_SUFFIX).toString());
-                if (fd.exists()) {
-                  if (LOG.isDebugEnabled()) {
-                    LOG.debug("Found crypto material with the hostname");
-                  }
-  
-                  String prefix = Paths.get(serviceCertificateDir,
-                      localHostname).toString();
-                  String kstoreFile = prefix + KEYSTORE_SUFFIX;
-                  String tstoreFile = prefix + TRUSTSTORE_SUFFIX;
-                  String kstorePass, tstorePass;
-                  
-                  if (null != certificateLocalization) {
-                    // Socket factory has been called from RM or NM
-                    // In any other case, ie Hopsworks,
-                    // CertificateLocalizationService would be null
-                    kstorePass = certificateLocalization
-                        .getSuperKeystorePass();
-                    tstorePass = certificateLocalization
-                        .getSuperTruststorePass();
-                  } else {
-                    LOG.debug("*** Called setTlsConfiguration for superuser " +
-                        "but no passwords provided ***");
-                    String[] keystore_truststore = readSuperPasswordFromFile(conf);
-                    kstorePass = keystore_truststore[0];
-                    tstorePass = keystore_truststore[1];
-                  }
-                  setTlsConfiguration(kstoreFile, kstorePass, tstoreFile,
-                      tstorePass, conf);
-                }
-              }
-            }
-          }
-        } catch(Exception ex){
-          LOG.error(ex, ex);
-        }
+  public void configureCryptoMaterial(CertificateLocalization
+      certificateLocalization, Set<String> proxySuperusers)
+      throws SSLCertificateException {
+    boolean cryptoConfigured = false;
+    String username = null;
+    try {
+      username = UserGroupInformation.getCurrentUser().getUserName();
+      String localHostname = NetUtils.getLocalHostname();
+      boolean forceConfigure = conf.getBoolean(FORCE_CONFIGURE,
+          DEFAULT_FORCE_CONFIGURE);
       
-        // *ClientCache* caches client instances based on their socket factory.
-        // In order to distinguish two client with the same socket factory but
-        // with different certificates, the hashCode is computed by the
-        // keystore filepath as well
-        this.keyStoreFilePath = conf.get(CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(),
-                KEY_STORE_FILEPATH_DEFAULT);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Current user: " + username + " - Hostname: " + localHostname);
+      }
+      // Application running in a container is trying to create a
+      // SecureSocket. The crypto material should have already been
+      // localized.
+      // KeyStore -> k_certificate
+      // trustStore -> t_certificate
+      File localized = new File("k_certificate");
+      if (localized.exists()) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Finally, the keystore that is used is: " + keyStoreFilePath);
+          LOG.debug("Crypto material found in NM localized directory");
         }
-        conf.setBoolean(FORCE_CONFIGURE, false);
+        
+        String password = getPasswordFromHopsworks(username, localized
+            .toString());
+        setTlsConfiguration("k_certificate", password, "t_certificate",
+            password, conf);
+        cryptoConfigured = true;
+      } else {
+        if (username.matches(USERNAME_PATTERN) ||
+            !proxySuperusers.contains(username)) {
+          // It's a normal user
+          if (!isCryptoMaterialSet(conf, username)
+              || forceConfigure) {
+            
+            String hopsworksMaterializeDir = conf.get(CryptoKeys
+                .CLIENT_MATERIALIZE_DIR.getValue(), CryptoKeys
+                .CLIENT_MATERIALIZE_DIR.getDefaultValue());
+            
+            // Client from HopsWorks is trying to create a SecureSocket
+            // The crypto material should be in hopsworksMaterialzieDir
+            File fd = Paths.get(hopsworksMaterializeDir, username +
+                KEYSTORE_SUFFIX).toFile();
+            if (fd.exists()) {
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Crypto material exists found in " +
+                    hopsworksMaterializeDir);
+              }
+              
+              // If certificateMaterializer is not null
+              // make the REST call otherwise take the material from the
+              // service. In a testing env, RM is located at the same
+              // machine as Hopsworks so it follows this execution path
+              // but we don't want to make the REST call
+              
+              String password;
+              
+              if (null != certificateLocalization) {
+                CryptoMaterial material = certificateLocalization
+                    .getMaterialLocation(username);
+                password = material.getKeyStorePass();
+              } else {
+                password = getPasswordFromHopsworks(username, fd
+                    .toString());
+              }
+              
+              setTlsConfiguration(Paths.get(hopsworksMaterializeDir,
+                  username + KEYSTORE_SUFFIX).toString(),
+                  password,
+                  Paths.get(hopsworksMaterializeDir, username +
+                      TRUSTSTORE_SUFFIX).toString(),
+                  password,
+                  conf);
+              cryptoConfigured = true;
+            } else {
+              // Fallback to /tmp directory
+              // In the future certificates should not exist there
+              fd = Paths.get("/tmp", username + KEYSTORE_SUFFIX)
+                  .toFile();
+              if (fd.exists()) {
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Crypto material exists in /tmp");
+                }
+                configureTlsClient("/tmp", username, conf);
+                cryptoConfigured = true;
+              } else {
+                // Client from other services RM or NM is trying to
+                // create a SecureSocket. Crypto material is already
+                // materialized with the CertificateLocalizerDeprecated
+                if (null != certificateLocalization) {
+                  CryptoMaterial material =
+                      certificateLocalization.getMaterialLocation(username);
+                  
+                  if (LOG.isDebugEnabled()) {
+                    LOG.debug("Gotten crypto material from the " +
+                        "CertificateLocalizationService");
+                  }
+                  setTlsConfiguration(material.getKeyStoreLocation(),
+                      material.getKeyStorePass(),
+                      material.getTrustStoreLocation(),
+                      material.getTrustStorePass(),
+                      conf);
+                  cryptoConfigured = true;
+                }
+              }
+            }
+          } else {
+            cryptoConfigured = true;
+          }
+        } else {
+          // It's a superuser
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(
+                "It's superuser - force configure: " + forceConfigure);
+          }
+          if ((!isCryptoMaterialSet(conf, username)
+              && !isHostnameInCryptoMaterial(conf, localHostname))
+              || forceConfigure) {
+            
+            String serviceCertificateDir = conf.get(CryptoKeys
+                .SERVICE_CERTS_DIR.getValue(), CryptoKeys
+                .SERVICE_CERTS_DIR.getDefaultValue());
+            
+            // First check if the hostname keystore exists
+            File fd = new File(
+                Paths.get(serviceCertificateDir, localHostname +
+                    KEYSTORE_SUFFIX).toString());
+            if (fd.exists()) {
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Found crypto material with the hostname");
+              }
+              
+              String prefix = Paths.get(serviceCertificateDir,
+                  localHostname).toString();
+              String kstoreFile = prefix + KEYSTORE_SUFFIX;
+              String tstoreFile = prefix + TRUSTSTORE_SUFFIX;
+              String kstorePass, tstorePass;
+              
+              if (null != certificateLocalization) {
+                // Socket factory has been called from RM or NM
+                // In any other case, ie Hopsworks,
+                // CertificateLocalizationService would be null
+                kstorePass = certificateLocalization
+                    .getSuperKeystorePass();
+                tstorePass = certificateLocalization
+                    .getSuperTruststorePass();
+              } else {
+                LOG.debug("*** Called setTlsConfiguration for superuser " +
+                    "but no passwords provided ***");
+                String[] keystore_truststore =
+                    readSuperPasswordFromFile(conf);
+                kstorePass = keystore_truststore[0];
+                tstorePass = keystore_truststore[1];
+              }
+              setTlsConfiguration(kstoreFile, kstorePass, tstoreFile,
+                  tstorePass, conf);
+              cryptoConfigured = true;
+            }
+          } else {
+            cryptoConfigured = true;
+          }
+        }
+      }
+    } catch (Exception ex) {
+      LOG.error(ex, ex);
+      throw new SSLCertificateException("Certificate could not be found!",
+          ex);
     }
+    
+    if (!cryptoConfigured) {
+      String message = "> HopsSSLSocketFactory could not " +
+          "determine cryptographic material for user <" + username +
+          ">. Check your configuration!";
+      SSLCertificateException ex = new SSLCertificateException(message);
+      LOG.error(message, ex);
+      throw ex;
+    }
+    
+    // *ClientCache* caches client instances based on their socket factory.
+    // In order to distinguish two client with the same socket factory but
+    // with different certificates, the hashCode is computed by the
+    // keystore filepath as well
+    this.keyStoreFilePath = conf.get(CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(),
+        KEY_STORE_FILEPATH_DEFAULT);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Finally, the keystore that is used is: " + keyStoreFilePath);
+    }
+    conf.setBoolean(FORCE_CONFIGURE, false);
+  }
     
     private String[] readSuperPasswordFromFile(Configuration conf) {
       Configuration sslConf = new Configuration(false);
