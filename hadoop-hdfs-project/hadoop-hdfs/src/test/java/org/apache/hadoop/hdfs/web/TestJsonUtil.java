@@ -28,19 +28,20 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.mortbay.util.ajax.JSON;
 
+import java.io.IOException;
 import java.util.Map;
 
 public class TestJsonUtil {
-  static FileStatus toFileStatus(HdfsFileStatus f, String parent) {
+  static FileStatus toFileStatus(HdfsFileStatus f, String parent) throws IOException {
     return new FileStatus(f.getLen(), f.isDir(), f.getReplication(),
         f.getBlockSize(), f.getModificationTime(), f.getAccessTime(),
         f.getPermission(), f.getOwner(), f.getGroup(),
-        f.isSymlink() ? new Path(f.getSymlink()) : null,
+        f.isSymlink() ? f.getSymlink() : null,
         new Path(f.getFullName(parent)));
   }
 
   @Test
-  public void testHdfsFileStatus() {
+  public void testHdfsFileStatus() throws IOException {
     final long now = Time.now();
     final String parent = "/dir";
     final HdfsFileStatus status =
