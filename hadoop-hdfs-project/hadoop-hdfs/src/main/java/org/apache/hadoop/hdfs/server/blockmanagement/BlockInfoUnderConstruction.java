@@ -198,7 +198,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     }
   }
 
-  void addExpectedReplicaIfNotPresent(DatanodeDescriptor dn,
+  void addReplicaIfNotPresent(DatanodeDescriptor dn, Block block,
       ReplicaState rState)
       throws StorageException, TransactionContextException {
     for (ReplicaUnderConstruction r : getExpectedReplicas()) {

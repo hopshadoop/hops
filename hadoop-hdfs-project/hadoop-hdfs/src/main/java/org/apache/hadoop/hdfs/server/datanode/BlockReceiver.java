@@ -165,7 +165,7 @@ class BlockReceiver implements Closeable {
         switch (stage) {
           case PIPELINE_SETUP_CREATE:
             replicaInfo = datanode.data.createRbw(block);
-            datanode.notifyNamenodeCreatingBlock(block);
+            datanode.notifyNamenodeReceivingBlock(block);
             break;
           case PIPELINE_SETUP_STREAMING_RECOVERY:
             replicaInfo = datanode.data
@@ -179,7 +179,7 @@ class BlockReceiver implements Closeable {
                   .deleteBlock(block.getBlockPoolId(), block.getLocalBlock());
             }
             block.setGenerationStamp(newGs);
-            datanode.notifyNamenodeAppendingBlock(block);
+            datanode.notifyNamenodeReceivingBlock(block);
             break;
           case PIPELINE_SETUP_APPEND_RECOVERY:
             replicaInfo =
@@ -189,7 +189,7 @@ class BlockReceiver implements Closeable {
                   .deleteBlock(block.getBlockPoolId(), block.getLocalBlock());
             }
             block.setGenerationStamp(newGs);
-            datanode.notifyNamenodeAppendingRecoveredAppend(block);
+            datanode.notifyNamenodeReceivingBlock(block);
             break;
           case TRANSFER_RBW:
           case TRANSFER_FINALIZED:

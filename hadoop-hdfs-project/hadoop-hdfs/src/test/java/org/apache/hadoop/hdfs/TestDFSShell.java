@@ -1404,10 +1404,10 @@ public class TestDFSShell {
     List<File> files = new ArrayList<>();
     List<DataNode> datanodes = cluster.getDataNodes();
     String poolId = cluster.getNamesystem().getBlockPoolId();
-    Iterable<BlockReportBlock>[] blocks = cluster.getAllBlockReports(poolId);
+    Iterable<Block>[] blocks = cluster.getAllBlockReports(poolId);
     for (int i = 0; i < blocks.length; i++) {
       DataNode dn = datanodes.get(i);
-      for (BlockReportBlock b : blocks[i]) {
+      for (Block b : blocks[i]) {
         files.add(DataNodeTestUtils.getFile(dn, poolId, b.getBlockId()));
       }
     }

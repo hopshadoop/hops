@@ -201,8 +201,11 @@ public class DatanodeProtocolClientSideTranslatorPB
     for (StorageBlockReport r : reports) {
       StorageBlockReportProto.Builder reportBuilder =
           StorageBlockReportProto.newBuilder()
-              .setStorage(PBHelper.convert(r.getStorage()))
-              .setReport(PBHelper.convert(r.getReport()));
+              .setStorage(PBHelper.convert(r.getStorage()));
+      long[] blocks = r.getBlocks();
+      for (long block : blocks) {
+        reportBuilder.addBlocks(block);
+      }
       builder.addReports(reportBuilder.build());
     }
     BlockReportResponseProto resp;

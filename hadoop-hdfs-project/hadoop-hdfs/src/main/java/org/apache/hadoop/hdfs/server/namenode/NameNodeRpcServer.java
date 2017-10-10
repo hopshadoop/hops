@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -826,12 +827,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public DatanodeCommand blockReport(DatanodeRegistration nodeReg,
       String poolId, StorageBlockReport[] reports) throws IOException {
     verifyRequest(nodeReg);
-    
-    BlockReport blist = reports[0].getReport(); // Assume no federation '0'
+    BlockListAsLongs blist = new BlockListAsLongs(reports[0].getBlocks());
     if (blockStateChangeLog.isDebugEnabled()) {
       blockStateChangeLog.debug(
           "*BLOCK* NameNode.blockReport: " + "from " + nodeReg + " " +
-              blist.getNumBlocks() + " blocks");
+              blist.getNumberOfBlocks() + " blocks");
     }
 
     namesystem.getBlockManager().processReport(nodeReg, poolId, blist);

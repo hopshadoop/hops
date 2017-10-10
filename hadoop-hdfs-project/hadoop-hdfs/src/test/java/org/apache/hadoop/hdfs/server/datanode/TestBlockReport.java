@@ -30,6 +30,7 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
@@ -162,8 +163,7 @@ public class TestBlockReport {
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
     StorageBlockReport[] report =
         {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-            BlockReport.builder(NUM_BUCKETS).addAllAsFinalized
-                (blocks).build())};
+            new BlockListAsLongs(blocks, null).getBlockListAsLongs())};
     cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
 
     List<LocatedBlock> blocksAfterReport =
@@ -247,8 +247,7 @@ public class TestBlockReport {
     DatanodeRegistration dnR = dn0.getDNRegistrationForBP(poolId);
     StorageBlockReport[] report =
         {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-            BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks).build
-                ())};
+            new BlockListAsLongs(blocks, null).getBlockListAsLongs())};
     cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
 
     BlockManagerTestUtil
@@ -292,7 +291,7 @@ public class TestBlockReport {
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
     StorageBlockReport[] report =
         {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-            BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks).build())};
+            new BlockListAsLongs(blocks, null).getBlockListAsLongs())};
     DatanodeCommand dnCmd =
         cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
     if (LOG.isDebugEnabled()) {
@@ -347,7 +346,7 @@ public class TestBlockReport {
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
     StorageBlockReport[] report =
         {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-            BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks).build())};
+            new BlockListAsLongs(blocks, null).getBlockListAsLongs())};
     cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
     printStats();
     Thread.sleep(10000); //HOP: wait for the replication monitor to catch up
@@ -401,7 +400,7 @@ public class TestBlockReport {
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
     StorageBlockReport[] report =
         {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-            BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks).build())};
+            new BlockListAsLongs(blocks, null).getBlockListAsLongs())};
     cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
     printStats();
     assertEquals("Wrong number of Corrupted blocks", 1,
@@ -425,7 +424,7 @@ public class TestBlockReport {
     }
     
     report[0] = new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-        BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks).build());
+        new BlockListAsLongs(blocks, null).getBlockListAsLongs());
     cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
     printStats();
 
@@ -478,7 +477,7 @@ public class TestBlockReport {
       DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
       StorageBlockReport[] report =
           {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-              BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks).build())};
+              new BlockListAsLongs(blocks, null).getBlockListAsLongs())};
       cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
       
       assertEquals("Wrong number of PendingReplication blocks", blocks.size(),
@@ -528,7 +527,7 @@ public class TestBlockReport {
       DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
       StorageBlockReport[] report =
           {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-              BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks).build())};
+              new BlockListAsLongs(blocks, null).getBlockListAsLongs())};
       cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
       
       assertEquals("Wrong number of PendingReplication blocks", 2,
@@ -543,37 +542,6 @@ public class TestBlockReport {
     }
   }
   
-//  @Test
-//  public void testHashes() throws IOException {
-//
-//    final String METHOD_NAME = GenericTestUtils.getMethodName();
-//    Path filePath = new Path("/" + METHOD_NAME + ".dat");
-//
-//    try {
-//      ArrayList<Block> blocks = writeFile(METHOD_NAME, 1,
-//          filePath);
-//      assert blocks.size() == 1;
-//      BlockChecker bc = new BlockChecker(filePath);
-//      bc.start();
-//
-//      bc.join();
-//      DataNode dn = cluster.getDataNodes().get(DN_N0);
-//      String poolId = cluster.getNamesystem().getBlockPoolId();
-//      DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
-//
-//      StorageBlockReport[] report =
-//          {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-//              BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks)
-//          .build())};
-//
-//      cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
-//
-//
-//    } catch (InterruptedException e) {
-//      e.printStackTrace();
-//    }
-//
-//  }
   /**
    * Test for the case where one of the DNs in the pipeline is in the
    * process of doing a block report exactly when the block is closed.
@@ -912,9 +880,6 @@ public class TestBlockReport {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, customBlockSize);
     conf.setLong(DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_INTERVAL_KEY,
         DN_RESCAN_INTERVAL);
-    conf.setInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, DFSConfigKeys
-        .DFS_REPLICATION_DEFAULT);
-    conf.setInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, 100);
     NUM_BUCKETS = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, DFSConfigKeys
         .DFS_NUM_BUCKETS_DEFAULT);
   }
@@ -947,7 +912,7 @@ public class TestBlockReport {
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
     StorageBlockReport[] report =
         {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-            BlockReport.builder(NUM_BUCKETS).addAllAsFinalized(blocks).build())};
+            new BlockListAsLongs(blocks, null).getBlockListAsLongs())};
     try{
     cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
     }catch(Exception e){

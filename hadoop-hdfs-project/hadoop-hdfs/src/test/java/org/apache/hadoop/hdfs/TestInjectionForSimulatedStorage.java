@@ -156,7 +156,7 @@ public class TestInjectionForSimulatedStorage {
       writeFile(cluster.getFileSystem(), testPath, numDataNodes);
       waitForBlockReplication(testFile, dfsClient.getNamenode(), numDataNodes,
           20);
-      Iterable<BlockReportBlock>[] blocksList = cluster.getAllBlockReports(bpid);
+      Iterable<Block>[] blocksList = cluster.getAllBlockReports(bpid);
       
       cluster.shutdown();
       cluster = null;
@@ -175,9 +175,9 @@ public class TestInjectionForSimulatedStorage {
           .format(false).build();
       cluster.waitActive();
       Set<Block> uniqueBlocks = new HashSet<>();
-      for (Iterable<BlockReportBlock> aBlocksList : blocksList) {
-        for (BlockReportBlock b : aBlocksList) {
-          uniqueBlocks.add(new Block(b.getBlockId(), b.getLength(), b.getGenerationStamp()));
+      for (Iterable<Block> aBlocksList : blocksList) {
+        for (Block b : aBlocksList) {
+          uniqueBlocks.add(new Block(b));
         }
       }
       // Insert all the blocks in the first data node
