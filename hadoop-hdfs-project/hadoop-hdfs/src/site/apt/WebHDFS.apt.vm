@@ -71,6 +71,8 @@ WebHDFS REST API
 
     * {{{Get Delegation Tokens}<<<GETDELEGATIONTOKENS>>>}}
         (see  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.getDelegationTokens)
+    * {{{Check access}<<<CHECKACCESS>>>}}
+        (see  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.access)
 
   * HTTP PUT
 
@@ -866,6 +868,28 @@ Content-Length: 0
   See also:
   {{{Token}<<<token>>>}},
    {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.cancelDelegationToken
+
+
+** {Check access}
+
+  * Submit a HTTP GET request.
+
++---------------------------------
+curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=CHECKACCESS
+                              &fsaction=<FSACTION>
++---------------------------------
+
+  The client receives a response with zero content length:
+
++---------------------------------
+HTTP/1.1 200 OK
+Content-Length: 0
++---------------------------------
+
+  []
+
+  See also:
+  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.access
 
 
 * {Error Responses}
@@ -1819,3 +1843,21 @@ var tokenProperties =
   See also:
   {{Authentication}}
 
+** {Fs Action}
+
+*----------------+-------------------------------------------------------------------+
+|| Name          | <<<fsaction>>> |
+*----------------+-------------------------------------------------------------------+
+|| Description   | File system operation read/write/execute |
+*----------------+-------------------------------------------------------------------+
+|| Type          | String |
+*----------------+-------------------------------------------------------------------+
+|| Default Value | null (an invalid value) |
+*----------------+-------------------------------------------------------------------+
+|| Valid Values  | Strings matching regex pattern \"[rwx-]\{3\}\" |
+*----------------+-------------------------------------------------------------------+
+|| Syntax        | \"[rwx-]\{3\}\" |
+*----------------+-------------------------------------------------------------------+
+
+  See also:
+  {{{Check access}<<<CHECKACCESS>>>}},

@@ -21,11 +21,13 @@ package org.apache.hadoop.hdfs.web;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.web.resources.DelegationParam;
 import org.apache.hadoop.hdfs.web.resources.DoAsParam;
+import org.apache.hadoop.hdfs.web.resources.FsActionParam;
 import org.apache.hadoop.hdfs.web.resources.GetOpParam;
 import org.apache.hadoop.hdfs.web.resources.PutOpParam;
 import org.apache.hadoop.hdfs.web.resources.TokenArgumentParam;
@@ -281,7 +283,29 @@ public class TestWebHdfsUrl {
     checkTokenSelection(fs, conf);
 
   }
-  
+
+  @Test(timeout=60000)
+  public void testCheckAccessUrl() throws IOException {
+    Configuration conf = new Configuration();
+
+    UserGroupInformation ugi =
+        UserGroupInformation.createRemoteUser("test-user");
+    UserGroupInformation.setLoginUser(ugi);
+
+    WebHdfsFileSystem webhdfs = getWebHdfsFileSystem(ugi, conf);
+    Path fsPath = new Path("/p1");
+
+    URL checkAccessUrl = webhdfs.toUrl(GetOpParam.Op.CHECKACCESS,
+        fsPath, new FsActionParam(FsAction.READ_WRITE));
+    checkQueryParams(
+        new String[]{
+            GetOpParam.Op.CHECKACCESS.toQueryString(),
+            new UserParam(ugi.getShortUserName()).toString(),
+            FsActionParam.NAME + "=" + FsAction.READ_WRITE.SYMBOL
+        },
+        checkAccessUrl);
+  }
+
   private void checkTokenSelection(MyWebHdfsFileSystem fs, Configuration conf)
       throws IOException {
     int port = fs.getCanonicalUri().getPort();

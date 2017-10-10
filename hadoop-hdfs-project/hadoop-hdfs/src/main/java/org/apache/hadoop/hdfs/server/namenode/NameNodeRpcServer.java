@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -1103,5 +1104,10 @@ class NameNodeRpcServer implements NamenodeProtocols {
       throws IOException {
     return namesystem.getRepairedBlockLocations(getClientMachine(), sourcePath,
         parityPath, block, isParity);
+  }
+
+  @Override // ClientProtocol
+  public void checkAccess(String path, FsAction mode) throws IOException {
+    namesystem.checkAccess(path, mode);
   }
 }

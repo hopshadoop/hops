@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster.DataNodeProperties;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
@@ -36,12 +37,15 @@ import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -290,7 +294,8 @@ public class TestSafeMode {
    * assert that they are either allowed or fail as expected.
    */
   @Test(timeout = 300000)
-  public void testOperationsWhileInSafeMode() throws IOException {
+  public void testOperationsWhileInSafeMode()
+      throws IOException, InterruptedException {
     final Path file1 = new Path("/file1");
 
     assertFalse(dfs.setSafeMode(SafeModeAction.SAFEMODE_GET));
@@ -357,6 +362,23 @@ public class TestSafeMode {
       DFSTestUtil.readFile(fs, file1);
     } catch (IOException ioe) {
       fail("Set times failed while in SM");
+    }
+
+    // Test access
+    UserGroupInformation ugiX = UserGroupInformation.createRemoteUser("userX");
+    FileSystem myfs = ugiX.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
+      public FileSystem run() throws IOException {
+        return FileSystem.get(conf);
+      }
+    });
+
+    myfs.access(file1, FsAction.READ);
+    try {
+      myfs.access(file1, FsAction.WRITE);
+      fail("The access call should have failed.");
+    } catch (AccessControlException e) {
+      // expected
     }
 
     assertFalse("Could not leave SM",
