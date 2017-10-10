@@ -137,19 +137,22 @@ public class DatanodeProtocolServerSideTranslatorPB
   public BlockReportResponseProto blockReport(RpcController controller,
       BlockReportRequestProto request) throws ServiceException {
     DatanodeCommand cmd = null;
-    StorageBlockReport[] storageBlockReports =
+    StorageBlockReport[] report =
         new StorageBlockReport[request.getReportsCount()];
     
     int index = 0;
     for (StorageBlockReportProto s : request.getReportsList()) {
-      DatanodeProtocolProtos.BlockReportProto report = s.getReport();
-      storageBlockReports[index++] =
-          new StorageBlockReport(PBHelper.convert(s.getStorage()),
-              PBHelper.convert(report));
+      List<Long> blockIds = s.getBlocksList();
+      long[] blocks = new long[blockIds.size()];
+      for (int i = 0; i < blockIds.size(); i++) {
+        blocks[i] = blockIds.get(i);
+      }
+      report[index++] =
+          new StorageBlockReport(PBHelper.convert(s.getStorage()), blocks);
     }
     try {
       cmd = impl.blockReport(PBHelper.convert(request.getRegistration()),
-          request.getBlockPoolId(), storageBlockReports);
+          request.getBlockPoolId(), report);
     } catch (IOException e) {
       throw new ServiceException(e);
     }

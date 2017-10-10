@@ -24,6 +24,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsBlocksMetadata;
@@ -975,24 +976,27 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
    * Generates a block report from the in-memory block map.
    */
   @Override // FsDatasetSpi
-  public BlockReport getBlockReport(String bpid) {
+  public BlockListAsLongs getBlockReport(String bpid) {
     int size = volumeMap.size(bpid);
-    BlockReport.Builder builder = BlockReport.builder(NUM_BUCKETS);
+    ArrayList<ReplicaInfo> finalized = new ArrayList<>(size);
+    ArrayList<ReplicaInfo> uc = new ArrayList<>();
     if (size == 0) {
-      return builder.build();
+      return new BlockListAsLongs(finalized, uc);
     }
     
     synchronized (this) {
       for (ReplicaInfo b : volumeMap.replicas(bpid)) {
         switch (b.getState()) {
           case FINALIZED:
+            finalized.add(b);
+            break;
           case RBW:
           case RWR:
-            builder.add(b);
+            uc.add(b);
             break;
           case RUR:
             ReplicaUnderRecovery rur = (ReplicaUnderRecovery) b;
-            builder.add(rur.getOriginalReplica());
+            uc.add(rur.getOriginalReplica());
             break;
           case TEMPORARY:
             break;
@@ -1000,7 +1004,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
             assert false : "Illegal ReplicaInfo state.";
         }
       }
-      return builder.build();
+      return new BlockListAsLongs(finalized, uc);
     }
   }
 

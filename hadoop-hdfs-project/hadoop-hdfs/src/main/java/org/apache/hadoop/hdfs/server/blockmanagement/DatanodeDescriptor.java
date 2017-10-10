@@ -399,6 +399,19 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return (Map<Long,Integer>)findBlocksHandler.handle();
   }
   
+    public Map<Long,Long> getAllMachineInvalidatedReplicasWithGenStamp() throws IOException {
+    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        InvalidateBlockDataAccess da = (InvalidateBlockDataAccess) HdfsStorageFactory
+            .getDataAccess(InvalidateBlockDataAccess.class);
+        return da.findInvalidatedBlockAndGenStampByStorageId(getSId());
+      }
+    };
+    return (Map<Long,Long>)findBlocksHandler.handle();
+  }
+  
   /**
    * Store block replication work.
    */

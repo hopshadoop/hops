@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor.BlockTargetPair;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.net.NetworkTopology;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -60,6 +62,8 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -144,7 +148,7 @@ public class TestBlockManager {
   private void removeNode(DatanodeDescriptor deadNode) throws IOException {
     NetworkTopology cluster = bm.getDatanodeManager().getNetworkTopology();
     cluster.remove(deadNode);
-    bm.datanodeRemoved(deadNode);
+    bm.removeBlocksAssociatedTo(deadNode);
   }
 
 
@@ -706,12 +710,12 @@ public class TestBlockManager {
     assertTrue(node.isFirstBlockReport());
     // send block report, should be processed
     reset(node);
-    bm.processReport(node, "pool", BlockReport.builder(numBuckets).build());
+    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
     verify(node).receivedBlockReport();
     assertFalse(node.isFirstBlockReport());
     // send block report again, should NOT be processed
     reset(node);
-    bm.processReport(node, "pool", BlockReport.builder(numBuckets).build());
+    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
     verify(node, never()).receivedBlockReport();
     assertFalse(node.isFirstBlockReport());
 
@@ -723,7 +727,7 @@ public class TestBlockManager {
     assertTrue(node.isFirstBlockReport()); // ready for report again
     // send block report, should be processed after restart
     reset(node);
-    bm.processReport(node, "pool", BlockReport.builder(numBuckets).build());
+    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
     verify(node).receivedBlockReport();
     assertFalse(node.isFirstBlockReport());
   }
@@ -748,7 +752,7 @@ public class TestBlockManager {
     // send block report while pretending to already have blocks
     reset(node);
     doReturn(1).when(node).numBlocks();
-    bm.processReport(node, "pool", BlockReport.builder(numBuckets).build());
+    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
     verify(node).receivedBlockReport();
     assertFalse(node.isFirstBlockReport());
   }

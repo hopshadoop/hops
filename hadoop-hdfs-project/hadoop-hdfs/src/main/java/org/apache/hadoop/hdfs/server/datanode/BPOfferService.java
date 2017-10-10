@@ -30,6 +30,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.ExceptionCheck;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
@@ -258,9 +259,9 @@ class BPOfferService implements Runnable {
     checkDelHint(delHint);
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
-            BlockStatus.RECEIVED, delHint);
-  
-    notifyNamenodeBlockImmediatelyInt(bInfo, true);
+            ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, delHint);
+
+    notifyNamenodeBlockImmediatelyInt(bInfo, false);
   }
 
   private void checkBlock(ExtendedBlock block) {
@@ -278,43 +279,19 @@ class BPOfferService implements Runnable {
     checkBlock(block);
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
-            BlockStatus.DELETED, null);
-    
+            BlockStatus.DELETED_BLOCK, null);
+
     notifyNamenodeDeletedBlockInt(bInfo);
   }
-  
-  public void notifyNamenodeCreatingBlock(ExtendedBlock block) {
+
+  void notifyNamenodeReceivingBlock(ExtendedBlock block) {
     checkBlock(block);
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
-            BlockStatus.CREATING, null);
+            BlockStatus.RECEIVING_BLOCK, null);
+
     notifyNamenodeBlockImmediatelyInt(bInfo, false);
   }
-  
-  public void notifyNamenodeAppendingBlock(ExtendedBlock block) {
-    checkBlock(block);
-    ReceivedDeletedBlockInfo bInfo =
-        new ReceivedDeletedBlockInfo(block.getLocalBlock(),
-            BlockStatus.APPENDING, null);
-    notifyNamenodeBlockImmediatelyInt(bInfo, false);
-  }
-  
-  public void notifyNamenodeAppendingRecoveredAppend(ExtendedBlock block) {
-    checkBlock(block);
-    ReceivedDeletedBlockInfo bInfo =
-        new ReceivedDeletedBlockInfo(block.getLocalBlock(),
-            BlockStatus.RECOVERING_APPEND, null);
-    notifyNamenodeBlockImmediatelyInt(bInfo, true);
-  }
-  
-  public void notifyNamenodeUpdateRecoveredBlock(ExtendedBlock block) {
-    checkBlock(block);
-    ReceivedDeletedBlockInfo bInfo =
-        new ReceivedDeletedBlockInfo(block.getLocalBlock(),
-            BlockStatus.UPDATE_RECOVERED, null);
-    notifyNamenodeBlockImmediatelyInt(bInfo, true);
-  }
- 
 
   //This must be called only by blockPoolManager
   void start() {
@@ -833,16 +810,16 @@ class BPOfferService implements Runnable {
 
       // Create block report
       long brCreateStartTime = now();
-      BlockReport bReport =
+      BlockListAsLongs bReport =
           dn.getFSDataset().getBlockReport(getBlockPoolId());
 
       // Send block report
       long brSendStartTime = now();
       StorageBlockReport[] report = {new StorageBlockReport(
           new DatanodeStorage(bpRegistration.getStorageID()),
-          bReport)};
+          bReport.getBlockListAsLongs())};
 
-      ActiveNode an = nextNNForBlkReport(bReport.getNumBlocks());
+      ActiveNode an = nextNNForBlkReport(bReport.getNumberOfBlocks());
       if (an != null) {
         blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
         if (blkReportHander == null || !blkReportHander.isInitialized()) {
@@ -861,7 +838,7 @@ class BPOfferService implements Runnable {
       long brCreateCost = brSendStartTime - brCreateStartTime;
       dn.getMetrics().addBlockReport(brSendCost);
       LOG.info(
-          "BlockReport of " + bReport.getNumBlocks() + " blocks took " +
+          "BlockReport of " + bReport.getNumberOfBlocks() + " blocks took " +
               brCreateCost + " msec to generate and " + brSendCost +
               " msecs for RPC and NN processing");
 

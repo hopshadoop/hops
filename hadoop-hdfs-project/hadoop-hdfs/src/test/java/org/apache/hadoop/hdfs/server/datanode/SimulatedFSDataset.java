@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.datanode;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsBlocksMetadata;
@@ -460,18 +461,17 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   }
 
   @Override
-  public synchronized BlockReport getBlockReport(String bpid) {
+  public synchronized BlockListAsLongs getBlockReport(String bpid) {
     final List<Block> blocks = new ArrayList<>();
     final Map<Block, BInfo> map = blockMap.get(bpid);
-    BlockReport.Builder builder = BlockReport.builder(NUM_BUCKETS);
     if (map != null) {
       for (BInfo b : map.values()) {
         if (b.isFinalized()) {
-          builder.addAsFinalized(b.theBlock);
+          blocks.add(b.theBlock);
         }
       }
     }
-    return builder.build();
+    return new BlockListAsLongs(blocks, null);
   }
 
   @Override // FSDatasetMBean

@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdfs.MiniDFSNNTopology.NNConf;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -1905,8 +1906,7 @@ public class MiniDFSCluster {
    *     getDataNodes()
    * @return the block report for the specified data node
    */
-  public Iterable<BlockReportBlock> getBlockReport(String bpid, int
-      dataNodeIndex) {
+  public Iterable<Block> getBlockReport(String bpid, int dataNodeIndex) {
     if (dataNodeIndex < 0 || dataNodeIndex > dataNodes.size()) {
       throw new IndexOutOfBoundsException();
     }
@@ -1920,9 +1920,9 @@ public class MiniDFSCluster {
    * BlockListAsLongs is indexed in the same order as the list of datanodes
    * returned by getDataNodes()
    */
-  public Iterable<BlockReportBlock>[] getAllBlockReports(String bpid) {
+  public Iterable<Block>[] getAllBlockReports(String bpid) {
     int numDataNodes = dataNodes.size();
-    Iterable<BlockReportBlock>[] result = new BlockReport[numDataNodes];
+    Iterable<Block>[] result = new BlockListAsLongs[numDataNodes];
     for (int i = 0; i < numDataNodes; ++i) {
       result[i] = getBlockReport(bpid, i);
     }

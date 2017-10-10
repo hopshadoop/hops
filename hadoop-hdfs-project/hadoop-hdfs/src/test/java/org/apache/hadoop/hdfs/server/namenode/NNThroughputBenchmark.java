@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -841,7 +842,7 @@ public class NNThroughputBenchmark {
     DatanodeStorage storage; //only one storage 
     ArrayList<Block> blocks;
     int nrBlocks; // actual number of blocks
-    BlockReport blockReportList;
+    long[] blockReportList;
     int dnIdx;
 
     /**
@@ -889,7 +890,7 @@ public class NNThroughputBenchmark {
       //first block reports
       storage = new DatanodeStorage(dnRegistration.getStorageID());
       final StorageBlockReport[] reports = {new StorageBlockReport(storage,
-          BlockReport.builder(NUM_BUCKETS).build())};
+          new BlockListAsLongs(null, null).getBlockListAsLongs())};
       nameNodeProto.blockReport(dnRegistration,
           nameNode.getNamesystem().getBlockPoolId(), reports);
     }
@@ -933,11 +934,11 @@ public class NNThroughputBenchmark {
       for (int idx = blocks.size() - 1; idx >= nrBlocks; idx--) {
         blocks.set(idx, new Block(blocks.size() - idx, 0, 0));
       }
-      blockReportList = BlockReport.builder(NUM_BUCKETS).addAllAsFinalized
-          (blocks).build();
+      blockReportList =
+          new BlockListAsLongs(blocks, null).getBlockListAsLongs();
     }
 
-    BlockReport getBlockReportList() {
+    long[] getBlockReportList() {
       return blockReportList;
     }
 
@@ -987,7 +988,7 @@ public class NNThroughputBenchmark {
               new ExportedBlockKeys(), VersionInfo.getVersion());
           ReceivedDeletedBlockInfo[] rdBlocks =
               {new ReceivedDeletedBlockInfo(blocks[i],
-                  ReceivedDeletedBlockInfo.BlockStatus.RECEIVED, null)};
+                  ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, null)};
           StorageReceivedDeletedBlocks[] report =
               {new StorageReceivedDeletedBlocks(receivedDNReg.getStorageID(),
                   rdBlocks)};
@@ -1122,7 +1123,7 @@ public class NNThroughputBenchmark {
           datanodes[dnIdx].addBlock(loc.getBlock().getLocalBlock());
           ReceivedDeletedBlockInfo[] rdBlocks =
               {new ReceivedDeletedBlockInfo(loc.getBlock().getLocalBlock(),
-                  ReceivedDeletedBlockInfo.BlockStatus.RECEIVED, null)};
+                  ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, null)};
           StorageReceivedDeletedBlocks[] report =
               {new StorageReceivedDeletedBlocks(
                   datanodes[dnIdx].dnRegistration.getStorageID(), rdBlocks)};

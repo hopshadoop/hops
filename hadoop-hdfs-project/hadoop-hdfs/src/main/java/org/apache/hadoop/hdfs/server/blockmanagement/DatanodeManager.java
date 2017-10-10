@@ -398,7 +398,7 @@ public class DatanodeManager {
           "DataNode is dead. Removing all replicas for datanode " + nodeInfo +
               " StorageID " + nodeInfo.getStorageID() + " index " +
               nodeInfo.getSId());
-      blockManager.datanodeRemoved(nodeInfo);
+      blockManager.removeBlocksAssociatedTo(nodeInfo);
     }
     networktopology.remove(nodeInfo);
 

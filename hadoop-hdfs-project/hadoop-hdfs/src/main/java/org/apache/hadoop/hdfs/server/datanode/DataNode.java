@@ -548,7 +548,7 @@ public class DataNode extends Configured
   }
   
   // calls specific to BP
-  void notifyNamenodeReceivedBlock(ExtendedBlock block,
+  protected void notifyNamenodeReceivedBlock(ExtendedBlock block,
       String delHint) {
     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
     if (bpos != null) {
@@ -560,50 +560,14 @@ public class DataNode extends Configured
     }
   }
   
-  void notifyNamenodeCreatingBlock(ExtendedBlock block){
+  // calls specific to BP
+  protected void notifyNamenodeReceivingBlock(ExtendedBlock block) {
     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
     if (bpos != null) {
-      bpos.notifyNamenodeCreatingBlock(block);
+      bpos.notifyNamenodeReceivingBlock(block);
     } else {
       LOG.error(
-          "Cannot find BPOfferService for reporting block creating for " +
-              "bpid=" + block.getBlockPoolId());
-    }
-  }
-  
-  void notifyNamenodeAppendingBlock(ExtendedBlock block){
-    BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
-    if (bpos != null) {
-      bpos.notifyNamenodeAppendingBlock(block);
-    } else {
-      LOG.error(
-          "Cannot find BPOfferService for reporting block appending for " +
-              "bpid=" +
-              block.getBlockPoolId());
-    }
-  }
-  
-  void notifyNamenodeAppendingRecoveredAppend(ExtendedBlock block){
-    BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
-    if (bpos != null) {
-      bpos.notifyNamenodeAppendingRecoveredAppend(block);
-    } else {
-      LOG.error(
-          "Cannot find BPOfferService for reporting block append recovery " +
-              "for bpid=" + block.getBlockPoolId());
-    }
-  }
-  
-  
-  
-  private void notifyNamenodeUpdateRecoveredBlock(ExtendedBlock block, String
-      delHint){
-     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
-    if (bpos != null) {
-      bpos.notifyNamenodeUpdateRecoveredBlock(block);
-    } else {
-      LOG.error(
-          "Cannot find BPOfferService for reporting block deleted for bpid=" +
+          "Cannot find BPOfferService for reporting block receiving for bpid=" +
               block.getBlockPoolId());
     }
   }
@@ -1917,7 +1881,7 @@ public class DataNode extends Configured
     ExtendedBlock newBlock = new ExtendedBlock(oldBlock);
     newBlock.setGenerationStamp(recoveryId);
     newBlock.setNumBytes(newLength);
-    notifyNamenodeUpdateRecoveredBlock(newBlock, "");
+    notifyNamenodeReceivedBlock(newBlock, "");
     return storageID;
   }
 
