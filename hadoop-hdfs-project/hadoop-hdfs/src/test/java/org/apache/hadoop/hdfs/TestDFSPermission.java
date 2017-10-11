@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.TestUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -26,6 +27,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -34,7 +36,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -42,6 +46,7 @@ import java.util.Random;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Unit tests for permission
@@ -119,7 +124,92 @@ public class TestDFSPermission {
       cluster.shutdown();
     }
   }
-  
+
+  @Test
+  public void testAccessOwner() throws IOException, InterruptedException {
+    FileSystem rootFs = FileSystem.get(conf);
+    Path p1 = new Path("/p1");
+    rootFs.mkdirs(p1);
+    rootFs.setOwner(p1, USER1_NAME, GROUP1_NAME);
+    fs = USER1.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
+      public FileSystem run() throws Exception {
+        return FileSystem.get(conf);
+      }
+    });
+    fs.setPermission(p1, new FsPermission((short) 0444));
+    fs.access(p1, FsAction.READ);
+    int inodeId = TestUtil.getINodeId(cluster.getNameNode(), p1);
+    try {
+      fs.access(p1, FsAction.WRITE);
+      fail("The access call should have failed.");
+    } catch (AccessControlException e) {
+      assertTrue("Permission denied messages must carry the username",
+          e.getMessage().contains(USER1_NAME));
+      assertTrue("Permission denied messages must carry the inode id",
+          e.getMessage().contains(String.valueOf(inodeId)));
+    }
+
+    Path badPath = new Path("/bad/bad");
+    try {
+      fs.access(badPath, FsAction.READ);
+      fail("The access call should have failed");
+    } catch (FileNotFoundException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testAccessGroupMember() throws IOException, InterruptedException {
+    FileSystem rootFs = FileSystem.get(conf);
+    Path p2 = new Path("/p2");
+    rootFs.mkdirs(p2);
+    rootFs.setOwner(p2, UserGroupInformation.getCurrentUser().getShortUserName(), GROUP1_NAME);
+    rootFs.setPermission(p2, new FsPermission((short) 0740));
+    fs = USER1.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
+      public FileSystem run() throws Exception {
+        return FileSystem.get(conf);
+      }
+    });
+    int inodeId = TestUtil.getINodeId(cluster.getNameNode(), p2);
+    fs.access(p2, FsAction.READ);
+    try {
+      fs.access(p2, FsAction.EXECUTE);
+      fail("The access call should have failed.");
+    } catch (AccessControlException e) {
+      assertTrue("Permission denied messages must carry the username",
+          e.getMessage().contains(USER1_NAME));
+      assertTrue("Permission denied messages must carry the inode id",
+          e.getMessage().contains(String.valueOf(inodeId)));
+    }
+  }
+
+  @Test
+  public void testAccessOthers() throws IOException, InterruptedException {
+    FileSystem rootFs = FileSystem.get(conf);
+    Path p3 = new Path("/p3");
+    rootFs.mkdirs(p3);
+    rootFs.setPermission(p3, new FsPermission((short) 0774));
+    fs = USER1.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
+      public FileSystem run() throws Exception {
+        return FileSystem.get(conf);
+      }
+    });
+    int inodeId = TestUtil.getINodeId(cluster.getNameNode(), p3);
+    fs.access(p3, FsAction.READ);
+    try {
+      fs.access(p3, FsAction.READ_WRITE);
+      fail("The access call should have failed.");
+    } catch (AccessControlException e) {
+      assertTrue("Permission denied messages must carry the username",
+          e.getMessage().contains(USER1_NAME));
+      assertTrue("Permission denied messages must carry the inode id",
+          e.getMessage().contains(String.valueOf(inodeId)));
+    }
+  }
+
   /**
    * This tests if permission setting in create, mkdir, and
    * setPermission works correctly

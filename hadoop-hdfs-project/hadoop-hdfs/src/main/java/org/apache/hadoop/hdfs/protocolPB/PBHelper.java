@@ -30,6 +30,7 @@ import io.hops.metadata.hdfs.entity.EncodingStatus;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FsServerDefaults;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
@@ -50,6 +51,7 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Create
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.DatanodeReportTypeProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFsStatsResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SafeModeActionProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.FsActionProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ActiveNamenodeListResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BalancerBandwidthCommandProto;
@@ -155,6 +157,13 @@ public class PBHelper {
 
   private PBHelper() {
     /** Hidden constructor */
+  }
+
+  private static final FsAction[] FSACTION_VALUES =
+      FsAction.values();
+
+  static <T extends Enum<T>, U extends Enum<U>> U castEnum(T from, U[] to) {
+    return to[from.ordinal()];
   }
 
   public static ByteString getByteString(byte[] bytes) {
@@ -1576,5 +1585,12 @@ public class PBHelper {
         throw new RuntimeException();
     }
   }
-  
+
+  public static FsActionProto convert(FsAction v) {
+    return FsActionProto.valueOf(v != null ? v.ordinal() : 0);
+  }
+
+  public static FsAction convert(FsActionProto v) {
+    return castEnum(v, FSACTION_VALUES);
+  }
 }

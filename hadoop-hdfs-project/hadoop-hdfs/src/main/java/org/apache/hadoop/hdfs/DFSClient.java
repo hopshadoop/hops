@@ -49,6 +49,7 @@ import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.VolumeId;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.NamenodeSelector.NamenodeHandle;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
@@ -107,7 +108,6 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.Time;
 
 import javax.net.SocketFactory;
-import javax.net.ssl.SSLException;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -3200,6 +3200,25 @@ public class DFSClient implements java.io.Closeable {
       }
     };
     doClientActionToAll(handler, "flushCache");
+  }
+
+  public void checkAccess(final String src, final FsAction mode)
+      throws IOException {
+    checkOpen();
+    try {
+      ClientActionHandler handler = new ClientActionHandler() {
+        @Override
+        public Object doAction(ClientProtocol namenode) throws IOException {
+          namenode.checkAccess(src, mode);
+          return null;
+        }
+      };
+      doClientActionWithRetry(handler, "checkAccess");
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+          FileNotFoundException.class,
+          UnresolvedPathException.class);
+    }
   }
 
   /**
