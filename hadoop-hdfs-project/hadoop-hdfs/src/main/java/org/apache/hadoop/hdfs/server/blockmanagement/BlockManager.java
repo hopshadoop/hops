@@ -100,6 +100,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -1876,12 +1877,16 @@ public class BlockManager {
     // Modify the (block-->datanode) map, according to the difference
     // between the old and new block report.
     //
-    Collection<BlockInfo> toAdd = new HashSet<>();
-    Collection<Long> toRemove = new HashSet<>();
-    Collection<Block> toInvalidate = new HashSet<>();
-    Collection<BlockToMarkCorrupt> toCorrupt =
-        new HashSet<>();
-    Collection<StatefulBlockInfo> toUC = new HashSet<>();
+    ConcurrentHashMap<BlockInfo, Boolean> mapToAdd = new ConcurrentHashMap<BlockInfo,Boolean>();
+    ConcurrentHashMap<Long, Boolean> mapToRemove = new ConcurrentHashMap<Long,Boolean>();
+    ConcurrentHashMap<Block, Boolean> mapToInvalidate = new ConcurrentHashMap<Block,Boolean>();
+    ConcurrentHashMap<BlockToMarkCorrupt, Boolean> mapToCorrupt = new ConcurrentHashMap<BlockToMarkCorrupt,Boolean>();
+    ConcurrentHashMap<StatefulBlockInfo, Boolean> mapToUC = new ConcurrentHashMap<StatefulBlockInfo,Boolean>();
+    Collection<BlockInfo> toAdd = Collections.newSetFromMap(mapToAdd);
+    Collection<Long> toRemove = Collections.newSetFromMap(mapToRemove);
+    Collection<Block> toInvalidate = Collections.newSetFromMap(mapToInvalidate);
+    Collection<BlockToMarkCorrupt> toCorrupt = Collections.newSetFromMap(mapToCorrupt);
+    Collection<StatefulBlockInfo> toUC = Collections.newSetFromMap(mapToUC);
 
     final boolean firstBlockReport =
         namesystem.isInStartupSafeMode() && node.isFirstBlockReport();
