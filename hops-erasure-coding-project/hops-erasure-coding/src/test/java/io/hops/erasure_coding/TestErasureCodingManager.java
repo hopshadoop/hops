@@ -41,6 +41,7 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
+
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 
@@ -72,7 +73,7 @@ public class TestErasureCodingManager extends ClusterTest {
     conf.set(DFSConfigKeys.BLOCK_REPAIR_MANAGER_CLASSNAME_KEY,
         DFSConfigKeys.DEFAULT_BLOCK_REPAIR_MANAGER_CLASSNAME);
     conf.setInt(DFSConfigKeys.RECHECK_INTERVAL_KEY, 20 * 1000);
-    conf.setInt("dfs.blockreport.intervalMsec", 30 * 1000);
+    conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 10 * 1000);
     conf.setInt(DFSConfigKeys.REPAIR_DELAY_KEY, 10 * 1000);
     conf.setInt(DFSConfigKeys.PARITY_REPAIR_DELAY_KEY, 10 * 1000);
     conf.setClass("fs.hdfs.impl", ErasureCodingFileSystem.class,
@@ -99,7 +100,7 @@ public class TestErasureCodingManager extends ClusterTest {
     }
   }
 
-  @Test
+  @Test(timeout = 120000)
   public void testEncoding() throws IOException, InterruptedException {
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
@@ -124,7 +125,7 @@ public class TestErasureCodingManager extends ClusterTest {
     assertEquals(policy, status.getEncodingPolicy());
   }
 
-  @Test
+  @Test(timeout = 120000)
   public void testLateEncoding() throws IOException {
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
         DFS_TEST_BLOCK_SIZE);
@@ -171,7 +172,7 @@ public class TestErasureCodingManager extends ClusterTest {
     }
   }
 
-  @Test
+  @Test(timeout = 120000)
   public void testRevoke() throws IOException, InterruptedException {
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
@@ -182,7 +183,7 @@ public class TestErasureCodingManager extends ClusterTest {
     while (!(status = dfs.getEncodingStatus(testFile.toUri().getPath()))
         .isEncoded()) {
       try {
-        Thread.sleep(1000);
+        Thread.sleep(5000);
       } catch (InterruptedException e) {
         LOG.error("Wait for encoding thread was interrupted.");
       }
@@ -191,7 +192,7 @@ public class TestErasureCodingManager extends ClusterTest {
     dfs.revokeEncoding(testFile.toUri().getPath(), (short) 2);
     while (dfs.getEncodingStatus(testFile.toUri().getPath()).isEncoded()) {
       try {
-        Thread.sleep(1000);
+        Thread.sleep(5000);
       } catch (InterruptedException e) {
         LOG.error("Wait for encoding thread was interrupted.");
       }
@@ -203,7 +204,7 @@ public class TestErasureCodingManager extends ClusterTest {
     assertEquals(2, dfs.getFileStatus(testFile).getReplication());
   }
 
-  @Test
+  @Test(timeout = 180000)
   public void testDelete() throws IOException, InterruptedException {
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
@@ -214,7 +215,7 @@ public class TestErasureCodingManager extends ClusterTest {
     while (!(status = dfs.getEncodingStatus(testFile.toUri().getPath()))
         .isEncoded()) {
       try {
-        Thread.sleep(1000);
+        Thread.sleep(5000);
       } catch (InterruptedException e) {
         LOG.error("Wait for encoding thread was interrupted.");
       }
@@ -230,7 +231,7 @@ public class TestErasureCodingManager extends ClusterTest {
     assertFalse(dfs.exists(parityPath));
   }
 
-  @Test
+  @Test(timeout = 300000)
   public void testSourceRepair() throws IOException, InterruptedException {
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
@@ -246,7 +247,8 @@ public class TestErasureCodingManager extends ClusterTest {
       }
     }
 
-    Thread.sleep(2 * conf.getInt("dfs.blockreport.intervalMsec", 0));
+    Thread.sleep(2 * conf.getLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, DFSConfigKeys
+        .DFS_BLOCKREPORT_INTERVAL_MSEC_DEFAULT));
 
     EncodingStatus status = dfs.getEncodingStatus(testFile.toUri().getPath());
     Path parityPath = new Path("/parity/" + status.getParityFileName());
@@ -271,7 +273,8 @@ public class TestErasureCodingManager extends ClusterTest {
     DataNodeUtil.loseBlock(getCluster(), lb);
     LOG.info("Losing block " + lb.toString());
 
-    Thread.sleep(2 * conf.getInt("dfs.blockreport.intervalMsec", 0) +
+    Thread.sleep(2 * conf.getLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY,
+        DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_DEFAULT) +
         2 * conf.getInt(DFSConfigKeys.RECHECK_INTERVAL_KEY, 0));
 
     while (true) {
@@ -293,7 +296,7 @@ public class TestErasureCodingManager extends ClusterTest {
     }
   }
 
-  @Test
+  @Test(timeout = 300000)
   public void testParityRepair() throws IOException, InterruptedException {
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
@@ -308,7 +311,8 @@ public class TestErasureCodingManager extends ClusterTest {
       }
     }
 
-    Thread.sleep(2 * conf.getInt("dfs.blockreport.intervalMsec", 0));
+    Thread.sleep(2 * conf.getLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY,
+        DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_DEFAULT));
 
     EncodingStatus status = dfs.getEncodingStatus(testFile.toUri().getPath());
     Path parityPath = new Path(conf.get(DFSConfigKeys.PARITY_FOLDER,
@@ -343,7 +347,7 @@ public class TestErasureCodingManager extends ClusterTest {
     } catch (BlockMissingException e) {
     }
 
-    Thread.sleep(2 * conf.getInt("dfs.blockreport.intervalMsec", 0) +
+    Thread.sleep(2 * conf.getLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY,DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_DEFAULT) +
         2 * conf.getInt(DFSConfigKeys.RECHECK_INTERVAL_KEY, 0));
 
     while (true) {
