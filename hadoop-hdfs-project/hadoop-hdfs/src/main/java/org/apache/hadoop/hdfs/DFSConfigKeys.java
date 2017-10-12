@@ -746,7 +746,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_BLOCKREPORT_INTERVAL_MSEC_KEY =
       "dfs.blockreport.intervalMsec";
   public static final long DFS_BLOCKREPORT_INTERVAL_MSEC_DEFAULT =
-      60 * 60 * 1000;
+      60 * 60 * 1000L;
   public static final String DFS_BLOCKREPORT_INITIAL_DELAY_KEY =
       "dfs.blockreport.initialDelay";
   public static final int DFS_BLOCKREPORT_INITIAL_DELAY_DEFAULT = 0;
