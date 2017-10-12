@@ -55,7 +55,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -122,7 +121,9 @@ class BPOfferService implements Runnable {
   private volatile int rpcRoundRobinIndex = 0;
   // you have bunch of NNs, which one to send the incremental block report
   private volatile int refreshNNRoundRobinIndex = 0;
-  private final ExecutorService executor;
+  final int maxNumIncrementalReportThreads;
+  private final ExecutorService incrementalBRExecutor;
+  private final ExecutorService brDispatcher;
       //in a heart beat only one actor should talk to name node and get the updated list of NNs
   //how to stop actors from communicating with all the NN at the same time for same RPC?
   //for that we will use a separate RR which will be incremented after Delta time (heartbeat time)
@@ -151,7 +152,11 @@ class BPOfferService implements Runnable {
 
     dnConf = dn.getDnConf();
 
-    executor = Executors.newFixedThreadPool(dnConf.iBRDispatherTPSize);
+    
+    maxNumIncrementalReportThreads = dnConf.iBRDispatherTPSize;
+    incrementalBRExecutor = Executors.newFixedThreadPool(maxNumIncrementalReportThreads);
+    brDispatcher = Executors.newSingleThreadExecutor();
+    
   }
 
   void refreshNNList(ArrayList<InetSocketAddress> addrs) throws IOException {
@@ -700,16 +705,20 @@ class BPOfferService implements Runnable {
       }
     } // while (shouldRun())
   } // offerService
-
-  AtomicInteger brThreadCounter = new AtomicInteger(0);
+  
+  private final Object BRLock = new Object();
+  private boolean brIsRunning = false;
+  private BRTask brTask = new BRTask();
   private void startBRThread(){
-   if(brThreadCounter.get()==0){
-     brThreadCounter.incrementAndGet();
-     executor.submit(new BRDispatcher());
-   }
+    synchronized (BRLock) {
+      if (!brIsRunning) {
+        brIsRunning = true;
+        brDispatcher.submit(brTask);
+      }
+    }
   }
 
-  private class BRDispatcher implements Callable{
+  private class BRTask implements Callable{
     /**
      * Computes a result, or throws an exception if unable to do so.
      *
@@ -718,32 +727,40 @@ class BPOfferService implements Runnable {
      */
     @Override
     public Object call() throws Exception {
-      try {
-        DatanodeCommand cmd = blockReport();
-        if (cmd != null) {
-          blkReportHander.processCommand(new DatanodeCommand[]{cmd});
-        }
-        // Now safe to start scanning the block pool.
-        // If it has already been started, this is a no-op.
-        if (dn.blockScanner != null) {
-          dn.blockScanner.addBlockPool(getBlockPoolId());
-        }
-        return null;
-      }finally {
-        brThreadCounter.decrementAndGet();
+      DatanodeCommand cmd = blockReport();
+      if (cmd != null) {
+        blkReportHander.processCommand(new DatanodeCommand[]{cmd});
       }
+      // Now safe to start scanning the block pool.
+      // If it has already been started, this is a no-op.
+      if (dn.blockScanner != null) {
+        dn.blockScanner.addBlockPool(getBlockPoolId());
+      }
+      synchronized (BRLock) {
+        brIsRunning = false;
+      }
+      return null;
     }
   }
+  
+  private final Object incrementalBRLock = new Object();
+  private int incrementalBRCounter = 0;
+  private final IncrementalBRTask incrementalBRTask = new IncrementalBRTask();
   /**
    * Report received blocks and delete hints to the Namenode
    *
    * @throws IOException
    */
   private void reportReceivedDeletedBlocks() throws IOException {
-    executor.submit(new IncrementailBRDispatcher());
+    synchronized (incrementalBRLock) {
+      if (incrementalBRCounter < maxNumIncrementalReportThreads){
+        incrementalBRCounter++;
+        incrementalBRExecutor.submit(incrementalBRTask);
+      }
+    }
   }
 
-  public class IncrementailBRDispatcher implements Callable{
+  public class IncrementalBRTask implements Callable{
     @Override
     public Object call() throws Exception {
       // check if there are newly received blocks
@@ -788,6 +805,9 @@ class BPOfferService implements Runnable {
             pendingReceivedRequests = pendingIncrementalBR.size();
           }
         }
+      }
+      synchronized (incrementalBRLock){
+        incrementalBRCounter--;
       }
       return null;
     }

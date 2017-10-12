@@ -73,7 +73,7 @@ public class TestBlockReconstructor extends ClusterTest {
         Util.encodeFile(getConfig(), dfs, codec, testFile, testParityFile));
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testSourceBlockRepair() throws IOException, InterruptedException {
     DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
     TestDfsClient testDfsClient = new TestDfsClient(getConfig());
