@@ -58,8 +58,12 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -102,7 +106,11 @@ public class TestBlockManager {
     HdfsStorageFactory.setConfiguration(conf);
     conf.set(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY,
         "need to set a dummy value here so it assumes a multi-rack cluster");
+    ExecutorService subTreeOpsPool = Executors.newFixedThreadPool(
+        conf.getInt(DFS_SUBTREE_EXECUTOR_LIMIT_KEY,
+            DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT));
     fsn = Mockito.mock(FSNamesystem.class);
+    Mockito.doReturn(subTreeOpsPool).when(fsn).getExecutorService();
     formatStorage();
     
     bm = new BlockManager(fsn, fsn, conf);
