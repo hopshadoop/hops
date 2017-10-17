@@ -2502,13 +2502,19 @@ public class BlockManager {
    *
    * @return the block that is stored in blockMap.
    */
-  private Block addStoredBlock(BlockInfo block, DatanodeDescriptor node,
+  private Block addStoredBlock(final BlockInfo block, DatanodeDescriptor node,
       DatanodeDescriptor delNodeHint, boolean logEveryBlock)
       throws IOException {
     assert block != null;
-    BlockCollection bc = block.getBlockCollection();
-    if (bc == null) {
-      // If this block does not belong to a file, then we are done.
+    BlockInfo storedBlock;
+    if (block instanceof BlockInfoUnderConstruction) {
+      //refresh our copy in case the block got completed in another thread
+      storedBlock = blocksMap.getStoredBlock(block);
+    } else {
+      storedBlock = block;
+    }
+    if (storedBlock == null || storedBlock.getBlockCollection() == null) {
+      // If this block does not belong to anyfile, then we are done.
       blockLog.info(
           "BLOCK* addStoredBlock: " + block + " on " + node + " size " +
               block.getNumBytes() + " but it does not belong to any file");
@@ -2516,9 +2522,10 @@ public class BlockManager {
       // it will happen in next block report otherwise.
       return block;
     }
-    
-    // Block is stored and belongs to a file.
-    
+    assert storedBlock != null : "Block must be stored by now";
+    BlockCollection bc = storedBlock.getBlockCollection();
+    assert bc != null : "Block must belong to a file";
+
     FSNamesystem fsNamesystem = (FSNamesystem) namesystem;
     NumberReplicas numBeforeAdding = null;
     if (fsNamesystem.isErasureCodingEnabled()) {
@@ -2526,78 +2533,78 @@ public class BlockManager {
     }
 
     // add block to the datanode
-    boolean added = node.addBlock(block);
+    boolean added = node.addBlock(storedBlock);
     int curReplicaDelta;
     if (added) {
       curReplicaDelta = 1;
       if (logEveryBlock) {
-        logAddStoredBlock(block, node);
+        logAddStoredBlock(storedBlock, node);
       }
     } else {
       curReplicaDelta = 0;
       blockLog.warn("BLOCK* addStoredBlock: " +
-          "Redundant addStoredBlock request received for " + block +
-          " on " + node + " size " + block.getNumBytes());
+          "Redundant addStoredBlock request received for " + storedBlock +
+          " on " + node + " size " + storedBlock.getNumBytes());
     }
 
     // Now check for completion of blocks and safe block count
-    NumberReplicas num = countNodes(block);
+    NumberReplicas num = countNodes(storedBlock);
     int numLiveReplicas = num.liveReplicas();
     int numCurrentReplica =
-        numLiveReplicas + pendingReplications.getNumReplicas(block);
+        numLiveReplicas + pendingReplications.getNumReplicas(storedBlock);
 
-    if (block.getBlockUCState() == BlockUCState.COMMITTED &&
+    if (storedBlock.getBlockUCState() == BlockUCState.COMMITTED &&
         numLiveReplicas >= minReplication) {
-      block =
-          completeBlock((MutableBlockCollection) bc, block, false);
-    } else if (block.isComplete()) {
+      storedBlock =
+          completeBlock((MutableBlockCollection) bc, storedBlock, false);
+    } else if (storedBlock.isComplete()) {
       // check whether safe replication is reached for the block
       // only complete blocks are counted towards that
       // Is no-op if not in safe mode.
       // In the case that the block just became complete above, completeBlock()
       // handles the safe block count maintenance.
-      namesystem.incrementSafeBlockCount(block);
+      namesystem.incrementSafeBlockCount(storedBlock);
     }
 
     // if file is under construction, then done for now
     if (bc instanceof MutableBlockCollection) {
-      return block;
+      return storedBlock;
     }
 
     // do not try to handle over/under-replicated blocks during safe mode
     if (!namesystem.isPopulatingReplQueues()) {
-      return block;
+      return storedBlock;
     }
 
     // handle underReplication/overReplication
     short fileReplication = bc.getBlockReplication();
-    if (!isNeededReplication(block, fileReplication, numCurrentReplica)) {
+    if (!isNeededReplication(storedBlock, fileReplication, numCurrentReplica)) {
       neededReplications
-          .remove(block, numCurrentReplica, num.decommissionedReplicas(),
+          .remove(storedBlock, numCurrentReplica, num.decommissionedReplicas(),
               fileReplication);
     } else {
-      updateNeededReplications(block, curReplicaDelta, 0);
+      updateNeededReplications(storedBlock, curReplicaDelta, 0);
     }
     if (numCurrentReplica > fileReplication) {
-      processOverReplicatedBlock(block, fileReplication, node,
+      processOverReplicatedBlock(storedBlock, fileReplication, node,
           delNodeHint);
     }
     // If the file replication has reached desired value
     // we can remove any corrupt replicas the block may have
-    int corruptReplicasCount = corruptReplicas.numCorruptReplicas(block);
+    int corruptReplicasCount = corruptReplicas.numCorruptReplicas(storedBlock);
     int numCorruptNodes = num.corruptReplicas();
     if (numCorruptNodes != corruptReplicasCount) {
       LOG.warn("Inconsistent number of corrupt replicas for " +
-          block + "blockMap has " + numCorruptNodes +
+          storedBlock + "blockMap has " + numCorruptNodes +
           " but corrupt replicas map has " + corruptReplicasCount);
     }
     if ((corruptReplicasCount > 0) && (numLiveReplicas >= fileReplication)) {
-      invalidateCorruptReplicas(block);
+      invalidateCorruptReplicas(storedBlock);
     }
 
     if (fsNamesystem.isErasureCodingEnabled()) {
       INode iNode = EntityManager.find(INode.Finder.ByINodeIdFTIS, bc.getId());
-      if (!iNode.isUnderConstruction() &&
+      if (iNode.isUnderConstruction() == false &&
           numBeforeAdding.liveReplicas() == 0 && numLiveReplicas > 0) {
         EncodingStatus status =
             EntityManager.find(EncodingStatus.Finder.ByInodeId, bc.getId());
@@ -2633,7 +2640,7 @@ public class BlockManager {
       }
     }
 
-    return block;
+    return storedBlock;
   }
 
   private void logAddStoredBlock(BlockInfo storedBlock,
