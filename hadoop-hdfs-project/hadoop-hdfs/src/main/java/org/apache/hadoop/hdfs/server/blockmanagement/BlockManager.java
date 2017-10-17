@@ -101,6 +101,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -294,7 +296,7 @@ public class BlockManager {
    * Number of batches to be processed by this namenode at one time
    */
   private final int processMisReplicatedNoOfBatchs;
-
+  
   public BlockManager(final Namesystem namesystem, final FSClusterStats stats,
       final Configuration conf) throws IOException {
     this.namesystem = namesystem;
@@ -355,7 +357,7 @@ public class BlockManager {
     this.shouldCheckForEnoughRacks =
         conf.get(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY) == null ?
             false : true;
-
+    
     this.blocksInvalidateWorkPct =
         DFSUtil.getInvalidateWorkPctPerIteration(conf);
     this.blocksReplWorkMultiplier = DFSUtil.getReplWorkMultiplier(conf);
@@ -1870,7 +1872,9 @@ public class BlockManager {
     }
     postponedMisreplicatedBlocks.removeAll(toRemove);
   }
-
+  
+  
+  
   private void processReport(final DatanodeDescriptor node,
       final BlockReport report) throws IOException {
     // Normal case:
@@ -1902,15 +1906,35 @@ public class BlockManager {
         addStoredBlockUnderConstructionTx(b.storedBlock, node, b.reportedState);
       }
     }
-
-    for (BlockInfo b : toAdd) {
+  
+  
+    final List<Callable<Object>> addTasks = new ArrayList<>();
+    for (final BlockInfo b : toAdd) {
       if (firstBlockReport) {
         addStoredBlockImmediateTx(b, node);
       } else {
-        addStoredBlockTx(b, node, null, true);
+        addTasks.add(new Callable<Object>() {
+          @Override
+          public Object call() throws Exception {
+            addStoredBlockTx(b, node, null, true);
+            return null;
+          }
+        });
       }
     }
-
+    try {
+      List<Future<Object>> futures = ((FSNamesystem) namesystem).getExecutorService().invokeAll(addTasks);
+      //Check for exceptions
+      for (Future<Object> maybeException : futures){
+        maybeException.get();
+      }
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    } catch (ExecutionException e) {
+      throw (IOException) e.getCause();
+    }
+  
+  
     for (BlockToMarkCorrupt b : toCorrupt) {
       markBlockAsCorruptTx(b, node);
     }
