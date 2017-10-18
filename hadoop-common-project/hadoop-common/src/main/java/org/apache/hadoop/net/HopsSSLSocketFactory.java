@@ -40,6 +40,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Set;
 
@@ -340,13 +341,33 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     }
     conf.setBoolean(FORCE_CONFIGURE, false);
   }
-    
-    private String[] readSuperPasswordFromFile(Configuration conf) {
+  
+    private String[] readSuperPasswordFromFile(Configuration conf)
+      throws IOException {
       Configuration sslConf = new Configuration(false);
       String sslConfResource = conf.get(SSLFactory.SSL_SERVER_CONF_KEY,
           "ssl-server.xml");
       
       File sslConfFile = new File(sslConfResource);
+      if (!sslConfFile.exists()) {
+        String hadoopConfDir = System.getenv("HADOOP_CONF_DIR");
+        if (hadoopConfDir == null) {
+          hadoopConfDir = System.getProperty("HADOOP_CONF_DIR");
+        }
+        if (hadoopConfDir == null) {
+          throw new IOException("JVM property -DHADOOP_CONF_DIR or " +
+              "environment variable is not exported and " + sslConfResource +
+              " is not in classpath");
+        }
+        Path sslConfPath = Paths.get(hadoopConfDir, sslConfResource);
+        sslConfFile = sslConfPath.toFile();
+      }
+      
+      if (!sslConfFile.exists()) {
+        throw new IOException("Could not locate ssl-server.xml. Export " +
+            "JVM property -DHADOOP_CONF_DIR or environment variable or add " +
+            sslConfResource + " to classpath.");
+      }
       FileInputStream sslConfIn = null;
       String[] keystore_truststore = new String[2];
       
@@ -355,7 +376,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
           sslConfIn = new FileInputStream(sslConfFile);
           sslConf.addResource(sslConfIn);
         } catch (IOException ex) {
-          sslConf.addResource(sslConfResource);
+          sslConf.addResource(sslConfFile.getAbsolutePath());
         }
         
         keystore_truststore[0] = sslConf.get(
