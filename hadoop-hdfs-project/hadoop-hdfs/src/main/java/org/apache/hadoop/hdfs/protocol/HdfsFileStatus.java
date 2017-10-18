@@ -19,28 +19,24 @@ package org.apache.hadoop.hdfs.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
+
+import java.io.IOException;
+import java.net.URI;
 
 /**
  * Interface that represents the over the wire information for a file.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class HdfsFileStatus {
+public class HdfsFileStatus extends FileStatus {
 
   private byte[] path;  // local name of the inode that's encoded in java UTF8
   private byte[] symlink; // symlink target encoded in java UTF8 or null
-  private long length;
-  private boolean isdir;
-  private short block_replication;
-  private long blocksize;
-  private long modification_time;
-  private long access_time;
-  private FsPermission permission;
-  private String owner;
-  private String group;
+
   private final long fileId;
   private boolean isFileStoredInDB;
 
@@ -76,39 +72,15 @@ public class HdfsFileStatus {
       long blocksize, long modification_time, long access_time,
       FsPermission permission, String owner, String group, byte[] symlink,
       byte[] path, boolean isFileStoredInDB) {
+
+    super(length, isdir, block_replication, blocksize, modification_time,
+        access_time, permission, owner, group,
+        path == null || path.length == 0 ? null : new Path(DFSUtil.bytes2String(path)));
+
     this.fileId = fileid;
-    this.length = length;
-    this.isdir = isdir;
-    this.block_replication = (short) block_replication;
-    this.blocksize = blocksize;
-    this.modification_time = modification_time;
-    this.access_time = access_time;
-    this.permission = (permission == null) ?
-        ((isdir || symlink != null) ? FsPermission.getDefault() :
-            FsPermission.getFileDefault()) : permission;
-    this.owner = (owner == null) ? "" : owner;
-    this.group = (group == null) ? "" : group;
     this.symlink = symlink;
     this.path = path;
     this.isFileStoredInDB = isFileStoredInDB;
-  }
-
-  /**
-   * Get the length of this file, in bytes.
-   *
-   * @return the length of this file, in bytes.
-   */
-  final public long getLen() {
-    return length;
-  }
-
-  /**
-   * Is this a directory?
-   *
-   * @return true if this is a directory
-   */
-  final public boolean isDir() {
-    return isdir;
   }
 
   /**
@@ -118,70 +90,6 @@ public class HdfsFileStatus {
    */
   public boolean isSymlink() {
     return symlink != null;
-  }
-  
-  /**
-   * Get the block size of the file.
-   *
-   * @return the number of bytes
-   */
-  final public long getBlockSize() {
-    return blocksize;
-  }
-
-  /**
-   * Get the replication factor of a file.
-   *
-   * @return the replication factor of a file.
-   */
-  final public short getReplication() {
-    return block_replication;
-  }
-
-  /**
-   * Get the modification time of the file.
-   *
-   * @return the modification time of file in milliseconds since January 1, 1970
-   * UTC.
-   */
-  final public long getModificationTime() {
-    return modification_time;
-  }
-
-  /**
-   * Get the access time of the file.
-   *
-   * @return the access time of file in milliseconds since January 1, 1970 UTC.
-   */
-  final public long getAccessTime() {
-    return access_time;
-  }
-
-  /**
-   * Get FsPermission associated with the file.
-   *
-   * @return permssion
-   */
-  final public FsPermission getPermission() {
-    return permission;
-  }
-  
-  /**
-   * Get the owner of the file.
-   *
-   * @return owner of the file
-   */
-  final public String getOwner() {
-    return owner;
-  }
-  
-  /**
-   * Get the group associated with the file.
-   *
-   * @return group for the file.
-   */
-  final public String getGroup() {
-    return group;
   }
   
   /**
@@ -251,10 +159,19 @@ public class HdfsFileStatus {
    *
    * @return the symlink as a string.
    */
-  final public String getSymlink() {
-    return DFSUtil.bytes2String(symlink);
+  @Override
+  final public Path getSymlink() throws IOException {
+    if (isSymlink()) {
+      return new Path(DFSUtil.bytes2String(symlink));
+    }
+    throw new IOException("Path " + getPath() + " is not a symbolic link");
   }
-  
+
+  @Override
+  public void setSymlink(Path sym) {
+    symlink = DFSUtil.string2Bytes(sym.toString());
+  }
+
   final public byte[] getSymlinkInBytes() {
     return symlink;
   }
@@ -262,4 +179,18 @@ public class HdfsFileStatus {
   final public long getFileId() { return fileId; }
 
   final public boolean isFileStoredInDB(){ return isFileStoredInDB; }
+
+  /**
+   * Resolve the short name of the Path given the URI, parent provided. This
+   * FileStatus reference will not contain a valid Path until it is resolved
+   * by this method.
+   * @param defaultUri FileSystem to fully qualify HDFS path.
+   * @param parent Parent path of this element.
+   * @return Reference to this instance.
+   */
+  public final FileStatus makeQualified(URI defaultUri, Path parent) {
+    // fully-qualify path
+    setPath(getFullPath(parent).makeQualified(defaultUri, null));
+    return this; // API compatibility
+  }
 }
