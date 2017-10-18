@@ -19,7 +19,13 @@ package org.apache.hadoop.hdfs.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DFSUtil;
+
+import java.io.IOException;
+import java.net.URI;
 
 /**
  * Interface that represents the over the wire information
@@ -74,4 +80,23 @@ public class HdfsLocatedFileStatus extends HdfsFileStatus {
   public LocatedBlocks getBlockLocations() {
     return locations;
   }
+
+  /**
+   * This function is used to transform the underlying HDFS LocatedBlocks to
+   * BlockLocations.
+   *
+   * The returned BlockLocation will have different formats for replicated
+   * and erasure coded file.
+   * Please refer to
+   * {@link org.apache.hadoop.fs.FileSystem#getFileBlockLocations
+   * (FileStatus, long, long)}
+   * for examples.
+   */
+  public final LocatedFileStatus makeQualifiedLocated(URI defaultUri, Path path)
+    throws IOException {
+    makeQualified(defaultUri, path);
+    return new LocatedFileStatus(this,
+        DFSUtil.locatedBlocks2Locations(getBlockLocations()));
+  }
+
 }

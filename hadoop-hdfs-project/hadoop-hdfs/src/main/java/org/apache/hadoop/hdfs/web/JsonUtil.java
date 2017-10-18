@@ -236,7 +236,7 @@ public class JsonUtil {
    * Convert a HdfsFileStatus object to a Json string.
    */
   public static String toJsonString(final HdfsFileStatus status,
-      boolean includeType) {
+      boolean includeType) throws IOException {
     if (status == null) {
       return null;
     }

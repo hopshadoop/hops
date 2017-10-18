@@ -143,21 +143,22 @@ public class Hdfs extends AbstractFileSystem {
     }
   }
 
-  private FileStatus makeQualified(HdfsFileStatus f, Path parent) {
+  private FileStatus makeQualified(HdfsFileStatus f, Path parent)
+      throws IOException{
     // NB: symlink is made fully-qualified in FileContext. 
     return new FileStatus(f.getLen(), f.isDir(), f.getReplication(),
         f.getBlockSize(), f.getModificationTime(), f.getAccessTime(),
         f.getPermission(), f.getOwner(), f.getGroup(),
-        f.isSymlink() ? new Path(f.getSymlink()) : null, (f.getFullPath(parent))
+        f.isSymlink() ? f.getSymlink() : null, (f.getFullPath(parent))
         .makeQualified(getUri(), null)); // fully-qualify path
   }
 
   private LocatedFileStatus makeQualifiedLocated(HdfsLocatedFileStatus f,
-      Path parent) {
+      Path parent) throws IOException {
     return new LocatedFileStatus(f.getLen(), f.isDir(), f.getReplication(),
         f.getBlockSize(), f.getModificationTime(), f.getAccessTime(),
         f.getPermission(), f.getOwner(), f.getGroup(),
-        f.isSymlink() ? new Path(f.getSymlink()) : null,
+        f.isSymlink() ? f.getSymlink() : null,
         (f.getFullPath(parent)).makeQualified(getUri(), null),
         // fully-qualify path
         DFSUtil.locatedBlocks2Locations(f.getBlockLocations()));
