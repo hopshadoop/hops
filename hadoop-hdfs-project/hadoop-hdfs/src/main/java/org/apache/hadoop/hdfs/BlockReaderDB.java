@@ -21,14 +21,23 @@ public class BlockReaderDB implements  BlockReader{
     private  final DatanodeInfo  dnInfo;
     private  final LocatedBlock locBlock;
     private  final byte[] data;
+    private  final int startOffset;
     private  final ByteArrayInputStream bis;
 
-    public BlockReaderDB(InetSocketAddress dnAddr, DatanodeInfo dnInfo, LocatedBlock locBlock, byte[] data) {
+    public BlockReaderDB(InetSocketAddress dnAddr, DatanodeInfo dnInfo, LocatedBlock locBlock, byte[] data,
+                         final int startOffset) {
         this.dnAddr = dnAddr;
         this.dnInfo = dnInfo;
         this.locBlock = locBlock;
         this.data = data;
         bis = new ByteArrayInputStream(data);
+
+        this.startOffset  = startOffset;
+        if(startOffset>0){
+            int read = bis.read(new byte[startOffset],0,startOffset);
+            assert  read == startOffset;
+        }
+
     }
 
     @Override
@@ -44,7 +53,7 @@ public class BlockReaderDB implements  BlockReader{
      */
     @Override
     public long skip(long n) throws IOException {
-                throw new UnsupportedOperationException("Not implemented yet");
+        return bis.skip(n);
     }
 
     @Override
