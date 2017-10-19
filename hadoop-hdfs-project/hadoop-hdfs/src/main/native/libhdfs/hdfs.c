@@ -508,7 +508,12 @@ hdfsFS hdfsBuilderConnect(struct hdfsBuilder *bld)
             goto done;
         }
     }
- 
+
+    const char* hdfs_user = getenv("HDFS_USER");
+    if (hdfs_user != NULL && bld->userName == NULL) {
+      bld->userName = hdfs_user;
+    }
+    
     //Check what type of FileSystem the caller wants...
     if (bld->nn == NULL) {
         // Get a local filesystem.
