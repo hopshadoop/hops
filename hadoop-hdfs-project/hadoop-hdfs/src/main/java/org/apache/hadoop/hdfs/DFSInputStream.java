@@ -921,7 +921,7 @@ public class DFSInputStream extends FSInputStream
 
     if(locBlock.isPhantomBlock() && !emulateHdfsClient){
       DFSClient.LOG.debug("Stuffed Inode:  Found Phantom LocatedBlock. Initializing BlockReaderDB, Data Len: "+locBlock.getData().length);
-      return new BlockReaderDB(dnAddr, chosenNode, locBlock, locBlock.getData());
+      return new BlockReaderDB(dnAddr, chosenNode, locBlock, locBlock.getData(),(int)startOffset); //small file. we can safely cast long to int
     }
 
     // Can't local read a block under construction, see HDFS-2757
