@@ -790,7 +790,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       HdfsFileStatus stat = namesystem.getFileInfo(path, false);
       if (stat != null) {
         // NB: getSymlink throws IOException if !stat.isSymlink() 
-        return stat.getSymlink();
+        return stat.getSymlink().toString();
       }
     } catch (UnresolvedPathException e) {
       return e.getResolvedPath().toString();

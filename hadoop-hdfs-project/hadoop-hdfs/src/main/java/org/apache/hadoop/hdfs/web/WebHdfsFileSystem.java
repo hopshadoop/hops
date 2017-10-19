@@ -636,11 +636,12 @@ public class WebHdfsFileSystem extends FileSystem
     return makeQualified(getHdfsFileStatus(f), f);
   }
 
-  private FileStatus makeQualified(HdfsFileStatus f, Path parent) {
+  private FileStatus makeQualified(HdfsFileStatus f, Path parent)
+      throws IOException {
     return new FileStatus(f.getLen(), f.isDir(), f.getReplication(),
         f.getBlockSize(), f.getModificationTime(), f.getAccessTime(),
         f.getPermission(), f.getOwner(), f.getGroup(),
-        f.isSymlink() ? new Path(f.getSymlink()) : null,
+        f.isSymlink() ? f.getSymlink() : null,
         f.getFullPath(parent).makeQualified(getUri(), getWorkingDirectory()));
   }
 

@@ -293,10 +293,10 @@ public class FSNamesystem
 
   private void logAuditEvent(boolean succeeded, UserGroupInformation ugi,
       InetAddress addr, String cmd, String src, String dst,
-      HdfsFileStatus stat) {
+      HdfsFileStatus stat) throws IOException {
     FileStatus status = null;
     if (stat != null) {
-      Path symlink = stat.isSymlink() ? new Path(stat.getSymlink()) : null;
+      Path symlink = stat.isSymlink() ? stat.getSymlink() : null;
       Path path = dst != null ? new Path(dst) : new Path(src);
       status =
           new FileStatus(stat.getLen(), stat.isDir(), stat.getReplication(),
