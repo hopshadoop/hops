@@ -823,7 +823,7 @@ public class BlockManager {
     DatanodeInfo randomDatanode =  datanodeManager.getRandomDN();
     DatanodeInfo[] machines = new DatanodeInfo[1];
     if(randomDatanode != null){
-      machines[0] = datanodeManager.getRandomDN();
+      machines[0] = randomDatanode;
     }
     else{
       DatanodeID phantomDatanodID = new DatanodeID(
