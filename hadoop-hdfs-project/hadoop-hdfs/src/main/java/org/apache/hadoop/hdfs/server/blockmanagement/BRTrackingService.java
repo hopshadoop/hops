@@ -128,6 +128,7 @@ public class BRTrackingService {
       }
     }
     LOG.info("Work ("+noOfBlks+" blks) could not be assigned");
-    throw new BRLoadBalancingException("Work ("+noOfBlks+" blks) could not be assigned. System is fully loaded now");
+    throw new BRLoadBalancingException("Work ("+noOfBlks+" blks) could not be assigned. System is fully loaded now. At most "+getBrLbMaxBlkPerTW(
+            DB_VAR_UPDATE_THRESHOLD )+" blocks can be processed per "+BR_LB_TIME_WINDOW_SIZE);
   }
 }

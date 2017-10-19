@@ -1320,8 +1320,13 @@ public class DatanodeManager {
   public DatanodeDescriptor getRandomDN(){
     List<String> sids = new ArrayList<>(storageIdMap.getStorageIds());
     if(sids.size()>0) {
-      String sid = sids.get(rand.nextInt(sids.size()));
-      return getDatanode(sid);
+      for(int i = 0;i < sids.size();i++){
+        String sid = sids.get(rand.nextInt(sids.size()));
+        DatanodeDescriptor dd = getDatanode(sid);
+        if(dd != null){
+          return dd;
+        }
+      }
     }
     return null;
   }
