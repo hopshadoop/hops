@@ -1651,7 +1651,10 @@ public class FSNamesystem
 
     INode targetNode = getINode(src);
     if(targetNode instanceof INodeFile && ((INodeFile) targetNode).isFileStoredInDB()){
-      throw new IOException("Can not set replication level for a file stored in the database. ");
+      // [s] for the files stored in the database setting the replication level does not make
+      // any sense. For now we will just set the replication level as requested by the user
+      ((INodeFile) targetNode).setReplication(replication);
+      return true;
     }
 
     final short[] oldReplication = new short[1];
