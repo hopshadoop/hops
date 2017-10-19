@@ -17,6 +17,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -1107,6 +1109,47 @@ public class TestSmallFilesCreation {
       writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
       assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
       verifyFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.getMessage());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  @Test
+  public void TestSmallFilesReplication() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+
+      final int BLOCK_SIZE = 1024 * 1024;
+      final boolean ENABLE_STORE_SMALL_FILES_IN_DB = true;
+      final int ONDISK_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_MEDIUM_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_LARGE_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT);
+      final int INMEMORY_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT);
+      final String FILE_NAME1 = "/TEST-FLIE1";
+      final String FILE_NAME2 = "/TEST-FLIE2";
+
+      conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, ENABLE_STORE_SMALL_FILES_IN_DB);
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(0).format(true).build();
+      cluster.waitActive();
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      writeFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+      assertTrue("Count of db file should be 1", countInMemoryDBFiles() == 1);
+      verifyFile(dfs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+
+      dfs.setReplication(new Path(FILE_NAME1),(short)10);
+
+      if(dfs.getFileStatus(new Path(FILE_NAME1)).getReplication() != 10){
+        fail("Unable to set replication for a small file");
+      }
 
     } catch (Exception e) {
       e.printStackTrace();
