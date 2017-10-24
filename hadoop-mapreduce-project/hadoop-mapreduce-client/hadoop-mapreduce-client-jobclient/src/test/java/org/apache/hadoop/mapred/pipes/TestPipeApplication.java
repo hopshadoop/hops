@@ -243,7 +243,7 @@ public class TestPipeApplication {
    *
    * @throws Exception
    */
-  @Test
+  @Test(timeout = 60000)
   public void testSubmitter() throws Exception {
 
     JobConf conf = new JobConf();
@@ -444,7 +444,7 @@ public class TestPipeApplication {
    * test PipesPartitioner
    * test set and get data from  PipesPartitioner
    */
-  @Test
+  @Test(timeout = 60000)
   public void testPipesPartitioner() {
 
     PipesPartitioner<IntWritable, Text> partitioner = new PipesPartitioner<IntWritable, Text>();

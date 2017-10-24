@@ -214,7 +214,7 @@ public class TestLargeDirectoryDelete {
     }
   }
   
-  @Test(timeout = 3000000)
+  @Test(timeout = 600000)
   public void largeDelete() throws Throwable {
     mc = new MiniDFSCluster.Builder(CONF).build();
     try {

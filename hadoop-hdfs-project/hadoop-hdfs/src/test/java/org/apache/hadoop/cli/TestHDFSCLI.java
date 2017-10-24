@@ -98,7 +98,7 @@ public class TestHDFSCLI extends CLITestHelperDFS {
     return cmd.getExecutor(namenode, conf).executeCommand(cmd.getCmd());
   }
   
-  @Test
+  @Test(timeout = 800000)
   @Override
   public void testAll() {
     super.testAll();

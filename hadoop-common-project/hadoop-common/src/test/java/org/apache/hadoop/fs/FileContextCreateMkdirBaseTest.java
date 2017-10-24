@@ -84,14 +84,14 @@ public abstract class FileContextCreateMkdirBaseTest {
   //      Test Mkdir
   ////////////////////////
   
-  @Test
+  @Test(timeout = 60000)
   public void testMkdirNonRecursiveWithExistingDir() throws IOException {
     Path f = getTestRootPath(fc, "aDir");
     fc.mkdir(f, FileContext.DEFAULT_PERM, false);
     Assert.assertTrue(isDir(fc, f));
   }
   
-  @Test
+  @Test(timeout = 60000)
   public void testMkdirNonRecursiveWithNonExistingDir() {
     try {
       fc.mkdir(getTestRootPath(fc,"NonExistant/aDir"),
@@ -103,7 +103,7 @@ public abstract class FileContextCreateMkdirBaseTest {
   }
   
   
-  @Test
+  @Test(timeout = 60000)
   public void testMkdirRecursiveWithExistingDir() throws IOException {
     Path f = getTestRootPath(fc, "aDir");
     fc.mkdir(f, FileContext.DEFAULT_PERM, true);
@@ -111,7 +111,7 @@ public abstract class FileContextCreateMkdirBaseTest {
   }
   
   
-  @Test
+  @Test(timeout = 60000)
   public void testMkdirRecursiveWithNonExistingDir() throws IOException {
     Path f = getTestRootPath(fc, "NonExistant2/aDir");
     fc.mkdir(f, FileContext.DEFAULT_PERM, true);
@@ -187,14 +187,14 @@ public abstract class FileContextCreateMkdirBaseTest {
   ///////////////////////
   //      Test Create
   ////////////////////////
-  @Test
+  @Test(timeout = 60000)
   public void testCreateNonRecursiveWithExistingDir() throws IOException {
     Path f = getTestRootPath(fc, "foo");
     createFile(fc, f);
     Assert.assertTrue(isFile(fc, f));
   }
   
-  @Test
+  @Test(timeout = 60000)
   public void testCreateNonRecursiveWithNonExistingDir() {
     try {
       createFileNonRecursive(fc, getTestRootPath(fc, "NonExisting/foo"));
@@ -205,7 +205,7 @@ public abstract class FileContextCreateMkdirBaseTest {
   }
   
   
-  @Test
+  @Test(timeout = 60000)
   public void testCreateRecursiveWithExistingDir() throws IOException {
     Path f = getTestRootPath(fc,"foo");
     createFile(fc, f);
@@ -213,7 +213,7 @@ public abstract class FileContextCreateMkdirBaseTest {
   }
   
   
-  @Test
+  @Test(timeout = 60000)
   public void testCreateRecursiveWithNonExistingDir() throws IOException {
     Path f = getTestRootPath(fc,"NonExisting/foo");
     createFile(fc, f);
