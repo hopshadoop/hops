@@ -153,7 +153,7 @@ public class BlockReaderDB implements  BlockReader{
       int actuallyRead = bis.read(buffer);
       if(actuallyRead > 0){
         buf.put(buffer);
-        buf.position(initialPosition);
+        buf.position(initialPosition+actuallyRead);
       }
       return actuallyRead;
     }

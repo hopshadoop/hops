@@ -17,6 +17,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -1160,4 +1161,49 @@ public class TestSmallFilesCreation {
       }
     }
   }
+
+  @Test
+  public void TestSmallFileByteBufferReader() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+
+      final int BLOCK_SIZE = 1024 * 1024;
+      final boolean ENABLE_STORE_SMALL_FILES_IN_DB = true;
+      final int ONDISK_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_MEDIUM_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_LARGE_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT);
+      final int INMEMORY_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT);
+      final String FILE_NAME1 = "/TEST-FLIE1";
+      final String FILE_NAME2 = "/TEST-FLIE2";
+
+      conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, ENABLE_STORE_SMALL_FILES_IN_DB);
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(0).format(true).build();
+      cluster.waitActive();
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      writeFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, ONDISK_LARGE_FILE_MAX_SIZE);
+
+      FSDataInputStream read = dfs.open(new Path(FILE_NAME1));
+      ByteBuffer buf = ByteBuffer.allocate(ONDISK_LARGE_FILE_MAX_SIZE);
+      while (buf.hasRemaining()) {
+        int readCount = read.read(buf);
+        if (readCount == -1) {
+          // this is probably a bug in the ParquetReader. We shouldn't have called readFully with a buffer
+          // that has more remaining than the amount of data in the stream.
+          throw new EOFException("Reached the end of stream. Still have: " + buf.remaining() + " bytes left");
+        }
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.getMessage());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
 }
