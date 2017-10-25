@@ -25,6 +25,7 @@ import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.logging.Log;
@@ -39,6 +40,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration;
+import org.apache.hadoop.yarn.util.resource.DominantResourceCalculatorGPU;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -66,25 +69,31 @@ public class TestPriceMultiplicationFactorService {
   public void TestMultiplicatorEvaluation() throws Exception {
 
     conf.setInt(YarnConfiguration.QUOTA_CONTAINERS_LOGS_MONITOR_INTERVAL, 2000);
-    conf.setFloat(YarnConfiguration.QUOTA_MULTIPLICATOR_THRESHOLD, 0.2f);
-    conf.setFloat(YarnConfiguration.QUOTA_INCREMENT_FACTOR, 10f);
+    conf.setFloat(YarnConfiguration.QUOTA_MULTIPLICATOR_THRESHOLD_GENERAL, 0.2f);
+    conf.setFloat(YarnConfiguration.QUOTA_MULTIPLICATOR_THRESHOLD_GPU, 0.2f);
+    conf.setFloat(YarnConfiguration.QUOTA_INCREMENT_FACTOR_GENERAL, 10f);
+    conf.setFloat(YarnConfiguration.QUOTA_INCREMENT_FACTOR_GPU, 20f);
+    conf.set(CapacitySchedulerConfiguration.RESOURCE_CALCULATOR_CLASS, DominantResourceCalculatorGPU.class.getName());
 
     MockRM rm = new MockRM(conf);
     rm.start();
 
     ConsumeSomeResources(rm);
     Thread.sleep(1000);
-    //all the resources are allocated: 1AM and 14 Containers 
+    //GENERAL: half of the resources are allocated: 1AM and 6 Containers with 1 vcore and 1MB each.
+    //so cluster utilisation is 0.5, overpricing is 0.5-0.2(threshold)=0,3
+    //multiplicator is 1+0,3*10(increment factor) = 4
+    //GPU: all the GPU resources are allocated.
     //so cluster utilisation is 1, overpricing is 1-0.2(threshold)=0,8
-    //multiplicator is 1+0,8*10(increment factor) = 9
-    CheckCurrentMultiplicator(9);
+    //multiplicator is 1+0,8*20(increment factor) = 17
+    CheckCurrentMultiplicator(4, 17);
 
   }
 
     private void ConsumeSomeResources(MockRM rm) throws Exception {
     // Start the nodes
-    MockNM nm1 = rm.registerNode("h1:1234", 5 * GB);
-    MockNM nm2 = rm.registerNode("h2:5678", 10 * GB);
+    MockNM nm1 = rm.registerNode("h1:1234", 4 * GB);
+    MockNM nm2 = rm.registerNode("h2:5678", 10 * GB, 10, 1);
 
     RMApp app = rm.submitApp(1 * GB);
 
@@ -96,46 +105,59 @@ public class TestPriceMultiplicationFactorService {
     am.registerAppAttempt();
 
     //request for containers
-    int request = 4;
+    int request = 3;
     am.allocate("h1", 1 * GB, request, new ArrayList<ContainerId>());
 
     //kick the scheduler
     List<Container> conts = am.allocate(new ArrayList<ResourceRequest>(),
             new ArrayList<ContainerId>()).getAllocatedContainers();
     int contReceived = conts.size();
-    while (contReceived < 4) { //only 4 containers can be allocated on node1
+    while (contReceived < request) { 
       nm1.nodeHeartbeat(true);
+      conts.addAll(am.allocate(new ArrayList<ResourceRequest>(),
+              new ArrayList<ContainerId>()).getAllocatedContainers());
+      contReceived = conts.size();
+      Thread.sleep(WAIT_SLEEP_MS);
+    }
+    Assert.assertEquals(request, conts.size());
+
+    Thread.sleep(5000);
+
+    //request for containers
+    request = 2;
+    am.allocate("h1", 1 * GB, request, new ArrayList<ContainerId>());
+    //send node2 heartbeat
+    conts = am.allocate(new ArrayList<ResourceRequest>(),
+            new ArrayList<ContainerId>()).getAllocatedContainers();
+    contReceived = conts.size();
+    while (contReceived < request) { 
+      nm2.nodeHeartbeat(true);
+      conts.addAll(am.allocate(new ArrayList<ResourceRequest>(),
+              new ArrayList<ContainerId>()).getAllocatedContainers());
+      contReceived = conts.size();
+      Thread.sleep(WAIT_SLEEP_MS);
+    }
+    Assert.assertEquals(request, conts.size());
+    
+    am.allocate("h1", 1 * GB, 1, new ArrayList<ContainerId>(), 1);
+    conts = am.allocate(new ArrayList<ResourceRequest>(),new ArrayList<ContainerId>()).getAllocatedContainers();
+    contReceived = conts.size();
+    while (contReceived < 1) { //only 4 containers can be allocated on node1
+      nm2.nodeHeartbeat(true);
       conts.addAll(am.allocate(new ArrayList<ResourceRequest>(),
               new ArrayList<ContainerId>()).getAllocatedContainers());
       contReceived = conts.size();
       //LOG.info("Got " + contReceived + " containers. Waiting to get " + 3);
       Thread.sleep(WAIT_SLEEP_MS);
     }
-    Assert.assertEquals(4, conts.size());
-
-    Thread.sleep(5000);
-
-    //request for containers
-    request = 10;
-    am.allocate("h1", 1 * GB, request, new ArrayList<ContainerId>());
-    //send node2 heartbeat
-    conts = am.allocate(new ArrayList<ResourceRequest>(),
-            new ArrayList<ContainerId>()).getAllocatedContainers();
-    contReceived = conts.size();
-    while (contReceived < 10) { //Now rest of the (request-4=10) containers can be allocated on node1
-      nm2.nodeHeartbeat(true);
-      conts.addAll(am.allocate(new ArrayList<ResourceRequest>(),
-              new ArrayList<ContainerId>()).getAllocatedContainers());
-      contReceived = conts.size();
-      //LOG.info("Got " + contReceived + " containers. Waiting to get " + 10);
-      Thread.sleep(WAIT_SLEEP_MS);
-    }
-    Assert.assertEquals(10, conts.size());
+    Assert.assertEquals(1, conts.size());
+    
     Thread.sleep(1000);
   }
     
-  private void CheckCurrentMultiplicator(float value) throws Exception {
-      LightWeightRequestHandler currentMultiplicatorHandler
+  private void CheckCurrentMultiplicator(final float generalMultiplicator, final float gpuMultiplicator) throws
+      Exception {
+    LightWeightRequestHandler currentMultiplicatorHandler
               = new LightWeightRequestHandler(
                       YARNOperationType.TEST) {
         @Override
@@ -149,21 +171,24 @@ public class TestPriceMultiplicationFactorService {
           Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> priceList = pmDA.getAll();
 
           connector.commit();
-          LOG.debug("got new multiplicator: " + priceList.get(PriceMultiplicator.MultiplicatorType.VARIABLE).getValue()
-              + "for VARIABLE");
-          return priceList.get(PriceMultiplicator.MultiplicatorType.VARIABLE).getValue();
+          return priceList;
         }
       };
       int nbTry=0;
-      float currentMultiplicator = -1;
-      while(nbTry<10){
-       currentMultiplicator = (Float) currentMultiplicatorHandler.handle();
-       if(currentMultiplicator==value){
-         break;
-       }
+      Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> currentMultiplicators = new HashMap<>();
+      while (nbTry < 10) {
+        currentMultiplicators
+            = (Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator>) currentMultiplicatorHandler.handle();
+        if (currentMultiplicators.get(PriceMultiplicator.MultiplicatorType.GENERAL).getValue() == generalMultiplicator
+            && currentMultiplicators.get(PriceMultiplicator.MultiplicatorType.GPU).getValue() == gpuMultiplicator) {
+          break;
+        }
        Thread.sleep(500);
        nbTry++;
       }
-      Assert.assertEquals(value, currentMultiplicator,0);
+    Assert.assertEquals(generalMultiplicator, currentMultiplicators.get(PriceMultiplicator.MultiplicatorType.GENERAL).
+        getValue(), 0);
+    Assert.
+        assertEquals(gpuMultiplicator, currentMultiplicators.get(PriceMultiplicator.MultiplicatorType.GPU).getValue(), 0);
   }
 }

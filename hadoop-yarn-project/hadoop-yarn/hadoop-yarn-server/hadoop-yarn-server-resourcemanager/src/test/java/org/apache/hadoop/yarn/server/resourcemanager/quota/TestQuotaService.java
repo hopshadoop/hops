@@ -78,13 +78,13 @@ public class TestQuotaService {
               = new ArrayList<>();
       hopContainerLog.add(new ContainerLog(
               "container_1450009406746_0001_01_000001",
-              10, 11, ContainerExitStatus.SUCCESS, (float) 0.1, 1 ,1024));
+              10, 11, ContainerExitStatus.SUCCESS, (float) 0.1, 1 ,1024, 0));
       hopContainerLog.add(new ContainerLog(
               "container_1450009406746_0001_02_000001",
-              10, 11, ContainerExitStatus.ABORTED, (float) 0.1,1,1024));
+              10, 11, ContainerExitStatus.ABORTED, (float) 0.1,1,1024, 0));
       hopContainerLog.add(new ContainerLog(
               "container_1450009406746_0001_03_000001",
-              10, 110, ContainerExitStatus.CONTAINER_RUNNING_STATE, (float) 0.1,1,1024));
+              10, 110, ContainerExitStatus.CONTAINER_RUNNING_STATE, (float) 0.1,1,1024, 0));
 
       final List<ProjectQuota> hopProjectQuota
               = new ArrayList<ProjectQuota>();
@@ -269,7 +269,7 @@ public class TestQuotaService {
       for (int j = 0; j < i; j++) {
         logs.add(new ContainerLog("container_1450009406746_0001_0" + i
                 + "_00000" + j, i, i,
-                ContainerExitStatus.CONTAINER_RUNNING_STATE,(float)0.1, 1 , 1024));
+                ContainerExitStatus.CONTAINER_RUNNING_STATE,(float)0.1, 1 , 1024, 0));
       }
       qs.insertEvents(logs);
     }
@@ -280,7 +280,7 @@ public class TestQuotaService {
 
       for (int j = 0; j < i; j++) {
         logs.add(new ContainerLog("container_1450009406746_0001_0" + i
-                + "_00000" + j, i, i + 5, ContainerExitStatus.SUCCESS,(float) 0.1,1,1024));
+                + "_00000" + j, i, i + 5, ContainerExitStatus.SUCCESS,(float) 0.1,1,1024, 0));
         totalCost+=1;
       }
     qs.insertEvents(logs);
@@ -293,7 +293,7 @@ public class TestQuotaService {
       for (int j = 0; j < i; j++) {
         logs.add(new ContainerLog("container_1450009406746_0001_0" + i
                 + "_00000" + j, i, i + 10,
-                ContainerExitStatus.CONTAINER_RUNNING_STATE,(float) 0.1,1,1024));
+                ContainerExitStatus.CONTAINER_RUNNING_STATE,(float) 0.1,1,1024, 0));
         totalCost+=1;
       }
       qs.insertEvents(logs);
@@ -305,7 +305,7 @@ public class TestQuotaService {
 
       for (int j = 0; j < i; j++) {
         logs.add(new ContainerLog("container_1450009406746_0001_0" + i
-                + "_00000" + j, i, i + 15, ContainerExitStatus.SUCCESS,(float) 0.1,1,1024));
+                + "_00000" + j, i, i + 15, ContainerExitStatus.SUCCESS,(float) 0.1,1,1024, 0));
         totalCost+=1;
       }
       qs.insertEvents(logs);
@@ -317,7 +317,7 @@ public class TestQuotaService {
 
       for (int j = 0; j < i; j++) {
         logs.add(new ContainerLog("container_1450009406746_0001_0" + i
-                + "_00000" + j, i, i + 16, ContainerExitStatus.PREEMPTED,(float) 0.1,1,1024));
+                + "_00000" + j, i, i + 16, ContainerExitStatus.PREEMPTED,(float) 0.1,1,1024, 0));
         totalCost+=1;
       }
       qs.insertEvents(logs);

@@ -157,6 +157,14 @@ public class MockAM {
   
   public AllocateResponse allocate(
       String host, int memory, int numContainers,
+      List<ContainerId> releases, int nbGpus) throws Exception {
+      List<ResourceRequest> reqs =
+        createReq(new String[] { host }, memory, 1, numContainers,
+            null,nbGpus);
+    return allocate(reqs, releases);
+  }
+  public AllocateResponse allocate(
+      String host, int memory, int numContainers,
       List<ContainerId> releases) throws Exception {
     return allocate(host, memory, numContainers, releases, null);
   }
@@ -206,6 +214,31 @@ public class MockAM {
     return reqs;
   }
   
+  public List<ResourceRequest> createReq(String[] hosts, int memory, int priority,
+      int containers, String labelExpression, int nbGpus) throws Exception {
+    List<ResourceRequest> reqs = new ArrayList<ResourceRequest>();
+    if (hosts != null) {
+      for (String host : hosts) {
+        // only add host/rack request when asked host isn't ANY
+        if (!host.equals(ResourceRequest.ANY)) {
+          ResourceRequest hostReq =
+              createResourceReq(host, memory, priority, containers,
+                  labelExpression, nbGpus);
+          reqs.add(hostReq);
+          ResourceRequest rackReq =
+              createResourceReq("/default-rack", memory, priority, containers,
+                  labelExpression, nbGpus);
+          reqs.add(rackReq);
+        }
+      }
+    }
+
+    ResourceRequest offRackReq = createResourceReq(ResourceRequest.ANY, memory,
+        priority, containers, labelExpression, nbGpus);
+    reqs.add(offRackReq);
+    return reqs;
+  }
+  
   public ResourceRequest createResourceReq(String resource, int memory, int priority,
       int containers) throws Exception {
     return createResourceReq(resource, memory, priority, containers, null);
@@ -213,6 +246,11 @@ public class MockAM {
 
   public ResourceRequest createResourceReq(String resource, int memory, int priority,
       int containers, String labelExpression) throws Exception {
+    return createResourceReq(resource, memory, priority, containers, labelExpression, 0);
+  }
+  
+  public ResourceRequest createResourceReq(String resource, int memory, int priority,
+      int containers, String labelExpression, int gpus) throws Exception {
     ResourceRequest req = Records.newRecord(ResourceRequest.class);
     req.setResourceName(resource);
     req.setNumContainers(containers);
@@ -221,6 +259,7 @@ public class MockAM {
     req.setPriority(pri);
     Resource capability = Records.newRecord(Resource.class);
     capability.setMemorySize(memory);
+    capability.setGPUs(gpus);
     req.setCapability(capability);
     if (labelExpression != null) {
      req.setNodeLabelExpression(labelExpression); 

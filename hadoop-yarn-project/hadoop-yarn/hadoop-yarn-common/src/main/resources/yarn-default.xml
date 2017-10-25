@@ -2778,12 +2778,21 @@
   <property>
     <description>
       The percentage of cluster utilisation above which we start increasing the amount of qota paid for
-      utilisation. As a float between 0 and 1
+      utilisation of general resouces (CPU, memory). As a float between 0 and 1
     </description>
-    <name>yarn.resourcemanager.quota.multiplicator.threshold</name>
+    <name>yarn.resourcemanager.quota.multiplicator.threshold.general</name>
     <value>0.2</value>
   </property>
-  
+
+  <property>
+    <description>
+      The percentage of cluster utilisation above which we start increasing the amount of qota paid for
+      utilisation of GPU resouces. As a float between 0 and 1
+    </description>
+    <name>yarn.resourcemanager.quota.multiplicator.threshold.gpu</name>
+    <value>0.2</value>
+  </property>
+
   <property>
     <description>
       Number of qota used by unit of time and unit of resource when the multiplicator is equal to 1.
@@ -2804,12 +2813,19 @@
   
   <property>
     <description>
-      factor by which to increase to cost of resource in regard to cluster utilisation.
+      factor by which to increase to cost of resource in regard to cluster utilisation for general resources.
     </description>
-    <name>yarn.resourcemanager.quota.multiplicator.increment</name>
+    <name>yarn.resourcemanager.quota.multiplicator.increment.general</name>
     <value>1</value>
   </property>
     
+  <property>
+    <description>
+      factor by which to increase to cost of resource in regard to cluster utilisation for gpu resources.
+    </description>
+    <name>yarn.resourcemanager.quota.multiplicator.increment.gpu</name>
+    <value>1</value>
+  </property>
   
   <property>
     <description>
@@ -2820,4 +2836,5 @@
     <value>10</value>
   </property>
 
+      
 </configuration>

@@ -63,6 +63,7 @@ public class QuotaService extends AbstractService {
   private int batchSize;
   private int minVcores;
   private int minMemory;
+  private int minGpus;
   private float basePrice;
   
   ApplicationStateDataAccess appStatDS
@@ -108,9 +109,13 @@ public class QuotaService extends AbstractService {
             YarnConfiguration.DEFAULT_QUOTA_BATCH_TIME);
     batchSize = conf.getInt(YarnConfiguration.QUOTA_BATCH_SIZE,
             YarnConfiguration.DEFAULT_QUOTA_BATCH_SIZE);
-    minVcores= conf.getInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES, YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
-    minMemory= conf.getInt(YarnConfiguration.QUOTA_MINIMUM_CHARGED_MB, YarnConfiguration.DEFAULT_QUOTA_MINIMUM_CHARGED_MB);
-    basePrice= conf.getFloat(YarnConfiguration.QUOTA_BASE_PRICE, YarnConfiguration.DEFAULT_QUOTA_BASE_PRICE);
+    minVcores = conf.getInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
+    minGpus = Math.max(1, conf.getInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS));
+    minMemory = conf.getInt(YarnConfiguration.QUOTA_MINIMUM_CHARGED_MB,
+        YarnConfiguration.DEFAULT_QUOTA_MINIMUM_CHARGED_MB);
+    basePrice = conf.getFloat(YarnConfiguration.QUOTA_BASE_PRICE, YarnConfiguration.DEFAULT_QUOTA_BASE_PRICE);
   }
 
   public void insertEvents(Collection<ContainerLog> containersLogs) {
@@ -260,8 +265,8 @@ public class QuotaService extends AbstractService {
                   + containerLog.getStop() + ", " + checkpoint
                   + ") current multiplicator " + currentMultiplicator);
 
-          float charge = computeCharge(nbRunningTicks, currentMultiplicator,
-                  containerLog.getNbVcores(), containerLog.getMemoryUsed());
+          float charge = computeCharge(nbRunningTicks, currentMultiplicator, containerLog.getNbVcores(), containerLog.
+              getMemoryUsed(), containerLog.getGpuUsed());
           chargeProjectQuota(chargedProjects, projectsQuotaMap,
                   projectName, user, containerLog.getContainerid(), charge);
           //** ProjectDailyCost charging**
@@ -281,8 +286,8 @@ public class QuotaService extends AbstractService {
                   + " for container " + containerLog.getContainerid()
                   + " current ticks " + nbRunningTicks + " current multiplicator "
                   + currentMultiplicator);
-          float charge = computeCharge(nbRunningTicks, currentMultiplicator,
-                  containerLog.getNbVcores(), containerLog.getMemoryUsed());
+          float charge = computeCharge(nbRunningTicks, currentMultiplicator, containerLog.getNbVcores(), containerLog.
+              getMemoryUsed(), containerLog.getGpuUsed());
           chargeProjectQuota(chargedProjects, projectsQuotaMap,
                   projectName, user, containerLog.getContainerid(), charge);
 
@@ -376,7 +381,7 @@ public class QuotaService extends AbstractService {
   }
 
   private float computeCharge(long ticks, float multiplicator, int nbVcores,
-          int memoryUsed) {
+          long memoryUsed, int nbGpus) {
     if (ticks < minNumberOfTicks) {
       ticks = minNumberOfTicks;
     }
@@ -384,7 +389,8 @@ public class QuotaService extends AbstractService {
     //proportional to the container size on the most used resource
     float vcoresUsage = (float) nbVcores / minVcores;
     float memoryUsage = (float) memoryUsed / minMemory;
-    float credit = (float) ticks * Math.max(vcoresUsage, memoryUsage)
+    float gpuUsage = (float) nbGpus / minGpus;
+    float credit = (float) ticks * Math.max(gpuUsage, Math.max(vcoresUsage, memoryUsage))
             * multiplicator * basePrice;
     return credit;
   }
