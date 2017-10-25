@@ -22,6 +22,7 @@ import io.hops.metadata.yarn.entity.quota.PriceMultiplicator;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.util.RMStorageFactory;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -39,10 +40,10 @@ public class PriceMultiplicatiorService extends AbstractService {
   private final RMContext rmcontext;
   private volatile boolean stopped = false;
   private Thread priceCalculationThread;
-  private float tippingPoint;
-  private float incrementFactor;
+  private Map<PriceMultiplicator.MultiplicatorType,Float> tippingPoints = new HashMap<>();
+  private Map<PriceMultiplicator.MultiplicatorType,Float> incrementFactors = new HashMap<>();
   private long priceMultiplicationFactorCalculationInterval;
-  private float currentMultiplicator;
+  private Map<PriceMultiplicator.MultiplicatorType,Float> currentMultiplicators = new HashMap<>();
 
   private PriceMultiplicatorDataAccess priceMultiplicatorDA;
 
@@ -57,12 +58,18 @@ public class PriceMultiplicatiorService extends AbstractService {
     this.conf = conf;
 
     // Initialize config parameters
-    this.tippingPoint = this.conf.getFloat(
-            YarnConfiguration.QUOTA_MULTIPLICATOR_THRESHOLD,
-            YarnConfiguration.DEFAULT_QUOTA_MULTIPLICATOR_THRESHOLD);
-    this.incrementFactor = this.conf.getFloat(
-            YarnConfiguration.QUOTA_INCREMENT_FACTOR,
-            YarnConfiguration.DEFAULT_QUOTA_INCREMENT_FACTOR);
+    this.tippingPoints.put(PriceMultiplicator.MultiplicatorType.GENERAL, this.conf.getFloat(
+            YarnConfiguration.QUOTA_MULTIPLICATOR_THRESHOLD_GENERAL,
+            YarnConfiguration.DEFAULT_QUOTA_MULTIPLICATOR_THRESHOLD_GENERAL));
+    this.tippingPoints.put(PriceMultiplicator.MultiplicatorType.GPU, this.conf.getFloat(
+            YarnConfiguration.QUOTA_MULTIPLICATOR_THRESHOLD_GPU,
+            YarnConfiguration.DEFAULT_QUOTA_MULTIPLICATOR_THRESHOLD_GPU));
+    this.incrementFactors.put(PriceMultiplicator.MultiplicatorType.GENERAL, this.conf.getFloat(
+            YarnConfiguration.QUOTA_INCREMENT_FACTOR_GENERAL,
+            YarnConfiguration.DEFAULT_QUOTA_INCREMENT_FACTOR_GENERAL));
+    this.incrementFactors.put(PriceMultiplicator.MultiplicatorType.GPU, this.conf.getFloat(
+            YarnConfiguration.QUOTA_INCREMENT_FACTOR_GPU,
+            YarnConfiguration.DEFAULT_QUOTA_INCREMENT_FACTOR_GPU));
     this.priceMultiplicationFactorCalculationInterval = this.conf.getLong(
             YarnConfiguration.QUOTA_PRICE_MULTIPLICATOR_INTERVAL,
             YarnConfiguration.DEFAULT_QUOTA_PRICE_MULTIPLICATOR_INTERVAL);
@@ -70,17 +77,18 @@ public class PriceMultiplicatiorService extends AbstractService {
     // Initialize DataAccesses
     this.priceMultiplicatorDA = (PriceMultiplicatorDataAccess) RMStorageFactory.
             getDataAccess(PriceMultiplicatorDataAccess.class);
-    currentMultiplicator = 1;
+    for(PriceMultiplicator.MultiplicatorType type: PriceMultiplicator.MultiplicatorType.values()){
+      currentMultiplicators.put(type, new Float(1));
+    }
     recover();
   }
 
   private void recover() throws IOException {
-    Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> currentMultiplicators
-            = getCurrentMultiplicator();
-    if (currentMultiplicators.get(PriceMultiplicator.MultiplicatorType.VARIABLE)
-            != null) {
-      currentMultiplicator = currentMultiplicators.get(
-              PriceMultiplicator.MultiplicatorType.VARIABLE).getValue();
+    Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> currentMultiplicators = getCurrentMultiplicator();
+    for (PriceMultiplicator.MultiplicatorType type : PriceMultiplicator.MultiplicatorType.values()) {
+      if (currentMultiplicators.get(type) != null) {
+        this.currentMultiplicators.put(type, currentMultiplicators.get(type).getValue());
+      }
     }
   }
 
@@ -136,13 +144,14 @@ public class PriceMultiplicatiorService extends AbstractService {
         try {
 
           // Calculate the price based on resource usage
-          CalculateNewPrice();
+          computeNewGeneralPrice();
+          computeNewGpuPrice();
 
-          persistMultiplicator();
+          persistMultiplicators();
           // Pass the latest price to the Containers Log Service          
           ContainersLogsService cl = rmcontext.getContainersLogsService();
           if (cl != null) {
-            cl.setCurrentPrice(currentMultiplicator);
+            cl.setCurrentPrices(currentMultiplicators);
           }
 
           Thread.sleep(priceMultiplicationFactorCalculationInterval);
@@ -156,46 +165,67 @@ public class PriceMultiplicatiorService extends AbstractService {
     }
   }
 
-  protected void CalculateNewPrice() throws IOException {
-
-    QueueMetrics metrics = rmcontext.getScheduler().
-            getRootQueueMetrics();
-
-    long totalMB = metrics.getAllocatedMB() + metrics.getAvailableMB();
-    int totalCores = metrics.getAllocatedVirtualCores() + metrics.
-            getAvailableVirtualCores();
-
-    long usedMB = metrics.getAllocatedMB() + metrics.getPendingMB();
-    float persentUsedMB = (float) usedMB / totalMB;
-
-    int usedCores = metrics.getAllocatedVirtualCores() + metrics.
-            getPendingVirtualCores();
-    float persentUsedCores = (float) usedCores / totalCores;
-
-    float incrementBase = Math.max(persentUsedCores, persentUsedMB)
-            - tippingPoint;
+  protected void computeNewGpuPrice() {
+    QueueMetrics metrics = rmcontext.getScheduler().getRootQueueMetrics();
+    float incrementBase = getPercenUsedGpus(metrics) - tippingPoints.get(PriceMultiplicator.MultiplicatorType.GPU);
     incrementBase = Math.max(incrementBase, 0);
-    currentMultiplicator = 1 + incrementBase * incrementFactor;
+    float multiplicator = 1 + incrementBase * incrementFactors.get(PriceMultiplicator.MultiplicatorType.GPU);
+    multiplicator = Math.max(multiplicator, currentMultiplicators.get(PriceMultiplicator.MultiplicatorType.GENERAL));
+    currentMultiplicators.put(PriceMultiplicator.MultiplicatorType.GPU, multiplicator);
 
-    LOG.debug("New multiplicator: " + currentMultiplicator + " (mem: "
-            + persentUsedMB + ", vcores: " + persentUsedCores + ")");
+    LOG.debug("New multiplicator: " + currentMultiplicators + " (mem: "
+        + getPercenUsedMB(metrics) + ", vcores: " + getPercenUsedCores(metrics) + ", gpus: "
+        + getPercenUsedGpus(metrics) + ")");
 
   }
 
-  private void persistMultiplicator() throws IOException {
+  private float getPercenUsedGpus(QueueMetrics metrics) {
+    int totalGpus = metrics.getAllocatedGPUs() + metrics.getAvailableGPUs();
+    int usedGpus = metrics.getAllocatedGPUs() + metrics.getPendingGPUs();
+    return (float) usedGpus / totalGpus;
+  }
+
+  private float getPercenUsedCores(QueueMetrics metrics) {
+    int totalCores = metrics.getAllocatedVirtualCores() + metrics.
+        getAvailableVirtualCores();
+    int usedCores = metrics.getAllocatedVirtualCores() + metrics.
+        getPendingVirtualCores();
+    return (float) usedCores / totalCores;
+  }
+
+  private float getPercenUsedMB(QueueMetrics metrics) {
+    long totalMB = metrics.getAllocatedMB() + metrics.getAvailableMB();
+    long usedMB = metrics.getAllocatedMB() + metrics.getPendingMB();
+    return (float) usedMB / totalMB;
+  }
+
+  protected void computeNewGeneralPrice() throws IOException {
+
+    QueueMetrics metrics = rmcontext.getScheduler().
+        getRootQueueMetrics();
+    float incrementBase = Math.max(getPercenUsedCores(metrics), getPercenUsedMB(metrics))
+        - tippingPoints.get(PriceMultiplicator.MultiplicatorType.GENERAL);
+    incrementBase = Math.max(incrementBase, 0);
+    currentMultiplicators.put(PriceMultiplicator.MultiplicatorType.GENERAL, 1 + incrementBase * incrementFactors.get(
+        PriceMultiplicator.MultiplicatorType.GENERAL));
+
+    LOG.debug("New multiplicator: " + currentMultiplicators + " (mem: "
+        + getPercenUsedMB(metrics) + ", vcores: " + getPercenUsedCores(metrics) + ")");
+
+  }
+
+  private void persistMultiplicators() throws IOException {
     LightWeightRequestHandler prepareHandler;
     prepareHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
       public Object performTask() throws IOException {
         connector.beginTransaction();
         connector.writeLock();
-
-        priceMultiplicatorDA.add(new PriceMultiplicator(
-                PriceMultiplicator.MultiplicatorType.VARIABLE,
-                currentMultiplicator));
-
+        for (Map.Entry<PriceMultiplicator.MultiplicatorType, Float> entry : currentMultiplicators.entrySet()) {
+          priceMultiplicatorDA.add(new PriceMultiplicator(entry.getKey(), entry.getValue()));
+        }
         connector.commit();
-        LOG.debug("Commited new multiplicator: " + currentMultiplicator + "for VARIABLE");
+        LOG.debug("Commited new multiplicator: " + currentMultiplicators + "for VARIABLE");
         return null;
       }
     };

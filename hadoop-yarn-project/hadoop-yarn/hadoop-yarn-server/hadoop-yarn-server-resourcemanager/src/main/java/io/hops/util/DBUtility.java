@@ -589,17 +589,17 @@ long start = System.currentTimeMillis();
     }
   }
 
-  public static void InitializeDB() throws IOException {
+  public static boolean InitializeDB() throws IOException {
     LightWeightRequestHandler setRMDTMasterKeyHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
       public Object performTask() throws IOException {
-        connector.formatStorage();
-        LOG.debug("HOP :: Format storage has been completed");
-        return null;
+        boolean success = connector.formatStorage();
+        LOG.debug("HOP :: Format storage has been completed: " + success);
+        return success;
       }
     };
-    setRMDTMasterKeyHandler.handle();
+    return (boolean) setRMDTMasterKeyHandler.handle();
   }
 
   public static byte[] verifySalt(final byte[] salt) throws IOException {
