@@ -30,6 +30,7 @@ import java.io.IOException;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
+import org.junit.Assert;
 
 public class TestLocalEncodingManagerImpl extends ClusterTest {
 
@@ -75,13 +76,13 @@ public class TestLocalEncodingManagerImpl extends ClusterTest {
 
     Codec codec = Util.getCodec(codecName);
     BaseEncodingManager.Statistics stats = new BaseEncodingManager.Statistics();
-    assertTrue(encodingManager.doFileRaid(conf, testFile, parityFile, codec,
+    Assert.assertTrue(encodingManager.doFileRaid(conf, testFile, parityFile, codec,
         stats, RaidUtils.NULL_PROGRESSABLE, 1, 1, false));
     try {
       dfs.open(parityFile);
       dfs.delete(parityFile, false);
     } catch (IOException e) {
-      fail("Couldn't open parity file under given path.");
+      Assert.fail("Couldn't open parity file under given path.");
     }
   }
 }

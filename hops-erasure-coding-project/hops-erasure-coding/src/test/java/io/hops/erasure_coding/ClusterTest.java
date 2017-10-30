@@ -15,12 +15,13 @@
  */
 package io.hops.erasure_coding;
 
-import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.junit.After;
+import org.junit.Before;
 
-public abstract class ClusterTest extends TestCase {
+public abstract class ClusterTest {
 
   protected static final int DFS_TEST_BLOCK_SIZE = 4 * 1024;
 
@@ -30,7 +31,7 @@ public abstract class ClusterTest extends TestCase {
 
   protected abstract Configuration getConfig();
 
-  @Override
+  @Before
   public void setUp() throws Exception {
     Configuration conf = getConfig();
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanode)
@@ -39,7 +40,7 @@ public abstract class ClusterTest extends TestCase {
     fs = FileSystem.get(conf);
   }
 
-  @Override
+  @After
   public void tearDown() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
