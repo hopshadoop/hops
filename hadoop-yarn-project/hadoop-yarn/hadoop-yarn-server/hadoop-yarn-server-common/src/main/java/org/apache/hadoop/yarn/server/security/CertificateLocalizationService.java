@@ -22,6 +22,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 import org.apache.hadoop.security.ssl.CryptoMaterial;
@@ -461,20 +462,27 @@ public class CertificateLocalizationService extends AbstractService
         appDir.mkdir();
       }
       File kstoreFile = Paths.get(appDir.getAbsolutePath(),
-          key.getUsername() + "__kstore.jks").toFile();
+          key.getUsername() + HopsSSLSocketFactory.KEYSTORE_SUFFIX)
+          .toFile();
       File tstoreFile = Paths.get(appDir.getAbsolutePath(),
-          key.getUsername() + "__tstore.jks").toFile();
+          key.getUsername() + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX)
+          .toFile();
+      File passwdFile = Paths.get(appDir.getAbsolutePath(),
+          key.getUsername() + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX)
+          .toFile();
       FileChannel kstoreChannel = new FileOutputStream(kstoreFile, false)
           .getChannel();
+      kstoreChannel.write(kstore);
+      kstoreChannel.close();
       FileChannel tstoreChannel = new FileOutputStream(tstoreFile, false)
           .getChannel();
-      kstoreChannel.write(kstore);
       tstoreChannel.write(tstore);
-      kstoreChannel.close();
       tstoreChannel.close();
+      FileUtils.writeStringToFile(passwdFile, kstorePass);
       
       CryptoMaterial material = new CryptoMaterial(kstoreFile.getAbsolutePath(),
-          tstoreFile.getAbsolutePath(), kstore, kstorePass, tstore, tstorePass);
+          tstoreFile.getAbsolutePath(), passwdFile.getAbsolutePath(),
+          kstore, kstorePass, tstore, tstorePass);
       materialLocation.put(key, material);
       futures.remove(key);
 

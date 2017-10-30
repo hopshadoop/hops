@@ -15,7 +15,6 @@
  */
 package org.apache.hadoop.net;
 
-import com.google.common.annotations.VisibleForTesting;
 import io.hops.security.HopsUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -28,7 +27,6 @@ import org.apache.hadoop.security.ssl.CertificateLocalization;
 import org.apache.hadoop.security.ssl.CryptoMaterial;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.SSLFactory;
-import org.codehaus.jettison.json.JSONException;
 
 import javax.net.SocketFactory;
 import javax.net.ssl.SSLContext;
@@ -49,9 +47,10 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     public static final String FORCE_CONFIGURE = "client.rpc.ssl.force.configure";
     public static final boolean DEFAULT_FORCE_CONFIGURE = false;
   
+    // Deprecated
     public static final String HOPSWORKS_REST_ENDPOINT_KEY =
         "client.hopsworks.rest.endpoint";
-    
+  
     private static final String KEY_STORE_FILEPATH_DEFAULT = "client.keystore.jks";
     private static final String KEY_STORE_PASSWORD_DEFAULT = "";
     private static final String KEY_PASSWORD_DEFAULT = "";
@@ -59,6 +58,10 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     private static final String TRUST_STORE_PASSWORD_DEFAULT = "";
     private static final String SOCKET_ENABLED_PROTOCOL_DEFAULT = "TLSv1";
     
+    public static final String LOCALIZED_PASSWD_FILE_NAME = "material_passwd";
+    public static final String LOCALIZED_KEYSTORE_FILE_NAME = "k_certificate";
+    public static final String LOCALIZED_TRUSTSTORE_FILE_NAME = "t_certificate";
+    public static final String PASSWD_FILE_SUFFIX = "__cert.key";
     public static final String KEYSTORE_SUFFIX = "__kstore.jks";
     public static final String TRUSTSTORE_SUFFIX = "__tstore.jks";
     private static final String PASSPHRASE = "adminpw";
@@ -130,25 +133,16 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
       this.conf = conf;
     }
   
-    // ONLY for testing
-    @VisibleForTesting
-    public void setPaswordFromHopsworks(String password) {
-      this.cryptoPassword = password;
-    }
-    
-    public String getPasswordFromHopsworks(String username, String
-        keystorePath) throws JSONException, IOException {
-      
+    private String readMaterialPasswordFromFile(File passwdFile)
+      throws IOException {
       if (null != cryptoPassword) {
         return cryptoPassword;
       }
       
-      cryptoPassword = HopsUtil
-          .getCertificatePasswordFromHopsworks(keystorePath, username, conf);
-          
+      cryptoPassword = HopsUtil.readCryptoMaterialPassword(passwdFile);
       return cryptoPassword;
     }
-  
+    
   public void configureCryptoMaterial(CertificateLocalization
       certificateLocalization, Set<String> proxySuperusers)
       throws SSLCertificateException {
@@ -169,15 +163,15 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
       // localized.
       // KeyStore -> k_certificate
       // trustStore -> t_certificate
-      File localized = new File("k_certificate");
+      File localized = new File(LOCALIZED_KEYSTORE_FILE_NAME);
       if (localized.exists()) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Crypto material found in NM localized directory");
         }
         
-        String password = getPasswordFromHopsworks(username, localized
-            .toString());
-        setTlsConfiguration("k_certificate", password, "t_certificate",
+        String password = readMaterialPasswordFromFile(
+            new File(LOCALIZED_PASSWD_FILE_NAME));
+        setTlsConfiguration(LOCALIZED_KEYSTORE_FILE_NAME, password, LOCALIZED_TRUSTSTORE_FILE_NAME,
             password, conf);
         cryptoConfigured = true;
       } else {
@@ -214,8 +208,9 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
                     .getMaterialLocation(username);
                 password = material.getKeyStorePass();
               } else {
-                password = getPasswordFromHopsworks(username, fd
-                    .toString());
+                Path passwdFile = Paths.get(hopsworksMaterializeDir, username
+                  + PASSWD_FILE_SUFFIX);
+                password = readMaterialPasswordFromFile(passwdFile.toFile());
               }
               
               setTlsConfiguration(Paths.get(hopsworksMaterializeDir,

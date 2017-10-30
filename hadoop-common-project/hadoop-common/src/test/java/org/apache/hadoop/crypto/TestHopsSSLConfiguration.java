@@ -19,6 +19,7 @@ import org.junit.rules.ExpectedException;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
@@ -98,7 +99,10 @@ public class TestHopsSSLConfiguration {
         String kstore = touchFile("/tmp/project__user__kstore.jks");
         String tstore = touchFile("/tmp/project__user__tstore.jks");
         String password = "a_strong_password";
-        hopsFactory.setPaswordFromHopsworks(password);
+        Path passwdFile = Paths.get("/tmp", "project__user__cert.key");
+        touchFile(passwdFile.toString());
+        FileUtils.writeStringToFile(passwdFile.toFile(), password, false);
+        
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("superuser");
@@ -129,8 +133,10 @@ public class TestHopsSSLConfiguration {
         touchFile(Paths.get(cwd, "k_certificate").toString());
         touchFile(Paths.get(cwd, "t_certificate").toString());
         final String password = "a_strong_password";
-        
-        
+        Path passwdFile = Paths.get(cwd, "material_passwd");
+        touchFile(passwdFile.toString());
+        FileUtils.writeStringToFile(passwdFile.toFile(), password, false);
+    
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("superuser");
@@ -138,7 +144,6 @@ public class TestHopsSSLConfiguration {
             @Override
             public Object run() throws SSLCertificateException {
                 hopsFactory.setConf(conf);
-                hopsFactory.setPaswordFromHopsworks(password);
                 hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
@@ -167,9 +172,12 @@ public class TestHopsSSLConfiguration {
             .toString();
         String tstore = Paths.get(tmp, "project__user__tstore.jks")
             .toString();
+        Path passwdFile = Paths.get(tmp, "project__user__cert.key");
         String password = "a_strong_password";
         touchFile(kstore);
         touchFile(tstore);
+        touchFile(passwdFile.toString());
+        FileUtils.writeStringToFile(passwdFile.toFile(), password, false);
         String hostname = NetUtils.getLocalHostname();
         String hKstore = Paths.get(tmp, hostname + "__kstore.jks")
             .toString();
@@ -182,7 +190,6 @@ public class TestHopsSSLConfiguration {
             .getValue(), "/tmp/" + hostname + "__kstore.jks");
         conf.set(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY
             .getValue(), "/tmp/" + hostname + "__tstore.jks");
-        hopsFactory.setPaswordFromHopsworks(password);
         UserGroupInformation ugi = UserGroupInformation
             .createRemoteUser("project__user");
         final Set<String> superusers = new HashSet<>(1);

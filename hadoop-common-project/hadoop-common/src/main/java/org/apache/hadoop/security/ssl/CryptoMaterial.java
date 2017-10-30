@@ -23,6 +23,7 @@ public class CryptoMaterial {
   private final String keyStoreLocation;
   private final int keyStoreSize;
   private final String trustStoreLocation;
+  private final String passwdLocation;
   private final int trustStoreSize;
   private final ByteBuffer keyStoreMem;
   private final String keyStorePass;
@@ -35,12 +36,13 @@ public class CryptoMaterial {
   private int requestedApplications;
   
   public CryptoMaterial(String keyStoreLocation, String trustStoreLocation,
-      ByteBuffer kStore, String kStorePass,
+      String passwdLocation, ByteBuffer kStore, String kStorePass,
       ByteBuffer tstore, String tstorePass) {
     this.keyStoreLocation = keyStoreLocation;
     this.keyStoreSize = kStore.capacity();
     this.trustStoreLocation = trustStoreLocation;
     this.trustStoreSize = tstore.capacity();
+    this.passwdLocation = passwdLocation;
     
     this.keyStoreMem = kStore.asReadOnlyBuffer();
     this.keyStorePass = kStorePass;
@@ -60,6 +62,10 @@ public class CryptoMaterial {
   
   public String getTrustStoreLocation() {
     return trustStoreLocation;
+  }
+  
+  public String getPasswdLocation() {
+    return passwdLocation;
   }
   
   public int getTrustStoreSize() {

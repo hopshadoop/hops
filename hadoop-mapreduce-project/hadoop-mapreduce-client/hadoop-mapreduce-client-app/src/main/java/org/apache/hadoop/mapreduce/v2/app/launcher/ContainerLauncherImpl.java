@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.mapreduce.v2.app.launcher;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -35,6 +36,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.hops.security.HopsUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -47,10 +49,10 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerLaunched
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptDiagnosticsUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.concurrent.HadoopThreadPoolExecutor;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
@@ -85,6 +87,8 @@ public class ContainerLauncherImpl extends AbstractService implements
       new LinkedBlockingQueue<ContainerLauncherEvent>();
   private final AtomicBoolean stopped;
   private ContainerManagementProtocolProxy cmProxy;
+  
+  private String certificatePassword = null;
 
   private Container getContainer(ContainerLauncherEvent event) {
     ContainerId id = event.getContainerID();
@@ -214,14 +218,29 @@ public class ContainerLauncherImpl extends AbstractService implements
   
     private void setupCryptoMaterial(StartContainersRequest request, String user)
         throws IOException {
-      Path kStorePath = Paths.get("k_certificate");
-      Path tStorePath = Paths.get("t_certificate");
-    
-      ByteBuffer kStore = ByteBuffer.wrap(Files.readAllBytes(kStorePath));
+      Path kStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+      Path tStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+      Path passwdPath = Paths.get(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+  
+      byte[] keyStoreBin = Files.readAllBytes(kStorePath);
+      ByteBuffer kStore = ByteBuffer.wrap(keyStoreBin);
       ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
-    
+      String password = readCryptoMaterialPassword(passwdPath.toFile());
+  
       request.setKeyStore(kStore);
+      request.setKeyStorePassword(password);
       request.setTrustStore(tStore);
+      request.setTrustStorePassword(password);
+    }
+  
+    private String readCryptoMaterialPassword(File passwdFile)
+        throws IOException {
+      if (null != certificatePassword) {
+        return certificatePassword;
+      }
+    
+      certificatePassword = HopsUtil.readCryptoMaterialPassword(passwdFile);
+      return certificatePassword;
     }
     
     @SuppressWarnings("unchecked")
