@@ -21,6 +21,7 @@ import com.google.common.io.ByteStreams;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.net.util.Base64;
@@ -32,6 +33,7 @@ import org.codehaus.jettison.json.JSONObject;
 import javax.ws.rs.core.MediaType;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 public class HopsUtil {
@@ -71,6 +73,25 @@ public class HopsUtil {
       String username, Configuration conf) throws JSONException, IOException {
     String keyStoreEncoded = keystoreEncode(keyStorePath);
     return getCertPassFromHwInternal(keyStoreEncoded, username, conf);
+  }
+  
+  /**
+   * Read password for cryptographic material from a file. The file could be
+   * either localized in a container or from Hopsworks certificates transient
+   * directory.
+   * @param passwdFile Location of the password file
+   * @return Password to unlock cryptographic material
+   * @throws IOException
+   */
+  public static String readCryptoMaterialPassword(File passwdFile) throws
+      IOException {
+    
+    if (!passwdFile.exists()) {
+      throw new FileNotFoundException("File containing crypto material " +
+          "password could not be found");
+    }
+    
+    return FileUtils.readFileToString(passwdFile);
   }
   
   private static String getCertPassFromHwInternal(String keyStoreEncoded,

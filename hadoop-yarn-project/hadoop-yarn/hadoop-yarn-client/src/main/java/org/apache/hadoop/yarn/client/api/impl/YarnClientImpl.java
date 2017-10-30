@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -127,7 +128,6 @@ import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.codehaus.jettison.json.JSONException;
 
 @Private
 @Unstable
@@ -338,8 +338,10 @@ public class YarnClientImpl extends YarnClient {
         HopsSSLSocketFactory.CryptoKeys.CLIENT_MATERIALIZE_DIR
             .getDefaultValue());
     
-    Path kStore = Paths.get(clientMaterializeDir, username + "__kstore.jks");
-    Path tStore = Paths.get(clientMaterializeDir, username + "__tstore.jks");
+    Path kStore = Paths.get(clientMaterializeDir, username +
+        HopsSSLSocketFactory.KEYSTORE_SUFFIX);
+    Path tStore = Paths.get(clientMaterializeDir, username +
+        HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
     
     if (!kStore.toFile().exists() || !tStore.toFile().exists()) {
       throw new IOException("Crypto material for user " + username
@@ -354,31 +356,29 @@ public class YarnClientImpl extends YarnClient {
     appContext.setKeyStore(kstoreBB);
     appContext.setTrustStore(tstoreBB);
   
-    // Passwords have not been set, get them from the REST endpoint
+    // Passwords have not been set, read them from the file containing the
+    // password
     if (appContext.getKeyStorePassword() == null || appContext
         .getKeyStorePassword().isEmpty()
         || appContext.getTrustStorePassword() == null || appContext
         .getTrustStorePassword().isEmpty()) {
-      String password = getPasswordFromHopsworks(username, keyStoreBin);
+      Path passwdFile = Paths.get(clientMaterializeDir, username
+          + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX);
+      String password = readCryptoMaterialPassword(passwdFile.toFile());
       appContext.setKeyStorePassword(password);
       appContext.setTrustStorePassword(password);
     }
   }
   
-  private String getPasswordFromHopsworks(String username, byte[] keyStore)
-      throws IOException {
-    
+  private String readCryptoMaterialPassword(File passwdFile) throws
+      IOException {
     if (null != certificatePassword) {
       return certificatePassword;
     }
     
-    try {
-      certificatePassword = HopsUtil
-          .getCertificatePasswordFromHopsworks(keyStore, username, getConfig());
-      return certificatePassword;
-    } catch (JSONException ex) {
-      throw new IOException(ex);
-    }
+    certificatePassword = HopsUtil.readCryptoMaterialPassword(passwdFile);
+    
+    return certificatePassword;
   }
   
   private void addTimelineDelegationToken(

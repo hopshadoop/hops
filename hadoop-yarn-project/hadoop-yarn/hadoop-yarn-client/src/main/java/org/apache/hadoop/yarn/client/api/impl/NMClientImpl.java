@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -37,6 +38,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
@@ -59,7 +61,6 @@ import org.apache.hadoop.yarn.client.api.NMClient;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy.ContainerManagementProtocolProxyData;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
-import org.codehaus.jettison.json.JSONException;
 
 /**
  * <p>
@@ -246,13 +247,14 @@ public class NMClientImpl extends NMClient {
   
   private void setupCryptoMaterial(StartContainersRequest request, String user)
       throws IOException {
-    Path kStorePath = Paths.get("k_certificate");
-    Path tStorePath = Paths.get("t_certificate");
+    Path kStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+    Path tStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+    Path passwdPath = Paths.get(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
     
     byte[] keyStoreBin = Files.readAllBytes(kStorePath);
     ByteBuffer kStore = ByteBuffer.wrap(keyStoreBin);
     ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
-    String password = getPasswordFromHopsworks(user, keyStoreBin);
+    String password = readCryptoMaterialPassword(passwdPath.toFile());
     
     request.setKeyStore(kStore);
     request.setKeyStorePassword(password);
@@ -260,19 +262,14 @@ public class NMClientImpl extends NMClient {
     request.setTrustStorePassword(password);
   }
   
-  private String getPasswordFromHopsworks(String username, byte[] keyStore)
+  private String readCryptoMaterialPassword(File passwdFile)
       throws IOException {
     if (null != certificatePassword) {
       return certificatePassword;
     }
     
-    try {
-      certificatePassword = HopsUtil
-          .getCertificatePasswordFromHopsworks(keyStore, username, getConfig());
-      return certificatePassword;
-    } catch (JSONException ex) {
-      throw new IOException(ex);
-    }
+    certificatePassword = HopsUtil.readCryptoMaterialPassword(passwdFile);
+    return certificatePassword;
   }
   
   @Override

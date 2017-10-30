@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager;
 import static org.apache.hadoop.service.Service.STATE.STARTED;
 
 import java.io.DataInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URISyntaxException;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -41,14 +43,17 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.PolicyProvider;
+import org.apache.hadoop.security.ssl.CryptoMaterial;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.service.CompositeService;
@@ -76,10 +81,13 @@ import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.LocalResource;
+import org.apache.hadoop.yarn.api.records.LocalResourceType;
+import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.LogAggregationContext;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.SerializedException;
+import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.LogAggregationContextPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
@@ -957,7 +965,30 @@ public class ContainerManagerImpl extends CompositeService implements
         }
       }
     }
-
+  
+    // Inject file to localize containing the certificates's password
+    if (getConfig() != null && getConfig().getBoolean(
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      String passwdLocation;
+      try {
+        CryptoMaterial cryptoMaterial = context
+            .getCertificateLocalizationService().getMaterialLocation(user);
+        passwdLocation = cryptoMaterial.getPasswdLocation();
+        if (passwdLocation != null) {
+          URL passwdURL = URL.newInstance("file", null, -1, passwdLocation);
+          File passwdFIle = new File(passwdLocation);
+          LocalResource passwdResource = LocalResource.newInstance(passwdURL,
+              LocalResourceType.FILE, LocalResourceVisibility.PRIVATE,
+              passwdFIle.length(), passwdFIle.lastModified());
+          launchContext.getLocalResources().put(
+              HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME, passwdResource);
+        }
+      } catch (InterruptedException | ExecutionException ex) {
+        throw new YarnException(ex);
+      }
+    }
+    
     // Sanity check for local resources
     for (Map.Entry<String, LocalResource> rsrc : launchContext
         .getLocalResources().entrySet()) {
