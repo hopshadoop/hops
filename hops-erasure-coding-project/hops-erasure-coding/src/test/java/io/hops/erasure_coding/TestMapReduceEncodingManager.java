@@ -33,6 +33,7 @@ import java.util.List;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
+import org.junit.Assert;
 
 public class TestMapReduceEncodingManager extends MrClusterTest {
 
@@ -52,7 +53,11 @@ public class TestMapReduceEncodingManager extends MrClusterTest {
     conf.setInt(DFS_REPLICATION_KEY, 1);
     conf.set(DFSConfigKeys.ERASURE_CODING_CODECS_KEY, Util.JSON_CODEC_ARRAY);
     conf.setBoolean(DFSConfigKeys.ERASURE_CODING_ENABLED_KEY, false);
-    numDatanode = 20; // Sometimes a node gets excluded during the test
+    conf.setInt(DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_KEY, 1);
+    numDatanode = 15; // Sometimes a node gets excluded during the test
   }
 
   @Override
@@ -74,20 +79,20 @@ public class TestMapReduceEncodingManager extends MrClusterTest {
 
     List<Report> reports;
     while ((reports = encodingManager.computeReports()).size() > 0) {
-      assertNotSame("Encoding failed.", Report.Status.FAILED,
+      Assert.assertNotSame("Encoding Assert.failed.", Report.Status.FAILED,
           reports.get(0).getStatus());
       Thread.sleep(1000);
     }
 
     FileStatus parityStatus = dfs.getFileStatus(parityFile);
-    assertEquals(parityStatus.getLen(), 6 * DFS_TEST_BLOCK_SIZE);
+    Assert.assertEquals(parityStatus.getLen(), 6 * DFS_TEST_BLOCK_SIZE);
     try {
       FSDataInputStream in = dfs.open(parityFile);
       byte[] buff = new byte[6 * DFS_TEST_BLOCK_SIZE];
       in.readFully(0, buff);
     } catch (BlockMissingException e) {
-      LOG.error("Reading parity failed", e);
-      fail("Parity could not be read.");
+      LOG.error("Reading parity Assert.failed", e);
+      Assert.fail("Parity could not be read.");
     }
   }
 
@@ -106,25 +111,25 @@ public class TestMapReduceEncodingManager extends MrClusterTest {
     MapReduceEncodingManager recoveredManager =
         new MapReduceEncodingManager(mrCluster.getConfig());
     List<Report> reports = recoveredManager.computeReports();
-    assertEquals(1, reports.size());
-    assertNotSame("Encoding failed.", Report.Status.FAILED,
+    Assert.assertEquals(1, reports.size());
+    Assert.assertNotSame("Encoding Assert.failed.", Report.Status.FAILED,
         reports.get(0).getStatus());
 
     while ((reports = recoveredManager.computeReports()).size() > 0) {
-      assertNotSame("Encoding failed.", Report.Status.FAILED,
+      Assert.assertNotSame("Encoding Assert.failed.", Report.Status.FAILED,
           reports.get(0).getStatus());
       Thread.sleep(1000);
     }
 
     FileStatus parityStatus = dfs.getFileStatus(parityFile);
-    assertEquals(parityStatus.getLen(), 6 * DFS_TEST_BLOCK_SIZE);
+    Assert.assertEquals(parityStatus.getLen(), 6 * DFS_TEST_BLOCK_SIZE);
     try {
       FSDataInputStream in = dfs.open(parityFile);
       byte[] buff = new byte[6 * DFS_TEST_BLOCK_SIZE];
       in.readFully(0, buff);
     } catch (BlockMissingException e) {
-      LOG.error("Reading parity failed", e);
-      fail("Parity could not be read.");
+      LOG.error("Reading parity Assert.failed", e);
+      Assert.fail("Parity could not be read.");
     }
   }
 }

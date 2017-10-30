@@ -38,6 +38,8 @@ import java.util.Random;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
+import org.junit.Assert;
+import org.junit.Before;
 
 public class TestBlockReconstructor extends ClusterTest {
 
@@ -63,13 +65,13 @@ public class TestBlockReconstructor extends ClusterTest {
     return conf;
   }
 
-  @Override
+  @Before
   public void setUp() throws Exception {
     super.setUp();
     DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
         DFS_TEST_BLOCK_SIZE);
-    assertTrue(
+    Assert.assertTrue(
         Util.encodeFile(getConfig(), dfs, codec, testFile, testParityFile));
   }
 
@@ -108,7 +110,7 @@ public class TestBlockReconstructor extends ClusterTest {
       in.readFully(0, buff);
     } catch (BlockMissingException e) {
       LOG.error("Reading failed", e);
-      fail("Repair failed. Missing a block.");
+      Assert.fail("Repair failed. Missing a block.");
     }
   }
 
@@ -148,7 +150,7 @@ public class TestBlockReconstructor extends ClusterTest {
       in.readFully(0, buff);
     } catch (BlockMissingException e) {
       LOG.error("Reading failed", e);
-      fail("Repair failed. Missing a block.");
+      Assert.fail("Repair failed. Missing a block.");
     }
   }
 }

@@ -44,6 +44,7 @@ import java.util.Random;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
+import org.junit.Assert;
 
 public class TestMapReduceBlockRepairManager extends MrClusterTest {
 
@@ -63,7 +64,11 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
     conf.setInt(DFS_REPLICATION_KEY, 1);
     conf.set(DFSConfigKeys.ERASURE_CODING_CODECS_KEY, Util.JSON_CODEC_ARRAY);
     conf.setBoolean(DFSConfigKeys.ERASURE_CODING_ENABLED_KEY, false);
-    numDatanode = 20; // Sometimes a node gets excluded during the test
+    conf.setInt(DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_KEY, 1);
+    numDatanode = 15; // Sometimes a node gets excluded during the test
   }
 
   @Override
@@ -88,7 +93,7 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
     // Busy waiting until the encoding is done
     List<Report> reports;
     while ((reports = encodingManager.computeReports()).size() > 0) {
-      assertNotSame(Report.Status.FAILED, reports.get(0).getStatus());
+      Assert.assertNotSame(Report.Status.FAILED, reports.get(0).getStatus());
       Thread.sleep(1000);
     }
 
@@ -110,7 +115,7 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
     repairManager.repairSourceBlocks("src", testFile, parityFile);
 
     while ((reports = repairManager.computeReports()).size() > 0) {
-      assertNotSame("Repair failed.", Report.Status.FAILED,
+      Assert.assertNotSame("Repair Assert.failed.", Report.Status.FAILED,
           reports.get(0).getStatus());
       Thread.sleep(1000);
     }
@@ -120,7 +125,7 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
       byte[] buff = new byte[TEST_BLOCK_COUNT * DFS_TEST_BLOCK_SIZE];
       in.readFully(0, buff);
     } catch (BlockMissingException e) {
-      fail("Repair failed. Missing a block.");
+      Assert.fail("Repair Assert.failed. Missing a block.");
     }
   }
 
@@ -141,7 +146,7 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
     // Busy waiting until the encoding is done
     List<Report> reports;
     while ((reports = encodingManager.computeReports()).size() > 0) {
-      assertNotSame(Report.Status.FAILED, reports.get(0).getStatus());
+      Assert.assertNotSame(Report.Status.FAILED, reports.get(0).getStatus());
       Thread.sleep(1000);
     }
 
@@ -181,13 +186,13 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
       Thread.sleep(1000);
       lastReport = reports.get(0);
     }
-    assertEquals(Report.Status.FAILED, lastReport.getStatus());
+    Assert.assertEquals(Report.Status.FAILED, lastReport.getStatus());
 
     try {
       FSDataInputStream in = dfs.open(testFile);
       byte[] buff = new byte[TEST_BLOCK_COUNT * DFS_TEST_BLOCK_SIZE];
       in.readFully(0, buff);
-      fail("Repair succeeded with bogus checksum.");
+      Assert.fail("Repair succeeded with bogus checksum.");
     } catch (BlockMissingException e) {
     }
   }
@@ -208,7 +213,7 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
     // Busy waiting until the encoding is done
     List<Report> reports;
     while ((reports = encodingManager.computeReports()).size() > 0) {
-      assertNotSame(Report.Status.FAILED, reports.get(0).getStatus());
+      Assert.assertNotSame(Report.Status.FAILED, reports.get(0).getStatus());
       Thread.sleep(1000);
     }
 
@@ -233,12 +238,12 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
         new MapReduceBlockRepairManager(mrCluster.getConfig());
 
     reports = recoverdManager.computeReports();
-    assertEquals(1, reports.size());
-    assertNotSame("Repair failed.", Report.Status.FAILED,
+    Assert.assertEquals(1, reports.size());
+    Assert.assertNotSame("Repair Assert.failed.", Report.Status.FAILED,
         reports.get(0).getStatus());
 
     while ((reports = recoverdManager.computeReports()).size() > 0) {
-      assertNotSame("Repair failed.", Report.Status.FAILED,
+      Assert.assertNotSame("Repair Assert.failed.", Report.Status.FAILED,
           reports.get(0).getStatus());
       Thread.sleep(1000);
     }
@@ -248,7 +253,7 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
       byte[] buff = new byte[TEST_BLOCK_COUNT * DFS_TEST_BLOCK_SIZE];
       in.readFully(0, buff);
     } catch (BlockMissingException e) {
-      fail("Repair failed. Missing a block.");
+      Assert.fail("Repair Assert.failed. Missing a block.");
     }
   }
 

@@ -46,6 +46,7 @@ import java.util.Random;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
+import org.junit.Assert;
 
 public class TestErasureCodingFileSystem extends ClusterTest {
 
@@ -82,7 +83,7 @@ public class TestErasureCodingFileSystem extends ClusterTest {
 
   @Test
   public void testSetAsDefaultFS() throws IOException {
-    assertEquals(ErasureCodingFileSystem.class,
+    Assert.assertEquals(ErasureCodingFileSystem.class,
         FileSystem.get(conf).getClass());
   }
 
@@ -126,7 +127,7 @@ public class TestErasureCodingFileSystem extends ClusterTest {
       byte[] buff = new byte[TEST_BLOCK_COUNT * DFS_TEST_BLOCK_SIZE];
       in.readFully(0, buff);
     } catch (BlockMissingException e) {
-      fail("Repair failed. Missing a block.");
+      Assert.fail("Repair failed. Missing a block.");
     }
   }
 
@@ -183,7 +184,7 @@ public class TestErasureCodingFileSystem extends ClusterTest {
       FSDataInputStream in = ecfs.open(testFile);
       byte[] buff = new byte[TEST_BLOCK_COUNT * DFS_TEST_BLOCK_SIZE];
       in.readFully(0, buff);
-      fail("Read succeeded with bogus checksum");
+      Assert.fail("Read succeeded with bogus checksum");
     } catch (BlockMissingException e) {
     }
   }

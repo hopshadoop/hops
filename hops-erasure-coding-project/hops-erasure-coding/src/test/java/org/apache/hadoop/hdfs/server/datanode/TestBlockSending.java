@@ -38,6 +38,7 @@ import java.util.List;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
+import org.junit.Assert;
 
 public class TestBlockSending extends ClusterTest {
 
@@ -89,7 +90,7 @@ public class TestBlockSending extends ClusterTest {
     ExtendedBlock extendedBlock = new ExtendedBlock(lb.getBlock());
     extendedBlock.setBlockId(lb.getBlock().getBlockId());
     int number = getCluster().getAllBlockFiles(extendedBlock).length;
-    assertEquals(conf.getInt(DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT),
+    Assert.assertEquals(conf.getInt(DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT),
         number);
   }
 }
