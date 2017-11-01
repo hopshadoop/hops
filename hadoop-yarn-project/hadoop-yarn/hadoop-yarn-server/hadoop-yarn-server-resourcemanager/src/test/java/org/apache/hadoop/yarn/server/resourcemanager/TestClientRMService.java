@@ -997,7 +997,7 @@ public class TestClientRMService {
   }
 
   private ConcurrentHashMap<ApplicationId, RMApp> getRMApps(
-      RMContext rmContext, YarnScheduler yarnScheduler) {
+      RMContext rmContext, YarnScheduler yarnScheduler) throws IOException {
     ConcurrentHashMap<ApplicationId, RMApp> apps = 
       new ConcurrentHashMap<ApplicationId, RMApp>();
     ApplicationId applicationId1 = getApplicationId(1);
@@ -1033,7 +1033,7 @@ public class TestClientRMService {
   private RMAppImpl getRMApp(RMContext rmContext, YarnScheduler yarnScheduler,
       ApplicationId applicationId3, YarnConfiguration config, String queueName,
       final long memorySeconds, final long vcoreSeconds, final long gpuSeconds,
-      String appNodeLabelExpression, String amNodeLabelExpression) {
+      String appNodeLabelExpression, String amNodeLabelExpression) throws IOException {
     ApplicationSubmissionContext asContext = mock(ApplicationSubmissionContext.class);
     when(asContext.getMaxAppAttempts()).thenReturn(1);
     when(asContext.getNodeLabelExpression()).thenReturn(appNodeLabelExpression);
@@ -1043,7 +1043,7 @@ public class TestClientRMService {
             System.currentTimeMillis(), "YARN", null,
             BuilderUtils.newResourceRequest(
                 RMAppAttemptImpl.AM_CONTAINER_PRIORITY, ResourceRequest.ANY,
-                Resource.newInstance(1024, 1, 1), 1)){
+                Resource.newInstance(1024, 1, 1), 1), null, null, null, null){
                   @Override
                   public ApplicationReport createAndGetApplicationReport(
                       String clientUserName, boolean allowAccess) {

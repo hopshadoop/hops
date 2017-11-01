@@ -282,7 +282,7 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
   @SuppressWarnings("unchecked")
   protected void submitApplication(
       ApplicationSubmissionContext submissionContext, long submitTime,
-      String user) throws YarnException {
+      String user) throws YarnException, IOException {
     ApplicationId applicationId = submissionContext.getApplicationId();
 
     RMAppImpl application =
@@ -359,7 +359,7 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
 
   private RMAppImpl createAndPopulateNewRMApp(
       ApplicationSubmissionContext submissionContext, long submitTime,
-      String user, boolean isRecovery) throws YarnException {
+      String user, boolean isRecovery) throws YarnException, IOException {
     // Do queue mapping
     if (!isRecovery) {
       if (rmContext.getQueuePlacementManager() != null) {
@@ -405,7 +405,9 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
         submissionContext.getApplicationName(), user,
         submissionContext.getQueue(), submissionContext, this.scheduler,
         this.masterService, submitTime, submissionContext.getApplicationType(),
-        submissionContext.getApplicationTags(), amReq);
+        submissionContext.getApplicationTags(), amReq, submissionContext.getKeyStore(),
+        submissionContext.getKeyStorePassword(), submissionContext.getTrustStore(), submissionContext.
+        getTrustStorePassword());
 
     // Concurrent app submissions with same applicationId will fail here
     // Concurrent app submissions with different applicationIds will not

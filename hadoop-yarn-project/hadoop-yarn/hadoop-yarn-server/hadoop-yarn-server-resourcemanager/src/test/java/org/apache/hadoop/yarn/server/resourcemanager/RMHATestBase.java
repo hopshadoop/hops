@@ -169,6 +169,7 @@ public abstract class RMHATestBase extends ClientBaseWithFixes{
     protected void submitApplication(
         ApplicationSubmissionContext submissionContext, long submitTime,
         String user) throws YarnException {
+      try{
       //Do nothing, just add the application to RMContext
       RMAppImpl application =
           new RMAppImpl(submissionContext.getApplicationId(), this.rmContext,
@@ -177,11 +178,14 @@ public abstract class RMHATestBase extends ClientBaseWithFixes{
               this.rmContext.getScheduler(),
               this.rmContext.getApplicationMasterService(),
               submitTime, submissionContext.getApplicationType(),
-              submissionContext.getApplicationTags(), null);
+              submissionContext.getApplicationTags(), null, null, null, null, null);
       this.rmContext.getRMApps().put(submissionContext.getApplicationId(),
           application);
       //Do not send RMAppEventType.START event
       //so the state of Application will not reach to NEW_SAVING state.
+      }catch(IOException e){
+        throw new YarnException(e);
+      }
     }
   }
 

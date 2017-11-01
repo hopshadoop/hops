@@ -21,6 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -223,13 +224,13 @@ public class FairSchedulerTestBase {
   }
 
   protected void createApplicationWithAMResource(ApplicationAttemptId attId,
-      String queue, String user, Resource amResource) {
+      String queue, String user, Resource amResource) throws IOException {
     RMContext rmContext = resourceManager.getRMContext();
     ApplicationId appId = attId.getApplicationId();
     RMApp rmApp = new RMAppImpl(appId, rmContext, conf,
         null, user, null, ApplicationSubmissionContext.newInstance(appId, null,
         queue, null, null, false, false, 0, amResource, null), scheduler, null,
-        0, null, null, null);
+        0, null, null, null, null, null, null, null);
     rmContext.getRMApps().put(appId, rmApp);
     RMAppEvent event = new RMAppEvent(appId, RMAppEventType.START);
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);
