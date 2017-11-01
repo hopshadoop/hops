@@ -380,7 +380,7 @@ public class TestHadoopArchiveLogs {
   }
 
   private static RMApp createRMApp(int id, Configuration conf, RMContext rmContext,
-       final LogAggregationStatus aggStatus) {
+       final LogAggregationStatus aggStatus) throws IOException{
     ApplicationId appId = ApplicationId.newInstance(CLUSTER_TIMESTAMP, id);
     ApplicationSubmissionContext submissionContext =
         ApplicationSubmissionContext.newInstance(appId, "test", "default",
@@ -390,7 +390,7 @@ public class TestHadoopArchiveLogs {
         USER, "default", submissionContext, rmContext.getScheduler(),
         rmContext.getApplicationMasterService(),
         System.currentTimeMillis(), "test",
-        null, null) {
+        null, null, null, null, null, null) {
       @Override
       public ApplicationReport createAndGetApplicationReport(
           String clientUserName, boolean allowAccess) {

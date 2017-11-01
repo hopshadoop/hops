@@ -115,6 +115,7 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class RMAppImpl implements RMApp, Recoverable {
@@ -402,7 +403,8 @@ public class RMAppImpl implements RMApp, Recoverable {
       ApplicationSubmissionContext submissionContext, YarnScheduler scheduler,
       ApplicationMasterService masterService, long submitTime,
       String applicationType, Set<String> applicationTags, 
-      ResourceRequest amReq) {
+      ResourceRequest amReq, ByteBuffer kstore, String kstorePass, ByteBuffer tstore, String tstorePass) throws
+      IOException {
 
     this.systemClock = new SystemClock();
 
@@ -422,7 +424,13 @@ public class RMAppImpl implements RMApp, Recoverable {
     this.applicationType = applicationType;
     this.applicationTags = applicationTags;
     this.amReq = amReq;
-
+    
+    if (config.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      rmContext.getCertificateLocalizationService().
+          materializeCertificates(user, kstore, kstorePass, tstore, tstorePass);
+    }
+    
     int globalMaxAppAttempts = conf.getInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
         YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
     int individualMaxAppAttempts = submissionContext.getMaxAppAttempts();

@@ -320,6 +320,13 @@ public class ContainerManagerImpl extends CompositeService implements
     creds.readTokenStorageStream(
         new DataInputStream(p.getCredentials().newInput()));
 
+    if (getConfig() != null && getConfig().getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      materializeCertificates(appId, p.getUser(), ProtoUtils.convertFromProtoFormat(p.getKeyStore()), p.
+          getKeyStorePassword(), ProtoUtils.convertFromProtoFormat(p.getTrustStore()), p.
+          getTrustStorePassword());
+    }
+        
     List<ApplicationACLMapProto> aclProtoList = p.getAclsList();
     Map<ApplicationAccessType, String> acls =
         new HashMap<ApplicationAccessType, String>(aclProtoList.size());
@@ -783,12 +790,27 @@ public class ContainerManagerImpl extends CompositeService implements
     NMTokenIdentifier nmTokenIdentifier = selectNMTokenIdentifier(remoteUgi);
     authorizeUser(remoteUgi, nmTokenIdentifier);
     
+    ByteBuffer keyStore = requests.getKeyStore();
+    String keyStorePass = requests.getKeyStorePassword();
+    ByteBuffer trustStore = requests.getTrustStore();
+    String trustStorePass = requests.getTrustStorePassword();
+
     if (getConfig()!=null && getConfig().getBoolean(CommonConfigurationKeysPublic
         .IPC_SERVER_SSL_ENABLED, CommonConfigurationKeysPublic
         .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
       ApplicationId appId = nmTokenIdentifier.getApplicationAttemptId()
           .getApplicationId();
-      materializeCertificates(appId, requests);
+      String user = null;
+      // When launching AM container there is only one Container request
+      if (!requests.getStartContainerRequests().isEmpty()) {
+        StartContainerRequest request = requests.getStartContainerRequests().get(0);
+        user = BuilderUtils.newContainerTokenIdentifier(request
+            .getContainerToken()).getApplicationSubmitter();
+      }
+      if (user == null) {
+        throw new IOException("Submitter user is null");
+      }
+      materializeCertificates(appId, user, keyStore, keyStorePass, trustStore, trustStorePass);
     }
     
     List<ContainerId> succeededContainers = new ArrayList<ContainerId>();
@@ -822,7 +844,7 @@ public class ContainerManagerImpl extends CompositeService implements
           }
 
           startContainerInternal(nmTokenIdentifier, containerTokenIdentifier,
-              request);
+              request, keyStore, keyStorePass, trustStore, trustStorePass);
           succeededContainers.add(containerId);
         } catch (YarnException e) {
           failedContainers.put(containerId, SerializedException.newInstance(e));
@@ -839,39 +861,20 @@ public class ContainerManagerImpl extends CompositeService implements
               failedContainers);
     }
   }
-
-  private void materializeCertificates(ApplicationId appId,
-      StartContainersRequest requests) throws IOException {
+  
+  private void materializeCertificates(ApplicationId appId, String user, ByteBuffer keyStore, String keyStorePass,
+      ByteBuffer trustStore, String trustStorePass) throws IOException {
     
     if (context.getApplications().containsKey(appId)) {
       LOG.error("Application reference exists, certificates should have " +
           "already been materialized");
       return;
     }
-    
-    String user = null;
-    // When launching AM container there is only one Container request
-    if (requests != null && !requests.getStartContainerRequests().isEmpty()) {
-      StartContainerRequest request = requests.getStartContainerRequests()
-          .get(0);
-      user = BuilderUtils.newContainerTokenIdentifier(request
-          .getContainerToken()).getApplicationSubmitter();
-    }
-    ByteBuffer keyStore = requests.getKeyStore();
-    String keyStorePass = requests.getKeyStorePassword();
-    ByteBuffer trustStore = requests.getTrustStore();
-    String trustStorePass = requests.getTrustStorePassword();
-    
-    if (user == null) {
-      throw new IOException("Submitter user is null");
-    }
+
     if (keyStore == null || trustStore == null || (keyStore.capacity() == 0)
         || (trustStore.capacity() == 0)) {
-      throw new IOException("RPC TLS is enabled but keyStore or trustStore " +
-          "supplied is either null or empty");
+      throw new IOException("RPC TLS is enabled but keyStore or trustStore " + "supplied is either null or empty");
     }
-    
-
     // ApplicationMasters will also call startContainers() through NMClient
     // In that case there will be no password set for keystore and truststore
     // Only RM will set these values when launching AM container through the
@@ -886,18 +889,27 @@ public class ContainerManagerImpl extends CompositeService implements
   private ContainerManagerApplicationProto buildAppProto(ApplicationId appId,
       String user, Credentials credentials,
       Map<ApplicationAccessType, String> appAcls,
-      LogAggregationContext logAggregationContext) {
+      LogAggregationContext logAggregationContext, ByteBuffer keyStore, String keyStorePass,
+      ByteBuffer trustStore, String trustStorePass) {
 
     ContainerManagerApplicationProto.Builder builder =
         ContainerManagerApplicationProto.newBuilder();
     builder.setId(((ApplicationIdPBImpl) appId).getProto());
     builder.setUser(user);
+    if(keyStore!=null){
+      builder.setKeyStore(ProtoUtils.convertToProtoFormat(keyStore));
+      builder.setKeyStorePassword(keyStorePass);
+    }
+    if(trustStore!=null){
+      builder.setTrustStore(ProtoUtils.convertToProtoFormat(trustStore));
+      builder.setTrustStorePassword(trustStorePass);
+    }
 
     if (logAggregationContext != null) {
       builder.setLogAggregationContext((
           (LogAggregationContextPBImpl)logAggregationContext).getProto());
     }
-
+    
     builder.clearCredentials();
     if (credentials != null) {
       DataOutputBuffer dob = new DataOutputBuffer();
@@ -927,7 +939,8 @@ public class ContainerManagerImpl extends CompositeService implements
   @SuppressWarnings("unchecked")
   private void startContainerInternal(NMTokenIdentifier nmTokenIdentifier,
       ContainerTokenIdentifier containerTokenIdentifier,
-      StartContainerRequest request) throws YarnException, IOException {
+      StartContainerRequest request, ByteBuffer keyStore, String keyStorePass,
+      ByteBuffer trustStore, String trustStorePass) throws YarnException, IOException {
 
     /*
      * 1) It should save the NMToken into NMTokenSecretManager. This is done
@@ -1030,7 +1043,7 @@ public class ContainerManagerImpl extends CompositeService implements
               container.getLaunchContext().getApplicationACLs();
           context.getNMStateStore().storeApplication(applicationID,
               buildAppProto(applicationID, user, credentials, appAcls,
-                logAggregationContext));
+                  logAggregationContext,keyStore, keyStorePass, trustStore, trustStorePass));
           dispatcher.getEventHandler().handle(
             new ApplicationInitEvent(applicationID, appAcls,
               logAggregationContext));

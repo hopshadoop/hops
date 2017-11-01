@@ -244,7 +244,7 @@ public class TestRMAppTransitions {
     rmDispatcher.start();
   }
 
-  protected RMApp createNewTestApp(ApplicationSubmissionContext submissionContext) {
+  protected RMApp createNewTestApp(ApplicationSubmissionContext submissionContext) throws IOException {
     ApplicationId applicationId = MockApps.newAppID(appId++);
     String user = MockApps.newUserName();
     String name = MockApps.newAppName();
@@ -265,7 +265,7 @@ public class TestRMAppTransitions {
 
     RMApp application = new RMAppImpl(applicationId, rmContext, conf, name,
         user, queue, submissionContext, scheduler, masterService,
-        System.currentTimeMillis(), "YARN", null, mock(ResourceRequest.class));
+        System.currentTimeMillis(), "YARN", null, mock(ResourceRequest.class), null, null, null, null);
 
     testAppStartState(applicationId, user, name, queue, application);
     this.rmContext.getRMApps().putIfAbsent(application.getApplicationId(),
@@ -1020,7 +1020,7 @@ public class TestRMAppTransitions {
             submissionContext.getApplicationTags(),
             BuilderUtils.newResourceRequest(
                 RMAppAttemptImpl.AM_CONTAINER_PRIORITY, ResourceRequest.ANY,
-                submissionContext.getResource(), 1));
+                submissionContext.getResource(), 1), null, null, null, null);
     Assert.assertEquals(RMAppState.NEW, application.getState());
 
     RMAppEvent recoverEvent =
@@ -1039,7 +1039,7 @@ public class TestRMAppTransitions {
   
   public void createRMStateForApplications(
       Map<ApplicationId, ApplicationStateData> applicationState,
-      RMAppState rmAppState) {
+      RMAppState rmAppState) throws IOException {
     RMApp app = createNewTestApp(null);
     ApplicationStateData appState =
         ApplicationStateData.newInstance(app.getSubmitTime(), app.getStartTime(),
@@ -1049,7 +1049,7 @@ public class TestRMAppTransitions {
   }
   
   @Test
-  public void testGetAppReport() {
+  public void testGetAppReport() throws IOException {
     RMApp app = createNewTestApp(null);
     assertAppState(RMAppState.NEW, app);
     ApplicationReport report = app.createAndGetApplicationReport(null, true);

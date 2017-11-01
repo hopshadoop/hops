@@ -594,26 +594,14 @@ public class ClientRMService extends AbstractService implements
       String kstorePass = submissionContext.getKeyStorePassword();
       ByteBuffer tstore = submissionContext.getTrustStore();
       String tstorePass = submissionContext.getTrustStorePassword();
-      
-      try {
-        if (kstore == null || tstore == null
-            || kstorePass.isEmpty() || tstorePass.isEmpty()) {
-          throw new IOException("RPC TLS is enabled but either keystore or " +
-              "truststore is null or no password provided");
-        }
-        if (kstore.capacity() == 0 || tstore.capacity() == 0) {
-          throw new IOException("RPC TLS is enabled but either keystore or " +
-              "truststore is empty");
-        }
-        
-        rmContext.getCertificateLocalizationService().materializeCertificates
-            (username, kstore, kstorePass, tstore, tstorePass);
-      } catch (IOException ex) {
-        LOG.error(ex, ex);
+
+      if (kstore == null || kstore.capacity() == 0 || tstore == null || tstore.capacity() == 0
+          || kstorePass.isEmpty() || tstorePass.isEmpty()) {
+        LOG.error("RPC TLS is enabled but either keystore or truststore is null or no password provided");
         RMAuditLogger.logFailure(user, AuditConstants.SUBMIT_APP_REQUEST,
-            ex.getMessage(), "ClientRMService",
+            "RPC TLS is enabled but either keystore or truststore is null or no password provided", "ClientRMService",
             "Exception in submitting application", applicationId);
-        throw RPCUtil.getRemoteException(ex);
+        throw new YarnException("RPC TLS is enabled but either keystore or truststore is null or no password provided");
       }
     }
     // Check whether app has already been put into rmContext,
@@ -663,6 +651,13 @@ public class ClientRMService extends AbstractService implements
           e.getMessage(), "ClientRMService",
           "Exception in submitting application", applicationId, callerContext);
       throw e;
+    } catch (IOException e) {
+      LOG.info("Exception in submitting application with id " +
+          applicationId.getId(), e);
+      RMAuditLogger.logFailure(user, AuditConstants.SUBMIT_APP_REQUEST,
+          e.getMessage(), "ClientRMService",
+          "Exception in submitting application", applicationId, callerContext);
+      throw new YarnException(e.getMessage(), e);
     }
 
     SubmitApplicationResponse response = recordFactory

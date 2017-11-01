@@ -31,6 +31,10 @@ message ContainerManagerApplicationProto {
   repeated ApplicationACLMapProto acls = 4;
   optional LogAggregationContextProto log_aggregation_context = 5;
   optional string userFolder = 6;
+  optional bytes key_store = 7;
+  optional string key_store_password = 8;
+  optional bytes trust_store = 9;
+  optional string trust_store_password = 10;
 }
 
 message DeletionServiceDeleteTaskProto {

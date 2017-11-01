@@ -81,6 +81,7 @@ import org.mockito.stubbing.Answer;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 
 /**
  * Testing applications being retired from RM.
@@ -192,9 +193,9 @@ public class TestAppManager{
     public int getCompletedAppsInStateStore() {
       return this.completedAppsInStateStore;
     }
-    public void submitApplication(
+    public void submitApplication (
         ApplicationSubmissionContext submissionContext, String user)
-            throws YarnException {
+            throws YarnException, IOException{
       super.submitApplication(submissionContext, System.currentTimeMillis(),
         user);
     }

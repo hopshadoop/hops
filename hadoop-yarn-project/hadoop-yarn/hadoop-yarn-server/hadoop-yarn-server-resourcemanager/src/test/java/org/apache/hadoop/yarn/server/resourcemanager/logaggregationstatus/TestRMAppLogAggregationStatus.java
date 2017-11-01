@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.logaggregationstatus;
 
+import java.io.IOException;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -344,7 +345,7 @@ public class TestRMAppLogAggregationStatus {
   }
 
   @Test (timeout = 10000)
-  public void testGetLogAggregationStatusForAppReport() {
+  public void testGetLogAggregationStatusForAppReport() throws IOException {
     YarnConfiguration conf = new YarnConfiguration();
 
     // Disable the log aggregation
@@ -487,7 +488,7 @@ public class TestRMAppLogAggregationStatus {
 
   }
 
-  private RMApp createRMApp(Configuration conf) {
+  private RMApp createRMApp(Configuration conf) throws IOException {
     ApplicationSubmissionContext submissionContext =
         ApplicationSubmissionContext.newInstance(appId, "test", "default",
           Priority.newInstance(0), null, false, true,
@@ -497,6 +498,6 @@ public class TestRMAppLogAggregationStatus {
       scheduler,
       this.rmContext.getApplicationMasterService(),
       System.currentTimeMillis(), "test",
-      null, null);
+      null, null, null, null, null, null);
   }
 }
