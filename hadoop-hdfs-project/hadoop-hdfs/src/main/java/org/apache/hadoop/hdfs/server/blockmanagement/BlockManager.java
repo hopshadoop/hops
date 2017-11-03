@@ -916,6 +916,9 @@ public class BlockManager {
       new IOException("Block Tokens are not currently supported for files stored in the database");
     }
     final AccessMode mode = needBlockToken ? AccessMode.READ : null;
+    if (data == null) {
+      data = new byte[0];
+    }
     final List<LocatedBlock> locatedblocks =
         createPhantomLocatedBlockList(file, data, mode);
 
