@@ -264,7 +264,9 @@ abstract class AbstractFileTree {
                 subtreeRoot instanceof INodeDirectoryWithQuota ? true : false,
                 subtreeRoot.isUnderConstruction(),
                 subtreeRoot.isSubtreeLocked(),
-                subtreeRoot.getSubtreeLockOwner(),size);
+                subtreeRoot.getSubtreeLockOwner(),
+                size,
+                subtreeRoot.getLogicalTime());
 
         addSubtreeRoot(pin);
         return subtreeRoot;
@@ -457,20 +459,37 @@ abstract class AbstractFileTree {
     protected void addChildNode(int level, ProjectedINode node,
         boolean quotaEnabledBranch) {
       if (srcDataset != null) {
+        node.incrementLogicalTime();
         metadataLogEntries.add(new MetadataLogEntry(srcDataset.getId(),
             node.getId(), node.getPartitionId(), node.getParentId(), node
-            .getName(), MetadataLogEntry.Operation.DELETE));
+            .getName(), node.getLogicalTime(), MetadataLogEntry.Operation
+            .DELETE));
       }
       if (dstDataset != null) {
+        node.incrementLogicalTime();
         metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
             node.getId(), node.getPartitionId(), node.getParentId(), node
-            .getName(), MetadataLogEntry.Operation.ADD));
+            .getName(), node.getLogicalTime(), MetadataLogEntry.Operation.ADD));
       }
       super.addChildNode(level, node, quotaEnabledBranch);
     }
 
     public Collection<MetadataLogEntry> getMetadataLogEntries() {
       return metadataLogEntries;
+    }
+
+    static void updateLogicalTime(final Collection<MetadataLogEntry> logEntries)
+        throws IOException {
+      new LightWeightRequestHandler(HDFSOperationType.UPDATE_LOGICAL_TIME){
+        @Override
+        public Object performTask() throws IOException {
+          INodeDataAccess<INode> dataAccess =
+              (INodeDataAccess) HdfsStorageFactory
+                  .getDataAccess(INodeDataAccess.class);
+          dataAccess.updateLogicalTime(logEntries);
+          return null;
+        }
+      }.handle();
     }
   }
 

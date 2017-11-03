@@ -20,6 +20,7 @@ import io.hops.metadata.DalAdaptor;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INode;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -169,6 +170,12 @@ public class INodeDALAdaptor
   }
 
   @Override
+  public void updateLogicalTime(Collection<MetadataLogEntry> logEntries)
+      throws StorageException {
+    dataAccess.updateLogicalTime(logEntries);
+  }
+
+  @Override
   public INode convertHDFStoDAL(
       org.apache.hadoop.hdfs.server.namenode.INode inode)
       throws StorageException {
@@ -186,6 +193,7 @@ public class INodeDALAdaptor
       hopINode.setId(inode.getId());
       hopINode.setIsDir(inode.isDirectory());
       hopINode.setPartitionId(inode.getPartitionId());
+      hopINode.setLogicalTime(inode.getLogicalTime());
 
       if (inode.isDirectory()) {
         hopINode.setUnderConstruction(false);
@@ -282,6 +290,7 @@ public class INodeDALAdaptor
         inode.setGroupIDNoPersistance(hopINode.getGroupID());
         inode.setHeaderNoPersistance(hopINode.getHeader());
         inode.setPartitionIdNoPersistance(hopINode.getPartitionId());
+        inode.setLogicalTimeNoPersistance(hopINode.getLogicalTime());
     }
     return inode;
     }catch (IOException ex){

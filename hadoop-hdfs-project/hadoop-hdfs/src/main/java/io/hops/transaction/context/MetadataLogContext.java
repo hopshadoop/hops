@@ -74,8 +74,9 @@ public class MetadataLogContext
   public void add(MetadataLogEntry logEntry)
       throws TransactionContextException {
     Key key = getKey(logEntry);
-    while (get(key) != null) {
-      key.timestamp = logEntry.updateTimestamp();
+    if(get(key) != null){
+      throw new RuntimeException("Conflicting logical time in the " +
+          "MetadataLogEntry");
     }
     super.add(logEntry);
     log("metadata-log-added","baseDirId", logEntry.getDatasetId(), "inodeId",
@@ -86,7 +87,7 @@ public class MetadataLogContext
   @Override
   Key getKey(MetadataLogEntry metadataLogEntry) {
     return new Key(metadataLogEntry.getDatasetId(),
-        metadataLogEntry.getInodeId(), metadataLogEntry.getTimestamp());
+        metadataLogEntry.getInodeId(), metadataLogEntry.getLogicalTime());
   }
 
   @Override
