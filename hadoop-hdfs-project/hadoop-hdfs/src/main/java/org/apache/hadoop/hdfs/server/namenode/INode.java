@@ -186,6 +186,8 @@ public abstract class INode implements Comparable<byte[]> {
 
   private FsPermission permission;
 
+  private int logicalTime;
+
   INode(PermissionStatus permissions, long mTime, long atime)
       throws IOException {
     this.setLocalNameNoPersistance((byte[]) null);
@@ -213,6 +215,7 @@ public abstract class INode implements Comparable<byte[]> {
     setPermissionStatusNoPersistance(other.getPermissionStatus());
     setModificationTimeNoPersistance(other.getModificationTime());
     setAccessTimeNoPersistance(other.getAccessTime());
+    setLogicalTimeNoPersistance(other.getLogicalTime());
 
     this.parentId = other.getParentId();
     this.id = other.getId();
@@ -793,7 +796,9 @@ public abstract class INode implements Comparable<byte[]> {
       }
       INodeDirectory datasetDir = getMetaEnabledParent();
       EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(),
-          getPartitionId(), getParentId(), getLocalName(), operation));
+          getPartitionId(), getParentId(), getLocalName(), ++logicalTime,
+          operation));
+      save();
     }
   }
 
@@ -967,5 +972,13 @@ public abstract class INode implements Comparable<byte[]> {
       return false;
 
     return true;
+  }
+
+  public int getLogicalTime(){
+    return logicalTime;
+  }
+
+  public void setLogicalTimeNoPersistance(Integer logicalTime){
+    this.logicalTime = logicalTime;
   }
 }

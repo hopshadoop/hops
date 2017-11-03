@@ -1725,15 +1725,20 @@ public class FSNamesystem
   }
 
   private void logMetadataEvents(AbstractFileTree.FileTree fileTree,
-      MetadataLogEntry.Operation operation) throws TransactionContextException,
-      StorageException {
+      MetadataLogEntry.Operation operation) throws IOException {
     ProjectedINode dataSetDir = fileTree.getSubtreeRoot();
+    Collection<MetadataLogEntry> logEntries = new ArrayList<>(fileTree
+        .getAllChildren().size());
     for (ProjectedINode node : fileTree.getAllChildren()) {
+      node.incrementLogicalTime();
       MetadataLogEntry logEntry = new MetadataLogEntry(dataSetDir.getId(),
           node.getId(), node.getPartitionId(), node.getParentId(), node
-          .getName(), operation);
+          .getName(), node.getLogicalTime(), operation);
+      logEntries.add(logEntry);
       EntityManager.add(logEntry);
     }
+    AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime
+        (logEntries);
   }
 
   long getPreferredBlockSize(final String filename) throws IOException {
@@ -6495,6 +6500,9 @@ public class FSNamesystem
           EntityManager.add(logEntry);
         }
 
+        AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime
+            (logEntries);
+
         for (Options.Rename op : options) {
           if (op == Rename.KEEP_ENCODING_STATUS) {
             INode[] srcNodes =
@@ -6740,6 +6748,9 @@ public class FSNamesystem
             for (MetadataLogEntry logEntry : logEntries) {
               EntityManager.add(logEntry);
             }
+
+            AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime
+                (logEntries);
 
             return dir.renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount,
                 dstDsCount);

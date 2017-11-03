@@ -312,5 +312,6 @@ public enum HDFSOperationType implements OperationType {
   GET_ALL_MACHINE_BLOCKS_IN_BUCKETS,
   // Block Report Hashes
   GET_ALL_MACHINE_HASHES,
-  CHECK_ACCESS
+  CHECK_ACCESS,
+  UPDATE_LOGICAL_TIME
 }
