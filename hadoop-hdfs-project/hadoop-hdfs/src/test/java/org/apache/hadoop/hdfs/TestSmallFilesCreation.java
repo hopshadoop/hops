@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * Created by salman on 2016-03-22.
@@ -1204,6 +1205,93 @@ public class TestSmallFilesCreation {
         cluster.shutdown();
       }
     }
+
   }
 
+  @Test
+  public void TestSmallFileListing() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+
+      final int BLOCK_SIZE = 1024 * 1024;
+      final boolean ENABLE_STORE_SMALL_FILES_IN_DB = true;
+      final int ONDISK_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_MEDIUM_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_LARGE_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT);
+      final int INMEMORY_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT);
+      final String BASE_DIR = "/dir";
+      final String FILE_NAME1 = BASE_DIR+"/TEST-FLIE1";
+      final String FILE_NAME2 = BASE_DIR+"/TEST-FLIE2";
+      final String FILE_NAME3 = BASE_DIR+"/TEST-FLIE3";
+
+      conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, ENABLE_STORE_SMALL_FILES_IN_DB);
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).format(true).build();
+      cluster.waitActive();
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      writeFile(dfs, FILE_NAME1, ONDISK_SMALL_FILE_MAX_SIZE);
+      writeFile(dfs, FILE_NAME2, ONDISK_MEDIUM_FILE_MAX_SIZE);
+      writeFile(dfs, FILE_NAME3, ONDISK_LARGE_FILE_MAX_SIZE);
+
+      verifyFile(dfs, FILE_NAME3, ONDISK_LARGE_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME2, ONDISK_MEDIUM_FILE_MAX_SIZE);
+      verifyFile(dfs, FILE_NAME1, ONDISK_SMALL_FILE_MAX_SIZE);
+
+
+      BlockLocation[] loc = dfs.getFileBlockLocations(new Path(FILE_NAME1), 0, Long.MAX_VALUE);
+      loc = dfs.getFileBlockLocations(new Path(FILE_NAME2), 0, Long.MAX_VALUE);
+      loc = dfs.getFileBlockLocations(new Path(FILE_NAME3), 0, Long.MAX_VALUE);
+
+      LocatedFileStatus fs = null;
+      RemoteIterator<LocatedFileStatus> itr = null;
+
+      assertTrue("Expecting 3 files", dfs.listStatus(new Path(BASE_DIR)).length == 3);
+      FileStatus[] fss = dfs.listStatus(new Path(FILE_NAME1));
+      assertTrue("Small file size did not match. Expecting "+ONDISK_SMALL_FILE_MAX_SIZE+" Got "+fss[0].getLen(),
+              fss[0].getLen()==ONDISK_SMALL_FILE_MAX_SIZE);
+
+
+      fss = dfs.listStatus(new Path(FILE_NAME2));
+      assertTrue("Small file size did not match. Expecting "+ONDISK_MEDIUM_FILE_MAX_SIZE+" Got "+fss[0].getLen(),
+              fss[0].getLen()==ONDISK_MEDIUM_FILE_MAX_SIZE);
+
+      fss = dfs.listStatus(new Path(FILE_NAME3));
+      assertTrue("Small file size did not match. Expecting "+ONDISK_LARGE_FILE_MAX_SIZE+" Got "+fss[0].getLen(),
+              fss[0].getLen()==ONDISK_LARGE_FILE_MAX_SIZE);
+
+
+
+      itr = dfs.listFiles(new Path(BASE_DIR),true);
+      while(itr.hasNext()){
+        fs = itr.next();
+        System.out.println("File: "+fs.getPath()+", Size: "+fs.getLen()+", Loc: "+Arrays.toString(fs.getBlockLocations()));
+      }
+
+       itr = dfs.listFiles(new Path(FILE_NAME1),true);
+      fs = itr.next();
+      assertTrue("Small file size did not match. Expecting "+ONDISK_SMALL_FILE_MAX_SIZE+" Got "+fs.getLen(),
+              fs.getLen()==ONDISK_SMALL_FILE_MAX_SIZE);
+
+      itr = dfs.listFiles(new Path(FILE_NAME2),true);
+      fs = itr.next();
+      assertTrue("Small file size did not match. Expecting "+ONDISK_MEDIUM_FILE_MAX_SIZE+" Got "+fs.getLen(),
+              fs.getLen()==ONDISK_MEDIUM_FILE_MAX_SIZE);
+
+      itr = dfs.listFiles(new Path(FILE_NAME3),true);
+      fs = itr.next();
+      assertTrue("Small file size did not match. Expecting "+ONDISK_LARGE_FILE_MAX_SIZE+" Got "+fs.getLen(),
+              fs.getLen()==ONDISK_LARGE_FILE_MAX_SIZE);
+
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.getMessage());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
 }
