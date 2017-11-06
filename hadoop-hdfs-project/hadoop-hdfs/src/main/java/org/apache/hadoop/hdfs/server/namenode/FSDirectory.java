@@ -2615,10 +2615,16 @@ public class FSDirectory implements Closeable {
     boolean isFileStoredInDB = false;
     if (node instanceof INodeFile) {
       INodeFile fileNode = (INodeFile) node;
-      size = fileNode.computeFileSize(true);
+      isFileStoredInDB = fileNode.isFileStoredInDB();
+
+      if(isFileStoredInDB){
+        size = fileNode.getSize();
+      }else{
+        size = fileNode.computeFileSize(true);
+      }
+
       replication = fileNode.getBlockReplication();
       blocksize = fileNode.getPreferredBlockSize();
-      isFileStoredInDB = fileNode.isFileStoredInDB();
       if(isFileStoredInDB){
         loc = getFSNamesystem().getBlockManager().createPhantomLocatedBlocks(fileNode,null,fileNode.isUnderConstruction(),false);
       }else {
