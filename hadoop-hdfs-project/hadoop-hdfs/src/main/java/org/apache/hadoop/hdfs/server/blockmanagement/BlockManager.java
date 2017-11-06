@@ -803,7 +803,7 @@ public class BlockManager {
     fakeBlk.setBlockIdNoPersistance(-file.getId());
     fakeBlk.setINodeIdNoPersistance(-file.getId());
     fakeBlk.setBlockIndexNoPersistance(0);
-    fakeBlk.setNumBytesNoPersistance(data.length);
+    fakeBlk.setNumBytesNoPersistance(file.getSize());
     fakeBlk.setTimestampNoPersistance(file.getModificationTime());
 
     final ExtendedBlock eb =
@@ -919,7 +919,7 @@ public class BlockManager {
     final List<LocatedBlock> locatedblocks =
         createPhantomLocatedBlockList(file, data, mode);
 
-    return new LocatedBlocks(data.length,
+    return new LocatedBlocks(file.getSize(),
         isFileUnderConstruction, locatedblocks, null, false/*last block is not complete*/);
   }
 
