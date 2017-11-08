@@ -605,17 +605,33 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <groupId>io.hops.metadata</groupId>
           <artifactId>hops-metadata-dal-impl-ndb</artifactId>
           <version>${project.version}</version>
+          <scope>test</scope>
         </dependency>
         <dependency>
           <groupId>io.hops.gpu</groupId>
           <artifactId>hops-gpu-management-impl-nvidia</artifactId>
           <version>${project.version}</version>
+          <scope>test</scope>
         </dependency>
         <dependency>
           <groupId>com.mysql.ndb</groupId>
           <artifactId>clusterj-native</artifactId>
           <version>7.5.6</version>
           <classifier>natives-linux</classifier>
+        </dependency>
+        <dependency>
+          <groupId>io.hops.gpu</groupId>
+          <artifactId>libhopsnvml</artifactId>
+          <version>1.0</version>
+          <type>so</type>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>io.hops.streaming</groupId>
+          <artifactId>libhopsyarn</artifactId>
+          <version>1.0</version>
+          <type>so</type>
+          <scope>test</scope>
         </dependency>
       </dependencies>
       <build>
@@ -633,6 +649,57 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <configuration>
                   <nativesTargetDir>${session.executionRootDirectory}/target/lib</nativesTargetDir>
                   <separateDirs>false</separateDirs>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>copy-dependency</id>
+                <phase>compile</phase>
+                <goals>
+                  <goal>copy</goal>
+                </goals>
+                <configuration>
+                  <artifactItems>
+                    <artifactItem>
+                      <groupId>io.hops.streaming</groupId>
+                      <artifactId>libhopsyarn</artifactId>
+                      <version>1.0</version>
+                      <type>so</type>
+                      <overWrite>true</overWrite>
+                      <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
+                    </artifactItem>
+                  </artifactItems>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>copy-dependency</id>
+                <phase>compile</phase>
+                <goals>
+                  <goal>copy</goal>
+                </goals>
+                <configuration>
+                  <artifactItems>
+                    <artifactItem>
+                      <groupId>io.hops.gpu</groupId>
+                      <artifactId>libhopsnvml</artifactId>
+                      <version>1.0</version>
+                      <type>so</type>
+                      <overWrite>true</overWrite>
+                      <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
+                      <!--<outputDirectory>target/native/lib</outputDirectory>-->
+                    </artifactItem>
+                  </artifactItems>
                 </configuration>
               </execution>
             </executions>
