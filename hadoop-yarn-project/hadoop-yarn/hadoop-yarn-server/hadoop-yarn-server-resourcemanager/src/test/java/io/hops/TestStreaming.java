@@ -56,7 +56,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import io.hops.metadata.yarn.dal.RMNodeApplicationsDataAccess;
 
-public class testStreaming {
+public class TestStreaming {
 
   private static Configuration conf;
 
