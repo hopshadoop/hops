@@ -73,7 +73,7 @@ public class TestStreaming {
   @Test
   public void test() throws StorageInitializtionException, IOException,
           InterruptedException {
-    RMStorageFactory.kickTheNdbEventStreamingAPI(true, conf);
+    RMStorageFactory.kickEventStreamingAPI(true, conf);
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
@@ -193,8 +193,8 @@ public class TestStreaming {
     event = DBEvent.receivedEvents.take();
     Assert.assertTrue(event instanceof ContainerStatusEvent);
     
-    RMStorageFactory.stopTheNdbEventStreamingAPI();
-    RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
+    RMStorageFactory.stopEventStreamingAPI();
+    RMStorageFactory.kickEventStreamingAPI(false, conf);
     Thread.sleep(1000);
     handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
