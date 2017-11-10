@@ -16,7 +16,6 @@
 package io.hops.util;
 
 import io.hops.DalDriver;
-import io.hops.DalNdbEventStreaming;
 import io.hops.DalStorageFactory;
 import io.hops.StorageConnector;
 import io.hops.exception.StorageInitializtionException;
@@ -57,6 +56,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import io.hops.DalEventStreaming;
 
 public class RMStorageFactory {
 
@@ -67,31 +67,30 @@ public class RMStorageFactory {
   private static Map<Class, EntityDataAccess> dataAccessAdaptors =
       new HashMap<Class, EntityDataAccess>();
 
-  private static DalNdbEventStreaming dNdbEventStreaming;
-  private static boolean ndbStreaingRunning = false;
+  private static DalEventStreaming dEventStreaming;
+  private static boolean streaingRunning = false;
   public static StorageConnector getConnector() {
     return dStorageFactory.getConnector();
   }
 
-  public static synchronized void kickTheNdbEventStreamingAPI(boolean isLeader,
+  public static synchronized void kickEventStreamingAPI(boolean isLeader,
           Configuration conf) throws
           StorageInitializtionException {
-    dNdbEventStreaming = DalDriver.loadHopsNdbEventStreamingLib(
-            YarnAPIStorageFactory.NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
+    dEventStreaming = DalDriver.loadHopsEventStreamingLib(YarnAPIStorageFactory.EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
     
     String connectionString = dStorageFactory.getConnector().getClusterConnectString() + ":" + 
-            conf.getInt(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_DB_PORT, 
-                    YarnConfiguration.DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT);
+            conf.getInt(YarnConfiguration.HOPS_EVENT_STREAMING_DB_PORT, 
+                    YarnConfiguration.DEFAULT_HOPS_EVENT_STREAMING_DB_PORT);
     
-    dNdbEventStreaming.init(connectionString, dStorageFactory.getConnector().getDatabaseName());
-    dNdbEventStreaming.startHopsNdbEvetAPISession(isLeader);
-    ndbStreaingRunning = true;
+    dEventStreaming.init(connectionString, dStorageFactory.getConnector().getDatabaseName());
+    dEventStreaming.startHopsEvetAPISession(isLeader);
+    streaingRunning = true;
   }
   
-  public static synchronized void stopTheNdbEventStreamingAPI() {
-    if(ndbStreaingRunning && dNdbEventStreaming!=null){
-      ndbStreaingRunning = false;
-      dNdbEventStreaming.closeHopsNdbEventAPISession();
+  public static synchronized void stopEventStreamingAPI() {
+    if(streaingRunning && dEventStreaming!=null){
+      streaingRunning = false;
+      dEventStreaming.closeHopsEventAPISession();
     }
   }
   

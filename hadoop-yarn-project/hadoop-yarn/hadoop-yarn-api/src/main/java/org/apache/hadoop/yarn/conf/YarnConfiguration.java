@@ -2543,9 +2543,9 @@ public class YarnConfiguration extends Configuration {
   
   public static final String HOPS_RM_PREFIX = "hops.yarn.resourcemanager.";
 
-  public static int DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT = 1186;
-  public static final String HOPS_NDB_EVENT_STREAMING_DB_PORT = HOPS_RM_PREFIX
-          + "ndb-event-streaming.db.port";
+  public static int DEFAULT_HOPS_EVENT_STREAMING_DB_PORT = 1186;
+  public static final String HOPS_EVENT_STREAMING_DB_PORT = HOPS_RM_PREFIX
+          + "event-streaming.db.port";
 
   /**
    * The address of the RM group membership interface.

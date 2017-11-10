@@ -61,7 +61,7 @@ public class YarnAPIStorageFactory {
       "dfs.storage.driver.configfile";
   public static final String DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT =
       "ndb-config.properties";
-  public static final String NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE
+  public static final String EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE
           = "io.hops.metadata.ndb.JniNdbEventStreaming";
 
   public static StorageConnector getConnector() {
