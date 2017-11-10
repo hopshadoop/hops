@@ -55,12 +55,17 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </dependencyManagement>
 
   <distributionManagement>
-     <repository>
-            <id>sics-release-repository</id>
-            <name>SICS Repository</name>
-            <url>scpexe://kompics.i.sics.se/home/maven/repository</url>
-        </repository>
-        <downloadUrl>http://kompics.sics.se/maven/repository</downloadUrl>
+    <repository>
+      <id>sics-release-repository</id>
+      <name>SICS Repository</name>
+      <url>scpexe://kompics.i.sics.se/home/maven/repository</url>
+    </repository>
+    <snapshotRepository>
+      <id>sics-snapshot-repository</id>
+      <name>SICS Snapshot Repository</name>
+      <url>scpexe://kompics.i.sics.se/home/maven/snapshotrepository</url>
+    </snapshotRepository>
+    <downloadUrl>http://kompics.sics.se/maven</downloadUrl>
   </distributionManagement>
 
   <repositories>
@@ -68,6 +73,21 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <id>sics-release</id>
       <name>SICS Release Repository</name>
       <url>http://kompics.sics.se/maven/repository</url>
+      <snapshots>
+        <enabled>false</enabled>
+        <updatePolicy>never</updatePolicy>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>sics-snapshot-repository</id>
+      <name>SICS Snapshot Repository</name>
+      <url>http://kompics.sics.se/maven/snapshotrepository</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <updatePolicy>always</updatePolicy>
+      </snapshots>
     </repository>
     <repository>
       <id>${distMgmtSnapshotsId}</id>
@@ -622,14 +642,14 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <dependency>
           <groupId>io.hops.gpu</groupId>
           <artifactId>libhopsnvml</artifactId>
-          <version>1.0</version>
+          <version>${project.version}</version>
           <type>so</type>
           <scope>test</scope>
         </dependency>
         <dependency>
           <groupId>io.hops.streaming</groupId>
           <artifactId>libhopsyarn</artifactId>
-          <version>1.0</version>
+          <version>${project.version}</version>
           <type>so</type>
           <scope>test</scope>
         </dependency>
@@ -668,38 +688,21 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <artifactItem>
                       <groupId>io.hops.streaming</groupId>
                       <artifactId>libhopsyarn</artifactId>
-                      <version>1.0</version>
+                      <version>${project.version}</version>
                       <type>so</type>
                       <overWrite>true</overWrite>
                       <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
                     </artifactItem>
-                  </artifactItems>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>copy-dependency</id>
-                <phase>compile</phase>
-                <goals>
-                  <goal>copy</goal>
-                </goals>
-                <configuration>
-                  <artifactItems>
                     <artifactItem>
                       <groupId>io.hops.gpu</groupId>
                       <artifactId>libhopsnvml</artifactId>
-                      <version>1.0</version>
+                      <version>${project.version}</version>
                       <type>so</type>
                       <overWrite>true</overWrite>
                       <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
-                      <!--<outputDirectory>target/native/lib</outputDirectory>-->
                     </artifactItem>
                   </artifactItems>
+                  <stripVersion>true</stripVersion>
                 </configuration>
               </execution>
             </executions>

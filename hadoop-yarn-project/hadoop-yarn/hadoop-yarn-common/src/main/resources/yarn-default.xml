@@ -2685,7 +2685,7 @@
     <description>
       Port on which the database is listening for events connection.
     </description>
-    <name>hops.yarn.resourcemanager.ndb-event-streaming.db.port</name>
+    <name>hops.yarn.resourcemanager.event-streaming.db.port</name>
     <value>1186</value>
   </property>
 
