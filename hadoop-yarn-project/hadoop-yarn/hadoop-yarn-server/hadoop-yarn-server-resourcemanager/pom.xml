@@ -228,12 +228,6 @@
       <artifactId>jersey-test-framework-grizzly2</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>io.hops.streaming</groupId>
-      <artifactId>libhopsyarn</artifactId>
-      <version>1.0</version>
-      <type>so</type>
-    </dependency>
   </dependencies>
 
   <build>
@@ -252,32 +246,6 @@
 
 
     <plugins>
-
-       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>copy-dependency</id>
-            <phase>compile</phase>
-            <goals>
-              <goal>copy</goal>
-            </goals>
-            <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>io.hops.streaming</groupId>
-                  <artifactId>libhopsyarn</artifactId>
-                  <version>1.0</version>
-                  <type>so</type>
-                  <overWrite>true</overWrite>
-                  <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
-                </artifactItem>
-              </artifactItems>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
       
       <!-- Publish tests jar -->
       <plugin>
