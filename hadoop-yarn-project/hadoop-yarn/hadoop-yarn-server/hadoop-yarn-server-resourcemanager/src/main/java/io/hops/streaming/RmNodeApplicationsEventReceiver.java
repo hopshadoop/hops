@@ -19,10 +19,9 @@ import static io.hops.streaming.DBEvent.receivedEvents;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-public class FinishedApplicationsEventReceiver {
+public class RmNodeApplicationsEventReceiver {
 
-  private static final Log LOG = LogFactory.getLog(
-          FinishedApplicationsEventReceiver.class);
+  private static final Log LOG = LogFactory.getLog(RmNodeApplicationsEventReceiver.class);
 
   public void createAndAddToQueue(String rmnodeId, String applicationId, String status) {
 
