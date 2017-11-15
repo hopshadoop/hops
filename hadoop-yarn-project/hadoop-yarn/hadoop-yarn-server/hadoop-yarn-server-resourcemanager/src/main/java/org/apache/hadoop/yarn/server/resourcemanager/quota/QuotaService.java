@@ -295,15 +295,18 @@ public class QuotaService extends AbstractService {
           chargeProjectDailyCost(chargedProjectsDailyCost, projectName,
                   user, curentDay, charge);
         }
-      } else if (checkpoint == containerLog.getStart() && containerLog.
-              getExitstatus() == ContainerExitStatus.CONTAINER_RUNNING_STATE) {
-        //create a checkPoint at start to store multiplicator.
-        ContainerCheckPoint newCheckpoint = new ContainerCheckPoint(
-                containerLog.getContainerid(), containerLog.getStart(),
-                currentMultiplicator);
-        containersCheckPoints.put(containerLog.getContainerid(), newCheckpoint);
-        toBePercistedContainerCheckPoint.add(newCheckpoint);
-      }
+      } else if (checkpoint == containerLog.getStart()){
+        if (containerLog.getExitstatus() == ContainerExitStatus.CONTAINER_RUNNING_STATE) {
+          //create a checkPoint at start to store multiplicator.
+          ContainerCheckPoint newCheckpoint = new ContainerCheckPoint(
+              containerLog.getContainerid(), containerLog.getStart(),
+              currentMultiplicator);
+          containersCheckPoints.put(containerLog.getContainerid(), newCheckpoint);
+          toBePercistedContainerCheckPoint.add(newCheckpoint);
+        } else {
+          //the container is not running remove it from db
+          toBeRemovedContainersLogs.add((ContainerLog) containerLog);
+        }
     }
     // Delet the finished ContainersLogs
     ContainersLogsDataAccess csDA = (ContainersLogsDataAccess) RMStorageFactory.
