@@ -2577,8 +2577,11 @@ public class YarnConfiguration extends Configuration {
   public static long DEFAULT_QUOTA_BATCH_TIME = 500;
   public static final String QUOTA_BATCH_SIZE = QUOTA_PREFIX + "batch.size";
   public static int DEFAULT_QUOTA_BATCH_SIZE = 100;
-  public static final String QUOTA_BASE_PRICE = QUOTA_PREFIX + "price.base";
-  public static float DEFAULT_QUOTA_BASE_PRICE = 1;
+  public static final String QUOTA_BASE_PRICE_PREFIX = QUOTA_PREFIX + "price.base.";
+  public static final String QUOTA_BASE_PRICE_GPU = QUOTA_BASE_PRICE_PREFIX + "gpu";
+  public static float DEFAULT_QUOTA_BASE_PRICE_GPU = 2;
+  public static final String QUOTA_BASE_PRICE_GENERAL = QUOTA_BASE_PRICE_PREFIX + "general";
+  public static float DEFAULT_QUOTA_BASE_PRICE_GENERAL = 1;
   public static final String QUOTA_MULTIPLICATOR_THRESHOLD = QUOTA_PREFIX + "multiplicator.threshold.";
   public static final String QUOTA_MULTIPLICATOR_THRESHOLD_GENERAL = QUOTA_MULTIPLICATOR_THRESHOLD + "general";
   public static float DEFAULT_QUOTA_MULTIPLICATOR_THRESHOLD_GENERAL = new Float(0.2);

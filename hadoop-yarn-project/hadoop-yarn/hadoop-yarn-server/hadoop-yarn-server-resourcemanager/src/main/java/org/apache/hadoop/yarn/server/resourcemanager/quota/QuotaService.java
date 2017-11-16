@@ -64,7 +64,8 @@ public class QuotaService extends AbstractService {
   private int minVcores;
   private int minMemory;
   private int minGpus;
-  private float basePrice;
+  private float basePriceGeneral;
+  private float basePriceGpu;
   
   ApplicationStateDataAccess appStatDS
           = (ApplicationStateDataAccess) RMStorageFactory.
@@ -115,7 +116,8 @@ public class QuotaService extends AbstractService {
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS));
     minMemory = conf.getInt(YarnConfiguration.QUOTA_MINIMUM_CHARGED_MB,
         YarnConfiguration.DEFAULT_QUOTA_MINIMUM_CHARGED_MB);
-    basePrice = conf.getFloat(YarnConfiguration.QUOTA_BASE_PRICE, YarnConfiguration.DEFAULT_QUOTA_BASE_PRICE);
+    basePriceGeneral = conf.getFloat(YarnConfiguration.QUOTA_BASE_PRICE_GENERAL, YarnConfiguration.DEFAULT_QUOTA_BASE_PRICE_GPU);
+    basePriceGeneral = conf.getFloat(YarnConfiguration.QUOTA_BASE_PRICE_GENERAL, YarnConfiguration.DEFAULT_QUOTA_BASE_PRICE_GENERAL);
   }
 
   public void insertEvents(Collection<ContainerLog> containersLogs) {
@@ -394,6 +396,10 @@ public class QuotaService extends AbstractService {
     float vcoresUsage = (float) nbVcores / minVcores;
     float memoryUsage = (float) memoryUsed / minMemory;
     float gpuUsage = (float) nbGpus / minGpus;
+    float basePrice = basePriceGeneral;
+    if(gpuUsage!=0){
+      basePrice = basePriceGpu;
+    }
     float credit = (float) ticks * Math.max(gpuUsage, Math.max(vcoresUsage, memoryUsage))
             * multiplicator * basePrice;
     return credit;
