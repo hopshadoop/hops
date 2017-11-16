@@ -2795,19 +2795,9 @@
 
   <property>
     <description>
-      Number of qota used by unit of time and unit of resource when the multiplicator is equal to 1 and the container is using
-      general resources (CPU and Mem).
+      Number of qota used by unit of time and unit of resource when the multiplicator is equal to 1.
     </description>
-    <name>yarn.resourcemanager.quota.price.base.general</name>
-    <value>1</value>
-  </property>
-  
-  <property>
-    <description>
-      Number of qota used by unit of time and unit of resource when the multiplicator is equal to 1 and
-      the container is using gpus.
-    </description>
-    <name>yarn.resourcemanager.quota.price.base.gpu</name>
+    <name>yarn.resourcemanager.quota.price.base</name>
     <value>1</value>
   </property>
   
