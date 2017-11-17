@@ -222,8 +222,17 @@ public class RMNodeImplDist extends RMNodeImpl {
               remoteContainer.getExitStatus(), nodeId.toString()));
     }
     
-    completedContainers.addAll(findLostContainers(
-          numRemoteRunningContainers, containerStatuses));
+    List<ContainerStatus> lostContainers = findLostContainers(
+      numRemoteRunningContainers, containerStatuses);
+    for (ContainerStatus lostContainer : lostContainers) {
+      containerToLog.add(
+        new io.hops.metadata.yarn.entity.ContainerStatus(
+          lostContainer.getContainerId().toString(), 
+          lostContainer.getState().name(), 
+          lostContainer.getDiagnostics(), 
+          lostContainer.getExitStatus(), nodeId.toString()));
+    }
+    completedContainers.addAll(lostContainers);
     
     if (newlyLaunchedContainers.size() != 0 || completedContainers.size() != 0) {
       UpdatedContainerInfo uci = new UpdatedContainerInfo(
