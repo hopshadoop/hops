@@ -1782,9 +1782,9 @@ public class BlockManager {
           " because namenode still in startup phase");
       return;
     }
-
-    processReport(node, newReport);
-
+  
+    ReportStatistics reportStatistics = processReport(node, newReport);
+  
     // Now that we have an up-to-date block report, we know that any
     // deletions from a previous NN iteration have been accounted for.
     boolean staleBefore = node.areBlockContentsStale();
@@ -1806,7 +1806,7 @@ public class BlockManager {
     }
     blockLog.info("BLOCK* processReport: from " + nodeID + ", blocks: " +
         newReport.getNumBlocks() + ", processing time: " +
-        (endTime - startTime) + " msecs");
+        (endTime - startTime) + " ms. " + reportStatistics);
   }
 
   /**
@@ -1875,7 +1875,7 @@ public class BlockManager {
   
   
   
-  private void processReport(final DatanodeDescriptor node,
+  private ReportStatistics processReport(final DatanodeDescriptor node,
       final BlockReport report) throws IOException {
     // Normal case:
     // Modify the (block-->datanode) map, according to the difference
@@ -1894,9 +1894,9 @@ public class BlockManager {
 
     final boolean firstBlockReport =
         namesystem.isInStartupSafeMode() && node.isFirstBlockReport();
-    reportDiff(node, report, toAdd, toRemove, toInvalidate, toCorrupt, toUC,
+    ReportStatistics reportStatistics = reportDiff(node, report, toAdd, toRemove, toInvalidate, toCorrupt, toUC,
         firstBlockReport);
-
+  
     // Process the blocks on each queue
     for (StatefulBlockInfo b : toUC) {
       if (firstBlockReport) {
@@ -1950,6 +1950,7 @@ public class BlockManager {
         removeStoredBlockTx(b, node);
       }
     }
+    return reportStatistics;
   }
   
   private static class HashMatchingResult{
@@ -1962,8 +1963,27 @@ public class BlockManager {
       this.mismatchedBuckets = mismatchedBuckets;
     }
   }
+  
+  class ReportStatistics{
+    int numBuckets;
+    int numBucketsMatching;
+    int numBlocks;
+    int numToRemove;
+    int numToInvalidate;
+    int numToCorrupt;
+    int numToUC;
+    int numToAdd;
+    int numConsideredSafeIfInSafemode;
+  
+    @Override
+    public String toString() {
+      return String.format("(buckets,bucketsMatching,blocks,toRemove,toInvalidate,toCorrupt,toUC,toAdd," +
+          "safeBlocksIfSafeMode)=(%d,%d,%d,%d,%d,%d,%d,%d,%d)", numBuckets, numBucketsMatching, numBlocks,
+          numToRemove, numToInvalidate, numToCorrupt, numToUC, numToAdd,numConsideredSafeIfInSafemode);
+    }
+  }
 
-  private void reportDiff(final DatanodeDescriptor dn,
+  private ReportStatistics reportDiff(final DatanodeDescriptor dn,
       final BlockReport newReport, final Collection<BlockInfo> toAdd,
       // add to DatanodeDescriptor
       final Collection<Long> toRemove,
@@ -1975,8 +1995,12 @@ public class BlockManager {
       throws IOException { // add to under-construction list
 
     if (newReport == null) {
-      return;
+      return null;
     }
+    
+    ReportStatistics stats = new ReportStatistics();
+    stats.numBuckets = newReport.getBuckets().length;
+    stats.numBlocks = newReport.getNumBlocks();
   
     HashMatchingResult matchingResult;
     if (dn.isFirstBlockReport()){
@@ -1992,6 +2016,8 @@ public class BlockManager {
       matchingResult = calculateMismatchedHashes(dn,
           newReport);
     }
+    stats.numBucketsMatching = matchingResult.matchingBuckets.size();
+    
     
     if(LOG.isDebugEnabled()){
       LOG.debug(String.format("%d/%d reported hashes matched",
@@ -2146,13 +2172,20 @@ public class BlockManager {
       LOG.error("Exception was thrown during block report processing", e);
     }
     
+    stats.numToAdd = toAdd.size();
+    stats.numToInvalidate = toInvalidate.size();
+    stats.numToCorrupt = toCorrupt.size();
+    stats.numToUC = toUC.size();
     toRemove.addAll(allMismatchedBlocksOnServer);
+    stats.numToRemove = toRemove.size();
     if (namesystem.isInStartupSafeMode()) {
       aggregatedSafeBlocks.removeAll(toRemove);
       LOG.debug("AGGREGATED SAFE BLOCK #: " + aggregatedSafeBlocks.size() +
           " REPORTED BLOCK #: " + newReport.getNumBlocks());
       namesystem.adjustSafeModeBlocks(aggregatedSafeBlocks);
+      stats.numConsideredSafeIfInSafemode = aggregatedSafeBlocks.size();
     }
+    return stats;
   }
   
   private ReplicaState fromBlockReportBlockState(
