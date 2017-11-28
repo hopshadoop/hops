@@ -320,7 +320,10 @@ public class INodeFile extends INode implements BlockCollection {
   long diskspaceConsumed()
       throws StorageException, TransactionContextException {
     if(isFileStoredInDB()){
-      return getSize(); // We do not know the replicaton of the database here. For now just return the size of the file
+      // We do not know the replicaton of the database here. However, to be
+      // consistent with normal files we will multiply the file size by the
+      // replication factor.
+      return getSize() * getBlockReplication();
     }else {
       return diskspaceConsumed(getBlocks()); // Compute the size of the file. Takes replication in to account
     }
