@@ -1650,17 +1650,13 @@ public class FSNamesystem
     }
 
     INode targetNode = getINode(src);
-    if(targetNode instanceof INodeFile && ((INodeFile) targetNode).isFileStoredInDB()){
-      // [s] for the files stored in the database setting the replication level does not make
-      // any sense. For now we will just set the replication level as requested by the user
-      ((INodeFile) targetNode).setReplication(replication);
-      return true;
-    }
 
     final short[] oldReplication = new short[1];
     final Block[] blocks = dir.setReplication(src, replication, oldReplication);
     isFile = blocks != null;
-    if (isFile) {
+    // [s] for the files stored in the database setting the replication level does not make
+    // any sense. For now we will just set the replication level as requested by the user
+    if (isFile && !((INodeFile) targetNode).isFileStoredInDB()) {
       blockManager.setReplication(oldReplication[0], replication, src, blocks);
     }
 
@@ -2786,9 +2782,20 @@ public class FSNamesystem
 
     pendingFile.setFileStoredInDB(true);
 
+    long oldSize = pendingFile.getSize();
+
     pendingFile.setSize(data.length);
 
     pendingFile.storeFileDataInDB(data);
+
+    //update quota
+    if (dir.isQuotaEnabled()) {
+      //account for only newly added data
+      long spaceConsumed = (data.length - oldSize) * pendingFile
+          .getBlockReplication();
+      dir.updateSpaceConsumed(src, 0, spaceConsumed);
+    }
+
 
     finalizeINodeFileUnderConstructionStoredInDB(src, pendingFile);
 
@@ -5116,7 +5123,8 @@ public class FSNamesystem
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
             locks.add(
-                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+                lf.getIndividualINodeLock(INodeLockType.WRITE,
+                    inodeIdentifier, true))
                 .add(lf.getBlockLock(block.getBlockId(), inodeIdentifier));
           }
 
@@ -5133,6 +5141,13 @@ public class FSNamesystem
             block.setGenerationStamp(pendingFile.nextGenerationStamp());
             locatedBlock = new LocatedBlock(block, new DatanodeInfo[0]);
             blockManager.setBlockToken(locatedBlock, AccessMode.WRITE);
+
+            if(dir.isQuotaEnabled()){
+              long diff = pendingFile.getPreferredBlockSize() - block
+                  .getNumBytes();
+              dir.updateSpaceConsumed(pendingFile.getFullPathName(), 0, diff
+                  * pendingFile.getBlockReplication());
+            }
             return locatedBlock;
           }
         };

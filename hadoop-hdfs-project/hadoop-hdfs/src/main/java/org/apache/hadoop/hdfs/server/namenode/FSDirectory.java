@@ -296,10 +296,17 @@ public class FSDirectory implements Closeable {
     INodeFileUnderConstruction fileINode =
         (INodeFileUnderConstruction) inodes[inodes.length - 1];
 
+    long diskspaceTobeConsumed = fileINode.getPreferredBlockSize() *
+        fileINode.getBlockReplication();
+    //When appending to a small file stored in DB we should consider the file
+    // size which was accounted for before in the inode attributes to avoid
+    // over calculation of quota
+    if(fileINode.isFileStoredInDB()){
+      diskspaceTobeConsumed -= (fileINode.getSize() *
+          fileINode.getBlockReplication());
+    }
     // check quota limits and updated space consumed
-    updateCount(inodes, inodes.length - 1, 0,
-        fileINode.getPreferredBlockSize() * fileINode.getBlockReplication(),
-        true);
+    updateCount(inodes, inodes.length - 1, 0, diskspaceTobeConsumed, true);
 
     // associate new last block for the file
     BlockInfoUnderConstruction blockInfo =

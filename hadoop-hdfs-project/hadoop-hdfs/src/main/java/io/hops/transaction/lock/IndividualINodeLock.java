@@ -70,7 +70,7 @@ final class IndividualINodeLock extends BaseINodeLock {
           "INodeIdentifier object is not properly " + "initialized ");
     }
 
-    if (readUpPathInodes) {
+    if (readUpPathInodes && inode != null) {
       List<INode> pathInodes = readUpInodes(inode);
       addPathINodesAndUpdateResolvingCache(INodeUtil.constructPath(pathInodes),
           pathInodes);
