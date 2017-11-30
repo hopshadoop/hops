@@ -270,12 +270,12 @@ public class QuotaService extends AbstractService {
 
         } else {
           //The container has finished running
-          toBeRemovedContainersLogs.add((ContainerLog) containerLog);
-          if (checkpoint != containerLog.getStart()) {
+          toBeRemovedContainersLogs.add((ContainerLog) containerLog);         
+          if(containersCheckPoints.remove(containerLog.getContainerid())!=null){
             toBeRemovedContainerCheckPoint.add(new ContainerCheckPoint(
-                    containerLog.getContainerid()));
-            containersCheckPoints.remove(containerLog.getContainerid());
+                  containerLog.getContainerid()));
           }
+          
           //** ProjectQuota charging**
           LOG.debug("charging project finished " + projectName
                   + " for container " + containerLog.getContainerid()
@@ -290,19 +290,24 @@ public class QuotaService extends AbstractService {
           chargeProjectDailyCost(chargedProjectsDailyCost, projectName,
                   user, curentDay, charge);
         }
-      } else if (checkpoint == containerLog.getStart()){
-        if (containerLog.getExitstatus() == ContainerExitStatus.CONTAINER_RUNNING_STATE) {
+      } else {
+        if (checkpoint == containerLog.getStart() && 
+                containerLog.getExitstatus() == ContainerExitStatus.CONTAINER_RUNNING_STATE) {
           //create a checkPoint at start to store multiplicator.
           ContainerCheckPoint newCheckpoint = new ContainerCheckPoint(
               containerLog.getContainerid(), containerLog.getStart(),
               currentMultiplicator);
           containersCheckPoints.put(containerLog.getContainerid(), newCheckpoint);
           toBePercistedContainerCheckPoint.add(newCheckpoint);
-        } else {
+        } else if(containerLog.getExitstatus() != ContainerExitStatus.CONTAINER_RUNNING_STATE) {
           //the container is not running remove it from db
           toBeRemovedContainersLogs.add((ContainerLog) containerLog);
+          if(containersCheckPoints.remove(containerLog.getContainerid())!=null){
+            toBeRemovedContainerCheckPoint.add(new ContainerCheckPoint(
+                  containerLog.getContainerid()));
+          }
         }
-      }
+      } 
     }
     // Delet the finished ContainersLogs
     ContainersLogsDataAccess csDA = (ContainersLogsDataAccess) RMStorageFactory.

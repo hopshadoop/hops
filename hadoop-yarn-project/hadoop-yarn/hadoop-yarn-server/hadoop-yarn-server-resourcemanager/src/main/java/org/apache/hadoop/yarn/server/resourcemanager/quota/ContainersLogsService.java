@@ -19,7 +19,6 @@ import io.hops.exception.StorageException;
 import io.hops.metadata.common.entity.LongVariable;
 import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
-import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
 import io.hops.metadata.yarn.dal.quota.ContainersLogsDataAccess;
 import io.hops.metadata.yarn.dal.quota.PriceMultiplicatorDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
@@ -63,7 +62,6 @@ public class ContainersLogsService extends CompositeService {
   private float currentMultiplicator; // This variable will be set/updated by the streaming service.
   private long multiplicatorPeirod;
 
-  ContainerStatusDataAccess containerStatusDA;
   ContainersLogsDataAccess containersLogsDA;
   VariableDataAccess variableDA;
 
@@ -112,8 +110,6 @@ public class ContainersLogsService extends CompositeService {
     currentMultiplicator = 1;
 
     // Initialize DataAccesses
-    containerStatusDA = (ContainerStatusDataAccess) RMStorageFactory.
-            getDataAccess(ContainerStatusDataAccess.class);
     containersLogsDA = (ContainersLogsDataAccess) RMStorageFactory.
             getDataAccess(ContainersLogsDataAccess.class);
     variableDA = (VariableDataAccess) RMStorageFactory.getDataAccess(
