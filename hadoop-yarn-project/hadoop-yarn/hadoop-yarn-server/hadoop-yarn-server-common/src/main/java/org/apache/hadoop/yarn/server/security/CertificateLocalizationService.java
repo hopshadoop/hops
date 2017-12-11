@@ -18,10 +18,12 @@
 package org.apache.hadoop.yarn.server.security;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
@@ -43,7 +45,10 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RemoveCryptoKeysRespons
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.mortbay.util.ajax.JSON;
 
+import javax.management.ObjectName;
+import javax.management.StandardMBean;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -55,6 +60,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -67,9 +73,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class CertificateLocalizationService extends AbstractService
-    implements CertificateLocalization, CertificateLocalizationProtocol {
+    implements CertificateLocalization, CertificateLocalizationProtocol, CertificateLocalizationMBean {
   
   private final Logger LOG = LogManager.getLogger
       (CertificateLocalizationService.class);
@@ -93,20 +100,26 @@ public class CertificateLocalizationService extends AbstractService
   private BlockingQueue<CertificateLocalizationEvent> evtQueue = null;
   private Thread eventProcessor = null;
   private volatile boolean stopped = false;
+  private ObjectName mbeanObjectName;
+  private final String serviceName;
+  public static final String JMX_MATERIALIZED_KEY = "materialized";
+  public static final String JMX_FORCE_REMOVE_OP = "forceRemoveMaterial";
+  private final ReentrantLock lock = new ReentrantLock(true);
   
   private File tmpDir;
   
   private Server server;
   private RecordFactory recordFactory;
   
-  public CertificateLocalizationService(boolean isHAEnabled, String prefix) {
+  public CertificateLocalizationService(boolean isHAEnabled, String serviceName) {
     super(CertificateLocalizationService.class.getName());
     this.isHAEnabled = isHAEnabled;
-    if (prefix == null) {
+    if (serviceName == null) {
       Random rand = new Random();
-      prefix = String.valueOf(rand.nextInt());
+      serviceName = String.valueOf(rand.nextInt());
     }
-    LOCALIZATION_DIR = prefix + "_" + LOCALIZATION_DIR_NAME;
+    this.serviceName = serviceName;
+    LOCALIZATION_DIR = serviceName + "_" + LOCALIZATION_DIR_NAME;
   }
   
   @Override
@@ -119,7 +132,6 @@ public class CertificateLocalizationService extends AbstractService
     // random UUID
     
     parseSuperuserPasswords(conf);
-    
     super.serviceInit(conf);
   }
   
@@ -142,6 +154,9 @@ public class CertificateLocalizationService extends AbstractService
     // Random materialization directory should have the default umask
     materializeDir.toFile().mkdir();
     LOG.debug("Initialized at dir: " + materializeDir.toString());
+  
+    StandardMBean mbean = new StandardMBean(this, CertificateLocalizationMBean.class);
+    mbeanObjectName = MBeans.register(serviceName, "CertificateLocalizer", mbean);
     
     super.serviceStart();
   }
@@ -267,6 +282,10 @@ public class CertificateLocalizationService extends AbstractService
   protected void serviceStop() throws Exception {
     stopServer();
     stopClients();
+    
+    if (mbeanObjectName != null) {
+      MBeans.unregister(mbeanObjectName);
+    }
     
     if (null != materializeDir) {
       FileUtils.deleteQuietly(materializeDir.toFile());
@@ -406,6 +425,73 @@ public class CertificateLocalizationService extends AbstractService
   }
   
   
+  /**
+   * JMX section
+   */
+  private class ReturnState<S, T> extends HashMap<S, T> {
+    private static final long serialVersionUID = 1L;
+  }
+  
+  /**
+   * Method invoked by a JMX client to get the state of the CertificateLocalization service.
+   * Under the attributes tab.
+   * @return It returns a map with the name of the material and the number of references.
+   */
+  @Override
+  public String getState() {
+    ImmutableMap<StorageKey, CryptoMaterial> state;
+    try {
+      lock.lock();
+      state = ImmutableMap.copyOf(materialLocation);
+    } finally {
+      lock.unlock();
+    }
+    
+    ReturnState<String, String> returnState = new ReturnState<>();
+    
+    ReturnState<String, Integer> internalState = new ReturnState<>();
+    for (Map.Entry<StorageKey, CryptoMaterial> entry : state.entrySet()) {
+      internalState.put(entry.getKey().getUsername(), entry.getValue().getRequestedApplications());
+    }
+    returnState.put(JMX_MATERIALIZED_KEY, JSON.toString(internalState));
+    
+    return JSON.toString(returnState);
+  }
+  
+  /**
+   * This method SHOULD be used *wisely*!!!
+   *
+   * This method is invoked by a JMX client to force remove crypto material associated with that username.
+   * Under the operations tab.
+   * @param username User of the crypto material
+   * @return True if the material exists in the store. False otherwise
+   * @throws InterruptedException
+   * @throws ExecutionException
+   */
+  @Override
+  public boolean forceRemoveMaterial(String username) throws InterruptedException, ExecutionException {
+    StorageKey key = new StorageKey(username);
+    CryptoMaterial cryptoMaterial = null;
+    Future<CryptoMaterial> future = futures.remove(key);
+    if (future != null) {
+      cryptoMaterial = future.get();
+    } else {
+      cryptoMaterial = materialLocation.get(key);
+    }
+    
+    if (cryptoMaterial == null) {
+      return false;
+    }
+    
+    Remover remover = new Remover(key, cryptoMaterial);
+    remover.run();
+    return true;
+  }
+  
+  /**
+   * End of JMX section
+   */
+  
   private class StorageKey {
     private final String username;
     
@@ -483,7 +569,13 @@ public class CertificateLocalizationService extends AbstractService
       CryptoMaterial material = new CryptoMaterial(kstoreFile.getAbsolutePath(),
           tstoreFile.getAbsolutePath(), passwdFile.getAbsolutePath(),
           kstore, kstorePass, tstore, tstorePass);
-      materialLocation.put(key, material);
+      try {
+        // We lock to get a consistent state if JMX getState is called at the same time
+        lock.lock();
+        materialLocation.put(key, material);
+      } finally {
+        lock.unlock();
+      }
       futures.remove(key);
 
       if (isHAEnabled && eventProcessor != null) {
@@ -515,7 +607,12 @@ public class CertificateLocalizationService extends AbstractService
       File appDir = Paths.get(materializeDir.toString(), key.getUsername())
           .toFile();
       FileUtils.deleteQuietly(appDir);
-      materialLocation.remove(key);
+      try {
+        lock.lock();
+        materialLocation.remove(key);
+      } finally {
+        lock.unlock();
+      }
       
       if (isHAEnabled && eventProcessor != null) {
         RemoveCryptoKeysRequest request = Records.newRecord
