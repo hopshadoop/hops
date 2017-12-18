@@ -2559,7 +2559,7 @@ public class YarnConfiguration extends Configuration {
    * Number of threads used to handle RM group membership interface.
    */
   public static final String RM_GROUP_MEMBERSHIP_CLIENT_THREAD_COUNT = RM_PREFIX
-          + "admin.client.thread-count";
+          + "group_membership.client.thread-count";
   public static final int DEFAULT_RM_GROUP_MEMBERSHIP_CLIENT_THREAD_COUNT = 1;
 
   public static final String DISTRIBUTED_RM = CLIENT_FAILOVER_PREFIX
