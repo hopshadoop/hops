@@ -22,10 +22,13 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
@@ -33,6 +36,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,6 +48,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo.AdminStates;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
@@ -970,4 +975,60 @@ public class DFSTestUtil {
       return new DFSTestUtil(nFiles, maxLevels, maxSize, minSize);
     }
   }
+
+  public static void waitForQuotaUpdatesToBeApplied() throws
+      InterruptedException, IOException {
+    //      Thread.sleep(5000);
+    final long MAX_TIME = 15000;
+    final long START_TIME = System.currentTimeMillis();
+    LightWeightRequestHandler quotaApplicationChecker=
+        new LightWeightRequestHandler(HDFSOperationType.TEST) {
+          @Override
+          public Object performTask() throws StorageException, IOException {
+            while(true){
+              if((System.currentTimeMillis() - START_TIME ) > MAX_TIME){
+                throw new StorageException("All quota updates were not applied in givin time. Time "+MAX_TIME+"ms");
+              }
+              try {
+                Thread.sleep(500);
+              }catch(InterruptedException e){}
+
+              QuotaUpdateDataAccess da = (QuotaUpdateDataAccess) HdfsStorageFactory.getDataAccess(QuotaUpdateDataAccess.class);
+              int count = da.getCount();
+
+              if(count==0){
+                return null;
+              }
+              LOG.debug("Quota updates are not yet fully applied. Remaining "+count);
+            }
+          }
+        };
+    quotaApplicationChecker.handle();
+  }
+
+  public static ContentSummary getContentSummary(DistributedFileSystem dfs, Path
+      path) throws IOException, InterruptedException {
+    ContentSummary c = dfs.getContentSummary(path);
+    LastUpdatedContentSummary lc = dfs.getLastUpdatedContentSummary(path);
+    if(!isContentSummaryUpToDate(c, lc)){
+      waitForQuotaUpdatesToBeApplied();
+      lc = dfs.getLastUpdatedContentSummary(path);
+    }
+    assertEquals(c.getDirectoryCount() + c.getFileCount(), lc.getFileAndDirCount());
+    assertEquals(c.getSpaceConsumed(), lc.getSpaceConsumed());
+    assertEquals(c.getQuota(), lc.getNsQuota());
+    assertEquals(c.getSpaceQuota(), lc.getDsQuota());
+    return c;
+  }
+
+  public static boolean isContentSummaryUpToDate(ContentSummary c,
+      LastUpdatedContentSummary lc){
+    return ((c.getDirectoryCount() + c.getFileCount()) == lc
+        .getFileAndDirCount())
+        && (c.getSpaceConsumed() == lc.getSpaceConsumed())
+        && (c.getQuota() == lc.getNsQuota())
+        && (c.getSpaceQuota() == lc.getDsQuota());
+  }
+
+
 }

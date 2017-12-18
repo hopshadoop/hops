@@ -1373,4 +1373,26 @@ public interface ClientProtocol {
   @Idempotent
   public void checkAccess(String path, FsAction mode) throws IOException;
 
+  /**
+   * Get last updated {@link LastUpdatedContentSummary} rooted at the specified directory.
+   * This Method performs faster than {@link ClientProtocol#getContentSummary}
+   * for quota enabled directories, otherwise it will perform the same as
+   * {@link ClientProtocol#getContentSummary}.
+   *
+   * @param path
+   *     The string representation of the path
+   * @throws AccessControlException
+   *     permission denied
+   * @throws FileNotFoundException
+   *     file <code>path</code> is not found
+   * @throws UnresolvedLinkException
+   *     if <code>path</code> contains a symlink.
+   * @throws IOException
+   *     If an I/O error occurred
+   */
+  @Idempotent
+  public LastUpdatedContentSummary getLastUpdatedContentSummary(String path)
+      throws AccessControlException, FileNotFoundException,
+      UnresolvedLinkException, IOException;
+
 }

@@ -54,6 +54,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
+import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -1233,5 +1234,19 @@ public class DistributedFileSystem extends FileSystem {
         return null;
       }
     }.resolve(this, absF);
+  }
+
+  /***
+   * Get the last updated content summary. This method provides a faster yet
+   * maybe stale content summary for quote enabled directory. To get
+   * the most accurate result use {@link DistributedFileSystem#getContentSummary}
+   * @param f path
+   * @return
+   * @throws IOException
+   */
+  public LastUpdatedContentSummary getLastUpdatedContentSummary(Path f) throws
+      IOException {
+    statistics.incrementReadOps(1);
+    return dfs.getLastUpdatedContentSummary(getPathName(f));
   }
 }

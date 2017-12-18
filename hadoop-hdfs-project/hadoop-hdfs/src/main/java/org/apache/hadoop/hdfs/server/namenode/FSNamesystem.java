@@ -93,6 +93,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
@@ -6234,6 +6235,7 @@ public class FSNamesystem
         throw new FileNotFoundException("File does not exist: " + path);
       }
       final INode subtreeRoot = pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1];
+      final INodeAttributes subtreeAttr = pathInfo.getSubtreeRootAttributes();
       final INodeIdentifier subtreeRootIdentifier = new INodeIdentifier(subtreeRoot.getId(),subtreeRoot.getParentId(),
           subtreeRoot.getLocalName(),subtreeRoot.getPartitionId());
       subtreeRootIdentifier.setDepth(((short) (INodeDirectory.ROOT_DIR_DEPTH + pathInfo.getPathComponents().length-1 )));
@@ -6241,27 +6243,13 @@ public class FSNamesystem
       final AbstractFileTree.CountingFileTree fileTree =
               new AbstractFileTree.CountingFileTree(this, subtreeRootIdentifier, FsAction.READ_EXECUTE);
       fileTree.buildUp();
-      return (ContentSummary) new LightWeightRequestHandler(
-              HDFSOperationType.GET_SUBTREE_ATTRIBUTES) {
-        @Override
-        public Object performTask() throws IOException {
-          INodeAttributesDataAccess<INodeAttributes> dataAccess =
-                  (INodeAttributesDataAccess<INodeAttributes>) HdfsStorageFactory
-                  .getDataAccess(INodeAttributesDataAccess.class);
-          INodeAttributes attributes =
-                  dataAccess.findAttributesByPk(subtreeRoot.getId());
-//          if(attributes!=null){
-//            assert fileTree.getDiskspaceCount() == attributes.getDiskspace(): "Diskspace count did not match fileTree "+fileTree.getDiskspaceCount()+" attributes "+attributes.getDiskspace();
-//            assert fileTree.getNamespaceCount() == attributes.getNsCount(): "Namespace count did not match fileTree "+fileTree.getNamespaceCount()+" attributes "+attributes.getNsCount();
-//          }
-          return new ContentSummary(fileTree.getFileSizeSummary(),
-                  fileTree.getFileCount(), fileTree.getDirectoryCount(),
-                  attributes == null ? subtreeRoot.getNsQuota()
-                  : attributes.getNsQuota(), fileTree.getDiskspaceCount(),
-                  attributes == null ? subtreeRoot.getDsQuota()
-                  : attributes.getDsQuota());
-        }
-      }.handle(this);
+
+    return new ContentSummary(fileTree.getFileSizeSummary(),
+        fileTree.getFileCount(), fileTree.getDirectoryCount(),
+        subtreeAttr == null ? subtreeRoot.getNsQuota() : subtreeAttr.getNsQuota(),
+        fileTree.getDiskspaceCount(), subtreeAttr == null ? subtreeRoot
+        .getDsQuota() : subtreeAttr.getDsQuota());
+
   }
 
   /**
@@ -7692,19 +7680,26 @@ public class FSNamesystem
             int numExistingComp = dir.getRootDir().
                 getExistingPathINodes(pathComponents, pathInodes, false);
 
-            if(pathInodes[pathInodes.length - 1] != null){  // complete path resolved
-              if(pathInodes[pathInodes.length - 1] instanceof INodeFile ){
+            INodeAttributes quotaDirAttributes = null;
+            INode leafInode = pathInodes[pathInodes.length - 1];
+            if(leafInode != null){  // complete path resolved
+              if(leafInode instanceof INodeFile ){
                 isDir = false;
                 //do ns and ds counts for file only
-                pathInodes[pathInodes.length - 1].spaceConsumedInTree(srcCounts);
-              }else{
+                leafInode.spaceConsumedInTree(srcCounts);
+              } else{
                 isDir =true;
+                if(leafInode instanceof INodeDirectoryWithQuota && dir
+                    .isQuotaEnabled()){
+                  quotaDirAttributes = ((INodeDirectoryWithQuota) leafInode)
+                      .getINodeAttributes();
+                }
               }
             }
 
             return new PathInformation(path, pathComponents,
                 pathInodes,numExistingComp,isDir,
-                srcCounts.getNsCount(), srcCounts.getDsCount());
+                srcCounts.getNsCount(), srcCounts.getDsCount(), quotaDirAttributes);
           }
         };
     return (PathInformation)handler.handle(this);
@@ -7718,10 +7713,11 @@ public class FSNamesystem
     private long nsCount;
     private long dsCount;
     private int numExistingComp;
+    private final INodeAttributes subtreeRootAttributes;
 
     public PathInformation(String path,
         byte[][] pathComponents, INode[] pathInodes, int numExistingComp,
-        boolean dir, long nsCount, long dsCount) {
+        boolean dir, long nsCount, long dsCount, INodeAttributes subtreeRootAttributes) {
       this.path = path;
       this.pathComponents = pathComponents;
       this.pathInodes = pathInodes;
@@ -7729,6 +7725,7 @@ public class FSNamesystem
       this.nsCount = nsCount;
       this.dsCount = dsCount;
       this.numExistingComp = numExistingComp;
+      this.subtreeRootAttributes = subtreeRootAttributes;
     }
 
     public String getPath() {
@@ -7758,6 +7755,11 @@ public class FSNamesystem
     public int getNumExistingComp() {
       return numExistingComp;
     }
+
+    public INodeAttributes getSubtreeRootAttributes() {
+      return subtreeRootAttributes;
+    }
+
   }
 
   public ExecutorService getExecutorService(){
@@ -7865,6 +7867,46 @@ public class FSNamesystem
     }
 
     checkAccessHandler.handle(this);
+  }
+
+  public LastUpdatedContentSummary getLastUpdatedContentSummary(final String path) throws
+      IOException{
+
+    LastUpdatedContentSummary luSummary = (LastUpdatedContentSummary) new
+        HopsTransactionalRequestHandler (HDFSOperationType
+            .GET_LAST_UPDATED_CONTENT_SUMMARY){
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getINodeLock(!dir.isQuotaEnabled(), nameNode, INodeLockType
+            .READ_COMMITTED, INodeResolveType.PATH, false, path));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        INode subtreeRoot = getINode(path);
+        if(subtreeRoot instanceof INodeDirectoryWithQuota){
+          INodeDirectoryWithQuota quotaDir = (INodeDirectoryWithQuota)
+              subtreeRoot;
+          return new LastUpdatedContentSummary(quotaDir.numItemsInTree(),
+              quotaDir.diskspaceConsumed(), quotaDir.getNsQuota(), quotaDir
+              .getDsQuota());
+        }
+        return null;
+      }
+
+    }.handle(this);
+
+    if(luSummary == null) {
+      ContentSummary summary = getContentSummary(path);
+      luSummary = new LastUpdatedContentSummary(summary.getFileCount() +
+          summary.getDirectoryCount(), summary.getSpaceConsumed(),
+          summary.getQuota(), summary.getSpaceQuota());
+    }
+
+    return luSummary;
+
   }
 
 }

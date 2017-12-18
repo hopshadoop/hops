@@ -67,6 +67,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
@@ -3289,4 +3290,30 @@ public class DFSClient implements java.io.Closeable {
   public int getNameNodesCount() throws IOException {
     return namenodeSelector.getNameNodesCount();
   }
+
+  /**
+   * Get {@link ContentSummary} rooted at the specified directory.
+   *
+   * @param src
+   *     The string representation of the path
+   * @see ClientProtocol#getLastUpdatedContentSummary(String)
+   */
+  LastUpdatedContentSummary getLastUpdatedContentSummary(final String src) throws
+      IOException {
+    try {
+      ClientActionHandler handler = new ClientActionHandler() {
+        @Override
+        public Object doAction(ClientProtocol namenode)
+            throws RemoteException, IOException {
+          return namenode.getLastUpdatedContentSummary(src);
+        }
+      };
+      return (LastUpdatedContentSummary) doClientActionWithRetry(handler,
+          "getLastUpdatedContentSummary");
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+          FileNotFoundException.class, UnresolvedPathException.class);
+    }
+  }
+
 }
