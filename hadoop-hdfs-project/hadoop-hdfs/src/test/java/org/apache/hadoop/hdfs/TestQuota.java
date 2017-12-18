@@ -29,12 +29,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -121,7 +123,7 @@ public class TestQuota {
 
       //try setting space quota with a 'binary prefix'
       runCommand(admin, false, "-setSpaceQuota", "2t", parent.toString());
-      assertEquals(2L << 40, dfs.getContentSummary(parent).getSpaceQuota());
+      assertEquals(2L << 40, DFSTestUtil.getContentSummary(dfs,parent).getSpaceQuota());
       
       // set diskspace quota to 10000 
       runCommand(admin, false, "-setSpaceQuota", Long.toString(spaceQuota),
@@ -134,21 +136,21 @@ public class TestQuota {
       // 3: create a file /test/datafile0
       final Path childFile0 = new Path(parent, "datafile0");
       DFSTestUtil.createFile(fs, childFile0, fileLen, replication, 0);
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 4: count -q /test
-      ContentSummary c = dfs.getContentSummary(parent);
-      waitForQuotaUpdatesToBeApplied();
+      ContentSummary c = DFSTestUtil.getContentSummary(dfs,parent);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       assertEquals(c.getFileCount() + c.getDirectoryCount(), 3);
       assertEquals(c.getQuota(), 3);
       assertEquals(c.getSpaceConsumed(), fileLen * replication);
       assertEquals(c.getSpaceQuota(), spaceQuota);
       
       // 5: count -q /test/data0
-      c = dfs.getContentSummary(childDir0);
+      c = DFSTestUtil.getContentSummary(dfs,childDir0);
       assertEquals(c.getFileCount() + c.getDirectoryCount(), 1);
       assertEquals(c.getQuota(), -1);
       // check disk space consumed
-      c = dfs.getContentSummary(parent);
+      c = DFSTestUtil.getContentSummary(dfs,parent);
       assertEquals(c.getSpaceConsumed(), fileLen * replication);
 
       // 6: create a directory /test/data1
@@ -156,7 +158,7 @@ public class TestQuota {
       boolean hasException = false;
       try {
         // HOP - Wait for quota updates to be applied
-        waitForQuotaUpdatesToBeApplied();
+        DFSTestUtil.waitForQuotaUpdatesToBeApplied();
         assertFalse(dfs.mkdirs(childDir1));
       } catch (QuotaExceededException e) {
         hasException = true;
@@ -177,13 +179,13 @@ public class TestQuota {
 
       // 8: clear quota /test
       runCommand(admin, new String[]{"-clrQuota", parent.toString()}, false);
-      c = dfs.getContentSummary(parent);
+      c = DFSTestUtil.getContentSummary(dfs,parent);
       assertEquals(c.getQuota(), -1);
       assertEquals(c.getSpaceQuota(), spaceQuota);
 
       // 9: clear quota /test/data0
       runCommand(admin, new String[]{"-clrQuota", childDir0.toString()}, false);
-      c = dfs.getContentSummary(childDir0);
+      c = DFSTestUtil.getContentSummary(dfs,childDir0);
       assertEquals(c.getQuota(), -1);
 
       // 10: create a file /test/datafile1
@@ -194,7 +196,7 @@ public class TestQuota {
       try {
         // HOP - Write in single blocks and wait to trigger exception
         fout.write(new byte[fileLen / 2]);
-        waitForQuotaUpdatesToBeApplied();
+        DFSTestUtil.waitForQuotaUpdatesToBeApplied();
         fout.write(new byte[fileLen / 2]);
         fout.close();
       } catch (QuotaExceededException e) {
@@ -208,7 +210,7 @@ public class TestQuota {
 
       // 9.s: clear diskspace quota
       runCommand(admin, false, "-clrSpaceQuota", parent.toString());
-      c = dfs.getContentSummary(parent);
+      c = DFSTestUtil.getContentSummary(dfs,parent);
       assertEquals(c.getQuota(), -1);
       assertEquals(c.getSpaceQuota(), -1);
 
@@ -237,7 +239,7 @@ public class TestQuota {
         hasException = true;
       }
       assertTrue(hasException);
-      c = dfs.getContentSummary(childDir0);
+      c = DFSTestUtil.getContentSummary(dfs,childDir0);
       assertEquals(c.getDirectoryCount() + c.getFileCount(), 1);
       assertEquals(c.getQuota(), 1);
       
@@ -404,45 +406,45 @@ public class TestQuota {
       assertTrue(dfs.mkdirs(new Path("/nqdir0/qdir1/qdir20/nqdir30")));
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 2: set the quota of /nqdir0/qdir1 to be 6
       final Path quotaDir1 = new Path("/nqdir0/qdir1");
       dfs.setQuota(quotaDir1, 6, HdfsConstants.QUOTA_DONT_SET);
-      ContentSummary c = dfs.getContentSummary(quotaDir1);
+      ContentSummary c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getDirectoryCount(), 3);
       assertEquals(c.getQuota(), 6);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 3: set the quota of /nqdir0/qdir1/qdir20 to be 7
       final Path quotaDir2 = new Path("/nqdir0/qdir1/qdir20");
       dfs.setQuota(quotaDir2, 7, HdfsConstants.QUOTA_DONT_SET);
-      c = dfs.getContentSummary(quotaDir2);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2);
       assertEquals(c.getDirectoryCount(), 2);
       assertEquals(c.getQuota(), 7);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 4: Create directory /nqdir0/qdir1/qdir21 and set its quota to 2
       final Path quotaDir3 = new Path("/nqdir0/qdir1/qdir21");
       assertTrue(dfs.mkdirs(quotaDir3));
       dfs.setQuota(quotaDir3, 2, HdfsConstants.QUOTA_DONT_SET);
-      c = dfs.getContentSummary(quotaDir3);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir3);
       assertEquals(c.getDirectoryCount(), 1);
       assertEquals(c.getQuota(), 2);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 5: Create directory /nqdir0/qdir1/qdir21/nqdir32
       Path tempPath = new Path(quotaDir3, "nqdir32");
       assertTrue(dfs.mkdirs(tempPath));
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir3);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir3);
       assertEquals(c.getDirectoryCount(), 2);
       assertEquals(c.getQuota(), 2);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 6: Create directory /nqdir0/qdir1/qdir21/nqdir33
       tempPath = new Path(quotaDir3, "nqdir33");
       boolean hasException = false;
@@ -452,26 +454,26 @@ public class TestQuota {
         hasException = true;
       }
       assertTrue(hasException);
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir3);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir3);
       assertEquals(c.getDirectoryCount(), 2);
       assertEquals(c.getQuota(), 2);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 7: Create directory /nqdir0/qdir1/qdir20/nqdir31
       tempPath = new Path(quotaDir2, "nqdir31");
       assertTrue(dfs.mkdirs(tempPath));
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir2);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2);
       assertEquals(c.getDirectoryCount(), 3);
       assertEquals(c.getQuota(), 7);
-      c = dfs.getContentSummary(quotaDir1);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getDirectoryCount(), 6);
       assertEquals(c.getQuota(), 6);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 8: Create directory /nqdir0/qdir1/qdir20/nqdir33
       tempPath = new Path(quotaDir2, "nqdir33");
       hasException = false;
@@ -483,21 +485,21 @@ public class TestQuota {
       assertTrue(hasException);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 9: Move /nqdir0/qdir1/qdir21/nqdir32 /nqdir0/qdir1/qdir20/nqdir30
       tempPath = new Path(quotaDir2, "nqdir30");
       dfs.rename(new Path(quotaDir3, "nqdir32"), tempPath);
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       assertFalse("Not all sub Tree locks cleared",TestSubtreeLock.subTreeLocksExists());
-      c = dfs.getContentSummary(quotaDir2);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2);
       assertEquals(c.getDirectoryCount(), 4);
       assertEquals(c.getQuota(), 7);
-      c = dfs.getContentSummary(quotaDir1);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getDirectoryCount(), 6);
       assertEquals(c.getQuota(), 6);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 10: Move /nqdir0/qdir1/qdir20/nqdir30 to /nqdir0/qdir1/qdir21
       hasException = false;
       try {
@@ -510,7 +512,7 @@ public class TestQuota {
       assertFalse(dfs.exists(new Path(quotaDir3, "nqdir30")));
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 10.a: Rename /nqdir0/qdir1/qdir20/nqdir30 to /nqdir0/qdir1/qdir21/nqdir32
       hasException = false;
       try {
@@ -523,24 +525,24 @@ public class TestQuota {
       assertFalse(dfs.exists(new Path(quotaDir3, "nqdir32")));
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 11: Move /nqdir0/qdir1/qdir20/nqdir30 to /nqdir0
       assertTrue(dfs.rename(tempPath, new Path("/nqdir0")));
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir2);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2);
       assertEquals(c.getDirectoryCount(), 2);
       assertEquals(c.getQuota(), 7);
-      c = dfs.getContentSummary(quotaDir1);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getDirectoryCount(), 4);
       assertEquals(c.getQuota(), 6);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 12: Create directory /nqdir0/nqdir30/nqdir33
       assertTrue(dfs.mkdirs(new Path("/nqdir0/nqdir30/nqdir33")));
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 13: Move /nqdir0/nqdir30 /nqdir0/qdir1/qdir20/qdir30
       hasException = false;
       try {
@@ -551,43 +553,43 @@ public class TestQuota {
       assertTrue(hasException);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 14: Move /nqdir0/qdir1/qdir21 /nqdir0/qdir1/qdir20
       assertTrue(dfs.rename(quotaDir3, quotaDir2));
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir1);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getDirectoryCount(), 4);
       assertEquals(c.getQuota(), 6);
-      c = dfs.getContentSummary(quotaDir2);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2);
       assertEquals(c.getDirectoryCount(), 3);
       assertEquals(c.getQuota(), 7);
       tempPath = new Path(quotaDir2, "qdir21");
-      c = dfs.getContentSummary(tempPath);
+      c = DFSTestUtil.getContentSummary(dfs,tempPath);
       assertEquals(c.getDirectoryCount(), 1);
       assertEquals(c.getQuota(), 2);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 15: Delete /nqdir0/qdir1/qdir20/qdir21
       dfs.delete(tempPath, true);
 
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir2);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2);
       assertEquals(c.getDirectoryCount(), 2);
       assertEquals(c.getQuota(), 7);
-      c = dfs.getContentSummary(quotaDir1);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getDirectoryCount(), 3);
       assertEquals(c.getQuota(), 6);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 16: Move /nqdir0/qdir30 /nqdir0/qdir1/qdir20
       assertTrue(dfs.rename(new Path("/nqdir0/nqdir30"), quotaDir2));
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir2);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2);
       assertEquals(c.getDirectoryCount(), 5);
       assertEquals(c.getQuota(), 7);
-      c = dfs.getContentSummary(quotaDir1);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getDirectoryCount(), 6);
       assertEquals(c.getQuota(), 6);
     } finally {
@@ -628,44 +630,44 @@ public class TestQuota {
       // set the quota of /nqdir0/qdir1 to 4 * fileSpace
       final Path quotaDir1 = new Path("/nqdir0/qdir1");
       dfs.setQuota(quotaDir1, HdfsConstants.QUOTA_DONT_SET, 4 * fileSpace);
-      ContentSummary c = dfs.getContentSummary(quotaDir1);
+      ContentSummary c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getSpaceQuota(), 4 * fileSpace);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // set the quota of /nqdir0/qdir1/qdir20 to 6 * fileSpace
       final Path quotaDir20 = new Path("/nqdir0/qdir1/qdir20");
       dfs.setQuota(quotaDir20, HdfsConstants.QUOTA_DONT_SET, 6 * fileSpace);
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir20);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir20);
       assertEquals(c.getSpaceQuota(), 6 * fileSpace);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // Create /nqdir0/qdir1/qdir21 and set its space quota to 2 * fileSpace
       final Path quotaDir21 = new Path("/nqdir0/qdir1/qdir21");
       assertTrue(dfs.mkdirs(quotaDir21));
       dfs.setQuota(quotaDir21, HdfsConstants.QUOTA_DONT_SET, 2 * fileSpace);
-      c = dfs.getContentSummary(quotaDir21);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir21);
       assertEquals(c.getSpaceQuota(), 2 * fileSpace);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // 5: Create directory /nqdir0/qdir1/qdir21/nqdir32
       Path tempPath = new Path(quotaDir21, "nqdir32");
       assertTrue(dfs.mkdirs(tempPath));
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // create a file under nqdir32/fileDir
       DFSTestUtil.createFile(dfs, new Path(tempPath, "fileDir/file1"), fileLen,
           replication, 0);
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir21);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir21);
       assertEquals(c.getSpaceConsumed(), fileSpace);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       FSDataOutputStream fout =
           dfs.create(new Path(quotaDir21, "nqdir33/file2"), replication);
       boolean hasException = false;
@@ -673,7 +675,7 @@ public class TestQuota {
         // HOP - Write in single blocks and wait to trigger exception
         for (int i = 0; i < 2 * fileLen; i += BLOCK_SIZE) {
           fout.write(new byte[BLOCK_SIZE]);
-          waitForQuotaUpdatesToBeApplied();
+          DFSTestUtil.waitForQuotaUpdatesToBeApplied();
         }
         fout.close();
       } catch (QuotaExceededException e) {
@@ -684,48 +686,48 @@ public class TestQuota {
 
       // delete nqdir33
       assertTrue(dfs.delete(new Path(quotaDir21, "nqdir33"), true));
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir21);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir21);
       assertEquals(c.getSpaceConsumed(), fileSpace);
       assertEquals(c.getSpaceQuota(), 2 * fileSpace);
 
       // Verify space before the move:
-      c = dfs.getContentSummary(quotaDir20);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir20);
       assertEquals(c.getSpaceConsumed(), 0);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // Move /nqdir0/qdir1/qdir21/nqdir32 /nqdir0/qdir1/qdir20/nqdir30
       Path dstPath = new Path(quotaDir20, "nqdir30");
       Path srcPath = new Path(quotaDir21, "nqdir32");
       assertTrue(dfs.rename(srcPath, dstPath));
       
       // verify space after the move
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir20);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir20);
       assertEquals(c.getSpaceConsumed(), fileSpace);
       // verify space for its parent
-      c = dfs.getContentSummary(quotaDir1);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getSpaceConsumed(), fileSpace);
       // verify space for source for the move
-      c = dfs.getContentSummary(quotaDir21);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir21);
       assertEquals(c.getSpaceConsumed(), 0);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       final Path file2 = new Path(dstPath, "fileDir/file2");
       int file2Len = 2 * fileLen;
       // create a larger file under /nqdir0/qdir1/qdir20/nqdir30
       DFSTestUtil.createFile(dfs, file2, file2Len, replication, 0);
 
-      waitForQuotaUpdatesToBeApplied();
-      c = dfs.getContentSummary(quotaDir20);
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir20);
       assertEquals(c.getSpaceConsumed(), 3 * fileSpace);
-      c = dfs.getContentSummary(quotaDir21);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir21);
       assertEquals(c.getSpaceConsumed(), 0);
 
       // HOP - Wait for asynchronous quota updates to be applied
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // Reverse: Move /nqdir0/qdir1/qdir20/nqdir30 to /nqdir0/qdir1/qdir21/
       hasException = false;
       try {
@@ -736,34 +738,34 @@ public class TestQuota {
       assertTrue(hasException);
       // make sure no intermediate directories left by failed rename
 
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       assertFalse(dfs.exists(srcPath));
       // directory should exist
       assertTrue(dfs.exists(dstPath));
       // verify space after the failed move
-      c = dfs.getContentSummary(quotaDir20);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir20);
       assertEquals(c.getSpaceConsumed(), 3 * fileSpace);
-      c = dfs.getContentSummary(quotaDir21);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir21);
       assertEquals(c.getSpaceConsumed(), 0);
 
       // Test Append :
       Thread.sleep(10000);
       // verify space quota
-      c = dfs.getContentSummary(quotaDir1);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir1);
       assertEquals(c.getSpaceQuota(), 4 * fileSpace);
       // verify space before append;
-      c = dfs.getContentSummary(dstPath);
+      c = DFSTestUtil.getContentSummary(dfs,dstPath);
       assertEquals(c.getSpaceConsumed(), 3 * fileSpace);
       Thread.sleep(10000);
       OutputStream out = dfs.append(file2);
       // appending 1 fileLen should succeed
       out.write(new byte[fileLen]);
       out.close();
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       file2Len += fileLen; // after append
 
       // verify space after append;
-      c = dfs.getContentSummary(dstPath);
+      c = DFSTestUtil.getContentSummary(dfs,dstPath);
       assertEquals(c.getSpaceConsumed(), 4 * fileSpace);
       // now increase the quota for quotaDir1
       dfs.setQuota(quotaDir1, HdfsConstants.QUOTA_DONT_SET, 5 * fileSpace);
@@ -791,13 +793,13 @@ public class TestQuota {
         // HOP - Write in single blocks and wait to trigger exception
         for (int i = 0; i < 2 ; i ++) {
           out.write(new byte[BLOCK_SIZE]);
-          waitForQuotaUpdatesToBeApplied();
+          DFSTestUtil.waitForQuotaUpdatesToBeApplied();
         }
         out.close();
         
         out = dfs.append(file2);
         out.write(new byte[BLOCK_SIZE]);
-        waitForQuotaUpdatesToBeApplied();
+        DFSTestUtil.waitForQuotaUpdatesToBeApplied();
         out.close();
       } catch (QuotaExceededException e) {
         hasException = true;
@@ -807,7 +809,7 @@ public class TestQuota {
       file2Len += fileLen; // after partial append
 
       // verify space after partial append
-      c = dfs.getContentSummary(dstPath);
+      c = DFSTestUtil.getContentSummary(dfs,dstPath);
       assertEquals(c.getSpaceConsumed(), 5 * fileSpace);
 
       // Test set replication :
@@ -816,7 +818,7 @@ public class TestQuota {
       dfs.setReplication(file2, (short) (replication - 1));
       
       // verify that space is reduced by file2Len
-      c = dfs.getContentSummary(dstPath);
+      c = DFSTestUtil.getContentSummary(dfs,dstPath);
       assertEquals(c.getSpaceConsumed(), 5 * fileSpace - file2Len);
       // now try to increase the replication and and expect an error.
       hasException = false;
@@ -828,7 +830,7 @@ public class TestQuota {
 
       assertTrue(hasException);
       // verify space consumed remains unchanged.
-      c = dfs.getContentSummary(dstPath);
+      c = DFSTestUtil.getContentSummary(dfs,dstPath);
       assertEquals(c.getSpaceConsumed(), 5 * fileSpace - file2Len);
       
       // now increase the quota for quotaDir1 and quotaDir20
@@ -837,7 +839,7 @@ public class TestQuota {
       // then increasing replication should be ok.
       dfs.setReplication(file2, (short) (replication + 1));
       // verify increase in space
-      c = dfs.getContentSummary(dstPath);
+      c = DFSTestUtil.getContentSummary(dfs,dstPath);
       assertEquals(c.getSpaceConsumed(), 5 * fileSpace + file2Len);
 
       // Test HDFS-2053 :
@@ -862,28 +864,28 @@ public class TestQuota {
       // Set space quota for subdirectory C
       dfs.setQuota(quotaDir2053_C, HdfsConstants.QUOTA_DONT_SET,
           (sizeFactorC + 1) * fileSpace);
-      c = dfs.getContentSummary(quotaDir2053_C);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2053_C);
       assertEquals(c.getSpaceQuota(), (sizeFactorC + 1) * fileSpace);
 
       // Create a file under subdirectory A
       DFSTestUtil.createFile(dfs, new Path(quotaDir2053_A, "fileA"),
           sizeFactorA * fileLen, replication, 0);
-      c = dfs.getContentSummary(quotaDir2053_A);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2053_A);
       assertEquals(c.getSpaceConsumed(), sizeFactorA * fileSpace);
 
       // Create a file under subdirectory B
       DFSTestUtil.createFile(dfs, new Path(quotaDir2053_B, "fileB"),
           sizeFactorB * fileLen, replication, 0);
-      c = dfs.getContentSummary(quotaDir2053_B);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2053_B);
       assertEquals(c.getSpaceConsumed(), sizeFactorB * fileSpace);
       // Create a file under subdirectory C (which has a space quota)
       DFSTestUtil.createFile(dfs, new Path(quotaDir2053_C, "fileC"),
           sizeFactorC * fileLen, replication, 0);
-      c = dfs.getContentSummary(quotaDir2053_C);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2053_C);
       assertEquals(c.getSpaceConsumed(), sizeFactorC * fileSpace);
 
       // Check space consumed for /hdfs-2053
-      c = dfs.getContentSummary(quotaDir2053);
+      c = DFSTestUtil.getContentSummary(dfs,quotaDir2053);
       assertEquals(c.getSpaceConsumed(),
           (sizeFactorA + sizeFactorB + sizeFactorC) * fileSpace);
 
@@ -944,7 +946,7 @@ public class TestQuota {
       // Creating a file should use half the quota
       DFSTestUtil.createFile(fs, file1, FILE_SIZE, (short) 3, 1L);
       DFSTestUtil.waitReplication(fs, file1, (short) 3);
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       c = fs.getContentSummary(dir);
       checkContentSummary(c, webhdfs.getContentSummary(dir));
       assertEquals("Quota is half consumed", QUOTA_SIZE / 2,
@@ -959,7 +961,7 @@ public class TestQuota {
       FSDataOutputStream out = fs.create(file2, (short) 3);
       try {
         out.write(new byte[FILE_SIZE]);
-        waitForQuotaUpdatesToBeApplied();
+        DFSTestUtil.waitForQuotaUpdatesToBeApplied();
         out.close();
       } catch (QuotaExceededException e) {
         exceededQuota = true;
@@ -1039,7 +1041,7 @@ public class TestQuota {
       FSDataOutputStream out = fs.create(file, (short) 3);
       try {
         out.write(new byte[FILE_SIZE]);
-        waitForQuotaUpdatesToBeApplied();
+        DFSTestUtil.waitForQuotaUpdatesToBeApplied();
         out.close();
         DFSTestUtil.waitReplication(fs, file, (short) 3);
       } catch (QuotaExceededException e) {
@@ -1077,7 +1079,7 @@ public class TestQuota {
       dfs.create(testFile2).close();
       dfs.create(testFile3).close();
 
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // This time should be too late to violate the quota further
       Path testFile4 = new Path(testFolder, "test4");
       try {
@@ -1089,7 +1091,7 @@ public class TestQuota {
 
       dfs.delete(testFile1, true);
       dfs.delete(testFile2, true);
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       try {
         dfs.create(testFile4).close();
         fail();
@@ -1098,13 +1100,13 @@ public class TestQuota {
       }
 
       dfs.delete(testFile3, true);
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       FSDataOutputStream out = dfs.create(testFile4);
       // Should be fast enough to violate the quota
       for (int i = 0; i < 3; i++) {
         out.write(new byte[BLOCK_SIZE]);
       }
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // This time should be too late to violate the quota further
       try {
         out.write(new byte[BLOCK_SIZE]);
@@ -1116,7 +1118,7 @@ public class TestQuota {
       IOUtils.closeStream(out);
 
       dfs.delete(testFile4, true);
-      waitForQuotaUpdatesToBeApplied();
+      DFSTestUtil.waitForQuotaUpdatesToBeApplied();
 
       out = dfs.create(testFile4);
       // Should be fast enough to violate the quota
@@ -1176,33 +1178,4 @@ public class TestQuota {
     }
   }
 
-  static void waitForQuotaUpdatesToBeApplied() throws InterruptedException, IOException {
-//      Thread.sleep(5000);
-
-    final long MAX_TIME = 15000;
-    final long START_TIME = System.currentTimeMillis();
-    LightWeightRequestHandler quotaApplicationChecker=
-            new LightWeightRequestHandler(HDFSOperationType.TEST) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        while(true){
-          if((System.currentTimeMillis() - START_TIME ) > MAX_TIME){
-            throw new StorageException("All quota updates were not applied in givin time. Time "+MAX_TIME+"ms");
-          }
-          try {
-            Thread.sleep(500);
-          }catch(InterruptedException e){}
-
-          QuotaUpdateDataAccess da = (QuotaUpdateDataAccess)HdfsStorageFactory.getDataAccess(QuotaUpdateDataAccess.class);
-          int count = da.getCount();
-
-          if(count==0){
-            return null;
-          }
-          LOG.debug("Quota updates are not yet fully applied. Remaining "+count);
-        }
-      }
-    };
-    quotaApplicationChecker.handle();
-  }
 }

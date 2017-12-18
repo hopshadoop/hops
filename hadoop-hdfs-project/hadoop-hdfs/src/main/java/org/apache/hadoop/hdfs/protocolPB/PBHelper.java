@@ -44,6 +44,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
+import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Datano
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFsStatsResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SafeModeActionProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.FsActionProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.LastUpdatedContentSummaryProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ActiveNamenodeListResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BalancerBandwidthCommandProto;
@@ -1592,5 +1594,26 @@ public class PBHelper {
 
   public static FsAction convert(FsActionProto v) {
     return castEnum(v, FSACTION_VALUES);
+  }
+
+  public static LastUpdatedContentSummary convert
+      (LastUpdatedContentSummaryProto cs) {
+    if (cs == null) {
+      return null;
+    }
+    return new LastUpdatedContentSummary(cs.getFileandDirCount(), cs
+        .getSpaceConsumed(), cs.getNsQuota(), cs.getDsQuota());
+  }
+
+  public static LastUpdatedContentSummaryProto convert(LastUpdatedContentSummary cs) {
+    if (cs == null) {
+      return null;
+    }
+    return LastUpdatedContentSummaryProto.newBuilder().
+        setFileandDirCount(cs.getFileAndDirCount()).
+        setNsQuota(cs.getNsQuota()).
+        setSpaceConsumed(cs.getSpaceConsumed()).
+        setDsQuota(cs.getDsQuota()).
+        build();
   }
 }

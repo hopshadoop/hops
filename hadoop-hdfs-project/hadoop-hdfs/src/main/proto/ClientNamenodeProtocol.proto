@@ -364,6 +364,21 @@ message GetContentSummaryResponseProto {
   required ContentSummaryProto summary = 1;
 }
 
+message GetLastUpdatedContentSummaryRequestProto {
+  required string path = 1;
+}
+
+message GetLastUpdatedContentSummaryResponseProto {
+  required LastUpdatedContentSummaryProto summary = 1;
+}
+
+message LastUpdatedContentSummaryProto {
+  required uint64 fileandDirCount = 1;
+  required uint64 nsQuota = 2;
+  required uint64 spaceConsumed = 3;
+  required uint64 dsQuota = 4;
+}
+
 message SetQuotaRequestProto {
   required string path = 1;
   required uint64 namespaceQuota = 2;
@@ -599,4 +614,7 @@ service ClientNamenodeProtocol {
   rpc changeConf (ChangeConfProto) returns (ChangeConfResponseProto);
   rpc flushCache (FlushUsersCacheRequestProto) returns (FlushUsersCacheResponseProto);
   rpc checkAccess(CheckAccessRequestProto) returns(CheckAccessResponseProto);
+  rpc getLastUpdatedContentSummary (GetLastUpdatedContentSummaryRequestProto)
+  returns (GetLastUpdatedContentSummaryResponseProto);
+
 }
