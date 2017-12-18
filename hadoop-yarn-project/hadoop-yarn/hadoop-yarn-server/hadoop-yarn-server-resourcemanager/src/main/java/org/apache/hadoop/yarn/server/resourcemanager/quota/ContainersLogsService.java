@@ -433,7 +433,7 @@ public class ContainersLogsService extends CompositeService {
     for (ContainerLog log : activeContainers.values()) {
       if ((tick - log.getStart()) % checkpointInterval == 0) {
         log.setStop(tickCounter.getValue());
-        if ((tick - log.getStart()) % multiplicatorPeirod == 0) {
+        if (((tick - log.getStart()) / checkpointInterval) % multiplicatorPeirod == 0) {
           float currentMultiplicator;
           if (log.getGpuUsed() != 0) {
             currentMultiplicator = currentMultiplicators.get(PriceMultiplicator.MultiplicatorType.GPU);

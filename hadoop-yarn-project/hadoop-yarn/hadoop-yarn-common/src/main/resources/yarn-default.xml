@@ -222,6 +222,12 @@
   </property>
 
   <property>
+    <description>Number of threads used to handle RM group membership interface.</description>
+    <name>yarn.resourcemanager.group_membership.client.thread-count</name>
+    <value>1</value>
+  </property>
+  
+  <property>
     <description>How often to try connecting to the
     ResourceManager.</description>
     <name>yarn.resourcemanager.connect.retry-interval.ms</name>
