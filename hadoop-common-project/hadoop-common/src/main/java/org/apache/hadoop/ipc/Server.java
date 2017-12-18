@@ -1585,7 +1585,7 @@ public abstract class Server {
     public Connection(SocketChannel channel, long lastContact, RpcSSLEngine rpcSSLEngine) {
       this.rpcSSLEngine = rpcSSLEngine;
       if (rpcSSLEngine != null) {
-        this.sslUnwrappedBuffer = ByteBuffer.allocate(51200);
+        this.sslUnwrappedBuffer = ByteBuffer.allocate(10 * 1024);
       }
       this.channel = channel;
       this.lastContact = lastContact;
@@ -1612,6 +1612,10 @@ public abstract class Server {
       }
     }
 
+    public void setSslUnwrappedBuffer(ByteBuffer sslUnwrappedBuffer) {
+      this.sslUnwrappedBuffer = sslUnwrappedBuffer;
+    }
+    
     public boolean doHandshake() throws IOException {
       return rpcSSLEngine.doHandshake();
     }
@@ -1927,7 +1931,7 @@ public abstract class Server {
       while (!shouldClose()) { // stop if a fatal response has been sent.
         // Decrypt incoming data
         if (isSSLEnabled) {
-          int bytesRead = rpcSSLEngine.read(channel, sslUnwrappedBuffer);
+          int bytesRead = rpcSSLEngine.read(channel, sslUnwrappedBuffer, this);
           if (bytesRead < 0) {
             return bytesRead;
           } else if (bytesRead > 0) {
@@ -3451,7 +3455,7 @@ public abstract class Server {
       }
       Connection connection;
       if (sslEngine != null) {
-        connection = new Connection(channel, Time.now(), new ServerRpcSSLEngineImpl(channel, sslEngine));
+        connection = new Connection(channel, Time.now(), new ServerRpcSSLEngineImpl(channel, sslEngine, maxDataLength));
       } else {
         connection = new Connection(channel, Time.now());
       }
