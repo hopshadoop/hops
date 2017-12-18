@@ -214,7 +214,7 @@ public abstract class RpcSSLEngineAbstr implements RpcSSLEngine {
     public abstract int write(WritableByteChannel channel, ByteBuffer buffer)
             throws IOException;
 
-    public abstract int read(ReadableByteChannel channel, ByteBuffer buffer)
+    public abstract int read(ReadableByteChannel channel, ByteBuffer buffer, Server.Connection connection)
         throws IOException;
 
     public static SSLContext initializeSSLContext(Configuration conf) throws IOException {

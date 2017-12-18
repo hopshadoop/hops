@@ -23,6 +23,7 @@ import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import java.io.IOException;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
@@ -35,9 +36,11 @@ public class ServerRpcSSLEngineImpl extends RpcSSLEngineAbstr {
     private final int MB = 1024 * KB;
     
     private final int MAX_BUFFER_SIZE = 5 * MB;
+    private final int maxUnWrappedDataLength;
     
-    public ServerRpcSSLEngineImpl(SocketChannel socketChannel, SSLEngine sslEngine) {
+    public ServerRpcSSLEngineImpl(SocketChannel socketChannel, SSLEngine sslEngine, int maxUnwrappedDataLength) {
         super(socketChannel, sslEngine);
+        this.maxUnWrappedDataLength = maxUnwrappedDataLength;
     }
 
     @Override
@@ -82,7 +85,7 @@ public class ServerRpcSSLEngineImpl extends RpcSSLEngineAbstr {
     }
     
     @Override
-    public int read(ReadableByteChannel channel, ByteBuffer buffer)
+    public int read(ReadableByteChannel channel, ByteBuffer buffer, Server.Connection connection)
         throws IOException {
         int netRead = channel.read(clientNetBuffer);
         if (netRead == -1) {
@@ -99,8 +102,21 @@ public class ServerRpcSSLEngineImpl extends RpcSSLEngineAbstr {
             if (unwrapResult.getStatus().equals(SSLEngineResult.Status.OK)) {
                 read += unwrapResult.bytesProduced();
                 clientAppBuffer.flip();
+                
                 while (clientAppBuffer.hasRemaining()) {
-                    buffer.put(clientAppBuffer.get());
+                    byte currentByte = clientAppBuffer.get();
+                    try {
+                        buffer.put(currentByte);
+                    } catch (BufferOverflowException ex) {
+                        if (buffer.capacity() < maxUnWrappedDataLength) {
+                            buffer = enlargeUnwrappedBuffer(buffer, currentByte);
+                            connection.setSslUnwrappedBuffer(buffer);
+                        } else {
+                            LOG.error("Buffer overflow clientAppBuffer position: " + clientAppBuffer.position() +
+                                " but buffer capacity " + buffer.capacity(), ex);
+                            throw ex;
+                        }
+                    }
                 }
                 clientAppBuffer.compact();
             } else if (unwrapResult.getStatus().equals(SSLEngineResult.Status
@@ -124,10 +140,19 @@ public class ServerRpcSSLEngineImpl extends RpcSSLEngineAbstr {
         
         return read;
     }
-
+    
     public X509Certificate getClientCertificate() throws SSLPeerUnverifiedException {
         // The first certificate is always the peer's own certificate
         // https://docs.oracle.com/javase/8/docs/api/javax/net/ssl/SSLSession.html#getPeerCertificates--
         return (X509Certificate) sslEngine.getSession().getPeerCertificates()[0];
+    }
+    
+    private ByteBuffer enlargeUnwrappedBuffer(ByteBuffer buffer, byte missedByte) {
+        buffer.flip();
+        ByteBuffer newBuffer = ByteBuffer.allocate(Math.min(buffer.capacity() * 2, maxUnWrappedDataLength));
+        newBuffer.put(buffer);
+        newBuffer.put(missedByte);
+        buffer = null;
+        return newBuffer;
     }
 }
