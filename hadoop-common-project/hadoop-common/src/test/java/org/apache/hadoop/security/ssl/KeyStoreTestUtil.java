@@ -476,6 +476,10 @@ public class KeyStoreTestUtil {
         FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY),
         keyPassword);
     }
+    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
+        FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY), "1000");
+    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
+        FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_TIMEUNIT_TPL_KEY), "MILLISECONDS");
     if (trustKS != null) {
       sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
         FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY), trustKS);

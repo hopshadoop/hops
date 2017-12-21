@@ -122,6 +122,8 @@ The mapred user should own the **ssl-server.xml** file and have exclusive read a
 | `ssl.server.keystore.type` | `jks` | Keystore file type |
 | `ssl.server.keystore.location` | NONE | Keystore file location. The mapred user should own this file and have exclusive read access to it. |
 | `ssl.server.keystore.password` | NONE | Keystore file password |
+| `ssl.server.keystore.reload.timeunit` | MILLISECONDS | Keystore reload interval time unit `java.util.concurrent.Timeunit` |
+| `ssl.server.keystore.reload.interval` | 10000 | Keystore reload interval, in TimeUnits defined by `ssl.server.keystore.reload.timeunit` |
 | `ssl.server.truststore.type` | `jks` | Truststore file type |
 | `ssl.server.truststore.location` | NONE | Truststore file location. The mapred user should own this file and have exclusive read access to it. |
 | `ssl.server.truststore.password` | NONE | Truststore file password |
@@ -144,6 +146,14 @@ The mapred user should own the **ssl-server.xml** file and have exclusive read a
   <property>
     <name>ssl.server.keystore.password</name>
     <value>serverfoo</value>
+  </property>
+  <property>
+    <name>ssl.server.keystore.reload.timeunit</name>
+    <value>MILLISECONDS</value>
+  </property>
+  <property>
+    <name>ssl.server.keystore.reload.interval</name>
+    <value>10000</value>
   </property>
 
   <!-- Server Trust Store -->
@@ -175,6 +185,8 @@ The mapred user should own the **ssl-client.xml** file and it should have defaul
 | `ssl.client.keystore.type` | `jks` | Keystore file type |
 | `ssl.client.keystore.location` | NONE | Keystore file location. The mapred user should own this file and it should have default permissions. |
 | `ssl.client.keystore.password` | NONE | Keystore file password |
+| `ssl.client.keystore.reload.timeunit` | MILLISECONDS | Keystore reload interval time unit `java.util.concurrent.Timeunit` |
+| `ssl.client.keystore.reload.interval` | 10000 | Keystore reload interval, in TimeUnits defined by `ssl.server.keystore.reload.timeunit` |
 | `ssl.client.truststore.type` | `jks` | Truststore file type |
 | `ssl.client.truststore.location` | NONE | Truststore file location. The mapred user should own this file and it should have default permissions. |
 | `ssl.client.truststore.password` | NONE | Truststore file password |
@@ -197,6 +209,14 @@ The mapred user should own the **ssl-client.xml** file and it should have defaul
   <property>
     <name>ssl.client.keystore.password</name>
     <value>clientfoo</value>
+  </property>
+  <property>
+    <name>ssl.client.keystore.reload.timeunit</name>
+    <value>MILLISECONDS</value>
+  </property>
+  <property>
+    <name>ssl.client.keystore.reload.interval</name>
+    <value>10000</value>
   </property>
 
   <!-- Client Trust Store -->
