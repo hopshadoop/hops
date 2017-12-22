@@ -761,9 +761,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
       quotaService = new QuotaService();
       addIfService(quotaService);
       rmContext.setQuotaService(quotaService);
-      
-      priceMultiplicatiorService = new PriceMultiplicatiorService(rmContext);
-      addIfService(priceMultiplicatiorService);
+      if(conf.getBoolean(YarnConfiguration.QUOTA_VARIABLE_PRICE_ENABLED,
+            YarnConfiguration.DEFAULT_QUOTA_VARIABLE_PRICE_ENABLED)){
+        priceMultiplicatiorService = new PriceMultiplicatiorService(rmContext);
+        addIfService(priceMultiplicatiorService);
+      }
       
       // creating monitors that handle preemption
       createPolicyMonitors();

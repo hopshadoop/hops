@@ -213,7 +213,7 @@
     <name>yarn.resourcemanager.admin.client.thread-count</name>
     <value>1</value>
   </property>
-
+ 
   <property>
     <description>Maximum time to wait to establish connection to
     ResourceManager.</description>
@@ -2718,7 +2718,15 @@
     <name>yarn.resourcemanager.quota.multiplicator.interval</name>
     <value>1000</value>
   </property>
-    
+
+  <property>
+    <description>
+      Enable or disable the variable pricing system
+    </description>
+    <name>yarn.resourcemanager.quota.variable.price.enabled</name>
+    <value>true</value>
+  </property>
+
   <property>
     <description>
       Number X of monitoring periods for which a quota multiplicator is set.
