@@ -2582,6 +2582,8 @@ public class YarnConfiguration extends Configuration {
   public static float DEFAULT_QUOTA_BASE_PRICE_GPU = 2;
   public static final String QUOTA_BASE_PRICE_GENERAL = QUOTA_BASE_PRICE_PREFIX + "general";
   public static float DEFAULT_QUOTA_BASE_PRICE_GENERAL = 1;
+  public static final String QUOTA_VARIABLE_PRICE_ENABLED = QUOTA_PREFIX + "variable.price.enabled";
+  public static boolean DEFAULT_QUOTA_VARIABLE_PRICE_ENABLED = true;
   public static final String QUOTA_MULTIPLICATOR_THRESHOLD = QUOTA_PREFIX + "multiplicator.threshold.";
   public static final String QUOTA_MULTIPLICATOR_THRESHOLD_GENERAL = QUOTA_MULTIPLICATOR_THRESHOLD + "general";
   public static float DEFAULT_QUOTA_MULTIPLICATOR_THRESHOLD_GENERAL = new Float(0.2);
