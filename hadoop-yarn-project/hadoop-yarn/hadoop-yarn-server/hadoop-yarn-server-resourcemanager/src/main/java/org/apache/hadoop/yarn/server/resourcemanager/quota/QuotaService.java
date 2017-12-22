@@ -273,7 +273,8 @@ public class QuotaService extends AbstractService {
                   projectName, user, containerLog.getContainerid(), charge);
           //** ProjectDailyCost charging**
           chargeProjectDailyCost(chargedProjectsDailyCost, projectName,
-                  user, curentDay, charge);
+                  user, curentDay, charge, 
+                  containerId.getApplicationAttemptId().getApplicationId());
 
         } else {
           //The container has finished running
@@ -295,7 +296,7 @@ public class QuotaService extends AbstractService {
 
           //** ProjectDailyCost charging**
           chargeProjectDailyCost(chargedProjectsDailyCost, projectName,
-                  user, curentDay, charge);
+                  user, curentDay, charge, containerId.getApplicationAttemptId().getApplicationId());
         }
       } else {
         if (checkpoint == containerLog.getStart() && 
@@ -368,7 +369,7 @@ public class QuotaService extends AbstractService {
 
   private void chargeProjectDailyCost(
           Map<ProjectDailyId, ProjectDailyCost> chargedProjectsDailyCost,
-          String projectid, String user, long day, float charge) {
+          String projectid, String user, long day, float charge, ApplicationId appId) {
 
     LOG.debug("Quota: project " + projectid + " user " + user + " has used "
             + charge + " credits, on day: " + day);
@@ -381,11 +382,11 @@ public class QuotaService extends AbstractService {
     ProjectDailyCost projectDailyCost = projectsDailyCostCache.get(key);
 
     if (projectDailyCost == null) {
-      projectDailyCost = new ProjectDailyCost(projectid, user, day, 0);
+      projectDailyCost = new ProjectDailyCost(projectid, user, day, 0, appId.toString());
       projectsDailyCostCache.put(key, projectDailyCost);
     }
 
-    projectDailyCost.incrementCharge(charge);
+    projectDailyCost.incrementCharge(charge, appId.toString());
 
     chargedProjectsDailyCost.put(key, projectDailyCost);
 
@@ -414,6 +415,7 @@ public class QuotaService extends AbstractService {
 
     final long day = TimeUnit.DAYS.convert(System.currentTimeMillis(),
             TimeUnit.MILLISECONDS);
+    cashDay = day;
     LightWeightRequestHandler recoveryHandler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
