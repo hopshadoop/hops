@@ -66,6 +66,7 @@ public class RMAppsBlock extends AppsBlock {
           .th(".runningcontainer", "Running Containers")
           .th(".allocatedCpu", "Allocated CPU VCores")
           .th(".allocatedMemory", "Allocated Memory MB")
+          .th(".allocatedGpu", "Allocated GPU")
           .th(".queuePercentage", "% of Queue")
           .th(".clusterPercentage", "% of Cluster")
           .th(".progress", "Progress")
@@ -145,6 +146,9 @@ public class RMAppsBlock extends AppsBlock {
         .append("\",\"")
         .append(app.getAllocatedMemoryMB() == -1 ? "N/A" :
             String.valueOf(app.getAllocatedMemoryMB()))
+        .append("\",\"")
+        .append(app.getAllocatedGpu() == -1 ? "N/A" :
+            String.valueOf(app.getAllocatedGpu()))
         .append("\",\"")
         .append(queuePercent)
         .append("\",\"")
