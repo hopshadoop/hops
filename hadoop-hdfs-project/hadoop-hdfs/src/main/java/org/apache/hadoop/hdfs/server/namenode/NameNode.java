@@ -68,6 +68,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
 import java.util.List;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HTTPS_ENABLE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY;
@@ -1177,11 +1178,18 @@ public class NameNode {
               rpcServer.getServiceRpcAddress().getPort();
     }
 
+    String httpAddress;
+    if (conf.getBoolean(DFSConfigKeys.DFS_HTTPS_ENABLE_KEY, DFS_HTTPS_ENABLE_DEFAULT)) {
+      httpAddress = httpServer.getHttpAddress().getAddress().getHostAddress() + ":" + conf.getInt(DFSConfigKeys
+          .DFS_HTTPS_PORT_KEY, DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT);
+    } else {
+      httpAddress = httpServer.getHttpAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpAddress()
+          .getPort() ;
+    }
+    
     leaderElection =
         new LeaderElection(new HdfsLeDescriptorFactory(), leadercheckInterval,
-            missedHeartBeatThreshold, leIncrement,
-            httpServer.getHttpAddress().getAddress().getHostAddress() + ":" +
-                httpServer.getHttpAddress().getPort(),
+            missedHeartBeatThreshold, leIncrement, httpAddress,
             rpcAddresses);
     leaderElection.start();
 
