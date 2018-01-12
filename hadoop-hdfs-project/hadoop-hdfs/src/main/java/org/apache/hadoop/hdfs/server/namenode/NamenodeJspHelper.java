@@ -169,7 +169,7 @@ class NamenodeJspHelper {
         "</td></tr>\n <tr><td class='col1'>Java Runtime Version :</td><td>" +javaVendor+" "+javaVersion+"</td></tr>"+
         "</td></tr>\n  <tr><td class='col1'>" + nn.getActiveNameNodes().size() +
         " NN(s):</td><td>" +
-        getAllActiveNNs(nn.getActiveNameNodes()) +
+        getAllActiveNNs(nn.getActiveNameNodes(), nn.conf) +
         "</td></tr>\n"+
         "</table></div>";
   }
@@ -181,7 +181,7 @@ class NamenodeJspHelper {
     }
  }
 
-  private static String getAllActiveNNs(SortedActiveNodeList activeNodeList) {
+  private static String getAllActiveNNs(SortedActiveNodeList activeNodeList, Configuration conf) {
     List<ActiveNode> list = activeNodeList.getActiveNodes();
     String leaderhost = getCanonicalHostName(activeNodeList.getLeader()
         .getRpcServerIpAddress());
@@ -199,8 +199,9 @@ class NamenodeJspHelper {
         sb.append("<br>");
       }
       String address = activeNodes.get(key).getHttpAddress();
-      
-      sb.append("<a href=\"http://").append(address).append("/dfshealth.jsp\">");
+      String scheme = conf.getBoolean(DFSConfigKeys.DFS_HTTPS_ENABLE_KEY, DFSConfigKeys.DFS_HTTPS_ENABLE_DEFAULT)
+          ? "https://" : "http://";
+      sb.append("<a href=\"" + scheme).append(address).append("/dfshealth.jsp\">");
 
       String hostString = key.equals(leaderhost) ? "<b class='col1'>" +
           key + "  (Leader) </b>" : key;
@@ -457,10 +458,16 @@ class NamenodeJspHelper {
     String addr = rpcHost + ":" + rpcAddr.getPort();
 
     String fqdn = InetAddress.getByName(nodeToRedirect).getCanonicalHostName();
+    int httpPort = -1;
+    if (nn.conf.getBoolean(DFSConfigKeys.DFS_HTTPS_ENABLE_KEY, DFSConfigKeys.DFS_HTTPS_ENABLE_DEFAULT)) {
+      httpPort = nn.conf.getInt(DFSConfigKeys.DFS_HTTPS_PORT_KEY, DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT);
+    } else {
+      httpPort = nn.getHttpAddress().getPort();
+    }
     redirectLocation =
         HttpConfig2.getSchemePrefix() + fqdn + ":" + redirectPort +
             "/browseDirectory.jsp?namenodeInfoPort=" +
-            nn.getHttpAddress().getPort() + "&dir=/" +
+            httpPort + "&dir=/" +
             (tokenString == null ? "" :
                 JspHelper.getDelegationTokenUrlParam(tokenString)) +
             JspHelper.getUrlParam(JspHelper.NAMENODE_ADDRESS, addr);
