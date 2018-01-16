@@ -87,6 +87,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.alias.CredentialProvider;
 import org.apache.hadoop.security.alias.CredentialProvider.CredentialEntry;
 import org.apache.hadoop.security.alias.CredentialProviderFactory;
+import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringInterner;
 import org.apache.hadoop.util.StringUtils;
@@ -877,6 +878,32 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
 
   private static final int SUB_START_IDX = 0;
   private static final int SUB_END_IDX = SUB_START_IDX + 1;
+
+  private volatile Set<String> PROXY_USERS = null;
+
+  public Set<String> getProxyUsers() {
+    if (PROXY_USERS == null) {
+      synchronized (this) {
+        if (PROXY_USERS == null) {
+          PROXY_USERS = new HashSet<>();
+
+          // hadoop.proxyuser.[a-zA-Z]+.*
+          String regex = ProxyUsers.CONF_HADOOP_PROXYUSER + "." + "([a-zA-Z0-9_\\-]+).(users|groups|hosts)";
+          regex = regex.replace(".", "\\.");
+          Pattern pattern = Pattern.compile(regex);
+
+          for (Object item : getProps().keySet()){
+            Matcher m = pattern.matcher((String)item);
+            if (m.matches()) {
+              PROXY_USERS.add(m.group(1));
+            }
+          }
+        }
+      }
+    }
+
+    return PROXY_USERS;
+  }
 
   /**
    * This is a manual implementation of the following regex

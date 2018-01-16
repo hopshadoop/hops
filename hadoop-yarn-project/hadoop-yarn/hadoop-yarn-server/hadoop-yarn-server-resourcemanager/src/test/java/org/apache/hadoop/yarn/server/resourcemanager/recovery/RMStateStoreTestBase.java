@@ -159,7 +159,8 @@ public class RMStateStoreTestBase {
     ApplicationSubmissionContext context =
         new ApplicationSubmissionContextPBImpl();
     context.setApplicationId(appId);
-
+    context.setApplicationName("some_application");
+    
     RMApp mockApp = mock(RMApp.class);
     when(mockApp.getApplicationId()).thenReturn(appId);
     when(mockApp.getSubmitTime()).thenReturn(submitTime);

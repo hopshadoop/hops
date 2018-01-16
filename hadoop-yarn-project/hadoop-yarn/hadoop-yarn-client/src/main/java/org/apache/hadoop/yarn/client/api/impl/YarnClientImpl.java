@@ -148,7 +148,6 @@ public class YarnClientImpl extends YarnClient {
   String timelineDTRenewer;
   protected boolean timelineServiceEnabled;
   protected boolean timelineServiceBestEffort;
-  
   private String certificatePassword = null;
 
   private static final String ROOT = "root";
@@ -191,6 +190,7 @@ public class YarnClientImpl extends YarnClient {
     timelineServiceBestEffort = conf.getBoolean(
         YarnConfiguration.TIMELINE_SERVICE_CLIENT_BEST_EFFORT,
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_CLIENT_BEST_EFFORT);
+
     super.serviceInit(conf);
   }
 
@@ -253,11 +253,13 @@ public class YarnClientImpl extends YarnClient {
       throw new ApplicationIdNotProvidedException(
           "ApplicationId is not provided in ApplicationSubmissionContext");
     }
-    
-    if (getConfig().getBoolean(CommonConfigurationKeysPublic
-            .IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      setCryptoMaterial(appContext);
+
+    String username = UserGroupInformation.getCurrentUser().getUserName();
+
+    if (getConfig().getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT) &&
+        !getConfig().getProxyUsers().contains(username)) {
+      setCryptoMaterial(username, appContext);
     }
     
     SubmitApplicationRequest request =
@@ -329,10 +331,8 @@ public class YarnClientImpl extends YarnClient {
     return applicationId;
   }
   
-  private void setCryptoMaterial(ApplicationSubmissionContext appContext)
+  private void setCryptoMaterial(String username, ApplicationSubmissionContext appContext)
       throws IOException {
-    String username = UserGroupInformation.getCurrentUser().getUserName();
-    
     String clientMaterializeDir = getConfig().get(HopsSSLSocketFactory
         .CryptoKeys.CLIENT_MATERIALIZE_DIR.getValue(),
         HopsSSLSocketFactory.CryptoKeys.CLIENT_MATERIALIZE_DIR

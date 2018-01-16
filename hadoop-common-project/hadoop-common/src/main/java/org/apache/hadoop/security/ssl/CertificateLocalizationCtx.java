@@ -17,18 +17,11 @@
  */
 package org.apache.hadoop.security.ssl;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.authorize.ProxyUsers;
-
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
 public class CertificateLocalizationCtx {
   private static volatile CertificateLocalizationCtx instance = null;
   private CertificateLocalization certificateLocalization = null;
-  private Set<String> proxySuperusers = null;
-  
+
   private CertificateLocalizationCtx() {
   }
   
@@ -51,28 +44,5 @@ public class CertificateLocalizationCtx {
   public CertificateLocalization getCertificateLocalization() {
     return certificateLocalization;
   }
-  
-  public synchronized void setProxySuperusers(Configuration conf) {
-    if (this.proxySuperusers == null) {
-      this.proxySuperusers = getSuperusersFromConf(conf);
-    }
-  }
-  
-  public Set<String> getProxySuperusers() {
-    return proxySuperusers;
-  }
-  
-  private Set<String> getSuperusersFromConf(Configuration conf) {
-    Set<String> superusers = new HashSet<>();
-    // Get the superusers
-    for (Map.Entry<String, String> entry : conf) {
-      String propName = entry.getKey();
-      if (propName.startsWith(ProxyUsers.CONF_HADOOP_PROXYUSER)) {
-        String[] tokens = propName.split("\\.");
-        // Configuration property is in the form of hadoop.proxyuser.USERNAME.{hosts,groups}
-        superusers.add(tokens[2]);
-      }
-    }
-    return superusers;
-  }
+
 }

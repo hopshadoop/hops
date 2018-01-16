@@ -426,7 +426,8 @@ public class RMAppImpl implements RMApp, Recoverable {
     this.amReq = amReq;
     
     if (config.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT) &&
+        !config.getProxyUsers().contains(user)) {
       rmContext.getCertificateLocalizationService().
           materializeCertificates(user, kstore, kstorePass, tstore, tstorePass);
     }

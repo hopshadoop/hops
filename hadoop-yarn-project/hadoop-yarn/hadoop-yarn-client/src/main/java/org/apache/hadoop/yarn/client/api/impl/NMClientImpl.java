@@ -213,7 +213,9 @@ public class NMClientImpl extends NMClient {
             .IPC_SERVER_SSL_ENABLED,
             CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
           String user = UserGroupInformation.getCurrentUser().getUserName();
-          setupCryptoMaterial(allRequests, user);
+          if (!getConfig().getProxyUsers().contains(user)) {
+            setupCryptoMaterial(allRequests, user);
+          }
         }
         
         StartContainersResponse response =

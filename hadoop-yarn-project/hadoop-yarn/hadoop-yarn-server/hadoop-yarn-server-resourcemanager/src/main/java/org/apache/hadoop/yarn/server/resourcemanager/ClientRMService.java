@@ -586,9 +586,9 @@ public class ClientRMService extends AbstractService implements
       throw RPCUtil.getRemoteException(ie);
     }
     
-    if (getConfig().getBoolean(CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED, CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+    if (getConfig().getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT) &&
+        !getConfig().getProxyUsers().contains(username)) {
   
       ByteBuffer kstore = submissionContext.getKeyStore();
       String kstorePass = submissionContext.getKeyStorePassword();
@@ -604,6 +604,7 @@ public class ClientRMService extends AbstractService implements
         throw new YarnException("RPC TLS is enabled but either keystore or truststore is null or no password provided");
       }
     }
+
     // Check whether app has already been put into rmContext,
     // If it is, simply return the response
     if (rmContext.getRMApps().get(applicationId) != null) {

@@ -17,12 +17,11 @@ package org.apache.hadoop.hdfs;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.ipc.RpcServerException;
-import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.HopsSSLTestUtils;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.junit.*;
@@ -35,6 +34,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.ipc.RemoteException;
 
@@ -51,21 +51,28 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
 
     @Before
     public void setUp() throws Exception {
-        conf = new HdfsConfiguration();
-        filesToPurge = prepareCryptoMaterial(conf, KeyStoreTestUtil.getClasspathDir(TestDFSSSLServer.class));
-        setCryptoConfig(conf);
+        clusterConf = new HdfsConfiguration();
+
+        filesToPurge = prepareCryptoMaterial(KeyStoreTestUtil.getClasspathDir(TestDFSSSLServer.class),
+            TEST_USER);
+        setCryptoConfig(clusterConf, true);
 
         String testDataPath = System
                 .getProperty(MiniDFSCluster.PROP_TEST_BUILD_DATA, "build/test/data");
         File testDataCluster1 = new File(testDataPath, "dfs_cluster");
         String c1Path = testDataCluster1.getAbsolutePath();
-        conf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, c1Path);
+        clusterConf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, c1Path);
         // Force DatanNode non-RPC communication to use plaintext socket
         // Until we test starting DN in secure-mode
-        conf.set("hadoop.rpc.socket.factory.class.ClientProtocol",
-                "org.apache.hadoop.net.StandardSocketFactory");
+        clusterConf.set("hadoop.rpc.socket.factory.class.ClientProtocol",
+                    "org.apache.hadoop.net.StandardSocketFactory");
 
-        cluster = new MiniDFSCluster.Builder(conf).build();
+        // Disable permissions check for this test, so that TEST_USER can write in /
+        clusterConf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, false);
+        cluster = new MiniDFSCluster.Builder(clusterConf).build();
+
+        clientConf = new HdfsConfiguration(clusterConf);
+        setCryptoConfig(clientConf, false);
         LOG.info("DFS cluster started");
     }
 
@@ -91,6 +98,29 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
 
     @Test
     public void testRpcCall() throws Exception {
+        UserGroupInformation ugi = UserGroupInformation.
+            createProxyUser(TEST_USER, UserGroupInformation.getCurrentUser());
+
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws Exception {
+                if (error_mode.equals(CERT_ERR.NO_CA)) {
+                    rule.expect(SSLException.class);
+                } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
+                    rule.expect(RemoteException.class);
+                }
+                testRpcCallInternal(clientConf);
+                return null;
+            }
+        });
+    }
+
+    @Test
+    public void testRpcCallAsProxyUser() throws Exception {
+        testRpcCallInternal(clusterConf);
+    }
+
+    private void testRpcCallInternal(Configuration conf) throws Exception {
         LOG.debug("testRpcCall");
         dfs1 = DistributedFileSystem.newInstance(conf);
         boolean exists = dfs1.exists(new Path("some_path"));
@@ -100,37 +130,59 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
 
     @Test
     public void testChecksum() throws Exception {
-        LOG.debug("testChecksum");
-        dfs1 = DistributedFileSystem.newInstance(conf);
-        Path file = new Path("some_file");
-        dfs1.create(file);
-        boolean exists = dfs1.exists(file);
-        assertTrue(exists);
-        FileChecksum checksum = dfs1.getFileChecksum(file);
-        LOG.debug("File checksum is: " + checksum.toString());
+        UserGroupInformation ugi = UserGroupInformation.
+            createProxyUser(TEST_USER, UserGroupInformation.getCurrentUser());
+
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws Exception {
+                LOG.debug("testChecksum");
+                if (error_mode.equals(CERT_ERR.NO_CA)) {
+                    rule.expect(SSLException.class);
+                } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
+                    rule.expect(RemoteException.class);
+                }
+                dfs1 = DistributedFileSystem.newInstance(clientConf);
+                Path file = new Path("some_file");
+                dfs1.create(file);
+                boolean exists = dfs1.exists(file);
+                assertTrue(exists);
+                FileChecksum checksum = dfs1.getFileChecksum(file);
+                LOG.debug("File checksum is: " + checksum.toString());
+                return null;
+            }
+        });
     }
 
     @Test
-    public void testRpcCallNonValidCert() throws Exception {
-        dfs1 = DistributedFileSystem.newInstance(conf);
+    public void testRpcCallMultipleThreads() throws Exception {
+        UserGroupInformation ugi = UserGroupInformation.
+            createProxyUser(TEST_USER, UserGroupInformation.getCurrentUser());
 
-        conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(), err_clientKeyStore.toString());
-        conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue(), passwd);
-        conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue(), passwd);
-        conf.set(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue(), err_clientTrustStore.toString());
-        conf.set(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue(), passwd);
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws Exception {
+                if (error_mode.equals(CERT_ERR.NO_CA)) {
+                    rule.expect(SSLException.class);
+                } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
+                    rule.expect(RemoteException.class);
+                }
+                dfs1 = DistributedFileSystem.newInstance(clientConf);
 
-        // Exception will be thrown later. JUnit does not execute the code
-        // after the exception, so make the call in a separate thread
-        invoker = new Thread(new Invoker(dfs1));
-        invoker.start();
+                // Exception will be thrown later. JUnit does not execute the code
+                // after the exception, so make the call in a separate thread
+                invoker = new Thread(new Invoker(dfs1));
+                invoker.start();
 
-        if (error_mode.equals(CERT_ERR.NO_CA)) {
-            rule.expect(SSLException.class);
-        } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
-            rule.expect(RemoteException.class);            
-        }
-        dfs2 = DistributedFileSystem.newInstance(conf);
+                if (error_mode.equals(CERT_ERR.NO_CA)) {
+                    rule.expect(SSLException.class);
+                } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
+                    rule.expect(RemoteException.class);
+                }
+                dfs2 = DistributedFileSystem.newInstance(clientConf);
+                return null;
+            }
+        });
     }
 
     private class Invoker implements Runnable {
