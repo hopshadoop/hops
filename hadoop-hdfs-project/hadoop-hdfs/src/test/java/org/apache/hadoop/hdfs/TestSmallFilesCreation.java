@@ -9,9 +9,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.util.ExitUtil;
+import org.junit.FixMethodOrder;
 import org.junit.Test;
+import org.junit.runners.MethodSorters;
 
+import static org.apache.hadoop.test.MoreAsserts.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -28,6 +33,7 @@ import java.util.Arrays;
  * Created by salman on 2016-03-22.
  */
 
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class TestSmallFilesCreation {
 
   static final String hdfsClinetEmulationForSF = "hdfsClientEmulationForSF";
@@ -1294,4 +1300,82 @@ public class TestSmallFilesCreation {
       }
     }
   }
+
+  /**
+   * The small files should spill on datanodes disks when the database is full.
+   * In the metadata-dal-impl project the default size for the disk data is
+   * set to 2G. This test writes small files of total size of 2.1G. It checks
+   * to make sure that some file have spilled to the datanodes disks.
+   * This test may take long time on slow machines
+   *
+   * NOTE: This test should run in the end. It calls truncate to free up the
+   * extents using the truncate command that changes the schema. Subsequent
+   * tests will fails.
+   * @throws IOException
+   */
+  @Test(timeout = 1800000) // 30 mins
+  public void TestWriteMaxSpillToDN() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+
+      final boolean ENABLE_STORE_SMALL_FILES_IN_DB = true;
+      final int MAX_SMALL_FILE_SIZE= 1024*1024*10;  //~ 200 of these files
+      // will fit in the database
+      conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, ENABLE_STORE_SMALL_FILES_IN_DB);
+      conf.setInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE );
+      conf.setInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 1024*1024*128);
+      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).format(true).build();
+      cluster.waitActive();
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      int count=210;
+      int i = 0;
+      try{
+        for(i = 0; i < count; i++){
+          writeFile(dfs, "/file"+i, MAX_SMALL_FILE_SIZE);
+        }
+      } catch( Exception e){
+        e.printStackTrace();
+        fail("Failed after creating "+i+" files");
+      }
+
+      try{
+        for(i = 0; i < count; i++){
+          verifyFile(dfs, "/file"+i, MAX_SMALL_FILE_SIZE);
+        }
+      } catch( Exception e){
+        e.printStackTrace();
+        fail("Failed to verify files");
+      }
+
+      int dbFiles = countDBFiles();
+      assertTrue("Count of db file should be more than 0 and less than "+count,
+              dbFiles > 0 && dbFiles < count );
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.getMessage());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  @Test
+  /** force format the database to release the extents
+   *
+   */
+  public void TestZLastTestCleanUp() throws IOException {
+      String[] argv = {"-format", "-force"};
+      ExitUtil.disableSystemExit();
+      Configuration conf = new HdfsConfiguration();
+      try {
+        NameNode.createNameNode(argv, conf);
+        fail("createNameNode() did not call System.exit()");
+      } catch (ExitUtil.ExitException e) {
+      }
+    }
 }

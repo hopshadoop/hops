@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.erasure_coding.Codec;
+import io.hops.exception.OutOfDBExtentsException;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -1699,8 +1700,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       LOG.debug("Stuffed Inode:  The file can not be stored  in the database");
       isThisFileStoredInDB = false;
       if (!smallFileDataQueue.isEmpty()) {
-        LOG.debug("Stuffed Inode:  Sync/Flush Called: " + syncOrFlushCalled + " Current File Size: " + currentPacket
-                .getLastByteOffsetBlock() + " Max size of a file in DB: " + dbFileMaxSize);
+//        LOG.debug("Stuffed Inode:  Sync/Flush Called: " + syncOrFlushCalled + " Current File Size: " + currentPacket
+//                .getLastByteOffsetBlock() + " Max size of a file in DB: " + dbFileMaxSize);
 
         for (Packet packet : smallFileDataQueue) {
           dataQueue.addLast(packet);
@@ -2112,28 +2113,44 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     }
 
     try {
-      flushBuffer();       // flush from all upper layers
-
-      if (currentPacket != null) {
-        waitAndQueueCurrentPacket();
-      }
-
-      if (bytesCurBlock != 0) {
-        // send an empty packet to mark the end of the block
-        currentPacket = new Packet(0, 0, bytesCurBlock);
-        currentPacket.lastPacketInBlock = true;
-        currentPacket.syncBlock = shouldSyncBlock;
-      }
-
-      flushInternal();             // flush all data to Datanodes
+      closeInternal();
       // get last block before destroying the streamer
-      ExtendedBlock lastBlock = streamer.getBlock();
-      closeThreads(false);
-      completeFile(lastBlock);
-      dfsClient.endFileLease(src);
-    } finally {
+    } catch (RemoteException e ) {
+      IOException outOfDBExtents =
+              e.unwrapRemoteException(OutOfDBExtentsException.class);
+      if (outOfDBExtents == e) {
+        currentPacket = null;
+        forwardSmallFilesPacketsToDataNodes(); // try to store the file on
+        bytesCurBlock=0;
+        closeInternal();
+      }
+    }
+    finally {
       closed = true;
     }
+  }
+
+  private void closeInternal() throws  IOException{
+    flushBuffer();       // flush from all upper layers
+
+    if (currentPacket != null) {
+      waitAndQueueCurrentPacket();
+    }
+
+//    if(currentPacket == null)
+    if (bytesCurBlock != 0) {
+      // send an empty packet to mark the end of the block
+      currentPacket = new Packet(0, 0, bytesCurBlock);
+      currentPacket.lastPacketInBlock = true;
+      currentPacket.syncBlock = shouldSyncBlock;
+    }
+
+    flushInternal();             // flush all data to Datanodes
+    // get last block before destroying the streamer
+    ExtendedBlock lastBlock = streamer.getBlock();
+    completeFile(lastBlock);
+    closeThreads(false);
+    dfsClient.endFileLease(src);
   }
 
   // should be called holding (this) lock since setTestFilename() may 
@@ -2146,53 +2163,12 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     long localstart = Time.now();
     long localtimeout = 400;
     boolean fileComplete = false;
+
+    backoffBeforeClose(last);
+
     while (!fileComplete) {
-      byte data[] = null;
-      if (canStoreFileInDB()) {
-        if (!this.smallFileDataQueue.isEmpty()) {
-          LOG.debug("Stuffed Inode:  Sending data to the NameNode in comple file operation ");
-          int length = 0;
-          for (Packet packet : smallFileDataQueue) {
-            LOG.debug("Stuffed Inode:  No: " + packet.seqno + " " + packet.dataStart + " " + packet.dataPos + " " + packet
-                    .checksumStart + " " + packet
-                    .checksumPos + " " + packet.buf.length);
-            if (!packet.isHeartbeatPacket()) {
-              length += (packet.dataPos - packet.dataStart);
-            }
-          }
-          LOG.debug("Stuffed Inode:  total data is " + length);
-          data = new byte[length];
-          int index = 0;
-          for (Packet packet : smallFileDataQueue) {
-            System.arraycopy(packet.buf, packet.dataStart, data, index, (packet.dataPos - packet.dataStart));
-            index += (packet.dataPos - packet.dataStart);
-          }
-        }
-      }
 
-      try {
-        if((last != null && last.getNumBytes() > 0)) {
-          // Default delay is 0.
-          // A small delay ensures that the namenodes have processed
-          // the incremental block reports before the complete file request.
-          Thread.sleep(dfsClient.getConf().delayBeforeClose);
-        }
-      } catch (InterruptedException e) {
-      }
-
-      try {
-        fileComplete =
-            dfsClient.complete(src, dfsClient.clientName, last, data);
-      }catch (RemoteException e){
-        IOException ue =
-            e.unwrapRemoteException(NSQuotaExceededException.class,
-                DSQuotaExceededException.class);
-        if (ue != e) {
-          throw ue; // no need to retry these exceptions
-        }else{
-          throw e;
-        }
-      }
+      fileComplete = completeFileInternal(last);
 
       if (!fileComplete) {
         if (!dfsClient.clientRunning || (dfsClient.hdfsTimeout > 0 &&
@@ -2206,7 +2182,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
         }
         try {
           Thread.sleep(localtimeout);
-          localtimeout*=2;
+          localtimeout *= 2;
           if (Time.now() - localstart > 5000) {
             DFSClient.LOG.info("Could not complete " + src + " retrying...");
           }
@@ -2214,6 +2190,68 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
         }
       }
     }
+  }
+
+  private void backoffBeforeClose(ExtendedBlock last){
+      try {
+        if ((last != null && last.getNumBytes() > 0)) {
+          // Default delay is 0.
+          // A small delay ensures that the namenodes have processed
+          // the incremental block reports before the complete file request.
+          Thread.sleep(dfsClient.getConf().delayBeforeClose);
+        }
+      } catch (InterruptedException e) { }
+    }
+
+
+  private boolean completeFileInternal(ExtendedBlock last) throws IOException {
+    boolean fileComplete = false;
+    byte data[] = null;
+    if (canStoreFileInDB()) {
+      data = getSmallFileData();
+    }
+
+    try {
+      fileComplete =
+              dfsClient.complete(src, dfsClient.clientName, last, data);
+    } catch (RemoteException e) {
+      IOException nonRetirableExceptions =
+              e.unwrapRemoteException(NSQuotaExceededException.class,
+                      DSQuotaExceededException.class,
+                      OutOfDBExtentsException.class );
+      if (nonRetirableExceptions != e) {
+        throw nonRetirableExceptions; // no need to retry these exceptions
+      } else {
+        throw e;
+      }
+    }
+    return fileComplete;
+  }
+
+  private byte[] getSmallFileData(){
+    byte data[] = null;
+    if (canStoreFileInDB()) {
+      if (!this.smallFileDataQueue.isEmpty()) {
+        LOG.debug("Stuffed Inode:  Sending data to the NameNode in comple file operation ");
+        int length = 0;
+        for (Packet packet : smallFileDataQueue) {
+          LOG.debug("Stuffed Inode:  No: " + packet.seqno + " " + packet.dataStart + " " + packet.dataPos + " " + packet
+                  .checksumStart + " " + packet
+                  .checksumPos + " " + packet.buf.length);
+          if (!packet.isHeartbeatPacket()) {
+            length += (packet.dataPos - packet.dataStart);
+          }
+        }
+        LOG.debug("Stuffed Inode:  total data is " + length);
+        data = new byte[length];
+        int index = 0;
+        for (Packet packet : smallFileDataQueue) {
+          System.arraycopy(packet.buf, packet.dataStart, data, index, (packet.dataPos - packet.dataStart));
+          index += (packet.dataPos - packet.dataStart);
+        }
+      }
+    }
+    return data;
   }
 
   @VisibleForTesting
