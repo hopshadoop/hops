@@ -130,8 +130,12 @@ public class AMLauncher implements Runnable {
         CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
       String user = rmContext.getRMApps().get(masterContainerID
           .getApplicationAttemptId().getApplicationId()).getUser();
-      setupCryptoMaterial(allRequests, user, masterContainerID
-          .getApplicationAttemptId().getApplicationId().toString());
+      /* If the user is a proxyuser, don't ship the certificates as
+       * the machines' ones will be used */
+      if (!conf.getProxyUsers().contains(user)) {
+        setupCryptoMaterial(allRequests, user, masterContainerID
+            .getApplicationAttemptId().getApplicationId().toString());
+      }
     }
     
     StartContainersResponse response =
@@ -177,7 +181,7 @@ public class AMLauncher implements Runnable {
         containerMgrProxy.stopContainers(stopRequest);
     
     // The application is cleaned-up when completes successfully or killed
-    // If the application failed more times than allowed, the cryptograhic
+    // If the application failed more times than allowed, the cryptographic
     // material is cleaned by RMAppImpl#AttemptFailedTransition
     if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {

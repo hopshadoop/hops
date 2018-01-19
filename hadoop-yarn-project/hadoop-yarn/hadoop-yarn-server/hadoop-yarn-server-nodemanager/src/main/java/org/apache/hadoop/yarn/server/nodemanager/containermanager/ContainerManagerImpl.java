@@ -321,7 +321,8 @@ public class ContainerManagerImpl extends CompositeService implements
         new DataInputStream(p.getCredentials().newInput()));
 
     if (getConfig() != null && getConfig().getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)
+        && !getConfig().getProxyUsers().contains(p.getUser())) {
       materializeCertificates(appId, p.getUser(), ProtoUtils.convertFromProtoFormat(p.getKeyStore()), p.
           getKeyStorePassword(), ProtoUtils.convertFromProtoFormat(p.getTrustStore()), p.
           getTrustStorePassword());
@@ -807,10 +808,13 @@ public class ContainerManagerImpl extends CompositeService implements
         user = BuilderUtils.newContainerTokenIdentifier(request
             .getContainerToken()).getApplicationSubmitter();
       }
+
       if (user == null) {
         throw new IOException("Submitter user is null");
+      } else if (!getConfig().getProxyUsers().contains(user)) {
+        // Do not materialize certificates for proxy superusers
+        materializeCertificates(appId, user, keyStore, keyStorePass, trustStore, trustStorePass);
       }
-      materializeCertificates(appId, user, keyStore, keyStorePass, trustStore, trustStorePass);
     }
     
     List<ContainerId> succeededContainers = new ArrayList<ContainerId>();
@@ -982,7 +986,8 @@ public class ContainerManagerImpl extends CompositeService implements
     // Inject file to localize containing the certificates's password
     if (getConfig() != null && getConfig().getBoolean(
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT) &&
+        !getConfig().getProxyUsers().contains(user)) {
       String passwdLocation;
       try {
         CryptoMaterial cryptoMaterial = context

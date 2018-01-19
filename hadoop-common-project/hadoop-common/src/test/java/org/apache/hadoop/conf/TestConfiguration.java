@@ -48,6 +48,8 @@ import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
@@ -1380,6 +1382,29 @@ public class TestConfiguration extends TestCase {
     Path fileResource = new Path(CONFIG);
     conf.addResource(fileResource);
     assertEquals("value", conf.get("attr"));
+  }
+
+  public void testHadoodpProxyUsers() throws Exception {
+    String user1 = UserGroupInformation.getCurrentUser().getUserName();
+    String user2 = "fdd-ddd";
+    String user3 = "fdd_ddd";
+    String user4 = "fd34ap";
+
+    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + user1 + ".groups", "*");
+    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + user1 + ".hosts", "*");
+    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + user2 + ".hosts", "*");
+    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + user3 + ".hosts", "*");
+    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + user4 + ".hosts", "*");
+    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "..hosts", "*");
+    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "...hosts", "*");
+    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + ".its.wrong", "*");
+
+    Set<String> parsedProxyUsers = conf.getProxyUsers();
+    assertEquals(4, parsedProxyUsers.size());
+    assertTrue(parsedProxyUsers.contains(user1));
+    assertTrue(parsedProxyUsers.contains(user2));
+    assertTrue(parsedProxyUsers.contains(user3));
+    assertTrue(parsedProxyUsers.contains(user4));
   }
 
   public static void main(String[] argv) throws Exception {

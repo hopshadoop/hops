@@ -193,10 +193,10 @@ public class HdfsStorageFactory {
     Properties clusterConf = new Properties();
     InputStream inStream =
         StorageConnector.class.getClassLoader().getResourceAsStream(configFile);
-    clusterConf.load(inStream);
     if(inStream == null){
       throw new FileNotFoundException("Unable to load database configuration file");
     }
+    clusterConf.load(inStream);
     return clusterConf;
   }
   

@@ -17,20 +17,19 @@ package org.apache.hadoop.yarn.server;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RpcServerException;
-import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.HopsSSLTestUtils;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
-import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
@@ -40,14 +39,12 @@ import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -58,6 +55,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.ByteBuffer;
+import java.security.PrivilegedExceptionAction;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -68,6 +66,7 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
     private MiniYARNCluster cluster;
     private ApplicationClientProtocol acClient, acClient1;
 
+
     public TestYarnSSLServer(CERT_ERR error_mode) {
         super.error_mode = error_mode;
     }
@@ -76,21 +75,23 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
     public void setUp() throws Exception {
         LOG.debug("Error mode: " + error_mode.name());
 
-        conf = new YarnConfiguration();
-        filesToPurge = prepareCryptoMaterial(conf, KeyStoreTestUtil
-            .getClasspathDir(TestYarnSSLServer.class));
-        setCryptoConfig(conf);
+        clusterConf = new YarnConfiguration();
+        filesToPurge = prepareCryptoMaterial(KeyStoreTestUtil.getClasspathDir(TestYarnSSLServer.class),
+            TEST_USER);
+        setCryptoConfig(clusterConf, true);
 
-        conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
-        conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
+        clusterConf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
+        clusterConf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
 
         cluster = new MiniYARNCluster(TestYarnSSLServer.class.getName(), 1,
             3, 1, 1, false, true);
-        cluster.init(conf);
+        cluster.init(clusterConf);
         cluster.start();
 
+        clientConf = new YarnConfiguration(clusterConf);
+        setCryptoConfig(clientConf, false);
+
         LOG.info("Started cluster");
-        acClient = ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class, true);
     }
 
     @After
@@ -115,8 +116,32 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
 
     @Test
     public void testSubmitApplication() throws Exception {
-        GetNewApplicationRequest newAppReq = GetNewApplicationRequest
-            .newInstance();
+        UserGroupInformation ugi = UserGroupInformation.
+            createProxyUser(TEST_USER, UserGroupInformation.getCurrentUser());
+
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws Exception {
+              if (error_mode.equals(CERT_ERR.NO_CA)) {
+                  rule.expect(SSLException.class);
+              } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
+                  rule.expect(RpcServerException.class);
+              }
+              submitApplication(clientConf,true);
+              return null;
+            }
+        });
+
+    }
+
+    @Test
+    public void testSubmitApplicationAsProxyUser() throws Exception {
+        submitApplication(clusterConf,false);
+    }
+
+    private void submitApplication(Configuration conf, boolean setCryptoMaterial) throws Exception {
+        GetNewApplicationRequest newAppReq = GetNewApplicationRequest.newInstance();
+        acClient = ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class, true);
         GetNewApplicationResponse newAppRes = acClient.getNewApplication
             (newAppReq);
         ApplicationSubmissionContext appCtx = Records.newRecord
@@ -125,38 +150,40 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
         appCtx.setApplicationId(newAppRes.getApplicationId());
         appCtx.setApplicationName("RandomApplication");
         appCtx.setApplicationType("SomeType");
-        
+
         Map<String, LocalResource> localResources = new HashMap<>();
         LocalResource lr = LocalResource.newInstance(URL.newInstance
                 ("hdfs://", "localhost", 8020, "aFile"),
             LocalResourceType.FILE, LocalResourceVisibility.PUBLIC, 100L, 100L);
         localResources.put("aFile", lr);
-        
+
         Map<String, String> env = new HashMap<>();
         env.put("env0", "someValue");
-        
+
         List<String> amCommnads = new ArrayList<>();
         amCommnads.add("someRandom --command");
-    
+
         ContainerLaunchContext amCtx = ContainerLaunchContext.newInstance
             (localResources, env, amCommnads, null, null, null);
-        
+
         appCtx.setAMContainerSpec(amCtx);
         appCtx.setResource(Resource.newInstance(2048, 2));
         appCtx.setQueue("default");
-    
-        //ByteBuffer[] material = getCryptoMaterial();
-        ByteBuffer kstore = ByteBuffer.allocate(5000);
-        ByteBuffer tstore = ByteBuffer.allocate(5000);
-        String pass = "password";
-        appCtx.setKeyStore(kstore);
-        appCtx.setKeyStorePassword(pass);
-        appCtx.setTrustStore(tstore);
-        appCtx.setTrustStorePassword(pass);
-    
+
+        if (setCryptoMaterial) {
+            //ByteBuffer[] material = getCryptoMaterial();
+            ByteBuffer kstore = ByteBuffer.allocate(5000);
+            ByteBuffer tstore = ByteBuffer.allocate(5000);
+            String pass = "password";
+            appCtx.setKeyStore(kstore);
+            appCtx.setKeyStorePassword(pass);
+            appCtx.setTrustStore(tstore);
+            appCtx.setTrustStorePassword(pass);
+        }
+
         ApplicationClientProtocol client = ClientRMProxy.createRMProxy(conf,
             ApplicationClientProtocol.class, true);
-        
+
         Thread invoker = new Thread(new Invoker(client));
         invoker.setName("AnotherClient");
         invoker.start();
@@ -165,68 +192,61 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
         LOG.debug("Submitting the application");
         acClient.submitApplication(appReq);
         LOG.debug("Submitted the application");
-        
+
         LOG.debug("Getting new application");
         newAppRes = acClient.getNewApplication(newAppReq);
         assertNotNull(newAppRes);
         LOG.debug("I have gotten the new application");
-        
+
         List<ApplicationReport> appsReport = acClient.getApplications(
             GetApplicationsRequest.newInstance()).getApplicationList();
         boolean found = false;
-        
+
         for (ApplicationReport appRep : appsReport) {
             if (appRep.getApplicationId().equals(appCtx.getApplicationId())) {
                 found = true;
                 break;
             }
         }
-        
+
         assertTrue(found);
         TimeUnit.SECONDS.sleep(10);
     }
     
     @Test(timeout = 3000)
     public void testRpcCall() throws Exception {
-        EnumSet<NodeState> filter = EnumSet.of(NodeState.RUNNING);
-        GetClusterNodesRequest req = GetClusterNodesRequest.newInstance();
-        req.setNodeStates(filter);
-        LOG.debug("Sending request");
-        GetClusterNodesResponse res = acClient.getClusterNodes(req);
-        LOG.debug("Got response from server");
-        assertNotNull("Response should not be null", res);
-        List<NodeReport> reports = res.getNodeReports();
-        LOG.debug("Printing cluster nodes report");
-        for (NodeReport report : reports) {
-            LOG.debug("NodeId: " + report.getNodeId().toString());
-        }
+        UserGroupInformation ugi = UserGroupInformation.
+            createProxyUser(TEST_USER, UserGroupInformation.getCurrentUser());
+
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws Exception {
+            acClient = ClientRMProxy.createRMProxy(clientConf, ApplicationClientProtocol.class, true);
+
+            EnumSet<NodeState> filter = EnumSet.of(NodeState.RUNNING);
+            GetClusterNodesRequest req = GetClusterNodesRequest.newInstance();
+            req.setNodeStates(filter);
+            LOG.debug("Sending request");
+
+            if (error_mode.equals(CERT_ERR.NO_CA)) {
+                rule.expect(SSLException.class);
+            } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
+                rule.expect(RpcServerException.class);
+            }
+            GetClusterNodesResponse res = acClient.getClusterNodes(req);
+
+            LOG.debug("Got response from server");
+            assertNotNull("Response should not be null", res);
+            List<NodeReport> reports = res.getNodeReports();
+            LOG.debug("Printing cluster nodes report");
+            for (NodeReport report : reports) {
+              LOG.debug("NodeId: " + report.getNodeId().toString());
+            }
+            return null;
+            }
+        });
     }
 
-    @Test
-    public void testRpcCallWithNonValidCert() throws Exception {
-        conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(), err_clientKeyStore.toString());
-        conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue(), passwd);
-        conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue(), passwd);
-        conf.set(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue(), err_clientTrustStore.toString());
-        conf.set(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue(), passwd);
-
-        // Exception will be thrown later. JUnit does not execute the code
-        // after the exception, so make the call in a separate thread
-        invoker = new Thread(new Invoker(acClient));
-        invoker.start();
-
-        LOG.debug("Creating the second client");
-        acClient1 = ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class,
-                true);
-
-        GetNewApplicationRequest req1 = GetNewApplicationRequest.newInstance();
-        if (error_mode.equals(CERT_ERR.NO_CA)) {
-            rule.expect(SSLException.class);
-        } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
-            rule.expect(RpcServerException.class);
-        }
-        GetNewApplicationResponse res1 = acClient1.getNewApplication(req1);
-    }
 
     private class Invoker implements Runnable {
         private final ApplicationClientProtocol client;
