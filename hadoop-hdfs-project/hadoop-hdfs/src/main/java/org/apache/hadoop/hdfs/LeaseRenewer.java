@@ -68,7 +68,7 @@ import java.util.Map;
  * </ul>
  * </p>
  */
-class LeaseRenewer {
+public class LeaseRenewer {
   static final Log LOG = LogFactory.getLog(LeaseRenewer.class);
 
   static final long LEASE_RENEWER_GRACE_DEFAULT = 60 * 1000L;
@@ -420,7 +420,8 @@ class LeaseRenewer {
     }
   }
 
-  void interruptAndJoin() throws InterruptedException {
+  //made public for testing
+  public void interruptAndJoin() throws InterruptedException {
     Daemon daemonCopy = null;
     synchronized (this) {
       if (isRunning()) {

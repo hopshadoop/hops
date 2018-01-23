@@ -1,14 +1,14 @@
 package org.apache.hadoop.hdfs.server.protocol;
 
 
-public class BlockReportBlock{
+public class ReportedBlock {
   private final long blockId;
   private final long generationStamp;
   private final long length;
   private final BlockReportBlockState state;
   
-  public BlockReportBlock(long blockId, long generationStamp, long length,
-      BlockReportBlockState state) {
+  public ReportedBlock(long blockId, long generationStamp, long length,
+                       BlockReportBlockState state) {
     this.blockId = blockId;
     this.generationStamp = generationStamp;
     this.length = length;

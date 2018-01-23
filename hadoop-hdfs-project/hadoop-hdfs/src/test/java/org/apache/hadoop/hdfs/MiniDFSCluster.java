@@ -22,7 +22,6 @@ import com.google.common.collect.Lists;
 import io.hops.erasure_coding.MockEncodingManager;
 import io.hops.erasure_coding.MockRepairManager;
 import io.hops.exception.StorageException;
-import io.hops.log.NDCWrapper;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.election.dal.HdfsLeDescriptorDataAccess;
@@ -60,7 +59,7 @@ import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
-import org.apache.hadoop.hdfs.server.protocol.BlockReportBlock;
+import org.apache.hadoop.hdfs.server.protocol.ReportedBlock;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
@@ -88,7 +87,6 @@ import java.net.URISyntaxException;
 import java.nio.channels.FileChannel;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -508,7 +506,7 @@ public class MiniDFSCluster {
   private boolean waitSafeMode = true;
   private boolean checkExitOnShutdown = true;
   protected final int storagesPerDatanode;
-  
+
   /**
    * A unique instance identifier for the cluster. This
    * is used to disambiguate HA filesystems in the case where
@@ -951,7 +949,7 @@ public class MiniDFSCluster {
    * @throws IllegalStateException if NameNode has been shutdown
    */
   public synchronized void startDataNodes(Configuration conf, int numDataNodes,
-      boolean manageDfsDirs, StartupOption operation, String[] racks, 
+      boolean manageDfsDirs, StartupOption operation, String[] racks,
       String[] hosts, long[] simulatedCapacities, boolean setupHostsFile)
           throws IOException {
     startDataNodes(conf, numDataNodes, null, manageDfsDirs, operation, racks, hosts,
@@ -2014,7 +2012,7 @@ public class MiniDFSCluster {
   public void setLeasePeriod(long soft, long hard, int nnIndex) {
     NameNodeAdapter.setLeasePeriod(getNamesystem(nnIndex), soft, hard);
   }
-   
+
   public void setWaitSafeMode(boolean wait) {
     this.waitSafeMode = wait;
   }
@@ -2212,10 +2210,10 @@ public class MiniDFSCluster {
    * @return metadata file corresponding to the block
    */
   public static File getBlockMetadataFile(File storageDir, ExtendedBlock blk) {
-    return new File(getFinalizedDir(storageDir, blk.getBlockPoolId()), 
+    return new File(getFinalizedDir(storageDir, blk.getBlockPoolId()),
         blk.getBlockName() + "_" + blk.getGenerationStamp() +
         Block.METADATA_EXTENSION);
-    
+
   }
 
   /**
@@ -2273,7 +2271,7 @@ public class MiniDFSCluster {
   
   /**
    * Get the block metadata file for a block from a given datanode
-   * 
+   *
    * @param dnIndex Index of the datanode to get block files for
    * @param block block for which corresponding files are needed
    */

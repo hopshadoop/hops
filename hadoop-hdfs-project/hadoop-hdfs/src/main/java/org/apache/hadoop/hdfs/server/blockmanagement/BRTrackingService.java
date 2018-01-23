@@ -109,9 +109,13 @@ public class BRTrackingService {
   private static long cachedBrLbMaxBlkPerTW = -1;
   private static long getBrLbMaxBlkPerTW(long DB_VAR_UPDATE_THRESHOLD) throws IOException {
     if ((System.currentTimeMillis() - lastChecked) > DB_VAR_UPDATE_THRESHOLD) {
-      cachedBrLbMaxBlkPerTW = HdfsVariables.getBrLbMaxBlkPerTW();
+      long newValue = HdfsVariables.getBrLbMaxBlkPerTW();
+      if(newValue != cachedBrLbMaxBlkPerTW){
+        cachedBrLbMaxBlkPerTW = newValue;
+        LOG.info("BRTrackingService. Processing "+cachedBrLbMaxBlkPerTW
+                +" per time window");
+      }
       lastChecked = System.currentTimeMillis();
-      LOG.debug("BRTrackingService. Processing "+cachedBrLbMaxBlkPerTW+" per time window");
     }
     return cachedBrLbMaxBlkPerTW;
   }

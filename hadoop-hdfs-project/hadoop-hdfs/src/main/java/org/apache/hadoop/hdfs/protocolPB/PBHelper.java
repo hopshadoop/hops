@@ -127,9 +127,9 @@ import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
-import org.apache.hadoop.hdfs.server.protocol.BlockReportBlock;
+import org.apache.hadoop.hdfs.server.protocol.ReportedBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlockReportBlockState;
-import org.apache.hadoop.hdfs.server.protocol.BlockReportBucket;
+import org.apache.hadoop.hdfs.server.protocol.Bucket;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
@@ -1802,11 +1802,11 @@ public class PBHelper {
    
     List<DatanodeProtocolProtos.BlockReportBucketProto> bucketProtos = new
         ArrayList<>();
-    for (BlockReportBucket bucket : report.getBuckets()){
+    for (Bucket bucket : report.getBuckets()){
   
       DatanodeProtocolProtos.BlockReportBucketProto.Builder bucketBuilder =
           DatanodeProtocolProtos.BlockReportBucketProto.newBuilder();
-      for (BlockReportBlock block : bucket.getBlocks()){
+      for (ReportedBlock block : bucket.getBlocks()){
         bucketBuilder.addBlocks(
             DatanodeProtocolProtos.BlockReportBlockProto.newBuilder()
                 .setBlockId(block.getBlockId())
@@ -1856,7 +1856,7 @@ public class PBHelper {
       DatanodeProtocolProtos.BlockReportProto blockReportProto) {
     int numBuckets = blockReportProto.getBucketsCount();
     
-    BlockReportBucket[] buckets = new BlockReportBucket[numBuckets];
+    Bucket[] buckets = new Bucket[numBuckets];
     long[] hashes = new long[numBuckets];
     int numBlocks = 0;
     
@@ -1866,15 +1866,15 @@ public class PBHelper {
       
       numBlocks += numBlocksInBucket;
       
-      BlockReportBlock[] blocks = new BlockReportBlock[numBlocksInBucket];
+      ReportedBlock[] blocks = new ReportedBlock[numBlocksInBucket];
       for (int j = 0; j < numBlocksInBucket; j++){
         DatanodeProtocolProtos.BlockReportBlockProto blockProto = bucketProto.getBlocks(j);
-        blocks[j] = new BlockReportBlock(blockProto.getBlockId(), blockProto
+        blocks[j] = new ReportedBlock(blockProto.getBlockId(), blockProto
             .getGenerationStamp(), blockProto.getLength(), convert(blockProto
             .getState()));
       }
       
-      BlockReportBucket bucket = new BlockReportBucket();
+      Bucket bucket = new Bucket();
       bucket.setBlocks(blocks);
       buckets[i] = bucket;
       hashes[i] = blockReportProto.getHashes(i);

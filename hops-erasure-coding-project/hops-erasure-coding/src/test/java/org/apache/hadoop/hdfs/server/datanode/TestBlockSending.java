@@ -35,10 +35,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 import org.junit.Assert;
+
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 
 public class TestBlockSending extends ClusterTest {
 
@@ -54,6 +53,7 @@ public class TestBlockSending extends ClusterTest {
   public TestBlockSending() {
     conf = new HdfsConfiguration();
     conf.setLong(DFS_BLOCK_SIZE_KEY, DFS_TEST_BLOCK_SIZE);
+    conf.setLong(DFS_NAMENODE_MIN_BLOCK_SIZE_KEY, DFS_TEST_BLOCK_SIZE);
     conf.setInt(DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT);
   }
 

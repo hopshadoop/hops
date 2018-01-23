@@ -197,7 +197,7 @@ public class DatanodeManager {
    * Software version -> Number of datanodes with this version
    */
   private HashMap<String, Integer> datanodesSoftwareVersions = new HashMap<String, Integer>(4, 0.75f);
-  
+
   DatanodeManager(final BlockManager blockManager, final Namesystem namesystem,
       final Configuration conf) throws IOException {
     this.namesystem = namesystem;
@@ -233,7 +233,7 @@ public class DatanodeManager {
     this.rejectUnresolvedTopologyDN = conf.getBoolean(
         DFSConfigKeys.DFS_REJECT_UNRESOLVED_DN_TOPOLOGY_MAPPING_KEY,
         DFSConfigKeys.DFS_REJECT_UNRESOLVED_DN_TOPOLOGY_MAPPING_DEFAULT);
-    
+
     // If the dns to switch mapping supports cache, resolve network
     // locations of those hosts in the include list and store the mapping
     // in the cache; so future calls to resolve will be fast.
@@ -610,7 +610,7 @@ public class DatanodeManager {
       HashMap<String, Integer> versionCount = new HashMap<String, Integer>();
       for (DatanodeDescriptor dn : datanodeMap.values()) {
         // Check isAlive too because right after removeDatanode(),
-        // isDatanodeDead() is still true 
+        // isDatanodeDead() is still true
         if (shouldCountVersion(dn)) {
           Integer num = versionCount.get(dn.getSoftwareVersion());
           num = num == null ? 1 : num + 1;
@@ -1191,7 +1191,7 @@ public class DatanodeManager {
     }
     return nodes;
   }
-  
+
   /**
    * Checks if name resolution was successful for the given address.  If IP
    * address and host name are the same, then it means name resolution has

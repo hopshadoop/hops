@@ -48,7 +48,9 @@ public class LastBlockReplicasHashBucketLock extends Lock {
               return new Integer(o1.getBucketId()).compareTo(o2.getBucketId());
             }
           });
-  
+
+          //FIXME-BR why lock buckets for all the replicas. Only the last
+          // replica should be locked. Am I missing something
           for (Replica replica : replicas) {
             EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId, replica
                 .getStorageId(), replica.getBucketId());

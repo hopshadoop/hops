@@ -69,8 +69,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import org.junit.Assert;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  * This test simulates a variety of situations when blocks are being
@@ -85,7 +84,7 @@ import static org.junit.Assert.assertTrue;
  *
  * The behavior should be the same in either variation.
  */
-public class TestBlockReport {
+public class TestBlockReport  {
   public static final Log LOG = LogFactory.getLog(TestBlockReport.class);
 
   private static short REPL_FACTOR = 1;
@@ -96,10 +95,10 @@ public class TestBlockReport {
   private static final int FILE_START = 0;
 
   static final int BLOCK_SIZE = 1024;
-  static final int NUM_BLOCKS = 10;
+  static final int NUM_BLOCKS = 20;
   static final int FILE_SIZE = NUM_BLOCKS * BLOCK_SIZE + 1;
   static String bpid;
-  private static int NUM_BUCKETS;
+  private static final int NUM_BUCKETS = 5;
 
   private MiniDFSCluster cluster;
   private DistributedFileSystem fs;
@@ -193,6 +192,7 @@ public class TestBlockReport {
       }
     }
   }
+
   /**
    * Test variations blockReport_01 through blockReport_09 with combined
    * and split block reports.
@@ -272,7 +272,7 @@ public class TestBlockReport {
    * are messed up and BlockReport is forced.
    * The modification of blocks' length has to be ignored
    *
-   * @throws java.io.IOException
+   * @throws IOException
    *     on an error
    */
   private void blockReport_01(boolean splitBlockReports) throws IOException {
@@ -667,7 +667,7 @@ public class TestBlockReport {
   public void testOneReplicaRbwReportArrivesAfterBlockCompleted()
       throws Exception {
     final CountDownLatch brFinished = new CountDownLatch(1);
-    DelayAnswer delayer = new GenericTestUtils.DelayAnswer(LOG) {
+    DelayAnswer delayer = new DelayAnswer(LOG) {
       @Override
       protected Object passThrough(InvocationOnMock invocation)
           throws Throwable {
@@ -962,11 +962,7 @@ public class TestBlockReport {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, customBlockSize);
     conf.setLong(DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_INTERVAL_KEY,
         DN_RESCAN_INTERVAL);
-    conf.setInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, DFSConfigKeys
-        .DFS_REPLICATION_DEFAULT);
-    conf.setInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, 100);
-    NUM_BUCKETS = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, DFSConfigKeys
-        .DFS_NUM_BUCKETS_DEFAULT);
+    conf.setInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, NUM_BUCKETS);
   }
 
 

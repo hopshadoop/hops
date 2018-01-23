@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Random;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 import org.junit.Assert;
 
@@ -61,6 +62,7 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
   public TestMapReduceBlockRepairManager() {
     conf = new HdfsConfiguration();
     conf.setLong(DFS_BLOCK_SIZE_KEY, DFS_TEST_BLOCK_SIZE);
+    conf.setLong(DFS_NAMENODE_MIN_BLOCK_SIZE_KEY, DFS_TEST_BLOCK_SIZE);
     conf.setInt(DFS_REPLICATION_KEY, 1);
     conf.set(DFSConfigKeys.ERASURE_CODING_CODECS_KEY, Util.JSON_CODEC_ARRAY);
     conf.setBoolean(DFSConfigKeys.ERASURE_CODING_ENABLED_KEY, false);
