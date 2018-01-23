@@ -44,7 +44,7 @@ public class AppendTestUtil {
    */
   static final Long RANDOM_NUMBER_GENERATOR_SEED = null;
 
-  static final Log LOG = LogFactory.getLog(AppendTestUtil.class);
+  public static final Log LOG = LogFactory.getLog(AppendTestUtil.class);
 
   private static final Random SEED = new Random();
 

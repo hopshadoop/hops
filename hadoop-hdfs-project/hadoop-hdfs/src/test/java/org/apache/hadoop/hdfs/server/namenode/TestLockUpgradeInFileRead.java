@@ -37,7 +37,8 @@ public class TestLockUpgradeInFileRead {
       final int BLOCK_SIZE = 1024;
       conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
       //update the access time every time
-      conf.setLong(DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, 100); // update the access time after every 100 ms
+      conf.setLong(DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, 10000); // update
+      // the access time after every 5 sec
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
       cluster.waitActive();
 
@@ -49,7 +50,7 @@ public class TestLockUpgradeInFileRead {
 
       FSNamesystem ns = cluster.getNamesystem();
       try{
-        Thread.sleep(1000); // One second has passed and the access time should be updated
+        Thread.sleep(10000);       // 5 seconds has passed and the access time should be updated
                                   // Should get a LockUpgradeException while trying to update the timestamp
                                   // while holding the read lock
         ns.getBlockLocationsWithLock("client", file.toString(), 0, 1024, TransactionLockTypes.INodeLockType.READ);
@@ -65,7 +66,6 @@ public class TestLockUpgradeInFileRead {
         e.printStackTrace();
       }
 
-
       try{
         // Now reading the file again with read lock should work
         ns.getBlockLocationsWithLock("client", file.toString(), 0, 1024, TransactionLockTypes.INodeLockType.READ);
@@ -75,7 +75,7 @@ public class TestLockUpgradeInFileRead {
       }
 
       try{
-        Thread.sleep(1000);
+        Thread.sleep(10000);
         FSDataInputStream in = dfs.open(file);
         in.read();
         in.close();

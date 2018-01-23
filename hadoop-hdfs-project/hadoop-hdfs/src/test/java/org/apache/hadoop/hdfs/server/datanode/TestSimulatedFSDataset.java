@@ -26,7 +26,7 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetFactory;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
-import org.apache.hadoop.hdfs.server.protocol.BlockReportBlock;
+import org.apache.hadoop.hdfs.server.protocol.ReportedBlock;
 import org.apache.hadoop.util.DataChecksum;
 import org.junit.Before;
 import org.junit.Test;
@@ -173,7 +173,7 @@ public class TestSimulatedFSDataset {
     addSomeBlocks(fsdataset);
     blockReport = fsdataset.getBlockReport(bpid);
     assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
-    for (BlockReportBlock b : blockReport) {
+    for (ReportedBlock b : blockReport) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getLength());
     }
@@ -187,7 +187,7 @@ public class TestSimulatedFSDataset {
     int bytesAdded = addSomeBlocks(fsdataset);
     blockReport = fsdataset.getBlockReport(bpid);
     assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
-    for (BlockReportBlock b : blockReport) {
+    for (ReportedBlock b : blockReport) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getLength());
     }
@@ -217,7 +217,7 @@ public class TestSimulatedFSDataset {
     int bytesAdded = addSomeBlocks(fsdataset);
     blockReport = fsdataset.getBlockReport(bpid);
     assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
-    for (BlockReportBlock b : blockReport) {
+    for (ReportedBlock b : blockReport) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getLength());
     }

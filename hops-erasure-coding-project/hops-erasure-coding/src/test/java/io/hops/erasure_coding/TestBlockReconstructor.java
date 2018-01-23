@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Random;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 import org.junit.Assert;
 import org.junit.Before;
@@ -57,6 +58,7 @@ public class TestBlockReconstructor extends ClusterTest {
     conf = new HdfsConfiguration();
     conf.setLong(DFS_BLOCK_SIZE_KEY, DFS_TEST_BLOCK_SIZE);
     conf.setInt(DFS_REPLICATION_KEY, 1);
+    conf.setInt(DFS_NAMENODE_MIN_BLOCK_SIZE_KEY, DFS_TEST_BLOCK_SIZE);
     numDatanode = 16;
   }
 

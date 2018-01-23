@@ -611,15 +611,13 @@ void test_init_app() {
 }
 
 void test_write_as_root() {
-
   char * cgroups_devices = TEST_ROOT "/cgroup-devices.txt";
   close(creat(cgroups_devices, O_RDWR));
   int exitcode = write_device_entry_to_cgroup_devices("a *:* rwm", cgroups_devices);
   if(exitcode == -1) {
-  printf("FAIL: can't write to cgroup\n", strerror(errno));
-  exit(1);
+    printf("FAIL: can't write to cgroup\n", strerror(errno));
+    exit(1);
   }
- return exitcode;
 }
 
 void test_run_container() {

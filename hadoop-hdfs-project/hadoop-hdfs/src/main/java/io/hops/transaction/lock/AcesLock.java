@@ -28,10 +28,10 @@ public class AcesLock extends Lock {
   protected void acquire(TransactionLocks locks) throws IOException {
     BaseINodeLock inodeLock = (BaseINodeLock) locks.getLock(Type.INode);
     for (INode inode : inodeLock.getAllResolvedINodes()){
-      if(inode.getNumAces() > 0){
+      if (inode.getNumAces() > 0) {
         //Retrieve aces for inode
         int[] indices = new int[inode.getNumAces()];
-        for (int i = 0 ; i < inode.getNumAces() ; i++ ){
+        for (int i = 0; i < inode.getNumAces(); i++) {
           indices[i] = i;
         }
         acquireLockList(TransactionLockTypes.LockType.WRITE, Ace.Finder.ByInodeIdAndIndices, inode.getId(), indices);

@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -31,7 +30,6 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
-import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.hdfs.StorageType;
@@ -330,6 +328,22 @@ public class DatanodeStorageInfo {
       }
     };
     return (Map<Long, Integer>) findBlocksHandler.handle();
+  }
+
+  public Map<Long, Integer> getAllStorageReplicasInBuckets(
+          final List<Integer> mismatchedBuckets) throws IOException {
+    LightWeightRequestHandler findReplicasHandler = new
+        LightWeightRequestHandler
+            (HDFSOperationType.GET_ALL_STORAGE_BLOCKS_IN_BUCKETS) {
+      @Override
+      public Object performTask() throws IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaDataAccess.class);
+        return da.findBlockAndInodeIdsByStorageIdAndBucketIds(sid,
+            mismatchedBuckets);
+      }
+    };
+    return (Map<Long,Integer>) findReplicasHandler.handle();
   }
 
   public Map<Long,Long> getAllStorageInvalidatedReplicasWithGenStamp() throws IOException {

@@ -21,8 +21,6 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.StorageMap;
-import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
-import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
 import io.hops.metadata.hdfs.dal.StorageDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -77,39 +75,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   private final Map<String, DatanodeStorageInfo> storageMap =
       new HashMap<String, DatanodeStorageInfo>();
   
-  public Map<Long,Integer> getAllMachineReplicasInBucket(final int bucketId,
-          final int sid)
-      throws IOException {
-    LightWeightRequestHandler findReplicasHandler = new
-        LightWeightRequestHandler
-            (HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IN_BUCKET) {
-      @Override
-      public Object performTask() throws IOException {
-        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-            .getDataAccess(ReplicaDataAccess.class);
-        return da.findBlockAndInodeIdsByStorageIdAndBucketId(sid,
-            bucketId);
-      }
-    };
-    return (Map<Long, Integer>) findReplicasHandler.handle();
-  }
-  
-  public Map<Long,Integer> getAllMachineReplicasInBuckets(
-      final List<Integer> mismatchedBuckets, final int sid) throws IOException {
-    LightWeightRequestHandler findReplicasHandler = new
-        LightWeightRequestHandler
-            (HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IN_BUCKETS) {
-      @Override
-      public Object performTask() throws IOException {
-        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-            .getDataAccess(ReplicaDataAccess.class);
-        return da.findBlockAndInodeIdsByStorageIdAndBucketIds(sid,
-            mismatchedBuckets);
-      }
-    };
-    return (Map<Long,Integer>) findReplicasHandler.handle();
-  }
-  
+
   /**
    * Block and targets pair
    */

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.erasure_coding.Report;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -27,7 +28,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
-import org.apache.hadoop.hdfs.server.protocol.BlockReportBlock;
+import org.apache.hadoop.hdfs.server.protocol.ReportedBlock;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.io.IOUtils;
@@ -118,7 +119,7 @@ public class TestDFSShell {
     out.close();
     return f;
   }
-  
+
   static void show(String s) {
     System.out.println(Thread.currentThread().getStackTrace()[2] + " " + s);
   }
@@ -1428,7 +1429,7 @@ public class TestDFSShell {
       DataNode dn = datanodes.get(i);
       Map<DatanodeStorage, BlockReport> map = blocks.get(i);
       for(Map.Entry<DatanodeStorage, BlockReport> e : map.entrySet()) {
-        for(BlockReportBlock b : e.getValue()) {
+        for(ReportedBlock b : e.getValue()) {
           files.add(DataNodeTestUtils.getFile(dn, poolId, b.getBlockId()));
         }
       }
