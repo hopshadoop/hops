@@ -15,29 +15,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.security.ssl;
+package org.apache.hadoop.net.hopssslchecks;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
-
-public interface CertificateLocalization {
-  void materializeCertificates(String username,
-      ByteBuffer keyStore, String keyStorePassword,
-      ByteBuffer trustStore, String trustStorePassword) throws IOException;
+/**
+ * Exception thrown by HopsSSLCheck when the supplied Hadoop configuration's RPC TLS properties are already set.
+ */
+public class SSLMaterialAlreadyConfiguredException extends Exception {
+  public SSLMaterialAlreadyConfiguredException() {
+    super();
+  }
   
-  void removeMaterial(String username)
-    throws InterruptedException, ExecutionException;
+  public SSLMaterialAlreadyConfiguredException(String message) {
+    super(message);
+  }
   
-  CryptoMaterial getMaterialLocation(String username)
-      throws FileNotFoundException, InterruptedException, ExecutionException;
+  public SSLMaterialAlreadyConfiguredException(Throwable cause) {
+    super(cause);
+  }
   
-  String getSuperKeystoreLocation();
-  
-  String getSuperKeystorePass();
-  
-  String getSuperTruststoreLocation();
-  
-  String getSuperTruststorePass();
+  public SSLMaterialAlreadyConfiguredException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }
