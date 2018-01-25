@@ -20,8 +20,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.ipc.RpcServerException;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.ssl.HopsSSLTestUtils;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -60,10 +58,6 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
         File testDataCluster1 = new File(testDataPath, "dfs_cluster");
         String c1Path = testDataCluster1.getAbsolutePath();
         conf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, c1Path);
-        // Force DatanNode non-RPC communication to use plaintext socket
-        // Until we test starting DN in secure-mode
-        conf.set("hadoop.rpc.socket.factory.class.ClientProtocol",
-                "org.apache.hadoop.net.StandardSocketFactory");
 
         cluster = new MiniDFSCluster.Builder(conf).build();
         LOG.info("DFS cluster started");

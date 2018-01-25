@@ -94,6 +94,7 @@ public class HopsUtil {
     return FileUtils.readFileToString(passwdFile);
   }
   
+  @Deprecated
   private static String getCertPassFromHwInternal(String keyStoreEncoded,
       String username, Configuration conf) throws JSONException, IOException {
     String uri = getUriForCertPassword(conf);
@@ -118,11 +119,13 @@ public class HopsUtil {
     return Base64.encodeBase64String(kStoreBlob);
   }
   
+  @Deprecated
   private static String getUriForCertPassword(Configuration conf)
     throws IOException {
     return getHopsworksEndpoint(conf) + CERT_PASS_RESOURCE;
   }
   
+  @Deprecated
   private static String getHopsworksEndpoint(Configuration conf)
     throws IOException {
     String hopsworksEndpoint = conf.get(HopsSSLSocketFactory

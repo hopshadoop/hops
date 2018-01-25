@@ -15,29 +15,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.security.ssl;
+package org.apache.hadoop.util.envVars;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
+import com.google.common.annotations.VisibleForTesting;
 
-public interface CertificateLocalization {
-  void materializeCertificates(String username,
-      ByteBuffer keyStore, String keyStorePassword,
-      ByteBuffer trustStore, String trustStorePassword) throws IOException;
+/**
+ * Factory class to get the process environment variables
+ */
+public class EnvironmentVariablesFactory {
+  private static volatile EnvironmentVariables instance;
   
-  void removeMaterial(String username)
-    throws InterruptedException, ExecutionException;
+  public static EnvironmentVariables getInstance() {
+    if (instance == null) {
+      synchronized (EnvironmentVariablesFactory.class) {
+        if (instance == null) {
+          instance = new SystemEnvironmentVariables();
+        }
+      }
+    }
+    
+    return instance;
+  }
   
-  CryptoMaterial getMaterialLocation(String username)
-      throws FileNotFoundException, InterruptedException, ExecutionException;
-  
-  String getSuperKeystoreLocation();
-  
-  String getSuperKeystorePass();
-  
-  String getSuperTruststoreLocation();
-  
-  String getSuperTruststorePass();
+  // This should be used only for testing
+  @VisibleForTesting
+  public static void setInstance(EnvironmentVariables environmentVariablesService) {
+    instance = environmentVariablesService;
+  }
 }
