@@ -86,7 +86,9 @@ public class CertificateLocalizationService extends AbstractService
   private final String LOCALIZATION_DIR_NAME = "certLoc";
   private final String LOCALIZATION_DIR;
   private Path materializeDir;
+  private String superKeystoreLocation;
   private String superKeystorePass;
+  private String superTrustStoreLocation;
   private String superTruststorePass;
   
   private final Map<StorageKey, CryptoMaterial> materialLocation =
@@ -131,7 +133,7 @@ public class CertificateLocalizationService extends AbstractService
     // TODO Get the localization directory from conf, for the moment is a
     // random UUID
     
-    parseSuperuserPasswords(conf);
+    parseSuperuserMaterial(conf);
     super.serviceInit(conf);
   }
   
@@ -161,13 +163,19 @@ public class CertificateLocalizationService extends AbstractService
     super.serviceStart();
   }
   
-  private void parseSuperuserPasswords(Configuration conf) {
+  private void parseSuperuserMaterial(Configuration conf) {
     Configuration sslConf = new Configuration(false);
     sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY,
         "ssl-server.xml"));
+    superKeystoreLocation = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY));
     superKeystorePass = sslConf.get(
         FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
             FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
+    superTrustStoreLocation = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
     superTruststorePass = sslConf.get(
         FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
             FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
@@ -175,12 +183,28 @@ public class CertificateLocalizationService extends AbstractService
   
   // This method is accessible only from RM or NM. In any other case
   // CertificateLocalizationService is null
+  @Override
+  public String getSuperKeystoreLocation() {
+    return superKeystoreLocation;
+  }
+  
+  // This method is accessible only from RM or NM. In any other case
+  // CertificateLocalizationService is null
+  @Override
   public String getSuperKeystorePass() {
     return superKeystorePass;
   }
   
   // This method is accessible only from RM or NM. In any other case
   // CertificateLocalizationService is null
+  @Override
+  public String getSuperTruststoreLocation() {
+    return superTrustStoreLocation;
+  }
+  
+  // This method is accessible only from RM or NM. In any other case
+  // CertificateLocalizationService is null
+  @Override
   public String getSuperTruststorePass() {
     return superTruststorePass;
   }

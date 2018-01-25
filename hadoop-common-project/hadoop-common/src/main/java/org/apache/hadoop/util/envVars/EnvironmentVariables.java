@@ -15,29 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.security.ssl;
+package org.apache.hadoop.util.envVars;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
-
-public interface CertificateLocalization {
-  void materializeCertificates(String username,
-      ByteBuffer keyStore, String keyStorePassword,
-      ByteBuffer trustStore, String trustStorePassword) throws IOException;
-  
-  void removeMaterial(String username)
-    throws InterruptedException, ExecutionException;
-  
-  CryptoMaterial getMaterialLocation(String username)
-      throws FileNotFoundException, InterruptedException, ExecutionException;
-  
-  String getSuperKeystoreLocation();
-  
-  String getSuperKeystorePass();
-  
-  String getSuperTruststoreLocation();
-  
-  String getSuperTruststorePass();
+public interface EnvironmentVariables {
+  String getEnv(String variableName);
 }

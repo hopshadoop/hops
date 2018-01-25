@@ -7,6 +7,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.SSLCertificateException;
+import org.apache.hadoop.util.envVars.EnvironmentVariables;
+import org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -21,11 +23,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
@@ -60,8 +63,9 @@ public class TestHopsSSLConfiguration {
             FileUtils.deleteQuietly(baseDirFile);
         }
         purgeFiles();
+        EnvironmentVariablesFactory.setInstance(null);
     }
-
+    
     @Test
     public void testExistingConfIsPreserved() throws Exception {
         String kstore = "someDir/project__user__kstore.jks";
@@ -76,11 +80,14 @@ public class TestHopsSSLConfiguration {
         conf.set(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue(), tstorePass);
 
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
-        ugi.doAs(new PrivilegedAction<Object>() {
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("superuser");
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
 
             @Override
-            public Object run() {
+            public Object run() throws SSLCertificateException {
                 hopsFactory.setConf(conf);
+                hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
         });
@@ -166,8 +173,6 @@ public class TestHopsSSLConfiguration {
         String tmp = System.getProperty("java.io.tmpdir");
         conf.set(HopsSSLSocketFactory.CryptoKeys.CLIENT_MATERIALIZE_DIR
             .getValue(), "/tmp");
-        conf.set(HopsSSLSocketFactory.CryptoKeys.SERVICE_CERTS_DIR.getValue(),
-            "/tmp");
         String kstore = Paths.get(tmp, "project__user__kstore.jks")
             .toString();
         String tstore = Paths.get(tmp, "project__user__tstore.jks")
@@ -216,7 +221,7 @@ public class TestHopsSSLConfiguration {
     }
     
     @Test
-    public void testConfigurationWithMissingCertificates() throws Exception {
+    public void testConfigurationWithMissingCertificatesNormalUser() throws Exception {
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser
             ("project__user");
         final Set<String> superusers = new HashSet<>(1);
@@ -233,9 +238,25 @@ public class TestHopsSSLConfiguration {
     }
     
     @Test
+    public void testConfigurationWithMissingCertificatesSuperUser() throws Exception {
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser("superuser");
+        createServerSSLConfig("/tmp/kstore.jks", "pass", "/tmp/tstore.jks",
+            "pass", conf);
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("superuser");
+        rule.expect(SSLCertificateException.class);
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws SSLCertificateException {
+                hopsFactory.setConf(conf);
+                hopsFactory.configureCryptoMaterial(null, superusers);
+                return null;
+            }
+        });
+    }
+    
+    @Test
     public void testWithNoConfigSuperuser() throws Exception {
-        conf.set(HopsSSLSocketFactory.CryptoKeys.SERVICE_CERTS_DIR.getValue()
-            , "/tmp");
         String hostname = NetUtils.getLocalHostname();
         String kstore = "/tmp/" + hostname + "__kstore.jks";
         touchFile(kstore);
@@ -243,7 +264,7 @@ public class TestHopsSSLConfiguration {
         String tstore = "/tmp/" + hostname + "__tstore.jks";
         touchFile(tstore);
 
-        createServerSSLConfig(pass, pass, conf);
+        createServerSSLConfig(kstore, pass, tstore, pass, conf);
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("glassfish");
@@ -267,11 +288,70 @@ public class TestHopsSSLConfiguration {
         assertEquals(pass,
                 conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
-
+    
+    @Test
+    public void testConfigurationWithEnvironmentVariable() throws Exception {
+        String user = "project__user";
+        File materialDir = Paths.get(BASEDIR, "crypto_material").toFile();
+        if (!materialDir.exists()) {
+            materialDir.mkdirs();
+        }
+        
+        MockEnvironmentVariablesService mockEnvService = new MockEnvironmentVariablesService();
+        mockEnvService.setEnv(HopsSSLSocketFactory.CRYPTO_MATERIAL_ENV_VAR, materialDir.getAbsolutePath());
+        EnvironmentVariablesFactory.setInstance(mockEnvService);
+        
+        String keystore = Paths.get(materialDir.getAbsolutePath(), user
+            + HopsSSLSocketFactory.KEYSTORE_SUFFIX).toString();
+        String truststore = Paths.get(materialDir.getAbsolutePath(), user
+            + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX).toString();
+        String passwd = Paths.get(materialDir.getAbsolutePath(), user
+            + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX).toString();
+        String password = "some_password";
+        touchFile(keystore);
+        touchFile(truststore);
+        touchFile(passwd);
+        FileUtils.writeStringToFile(new File(passwd), password, false);
+        
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("glassfish");
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
+            @Override
+            public SSLCertificateException run() throws Exception {
+                hopsFactory.setConf(conf);
+                hopsFactory.configureCryptoMaterial(null, superusers);
+                return null;
+            }
+        });
+        
+        assertEquals(keystore, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+        assertEquals(truststore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+    }
+    
+    // Mock system environment variables
+    private class MockEnvironmentVariablesService implements EnvironmentVariables {
+        private final Map<String, String> mockEnvVars;
+        
+        private MockEnvironmentVariablesService() {
+            mockEnvVars = new HashMap<>();
+        }
+        
+        private void setEnv(String variableName, String variableValue) {
+            mockEnvVars.put(variableName, variableValue);
+        }
+        
+        @Override
+        public String getEnv(String variableName) {
+            return mockEnvVars.get(variableName);
+        }
+    }
+    
     @Test
     public void testNoConfigHostCertificates() throws Exception {
-        conf.set(HopsSSLSocketFactory.CryptoKeys.SERVICE_CERTS_DIR.getValue(),
-            "/tmp");
         String hostname = NetUtils.getLocalHostname();
         String kstore = "/tmp/" + hostname + "__kstore.jks";
         String tstore = "/tmp/" + hostname + "__tstore.jks";
@@ -280,7 +360,7 @@ public class TestHopsSSLConfiguration {
         touchFile(tstore);
         String password = "a_strong_password";
         
-        createServerSSLConfig(password, password, conf);
+        createServerSSLConfig(kstore, password, tstore, password, conf);
     
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
         final Set<String> superusers = new HashSet<>(1);
@@ -304,8 +384,8 @@ public class TestHopsSSLConfiguration {
             .TRUST_STORE_PASSWORD_KEY.getValue()));
     }
     
-    private void createServerSSLConfig(String keyStorePassword,
-        String trustStorePassword, Configuration conf) throws IOException {
+    private void createServerSSLConfig(String keystoreLocation, String keyStorePassword,
+        String truststoreLocation, String trustStorePassword, Configuration conf) throws IOException {
         
         Configuration sslConf = new Configuration(false);
         
@@ -316,8 +396,16 @@ public class TestHopsSSLConfiguration {
         sslConf.set(
             FileBasedKeyStoresFactory.resolvePropertyName(
                 SSLFactory.Mode.SERVER,
+                FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY), keystoreLocation);
+        sslConf.set(
+            FileBasedKeyStoresFactory.resolvePropertyName(
+                SSLFactory.Mode.SERVER,
                 FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY),
             keyStorePassword);
+        sslConf.set(
+            FileBasedKeyStoresFactory.resolvePropertyName(
+                SSLFactory.Mode.SERVER,
+                FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY), truststoreLocation);
         sslConf.set(
             FileBasedKeyStoresFactory.resolvePropertyName(
                 SSLFactory.Mode.SERVER,
@@ -347,10 +435,13 @@ public class TestHopsSSLConfiguration {
         touchFile(Paths.get(cwd, "glassfish__tstore.jks").toString());
 
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
-        ugi.doAs(new PrivilegedAction<Object>() {
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("glassfish");
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
             @Override
-            public Object run() {
+            public Object run() throws SSLCertificateException {
                 hopsFactory.setConf(conf);
+                hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
         });
