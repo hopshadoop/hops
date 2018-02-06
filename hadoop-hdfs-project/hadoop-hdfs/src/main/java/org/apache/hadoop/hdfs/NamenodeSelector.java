@@ -31,6 +31,7 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import javax.net.ssl.SSLException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -346,6 +347,11 @@ public class NamenodeSelector {
         if (e instanceof RemoteException
                 && ((RemoteException) e).getErrorCode().equals(
                 RpcHeaderProtos.RpcResponseHeaderProto.RpcErrorCodeProto.FATAL_UNAUTHORIZED)) {
+          throw e;
+        }
+        if (e instanceof IOException
+            && (e.getCause() instanceof FileNotFoundException)) {
+          LOG.fatal("Could not find file: " + e.getMessage(), e);
           throw e;
         }
         LOG.warn("Failed to get list of NN from default NN. Default NN was " +
