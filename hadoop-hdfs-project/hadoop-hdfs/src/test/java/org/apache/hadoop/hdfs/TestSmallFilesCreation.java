@@ -1320,8 +1320,8 @@ public class TestSmallFilesCreation {
       Configuration conf = new HdfsConfiguration();
 
       final boolean ENABLE_STORE_SMALL_FILES_IN_DB = true;
-      final int MAX_SMALL_FILE_SIZE= 1024*1024*10;  //~ 200 of these files
-      // will fit in the database
+      final int MAX_SMALL_FILE_SIZE= 1024*1024*10;  //default allocated disk
+      // space is 128 MB. ~ 12 small files of size 10 MB can fit there
       conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, ENABLE_STORE_SMALL_FILES_IN_DB);
       conf.setInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE );
       conf.setInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
@@ -1330,7 +1330,7 @@ public class TestSmallFilesCreation {
       cluster.waitActive();
       DistributedFileSystem dfs = cluster.getFileSystem();
 
-      int count=210;
+      int count=13;
       int i = 0;
       try{
         for(i = 0; i < count; i++){
