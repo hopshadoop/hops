@@ -53,7 +53,11 @@ public abstract class MaterializeCryptoKeysRequest {
   public abstract String getTruststorePassword();
   
   public abstract void setTruststorePassword(String password);
-  
+
+  public abstract String getUserFolder();
+
+  public abstract void setUserFolder(String userFolder);
+
   @Override
   public String toString() {
     return "MaterializeCryptoRequest username: " + getUsername() + " " +

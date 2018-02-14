@@ -322,11 +322,11 @@ public class ContainerManagerImpl extends CompositeService implements
 
     if (getConfig() != null && getConfig().getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      materializeCertificates(appId, p.getUser(), ProtoUtils.convertFromProtoFormat(p.getKeyStore()), p.
-          getKeyStorePassword(), ProtoUtils.convertFromProtoFormat(p.getTrustStore()), p.
-          getTrustStorePassword());
+      materializeCertificates(appId, p.getUser(), p.getUserFolder(),
+          ProtoUtils.convertFromProtoFormat(p.getKeyStore()), p.getKeyStorePassword(),
+          ProtoUtils.convertFromProtoFormat(p.getTrustStore()), p.getTrustStorePassword());
     }
-        
+
     List<ApplicationACLMapProto> aclProtoList = p.getAclsList();
     Map<ApplicationAccessType, String> acls =
         new HashMap<ApplicationAccessType, String>(aclProtoList.size());
@@ -800,17 +800,19 @@ public class ContainerManagerImpl extends CompositeService implements
         .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
       ApplicationId appId = nmTokenIdentifier.getApplicationAttemptId()
           .getApplicationId();
-      String user = null;
+      String user = null, userFolder = null;
       // When launching AM container there is only one Container request
       if (!requests.getStartContainerRequests().isEmpty()) {
         StartContainerRequest request = requests.getStartContainerRequests().get(0);
         user = BuilderUtils.newContainerTokenIdentifier(request
             .getContainerToken()).getApplicationSubmitter();
+        userFolder = BuilderUtils.newContainerTokenIdentifier(request
+            .getContainerToken()).getApplicationSubmitterFolder();
       }
-      if (user == null) {
+      if (user == null || userFolder == null) {
         throw new IOException("Submitter user is null");
       }
-      materializeCertificates(appId, user, keyStore, keyStorePass, trustStore, trustStorePass);
+      materializeCertificates(appId, user, userFolder, keyStore, keyStorePass, trustStore, trustStorePass);
     }
     
     List<ContainerId> succeededContainers = new ArrayList<ContainerId>();
@@ -862,7 +864,8 @@ public class ContainerManagerImpl extends CompositeService implements
     }
   }
   
-  private void materializeCertificates(ApplicationId appId, String user, ByteBuffer keyStore, String keyStorePass,
+  private void materializeCertificates(ApplicationId appId, String user, String userFolder,
+      ByteBuffer keyStore, String keyStorePass,
       ByteBuffer trustStore, String trustStorePass) throws IOException {
     
     if (context.getApplications().containsKey(appId)) {
@@ -881,13 +884,13 @@ public class ContainerManagerImpl extends CompositeService implements
     // AMLauncher
     if (keyStorePass != null && !keyStorePass.isEmpty()
         && trustStorePass != null && !trustStorePass.isEmpty()) {
-      context.getCertificateLocalizationService().materializeCertificates(user,
+      context.getCertificateLocalizationService().materializeCertificates(user, userFolder,
           keyStore, keyStorePass, trustStore, trustStorePass);
     }
   }
   
   private ContainerManagerApplicationProto buildAppProto(ApplicationId appId,
-      String user, Credentials credentials,
+      String user, String userFolder, Credentials credentials,
       Map<ApplicationAccessType, String> appAcls,
       LogAggregationContext logAggregationContext, ByteBuffer keyStore, String keyStorePass,
       ByteBuffer trustStore, String trustStorePass) {
@@ -896,6 +899,8 @@ public class ContainerManagerImpl extends CompositeService implements
         ContainerManagerApplicationProto.newBuilder();
     builder.setId(((ApplicationIdPBImpl) appId).getProto());
     builder.setUser(user);
+    builder.setUserFolder(userFolder);
+
     if(keyStore!=null){
       builder.setKeyStore(ProtoUtils.convertToProtoFormat(keyStore));
       builder.setKeyStorePassword(keyStorePass);
@@ -1042,7 +1047,7 @@ public class ContainerManagerImpl extends CompositeService implements
           Map<ApplicationAccessType, String> appAcls =
               container.getLaunchContext().getApplicationACLs();
           context.getNMStateStore().storeApplication(applicationID,
-              buildAppProto(applicationID, user, credentials, appAcls,
+              buildAppProto(applicationID, user, userFolder, credentials, appAcls,
                   logAggregationContext,keyStore, keyStorePass, trustStore, trustStorePass));
           dispatcher.getEventHandler().handle(
             new ApplicationInitEvent(applicationID, appAcls,

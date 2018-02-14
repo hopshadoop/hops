@@ -56,15 +56,17 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -84,13 +86,14 @@ public class CertificateLocalizationService extends AbstractService
   private final String SYSTEM_TMP = System.getProperty("java.io.tmpdir",
       "/tmp");
   private final String LOCALIZATION_DIR_NAME = "certLoc";
-  private final String LOCALIZATION_DIR;
+  private String LOCALIZATION_DIR;
+  private String serviceName;
   private Path materializeDir;
   private String superKeystoreLocation;
   private String superKeystorePass;
   private String superTrustStoreLocation;
   private String superTruststorePass;
-  
+
   private final Map<StorageKey, CryptoMaterial> materialLocation =
       new ConcurrentHashMap<>();
   private final Map<StorageKey, Future<CryptoMaterial>> futures =
@@ -103,66 +106,82 @@ public class CertificateLocalizationService extends AbstractService
   private Thread eventProcessor = null;
   private volatile boolean stopped = false;
   private ObjectName mbeanObjectName;
-  private final String serviceName;
+  private final ServiceType service;
   public static final String JMX_MATERIALIZED_KEY = "materialized";
   public static final String JMX_FORCE_REMOVE_OP = "forceRemoveMaterial";
   private final ReentrantLock lock = new ReentrantLock(true);
   
-  private File tmpDir;
-  
   private Server server;
   private RecordFactory recordFactory;
-  
-  public CertificateLocalizationService(boolean isHAEnabled, String serviceName) {
+
+  public enum ServiceType {
+    RM("RM"),
+    NM("NM");
+
+    private final String service;
+
+    ServiceType(String service) {
+      this.service = service;
+    }
+
+    @Override
+    public String toString() {
+      return service;
+    }
+  }
+
+  public CertificateLocalizationService(boolean isHAEnabled, ServiceType service) {
     super(CertificateLocalizationService.class.getName());
     this.isHAEnabled = isHAEnabled;
-    if (serviceName == null) {
-      Random rand = new Random();
-      serviceName = String.valueOf(rand.nextInt());
-    }
-    this.serviceName = serviceName;
-    LOCALIZATION_DIR = serviceName + "_" + LOCALIZATION_DIR_NAME;
+    this.service = service;
   }
   
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     if (isHAEnabled) {
       recordFactory = RecordFactoryProvider.getRecordFactory(conf);
+
+      // HA is enabled only for the Resource Manager
+      String rmID = conf.get(YarnConfiguration.RM_HA_ID, "0");
+      serviceName = service + rmID;
+    } else {
+      serviceName = service.toString();
     }
-    
-    // TODO Get the localization directory from conf, for the moment is a
-    // random UUID
-    
+
+    LOCALIZATION_DIR = serviceName +  "_" + LOCALIZATION_DIR_NAME;
+
     parseSuperuserMaterial(conf);
     super.serviceInit(conf);
   }
   
   @Override
   protected void serviceStart() throws Exception {
-    String uuid = UUID.randomUUID().toString();
-    tmpDir = Paths.get(SYSTEM_TMP, LOCALIZATION_DIR).toFile();
-    if (!tmpDir.exists()) {
-      tmpDir.mkdir();
+    materializeDir = Paths.get(SYSTEM_TMP, LOCALIZATION_DIR);
+    File fileMaterializeDir = materializeDir.toFile();
+    if (!fileMaterializeDir.exists()) {
+      fileMaterializeDir.mkdir();
+      Set<PosixFilePermission> materializeDirPerm;
+      if (service == ServiceType.NM) {
+        // the nm user should have full access to the directory, everyone else should have only execute access
+        // to traverse the directory
+        materializeDirPerm = EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
+            PosixFilePermission.OWNER_EXECUTE, PosixFilePermission.GROUP_EXECUTE, PosixFilePermission.OTHERS_EXECUTE);
+      } else {
+        // Only the rm user should access to this directory
+        materializeDirPerm = EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
+            PosixFilePermission.OWNER_EXECUTE);
+      }
+      Files.setPosixFilePermissions(materializeDir, materializeDirPerm);
     }
-    tmpDir.setExecutable(false, false);
-    tmpDir.setExecutable(true);
-    // Writable only to the owner
-    tmpDir.setWritable(false, false);
-    tmpDir.setWritable(true);
-    // Readable by none
-    tmpDir.setReadable(false, false);
-    
-    materializeDir = Paths.get(tmpDir.getAbsolutePath(), uuid);
-    // Random materialization directory should have the default umask
-    materializeDir.toFile().mkdir();
+
     LOG.debug("Initialized at dir: " + materializeDir.toString());
   
     StandardMBean mbean = new StandardMBean(this, CertificateLocalizationMBean.class);
     mbeanObjectName = MBeans.register(serviceName, "CertificateLocalizer", mbean);
-    
+
     super.serviceStart();
   }
-  
+
   private void parseSuperuserMaterial(Configuration conf) {
     Configuration sslConf = new Configuration(false);
     sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY,
@@ -301,7 +320,7 @@ public class CertificateLocalizationService extends AbstractService
     }
     return rmAddresses;
   }
-  
+
   @Override
   protected void serviceStop() throws Exception {
     stopServer();
@@ -329,15 +348,11 @@ public class CertificateLocalizationService extends AbstractService
     return materializeDir;
   }
   
-  @VisibleForTesting
-  public File getTmpDir() {
-    return tmpDir;
-  }
-  
   @Override
-  public void materializeCertificates(String username,
+  public void materializeCertificates(String username, String userFolder,
       ByteBuffer keyStore, String keyStorePass,
       ByteBuffer trustStore, String trustStorePass) throws IOException {
+
     StorageKey key = new StorageKey(username);
     CryptoMaterial material = materialLocation.get(key);
     if (null != material) {
@@ -346,7 +361,7 @@ public class CertificateLocalizationService extends AbstractService
     }
   
     Future<CryptoMaterial> future = execPool.submit(new Materializer(key,
-        keyStore, keyStorePass, trustStore, trustStorePass));
+        userFolder, keyStore, keyStorePass, trustStore, trustStorePass));
     futures.put(key, future);
     // Put the CryptoMaterial lazily in the materialLocation map
   
@@ -415,11 +430,11 @@ public class CertificateLocalizationService extends AbstractService
     LOG.debug("Received *materializeCrypto* request " + request);
     MaterializeCryptoKeysResponse response = recordFactory.newRecordInstance
         (MaterializeCryptoKeysResponse.class);
-    
+
     try {
-      materializeCertificates(request.getUsername(), request.getKeystore(),
-          request.getKeystorePassword(), request.getTruststore(),
-          request.getTruststorePassword());
+      materializeCertificates(request.getUsername(), request.getUserFolder(),
+          request.getKeystore(), request.getKeystorePassword(),
+          request.getTruststore(), request.getTruststorePassword());
       response.setSuccess(true);
     } catch (IOException ex) {
       response.setSuccess(false);
@@ -550,14 +565,16 @@ public class CertificateLocalizationService extends AbstractService
   
   private class Materializer implements Callable<CryptoMaterial> {
     private final StorageKey key;
+    private final String userFolder;
     private final ByteBuffer kstore;
     private final String kstorePass;
     private final ByteBuffer tstore;
     private final String tstorePass;
     
-    private Materializer(StorageKey key, ByteBuffer kstore, String kstorePass,
+    private Materializer(StorageKey key, String userFolder, ByteBuffer kstore, String kstorePass,
         ByteBuffer tstore, String tstorePass) {
       this.key = key;
+      this.userFolder = userFolder;
       this.kstore = kstore;
       this.kstorePass = kstorePass;
       this.tstore = tstore;
@@ -566,32 +583,43 @@ public class CertificateLocalizationService extends AbstractService
     
     @Override
     public CryptoMaterial call() throws IOException {
-      File appDir = Paths.get(materializeDir.toString(), key.getUsername())
-          .toFile();
+
+      Path appDirPath = Paths.get(materializeDir.toString(), userFolder);
+      File appDir = appDirPath.toFile();
       if (!appDir.exists()) {
         appDir.mkdir();
       }
-      File kstoreFile = Paths.get(appDir.getAbsolutePath(),
-          key.getUsername() + HopsSSLSocketFactory.KEYSTORE_SUFFIX)
-          .toFile();
-      File tstoreFile = Paths.get(appDir.getAbsolutePath(),
-          key.getUsername() + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX)
-          .toFile();
-      File passwdFile = Paths.get(appDir.getAbsolutePath(),
-          key.getUsername() + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX)
-          .toFile();
-      FileChannel kstoreChannel = new FileOutputStream(kstoreFile, false)
+
+      Path kStorePath = Paths.get(appDir.getAbsolutePath(),
+          key.getUsername() + HopsSSLSocketFactory.KEYSTORE_SUFFIX);
+      Path tStorePath = Paths.get(appDir.getAbsolutePath(),
+          key.getUsername() + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
+      Path passwdPath = Paths.get(appDir.getAbsolutePath(),
+          key.getUsername() + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX);
+
+      FileChannel kstoreChannel = new FileOutputStream(kStorePath.toFile(), false)
           .getChannel();
       kstoreChannel.write(kstore);
       kstoreChannel.close();
-      FileChannel tstoreChannel = new FileOutputStream(tstoreFile, false)
+      FileChannel tstoreChannel = new FileOutputStream(tStorePath.toFile(), false)
           .getChannel();
       tstoreChannel.write(tstore);
       tstoreChannel.close();
-      FileUtils.writeStringToFile(passwdFile, kstorePass);
-      
-      CryptoMaterial material = new CryptoMaterial(kstoreFile.getAbsolutePath(),
-          tstoreFile.getAbsolutePath(), passwdFile.getAbsolutePath(),
+      FileUtils.writeStringToFile(passwdPath.toFile(), kstorePass);
+
+      if (service == ServiceType.NM) {
+        Set<PosixFilePermission> materialPermissions =
+            EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
+        PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_EXECUTE);
+
+        Files.setPosixFilePermissions(appDirPath, materialPermissions);
+        Files.setPosixFilePermissions(kStorePath, materialPermissions);
+        Files.setPosixFilePermissions(tStorePath, materialPermissions);
+        Files.setPosixFilePermissions(passwdPath, materialPermissions);
+      }
+
+      CryptoMaterial material = new CryptoMaterial(appDirPath.toString(),
+          kStorePath.toString(), tStorePath.toString(), passwdPath.toString(),
           kstore, kstorePass, tstore, tstorePass);
       try {
         // We lock to get a consistent state if JMX getState is called at the same time
@@ -606,6 +634,7 @@ public class CertificateLocalizationService extends AbstractService
         MaterializeCryptoKeysRequest request = Records.newRecord
             (MaterializeCryptoKeysRequest.class);
         request.setUsername(key.getUsername());
+        request.setUserFolder(userFolder);
         request.setKeystore(kstore);
         request.setKeystorePassword(kstorePass);
         request.setTruststore(tstore);
@@ -628,8 +657,7 @@ public class CertificateLocalizationService extends AbstractService
     
     @Override
     public void run() {
-      File appDir = Paths.get(materializeDir.toString(), key.getUsername())
-          .toFile();
+      File appDir = new File(material.getCertFolder());
       FileUtils.deleteQuietly(appDir);
       try {
         lock.lock();
@@ -688,7 +716,7 @@ public class CertificateLocalizationService extends AbstractService
         }
       }
     }
-    
+
     private void materializeRequest(MaterializeCryptoKeysRequest request) {
       for (CertificateLocalizationProtocol client : clients) {
         try {

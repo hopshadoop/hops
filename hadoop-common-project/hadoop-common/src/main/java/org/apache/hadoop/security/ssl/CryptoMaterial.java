@@ -20,6 +20,7 @@ package org.apache.hadoop.security.ssl;
 import java.nio.ByteBuffer;
 
 public class CryptoMaterial {
+  private final String certFolder;
   private final String keyStoreLocation;
   private final int keyStoreSize;
   private final String trustStoreLocation;
@@ -35,9 +36,10 @@ public class CryptoMaterial {
   // at the same time
   private int requestedApplications;
   
-  public CryptoMaterial(String keyStoreLocation, String trustStoreLocation,
+  public CryptoMaterial(String certFolder, String keyStoreLocation, String trustStoreLocation,
       String passwdLocation, ByteBuffer kStore, String kStorePass,
       ByteBuffer tstore, String tstorePass) {
+    this.certFolder = certFolder;
     this.keyStoreLocation = keyStoreLocation;
     this.keyStoreSize = kStore.capacity();
     this.trustStoreLocation = trustStoreLocation;
@@ -51,6 +53,8 @@ public class CryptoMaterial {
     
     requestedApplications = 1;
   }
+
+  public String getCertFolder() { return certFolder; }
   
   public String getKeyStoreLocation() {
     return keyStoreLocation;

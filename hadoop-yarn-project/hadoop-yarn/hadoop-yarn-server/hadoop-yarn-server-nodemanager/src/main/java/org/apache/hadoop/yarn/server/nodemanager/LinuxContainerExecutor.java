@@ -23,8 +23,12 @@ import com.google.common.base.Optional;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.CertificateLocalization;
+import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
@@ -51,15 +55,16 @@ import org.apache.hadoop.yarn.server.nodemanager.executor.DeletionAsUserContext;
 import org.apache.hadoop.yarn.server.nodemanager.executor.LocalizerStartContext;
 import org.apache.hadoop.yarn.server.nodemanager.util.DefaultLCEResourcesHandler;
 import org.apache.hadoop.yarn.server.nodemanager.util.LCEResourcesHandler;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.*;
@@ -232,6 +237,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     List<String> prefixCommands = new ArrayList<>();
 
     addSchedPriorityCommand(prefixCommands);
+
     initializeContainerOp.appendArgs(
         runAsUser,
         userFolder,
@@ -262,13 +268,32 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     buildMainArgs(localizerArgs, user, appId, locId, nmAddr, localDirs, userFolder);
     initializeContainerOp.appendArgs(localizerArgs);
 
+    Map<String, String> environment = null;
+
+     // If SSL is enabled, populate the environment with the location of the certificates
+    if (getConf().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      String certFolder = null;
+      CertificateLocalization certificateLocalization = CertificateLocalizationCtx.getInstance()
+          .getCertificateLocalization();
+
+      try {
+        certFolder = certificateLocalization.getMaterialLocation(user).getCertFolder();
+      } catch (ExecutionException e) {
+        throw new InterruptedException("Execution of CertificateMaterializer interrupted");
+      }
+
+      environment = new HashMap<>();
+      environment.put(HopsSSLSocketFactory.CRYPTO_MATERIAL_ENV_VAR, certFolder);
+    }
+
     try {
       Configuration conf = super.getConf();
       PrivilegedOperationExecutor privilegedOperationExecutor =
           getPrivilegedOperationExecutor();
 
       privilegedOperationExecutor.executePrivilegedOperation(prefixCommands,
-          initializeContainerOp, null, null, false, true);
+          initializeContainerOp, null, environment, false, true);
 
     } catch (PrivilegedOperationException e) {
       int exitCode = e.getExitCode();
