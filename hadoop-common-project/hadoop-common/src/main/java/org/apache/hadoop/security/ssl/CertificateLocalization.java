@@ -23,7 +23,8 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
 public interface CertificateLocalization {
-  void materializeCertificates(String username,
+
+  void materializeCertificates(String username, String userFolder,
       ByteBuffer keyStore, String keyStorePassword,
       ByteBuffer trustStore, String trustStorePassword) throws IOException;
   

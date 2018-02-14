@@ -163,4 +163,22 @@ public class MaterializeCryptoKeysRequestPBImpl extends
     }
     builder.setTruststorePassword(password);
   }
+
+  @Override
+  public String getUserFolder() {
+    YarnServerCommonServiceProtos.MaterializeCryptoKeysRequestProtoOrBuilder p =
+        viaProto ? proto : builder;
+
+    return (p.hasUserFolder()) ? p.getUserFolder() : null;
+  }
+
+  @Override
+  public void setUserFolder(String userFolder) {
+    maybeInitBuilder();
+    if (userFolder == null) {
+      builder.clearUserFolder();
+      return;
+    }
+    builder.setUserFolder(userFolder);
+  }
 }

@@ -130,6 +130,7 @@ message MaterializeCryptoKeysRequestProto {
   required string keystore_password = 3;
   required bytes truststore = 4;
   required string truststore_password = 5;
+  required string user_folder = 6;
 }
 
 message MaterializeCryptoKeysResponseProto {

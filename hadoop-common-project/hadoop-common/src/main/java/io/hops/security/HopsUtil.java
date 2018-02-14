@@ -93,7 +93,7 @@ public class HopsUtil {
     
     return FileUtils.readFileToString(passwdFile);
   }
-  
+
   @Deprecated
   private static String getCertPassFromHwInternal(String keyStoreEncoded,
       String username, Configuration conf) throws JSONException, IOException {

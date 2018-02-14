@@ -1469,7 +1469,7 @@ LOG.info("+");
       boolean isHAEnabled = rmContext.isHAEnabled();
       
       certificateLocalizationService = new CertificateLocalizationService(isHAEnabled,
-          "RM");
+          CertificateLocalizationService.ServiceType.RM);
       CertificateLocalizationCtx.getInstance().setCertificateLocalization
           (certificateLocalizationService);
       addService(certificateLocalizationService);
