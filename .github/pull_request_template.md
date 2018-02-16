@@ -4,7 +4,7 @@
 - [ ] Tests for the changes have been added and passed (for bug fixes / features)
 - [ ] HOPS JIRA issue has been opened for this PR
 - [ ] All commits have been squashed down to a single commit
-
+- [ ] The commit message has the following format: [HOPS-XXX] message
 
 * **Post a link to the associated JIRA issue**
 
