@@ -138,6 +138,14 @@ message SetStoragePolicyResponseProto { // void response
 message GetStoragePoliciesRequestProto { // void request
 }
 
+message GetStoragePolicyRequestProto {
+  required uint32 storagePolicyID = 1;
+}
+
+message GetStoragePolicyResponseProto {
+  required BlockStoragePolicyProto policy = 1;
+}
+
 message GetStoragePoliciesResponseProto {
   repeated BlockStoragePolicyProto policies = 1;
 }
@@ -599,6 +607,7 @@ service ClientNamenodeProtocol {
   rpc append (AppendRequestProto) returns (AppendResponseProto);
   rpc setReplication (SetReplicationRequestProto) returns (SetReplicationResponseProto);
   rpc setStoragePolicy(SetStoragePolicyRequestProto) returns(SetStoragePolicyResponseProto);
+  rpc getStoragePolicy(GetStoragePolicyRequestProto) returns(GetStoragePolicyResponseProto);  
   rpc getStoragePolicies(GetStoragePoliciesRequestProto) returns(GetStoragePoliciesResponseProto);
   rpc setMetaEnabled (SetMetaEnabledRequestProto) returns (SetMetaEnabledResponseProto);
   rpc setPermission (SetPermissionRequestProto) returns (SetPermissionResponseProto);

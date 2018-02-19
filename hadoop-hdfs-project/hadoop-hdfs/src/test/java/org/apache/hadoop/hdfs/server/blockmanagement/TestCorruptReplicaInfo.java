@@ -174,7 +174,7 @@ public class TestCorruptReplicaInfo {
       @Override
       public Object performTask() throws StorageException, IOException {
         blocksMap.addBlockCollection(blk, new INodeFile(new PermissionStatus
-            ("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1));
+            ("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1, (byte) 0));
         crm.addToCorruptReplicasMap(blk, storage, reason);
         return null;
       }

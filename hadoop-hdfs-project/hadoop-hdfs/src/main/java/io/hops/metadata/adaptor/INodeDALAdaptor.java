@@ -189,7 +189,9 @@ public class INodeDALAdaptor
       hopINode.setName(inode.getLocalName());
       hopINode.setParentId(inode.getParentId());
       hopINode.setPermission(inode.getFsPermission().toShort());
-      hopINode.setStoragePolicy(inode.getLocalStoragePolicyID());
+      if(!inode.isSymlink()){
+        hopINode.setStoragePolicy(inode.getLocalStoragePolicyID());
+      }
       hopINode.setSubtreeLocked(inode.isSubtreeLocked());
       hopINode.setSubtreeLockOwner(inode.getSubtreeLockOwner());
       hopINode.setUserID(inode.getUserID());
@@ -257,12 +259,13 @@ public class INodeDALAdaptor
               INodeFile.getBlockReplication(hopINode.getHeader()),
               INodeFile.getPreferredBlockSize(hopINode.getHeader()),
               hopINode.getModificationTime(), hopINode.getClientName(),
-              hopINode.getClientMachine(), dnID);
+              hopINode.getClientMachine(), dnID, hopINode.getStoragePolicy());
 
             inode.setAccessTimeNoPersistance(hopINode.getAccessTime());
           } else {
             inode = new INodeFile(ps, hopINode.getHeader(),
-                hopINode.getModificationTime(), hopINode.getAccessTime(), hopINode.isFileStoredInDB());
+                hopINode.getModificationTime(), hopINode.getAccessTime(), hopINode.isFileStoredInDB(),
+                hopINode.getStoragePolicy());
           }
           ((INodeFile) inode).setGenerationStampNoPersistence(
               hopINode.getGenerationStamp());

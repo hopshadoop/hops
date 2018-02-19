@@ -408,6 +408,13 @@ public interface ClientProtocol {
       IOException;
 
   /**
+   * Get the block storage policies corresponding the  the policy ID.
+   * @return All the in-use block storage policies currently.
+   */
+  @Idempotent
+  public BlockStoragePolicy getStoragePolicy(byte storagePolicyID) throws IOException;
+  
+  /**
    * Get all the available block storage policies.
    * @return All the in-use block storage policies currently.
    */

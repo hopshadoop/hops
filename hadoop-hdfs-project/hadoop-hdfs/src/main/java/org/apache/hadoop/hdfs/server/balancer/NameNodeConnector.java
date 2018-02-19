@@ -57,6 +57,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.fs.FSDataOutputStream;
 
 /**
  * The class provides utilities for {@link Balancer} to access a NameNode
@@ -67,7 +68,39 @@ public class NameNodeConnector implements Closeable {
   private static final Path BALANCER_ID_PATH = new Path("/system/balancer.id");
   private static final int MAX_NOT_CHANGED_ITERATIONS = 5;
   private static boolean write2IdFile = true;
+ 
+  /**
+   * Create {@link NameNodeConnector} for the given namenodes.
+   */
+  public static List<NameNodeConnector> newNameNodeConnectors(
+      Collection<URI> namenodes, String name, Path idPath, Configuration conf)
+      throws IOException {
+    final List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>(
+        namenodes.size());
+    for (URI uri : namenodes) {
+      NameNodeConnector nnc = new NameNodeConnector(uri, null, conf);
+      connectors.add(nnc);
+    }
+    return connectors;
+  }
 
+  public static List<NameNodeConnector> newNameNodeConnectors(
+      Map<URI, List<Path>> namenodes, String name, Path idPath,
+      Configuration conf) throws IOException {
+    final List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>(
+        namenodes.size());
+    for (Map.Entry<URI, List<Path>> entry : namenodes.entrySet()) {
+      NameNodeConnector nnc = new NameNodeConnector(entry.getKey(), entry.getValue(), conf);
+      connectors.add(nnc);
+    }
+    return connectors;
+  }
+
+  @VisibleForTesting
+  public static void setWrite2IdFile(boolean write2IdFile) {
+    NameNodeConnector.write2IdFile = write2IdFile;
+  }
+  
   final URI nameNodeUri;
   final String blockpoolID;
 
@@ -75,9 +108,9 @@ public class NameNodeConnector implements Closeable {
   final ClientProtocol client;
   final DistributedFileSystem fs;
   final OutputStream out;
-
   private final List<Path> targetPaths;
   private final AtomicLong bytesMoved = new AtomicLong();
+  
   private int notChangedIterations = 0;
 
   private final boolean isBlockTokenEnabled;
@@ -230,7 +263,7 @@ public class NameNodeConnector implements Closeable {
    */
   private OutputStream checkAndMarkRunningBalancer() throws IOException {
     try {
-      final DataOutputStream out = fs.create(BALANCER_ID_PATH);
+      final FSDataOutputStream out = fs.create(BALANCER_ID_PATH);
       if (write2IdFile) {
         out.writeBytes(InetAddress.getLocalHost().getHostName());
         out.flush();
@@ -298,37 +331,5 @@ public class NameNodeConnector implements Closeable {
         shouldRun = false;
       }
     }
-  }
-
-  /**
-   * Create {@link NameNodeConnector} for the given namenodes.
-   */
-  public static List<NameNodeConnector> newNameNodeConnectors(
-      Collection<URI> namenodes, String name, Path idPath, Configuration conf)
-      throws IOException {
-    final List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>(
-        namenodes.size());
-    for (URI uri : namenodes) {
-      NameNodeConnector nnc = new NameNodeConnector(uri, null, conf);
-      connectors.add(nnc);
-    }
-    return connectors;
-  }
-
-  public static List<NameNodeConnector> newNameNodeConnectors(
-      Map<URI, List<Path>> namenodes, String name, Path idPath,
-      Configuration conf) throws IOException {
-    final List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>(
-        namenodes.size());
-    for (Map.Entry<URI, List<Path>> entry : namenodes.entrySet()) {
-      NameNodeConnector nnc = new NameNodeConnector(entry.getKey(), entry.getValue(), conf);
-      connectors.add(nnc);
-    }
-    return connectors;
-  }
-
-  @VisibleForTesting
-  public static void setWrite2IdFile(boolean write2IdFile) {
-    NameNodeConnector.write2IdFile = write2IdFile;
   }
 }

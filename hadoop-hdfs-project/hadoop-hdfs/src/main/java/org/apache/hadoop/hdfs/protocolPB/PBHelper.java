@@ -101,6 +101,8 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.RecoveringBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.ReplicaStateProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageReportProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageTypesProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageUuidsProto;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
@@ -761,15 +763,41 @@ public class PBHelper {
     for (Block block : blocks) {
       builder.addBlocks(PBHelper.convert(block));
     }
-    builder.addAllTargets(PBHelper.convert(cmd.getTargets()));
+    builder.addAllTargets(convert(cmd.getTargets())).
+        addAllTargetStorageUuids(convert(cmd.getTargetStorageIDs()));
+    StorageType[][] types = cmd.getTargetStorageTypes();
+    if (types != null) {
+      builder.addAllTargetStorageTypes(convert(types));
+    }
     return builder.build();
   }
 
+  private static List<StorageTypesProto> convert(StorageType[][] types) {
+    List<StorageTypesProto> list = Lists.newArrayList();
+    if (types != null) {
+      for (StorageType[] ts : types) {
+        StorageTypesProto.Builder builder = StorageTypesProto.newBuilder();
+        builder.addAllStorageTypes(convertStorageTypes(ts));
+        list.add(builder.build());
+      }
+    }
+    return list;
+  }
+  
   private static List<DatanodeInfosProto> convert(DatanodeInfo[][] targets) {
     DatanodeInfosProto[] ret = new DatanodeInfosProto[targets.length];
     for (int i = 0; i < targets.length; i++) {
       ret[i] = DatanodeInfosProto.newBuilder()
           .addAllDatanodes(PBHelper.convert(targets[i])).build();
+    }
+    return Arrays.asList(ret);
+  }
+
+  private static List<StorageUuidsProto> convert(String[][] targetStorageUuids) {
+    StorageUuidsProto[] ret = new StorageUuidsProto[targetStorageUuids.length];
+    for (int i = 0; i < targetStorageUuids.length; i++) {
+      ret[i] = StorageUuidsProto.newBuilder()
+          .addAllStorageUuids(Arrays.asList(targetStorageUuids[i])).build();
     }
     return Arrays.asList(ret);
   }
@@ -860,7 +888,7 @@ public class PBHelper {
     } else {
       for(int i = 0; i < targetStorageTypes.length; i++) {
         List<StorageTypeProto> p = targetStorageTypesList.get(i).getStorageTypesList();
-        targetStorageTypes[i] = p.toArray(new StorageType[p.size()]);
+        targetStorageTypes[i] = convertStorageTypes(p, targets[i].length);
       }
     }
 

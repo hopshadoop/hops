@@ -39,7 +39,7 @@ public class HdfsFileStatus extends FileStatus {
 
   private final long fileId;
   private boolean isFileStoredInDB;
-  private byte storagePolicy;
+  private final byte storagePolicy;
 
   public static final byte[] EMPTY_NAME = new byte[0];
 

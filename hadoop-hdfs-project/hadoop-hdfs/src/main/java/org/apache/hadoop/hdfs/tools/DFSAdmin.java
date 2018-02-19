@@ -539,6 +539,8 @@ public class DFSAdmin extends FsShell {
             "\t[-printTopology]\n" +
             "\t[-deleteBlockPool datanodehost:port blockpoolId [force]]\n" +
             "\t[-setBalancerBandwidth <bandwidth>]\n" +
+            "\t[-setStoragePolicy path policyName\n" +
+            "\t[-getStoragePolicy path\n" +
             "\t[-help [cmd]]\n";
 
     String report =
@@ -599,6 +601,12 @@ public class DFSAdmin extends FsShell {
         "\t\tthe dfs.balance.bandwidthPerSec parameter.\n\n" +
         "\t\t--- NOTE: The new value is not persistent on the DataNode.---\n";
     
+    String setStoragePolicy = "-setStoragePolicy path policyName\n"
+        + "\tSet the storage policy for a file/directory.\n";
+
+    String getStoragePolicy = "-getStoragePolicy path\n"
+        + "\tGet the storage policy for a file/directory.\n";
+
     String help =
         "-help [cmd]: \tDisplays help for the given command or all commands if none\n" +
             "\t\tis specified.\n";
@@ -629,6 +637,10 @@ public class DFSAdmin extends FsShell {
       System.out.println(deleteBlockPool);
     } else if ("setBalancerBandwidth".equals(cmd)) {
       System.out.println(setBalancerBandwidth);
+    } else if ("setStoragePolicy".equalsIgnoreCase(cmd))  {
+      System.out.println(setStoragePolicy);
+    } else if ("getStoragePolicy".equalsIgnoreCase(cmd))  {
+      System.out.println(getStoragePolicy);
     } else if ("help".equals(cmd)) {
       System.out.println(help);
     } else {
@@ -646,6 +658,8 @@ public class DFSAdmin extends FsShell {
       System.out.println(printTopology);
       System.out.println(deleteBlockPool);
       System.out.println(setBalancerBandwidth);
+      System.out.println(setStoragePolicy);
+      System.out.println(getStoragePolicy);
       System.out.println(help);
       System.out.println();
       ToolRunner.printGenericCommandUsage(System.out);
@@ -829,6 +843,12 @@ public class DFSAdmin extends FsShell {
     } else if ("-setBalancerBandwidth".equals(cmd)) {
       System.err.println("Usage: java DFSAdmin" +
           " [-setBalancerBandwidth <bandwidth in bytes per second>]");
+    } else if ("-setStoragePolicy".equals(cmd)) {
+      System.err.println("Usage: java DFSAdmin"
+          + " [-setStoragePolicy path policyName]");
+    } else if ("-getStoragePolicy".equals(cmd)) {
+      System.err.println("Usage: java DFSAdmin"
+          + " [-getStoragePolicy path]");
     } else {
       System.err.println("Usage: java DFSAdmin");
       System.err.println("Note: Administrative commands can only be run as the HDFS superuser.");
@@ -847,6 +867,8 @@ public class DFSAdmin extends FsShell {
       System.err.println("\t[-setBalancerBandwidth <bandwidth in bytes per second>]");
       System.err.println("\t[-setStoragePolicy path policyName]\n");
       System.err.println("\t[-getStoragePolicy path]\n");
+      System.err.println("\t[-setStoragePolicy path policyName]");
+      System.err.println("\t[-getStoragePolicy path]");
       System.err.println("\t[-help [cmd]]");
       System.err.println();
       ToolRunner.printGenericCommandUsage(System.err);
@@ -925,7 +947,7 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
-    }
+    } 
     
     // initialize DFSAdmin
     try {

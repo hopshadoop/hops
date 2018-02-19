@@ -20,6 +20,12 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -27,11 +33,14 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.IOException; 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import org.junit.Before;
 
 public class TestINodeFile {
 
@@ -39,8 +48,33 @@ public class TestINodeFile {
   static final long BLKSIZE_MAXVALUE = ~(0xffffL << BLOCKBITS);
 
   private String userName = "Test";
+  private static final PermissionStatus perm = new PermissionStatus(
+      "userName", null, FsPermission.getDefault());
   private short replication;
   private long preferredBlockSize;
+
+  @Before
+  public void setup() throws IOException{
+    Configuration conf = new HdfsConfiguration();
+    HdfsStorageFactory.setConfiguration(conf);
+    HdfsStorageFactory.formatStorage();
+  }
+  
+  INodeFile createINodeFile(short replication, long preferredBlockSize) throws IOException {
+    return new INodeFile(perm, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
+  }
+    
+  private static INodeFile createINodeFile(byte storagePolicyID) throws IOException {
+    return new INodeFile(perm, null, (short) 3, 0L, 0L, 1024L, storagePolicyID);
+  }
+
+  @Test
+  public void testStoragePolicyID() throws IOException {
+    for (byte i = 1; i < 16; i++) {
+      final INodeFile f = createINodeFile(i);
+      assertEquals(i, f.getStoragePolicyID());
+    }
+  }
 
   /**
    * Test for the Replication value. Sets a value and checks if it was set
@@ -50,9 +84,7 @@ public class TestINodeFile {
   public void testReplication() throws IOException {
     replication = 3;
     preferredBlockSize = 128 * 1024 * 1024;
-    INodeFile inf = new INodeFile(
-        new PermissionStatus(userName, null, FsPermission.getDefault()), null,
-        replication, 0L, 0L, preferredBlockSize);
+    INodeFile inf = createINodeFile(replication, preferredBlockSize);
     assertEquals("True has to be returned in this case", replication,
         inf.getBlockReplication());
   }
@@ -69,9 +101,7 @@ public class TestINodeFile {
       throws IllegalArgumentException, IOException {
     replication = -1;
     preferredBlockSize = 128 * 1024 * 1024;
-    new INodeFile(
-        new PermissionStatus(userName, null, FsPermission.getDefault()), null,
-        replication, 0L, 0L, preferredBlockSize);
+    createINodeFile(replication, preferredBlockSize);
   }
 
   /**
@@ -82,9 +112,7 @@ public class TestINodeFile {
   public void testPreferredBlockSize() throws IOException {
     replication = 3;
     preferredBlockSize = 128 * 1024 * 1024;
-    INodeFile inf = new INodeFile(
-        new PermissionStatus(userName, null, FsPermission.getDefault()), null,
-        replication, 0L, 0L, preferredBlockSize);
+    INodeFile inf = createINodeFile(replication, preferredBlockSize);
     assertEquals("True has to be returned in this case", preferredBlockSize,
         inf.getPreferredBlockSize());
   }
@@ -93,9 +121,7 @@ public class TestINodeFile {
   public void testPreferredBlockSizeUpperBound() throws IOException {
     replication = 3;
     preferredBlockSize = BLKSIZE_MAXVALUE;
-    INodeFile inf = new INodeFile(
-        new PermissionStatus(userName, null, FsPermission.getDefault()), null,
-        replication, 0L, 0L, preferredBlockSize);
+    INodeFile inf = createINodeFile(replication, preferredBlockSize);
     assertEquals("True has to be returned in this case", BLKSIZE_MAXVALUE,
         inf.getPreferredBlockSize());
   }
@@ -112,9 +138,7 @@ public class TestINodeFile {
       throws IllegalArgumentException, IOException {
     replication = 3;
     preferredBlockSize = -1;
-    new INodeFile(
-        new PermissionStatus(userName, null, FsPermission.getDefault()), null,
-        replication, 0L, 0L, preferredBlockSize);
+    createINodeFile(replication, preferredBlockSize);
   }
 
   /**
@@ -129,9 +153,7 @@ public class TestINodeFile {
       throws IllegalArgumentException, IOException {
     replication = 3;
     preferredBlockSize = BLKSIZE_MAXVALUE + 1;
-    new INodeFile(
-        new PermissionStatus(userName, null, FsPermission.getDefault()), null,
-        replication, 0L, 0L, preferredBlockSize);
+    createINodeFile(replication, preferredBlockSize);
   }
 
   //  @Test
@@ -142,8 +164,7 @@ public class TestINodeFile {
 
     replication = 3;
     preferredBlockSize = 128 * 1024 * 1024;
-    INodeFile inf =
-        new INodeFile(perms, null, replication, 0L, 0L, preferredBlockSize);
+    INodeFile inf =createINodeFile(replication, preferredBlockSize);
     inf.setLocalName("f");
 
     INodeDirectory root = new INodeDirectory(INodeDirectory.ROOT_NAME, perms);
@@ -212,7 +233,7 @@ public class TestINodeFile {
       PermissionStatus perms =
           new PermissionStatus(userName, null, FsPermission.getDefault());
       iNodes[i] =
-          new INodeFile(perms, null, replication, 0L, 0L, preferredBlockSize);
+          new INodeFile(perms, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
       iNodes[i].setLocalNameNoPersistance(fileNamePrefix + Integer.toString(i));
       BlockInfo newblock = new BlockInfo();
       newblock.setBlockId(blkid++);
@@ -266,7 +287,7 @@ public class TestINodeFile {
 
     {//cast from INodeFile
       final INode from =
-          new INodeFile(perm, null, replication, 0L, 0L, preferredBlockSize);
+          new INodeFile(perm, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
       
       //cast to INodeFile, should success
       final INodeFile f = INodeFile.valueOf(from, path);
@@ -292,7 +313,7 @@ public class TestINodeFile {
     {//cast from INodeFileUnderConstruction
       final INode from =
           new INodeFileUnderConstruction(perm, replication, 0L, 0L, "client",
-              "machine", null);
+              "machine", null, (byte) 0);
       
       //cast to INodeFile, should success
       final INodeFile f = INodeFile.valueOf(from, path);

@@ -281,7 +281,7 @@ public class FSNamesystem
   private HdfsFileStatus getAuditFileInfo(String path, boolean resolveSymlink)
       throws IOException {
     return (isAuditEnabled() && isExternalInvocation()) ?
-        dir.getFileInfo(path, resolveSymlink) : null;
+        dir.getFileInfo(path, resolveSymlink, false) : null;
   }
 
   private void logAuditEvent(boolean succeeded, String cmd, String src)
@@ -360,6 +360,9 @@ public class FSNamesystem
   private final BlockManager blockManager;
   private final DatanodeStatistics datanodeStatistics;
 
+  // whether setStoragePolicy is allowed.
+  private final boolean isStoragePolicyEnabled;
+  
   // Block pool ID used by this namenode
   //HOP made it final and now its value is read from the config file. all
   // namenodes should have same block pool id
@@ -511,6 +514,10 @@ public class FSNamesystem
       this.datanodeStatistics =
           blockManager.getDatanodeManager().getDatanodeStatistics();
 
+      this.isStoragePolicyEnabled =
+          conf.getBoolean(DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY,
+                          DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_DEFAULT);
+      
       this.fsOwner = UserGroupInformation.getCurrentUser();
       this.fsOwnerShortUserName = fsOwner.getShortUserName();
       this.superGroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
@@ -1762,7 +1769,12 @@ public class FSNamesystem
   private void setStoragePolicyInt(final String filename, final String policyName)
       throws IOException, UnresolvedLinkException, AccessControlException {
 
-    final BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(policyName);
+    if (!isStoragePolicyEnabled) {
+      throw new IOException("Failed to set storage policy since "
+          + DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY + " is set to false.");
+    }
+    
+    final BlockStoragePolicy policy =  blockManager.getStoragePolicy(policyName);
     if (policy == null) {
       throw new HadoopIllegalArgumentException("Cannot find a block policy with the name " + policyName);
     }
@@ -1776,7 +1788,7 @@ public class FSNamesystem
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask() throws IOException {           
             FSPermissionChecker pc = getPermissionChecker();
             if (isInSafeMode()) {
               throw new SafeModeException("Cannot set metaEnabled for " + filename, safeMode);
@@ -1795,11 +1807,20 @@ public class FSNamesystem
   }
 
 
+  BlockStoragePolicy getDefaultStoragePolicy() throws IOException {
+    return blockManager.getDefaultStoragePolicy();
+  }
+ 
+  
+  BlockStoragePolicy getStoragePolicy(byte storagePolicyID) throws IOException {
+    return blockManager.getStoragePolicy(storagePolicyID);
+  }
+  
   /**
    * @return All the existing block storage policies
    */
   BlockStoragePolicy[] getStoragePolicies() throws IOException {
-    return BlockStoragePolicySuite.getAllStoragePolicies();
+    return blockManager.getStoragePolicies();
   }
 
   long getPreferredBlockSize(final String filename) throws IOException {
@@ -1897,7 +1918,7 @@ public class FSNamesystem
     FSPermissionChecker pc = getPermissionChecker();
     startFileInternal(pc, src, permissions, holder, clientMachine, flag,
         createParent, replication, blockSize);
-    final HdfsFileStatus stat = dir.getFileInfoForCreate(src, false);
+    final HdfsFileStatus stat = dir.getFileInfoForCreate(src, false, true);
     logAuditEvent(true, "create", src, null,
         (isAuditEnabled() && isExternalInvocation()) ? stat : null);
     return stat;
@@ -2622,18 +2643,15 @@ public class FSNamesystem
             preferredBlockSize = file.getPreferredBlockSize();
 
             byte storagePolicyID = file.getStoragePolicyID();
-            BlockStoragePolicy storagePolicy =
-                BlockStoragePolicySuite.getPolicy(storagePolicyID);
 
             //find datanode storages
             final DatanodeManager dm = blockManager.getDatanodeManager();
             chosen = Arrays.asList(dm.getDatanodeStorageInfos(existings, storageIDs));
 
             // choose new datanodes.
-            final DatanodeStorageInfo[] targets =
-                blockManager.getBlockPlacementPolicy()
-                    .chooseTarget(src, numAdditionalNodes, clientNode, chosen,
-                        true, excludes, preferredBlockSize, storagePolicy);
+            final DatanodeStorageInfo[] targets = blockManager.chooseTarget4AdditionalDatanode(
+                src, numAdditionalNodes, clientNode, chosen,
+                excludes, preferredBlockSize, storagePolicyID);
 
             final LocatedBlock lb = new LocatedBlock(blk, targets);
             blockManager.setBlockToken(lb, AccessMode.COPY);
@@ -3289,10 +3307,12 @@ public class FSNamesystem
             HdfsFileStatus stat;
             FSPermissionChecker pc = getPermissionChecker();
             try {
+              boolean isSuperUser = true;
               if (isPermissionEnabled) {
                 checkTraverse(pc, src);
+                isSuperUser = pc.isSuperUser();
               }
-              stat = dir.getFileInfo(src, resolveLink);
+              stat = dir.getFileInfo(src, resolveLink, isSuperUser);
             } catch (AccessControlException e) {
               logAuditEvent(false, "getfileinfo", src);
               throw e;
@@ -3348,7 +3368,7 @@ public class FSNamesystem
     FSPermissionChecker pc = getPermissionChecker();
     status = mkdirsInternal(pc, src, permissions, createParent);
     if (status) {
-      resultingStat = dir.getFileInfo(src, false);
+      resultingStat = dir.getFileInfo(src, false, false);
     }
 
     if (status) {
@@ -3916,15 +3936,17 @@ public class FSNamesystem
       throws IOException {
     DirectoryListing dl;
     FSPermissionChecker pc = getPermissionChecker();
+    boolean isSuperUser = true;
     if (isPermissionEnabled) {
       if (dir.isDir(src)) {
         checkPathAccess(pc, src, FsAction.READ_EXECUTE);
       } else {
         checkTraverse(pc, src);
       }
+      isSuperUser = pc.isSuperUser();
     }
     logAuditEvent(true, "listStatus", src);
-    dl = dir.getListing(src, startAfter, needLocation);
+    dl = dir.getListing(src, startAfter, needLocation, isSuperUser);
     return dl;
   }
 
@@ -7780,16 +7802,13 @@ public class FSNamesystem
         return targetNode.getLocalStoragePolicyID();
       }
     }.handle();
-    BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(storagePolicyID);
 
-    BlockPlacementPolicyDefault placementPolicy = (BlockPlacementPolicyDefault)
-        getBlockManager().getBlockPlacementPolicy();
     List<DatanodeStorageInfo> chosenStorages = new LinkedList<DatanodeStorageInfo>();
 
-    DatanodeStorageInfo[] descriptors = placementPolicy
-        .chooseTarget(isParity ? parityPath : sourcePath,
+    final DatanodeStorageInfo[] descriptors = blockManager.chooseTarget4ParityRepair(
+                isParity ? parityPath : sourcePath,
             isParity ? 1 : status.getEncodingPolicy().getTargetReplication(),
-            null, chosenStorages, false, excluded, block.getBlockSize(), policy);
+            null, chosenStorages, excluded, block.getBlockSize(), storagePolicyID);
 
     return new LocatedBlock(block.getBlock(), descriptors);
   }

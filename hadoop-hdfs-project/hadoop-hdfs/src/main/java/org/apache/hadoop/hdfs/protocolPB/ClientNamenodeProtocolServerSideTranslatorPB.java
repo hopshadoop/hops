@@ -403,6 +403,24 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
   }
 
   @Override
+  public ClientNamenodeProtocolProtos.GetStoragePolicyResponseProto getStoragePolicy(
+      RpcController controller, ClientNamenodeProtocolProtos.GetStoragePolicyRequestProto request)
+      throws ServiceException {
+    try {
+      BlockStoragePolicy policy = server.getStoragePolicy((byte)request.getStoragePolicyID());
+      ClientNamenodeProtocolProtos.GetStoragePolicyResponseProto.Builder builder =
+          ClientNamenodeProtocolProtos.GetStoragePolicyResponseProto.newBuilder();
+      if (policy == null) {
+        return builder.build();
+      }
+      builder.setPolicy(PBHelper.convert(policy));
+      return builder.build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+  
+  @Override
   public ClientNamenodeProtocolProtos.GetStoragePoliciesResponseProto getStoragePolicies(
       RpcController controller, ClientNamenodeProtocolProtos.GetStoragePoliciesRequestProto request)
       throws ServiceException {
