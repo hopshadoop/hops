@@ -46,6 +46,6 @@ public enum StorageType {
   }
   
   public boolean isMovable() {
-    return false;
+    return true;
   }
 }

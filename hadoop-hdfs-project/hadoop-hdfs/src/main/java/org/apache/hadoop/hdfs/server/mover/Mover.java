@@ -102,6 +102,8 @@ public class Mover {
   private final Dispatcher dispatcher;
   private final StorageMap storages;
   private final List<Path> targetPaths;
+  
+  private final BlockStoragePolicy[] blockStoragePolicies;
 
   Mover(NameNodeConnector nnc, Configuration conf) {
     final long movedWinWidth = conf.getLong(
@@ -119,9 +121,12 @@ public class Mover {
         maxConcurrentMovesPerNode, conf);
     this.storages = new StorageMap();
     this.targetPaths = nnc.getTargetPaths();
+    this.blockStoragePolicies = new BlockStoragePolicy[1 <<
+        BlockStoragePolicySuite.ID_BIT_LENGTH];
   }
 
   void init() throws IOException {
+    initStoragePolicies();
     final List<DatanodeStorageReport> reports = dispatcher.init();
     for (DatanodeStorageReport r : reports) {
       final DDatanode dn = dispatcher.newDatanode(r.getDatanodeInfo());
@@ -132,6 +137,14 @@ public class Mover {
             maxRemaining) : null;
         storages.add(source, target);
       }
+    }
+  }
+
+  private void initStoragePolicies() throws IOException {
+    BlockStoragePolicy[] policies = dispatcher.getDistributedFileSystem()
+        .getStoragePolicies();
+    for (BlockStoragePolicy policy : policies) {
+      this.blockStoragePolicies[policy.getId()] = policy;
     }
   }
 
@@ -249,7 +262,7 @@ public class Mover {
       if (policyId == BlockStoragePolicySuite.ID_UNSPECIFIED) {
         return false;
       }
-      final BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(policyId);
+      final BlockStoragePolicy policy = blockStoragePolicies[policyId];
       if (policy == null) {
         LOG.warn("Failed to get the storage policy of file " + fullPath);
         return false;
@@ -498,7 +511,7 @@ public class Mover {
       } else if (line.hasOption("p")) {
         paths = line.getOptionValues("p");
       }
-      Collection<URI> namenodes = DFSUtil.getNsServiceRpcUris(conf);
+      Collection<URI> namenodes = DFSUtil.getNameNodesRPCAddressesAsURIs(conf);
       if (paths == null || paths.length == 0) {
         for (URI namenode : namenodes) {
           map.put(namenode, null);

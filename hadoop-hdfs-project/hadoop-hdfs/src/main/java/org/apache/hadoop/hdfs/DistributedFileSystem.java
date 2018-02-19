@@ -59,7 +59,6 @@ import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
@@ -539,9 +538,10 @@ public class DistributedFileSystem extends FileSystem {
    * Get the effective storage policy for a file.
    */
   public BlockStoragePolicy getStoragePolicy(final Path src) throws IOException {
+    statistics.incrementReadOps(1);
     HdfsFileStatus fi = dfs.getFileInfo(getPathName(src));
     if (fi != null) {
-      return BlockStoragePolicySuite.getPolicy(fi.getStoragePolicy());
+      return dfs.getStoragePolicy(fi.getStoragePolicy());
     } else {
       throw new FileNotFoundException("File does not exist: " + src);
     }

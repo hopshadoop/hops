@@ -500,17 +500,11 @@ public abstract class INode implements Comparable<byte[]> {
    *    effective storage policy.
    */
   public byte getStoragePolicyID() throws TransactionContextException, StorageException {
-    byte localPolicyId = getLocalStoragePolicyID();
-
-    if (localPolicyId != BlockStoragePolicySuite.ID_UNSPECIFIED) {
-      return localPolicyId;
+    byte id = getLocalStoragePolicyID();
+    if (id == BlockStoragePolicySuite.ID_UNSPECIFIED) {
+      return this.getParent() != null ? this.getParent().getStoragePolicyID() : id;
     }
-
-    // if it is unspecified, check its parent
-    //
-    INodeDirectory parent = getParent();
-    return parent != null ? parent.getStoragePolicyID() :
-        BlockStoragePolicySuite.getDefaultPolicy().getId();
+    return id;
   }
 
   /**

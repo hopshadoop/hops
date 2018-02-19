@@ -59,10 +59,14 @@ import org.junit.rules.ExpectedException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import org.apache.hadoop.hdfs.TestBlockStoragePolicy;
+import org.junit.Assert;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -230,8 +234,7 @@ public class TestReplicationPolicy {
       List<DatanodeStorageInfo> chosenNodes,
       Set<Node> excludedNodes) {
     return replicator.chooseTarget(filename, numOfReplicas, writer, chosenNodes,
-        false, excludedNodes, BLOCK_SIZE,
-        BlockStoragePolicySuite.getDefaultPolicy());
+        false, excludedNodes, BLOCK_SIZE,TestBlockStoragePolicy.DEFAULT_STORAGE_POLICY);
   }
 
   /**
@@ -299,7 +302,7 @@ public class TestReplicationPolicy {
     excludedNodes.add(dataNodes[1]);
     chosenNodes.add(storages[2]);
     targets = replicator.chooseTarget(filename, 1, dataNodes[0], chosenNodes, true,
-        excludedNodes, BLOCK_SIZE, BlockStoragePolicySuite.getDefaultPolicy());
+        excludedNodes, BLOCK_SIZE, TestBlockStoragePolicy.DEFAULT_STORAGE_POLICY);
     System.out.println("targets=" + Arrays.asList(targets));
     assertEquals(2, targets.length);
     //make sure that the chosen node is in the target.
@@ -704,7 +707,7 @@ public class TestReplicationPolicy {
           .getNamesystem().getBlockManager().getBlockPlacementPolicy();
       DatanodeStorageInfo[] targets = replicator.chooseTarget(filename, 3,
           staleNodeInfo, new ArrayList<DatanodeStorageInfo>(), false, null,
-          BLOCK_SIZE, BlockStoragePolicySuite.getDefaultPolicy());
+          BLOCK_SIZE, TestBlockStoragePolicy.DEFAULT_STORAGE_POLICY);
 
       assertEquals(targets.length, 3);
       assertFalse(isOnSameRack(targets[0], staleNodeInfo));
@@ -731,7 +734,7 @@ public class TestReplicationPolicy {
       // Call chooseTarget
       targets = replicator.chooseTarget(filename, 3, staleNodeInfo,
           new ArrayList<DatanodeStorageInfo>(), false, null, BLOCK_SIZE,
-          BlockStoragePolicySuite.getDefaultPolicy());
+          TestBlockStoragePolicy.DEFAULT_STORAGE_POLICY);
       assertEquals(targets.length, 3);
       assertTrue(isOnSameRack(targets[0], staleNodeInfo));
 
@@ -1001,6 +1004,63 @@ public class TestReplicationPolicy {
         fifthPrioritySize,
         chosenBlocks.get(UnderReplicatedBlocks.QUEUE_WITH_CORRUPT_BLOCKS)
             .size());
+  }
+
+  /**
+   * Test for the chooseReplicaToDelete are processed based on 
+   * block locality and free space
+   */
+  @Test
+  public void testChooseReplicaToDelete() throws Exception {
+    List<DatanodeStorageInfo> replicaList = new ArrayList<DatanodeStorageInfo>();
+    final Map<String, List<DatanodeStorageInfo>> rackMap
+        = new HashMap<String, List<DatanodeStorageInfo>>();
+    
+    dataNodes[0].setRemaining(4*1024*1024);
+    replicaList.add(storages[0]);
+    
+    dataNodes[1].setRemaining(3*1024*1024);
+    replicaList.add(storages[1]);
+    
+    dataNodes[2].setRemaining(2*1024*1024);
+    replicaList.add(storages[2]);
+    
+    dataNodes[5].setRemaining(1*1024*1024);
+    replicaList.add(storages[5]);
+    
+    // Refresh the last update time for all the datanodes
+    for (int i = 0; i < dataNodes.length; i++) {
+      dataNodes[i].setLastUpdate(Time.now());
+    }
+    
+    List<DatanodeStorageInfo> first = new ArrayList<DatanodeStorageInfo>();
+    List<DatanodeStorageInfo> second = new ArrayList<DatanodeStorageInfo>();
+    replicator.splitNodesWithRack(replicaList, rackMap, first, second);
+    // storages[0] and storages[1] are in first set as their rack has two 
+    // replica nodes, while storages[2] and dataNodes[5] are in second set.
+    assertEquals(2, first.size());
+    assertEquals(2, second.size());
+    List<StorageType> excessTypes = new ArrayList<StorageType>();
+    {
+      // test returning null
+      excessTypes.add(StorageType.SSD);
+      Assert.assertNull(replicator.chooseReplicaToDelete(
+          null, null, (short)3, first, second, excessTypes));
+    }
+    excessTypes.add(StorageType.DEFAULT);
+    DatanodeStorageInfo chosen = replicator.chooseReplicaToDelete(
+        null, null, (short)3, first, second, excessTypes);
+    // Within first set, storages[1] with less free space
+    assertEquals(chosen, storages[1]);
+
+    replicator.adjustSetsWithChosenReplica(rackMap, first, second, chosen);
+    assertEquals(0, first.size());
+    assertEquals(3, second.size());
+    // Within second set, storages[5] with less free space
+    excessTypes.add(StorageType.DEFAULT);
+    chosen = replicator.chooseReplicaToDelete(
+        null, null, (short)2, first, second, excessTypes);
+    assertEquals(chosen, storages[5]);
   }
 
   /**

@@ -71,20 +71,22 @@ public class INodeFile extends INode implements BlockCollection {
 
   public INodeFile(PermissionStatus permissions, BlockInfo[] blklist,
       short replication, long modificationTime, long atime,
-      long preferredBlockSize) throws IOException {
+      long preferredBlockSize, byte storagePolicyID) throws IOException {
     super(permissions, modificationTime, atime);
     this.setReplicationNoPersistance(replication);
     this.setPreferredBlockSizeNoPersistance(preferredBlockSize);
     this.setFileStoredInDBNoPersistence(false); // it is set when the data is stored in the database
+    this.setBlockStoragePolicyIDNoPersistance(storagePolicyID);
   }
 
   public INodeFile(PermissionStatus permissions, long header,
-      long modificationTime, long atime, boolean isFileStoredInDB) throws IOException {
+      long modificationTime, long atime, boolean isFileStoredInDB, byte storagepolicy) throws IOException {
     super(permissions, modificationTime, atime);
     this.setHeaderNoPersistance(header);
     this.isFileStoredInDB = isFileStoredInDB;
+    this.blockStoragePolicyID = storagepolicy;
   }
-
+  
   //HOP:
   public INodeFile(INodeFile other)
       throws IOException {

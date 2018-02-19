@@ -311,6 +311,20 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
+  public BlockStoragePolicy getStoragePolicy(byte storagePolicyID) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.GetStoragePolicyRequestProto req
+          = ClientNamenodeProtocolProtos.GetStoragePolicyRequestProto.newBuilder().setStoragePolicyID(storagePolicyID).
+          build();
+      ClientNamenodeProtocolProtos.GetStoragePolicyResponseProto response = rpcProxy
+          .getStoragePolicy(null, req);
+      return PBHelper.convert(response.getPolicy());
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+  
+  @Override
   public BlockStoragePolicy[] getStoragePolicies() throws IOException {
     try {
       ClientNamenodeProtocolProtos.GetStoragePoliciesResponseProto response = rpcProxy

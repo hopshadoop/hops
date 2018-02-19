@@ -41,6 +41,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Collections;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.anyObject;
@@ -73,7 +74,7 @@ public class TestFsLimits {
     HdfsStorageFactory.setConfiguration(conf);
     assert (HdfsStorageFactory.formatStorage());
     Users.addUserToGroup(perms.getUserName(), perms.getGroupName());
-    rootInode = FSDirectory.createRootInode(perms, true);
+    rootInode = DFSTestUtil.createRootFolder(perms);
     inodes = new INode[]{rootInode, null};
     fs = null;
     fsIsReady = true;

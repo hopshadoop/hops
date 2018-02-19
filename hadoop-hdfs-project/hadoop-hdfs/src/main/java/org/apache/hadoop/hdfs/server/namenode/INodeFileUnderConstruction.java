@@ -62,9 +62,9 @@ public class INodeFileUnderConstruction extends INodeFile
 
   public INodeFileUnderConstruction(PermissionStatus permissions,
       short replication, long preferredBlockSize, long modTime,
-      String clientName, String clientMachine, DatanodeID clientNode)
+      String clientName, String clientMachine, DatanodeID clientNode, byte storagePolicy)
       throws IOException {
-    super(permissions, null, replication, modTime, modTime, preferredBlockSize);
+    super(permissions, null, replication, modTime, modTime, preferredBlockSize, storagePolicy);
     this.clientName = clientName;
     this.clientMachine = clientMachine;
     this.clientNode = clientNode;
@@ -81,9 +81,9 @@ public class INodeFileUnderConstruction extends INodeFile
   public INodeFileUnderConstruction(byte[] name, short blockReplication,
       long modificationTime, long preferredBlockSize, BlockInfo[] blocks,
       PermissionStatus perm, String clientName, String clientMachine,
-      DatanodeID clientNode, int inodeId, int pid) throws IOException {
+      DatanodeID clientNode, int inodeId, int pid, byte storagePolicy) throws IOException {
     super(perm, blocks, blockReplication, modificationTime, modificationTime,
-        preferredBlockSize);
+        preferredBlockSize, storagePolicy);
     setLocalNameNoPersistance(name);
     this.clientName = clientName;
     this.clientMachine = clientMachine;

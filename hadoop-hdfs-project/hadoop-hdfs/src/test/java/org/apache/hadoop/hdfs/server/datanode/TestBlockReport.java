@@ -476,14 +476,6 @@ public class TestBlockReport {
         cluster.getNamesystem().getPendingDeletionBlocks(), is(1L));
   }
 
-  // Client requests new block from NN. The test corrupts this very block
-  // and forces new block report.
-  // The test case isn't specific for BlockReport because it relies on
-  // BlockScanner which is out of scope of this test
-  // Keeping the name to be in synch with the test plan
-  //
-  public void blockReport_05() {
-  }
 
   /**
    * Test creates a file and closes it.

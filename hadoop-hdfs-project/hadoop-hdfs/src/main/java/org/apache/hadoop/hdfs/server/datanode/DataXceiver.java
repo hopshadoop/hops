@@ -377,7 +377,9 @@ class DataXceiver extends Receiver implements Runnable {
               "\n  block  =" + block + ", newGs=" + latestGenerationStamp +
               ", bytesRcvd=[" + minBytesRcvd + ", " + maxBytesRcvd + "]" +
               "\n  targets=" + Arrays.asList(targets) + "; pipelineSize=" +
-              pipelineSize + ", srcDataNode=" + srcDataNode);
+              pipelineSize + ", srcDataNode=" + srcDataNode +
+              "\n storageType= " + storageType + "; tagetStorageTypes= " + 
+              Arrays.asList(targetStorageTypes));
       LOG.debug("isDatanode=" + isDatanode + ", isClient=" + isClient +
           ", isTransfer=" + isTransfer);
       LOG.debug("writeBlock receive buf size " + s.getReceiveBufferSize() +

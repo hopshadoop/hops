@@ -430,6 +430,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override
+  public BlockStoragePolicy getStoragePolicy(byte storagePolicyID) throws IOException {
+    return namesystem.getStoragePolicy(storagePolicyID);
+  }
+  
+  @Override
   public BlockStoragePolicy[] getStoragePolicies() throws IOException {
     return namesystem.getStoragePolicies();
   }

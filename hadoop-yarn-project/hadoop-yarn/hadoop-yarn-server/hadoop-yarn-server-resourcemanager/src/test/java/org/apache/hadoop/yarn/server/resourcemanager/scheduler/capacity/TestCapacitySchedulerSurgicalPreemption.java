@@ -51,7 +51,7 @@ public class TestCapacitySchedulerSurgicalPreemption
         true);
   }
 
-  @Test(timeout = 60000)
+  @Test(timeout = 120000)
   public void testSimpleSurgicalPreemption()
       throws Exception {
     /**

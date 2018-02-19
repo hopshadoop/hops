@@ -293,7 +293,8 @@ public class BlockManager {
    * for block replicas placement
    */
   private BlockPlacementPolicy blockplacement;
-
+  private final BlockStoragePolicySuite storagePolicySuite;
+  
   /**
    * Number of blocks to process at one batch
    */
@@ -324,6 +325,7 @@ public class BlockManager {
     blockplacement = BlockPlacementPolicy.getInstance(
         conf, stats, datanodeManager.getNetworkTopology(),
         datanodeManager.getHost2DatanodeMap());
+    storagePolicySuite = BlockStoragePolicySuite.createDefaultSuite();
     pendingReplications = new PendingReplicationBlocks(conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
         DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_DEFAULT) *
@@ -432,6 +434,22 @@ public class BlockManager {
     return new NameNodeBlockTokenSecretManager(updateMin * 60 * 1000L,
         lifetimeMin * 60 * 1000L, null, encryptionAlgorithm, namesystem);
   }
+  
+  public BlockStoragePolicy getDefaultStoragePolicy(){
+    return storagePolicySuite.getDefaultPolicy();
+  }
+  
+  public BlockStoragePolicy getStoragePolicy(final String policyName) {
+    return storagePolicySuite.getPolicy(policyName);
+  }
+
+  public BlockStoragePolicy getStoragePolicy(final byte policyId) {
+    return storagePolicySuite.getPolicy(policyId);
+  }
+
+  public BlockStoragePolicy[] getStoragePolicies() {
+    return storagePolicySuite.getAllPolicies();
+  }
 
   public void setBlockPoolId(String blockPoolId) {
     if (isBlockTokenEnabled()) {
@@ -488,9 +506,7 @@ public class BlockManager {
     return datanodeManager;
   }
 
-  /**
-   * @return the BlockPlacementPolicy
-   */
+  @VisibleForTesting
   public BlockPlacementPolicy getBlockPlacementPolicy() {
     return blockplacement;
   }
@@ -1596,7 +1612,7 @@ public class BlockManager {
       // It is costly to extract the filename for which chooseTargets is called,
       // so for now we pass in the blk collection itself.
 
-      rw.chooseTargets(blockplacement, excludedNodes);
+      rw.chooseTargets(blockplacement, storagePolicySuite, excludedNodes);
     }
 
     for (ReplicationWork rw : work) {
@@ -1713,11 +1729,11 @@ public class BlockManager {
     List<DatanodeDescriptor> favoredDatanodeDescriptors =
         getDatanodeDescriptors(favoredNodes);
 
-    BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(storagePolicyID);
+    BlockStoragePolicy storagePolicy = storagePolicySuite.getPolicy(storagePolicyID);
 
     final DatanodeStorageInfo[] targets = blockplacement.chooseTarget(src,
         numOfReplicas, client, excludedNodes, blocksize,
-        favoredDatanodeDescriptors, policy);
+        favoredDatanodeDescriptors, storagePolicy);
 
     if (targets.length < minReplication) {
       throw new IOException("File " + src
@@ -1737,8 +1753,31 @@ public class BlockManager {
       DatanodeDescriptor clientnode, Set<Node> excludes, long blocksize) {
     return blockplacement.chooseTarget(src, 1, clientnode,
         Collections.<DatanodeStorageInfo>emptyList(), false, excludes,
-        blocksize, BlockStoragePolicySuite.getDefaultPolicy());
+        blocksize, storagePolicySuite.getDefaultPolicy());
   }
+
+  /** Choose target for getting additional datanodes for an existing pipeline. */
+  public DatanodeStorageInfo[] chooseTarget4AdditionalDatanode(String src,
+      int numAdditionalNodes,
+      Node clientnode,
+      List<DatanodeStorageInfo> chosen,
+      Set<Node> excludes,
+      long blocksize,
+      byte storagePolicyID) {
+    
+    final BlockStoragePolicy storagePolicy = storagePolicySuite.getPolicy(storagePolicyID);
+    return blockplacement.chooseTarget(src, numAdditionalNodes, clientnode,
+        chosen, true, excludes, blocksize, storagePolicy);
+  }
+  
+  public DatanodeStorageInfo[] chooseTarget4ParityRepair(String src,  int numOfReplicas,
+      DatanodeDescriptor clientnode,List<DatanodeStorageInfo> chosen, Set<Node> excludes, long blocksize,
+      byte storagePolicyID) {
+    final BlockStoragePolicy storagePolicy = storagePolicySuite.getPolicy(storagePolicyID);
+    return blockplacement.chooseTarget(src, numOfReplicas, clientnode,
+        chosen, false, excludes, blocksize, storagePolicy);
+  }
+
 
   /**
    * Get list of datanode descriptors for given list of nodes. Nodes are
@@ -3267,7 +3306,7 @@ public class BlockManager {
     // first form a rack to datanodes map and
     BlockCollection bc = getBlockCollection(b);
     final BlockStoragePolicy storagePolicy =
-        BlockStoragePolicySuite.getPolicy(bc.getStoragePolicyID());
+        storagePolicySuite.getPolicy(bc.getStoragePolicyID());
 
     final List<StorageType> excessTypes = storagePolicy.chooseExcess(
         replication, DatanodeStorageInfo.toStorageTypes(nonExcess));
@@ -4327,6 +4366,7 @@ public class BlockManager {
     }
 
     private void chooseTargets(BlockPlacementPolicy blockplacement,
+        BlockStoragePolicySuite storagePolicySuite,
         Set<Node> excludedNodes)
         throws TransactionContextException, StorageException {
       try {
@@ -4334,7 +4374,7 @@ public class BlockManager {
         targets = blockplacement.chooseTarget(null /*bc.getName()*/,
             additionalReplRequired, srcNode, liveReplicaStorages, false,
             excludedNodes, block.getNumBytes(),
-            BlockStoragePolicySuite.getPolicy(bc.getStoragePolicyID()));
+            storagePolicySuite.getPolicy(bc.getStoragePolicyID()));
       } finally {
         srcNode.decrementPendingReplicationWithoutTargets();
       }

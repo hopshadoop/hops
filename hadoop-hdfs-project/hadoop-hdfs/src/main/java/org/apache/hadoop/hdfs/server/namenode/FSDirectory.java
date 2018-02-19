@@ -116,6 +116,7 @@ public class FSDirectory implements Closeable {
         conf.getBoolean(DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_KEY,
             DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_DEFAULT);
 
+    namesystem = ns;
 
     createRootInode(ns.createFsOwnerPermissions(new FsPermission((short) 0755)),
         false /*dont overwrite if root inode already existes*/);
@@ -139,7 +140,7 @@ public class FSDirectory implements Closeable {
     NameNode.LOG
         .info("Caching file names occuring more than " + threshold + " times");
     nameCache = new NameCache<>(threshold);
-    namesystem = ns;
+    
   }
 
   private FSNamesystem getFSNamesystem() {
@@ -219,7 +220,7 @@ public class FSDirectory implements Closeable {
     }
     INodeFileUnderConstruction newNode =
         new INodeFileUnderConstruction(permissions, replication,
-            preferredBlockSize, modTime, clientName, clientMachine, clientNode);
+            preferredBlockSize, modTime, clientName, clientMachine, clientNode, (byte) 0);
 
 
     newNode = addNode(path, newNode, UNKNOWN_DISK_SPACE);
@@ -1118,7 +1119,7 @@ public class FSDirectory implements Closeable {
     INode inode = inodes[inodes.length - 1];
 
     if (inode == null) {
-      throw new FileNotFoundException(src + " is not a file or directory");
+      throw new FileNotFoundException("File/Directory does not exist: " + src);
     } else if (inode.isSymlink()) {
       throw new IOException("Cannot set storage policy for symlink: " + src);
     } else {
@@ -1407,6 +1408,10 @@ public class FSDirectory implements Closeable {
     targetNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
   }
 
+  private byte getStoragePolicyID(byte inodePolicy, byte parentPolicy) {
+    return inodePolicy != BlockStoragePolicySuite.ID_UNSPECIFIED ? inodePolicy : parentPolicy;
+  }
+
   /**
    * Get a partial listing of the indicated directory
    *
@@ -1419,7 +1424,7 @@ public class FSDirectory implements Closeable {
    * @return a partial listing starting after startAfter
    */
   DirectoryListing getListing(String src, byte[] startAfter,
-      boolean needLocation)
+      boolean needLocation, boolean isSuperUser)
       throws UnresolvedLinkException, IOException, StorageException {
     String srcs = normalizePath(src);
     INode targetNode = getRootDir().getNode(srcs, true);
@@ -1427,10 +1432,13 @@ public class FSDirectory implements Closeable {
       return null;
     }
 
+    byte parentStoragePolicy = isSuperUser ?
+      targetNode.getStoragePolicyID() : BlockStoragePolicySuite.ID_UNSPECIFIED;
+    
     if (!targetNode.isDirectory()) {
       return new DirectoryListing(new HdfsFileStatus[]{
           createFileStatus(HdfsFileStatus.EMPTY_NAME, targetNode,
-              needLocation)}, 0);
+              needLocation, parentStoragePolicy)}, 0);
     }
     INodeDirectory dirInode = (INodeDirectory) targetNode;
     List<INode> contents = dirInode.getChildrenList();
@@ -1440,7 +1448,9 @@ public class FSDirectory implements Closeable {
     HdfsFileStatus listing[] = new HdfsFileStatus[numOfListing];
     for (int i = 0; i < numOfListing; i++) {
       INode cur = contents.get(startChild + i);
-      listing[i] = createFileStatus(cur.name, cur, needLocation);
+      byte curPolicy = isSuperUser && !cur.isSymlink() ? cur.getLocalStoragePolicyID()
+          : BlockStoragePolicySuite.ID_UNSPECIFIED;
+      listing[i] = createFileStatus(cur.name, cur, needLocation, getStoragePolicyID(curPolicy, parentStoragePolicy));
     }
     return new DirectoryListing(listing,
         totalNumChildren - startChild - numOfListing);
@@ -1456,25 +1466,29 @@ public class FSDirectory implements Closeable {
    * @return object containing information regarding the file
    * or null if file not found
    */
-  HdfsFileStatus getFileInfo(String src, boolean resolveLink)
+  HdfsFileStatus getFileInfo(String src, boolean resolveLink, boolean includeStoragePolicy)
       throws IOException {
     String srcs = normalizePath(src);
     INode targetNode = getRootDir().getNode(srcs, resolveLink);
     if (targetNode == null) {
       return null;
     } else {
-      return createFileStatus(HdfsFileStatus.EMPTY_NAME, targetNode);
+      byte policyId = includeStoragePolicy && targetNode != null && !targetNode.isSymlink() ? targetNode.
+          getStoragePolicyID() : BlockStoragePolicySuite.ID_UNSPECIFIED;
+      return createFileStatus(HdfsFileStatus.EMPTY_NAME, targetNode, policyId);
     }
   }
 
-  HdfsFileStatus getFileInfoForCreate(String src, boolean resolveLink)
+  HdfsFileStatus getFileInfoForCreate(String src, boolean resolveLink, boolean includeStoragePolicy)
       throws IOException {
     String srcs = normalizePath(src);
     INode targetNode = getRootDir().getNode(srcs, resolveLink);
     if (targetNode == null) {
       return null;
     } else {
-      return createFileStatusForCreate(HdfsFileStatus.EMPTY_NAME, targetNode);
+      byte policyId = includeStoragePolicy && targetNode != null && !targetNode.isSymlink() ? targetNode.
+          getStoragePolicyID() : BlockStoragePolicySuite.ID_UNSPECIFIED;
+      return createFileStatusForCreate(HdfsFileStatus.EMPTY_NAME, targetNode, policyId);
     }
   }
 
@@ -2590,23 +2604,23 @@ public class FSDirectory implements Closeable {
    *     if any error occurs
    */
   private HdfsFileStatus createFileStatus(byte[] path, INode node,
-      boolean needLocation) throws IOException, StorageException {
+      boolean needLocation, byte storagePolicy) throws IOException, StorageException {
     if (needLocation) {
-      return createLocatedFileStatus(path, node);
+      return createLocatedFileStatus(path, node, storagePolicy);
     } else {
-      return createFileStatus(path, node);
+      return createFileStatus(path, node, storagePolicy);
     }
   }
 
-  private HdfsFileStatus createFileStatusForCreate(byte[] path, INode node)
+  private HdfsFileStatus createFileStatusForCreate(byte[] path, INode node, byte storagePolicy)
       throws IOException {
-    return createFileStatus(path, node, 0);
+    return createFileStatus(path, node, storagePolicy, 0);
   }
 
   /**
    * Create FileStatus by file INode
    */
-  private HdfsFileStatus createFileStatus(byte[] path, INode node)
+  private HdfsFileStatus createFileStatus(byte[] path, INode node, byte storagePolicy)
       throws IOException {
     long size = 0;     // length is zero for directories
 
@@ -2615,10 +2629,10 @@ public class FSDirectory implements Closeable {
       size = fileNode.getSize();//.computeFileSize(true);
       //size = fileNode.computeFileSize(true);
     }
-    return createFileStatus(path, node, size);
+    return createFileStatus(path, node, storagePolicy, size);
   }
 
-  private HdfsFileStatus createFileStatus(byte[] path, INode node, long size)
+  private HdfsFileStatus createFileStatus(byte[] path, INode node, byte storagePolicy, long size)
       throws IOException {
     short replication = 0;
     long blocksize = 0;
@@ -2643,13 +2657,14 @@ public class FSDirectory implements Closeable {
         node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null,
         path,
         isStoredInDB,
-        node.getStoragePolicyID());
+        storagePolicy);
   }
 
   /**
    * Create FileStatus with location info by file INode
    */
-  private HdfsLocatedFileStatus createLocatedFileStatus(byte[] path, INode node) throws IOException, StorageException {
+  private HdfsLocatedFileStatus createLocatedFileStatus(byte[] path, INode node, byte storagePolicy) throws IOException,
+      StorageException {
     long size = 0;     // length is zero for directories
     short replication = 0;
     long blocksize = 0;
@@ -2684,7 +2699,7 @@ public class FSDirectory implements Closeable {
         blocksize, node.getModificationTime(), node.getAccessTime(),
         node.getFsPermission(), node.getUserName(), node.getGroupName(),
         node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path,
-        loc, isFileStoredInDB, node.getStoragePolicyID());
+        loc, isFileStoredInDB, storagePolicy);
   }
 
 
@@ -2756,7 +2771,7 @@ public class FSDirectory implements Closeable {
   }
   
   //add root inode if its not there
-  public static INodeDirectoryWithQuota createRootInode(
+  public INodeDirectoryWithQuota createRootInode(
       final PermissionStatus ps, final boolean overwrite) throws IOException {
     LightWeightRequestHandler addRootINode =
         new LightWeightRequestHandler(HDFSOperationType.SET_ROOT) {
@@ -2771,7 +2786,6 @@ public class FSDirectory implements Closeable {
             if (rootInode == null || overwrite == true) {
               newRootINode = INodeDirectoryWithQuota.createRootDir(ps);
               // Set the block storage policy to DEFAULT
-              newRootINode.setBlockStoragePolicyIDNoPersistance(BlockStoragePolicySuite.getDefaultPolicy().getId());
               List<INode> newINodes = new ArrayList();
               newINodes.add(newRootINode);
               da.prepare(INode.EMPTY_LIST, newINodes, INode.EMPTY_LIST);

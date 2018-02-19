@@ -1999,7 +1999,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
 
       waitForAckedSeqno(toWaitFor);
 
-      if (updateLength) {
+      if (updateLength || persistBlocks.get()) {
         synchronized (this) {
           if (streamer != null && streamer.block != null) {
             lastBlockLength = streamer.block.getNumBytes();
