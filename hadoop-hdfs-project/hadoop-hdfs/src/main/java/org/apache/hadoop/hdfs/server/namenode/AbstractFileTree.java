@@ -55,7 +55,7 @@ abstract class AbstractFileTree {
   private final FSNamesystem namesystem;
   private final FSPermissionChecker fsPermissionChecker;
   private final INodeIdentifier subtreeRootId;
-  private final List<Future> activeCollectors = new ArrayList<>();
+  private ConcurrentLinkedQueue<Future> activeCollectors = new ConcurrentLinkedQueue<>();
   private final FsAction subAccess;
   private volatile IOException exception;
 
@@ -128,10 +128,8 @@ abstract class AbstractFileTree {
                   return null;
                 }
                 if (inode.isDirectory()) {
-                  synchronized (activeCollectors) {
-                    collectChildren(inode.getId(),((short)(depth+1)), level + 1,
-                        inode.isDirWithQuota());
-                  }
+                  collectChildren(inode.getId(), ((short) (depth + 1)), level + 1,
+                          inode.isDirWithQuota());
                 }
               }
               return null;
@@ -185,14 +183,11 @@ abstract class AbstractFileTree {
         subtreeRoot instanceof INodeDirectoryWithQuota ? true : false;
     collectChildren(subtreeRootId.getInodeId(), subtreeRootId.getDepth() ,2, quotaEnabled);
     while (true) {
-      Future future;
-      synchronized (activeCollectors) {
-        if (activeCollectors.size() == 0) {
+      try {
+        Future future = activeCollectors.poll();
+        if (future == null) {
           break;
         }
-        future = activeCollectors.remove(0);
-      }
-      try {
         future.get();
       } catch (InterruptedException e) {
         LOG.info("FileTree builder was interrupted");
