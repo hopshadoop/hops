@@ -99,7 +99,7 @@ public class LayoutVersion {
     OPTIMIZE_PERSIST_BLOCKS(-40,
         "Serialize block lists with delta-encoded variable length ints, " +
             "add OP_UPDATE_BLOCKS"),
-    ADD_DATANODE_AND_STORAGE_UUIDS(-49, "Replace StorageID with DatanodeUuid."
+    ADD_DATANODE_AND_STORAGE_UUIDS(-41, "Replace StorageID with DatanodeUuid."
         + " Use distinct StorageUuid per storage directory.");
     
     final int lv;
