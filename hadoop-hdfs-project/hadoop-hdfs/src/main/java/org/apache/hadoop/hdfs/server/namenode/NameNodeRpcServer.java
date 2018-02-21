@@ -946,12 +946,14 @@ class NameNodeRpcServer implements NamenodeProtocols {
    * @throws UnregisteredNodeException
    *     if the registration is invalid
    */
-  void verifyRequest(NodeRegistration nodeReg) throws IOException {
-    verifyLayoutVersion(nodeReg.getVersion());
-    if (!namesystem.getRegistrationID().equals(nodeReg.getRegistrationID())) {
-      LOG.warn("Invalid registrationID - expected: " +
-          namesystem.getRegistrationID() + " received: " +
-          nodeReg.getRegistrationID());
+  private void verifyRequest(NodeRegistration nodeReg) throws IOException {
+    // verify registration ID
+    final String id = nodeReg.getRegistrationID();
+    final String expectedID = namesystem.getRegistrationID();
+    if (!expectedID.equals(id)) {
+      LOG.warn("Registration IDs mismatched: the "
+          + nodeReg.getClass().getSimpleName() + " ID is " + id
+          + " but the expected ID is " + expectedID);
       throw new UnregisteredNodeException(nodeReg);
     }
   }

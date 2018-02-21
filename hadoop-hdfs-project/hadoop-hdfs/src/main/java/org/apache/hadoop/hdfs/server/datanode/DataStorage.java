@@ -43,6 +43,8 @@ import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DiskChecker;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileLock;
@@ -53,6 +55,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.hadoop.fs.HardLink;
+import org.apache.hadoop.io.IOUtils;
 
 /**
  * Data storage information file.
@@ -473,7 +477,7 @@ public class DataStorage extends Storage {
 
     // do upgrade
     if (this.layoutVersion > HdfsConstants.LAYOUT_VERSION) {
-      doUpgrade(datanode, sd, nsInfo);  // upgrade
+      doUpgrade( sd, nsInfo);  // upgrade
       createStorageID(sd, !haveValidStorageId);
       return;
     }
@@ -488,11 +492,82 @@ public class DataStorage extends Storage {
   }
 
   /**
-   * Upgrading not supported as of now.
+   * Upgrade -- Move current storage into a backup directory,
+   * and hardlink all its blocks into the new current directory.
+   * <p/>
+   * Upgrade from pre-0.22 to 0.22 or later release e.g. 0.19/0.20/ =>
+   * 0.22/0.23
+   * <ul>
+   * <li> If <SD>/previous exists then delete it </li>
+   * <li> Rename <SD>/current to <SD>/previous.tmp </li>
+   * <li>Create new <SD>/current/<bpid>/current directory<li>
+   * <ul>
+   * <li> Hard links for block files are created from <SD>/previous.tmp
+   * to <SD>/current/<bpid>/current </li>
+   * <li> Saves new version file in <SD>/current/<bpid>/current directory </li>
+   * </ul>
+   * <li> Rename <SD>/previous.tmp to <SD>/previous </li>
+   * </ul>
+   * <p/>
+   * There should be only ONE namenode in the cluster for first
+   * time upgrade to 0.22
+   *
+   * @param sd
+   *     storage directory
+   * @throws IOException
+   *     on error
    */
-  void doUpgrade(DataNode datanode, StorageDirectory sd, NamespaceInfo nsInfo)
-      throws IOException {
-    throw new IOException("doUpgrade not supported yet.");
+  void doUpgrade(StorageDirectory sd, NamespaceInfo nsInfo) throws IOException {
+    if (LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
+      clusterID = nsInfo.getClusterID();
+      layoutVersion = nsInfo.getLayoutVersion();
+      writeProperties(sd);
+      return;
+  }
+
+    LOG.info("Upgrading storage directory " + sd.getRoot() + ".\n   old LV = " +
+        this.getLayoutVersion() + "; old CTime = " + this.getCTime() +
+        ".\n   new LV = " + nsInfo.getLayoutVersion() + "; new CTime = " +
+        nsInfo.getCTime());
+    
+    File curDir = sd.getCurrentDir();
+    File prevDir = sd.getPreviousDir();
+    File bbwDir = new File(sd.getRoot(), Storage.STORAGE_1_BBW);
+
+    assert curDir.exists() : "Data node current directory must exist.";
+    // Cleanup directory "detach"
+    cleanupDetachDir(new File(curDir, STORAGE_DIR_DETACHED));
+    
+    // 1. delete <SD>/previous dir before upgrading
+    if (prevDir.exists()) {
+      deleteDir(prevDir);
+    }
+    // get previous.tmp directory, <SD>/previous.tmp
+    File tmpDir = sd.getPreviousTmp();
+    assert !tmpDir
+        .exists() : "Data node previous.tmp directory must not exist.";
+    
+    // 2. Rename <SD>/current to <SD>/previous.tmp
+    rename(curDir, tmpDir);
+    
+    // 3. Format BP and hard link blocks from previous directory
+    File curBpDir =
+        BlockPoolSliceStorage.getBpRoot(nsInfo.getBlockPoolID(), curDir);
+    BlockPoolSliceStorage bpStorage =
+        new BlockPoolSliceStorage(nsInfo.getNamespaceID(),
+            nsInfo.getBlockPoolID(), nsInfo.getCTime(), nsInfo.getClusterID());
+    bpStorage.format(curDir, nsInfo);
+    linkAllBlocks(tmpDir, bbwDir, new File(curBpDir, STORAGE_DIR_CURRENT));
+    
+    // 4. Write version file under <SD>/current
+    layoutVersion = HdfsConstants.LAYOUT_VERSION;
+    clusterID = nsInfo.getClusterID();
+    writeProperties(sd);
+    
+    // 5. Rename <SD>/previous.tmp to <SD>/previous
+    rename(tmpDir, prevDir);
+    LOG.info("Upgrade of " + sd.getRoot() + " is complete");
+    addBlockPoolStorage(nsInfo.getBlockPoolID(), bpStorage);
   }
 
   /**
@@ -638,6 +713,112 @@ public class DataStorage extends Storage {
         BlockPoolSliceStorage bpStorage = bpStorageMap.get(bpID);
         bpStorage.doFinalize(sd.getCurrentDir());
       }
+    }
+  }
+
+  /**
+   * Hardlink all finalized and RBW blocks in fromDir to toDir
+   *
+   * @param fromDir
+   *     The directory where the 'from' snapshot is stored
+   * @param fromBbwDir
+   *     In HDFS 1.x, the directory where blocks
+   *     that are under construction are stored.
+   * @param toDir
+   *     The current data directory
+   * @throws IOException
+   *     If error occurs during hardlink
+   */
+  private void linkAllBlocks(File fromDir, File fromBbwDir, File toDir)
+      throws IOException {
+    HardLink hardLink = new HardLink();
+    // do the link
+    int diskLayoutVersion = this.getLayoutVersion();
+    if (LayoutVersion.supports(Feature.APPEND_RBW_DIR, diskLayoutVersion)) {
+      // hardlink finalized blocks in tmpDir/finalized
+      linkBlocks(new File(fromDir, STORAGE_DIR_FINALIZED),
+          new File(toDir, STORAGE_DIR_FINALIZED), diskLayoutVersion, hardLink);
+      // hardlink rbw blocks in tmpDir/rbw
+      linkBlocks(new File(fromDir, STORAGE_DIR_RBW),
+          new File(toDir, STORAGE_DIR_RBW), diskLayoutVersion, hardLink);
+    } else { // pre-RBW version
+      // hardlink finalized blocks in tmpDir
+      linkBlocks(fromDir, new File(toDir, STORAGE_DIR_FINALIZED),
+          diskLayoutVersion, hardLink);
+      if (fromBbwDir.exists()) {
+        /*
+         * We need to put the 'blocksBeingWritten' from HDFS 1.x into the rbw
+         * directory.  It's a little messy, because the blocksBeingWriten was
+         * NOT underneath the 'current' directory in those releases.  See
+         * HDFS-3731 for details.
+         */
+        linkBlocks(fromBbwDir, new File(toDir, STORAGE_DIR_RBW),
+            diskLayoutVersion, hardLink);
+      }
+    }
+    LOG.info(hardLink.linkStats.report());
+  }
+  
+  static void linkBlocks(File from, File to, int oldLV, HardLink hl)
+      throws IOException {
+    if (!from.exists()) {
+      return;
+    }
+    if (!from.isDirectory()) {
+      if (from.getName().startsWith(COPY_FILE_PREFIX)) {
+        FileInputStream in = new FileInputStream(from);
+        try {
+          FileOutputStream out = new FileOutputStream(to);
+          try {
+            IOUtils.copyBytes(in, out, 16 * 1024);
+            hl.linkStats.countPhysicalFileCopies++;
+          } finally {
+            out.close();
+          }
+        } finally {
+          in.close();
+        }
+      } else {
+        HardLink.createHardLink(from, to);
+        hl.linkStats.countSingleLinks++;
+      }
+      return;
+    }
+    // from is a directory
+    hl.linkStats.countDirs++;
+
+    if (!to.mkdirs()) {
+      throw new IOException("Cannot create directory " + to);
+    }
+    
+    String[] blockNames = from.list(new java.io.FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.startsWith(BLOCK_FILE_PREFIX);
+      }
+    });
+
+    // Block files just need hard links with the same file names
+    // but a different directory
+    if (blockNames.length > 0) {
+      HardLink.createHardLinkMult(from, blockNames, to);
+      hl.linkStats.countMultLinks++;
+      hl.linkStats.countFilesMultLinks += blockNames.length;
+    } else {
+      hl.linkStats.countEmptyDirs++;
+    }
+    
+    // Now take care of the rest of the files and subdirectories
+    String[] otherNames = from.list(new java.io.FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.startsWith(BLOCK_SUBDIR_PREFIX) ||
+            name.startsWith(COPY_FILE_PREFIX);
+      }
+    });
+    for (int i = 0; i < otherNames.length; i++) {
+      linkBlocks(new File(from, otherNames[i]), new File(to, otherNames[i]),
+          oldLV, hl);
     }
   }
 
