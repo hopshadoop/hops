@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -32,6 +33,7 @@ import org.tukaani.xz.UnsupportedOptionsException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.List;
 
@@ -564,5 +566,56 @@ public class INodeDirectory extends INode {
         INodeDirectory.getRootDirPartitionKey());
     rootINodeIdentifier.setDepth(INodeDirectory.ROOT_DIR_DEPTH);
     return rootINodeIdentifier;
+  }
+  
+  /*
+   * The following code is to dump the tree recursively for testing.
+   *
+   * \- foo (INodeDirectory@33dd2717)
+   * \- sub1 (INodeDirectory@442172)
+   * +- file1 (INodeFile@78392d4)
+   * +- file2 (INodeFile@78392d5)
+   * +- sub11 (INodeDirectory@8400cff)
+   * \- file3 (INodeFile@78392d6)
+   * \- z_file4 (INodeFile@45848712)
+   */
+  static final String DUMPTREE_EXCEPT_LAST_ITEM = "+-";
+  static final String DUMPTREE_LAST_ITEM = "\\-";
+
+  @VisibleForTesting
+  @Override
+  public void dumpTreeRecursively(PrintWriter out, StringBuilder prefix) throws StorageException,
+      TransactionContextException {
+    super.dumpTreeRecursively(out, prefix);
+    if (prefix.length() >= 2) {
+      prefix.setLength(prefix.length() - 2);
+      prefix.append("  ");
+    }
+    dumpTreeRecursively(out, prefix, getChildren());
+  }
+
+  /**
+   * Dump the given subtrees.
+   *
+   * @param prefix The prefix string that each line should print.
+   * @param subs The subtrees.
+   */
+  @VisibleForTesting
+  protected static void dumpTreeRecursively(PrintWriter out,
+      StringBuilder prefix, List<? extends INode> subs) throws StorageException, TransactionContextException {
+    prefix.append(DUMPTREE_EXCEPT_LAST_ITEM);
+    if (subs != null && subs.size() != 0) {
+      int i = 0;
+      for (; i < subs.size() - 1; i++) {
+        subs.get(i).dumpTreeRecursively(out, prefix);
+        prefix.setLength(prefix.length() - 2);
+        prefix.append(DUMPTREE_EXCEPT_LAST_ITEM);
+      }
+
+      prefix.setLength(prefix.length() - 2);
+      prefix.append(DUMPTREE_LAST_ITEM);
+      subs.get(i).dumpTreeRecursively(out, prefix);
+    }
+    prefix.setLength(prefix.length() - 2);
   }
 }
