@@ -80,18 +80,12 @@ public class TestFsLimits {
     fsIsReady = true;
   }
 
-  private static class TestFSDirectory extends FSDirectory {
-    public TestFSDirectory() throws IOException {
+  private static class MockFSDirectory extends FSDirectory {
+    public MockFSDirectory() throws IOException {
       super(getMockNamesystem(), conf);
       setReady(fsIsReady);
     }
     
-    @Override
-    public <T extends INode> void verifyFsLimits(INode[] pathComponents,
-        int pos, T child)
-        throws FSLimitException, StorageException, TransactionContextException {
-      super.verifyFsLimits(pathComponents, pos, child);
-    }
   }
 
   @Before
@@ -188,7 +182,7 @@ public class TestFsLimits {
           public Object performTask() throws StorageException, IOException {
             // have to create after the caller has had a chance to set conf values
             if (fs == null) {
-              fs = new TestFSDirectory();
+              fs = new MockFSDirectory();
             }
 
             INode child = new INodeDirectory(name, perms);

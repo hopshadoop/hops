@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.SignedBytes;
 import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.StorageException;
@@ -39,6 +40,8 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.util.StringUtils;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -374,10 +377,10 @@ public abstract class INode implements Comparable<byte[]> {
   /**
    * Get local file name
    *
-   * @return local file name
+   * @return null if the local name is null; otherwise, return the local name.
    */
   public String getLocalName() {
-    return DFSUtil.bytes2String(name);
+    return name == null? null: DFSUtil.bytes2String(name);
   }
 
 
@@ -394,7 +397,8 @@ public abstract class INode implements Comparable<byte[]> {
   /**
    * Get local file name
    *
-   * @return local file name
+   * @return null if the local name is null;
+   *         otherwise, return the local name byte array.
    */
   byte[] getLocalNameBytes() {
     return name;
@@ -1006,5 +1010,34 @@ public abstract class INode implements Comparable<byte[]> {
 
   public void setLogicalTimeNoPersistance(Integer logicalTime){
     this.logicalTime = logicalTime;
+  }
+  
+  /**
+   * Dump the subtree starting from this inode.
+   *
+   * @return a text representation of the tree.
+   */
+  @VisibleForTesting
+  public StringBuffer dumpTreeRecursively() throws StorageException, TransactionContextException {
+    final StringWriter out = new StringWriter();
+    dumpTreeRecursively(new PrintWriter(out, true), new StringBuilder());
+    return out.getBuffer();
+  }
+
+  /**
+   * Dump tree recursively.
+   *
+   * @param prefix The prefix string that each line should print.
+   */
+  @VisibleForTesting
+  public void dumpTreeRecursively(PrintWriter out, StringBuilder prefix) throws StorageException,
+      TransactionContextException {
+    out.print(prefix);
+    out.print(" ");
+    out.print(getLocalName());
+    out.print("   (");
+    final String s = super.toString();
+    out.print(s.substring(s.lastIndexOf(getClass().getSimpleName())));
+    out.println(")");
   }
 }
