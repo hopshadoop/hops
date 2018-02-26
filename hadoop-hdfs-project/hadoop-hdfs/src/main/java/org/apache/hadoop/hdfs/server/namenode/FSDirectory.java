@@ -202,7 +202,7 @@ public class FSDirectory implements Closeable {
    */
   INodeFileUnderConstruction addFile(String path, PermissionStatus permissions,
       short replication, long preferredBlockSize, String clientName,
-      String clientMachine, DatanodeDescriptor clientNode, long generationStamp)
+      String clientMachine, DatanodeDescriptor clientNode)
       throws IOException {
 
     // Always do an implicit mkdirs for parent directory tree.
