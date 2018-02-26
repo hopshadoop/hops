@@ -2029,10 +2029,9 @@ public class FSNamesystem
 
         // increment global generation stamp
         //HOP[M] generationStamp is not used for inodes
-        long genStamp = 0;
         INodeFileUnderConstruction newNode =
             dir.addFile(src, permissions, replication, blockSize, holder,
-                clientMachine, clientNode, genStamp);
+                clientMachine, clientNode);
         if (newNode == null) {
           throw new IOException("DIR* NameSystem.startFile: " +
               "Unable to add file to namespace.");
