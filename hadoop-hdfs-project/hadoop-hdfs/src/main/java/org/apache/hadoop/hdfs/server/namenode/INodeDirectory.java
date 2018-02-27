@@ -171,9 +171,9 @@ public class INodeDirectory extends INode {
   private INode getNode(byte[][] components, boolean resolveLink)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
-    INode[] inode = new INode[1];
-    getExistingPathINodes(components, inode, resolveLink);
-    return inode[0];
+    INodesInPath inodesInPath = getExistingPathINodes(components, 1,
+        resolveLink);
+    return inodesInPath.inodes[0];
   }
 
   /**
@@ -231,7 +231,7 @@ public class INodeDirectory extends INode {
    *     be thrown when the path refers to a symbolic link.
    * @return number of existing INodes in the path
    */
-  int getExistingPathINodes(byte[][] components, INode[] existing,
+  INodesInPath getExistingPathINodes(byte[][] components, int numOfINodes,
       boolean resolveLink) throws UnresolvedLinkException, StorageException,
       TransactionContextException {
     assert
@@ -240,16 +240,17 @@ public class INodeDirectory extends INode {
             (components[0] == null ? null :
                 DFSUtil.bytes2String(components[0]));
 
+    INodesInPath existing = new INodesInPath(numOfINodes);
     INode curNode = this;
     int count = 0;
-    int index = existing.length - components.length;
+    int index = numOfINodes - components.length;
     if (index > 0) {
       index = 0;
     }
     while (count < components.length && curNode != null) {
       final boolean lastComp = (count == components.length - 1);
       if (index >= 0) {
-        existing[index] = curNode;
+        existing.inodes[index] = curNode;
       }
       if (curNode.isSymlink() && (!lastComp || (lastComp && resolveLink))) {
         final String path = constructPath(components, 0, components.length);
@@ -267,6 +268,7 @@ public class INodeDirectory extends INode {
         throw new UnresolvedPathException(path, preceding, remainder, target);
       }
       count++;
+      existing.count = count;
       index++;
       if (lastComp || !curNode.isDirectory()) {
         break;
@@ -274,7 +276,7 @@ public class INodeDirectory extends INode {
       INodeDirectory parentDir = (INodeDirectory) curNode;
       curNode = parentDir.getChildINode(components[count]);
     }
-    return count;
+    return existing;
   }
 
   /**
@@ -296,11 +298,9 @@ public class INodeDirectory extends INode {
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
     byte[][] components = getPathComponents(path);
-    INode[] inodes = new INode[components.length];
-
-    this.getExistingPathINodes(components, inodes, resolveLink);
-    
-    return inodes;
+    INodesInPath inodes = this.getExistingPathINodes(components,
+        components.length, resolveLink);
+    return inodes.inodes;
   }
 
   /**
@@ -420,9 +420,8 @@ public class INodeDirectory extends INode {
       return null;
     }
     // Gets the parent INode
-    INode[] inodes = new INode[2];
-    getExistingPathINodes(pathComponents, inodes, false);
-    INode inode = inodes[0];
+    INodesInPath inodes =  getExistingPathINodes(pathComponents, 2, false);
+    INode inode = inodes.inodes[0];
     if (inode == null) {
       throw new FileNotFoundException("Parent path does not exist: " +
           DFSUtil.byteArray2String(pathComponents));
@@ -617,5 +616,28 @@ public class INodeDirectory extends INode {
       subs.get(i).dumpTreeRecursively(out, prefix);
     }
     prefix.setLength(prefix.length() - 2);
+  }
+  
+  /**
+   * Used by
+   * {@link INodeDirectory#getExistingPathINodes(byte[][], int, boolean)}.
+   * Containing INodes information resolved from a given path.
+   */
+  static class INodesInPath {
+    private INode[] inodes;
+    private int count;
+    
+    public INodesInPath(int number) {
+      assert (number >= 0);
+      this.inodes = new INode[number];
+    }
+    
+    INode[] getINodes() {
+      return inodes;
+    }
+    
+    int getCount() {
+      return count;
+    }
   }
 }
