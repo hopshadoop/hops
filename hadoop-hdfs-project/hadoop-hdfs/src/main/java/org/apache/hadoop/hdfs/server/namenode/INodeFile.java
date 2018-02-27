@@ -263,14 +263,14 @@ public class INodeFile extends INode implements BlockCollection {
   }
 
   @Override
-  int collectSubtreeBlocksAndClear(List<Block> v)
+  int collectSubtreeBlocksAndClear(BlocksMapUpdateInfo info)
       throws StorageException, TransactionContextException {
     parent = null;
     BlockInfo[] blocks = getBlocks();
-    if (blocks != null && v != null) {
+    if (blocks != null && info != null) {
       for (BlockInfo blk : blocks) {
         blk.setBlockCollection(null);
-        v.add(blk);
+        info.addDeleteBlock(blk);
       }
     }
 

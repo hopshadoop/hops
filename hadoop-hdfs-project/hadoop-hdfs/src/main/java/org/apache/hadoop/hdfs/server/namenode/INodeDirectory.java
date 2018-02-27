@@ -535,7 +535,7 @@ public class INodeDirectory extends INode {
   }
 
   @Override
-  int collectSubtreeBlocksAndClear(List<Block> v)
+  int collectSubtreeBlocksAndClear(BlocksMapUpdateInfo info)
       throws StorageException, TransactionContextException {
     int total = 1;
     List<INode> children = getChildren();
@@ -543,7 +543,7 @@ public class INodeDirectory extends INode {
       return total;
     }
     for (INode child : children) {
-      total += child.collectSubtreeBlocksAndClear(v);
+      total += child.collectSubtreeBlocksAndClear(info);
     }
     
     parent = null;
