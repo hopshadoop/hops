@@ -327,7 +327,7 @@ public abstract class INode implements Comparable<byte[]> {
    * Count and return the number of files in the sub tree.
    * Also clears references since this INode is deleted.
    */
-  abstract int collectSubtreeBlocksAndClear(List<Block> v)
+  abstract int collectSubtreeBlocksAndClear(BlocksMapUpdateInfo v)
       throws StorageException, TransactionContextException;
 
   /**
@@ -1039,5 +1039,51 @@ public abstract class INode implements Comparable<byte[]> {
     final String s = super.toString();
     out.print(s.substring(s.lastIndexOf(getClass().getSimpleName())));
     out.println(")");
+  }
+  
+  /**
+   * Information used for updating the blocksMap when deleting files.
+   */
+  public static class BlocksMapUpdateInfo {
+
+    /**
+     * The list of blocks that need to be removed from blocksMap
+     */
+    private List<Block> toDeleteList;
+
+    public BlocksMapUpdateInfo(List<Block> toDeleteList) {
+      this.toDeleteList = toDeleteList == null ? new ArrayList<Block>()
+          : toDeleteList;
+    }
+
+    public BlocksMapUpdateInfo() {
+      toDeleteList = new ArrayList<Block>();
+    }
+
+    /**
+     * @return The list of blocks that need to be removed from blocksMap
+     */
+    public List<Block> getToDeleteList() {
+      return toDeleteList;
+    }
+
+    /**
+     * Add a to-be-deleted block into the
+     * {@link BlocksMapUpdateInfo#toDeleteList}
+     *
+     * @param toDelete the to-be-deleted block
+     */
+    public void addDeleteBlock(Block toDelete) {
+      if (toDelete != null) {
+        toDeleteList.add(toDelete);
+      }
+    }
+
+    /**
+     * Clear {@link BlocksMapUpdateInfo#toDeleteList}
+     */
+    public void clear() {
+      toDeleteList.clear();
+    }
   }
 }

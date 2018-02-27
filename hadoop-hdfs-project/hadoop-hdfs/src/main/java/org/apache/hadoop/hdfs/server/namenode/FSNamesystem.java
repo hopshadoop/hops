@@ -118,6 +118,7 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
+import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
 import org.apache.hadoop.hdfs.server.namenode.metrics.FSNamesystemMBean;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
@@ -3219,7 +3220,7 @@ public class FSNamesystem
       boolean enforcePermission)
       throws
       IOException {
-    ArrayList<Block> collectedBlocks = new ArrayList<>();
+    BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
     FSPermissionChecker pc = getPermissionChecker();
     if (isInSafeMode()) {
       throw new SafeModeException("Cannot delete " + src, safeMode);
@@ -3248,28 +3249,38 @@ public class FSNamesystem
    * From the given list, incrementally remove the blocks from blockManager.
    * Write lock is dropped and reacquired every BLOCK_DELETION_INCREMENT to
    * ensure that other waiters on the lock can get in. See HDFS-2938
+   *
+   * @param blocks
+   *          An instance of {@link BlocksMapUpdateInfo} which contains a list
+   *          of blocks that need to be removed from blocksMap
    */
-  private void removeBlocks(List<Block> blocks)
+  private void removeBlocks(BlocksMapUpdateInfo blocks)
       throws StorageException, TransactionContextException {
     int start = 0;
     int end = 0;
-    while (start < blocks.size()) {
+    List<Block> toDeleteList = blocks.getToDeleteList();
+    while (start < toDeleteList.size()) {
       end = BLOCK_DELETION_INCREMENT + start;
-      end = end > blocks.size() ? blocks.size() : end;
+      end = end > toDeleteList.size() ? toDeleteList.size() : end;
       for (int i = start; i < end; i++) {
-        blockManager.removeBlock(blocks.get(i));
+        blockManager.removeBlock(toDeleteList.get(i));
       }
       start = end;
     }
   }
 
-  void removePathAndBlocks(String src, List<Block> blocks)
-      throws IOException {
+  /**
+   * Remove leases and blocks related to a given path
+   *
+   * @param src The given path
+   * @param blocks Containing the list of blocks to be deleted from blocksMap
+   */
+  void removePathAndBlocks(String src, BlocksMapUpdateInfo blocks) throws IOException {
     leaseManager.removeLeaseWithPrefixPath(src);
     if (blocks == null) {
       return;
     }
-    for (Block b : blocks) {
+    for (Block b : blocks.getToDeleteList()) {
       blockManager.removeBlock(b);
     }
   }

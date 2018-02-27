@@ -68,7 +68,7 @@ public class INodeSymlink extends INode {
   }
   
   @Override
-  int collectSubtreeBlocksAndClear(List<Block> v)
+  int collectSubtreeBlocksAndClear(BlocksMapUpdateInfo info)
       throws StorageException, TransactionContextException {
     //HOP:
     EntityManager.remove(this);
