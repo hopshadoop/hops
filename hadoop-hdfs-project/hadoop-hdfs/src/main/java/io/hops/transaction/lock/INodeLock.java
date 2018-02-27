@@ -560,7 +560,7 @@ class INodeLock extends BaseINodeLock {
     if (lastINode != null) {
       if (lastINode instanceof INodeDirectory) {
         setINodeLockType(TransactionLockTypes.INodeLockType.READ_COMMITTED); //if the parent is locked then taking lock on all children is not necessary
-        children.addAll(((INodeDirectory) lastINode).getChildren());
+        children.addAll(((INodeDirectory) lastINode).getChildrenList());
       }
     }
     return children;
@@ -581,7 +581,7 @@ class INodeLock extends BaseINodeLock {
       INode next = unCheckedDirs.poll();
       if (next instanceof INodeDirectory) {
         setINodeLockType(TransactionLockTypes.INodeLockType.READ_COMMITTED); //locking the parent is sufficient
-        List<INode> clist = ((INodeDirectory) next).getChildren();
+        List<INode> clist = ((INodeDirectory) next).getChildrenList();
         unCheckedDirs.addAll(clist);
         children.addAll(clist);
       }

@@ -78,10 +78,9 @@ public class INodeDirectory extends INode {
   /**
    * constructor
    */
-  INodeDirectory(byte[] localName, PermissionStatus permissions, long mTime)
+  INodeDirectory(byte[] name, PermissionStatus permissions, long mtime)
       throws IOException {
-    this(permissions, mTime);
-    this.setLocalNameNoPersistance(localName);
+    super(name, permissions, null, mtime, 0L);
   }
   
   /**
@@ -258,7 +257,7 @@ public class INodeDirectory extends INode {
         final String remainder =
             constructPath(components, count + 1, components.length);
         final String link = DFSUtil.bytes2String(components[count]);
-        final String target = ((INodeSymlink) curNode).getLinkValue();
+        final String target = ((INodeSymlink) curNode).getSymlinkString();
         if (NameNode.stateChangeLog.isDebugEnabled()) {
           NameNode.stateChangeLog.debug("UnresolvedPathException " +
               " path: " + path + " preceding: " + preceding +
@@ -336,7 +335,7 @@ public class INodeDirectory extends INode {
    */
   <T extends INode> T addChild(final T node, boolean setModTime)
       throws IOException {
-    INode existingInode = getChildINode(node.name);
+    INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
       return null;
     }
@@ -401,11 +400,10 @@ public class INodeDirectory extends INode {
    *     if parent does not exist or
    *     is not a directory.
    */
-  INodeDirectory addToParent(byte[] localname, INode newNode,
+  INodeDirectory addToParent(INode newNode,
       INodeDirectory parent, boolean propagateModTime)
       throws IOException {
     // insert into the parent children list
-    newNode.setLocalNameNoPersistance(localname);
     if (parent.addChild(newNode, propagateModTime) == null) {
       return null;
     }
@@ -518,7 +516,7 @@ public class INodeDirectory extends INode {
   /**
    * @return the children list which is possibly null.
    */
-  public List<INode> getChildren()
+  private List<INode> getChildren()
       throws StorageException, TransactionContextException {
     if (getId() == INode.NON_EXISTING_ID) {
       return null;
@@ -639,5 +637,10 @@ public class INodeDirectory extends INode {
     int getCount() {
       return count;
     }
+  }
+  
+  @Override
+  public INode cloneInode () throws IOException{
+    return new INodeDirectory(this);
   }
 }

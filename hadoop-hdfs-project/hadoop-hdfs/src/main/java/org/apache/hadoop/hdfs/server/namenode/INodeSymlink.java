@@ -26,34 +26,33 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 /**
- * An INode representing a symbolic link.
+ * An {@link INode} representing a symbolic link.
  */
 @InterfaceAudience.Private
 public class INodeSymlink extends INode {
-  private byte[] symlink; // The target URI
+  private final byte[] symlink; // The target URI
 
-  public INodeSymlink(String value, long modTime, long atime,
+  public INodeSymlink(String value, long mtime, long atime,
       PermissionStatus permissions) throws IOException {
-    super(permissions, modTime, atime);
-    assert value != null;
-    setLinkValue(value);
-    setModificationTimeForceNoPersistance(modTime);
-    setAccessTimeNoPersistance(atime);
+    super(permissions, mtime, atime);
+    this.symlink = DFSUtil.string2Bytes(value);
   }
 
+  public INodeSymlink(INodeSymlink other) throws IOException{
+    super(other);
+    this.symlink = Arrays.copyOf(other.symlink, other.symlink.length);
+  }
+  
   @Override
   public boolean isSymlink() {
     return true;
   }
-  
-  void setLinkValue(String value) {
-    this.symlink = DFSUtil.string2Bytes(value);
-  }
 
-  public String getLinkValue() {
+  public String getSymlinkString() {
     return DFSUtil.bytes2String(symlink);
   }
 
@@ -91,5 +90,10 @@ public class INodeSymlink extends INode {
   public byte getLocalStoragePolicyID() {
     throw new UnsupportedOperationException(
         "Storage policy are not supported on symlinks");
+  }
+  
+  @Override
+  public INode cloneInode () throws IOException{
+    return new INodeSymlink(this);
   }
 }

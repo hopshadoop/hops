@@ -69,7 +69,7 @@ public class INodeResolver {
       final String remainder =
           INodeUtil.constructPath(components, count + 1, components.length);
       final String link = DFSUtil.bytes2String(components[count]);
-      final String target = ((INodeSymlink) currentInode).getLinkValue();
+      final String target = ((INodeSymlink) currentInode).getSymlinkString();
       if (NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug(
             "UnresolvedPathException " + " path: " + symPath + " preceding: " +

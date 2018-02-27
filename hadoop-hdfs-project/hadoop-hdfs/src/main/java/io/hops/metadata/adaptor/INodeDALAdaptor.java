@@ -249,17 +249,15 @@ public class INodeDALAdaptor
         } else if (hopINode.getSymlink() != null) {
           inode = new INodeSymlink(hopINode.getSymlink(),
               hopINode.getModificationTime(), hopINode.getAccessTime(), ps);
-      } else {
-        if (hopINode.isUnderConstruction()) {
-          DatanodeID dnID = (hopINode.getClientNode() == null ||
-              hopINode.getClientNode().isEmpty()) ? null :
-              new DatanodeID(hopINode.getClientNode());
-
-          inode = new INodeFileUnderConstruction(ps,
-              INodeFile.getBlockReplication(hopINode.getHeader()),
-              INodeFile.getPreferredBlockSize(hopINode.getHeader()),
-              hopINode.getModificationTime(), hopINode.getClientName(),
-              hopINode.getClientMachine(), dnID, hopINode.getStoragePolicy());
+        } else {
+          if (hopINode.isUnderConstruction()) {
+            DatanodeID dnID = (hopINode.getClientNode() == null || hopINode.getClientNode().isEmpty()) ? null
+                : new DatanodeID(hopINode.getClientNode());
+            inode = new INodeFileUnderConstruction(ps,
+                org.apache.hadoop.hdfs.server.namenode.INode.HeaderFormat.getReplication(hopINode.getHeader()),
+                org.apache.hadoop.hdfs.server.namenode.INode.HeaderFormat.getPreferredBlockSize(hopINode.getHeader()),
+                hopINode.getModificationTime(), hopINode.getClientName(),
+                hopINode.getClientMachine(), dnID, hopINode.getStoragePolicy());
 
             inode.setAccessTimeNoPersistance(hopINode.getAccessTime());
           } else {
@@ -270,7 +268,7 @@ public class INodeDALAdaptor
           ((INodeFile) inode).setGenerationStampNoPersistence(
               hopINode.getGenerationStamp());
           ((INodeFile) inode).setSizeNoPersistence(hopINode.getFileSize());
-          ((INodeFile) inode).setHasBlocksNoPersistance(INodeFile.hasBlocks(hopINode.getHeader()));
+          
           ((INodeFile) inode).setFileStoredInDBNoPersistence(hopINode.isFileStoredInDB());
         }
         inode.setIdNoPersistance(hopINode.getId());
@@ -284,9 +282,9 @@ public class INodeDALAdaptor
         inode.setPartitionIdNoPersistance(hopINode.getPartitionId());
         inode.setLogicalTimeNoPersistance(hopINode.getLogicalTime());
         inode.setBlockStoragePolicyIDNoPersistance(hopINode.getStoragePolicy());
-    }
-    return inode;
-    }catch (IOException ex){
+      }
+      return inode;
+    } catch (IOException ex) {
       throw new StorageException(ex);
     }
   }

@@ -57,13 +57,6 @@ public class INodeFile extends INode implements BlockCollection {
     return (INodeFile) inode;
   }
 
-  //Number of bits for Block size
-  static final short BLOCKBITS = 48;
-
-  //Header mask 64-bit representation
-  //Format: [16 bits for replication][48 bits for PreferredBlockSize]
-  static final long HEADERMASK = 0xffffL << BLOCKBITS;
-
   private int generationStamp = (int) GenerationStamp.FIRST_VALID_STAMP;
   private long size;
   private boolean isFileStoredInDB = false;
@@ -73,8 +66,8 @@ public class INodeFile extends INode implements BlockCollection {
       short replication, long modificationTime, long atime,
       long preferredBlockSize, byte storagePolicyID) throws IOException {
     super(permissions, modificationTime, atime);
-    this.setReplicationNoPersistance(replication);
-    this.setPreferredBlockSizeNoPersistance(preferredBlockSize);
+    header = HeaderFormat.combineReplication(header, replication);
+    header = HeaderFormat.combinePreferredBlockSize(header, preferredBlockSize);
     this.setFileStoredInDBNoPersistence(false); // it is set when the data is stored in the database
     this.setBlockStoragePolicyIDNoPersistance(storagePolicyID);
   }
@@ -82,7 +75,7 @@ public class INodeFile extends INode implements BlockCollection {
   public INodeFile(PermissionStatus permissions, long header,
       long modificationTime, long atime, boolean isFileStoredInDB, byte storagepolicy) throws IOException {
     super(permissions, modificationTime, atime);
-    this.setHeaderNoPersistance(header);
+    this.header = header;
     this.isFileStoredInDB = isFileStoredInDB;
     this.blockStoragePolicyID = storagepolicy;
   }
@@ -91,14 +84,11 @@ public class INodeFile extends INode implements BlockCollection {
   public INodeFile(INodeFile other)
       throws IOException {
     super(other);
-    setReplicationNoPersistance(other.getBlockReplication());
-    setPreferredBlockSizeNoPersistance(other.getPreferredBlockSize());
     setGenerationStampNoPersistence(other.getGenerationStamp());
     setSizeNoPersistence(other.getSize());
     setFileStoredInDBNoPersistence(other.isFileStoredInDB());
-    setHasBlocksNoPersistance(other.hasBlocks());
     setPartitionIdNoPersistance(other.getPartitionId());
-    setHeaderNoPersistance(other.getHeader());
+    this.header = other.getHeader();
   }
 
   /**
@@ -106,7 +96,7 @@ public class INodeFile extends INode implements BlockCollection {
    */
   @Override
   public short getBlockReplication() {
-    return getBlockReplication(header);
+    return HeaderFormat.getReplication(header);
   }
 
   @Override
@@ -124,7 +114,7 @@ public class INodeFile extends INode implements BlockCollection {
    */
   @Override
   public long getPreferredBlockSize() {
-    return getPreferredBlockSize(header);
+    return HeaderFormat.getPreferredBlockSize(header);
   }
 
   /**
@@ -409,7 +399,7 @@ public class INodeFile extends INode implements BlockCollection {
 
   void setReplication(short replication)
       throws StorageException, TransactionContextException {
-    setReplicationNoPersistance(replication);
+    header = HeaderFormat.combineReplication(header, replication);
     save();
   }
 
@@ -498,4 +488,8 @@ public class INodeFile extends INode implements BlockCollection {
     }
   }
 
+  @Override
+  public INode cloneInode () throws IOException{
+    return new INodeFile(this);
+  }
 }
