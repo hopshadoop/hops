@@ -67,6 +67,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectory.INodesInPath;
 import org.apache.hadoop.hdfs.util.ByteArray;
 import org.apache.hadoop.security.AccessControlException;
 
@@ -483,8 +484,9 @@ public class FSDirectory implements Closeable {
           "Cannot rename symlink " + src + " to its target " + dst);
     }
     final byte[][] dstComponents = INode.getPathComponents(dst);
-    final INode[] dstInodes = new INode[dstComponents.length];
-    getRootDir().getExistingPathINodes(dstComponents, dstInodes, false);
+    INodeDirectory.INodesInPath dstInodesInPath = getRootDir().getExistingPathINodes(dstComponents,
+        dstComponents.length, false);
+    INode[] dstInodes = dstInodesInPath.getINodes();
     INode dstInode = dstInodes[dstInodes.length - 1];
     if (dstInodes.length == 1) {
       error = "rename destination cannot be the root";
@@ -686,8 +688,9 @@ public class FSDirectory implements Closeable {
     
     byte[][] dstComponents = INode.getPathComponents(dst);
     LOG.debug("destination is " + dst);
-    INode[] dstInodes = new INode[dstComponents.length];
-    getRootDir().getExistingPathINodes(dstComponents, dstInodes, false);
+    INodesInPath dstInodesInPath = getRootDir().getExistingPathINodes(dstComponents,
+        dstComponents.length, false);
+    final INode[] dstInodes = dstInodesInPath.getINodes();
     if (dstInodes[dstInodes.length - 1] != null) {
       NameNode.stateChangeLog.warn(
           "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
@@ -793,8 +796,9 @@ public class FSDirectory implements Closeable {
 
     byte[][] dstComponents = INode.getPathComponents(dst);
     LOG.debug("destination is " + dst);
-    INode[] dstInodes = new INode[dstComponents.length];
-    getRootDir().getExistingPathINodes(dstComponents, dstInodes, false);
+    INodesInPath dstInodesInPath = getRootDir().getExistingPathINodes(dstComponents,
+        dstComponents.length, false);
+    final INode[] dstInodes = dstInodesInPath.getINodes();
     if (dstInodes[dstInodes.length - 1] != null) {
       NameNode.stateChangeLog.warn(
           "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
@@ -936,8 +940,9 @@ public class FSDirectory implements Closeable {
       throw new IOException(error);
     }
     final byte[][] dstComponents = INode.getPathComponents(dst);
-    final INode[] dstInodes = new INode[dstComponents.length];
-    getRootDir().getExistingPathINodes(dstComponents, dstInodes, false);
+    INodesInPath dstInodesInPath = getRootDir().getExistingPathINodes(dstComponents,
+        dstComponents.length, false);
+    final INode[] dstInodes = dstInodesInPath.getINodes();
     INode dstInode = dstInodes[dstInodes.length - 1];
     if (dstInodes.length == 1) {
       error = "rename destination cannot be the root";
@@ -1744,10 +1749,11 @@ public class FSDirectory implements Closeable {
     src = normalizePath(src);
     String[] names = INode.getPathNames(src);
     byte[][] components = INode.getPathComponents(names);
-    INode[] inodes = new INode[components.length];
-    final int lastInodeIndex = inodes.length - 1;
+    final int lastInodeIndex = components.length - 1;
 
-    getRootDir().getExistingPathINodes(components, inodes, false);
+    INodesInPath inodesInPath = getRootDir().getExistingPathINodes(components,
+        components.length, false);
+    INode[] inodes = inodesInPath.getINodes();
 
     // find the index of the first null in inodes[]
     StringBuilder pathbuilder = new StringBuilder();
@@ -1815,15 +1821,13 @@ public class FSDirectory implements Closeable {
     return true;
   }
 
-  /**
-   */
   INode unprotectedMkdir(String src, PermissionStatus permissions,
       long timestamp)
       throws IOException {
     byte[][] components = INode.getPathComponents(src);
-    INode[] inodes = new INode[components.length];
-
-    getRootDir().getExistingPathINodes(components, inodes, false);
+    INodesInPath inodesInPath = getRootDir().getExistingPathINodes(components,
+        components.length, false);
+    INode[] inodes = inodesInPath.getINodes();
     unprotectedMkdir(inodes, inodes.length - 1, components[inodes.length - 1],
         permissions, timestamp);
     return inodes[inodes.length - 1];
@@ -1853,8 +1857,9 @@ public class FSDirectory implements Closeable {
     byte[] path = components[components.length - 1];
     child.setLocalNameNoPersistance(path);
     cacheName(child);
-    INode[] inodes = new INode[components.length];
-    getRootDir().getExistingPathINodes(components, inodes, false);
+    INodesInPath inodesInPath = getRootDir().getExistingPathINodes(components,
+        components.length, false);
+    INode[] inodes = inodesInPath.getINodes();
     return addChild(inodes, inodes.length - 1, child, childDiskspace);
   }
 

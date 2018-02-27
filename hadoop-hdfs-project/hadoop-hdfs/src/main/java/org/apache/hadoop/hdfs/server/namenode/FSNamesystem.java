@@ -7847,12 +7847,12 @@ public class FSNamesystem
             }
 
             byte[][] pathComponents = INode.getPathComponents(path);
-            INode[] pathInodes = new INode[pathComponents.length];
             boolean isDir = false;
-            INode.DirCounts srcCounts  = new INode.DirCounts();
-            int numExistingComp = dir.getRootDir().
-                getExistingPathINodes(pathComponents, pathInodes, false);
-
+            INode.DirCounts srcCounts = new INode.DirCounts();
+            INodeDirectory.INodesInPath dstInodesInPath = dir.getRootDir().getExistingPathINodes(pathComponents,
+                pathComponents.length, false);
+            final INode[] pathInodes = dstInodesInPath.getINodes();
+            
             INodeAttributes quotaDirAttributes = null;
             INode leafInode = pathInodes[pathInodes.length - 1];
             if(leafInode != null){  // complete path resolved
@@ -7871,7 +7871,7 @@ public class FSNamesystem
             }
 
             return new PathInformation(path, pathComponents,
-                pathInodes,numExistingComp,isDir,
+                pathInodes,dstInodesInPath.getCount(),isDir,
                 srcCounts.getNsCount(), srcCounts.getDsCount(), quotaDirAttributes);
           }
         };
