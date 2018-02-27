@@ -268,13 +268,13 @@ public class FSDirectory implements Closeable {
   /**
    * Add a block to the file. Returns a reference to the added block.
    */
-  BlockInfo addBlock(String path, INode[] inodes, Block block,
+  BlockInfo addBlock(String path, INodesInPath inodesInPath, Block block,
       DatanodeStorageInfo targets[])
       throws QuotaExceededException, StorageException,
-      TransactionContextException {
-    assert inodes[inodes.length - 1]
-        .isUnderConstruction() : "INode should correspond to a file under construction";
-    INodeFileUnderConstruction fileINode = (INodeFileUnderConstruction) inodes[inodes.length - 1];
+      TransactionContextException, IOException {
+    final INode[] inodes = inodesInPath.getINodes();
+      final INodeFileUnderConstruction fileINode = 
+          INodeFileUnderConstruction.valueOf(inodes[inodes.length-1], path);
 
     long diskspaceTobeConsumed = fileINode.getBlockDiskspace();
     //When appending to a small file stored in DB we should consider the file
@@ -285,7 +285,7 @@ public class FSDirectory implements Closeable {
           fileINode.getBlockReplication());
     }
     // check quota limits and updated space consumed
-    updateCount(inodes, inodes.length - 1, 0, diskspaceTobeConsumed, true);
+    updateCount(inodesInPath, inodes.length - 1, 0, diskspaceTobeConsumed, true);
 
     // associate new last block for the file
     BlockInfoUnderConstruction blockInfo =
@@ -354,8 +354,9 @@ public class FSDirectory implements Closeable {
     }
 
     // update space consumed
-    INode[] pathINodes = getExistingPathINodes(path);
-    updateCount(pathINodes, pathINodes.length - 1, 0,
+    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(path, true);
+    final INode[] inodes = inodesInPath.getINodes();
+    updateCount(inodesInPath, inodes.length-1, 0,
         -fileNode.getPreferredBlockSize() * fileNode.getBlockReplication(),
         true);
   }
@@ -437,7 +438,8 @@ public class FSDirectory implements Closeable {
       }
     }
     String error = null;
-    final INode[] srcInodes = getRootDir().getExistingPathINodes(src, false);
+    INodesInPath srcInodesInPath = getRootDir().getExistingPathINodes(src, false);
+    INode[] srcInodes = srcInodesInPath.getINodes();
     final INode srcInode = srcInodes[srcInodes.length - 1];
     // validate source
     if (srcInode == null) {
@@ -518,7 +520,7 @@ public class FSDirectory implements Closeable {
     verifyQuotaForRename(srcInodes, dstInodes, srcNsCount, srcDsCount,
         dstNsCount, dstDsCount);
     INode removedSrc =
-        removeChildForRename(srcInodes, srcInodes.length - 1, srcNsCount,
+        removeChildForRename(srcInodesInPath, srcInodes.length - 1, srcNsCount,
             srcDsCount);
     if (removedSrc == null) {
       error = "Failed to rename " + src + " to " + dst +
@@ -535,7 +537,7 @@ public class FSDirectory implements Closeable {
     INode removedDst = null;
     try {
       if (dstInode != null) { // dst exists remove it
-        removedDst = removeChild(dstInodes, dstInodes.length - 1,dstNsCount,
+        removedDst = removeChild(dstInodesInPath, dstInodes.length - 1,dstNsCount,
                 dstDsCount);
         dstChildName = removedDst.getLocalName();
       }
@@ -544,7 +546,7 @@ public class FSDirectory implements Closeable {
       removedSrc.setLocalNameNoPersistance(dstComponents[dstInodes.length - 1]);
       // add src as dst to complete rename
       dstChild =
-          addChildNoQuotaCheck(dstInodes, dstInodes.length - 1, removedSrc,
+          addChildNoQuotaCheck(dstInodesInPath, dstInodes.length - 1, removedSrc,
               srcNsCount, srcDsCount);
 
       int filesDeleted = 0;
@@ -589,13 +591,13 @@ public class FSDirectory implements Closeable {
       if (removedSrc != null) {
         // Rename failed - restore src
         removedSrc.setLocalNameNoPersistance(srcChildName);
-        addChildNoQuotaCheck(srcInodes, srcInodes.length - 1, removedSrc,
+        addChildNoQuotaCheck(srcInodesInPath, srcInodes.length - 1, removedSrc,
             srcNsCount, srcDsCount);
       }
       if (removedDst != null) {
         // Rename failed - restore dst
         removedDst.setLocalNameNoPersistance(dstChildName);
-        addChildNoQuotaCheck(dstInodes, dstInodes.length - 1, removedDst,
+        addChildNoQuotaCheck(dstInodesInPath, dstInodes.length - 1, removedDst,
             dstNsCount, dstDsCount);
       }
     }
@@ -622,7 +624,8 @@ public class FSDirectory implements Closeable {
   @Deprecated
   boolean unprotectedRenameTo(String src, String dst, long timestamp)
       throws IOException {
-    INode[] srcInodes = getRootDir().getExistingPathINodes(src, false);
+    INodesInPath srcInodesInPath = getRootDir().getExistingPathINodes(src, false);
+    INode[] srcInodes = srcInodesInPath.getINodes();
     INode srcInode = srcInodes[srcInodes.length - 1];
     
     // check the validation of the source
@@ -689,7 +692,7 @@ public class FSDirectory implements Closeable {
     String srcChildName = null;
     try {
       // remove src
-      srcChild = removeChildForRename(srcInodes, srcInodes.length - 1);
+      srcChild = removeChildForRename(srcInodesInPath, srcInodes.length - 1);
       if (srcChild == null) {
         NameNode.stateChangeLog.warn(
             "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " +
@@ -704,7 +707,7 @@ public class FSDirectory implements Closeable {
       srcChild.setLocalNameNoPersistance(dstComponents[dstInodes.length - 1]);
       
       // add src to the destination
-      dstChild = addChildNoQuotaCheck(dstInodes, dstInodes.length - 1, srcChild,
+      dstChild = addChildNoQuotaCheck(dstInodesInPath, dstInodes.length - 1, srcChild,
           UNKNOWN_DISK_SPACE);
       if (dstChild != null) {
         srcChild = null;
@@ -729,7 +732,7 @@ public class FSDirectory implements Closeable {
       if (dstChild == null && srcChild != null) {
         // put it back
         srcChild.setLocalNameNoPersistance(srcChildName);
-        addChildNoQuotaCheck(srcInodes, srcInodes.length - 1, srcChild,
+        addChildNoQuotaCheck(srcInodesInPath, srcInodes.length - 1, srcChild,
             UNKNOWN_DISK_SPACE);
       }
     }
@@ -743,7 +746,8 @@ public class FSDirectory implements Closeable {
   boolean unprotectedRenameTo(String src, String dst, long timestamp,
       long srcNsCount, long srcDsCount, long dstNsCount, long dstDsCount)
       throws IOException {
-    INode[] srcInodes = getRootDir().getExistingPathINodes(src, false);
+    final INodesInPath srcInodesInPath = getRootDir().getExistingPathINodes(src, false);
+    final INode[] srcInodes = srcInodesInPath.getINodes();
     INode srcInode = srcInodes[srcInodes.length - 1];
 
     // check the validation of the source
@@ -799,7 +803,7 @@ public class FSDirectory implements Closeable {
     try {
       // remove src
       srcChild =
-          removeChildForRename(srcInodes, srcInodes.length - 1, srcNsCount,
+          removeChildForRename(srcInodesInPath, srcInodes.length - 1, srcNsCount,
               srcDsCount);
       if (srcChild == null) {
         NameNode.stateChangeLog.warn(
@@ -815,7 +819,7 @@ public class FSDirectory implements Closeable {
       srcChild.setLocalNameNoPersistance(dstComponents[dstInodes.length - 1]);
 
       // add src to the destination
-      dstChild = addChildNoQuotaCheck(dstInodes, dstInodes.length - 1, srcChild,
+      dstChild = addChildNoQuotaCheck(dstInodesInPath, dstInodes.length - 1, srcChild,
           srcNsCount, srcDsCount);
       if (dstChild != null) {
         srcChild = null;
@@ -841,7 +845,7 @@ public class FSDirectory implements Closeable {
       if (dstChild == null && srcChild != null) {
         // put it back
         srcChild.setLocalNameNoPersistance(srcChildName);
-        addChildNoQuotaCheck(srcInodes, srcInodes.length - 1, srcChild,
+        addChildNoQuotaCheck(srcInodesInPath, srcInodes.length - 1, srcChild,
             srcNsCount, srcDsCount);
       }
     }
@@ -879,7 +883,8 @@ public class FSDirectory implements Closeable {
       }
     }
     String error = null;
-    final INode[] srcInodes = getRootDir().getExistingPathINodes(src, false);
+    final INodesInPath srcInodesInPath = getRootDir().getExistingPathINodes(src, false);
+    final INode[] srcInodes = srcInodesInPath.getINodes();
     final INode srcInode = srcInodes[srcInodes.length - 1];
     // validate source
     if (srcInode == null) {
@@ -965,7 +970,7 @@ public class FSDirectory implements Closeable {
 
     // Ensure dst has quota to accommodate rename
     verifyQuotaForRename(srcInodes, dstInodes);
-    INode removedSrc = removeChildForRename(srcInodes, srcInodes.length - 1);
+    INode removedSrc = removeChildForRename(srcInodesInPath, srcInodes.length - 1);
     if (removedSrc == null) {
       error = "Failed to rename " + src + " to " + dst +
           " because the source can not be removed";
@@ -981,7 +986,7 @@ public class FSDirectory implements Closeable {
     INode removedDst = null;
     try {
       if (dstInode != null) { // dst exists remove it
-        removedDst = removeChild(dstInodes, dstInodes.length - 1);
+        removedDst = removeChild(dstInodesInPath, dstInodes.length - 1);
         dstChildName = removedDst.getLocalName();
       }
 
@@ -989,7 +994,7 @@ public class FSDirectory implements Closeable {
       removedSrc.setLocalNameNoPersistance(dstComponents[dstInodes.length - 1]);
       // add src as dst to complete rename
       dstChild =
-          addChildNoQuotaCheck(dstInodes, dstInodes.length - 1, removedSrc,
+          addChildNoQuotaCheck(dstInodesInPath, dstInodes.length - 1, removedSrc,
               UNKNOWN_DISK_SPACE);
 
       int filesDeleted = 0;
@@ -1024,13 +1029,13 @@ public class FSDirectory implements Closeable {
       if (removedSrc != null) {
         // Rename failed - restore src
         removedSrc.setLocalNameNoPersistance(srcChildName);
-        addChildNoQuotaCheck(srcInodes, srcInodes.length - 1, removedSrc,
+        addChildNoQuotaCheck(srcInodesInPath, srcInodes.length - 1, removedSrc,
             UNKNOWN_DISK_SPACE);
       }
       if (removedDst != null) {
         // Rename failed - restore dst
         removedDst.setLocalNameNoPersistance(dstChildName);
-        addChildNoQuotaCheck(dstInodes, dstInodes.length - 1, removedDst,
+        addChildNoQuotaCheck(dstInodesInPath, dstInodes.length - 1, removedDst,
             UNKNOWN_DISK_SPACE);
       }
     }
@@ -1064,7 +1069,8 @@ public class FSDirectory implements Closeable {
       short[] oldReplication)
       throws QuotaExceededException, UnresolvedLinkException, StorageException,
       TransactionContextException {
-    INode[] inodes = getRootDir().getExistingPathINodes(src, true);
+    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(src, true);
+    final INode[] inodes = inodesInPath.getINodes();
     INode inode = inodes[inodes.length - 1];
     if (inode == null || !inode.isFile()) {
       return null;
@@ -1075,7 +1081,7 @@ public class FSDirectory implements Closeable {
     // check disk quota
     long dsDelta =
         (replication - oldRepl) * (fileNode.diskspaceConsumed() / oldRepl);
-    updateCount(inodes, inodes.length - 1, 0, dsDelta, true);
+    updateCount(inodesInPath, inodes.length - 1, 0, dsDelta, true);
 
     fileNode.setReplication(replication);
 
@@ -1090,7 +1096,8 @@ public class FSDirectory implements Closeable {
   }
 
   void unprotectedSetStoragePolicy(String src, BlockStoragePolicy policy) throws IOException {
-    INode[] inodes = getRootDir().getExistingPathINodes(src, true);
+    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(src, true);
+    final INode[] inodes = inodesInPath.getINodes();
     INode inode = inodes[inodes.length - 1];
 
     if (inode == null) {
@@ -1189,7 +1196,8 @@ public class FSDirectory implements Closeable {
     }
     // do the move
     
-    INode[] trgINodes = getExistingPathINodes(target);
+    final INodesInPath trgINodesInPath = getExistingPathINodes(target);
+    final INode[] trgINodes = trgINodesInPath.getINodes();
     INodeFile trgInode = (INodeFile) trgINodes[trgINodes.length - 1];
     INodeDirectory trgParent = (INodeDirectory) trgINodes[trgINodes.length - 2];
     
@@ -1232,7 +1240,7 @@ public class FSDirectory implements Closeable {
     trgInode.setModificationTimeForce(timestamp);
     trgParent.setModificationTime(timestamp);
     // update quota on the parent directory ('count' files removed, 0 space)
-    unprotectedUpdateCount(trgINodes, trgINodes.length - 1, -count, 0);
+    unprotectedUpdateCount(trgINodesInPath, trgINodes.length - 1, -count, 0);
     
 
     EntityManager
@@ -1320,7 +1328,8 @@ public class FSDirectory implements Closeable {
       TransactionContextException {
     src = normalizePath(src);
 
-    INode[] inodes = getRootDir().getExistingPathINodes(src, false);
+    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(src, false);
+    final INode[] inodes = inodesInPath.getINodes();
     INode targetNode = inodes[inodes.length - 1];
 
     if (targetNode == null) { // non-existent src
@@ -1343,7 +1352,7 @@ public class FSDirectory implements Closeable {
 
     int pos = inodes.length - 1;
     // Remove the node from the namespace
-    targetNode = removeChild(inodes, pos);
+    targetNode = removeChild(inodesInPath, pos);
     if (targetNode == null) {
       return 0;
     }
@@ -1487,7 +1496,7 @@ public class FSDirectory implements Closeable {
    * filled with null
    * @see INodeDirectory#getExistingPathINodes(byte[][], INode[], boolean)
    */
-  INode[] getExistingPathINodes(String path)
+  INodesInPath getExistingPathINodes(String path)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
     return getRootDir().getExistingPathINodes(path, true);
@@ -1550,12 +1559,13 @@ public class FSDirectory implements Closeable {
   void updateSpaceConsumed(String path, long nsDelta, long dsDelta)
       throws QuotaExceededException, FileNotFoundException,
       UnresolvedLinkException, StorageException, TransactionContextException {
-    INode[] inodes = getRootDir().getExistingPathINodes(path, false);
+    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(path, false);
+    final INode[] inodes = inodesInPath.getINodes();
     int len = inodes.length;
     if (inodes[len - 1] == null) {
       throw new FileNotFoundException(path + " does not exist under rootDir.");
     }
-    updateCount(inodes, len - 1, nsDelta, dsDelta, true);
+    updateCount(inodesInPath, len - 1, nsDelta, dsDelta, true);
   }
   
   /**
@@ -1574,7 +1584,7 @@ public class FSDirectory implements Closeable {
    * @throws QuotaExceededException
    *     if the new count violates any quota limit
    */
-  private void updateCount(INode[] inodes, int numOfINodes, long nsDelta,
+  private void updateCount(INodesInPath inodesInPath, int numOfINodes, long nsDelta,
       long dsDelta, boolean checkQuota)
       throws QuotaExceededException, StorageException,
       TransactionContextException {
@@ -1586,6 +1596,7 @@ public class FSDirectory implements Closeable {
       //still initializing. do not check or update quotas.
       return;
     }
+    final INode[] inodes = inodesInPath.getINodes();
     if (numOfINodes > inodes.length) {
       numOfINodes = inodes.length;
     }
@@ -1601,11 +1612,11 @@ public class FSDirectory implements Closeable {
    * update quota of each inode and check to see if quota is exceeded.
    * See {@link #updateCount(INode[], int, long, long, boolean)}
    */
-  private void updateCountNoQuotaCheck(INode[] inodes, int numOfINodes,
+  private void updateCountNoQuotaCheck(INodesInPath inodesInPath, int numOfINodes,
       long nsDelta, long dsDelta)
       throws StorageException, TransactionContextException {
     try {
-      updateCount(inodes, numOfINodes, nsDelta, dsDelta, false);
+      updateCount(inodesInPath, numOfINodes, nsDelta, dsDelta, false);
     } catch (QuotaExceededException e) {
       NameNode.LOG.warn("FSDirectory.updateCountNoQuotaCheck - unexpected ", e);
     }
@@ -1620,12 +1631,12 @@ public class FSDirectory implements Closeable {
    * @param nsDelta
    * @param dsDelta
    */
-  void unprotectedUpdateCount(INode[] inodes, int numOfINodes, long nsDelta,
+  void unprotectedUpdateCount(INodesInPath inodesInPath, int numOfINodes, long nsDelta,
       long dsDelta) throws StorageException, TransactionContextException {
     if (!isQuotaEnabled()) {
       return;
     }
-
+    final INode[] inodes = inodesInPath.getINodes();
     INode iNode = inodes[numOfINodes - 1];
     namesystem.getQuotaUpdateManager()
         .addUpdate(iNode.getId(), nsDelta, dsDelta);
@@ -1753,7 +1764,7 @@ public class FSDirectory implements Closeable {
     for (; i < inodes.length; i++) {
       pathbuilder.append(Path.SEPARATOR + names[i]);
       String cur = pathbuilder.toString();
-      unprotectedMkdir(inodes, i, components[i],
+      unprotectedMkdir(inodesInPath, i, components[i],
           (i < lastInodeIndex) ? parentPermissions : permissions, now);
       if (inodes[i] == null) {
         return false;
@@ -1779,7 +1790,7 @@ public class FSDirectory implements Closeable {
     INodesInPath inodesInPath = getRootDir().getExistingPathINodes(components,
         components.length, false);
     INode[] inodes = inodesInPath.getINodes();
-    unprotectedMkdir(inodes, inodes.length - 1, components[inodes.length - 1],
+    unprotectedMkdir(inodesInPath, inodes.length - 1, components[inodes.length - 1],
         permissions, timestamp);
     return inodes[inodes.length - 1];
   }
@@ -1789,12 +1800,12 @@ public class FSDirectory implements Closeable {
    * The parent path to the directory is at [0, pos-1].
    * All ancestors exist. Newly created one stored at index pos.
    */
-  private void unprotectedMkdir(INode[] inodes, int pos, byte[] name,
+  private void unprotectedMkdir(INodesInPath inodesInPath, int pos, byte[] name,
       PermissionStatus permission, long timestamp)
       throws IOException {
-    inodes[pos] =
-        addChild(inodes, pos, new INodeDirectory(name, permission, timestamp),
-            -1);
+    final INodeDirectory dir = new INodeDirectory(name, permission, timestamp);
+    final INode inode = addChild(inodesInPath, pos, dir, -1, true);
+    inodesInPath.setINode(pos, inode);
   }
   
   /**
@@ -1811,7 +1822,8 @@ public class FSDirectory implements Closeable {
     INodesInPath inodesInPath = getRootDir().getExistingPathINodes(components,
         components.length, false);
     INode[] inodes = inodesInPath.getINodes();
-    return addChild(inodes, inodes.length - 1, child, childDiskspace);
+    return addChild(inodesInPath, inodesInPath.getINodes().length-1, child,
+          childDiskspace, true);
   }
 
   /**
@@ -1991,9 +2003,10 @@ public class FSDirectory implements Closeable {
    * Its ancestors are stored at [0, pos-1].
    * QuotaExceededException is thrown if it violates quota limit
    */
-  private <T extends INode> T addChild(INode[] pathComponents, int pos, T child,
+  private <T extends INode> T addChild(INodesInPath inodesInPath, int pos, T child,
       long childDiskspace, boolean checkQuota)
       throws IOException {
+    final INode[] inodes = inodesInPath.getINodes();
     // The filesystem limits are not really quotas, so this check may appear
     // odd.  It's because a rename operation deletes the src, tries to add
     // to the dest, if that fails, re-adds the src from whence it came.
@@ -2001,7 +2014,7 @@ public class FSDirectory implements Closeable {
     // original location becase a quota violation would cause the the item
     // to go "poof".  The fs limits must be bypassed for the same reason.
     if (checkQuota) {
-      verifyFsLimits(pathComponents, pos, child);
+      verifyFsLimits(inodes, pos, child);
     }
     
     INode.DirCounts counts = new INode.DirCounts();
@@ -2012,33 +2025,13 @@ public class FSDirectory implements Closeable {
       childDiskspace = counts.getDsCount();
     }
 
-    updateCount(pathComponents, pos, counts.getNsCount(), childDiskspace,
-        checkQuota);
-    if (pathComponents[pos - 1] == null) {
-      throw new NullPointerException("Panic: parent does not exist");
-    }
-    T addedNode =
-        ((INodeDirectory) pathComponents[pos - 1]).addChild(child, true);
-    if (addedNode == null) {
-      updateCount(pathComponents, pos, -counts.getNsCount(), -childDiskspace,
-          true);
-    }
-
-    if (addedNode != null) {
-      if (!addedNode.isDirectory()) {
-        INode[] pc = Arrays.copyOf(pathComponents, pathComponents.length);
-        pc[pc.length - 1] = addedNode;
-        String path = getFullPathName(pc, pc.length - 1);
-        Cache.getInstance().set(path, pc);
-      }
-    }
-    //
-    return addedNode;
+    return addChild(inodesInPath, pos, child, counts.getNsCount(), childDiskspace, checkQuota);
   }
 
-  private <T extends INode> T addChild(INode[] pathComponents, int pos, T child,
+  private <T extends INode> T addChild(INodesInPath inodesInPath, int pos, T child,
       long childNamespace, long childDiskspace, boolean checkQuota)
       throws IOException {
+    final INode[] inodes = inodesInPath.getINodes();
     // The filesystem limits are not really quotas, so this check may appear
     // odd.  It's because a rename operation deletes the src, tries to add
     // to the dest, if that fails, re-adds the src from whence it came.
@@ -2046,23 +2039,21 @@ public class FSDirectory implements Closeable {
     // original location becase a quota violation would cause the the item
     // to go "poof".  The fs limits must be bypassed for the same reason.
     if (checkQuota) {
-      verifyFsLimits(pathComponents, pos, child);
+      verifyFsLimits(inodes, pos, child);
     }
 
-    updateCount(pathComponents, pos, childNamespace, childDiskspace,
-        checkQuota);
-    if (pathComponents[pos - 1] == null) {
+    updateCount(inodesInPath, pos, childNamespace, childDiskspace, checkQuota);
+    if (inodes[pos-1] == null) {
       throw new NullPointerException("Panic: parent does not exist");
     }
-    T addedNode =
-        ((INodeDirectory) pathComponents[pos - 1]).addChild(child, true);
+    final T addedNode = ((INodeDirectory)inodes[pos-1]).addChild(child, true);
     if (addedNode == null) {
-      updateCount(pathComponents, pos, -childNamespace, -childDiskspace, true);
+      updateCount(inodesInPath, pos, -childNamespace, -childDiskspace, true);
     }
 
     if (addedNode != null) {
       if (!addedNode.isDirectory()) {
-        INode[] pc = Arrays.copyOf(pathComponents, pathComponents.length);
+        INode[] pc = Arrays.copyOf(inodes, inodes.length);
         pc[pc.length - 1] = addedNode;
         String path = getFullPathName(pc, pc.length - 1);
         Cache.getInstance().set(path, pc);
@@ -2071,31 +2062,26 @@ public class FSDirectory implements Closeable {
     //
     return addedNode;
   }
-
-  private <T extends INode> T addChild(INode[] pathComponents, int pos, T child,
-      long childDiskspace) throws IOException {
-    return addChild(pathComponents, pos, child, childDiskspace, true);
-  }
   
-  private <T extends INode> T addChildNoQuotaCheck(INode[] pathComponents,
+  private <T extends INode> T addChildNoQuotaCheck(INodesInPath inodesInPath,
       int pos, T child, long childDiskspace)
       throws IOException {
     T inode = null;
     try {
-      inode = addChild(pathComponents, pos, child, childDiskspace, false);
+      inode = addChild(inodesInPath, pos, child, childDiskspace, false);
     } catch (QuotaExceededException e) {
       NameNode.LOG.warn("FSDirectory.addChildNoQuotaCheck - unexpected", e);
     }
     return inode;
   }
   
-  private <T extends INode> T addChildNoQuotaCheck(INode[] pathComponents,
+  private <T extends INode> T addChildNoQuotaCheck(INodesInPath inodesInPath,
       int pos, T child, long childNamespace, long childDiskspace)
       throws IOException {
     T inode = null;
     try {
       inode =
-          addChild(pathComponents, pos, child, childNamespace, childDiskspace,
+          addChild(inodesInPath, pos, child, childNamespace, childDiskspace,
               false);
     } catch (QuotaExceededException e) {
       NameNode.LOG.warn("FSDirectory.addChildNoQuotaCheck - unexpected", e);
@@ -2109,20 +2095,21 @@ public class FSDirectory implements Closeable {
    * Count of each ancestor with quota is also updated.
    * Return the removed node; null if the removal fails.
    */
-  INode removeChild(INode[] pathComponents, int pos, boolean forRename)
+  INode removeChild(final INodesInPath inodesInPath, int pos, boolean forRename)
       throws StorageException, TransactionContextException {
+    final INode[] inodes = inodesInPath.getINodes();
     INode removedNode = null;
     INode.DirCounts counts = new INode.DirCounts();
     if (forRename) {
-      removedNode = pathComponents[pos];
+      removedNode = inodes[pos];
       removedNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
     } else {
       if(isQuotaEnabled()){
-        INode nodeToBeRemored = pathComponents[pos];
+        INode nodeToBeRemored = inodes[pos];
         nodeToBeRemored.spaceConsumedInTree(counts);
       }
-      removedNode = ((INodeDirectory) pathComponents[pos - 1])
-          .removeChild(pathComponents[pos]);
+      removedNode = ((INodeDirectory) inodes[pos - 1])
+          .removeChild(inodes[pos]);
     }
     if (removedNode != null && isQuotaEnabled()) {
       List<QuotaUpdate> outstandingUpdates = (List<QuotaUpdate>) EntityManager
@@ -2133,22 +2120,23 @@ public class FSDirectory implements Closeable {
         nsDelta += update.getNamespaceDelta();
         dsDelta += update.getDiskspaceDelta();
       }
-      updateCountNoQuotaCheck(pathComponents, pos,
+      updateCountNoQuotaCheck(inodesInPath, pos,
           -counts.getNsCount() + nsDelta, -counts.getDsCount() + dsDelta);
     }
     return removedNode;
   }
   
-  INode removeChild(INode[] pathComponents, int pos, boolean forRename, 
+  INode removeChild(final INodesInPath inodesInPath, int pos, boolean forRename, 
           final long nsCount, final long dsCount)
       throws StorageException, TransactionContextException {
+    final INode[] inodes = inodesInPath.getINodes();
     INode removedNode = null;
     if (forRename) {
-      removedNode = pathComponents[pos];
+      removedNode = inodes[pos];
       removedNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
     } else {
-      removedNode = ((INodeDirectory) pathComponents[pos - 1])
-          .removeChild(pathComponents[pos]);
+      removedNode = ((INodeDirectory) inodes[pos - 1])
+          .removeChild(inodes[pos]);
     }
     if (removedNode != null && isQuotaEnabled()) {
       List<QuotaUpdate> outstandingUpdates = (List<QuotaUpdate>) EntityManager
@@ -2161,16 +2149,17 @@ public class FSDirectory implements Closeable {
       }
       //INode.DirCounts counts = new INode.DirCounts();
       //removedNode.spaceConsumedInTree(counts);
-      updateCountNoQuotaCheck(pathComponents, pos,
+      updateCountNoQuotaCheck(inodesInPath, pos,
           -nsCount + nsDelta, -dsCount + dsDelta);
     }
     return removedNode;
   }
 
-  INode removeChildNonRecursively(INode[] pathComponents, int pos)
+  INode removeChildNonRecursively(final INodesInPath inodesInPath, int pos)
       throws StorageException, TransactionContextException {
-    INode removedNode = ((INodeDirectory) pathComponents[pos - 1])
-        .removeChild(pathComponents[pos]);
+    final INode[] inodes = inodesInPath.getINodes();
+    INode removedNode = ((INodeDirectory) inodes[pos - 1])
+        .removeChild(inodes[pos]);
     if (removedNode != null && isQuotaEnabled()) {
       List<QuotaUpdate> outstandingUpdates = (List<QuotaUpdate>) EntityManager
           .findList(QuotaUpdate.Finder.ByINodeId, removedNode.getId());
@@ -2181,38 +2170,38 @@ public class FSDirectory implements Closeable {
         dsDelta += update.getDiskspaceDelta();
       }
       if (removedNode.isDirectory()) {
-        updateCountNoQuotaCheck(pathComponents, pos, -1 + nsDelta, dsDelta);
+        updateCountNoQuotaCheck(inodesInPath, pos, -1 + nsDelta, dsDelta);
       } else {
         INode.DirCounts counts = new INode.DirCounts();
         removedNode.spaceConsumedInTree(counts);
-        updateCountNoQuotaCheck(pathComponents, pos,
+        updateCountNoQuotaCheck(inodesInPath, pos,
             -counts.getNsCount() + nsDelta, -counts.getDsCount() + dsDelta);
       }
     }
     return removedNode;
   }
   
-  private INode removeChild(INode[] pathComponents, int pos)
+  private INode removeChild(final INodesInPath inodesInPath, int pos)
       throws StorageException, TransactionContextException {
-    return removeChild(pathComponents, pos, false);
+    return removeChild(inodesInPath, pos, false);
   }
   
-  private INode removeChild(INode[] pathComponents, int pos, final long nsCount,
+  private INode removeChild(final INodesInPath inodesInPath, int pos, final long nsCount,
           final long dsCount)
       throws StorageException, TransactionContextException {
-    return removeChild(pathComponents, pos, false,nsCount,dsCount);
+    return removeChild(inodesInPath, pos, false,nsCount,dsCount);
   }
   
 
-  private INode removeChildForRename(INode[] pathComponents, int pos)
+  private INode removeChildForRename(final INodesInPath inodesInPath, int pos)
       throws StorageException, TransactionContextException {
-    return removeChild(pathComponents, pos, true);
+    return removeChild(inodesInPath, pos, true);
   }
 
-  private INode removeChildForRename(INode[] pathComponents, int pos,
+  private INode removeChildForRename(final INodesInPath inodesInPath, int pos,
       long nsCount, long dsCount)
       throws StorageException, TransactionContextException {
-    return removeChild(pathComponents, pos, true, nsCount, dsCount);
+    return removeChild(inodesInPath, pos, true, nsCount, dsCount);
   }
   
   /**
@@ -2350,7 +2339,8 @@ public class FSDirectory implements Closeable {
     
     String srcs = normalizePath(src);
 
-    INode[] inodes = getRootDir().getExistingPathINodes(src, true);
+    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(src, true);
+    final INode[] inodes = inodesInPath.getINodes();
     INode targetNode = inodes[inodes.length - 1];
     if (targetNode == null) {
       throw new FileNotFoundException("Directory does not exist: " + srcs);
@@ -2435,7 +2425,8 @@ public class FSDirectory implements Closeable {
 
     String srcs = normalizePath(src);
 
-    INode[] inodes = getRootDir().getExistingPathINodes(src, true);
+    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(src, true);
+    final INode[] inodes = inodesInPath.getINodes();
     INode targetNode = inodes[inodes.length - 1];
     if (targetNode == null) {
       throw new FileNotFoundException("Directory does not exist: " + srcs);
