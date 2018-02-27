@@ -61,6 +61,13 @@ public class INodeFile extends INode implements BlockCollection {
   private long size;
   private boolean isFileStoredInDB = false;
   
+  /**
+   * @return true unconditionally.
+   */
+  @Override
+  public final boolean isFile() {
+    return true;
+  }
 
   public INodeFile(PermissionStatus permissions, BlockInfo[] blklist,
       short replication, long modificationTime, long atime,
