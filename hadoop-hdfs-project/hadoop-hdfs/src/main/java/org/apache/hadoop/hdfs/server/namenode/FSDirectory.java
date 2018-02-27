@@ -265,14 +265,14 @@ public class FSDirectory implements Closeable {
 //    return newNode;
 //  }
 
-  INodeDirectory addToParent(byte[] src, INodeDirectory parentINode,
+  INodeDirectory addToParent(INodeDirectory parentINode,
       INode newNode, boolean propagateModTime)
       throws IOException {
     // NOTE: This does not update space counts for parents
     INodeDirectory newParent = null;
     try {
       newParent =
-          getRootDir().addToParent(src, newNode, parentINode, propagateModTime);
+          getRootDir().addToParent(newNode, parentINode, propagateModTime);
       cacheName(newNode);
     } catch (FileNotFoundException e) {
       return null;
@@ -480,7 +480,7 @@ public class FSDirectory implements Closeable {
     }
 
     if (srcInode.isSymlink() &&
-        dst.equals(((INodeSymlink) srcInode).getLinkValue())) {
+        dst.equals(((INodeSymlink) srcInode).getSymlinkString())) {
       throw new FileAlreadyExistsException(
           "Cannot rename symlink " + src + " to its target " + dst);
     }
@@ -554,7 +554,7 @@ public class FSDirectory implements Closeable {
       throw new IOException(error);
     }
 
-    INode srcClone = cloneINode(removedSrc);
+    INode srcClone = removedSrc.cloneInode();
 
     final String srcChildName = removedSrc.getLocalName();
     String dstChildName = null;
@@ -673,7 +673,7 @@ public class FSDirectory implements Closeable {
       return true;
     }
     if (srcInode.isSymlink() &&
-        dst.equals(((INodeSymlink) srcInode).getLinkValue())) {
+        dst.equals(((INodeSymlink) srcInode).getSymlinkString())) {
       throw new FileAlreadyExistsException(
           "Cannot rename symlink " + src + " to its target " + dst);
     }
@@ -724,7 +724,7 @@ public class FSDirectory implements Closeable {
       }
       
 
-      INode srcClone = cloneINode(srcChild);
+      INode srcClone = srcChild.cloneInode();
 
       srcChildName = srcChild.getLocalName();
       srcChild.setLocalNameNoPersistance(dstComponents[dstInodes.length - 1]);
@@ -790,7 +790,7 @@ public class FSDirectory implements Closeable {
     }
 
     if (srcInode.isSymlink() &&
-        dst.equals(((INodeSymlink) srcInode).getLinkValue())) {
+        dst.equals(((INodeSymlink) srcInode).getSymlinkString())) {
       throw new FileAlreadyExistsException(
           "Cannot rename symlink " + src + " to its target " + dst);
     }
@@ -835,7 +835,7 @@ public class FSDirectory implements Closeable {
       }
 
 
-      INode srcClone = cloneINode(srcChild);
+      INode srcClone = srcChild.cloneInode();
 
       srcChildName = srcChild.getLocalName();
       srcChild.setLocalNameNoPersistance(dstComponents[dstInodes.length - 1]);
@@ -927,7 +927,7 @@ public class FSDirectory implements Closeable {
           "The source " + src + " and destination " + dst + " are the same");
     }
     if (srcInode.isSymlink() &&
-        dst.equals(((INodeSymlink) srcInode).getLinkValue())) {
+        dst.equals(((INodeSymlink) srcInode).getSymlinkString())) {
       throw new FileAlreadyExistsException(
           "Cannot rename symlink " + src + " to its target " + dst);
     }
@@ -966,15 +966,14 @@ public class FSDirectory implements Closeable {
             .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
         throw new FileAlreadyExistsException(error);
       }
-      List<INode> children =
-          dstInode.isDirectory() ? ((INodeDirectory) dstInode).getChildren() :
-              null;
-      if (children != null && children.size() != 0) {
-        error =
-            "rename cannot overwrite non empty destination directory " + dst;
-        NameNode.stateChangeLog
-            .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-        throw new IOException(error);
+      if (dstInode.isDirectory()) {
+        final List<INode> children = ((INodeDirectory) dstInode).getChildrenList();
+        if (!children.isEmpty()) {
+          error = "rename destination directory is not empty: " + dst;
+          NameNode.stateChangeLog.warn(
+              "DIR* FSDirectory.unprotectedRenameTo: " + error);
+          throw new IOException(error);
+        }
       }
     }
     if (dstInodes[dstInodes.length - 2] == null) {
@@ -1001,7 +1000,7 @@ public class FSDirectory implements Closeable {
       throw new IOException(error);
     }
 
-    INode srcClone = cloneINode(removedSrc);
+    INode srcClone = removedSrc.cloneInode();
 
     final String srcChildName = removedSrc.getLocalName();
     String dstChildName = null;
@@ -1402,7 +1401,7 @@ public class FSDirectory implements Closeable {
 
   private void addMetaDataLogForDirDeletion(INode targetNode) throws TransactionContextException, StorageException {
     if (targetNode.isDirectory()) {
-      List<INode> children = ((INodeDirectory) targetNode).getChildren();
+      List<INode> children = ((INodeDirectory) targetNode).getChildrenList();
       for(INode child : children){
        if(child.isDirectory()){
          addMetaDataLogForDirDeletion(child);
@@ -1456,7 +1455,8 @@ public class FSDirectory implements Closeable {
       INode cur = contents.get(startChild + i);
       byte curPolicy = isSuperUser && !cur.isSymlink() ? cur.getLocalStoragePolicyID()
           : BlockStoragePolicySuite.ID_UNSPECIFIED;
-      listing[i] = createFileStatus(cur.name, cur, needLocation, getStoragePolicyID(curPolicy, parentStoragePolicy));
+      listing[i] = createFileStatus(cur.getLocalNameBytes(), cur, needLocation, getStoragePolicyID(curPolicy,
+          parentStoragePolicy));
     }
     return new DirectoryListing(listing,
         totalNumChildren - startChild - numOfListing);
@@ -2811,39 +2811,6 @@ public class FSDirectory implements Closeable {
           }
         };
     return (INodeDirectoryWithQuota) addRootINode.handle();
-  }
-
-  private INode cloneINode(final INode inode)
-      throws IOException {
-    INode clone = null;
-    if (inode instanceof INodeDirectoryWithQuota) {
-      clone = new INodeDirectoryWithQuota(
-          ((INodeDirectoryWithQuota) inode).getNsQuota(),
-          ((INodeDirectoryWithQuota) inode).getDsQuota(),
-          (INodeDirectory) inode);
-    } else if (inode instanceof INodeSymlink) {
-      clone = new INodeSymlink(((INodeSymlink) inode).getLinkValue(),
-          ((INodeSymlink) inode).getModificationTime(),
-          ((INodeSymlink) inode).getAccessTime(),
-          ((INodeSymlink) inode).getPermissionStatus());
-
-    } else if (inode instanceof INodeFileUnderConstruction) {
-      INodeFileUnderConstruction ifuc = ((INodeFileUnderConstruction) inode);
-      clone = new INodeFileUnderConstruction(ifuc);
-      ((INodeFileUnderConstruction)clone).setFileStoredInDB(((INodeFileUnderConstruction)inode).isFileStoredInDB());
-      ((INodeFileUnderConstruction)clone).setHasBlocksNoPersistance(((INodeFileUnderConstruction)inode).hasBlocks());
-    } else if (inode instanceof INodeFile) {
-      clone = new INodeFile((INodeFile) inode);
-    } else if (inode instanceof INodeDirectory) {
-      clone = new INodeDirectory((INodeDirectory) inode);
-    }
-    clone.setHeaderNoPersistance(inode.getHeader());
-    clone.setPartitionIdNoPersistance(inode.getPartitionId());
-    clone.setLocalNameNoPersistance(inode.getLocalName());
-    clone.setIdNoPersistance(inode.getId());
-    clone.setParentIdNoPersistance(inode.getParentId());
-    clone.setUser(inode.getUserName());
-    return clone;
   }
 
   public boolean hasChildren(final int parentId, final boolean areChildrenRandomlyPartitioned) throws IOException {

@@ -113,17 +113,6 @@ public abstract class INode implements Comparable<byte[]> {
   }
 
 
-  /**
-   * The inode name is in java UTF8 encoding;
-   * The name in HdfsFileStatus should keep the same encoding as this.
-   * if this encoding is changed, implicitly getFileInfo and listStatus in
-   * clientProtocol are changed; The decoding at the client
-   * side should change accordingly.
-   */
-  protected byte[] name;
-  protected INodeDirectory parent;
-  protected long modificationTime;
-  protected long accessTime;
   protected byte blockStoragePolicyID;
   
 
@@ -137,28 +126,79 @@ public abstract class INode implements Comparable<byte[]> {
   protected long subtreeLockOwner;
 
 
-  //Number of bits for Block size
-  final static short BLOCK_BITS = 48;
-  final static short REPLICATION_BITS = 8;
-  final static short BOOLEAN_BITS = 8;
-  final static short HAS_BLKS_BITS = 1; // this is out of the 8 bits for the storing booleans
-  //Header mask 64-bit representation
-  //Format:[8 bits for flags][8 bits for replication degree][48 bits for PreferredBlockSize]
-  final static long BLOCK_SIZE_MASK =  0x0000FFFFFFFFFFFFL;
-  final static long REPLICATION_MASK = 0x00FF000000000000L;
-  final static long FLAGS_MASK =       0xFF00000000000000L;
-  final static long HAS_BLKS_MASK =    0x0100000000000000L;
-  //[8 bits for flags]
-  //0 bit : 1 if the file has blocks. 0 blocks
-  //remaining bits are not yet used
-  long header;
+  
+  
+  public static class HeaderFormat {
 
-  /**
-   * Simple wrapper for two counters :
-   * nsCount (namespace consumed) and dsCount (diskspace consumed).
-   */
+    /**
+     * Number of bits for Block size
+     */
+    static final int BLOCKBITS = 48;
+    //Number of bits for Block size
+    final static short REPLICATION_BITS = 8;
+    final static short BOOLEAN_BITS = 8;
+    final static short HAS_BLKS_BITS = 1; // this is out of the 8 bits for the storing booleans
+    //Header mask 64-bit representation
+    //Format:[8 bits for flags][8 bits for replication degree][48 bits for PreferredBlockSize]
+    final static long MAX_BLOCK_SIZE = 0x0000FFFFFFFFFFFFL;
+    final static long REPLICATION_MASK = 0x00FF000000000000L;
+    final static long FLAGS_MASK = 0xFF00000000000000L;
+    final static long HAS_BLKS_MASK = 0x0100000000000000L;
+    //[8 bits for flags]
+    //0 bit : 1 if the file has blocks. 0 blocks
+    //remaining bits are not yet used
+
+    static public short getReplication(long header) {
+      return (short) ((header & REPLICATION_MASK) >> BLOCKBITS);
+    }
+
+    static long combineReplication(long header, short replication) {
+      if (replication <= 0 || replication > (Math.pow(2, REPLICATION_BITS) - 1)) {
+        throw new IllegalArgumentException("Unexpected value for the " + "replication [" + replication
+            + "]. Expected [1:" + (Math.pow(2, REPLICATION_BITS) - 1) + "]");
+      }
+      return ((long) replication << BLOCKBITS) | (header & ~REPLICATION_MASK);
+    }
+
+    static public long getPreferredBlockSize(long header) {
+      return header & MAX_BLOCK_SIZE;
+    }
+
+    static long combinePreferredBlockSize(long header, long blockSize) {
+      if ((blockSize < 0) || (blockSize > (Math.pow(2, BLOCKBITS) - 1))) {
+        throw new IllegalArgumentException("Unexpected value for the block " + "size [" + blockSize + "]. Expected [1:"
+            + (Math.pow(2, BLOCKBITS) - 1) + "]");
+      }
+      return (header & ~MAX_BLOCK_SIZE) | (blockSize & MAX_BLOCK_SIZE);
+    }
+
+    static long combineHasBlocksNoPersistance(long header, boolean hasBlocks) {
+      long val = (hasBlocks) ? 1 : 0;
+      return ((long) val << (BLOCKBITS + REPLICATION_BITS)) | (header & ~HAS_BLKS_MASK);
+    }
+
+    static public boolean hasBlocks(long header) {
+      long val = (header & HAS_BLKS_MASK);
+      long val2 = val >> (BLOCKBITS + REPLICATION_BITS);
+      if (val2 == 1) {
+        return true;
+      } else if (val2 == 0) {
+        return false;
+      } else {
+        throw new IllegalStateException("Flags in the inode header are messed up");
+      }
+    }
+
+  }
+  
+  
+  long header = 0L;
+
+  /** Wrapper of two counters for namespace consumed and diskspace consumed. */
   static class DirCounts {
+    /** namespace count */
     long nsCount = 0;
+    /** diskspace count */
     long dsCount = 0;
     
     /**
@@ -186,39 +226,51 @@ public abstract class INode implements Comparable<byte[]> {
 
   private int logicalTime;
 
-  INode(PermissionStatus permissions, long mTime, long atime)
-      throws IOException {
-    this.setLocalNameNoPersistance((byte[]) null);
-    this.parent = null;
-    this.modificationTime = mTime;
-    setAccessTimeNoPersistance(atime);
-    setPermissionStatusNoPersistance(permissions);
+  /**
+   * The inode name is in java UTF8 encoding;
+   * The name in HdfsFileStatus should keep the same encoding as this.
+   * if this encoding is changed, implicitly getFileInfo and listStatus in
+   * clientProtocol are changed; The decoding at the client
+   * side should change accordingly.
+   */
+  private byte[] name = null;
 
-    blockStoragePolicyID = BlockStoragePolicySuite.ID_UNSPECIFIED;
+  protected INodeDirectory parent = null;
+  protected long modificationTime = 0L;
+  protected long accessTime = 0L;
+
+  INode(byte[] name, PermissionStatus permission, INodeDirectory parent,
+      long modificationTime, long accessTime) throws IOException{
+    this.name = name;
+    this.permission = permission.getPermission();
+    this.userName = permission.getUserName();
+    this.userId = UsersGroups.getUserID(permission.getUserName());
+    this.groupName = permission.getGroupName();
+    this.groupId = UsersGroups.getGroupID(permission.getGroupName());
+    this.parent = parent;
+    this.modificationTime = modificationTime;
+    this.accessTime = accessTime;
   }
 
-  protected INode(String name, PermissionStatus permissions)
-      throws IOException {
-    this(permissions, 0L, 0L);
-    setLocalNameNoPersistance(name);
+  INode(PermissionStatus permissions, long mtime, long atime) throws IOException{
+    this(null, permissions, null, mtime, atime);
   }
   
-  /**
-   * copy constructor
-   *
-   * @param other
-   *     Other node to be copied
-   */
+  protected INode(String name, PermissionStatus permissions)
+      throws IOException {
+    this(DFSUtil.string2Bytes(name), permissions, null, 0L, 0L);
+  }
+  
+  /** @param other Other node to be copied */
   INode(INode other) throws IOException {
-    setLocalNameNoPersistance(other.getLocalName());
-    setParentNoPersistance(other.getParent());
-    setIdNoPersistance(other.getId());
-    setPermissionStatusNoPersistance(other.getPermissionStatus());
-    setModificationTimeNoPersistance(other.getModificationTime());
-    setAccessTimeNoPersistance(other.getAccessTime());
-    setLogicalTimeNoPersistance(other.getLogicalTime());
-
-    setBlockStoragePolicyIDNoPersistance(other.getLocalStoragePolicyID());
+    this(other.getLocalNameBytes(), other.getPermissionStatus(), other.
+        getParent(),
+        other.getModificationTime(), other.getAccessTime());
+    this.header = other.header;
+    this.partitionId = other.partitionId;
+    this.id = other.id;
+    this.parentId = other.parentId;    
+    this.logicalTime = other.logicalTime;
   }
 
   /**
@@ -228,16 +280,6 @@ public abstract class INode implements Comparable<byte[]> {
     return name.length == 0;
   }
 
-  /**
-   * Set the {@link PermissionStatus}
-   */
-  private void setPermissionStatusNoPersistance(PermissionStatus ps)
-      throws IOException {
-    setUserNoPersistance(ps.getUserName());
-    setGroupNoPersistance(ps.getGroupName());
-    setPermissionNoPersistance(ps.getPermission());
-  }
-  
   /**
    * Get the {@link PermissionStatus}
    */
@@ -897,76 +939,21 @@ public abstract class INode implements Comparable<byte[]> {
     }
   }
 
-  public static short getBlockReplication(long header) {
-    long val = (header & REPLICATION_MASK);
-    long val2 = val >> BLOCK_BITS;
-    return (short) val2;
-  }
-
-  void setReplicationNoPersistance(short replication) {
-    if (replication <= 0 || replication > (Math.pow(2, REPLICATION_BITS) - 1)) {
-      throw new IllegalArgumentException("Unexpected value for the " +
-          "replication [" + replication + "]. Expected [1:" + (Math.pow(2, REPLICATION_BITS) - 1) + "]");
-    }
-    header = ((long) replication << BLOCK_BITS) | (header & ~REPLICATION_MASK);
-  }
-
-  public static long getPreferredBlockSize(long header) {
-    return header & BLOCK_SIZE_MASK;
-  }
-
-  protected void setPreferredBlockSizeNoPersistance(long preferredBlkSize) {
-    if ((preferredBlkSize < 0) || (preferredBlkSize > (Math.pow(2, BLOCK_BITS) - 1))) {
-      throw new IllegalArgumentException("Unexpected value for the block " +
-          "size [" + preferredBlkSize + "]. Expected [1:" + (Math.pow(2, BLOCK_BITS) - 1) + "]");
-    }
-    header = (header & ~BLOCK_SIZE_MASK) | (preferredBlkSize & BLOCK_SIZE_MASK);
-  }
-
   public long getHeader() {
     return header;
   }
 
   public void setHeaderNoPersistance(long header) {
-    long preferecBlkSize = getPreferredBlockSize(header);
-    short replication = getBlockReplication(header);
-    if (preferecBlkSize < 0) {
-      throw new IllegalArgumentException("Unexpected value for the " +
-          "block size [" + preferecBlkSize + "]");
-    }
-
-    if (replication < 0) {
-      throw new IllegalArgumentException("Unexpected value for the " +
-          "replication [" + replication + "]");
-    }
-
     this.header = header;
   }
 
   public void setHasBlocks(boolean hasBlocks) throws TransactionContextException, StorageException {
-    setHasBlocksNoPersistance(hasBlocks);
+    header = HeaderFormat.combineHasBlocksNoPersistance(header, hasBlocks);
     save();
   }
 
-  public void setHasBlocksNoPersistance(boolean hasBlocks) {
-    long val = (hasBlocks) ? 1 : 0;
-    header = ((long) val << (BLOCK_BITS + REPLICATION_BITS)) | (header & ~HAS_BLKS_MASK);
-  }
-
-  public static boolean hasBlocks(long header) {
-    long val = (header & HAS_BLKS_MASK);
-    long val2 = val >> (BLOCK_BITS + REPLICATION_BITS);
-    if (val2 == 1) {
-      return true;
-    } else if (val2 == 0) {
-      return false;
-    } else {
-      throw new IllegalStateException("Flags in the inode header are messed up");
-    }
-  }
-
   public boolean hasBlocks(){
-   return hasBlocks(header);
+   return HeaderFormat.hasBlocks(header);
   }
 
   public short myDepth() throws TransactionContextException, StorageException {
@@ -1086,4 +1073,6 @@ public abstract class INode implements Comparable<byte[]> {
       toDeleteList.clear();
     }
   }
+  
+  public abstract INode cloneInode() throws IOException;
 }

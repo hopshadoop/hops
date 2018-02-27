@@ -6488,7 +6488,7 @@ public class FSNamesystem
       throw new IOException(error);
     }
     if (srcInode.isSymlink()
-        && dst.equals(((INodeSymlink) srcInode).getLinkValue())) {
+        && dst.equals(((INodeSymlink) srcInode).getSymlinkString())) {
       throw new FileAlreadyExistsException(
           "Cannot rename symlink " + src + " to its target " + dst);
     }

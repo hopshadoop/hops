@@ -281,4 +281,9 @@ public class INodeFileUnderConstruction extends INodeFile
 
     return null;
   }
+  
+  @Override
+  public INode cloneInode () throws IOException{
+    return new INodeFileUnderConstruction(this);
+  }
 }

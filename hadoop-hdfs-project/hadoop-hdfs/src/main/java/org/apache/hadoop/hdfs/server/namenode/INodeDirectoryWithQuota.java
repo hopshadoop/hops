@@ -68,6 +68,9 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
     super(name, permissions);
   }
   
+  public INodeDirectoryWithQuota(INodeDirectoryWithQuota other) throws IOException{
+    this(other.getNsQuota(),other.getDsQuota(),other);
+  }
   /**
    * Get this directory's namespace quota
    *
@@ -135,28 +138,9 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
    * @param dsDelta
    *     change to disk space occupied
    */
-  void updateNumItemsInTree(Long nsDelta, Long dsDelta)
+  void addSpaceConsumed(Long nsDelta, Long dsDelta)
       throws StorageException, TransactionContextException {
-    getINodeAttributes()
-        .setNsCount(getINodeAttributes().getNsCount() + nsDelta);
-    getINodeAttributes()
-        .setDiskspace(getINodeAttributes().getDiskspace() + dsDelta);
-  }
-  
-  /**
-   * Update the size of the tree
-   *
-   * @param nsDelta
-   *     the change of the tree size
-   * @param dsDelta
-   *     change to disk space occupied
-   */
-  void unprotectedUpdateNumItemsInTree(Long nsDelta, Long dsDelta)
-      throws StorageException, TransactionContextException {
-    getINodeAttributes()
-        .setNsCount(getINodeAttributes().getNsCount() + nsDelta);
-    getINodeAttributes()
-        .setDiskspace(getINodeAttributes().getDiskspace() + dsDelta);
+    setSpaceConsumed(getINodeAttributes().getNsCount() + nsDelta, getINodeAttributes().getDiskspace() + dsDelta);
   }
   
   /**
@@ -254,4 +238,8 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
     getINodeAttributes().setInodeIdNoPersistance(id);
   }
 
+  @Override
+  public INode cloneInode () throws IOException{
+    return new INodeDirectoryWithQuota(this);
+  }
 }
