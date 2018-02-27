@@ -122,6 +122,7 @@ import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
 import org.apache.hadoop.hdfs.server.namenode.metrics.FSNamesystemMBean;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectory.INodesInPath;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
@@ -888,7 +889,8 @@ public class FSNamesystem
 
     //remove sto from
     if(isSTO){
-      INode[] nodes = dir.getRootDir().getExistingPathINodes(src, false);
+      INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, false);
+      INode[] nodes = inodesInPath.getINodes();
       INode inode = nodes[nodes.length - 1];
       if (inode != null && inode.isSubtreeLocked()) {
         inode.setSubtreeLocked(false);
@@ -1006,7 +1008,8 @@ public class FSNamesystem
     resultingStat = getAuditFileInfo(src, false);
     logAuditEvent(true, "setOwner", src, null, resultingStat);
     if(isSTO){
-      INode[] nodes = dir.getRootDir().getExistingPathINodes(src, false);
+      INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, false);
+      INode[] nodes = inodesInPath.getINodes();
       INode inode = nodes[nodes.length - 1];
       if (inode != null && inode.isSubtreeLocked()) {
         inode.setSubtreeLocked(false);
@@ -2413,14 +2416,14 @@ public class FSNamesystem
 
             // Part I. Analyze the state of the file with respect to the input data.
             LocatedBlock[] onRetryBlock = new LocatedBlock[1];
-            final INode[] inodes;
+            final INodesInPath inodesInPath;
             try {
-              inodes = analyzeFileState(src, clientName,
+              inodesInPath = analyzeFileState(src, clientName,
                 previous, onRetryBlock);
             } catch(IOException e) {
               throw e;
             }
-
+            INode[] inodes = inodesInPath.getINodes();
             final INodeFileUnderConstruction pendingFile =
                 (INodeFileUnderConstruction) inodes[inodes.length - 1];
 
@@ -2452,8 +2455,9 @@ public class FSNamesystem
             Block newBlock;
             long offset;
             LocatedBlock[] onRetryBlock2 = new LocatedBlock[1];
-            INode[] inodes2 =
+            INodesInPath iNodesInPath2 =
                 analyzeFileState(src, clientName, previous, onRetryBlock2);
+            INode[] inodes2 = iNodesInPath2.getINodes();
             final INodeFileUnderConstruction pendingFile2 =
                 (INodeFileUnderConstruction) inodes2[inodes2.length - 1];
 
@@ -2468,7 +2472,7 @@ public class FSNamesystem
 
             // allocate new block, record block locations in INode.
             newBlock = createNewBlock(pendingFile2);
-            saveAllocatedBlock(src, inodes2, newBlock, targets);
+            saveAllocatedBlock(src, iNodesInPath2, newBlock, targets);
 
 
             dir.persistBlocks(src, pendingFile2);
@@ -2500,7 +2504,7 @@ public class FSNamesystem
     return (LocatedBlock) additionalBlockHandler.handle(this);
   }
 
-  private INode[] analyzeFileState(String src, String clientName,
+  private INodesInPath analyzeFileState(String src, String clientName,
       ExtendedBlock previous, LocatedBlock[] onRetryBlock)
       throws IOException {
 
@@ -2514,7 +2518,8 @@ public class FSNamesystem
     checkFsObjectLimit();
 
     Block previousBlock = ExtendedBlock.getLocalBlock(previous);
-    final INode[] inodes = dir.getRootDir().getExistingPathINodes(src, true);
+    final INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, true);
+    final INode[] inodes = inodesInPath.getINodes();
     final INodeFileUnderConstruction pendingFile =
         checkLease(src, clientName, inodes[inodes.length - 1]);
     BlockInfo lastBlockInFile = pendingFile.getLastBlock();
@@ -2576,7 +2581,7 @@ public class FSNamesystem
             ((BlockInfoUnderConstruction) lastBlockInFile).getExpectedStorageLocations(
                 getBlockManager().getDatanodeManager()),
             offset);
-        return inodes;
+        return inodesInPath;
       } else {
         // Case 3
         throw new IOException("Cannot allocate block in " + src + ": " +
@@ -2590,7 +2595,7 @@ public class FSNamesystem
       throw new NotReplicatedYetException("Not replicated yet: " + src + 
               " block " + pendingFile.getPenultimateBlock());
     }
-    return inodes;
+    return inodesInPath;
   }
 
   private LocatedBlock makeLocatedBlock(Block blk, DatanodeStorageInfo[] locs, long offset)
@@ -2908,16 +2913,15 @@ public class FSNamesystem
    *
    * @param src
    *     path to the file
-   * @param inodes
-   *     representing each of the components of src.
-   *     The last INode is the INode for the file.
+   * @param inodesInPath representing each of the components of src. 
+   *                     The last INode is the INode for the file.
    * @throws QuotaExceededException
    *     If addition of block exceeds space quota
    */
-  private BlockInfo saveAllocatedBlock(String src, INode[] inodes,
+  private BlockInfo saveAllocatedBlock(String src, INodesInPath inodesInPath,
       Block newBlock,
       DatanodeStorageInfo targets[]) throws IOException, StorageException {
-    BlockInfo b = dir.addBlock(src, inodes, newBlock, targets);
+    BlockInfo b = dir.addBlock(src, inodesInPath, newBlock, targets);
     NameNode.stateChangeLog.info(
         "BLOCK* allocateBlock: " + src + ". " + getBlockPoolId() + " " + b);
     DatanodeStorageInfo.incrementBlocksScheduled(targets);
@@ -6674,10 +6678,12 @@ public class FSNamesystem
 
         for (Options.Rename op : options) {
           if (op == Rename.KEEP_ENCODING_STATUS) {
-            INode[] srcNodes =
+            INodesInPath srcInodesInPath =
                 dir.getRootDir().getExistingPathINodes(src, false);
-            INode[] dstNodes =
+            INode[] srcNodes = srcInodesInPath.getINodes();
+            INodesInPath dstInodesInPath =
                 dir.getRootDir().getExistingPathINodes(dst, false);
+            INode[] dstNodes = dstInodesInPath.getINodes();
             INode srcNode = srcNodes[srcNodes.length - 1];
             INode dstNode = dstNodes[dstNodes.length - 1];
             EncodingStatus status = EntityManager.find(
@@ -6709,7 +6715,8 @@ public class FSNamesystem
       INode inode;
       if (!src.equals("/")) {
         EntityManager.remove(new SubTreeOperation(getSubTreeLockPathPrefix(src)));
-        nodes = dir.getRootDir().getExistingPathINodes(src, false);
+        INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, false);
+        nodes = inodesInPath.getINodes();
         inode = nodes[nodes.length - 1];
         if (inode != null && inode.isSubtreeLocked()) {
           inode.setSubtreeLocked(false);
@@ -7193,7 +7200,8 @@ public class FSNamesystem
               ancestorAccess, parentAccess, access, subAccess);
         }
 
-        INode[] nodes = dir.getRootDir().getExistingPathINodes(path, false);
+        INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(path, false);
+        INode[] nodes = inodesInPath.getINodes();
         INode inode = nodes[nodes.length - 1];
         if (inode != null && inode.isDirectory() &&
             !inode.isRoot()) { // never lock the fs root
@@ -7287,7 +7295,8 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
-        INode[] nodes = dir.getRootDir().getExistingPathINodes(path, false);
+        INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(path, false);
+        INode[] nodes = inodesInPath.getINodes();
         INode inode = nodes[nodes.length - 1];
         if (inode != null && inode.isSubtreeLocked()) {
           inode.setSubtreeLocked(false);
@@ -7667,7 +7676,8 @@ public class FSNamesystem
   public INode getINode(String path)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
-    INode[] inodes = dir.getExistingPathINodes(path);
+    INodesInPath inodesInPath = dir.getExistingPathINodes(path);
+    INode[] inodes = inodesInPath.getINodes();
     return inodes[inodes.length - 1];
   }
 
