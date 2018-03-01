@@ -28,6 +28,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.ObjectWritable;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 
 /* Cache a client using its socket factory as the hash key */
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
@@ -57,7 +58,12 @@ public class ClientCache {
       client = new Client(valueClass, conf, factory);
       clients.put(factory, client);
     } else {
-      client.incCount();
+      if (invalidateCache(factory, client)) {
+        client = new Client(valueClass, conf, factory);
+        clients.put(factory, client);
+      } else {
+        client.incCount();
+      }
     }
     if (Client.LOG.isDebugEnabled()) {
       Client.LOG.debug("getting client out of cache: " + client);
@@ -65,6 +71,35 @@ public class ClientCache {
     return client;
   }
 
+  // In case of the same user but with different crypto material and password
+  private boolean invalidateCache(SocketFactory newFactory, Client client) {
+    SocketFactory cachedFactory = client.getSocketFactory();
+    if (newFactory instanceof HopsSSLSocketFactory
+        && cachedFactory instanceof HopsSSLSocketFactory) {
+      String cachedKeystorePath = ((HopsSSLSocketFactory) cachedFactory).getConf().get(
+          HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(),
+          HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getDefaultValue());
+      String cachedPassword = ((HopsSSLSocketFactory) cachedFactory).getConf().get(
+          HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue(),
+          HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getDefaultValue());
+      
+      String newKeystorePath = ((HopsSSLSocketFactory) newFactory).getConf().get(
+          HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(),
+          HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getDefaultValue());
+      String newPassword = ((HopsSSLSocketFactory) newFactory).getConf().get(
+          HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue(),
+          HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getDefaultValue());
+      
+      if (!cachedKeystorePath.equals(newKeystorePath) || !cachedPassword.equals(newPassword)) {
+        Client.LOG.debug("Invalidating Client " + client + " because of stale crypto material");
+        clients.remove(client.getSocketFactory());
+        client.stop();
+        return true;
+      }
+    }
+    
+    return false;
+  }
   /**
    * Construct & cache an IPC client with the default SocketFactory 
    * and default valueClass if no cached client exists. 
