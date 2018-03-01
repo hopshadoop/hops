@@ -599,11 +599,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }
 
     boolean ret;
-    if (namesystem.isLegacyRenameEnabled()) {
-      ret = namesystem.renameTo(src, dst);
-    } else {
-      ret = namesystem.multiTransactionalRename(src, dst);
-    }
+    ret = namesystem.multiTransactionalRename(src, dst);
     if (ret) {
       metrics.incrFilesRenamed();
     }
@@ -627,11 +623,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
               " characters, " + MAX_PATH_DEPTH + " levels.");
     }
 
-    if (namesystem.isLegacyRenameEnabled()) {
-      namesystem.renameTo(src, dst, options);
-    } else {
-      namesystem.multiTransactionalRename(src, dst, options);
-    }
+    namesystem.multiTransactionalRename(src, dst, options);
     metrics.incrFilesRenamed();
   }
 
@@ -643,13 +635,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }
 
     boolean ret;
-    if (namesystem.isLegacyDeleteEnabled()) {
-      //ret = namesystem.incrementalDelete(src, recursive);
-      throw new UnsupportedOptionsException("Old single transaction delete "
-              + "is not supported ");
-    } else {
-      ret = namesystem.multiTransactionalDelete(src, recursive);
-    }
+    ret = namesystem.multiTransactionalDelete(src, recursive);
 
     if (ret) {
       metrics.incrDeleteFileOps();
@@ -786,13 +772,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void setQuota(String path, long namespaceQuota, long diskspaceQuota)
       throws IOException {
-    if (namesystem.isLegacySetQuotaEnabled()) {
-      //namesystem.setQuota(path, namespaceQuota, diskspaceQuota);
-      throw new UnsupportedOperationException("Legacy SetQuota is not supported");
-    } else {
       namesystem
           .multiTransactionalSetQuota(path, namespaceQuota, diskspaceQuota);
-    }
   }
   
   @Override // ClientProtocol

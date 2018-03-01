@@ -21,13 +21,13 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.transaction.EntityManager;
+import java.io.FileNotFoundException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.MutableBlockCollection;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
@@ -45,10 +45,10 @@ public class INodeFileUnderConstruction extends INodeFile
    * Cast INode to INodeFileUnderConstruction.
    */
   public static INodeFileUnderConstruction valueOf(INode inode, String path)
-      throws IOException {
+      throws FileNotFoundException {
     final INodeFile file = INodeFile.valueOf(inode, path);
     if (!file.isUnderConstruction()) {
-      throw new IOException("File is not under construction: " + path);
+      throw new FileNotFoundException("File is not under construction: " + path);
     }
     return (INodeFileUnderConstruction) file;
   }

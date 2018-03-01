@@ -35,6 +35,7 @@ import org.junit.Test;
 import java.io.FileNotFoundException;
 import java.io.IOException; 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 
 import static org.junit.Assert.assertEquals;
@@ -280,8 +281,8 @@ public class TestINodeFile {
       try {
         INodeDirectory.valueOf(from, path);
         fail();
-      } catch (IOException ioe) {
-        assertTrue(ioe.getMessage().contains("Directory does not exist"));
+      } catch (FileNotFoundException e) {
+        assertTrue(e.getMessage().contains("Directory does not exist"));
       }
     }
 
@@ -305,8 +306,7 @@ public class TestINodeFile {
       try {
         INodeDirectory.valueOf(from, path);
         fail();
-      } catch (IOException ioe) {
-        assertTrue(ioe.getMessage().contains("Path is not a directory"));
+      } catch(PathIsNotDirectoryException e) {
       }
     }
 
@@ -328,8 +328,7 @@ public class TestINodeFile {
       try {
         INodeDirectory.valueOf(from, path);
         fail();
-      } catch (IOException ioe) {
-        assertTrue(ioe.getMessage().contains("Path is not a directory"));
+      } catch (PathIsNotDirectoryException e) {
       }
     }
 

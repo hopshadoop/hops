@@ -428,7 +428,6 @@ public class TestMetadataLog extends TestCase {
   @Test
   public void testEnableLogForExistingDirectory() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_LEGACY_DELETE_ENABLE_KEY, true);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
         .numDataNodes(2)
         .build();

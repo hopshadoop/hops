@@ -63,7 +63,7 @@ public class INodeAttributes {
     if (nsQuota != null) {
       this.nsQuota = nsQuota;
     } else {
-      this.nsQuota = FSDirectory.UNKNOWN_DISK_SPACE;
+      this.nsQuota = -1L;
     }
     if (nsCount != null) {
       this.nsCount = nsCount;
