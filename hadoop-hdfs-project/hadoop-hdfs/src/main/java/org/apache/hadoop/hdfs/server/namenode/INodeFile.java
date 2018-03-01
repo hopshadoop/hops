@@ -47,7 +47,7 @@ public class INodeFile extends INode implements BlockCollection {
   /**
    * Cast INode to INodeFile.
    */
-  public static INodeFile valueOf(INode inode, String path) throws IOException {
+  public static INodeFile valueOf(INode inode, String path) throws FileNotFoundException {
     if (inode == null) {
       throw new FileNotFoundException("File does not exist: " + path);
     }
@@ -58,7 +58,7 @@ public class INodeFile extends INode implements BlockCollection {
   }
 
   private int generationStamp = (int) GenerationStamp.FIRST_VALID_STAMP;
-  private long size;
+  private long size = 0;
   private boolean isFileStoredInDB = false;
   
   /**

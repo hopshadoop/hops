@@ -27,15 +27,14 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
-import org.tukaani.xz.UnsupportedOptionsException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.fs.PathIsNotDirectoryException;
 
 /**
  * Directory INode class.
@@ -44,13 +43,14 @@ public class INodeDirectory extends INode {
   /**
    * Cast INode to INodeDirectory.
    */
-  public static INodeDirectory valueOf(INode inode, String path)
-      throws IOException {
+  public static INodeDirectory valueOf(INode inode, Object path
+      ) throws FileNotFoundException, PathIsNotDirectoryException {
     if (inode == null) {
-      throw new IOException("Directory does not exist: " + path);
+      throw new FileNotFoundException("Directory does not exist: "
+          + DFSUtil.path2String(path));
     }
     if (!inode.isDirectory()) {
-      throw new IOException("Path is not a directory: " + path);
+      throw new PathIsNotDirectoryException(DFSUtil.path2String(path));
     }
     return (INodeDirectory) inode;
   }
@@ -328,14 +328,13 @@ public class INodeDirectory extends INode {
    *     set modification time for the parent node
    *     not needed when replaying the addition and
    *     the parent already has the proper mod time
-   * @return null if the child with this name already exists;
-   * node, otherwise
+   *  @return false if the child with this name already exists; 
+   *         otherwise, return true;
    */
-  <T extends INode> T addChild(final T node, boolean setModTime)
-      throws IOException {
+  boolean addChild(final INode node, final boolean setModTime) throws IOException{
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
-      return null;
+      return false;
     }
 
     if (!node.exists()) {
@@ -364,7 +363,7 @@ public class INodeDirectory extends INode {
 
     node.logMetadataEvent(MetadataLogEntry.Operation.ADD);
 
-    return node;
+    return true;
   }
 
   /**
@@ -375,62 +374,36 @@ public class INodeDirectory extends INode {
    *     file path
    * @param newNode
    *     INode to be added
-   * @return null if the node already exists; inserted INode, otherwise
+   * @return false if the node already exists; otherwise, return true;
    * @throws FileNotFoundException
    *     if parent does not exist or
    * @throws UnresolvedLinkException
    *     if any path component is a symbolic link
    *     is not a directory.
    */
-  <T extends INode> T addNode(String path, T newNode)
-      throws IOException {
+  boolean addINode(String path, INode newNode) throws FileNotFoundException, PathIsNotDirectoryException,
+      UnresolvedLinkException, StorageException, IOException {
     byte[][] pathComponents = getPathComponents(path);
-    return addToParent(pathComponents, newNode, true) == null ? null : newNode;
+    if (pathComponents.length < 2) { // add root
+      return false;
+    }
+    newNode.setLocalName(pathComponents[pathComponents.length - 1]);
+    // insert into the parent children list
+    INodeDirectory parent = getParent(pathComponents);
+    return parent.addChild(newNode, true);
   }
 
 
   INodeDirectory getParent(byte[][] pathComponents)
-      throws FileNotFoundException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws FileNotFoundException, PathIsNotDirectoryException, UnresolvedLinkException, StorageException,
+      TransactionContextException{
     if (pathComponents.length < 2)  // add root
     {
       return null;
     }
     // Gets the parent INode
     INodesInPath inodes =  getExistingPathINodes(pathComponents, 2, false);
-    INode inode = inodes.inodes[0];
-    if (inode == null) {
-      throw new FileNotFoundException("Parent path does not exist: " +
-          DFSUtil.byteArray2String(pathComponents));
-    }
-    if (!inode.isDirectory()) {
-      throw new FileNotFoundException("Parent path is not a directory: " +
-          DFSUtil.byteArray2String(pathComponents));
-    }
-    return (INodeDirectory) inode;
-  }
-  
-  /**
-   * Add new inode
-   * Optimized version of addNode()
-   *
-   * @return parent INode if new inode is inserted
-   * or null if it already exists.
-   * @throws FileNotFoundException
-   *     if parent does not exist or
-   *     is not a directory.
-   */
-  INodeDirectory addToParent(byte[][] pathComponents, INode newNode,
-      boolean propagateModTime)
-      throws IOException {
-    if (pathComponents.length < 2) { // add root
-      return null;
-    }
-    newNode
-        .setLocalNameNoPersistance(pathComponents[pathComponents.length - 1]);
-    // insert into the parent children list
-    INodeDirectory parent = getParent(pathComponents);
-    return parent.addChild(newNode, propagateModTime) == null ? null : parent;
+    return INodeDirectory.valueOf(inodes.inodes[0], pathComponents);
   }
 
   @Override

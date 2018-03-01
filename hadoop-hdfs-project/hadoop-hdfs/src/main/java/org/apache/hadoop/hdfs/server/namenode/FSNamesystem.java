@@ -196,14 +196,6 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DIR_DELETE_BATCH_SIZE;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DIR_DELETE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_LEGACY_CONTENT_SUMMARY_ENABLE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_LEGACY_CONTENT_SUMMARY_ENABLE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_LEGACY_DELETE_ENABLE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_LEGACY_DELETE_ENABLE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_LEGACY_RENAME_ENABLE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_LEGACY_RENAME_ENABLE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_LEGACY_SET_QUOTA_ENABLE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_LEGACY_SET_QUOTA_ENABLE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOGGERS_KEY;
@@ -404,10 +396,6 @@ public class FSNamesystem
   private NameNode nameNode;
   private final Configuration conf;
   private final QuotaUpdateManager quotaUpdateManager;
-  private final boolean legacyDeleteEnabled;
-  private final boolean legacyRenameEnabled;
-  private final boolean legacyContentSummaryEnabled;
-  private final boolean legacySetQuotaEnabled;
 
   private final ExecutorService subtreeOperationsExecutor;
   private final boolean erasureCodingEnabled;
@@ -531,15 +519,6 @@ public class FSNamesystem
       blockManager.setBlockPoolId(blockPoolId);
       hopSpecificInitialization(conf);
       this.quotaUpdateManager = new QuotaUpdateManager(this, conf);
-      legacyDeleteEnabled = conf.getBoolean(DFS_LEGACY_DELETE_ENABLE_KEY,
-          DFS_LEGACY_DELETE_ENABLE_DEFAULT);
-      legacyRenameEnabled = conf.getBoolean(DFS_LEGACY_RENAME_ENABLE_KEY,
-          DFS_LEGACY_RENAME_ENABLE_DEFAULT);
-      legacyContentSummaryEnabled =
-          conf.getBoolean(DFS_LEGACY_CONTENT_SUMMARY_ENABLE_KEY,
-              DFS_LEGACY_CONTENT_SUMMARY_ENABLE_DEFAULT);
-      legacySetQuotaEnabled = conf.getBoolean(DFS_LEGACY_SET_QUOTA_ENABLE_KEY,
-          DFS_LEGACY_SET_QUOTA_ENABLE_DEFAULT);
       subtreeOperationsExecutor = Executors.newFixedThreadPool(
           conf.getInt(DFS_SUBTREE_EXECUTOR_LIMIT_KEY,
               DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT));
@@ -3000,152 +2979,6 @@ public class FSNamesystem
   ////////////////////////////////////////////////////////////////
 
   /**
-   * Change the indicated filename.
-   *
-   * @deprecated Use {@link #renameTo(String, String, Options.Rename...)}
-   * instead.
-   */
-  @Deprecated
-  boolean renameTo(final String src, final String dst) throws IOException {
-    HopsTransactionalRequestHandler renameToHandler =
-        new HopsTransactionalRequestHandler(HDFSOperationType.DEPRICATED_RENAME, src) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = getInstance();
-            locks.add(lf.getLegacyRenameINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/, nameNode,
-                INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                INodeResolveType.PATH, src, dst))
-                .add(lf.getLeaseLock(LockType.WRITE))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
-                .add(lf.getBlockRelated(BLK.RE, BLK.UC, BLK.IV, BLK.CR, BLK.ER,
-                    BLK.PE, BLK.UR));
-            if (dir.isQuotaEnabled()) {
-              locks.add(lf.getQuotaUpdateLock(true, src, dst));
-            }
-          }
-
-          @Override
-          public Object performTask() throws IOException {
-            try {
-              return renameToInt(src, dst);
-            } catch (AccessControlException e) {
-              logAuditEvent(false, "rename", src, dst, null);
-              throw e;
-            }
-          }
-        };
-    return (Boolean) renameToHandler.handle(this);
-  }
-
-  private boolean renameToInt(String src, String dst)
-      throws IOException {
-    boolean status = false;
-    HdfsFileStatus resultingStat = null;
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* NameSystem.renameTo: " + src +
-          " to " + dst);
-    }
-    FSPermissionChecker pc = getPermissionChecker();
-    status = renameToInternal(pc, src, dst);
-    if (status) {
-      resultingStat = getAuditFileInfo(dst, false);
-    }
-
-    if (status) {
-      logAuditEvent(true, "rename", src, dst, resultingStat);
-    }
-    return status;
-  }
-
-  /**
-   * @deprecated See {@link #renameTo(String, String)}
-   */
-  @Deprecated
-  private boolean renameToInternal(FSPermissionChecker pc, String src,
-      String dst)
-      throws IOException {
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot rename " + src, safeMode);
-    }
-    if (!DFSUtil.isValidName(dst)) {
-      throw new IOException("Invalid name: " + dst);
-    }
-    if (isPermissionEnabled) {
-      //We should not be doing this.  This is move() not renameTo().
-      //but for now,
-      //NOTE: yes, this is bad!  it's assuming much lower level behavior
-      //      of rewriting the dst
-      String actualDst =
-          dir.isDir(dst) ? dst + Path.SEPARATOR + new Path(src).getName() : dst;
-      checkParentAccess(pc, src, FsAction.WRITE);
-      checkAncestorAccess(pc, actualDst, FsAction.WRITE);
-    }
-  
-    return dir.renameTo(src, dst);
-  }
-
-
-  /**
-   * Rename src to dst
-   */
-  void renameTo(final String src, final String dst,
-      final Options.Rename... options) throws IOException {
-    new HopsTransactionalRequestHandler(HDFSOperationType.RENAME, src) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        locks.add(lf.getRenameINodeLock(nameNode,
-            INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-            INodeResolveType.PATH, src, dst))
-            .add(lf.getLeaseLock(LockType.WRITE))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
-            .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.IV,
-                BLK.PE, BLK.ER));
-        if (dir.isQuotaEnabled()) {
-          locks.add(lf.getQuotaUpdateLock(true, src, dst));
-        }
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        HdfsFileStatus resultingStat;
-        if (NameNode.stateChangeLog.isDebugEnabled()) {
-          NameNode.stateChangeLog.debug(
-              "DIR* NameSystem.renameTo: with options - " + src + " to " + dst);
-        }
-        FSPermissionChecker pc = getPermissionChecker();
-        renameToInternal(pc, src, dst, options);
-        resultingStat = getAuditFileInfo(dst, false);
-
-        if (resultingStat != null) {
-          StringBuilder cmd = new StringBuilder("rename options=");
-          for (Rename option : options) {
-            cmd.append(option.value()).append(" ");
-          }
-          logAuditEvent(true, cmd.toString(), src, dst, resultingStat);
-        }
-        return null;
-      }
-    }.handle(this);
-  }
-
-  private void renameToInternal(FSPermissionChecker pc, String src, String dst,
-      Options.Rename... options) throws IOException {
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot rename " + src, safeMode);
-    }
-    if (!DFSUtil.isValidName(dst)) {
-      throw new InvalidPathException("Invalid name: " + dst);
-    }
-    if (isPermissionEnabled) {
-      checkParentAccess(pc, src, FsAction.WRITE);
-      checkAncestorAccess(pc, dst, FsAction.WRITE);
-    }
-
-    dir.renameTo(src, dst, options);
-  }
-
-  /**
    * Remove the indicated file from namespace.
    *
    * @see ClientProtocol#delete(String, boolean) for detailed descriptoin and
@@ -3432,71 +3265,8 @@ public class FSNamesystem
   ContentSummary getContentSummary(final String src)
       throws
       IOException {
-    if (isLegacyContentSummaryEnabled()) {
-      throw new UnsupportedActionException("Legacy Content Summary is not supported");
-    } else {
-      return multiTransactionalGetContentSummary(src);
-    }
+    return multiTransactionalGetContentSummary(src);
   }
-
-  //  ContentSummary getContentSummaryLegacy(final String src)
-  //      throws AccessControlException, FileNotFoundException,
-  //      UnresolvedLinkException, IOException {
-  //    HopsTransactionalRequestHandler getContentSummaryHandler =
-  //        new HopsTransactionalRequestHandler(
-  //            HDFSOperationType.GET_CONTENT_SUMMARY, src) {
-  //          @Override
-  //          public void acquireLock(TransactionLocks locks) throws IOException {
-  //            LockFactory lf = getInstance();
-  //            locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,
-  //                INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, src))
-  //                .add(lf.getBlockLock());
-  //          }
-  //
-  //          @Override
-  //          public Object performTask() throws IOException {
-  //            FSPermissionChecker pc =
-  //                new FSPermissionChecker(fsOwnerShortUserName, superGroup);
-  //            if (isPermissionEnabled) {
-  //              checkPermission(pc, src, false, null, null, null,
-  //                  FsAction.READ_EXECUTE);
-  //            }
-  //            return dir.getContentSummary(src);
-  //          }
-  //        };
-  //    return (ContentSummary) getContentSummaryHandler.handle(this);
-  //  }
-
-  /**
-   * Set the namespace quota and diskspace quota for a directory.
-   * See {@link ClientProtocol#setQuota(String, long, long)} for the
-   * contract.
-   */
-  //  void setQuota(final String path, final long nsQuota, final long dsQuota)
-  //      throws IOException, UnresolvedLinkException {
-  //    HopsTransactionalRequestHandler setQuotaHandler =
-  //        new HopsTransactionalRequestHandler(HDFSOperationType.SET_QUOTA, path) {
-  //          @Override
-  //          public void acquireLock(TransactionLocks locks) throws IOException {
-  //            LockFactory lf = getInstance();
-  //            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-  //                INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, path))
-  //                .add(lf.getBlockLock());
-  //          }
-  //
-  //          @Override
-  //          public Object performTask() throws StorageException, IOException {
-  //            checkSuperuserPrivilege();
-  //            if (isInSafeMode()) {
-  //              throw new SafeModeException("Cannot set quota on " + path,
-  //                  safeMode);
-  //            }
-  //            dir.setQuota(path, nsQuota, dsQuota);
-  //            return null;
-  //          }
-  //        };
-  //    setQuotaHandler.handle(this);
-  //  }
 
   /**
    * Persist all metadata about this file.
@@ -6262,22 +6032,6 @@ public class FSNamesystem
     return subtreeOperationsExecutor;
   }
 
-  boolean isLegacyDeleteEnabled() {
-    return legacyDeleteEnabled;
-  }
-
-  boolean isLegacyRenameEnabled() {
-    return legacyRenameEnabled;
-  }
-
-  private boolean isLegacyContentSummaryEnabled() {
-    return legacyContentSummaryEnabled;
-  }
-
-  boolean isLegacySetQuotaEnabled() {
-    return legacySetQuotaEnabled;
-  }
-
   /**
    * Setting the quota of a directory in multiple transactions. Calculating the
    * namespace counts of a large directory tree might take to much time for a
@@ -6556,10 +6310,12 @@ public class FSNamesystem
     //mechanism on the src and dst
     //However the quota is enabled then all the quota update on the dst
     //must be applied before the move operation.
-    long srcNsCount = srcInfo.getNsCount(); //if not dir then it will return zero
-    long srcDsCount = srcInfo.getDsCount();
-    long dstNsCount = dstInfo.getNsCount();
-    long dstDsCount = dstInfo.getDsCount();
+    INode.DirCounts srcCounts = new INode.DirCounts();
+    srcCounts.nsCount = srcInfo.getNsCount(); //if not dir then it will return zero
+    srcCounts.dsCount = srcInfo.getDsCount();
+    INode.DirCounts dstCounts = new INode.DirCounts();
+    dstCounts.nsCount = dstInfo.getNsCount();
+    dstCounts.dsCount = dstInfo.getDsCount();
     boolean isUsingSubTreeLocks = srcInfo.isDir();
     boolean renameTransactionCommitted = false;
     INodeIdentifier srcSubTreeRoot = null;
@@ -6587,14 +6343,14 @@ public class FSNamesystem
                     srcSubTreeRoot);
             srcFileTree.buildUp();
           }
-          srcNsCount = srcFileTree.getNamespaceCount();
-          srcDsCount = srcFileTree.getDiskspaceCount();
+          srcCounts.nsCount = srcFileTree.getNamespaceCount();
+          srcCounts.dsCount = srcFileTree.getDiskspaceCount();
         }
       } else {
         LOG.debug("Rename src: " + src + " dst: " + dst + " does not require sub-tree locking mechanism");
       }
 
-      renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount, dstDsCount,
+      renameTo(src, dst, srcCounts, dstCounts,
           isUsingSubTreeLocks, subTreeLockDst, logEntries, options);
       renameTransactionCommitted = true;
     } finally {
@@ -6622,9 +6378,8 @@ public class FSNamesystem
     return null;
   }
 
-  private void renameTo(final String src, final String dst, final long srcNsCount,
-      final long srcDsCount, final long dstNsCount, final long dstDsCount,
-      final boolean isUsingSubTreeLocks, final String subTreeLockDst,
+  private void renameTo(final String src, final String dst, final INode.DirCounts srcCounts,
+      final INode.DirCounts dstCounts, final boolean isUsingSubTreeLocks, final String subTreeLockDst,
       final Collection<MetadataLogEntry> logEntries,
       final Options.Rename... options
   )
@@ -6699,7 +6454,7 @@ public class FSNamesystem
         removeSubTreeLocksForRenameInternal(src, isUsingSubTreeLocks,
             subTreeLockDst);
 
-        dir.renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount, dstDsCount,
+        dir.renameTo(src, dst, srcCounts, dstCounts,
             options);
         return null;
       }
@@ -6797,10 +6552,12 @@ public class FSNamesystem
     //mechanism on the src and dst
     //However the quota is enabled then all the quota update on the dst
     //must be applied before the move operation.
-    long srcNsCount = srcInfo.getNsCount(); //if not dir then it will return zero
-    long srcDsCount = srcInfo.getDsCount();
-    long dstNsCount = dstInfo.getNsCount();
-    long dstDsCount = dstInfo.getDsCount();
+    INode.DirCounts srcCounts = new INode.DirCounts();
+    srcCounts.nsCount = srcInfo.getNsCount(); //if not dir then it will return zero
+    srcCounts.dsCount = srcInfo.getDsCount();
+    INode.DirCounts dstCounts = new INode.DirCounts();
+    dstCounts.nsCount = dstInfo.getNsCount();
+    dstCounts.dsCount = dstInfo.getDsCount();
     boolean isUsingSubTreeLocks = srcInfo.isDir();
     boolean renameTransactionCommitted = false;
     INodeIdentifier srcSubTreeRoot = null;
@@ -6829,15 +6586,14 @@ public class FSNamesystem
                     srcSubTreeRoot);
             srcFileTree.buildUp();
           }
-          srcNsCount = srcFileTree.getNamespaceCount();
-          srcDsCount = srcFileTree.getDiskspaceCount();
+          srcCounts.nsCount = srcFileTree.getNamespaceCount();
+          srcCounts.dsCount = srcFileTree.getDiskspaceCount();
         }
       } else {
         LOG.debug("Rename src: " + src + " dst: " + dst + " does not require sub-tree locking mechanism");
       }
 
-      boolean retValue = renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount, dstDsCount,
-          isUsingSubTreeLocks, subTreeLockDst, logEntries);
+      boolean retValue = renameTo(src, dst, srcCounts, dstCounts, isUsingSubTreeLocks, subTreeLockDst, logEntries);
 
       // the rename Tx has committed. it has also remove the subTreeLocks
       renameTransactionCommitted = true;
@@ -6872,8 +6628,7 @@ public class FSNamesystem
    * instead.
    */
   @Deprecated
-  boolean renameTo(final String src, final String dst, final long srcNsCount,
-      final long srcDsCount, final long dstNsCount, final long dstDsCount,
+  boolean renameTo(final String src, final String dst, final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
       final boolean isUsingSubTreeLocks, final String subTreeLockDst,
       final Collection<MetadataLogEntry> logEntries)
       throws IOException {
@@ -6928,8 +6683,7 @@ public class FSNamesystem
             AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime
                 (logEntries);
 
-            return dir.renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount,
-                dstDsCount);
+            return dir.renameTo(src, dst, srcCounts, dstCounts);
           }
         };
     return (Boolean) renameToHandler.handle(this);

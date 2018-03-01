@@ -214,25 +214,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_INMEMORY_CACHE_MAX_SIZE = "dfs" +
       ".resolvingcache.inmemory.maxsize";
   public static final int DFS_INMEMORY_CACHE_MAX_SIZE_DEFAULT = 100000;
-
-  public static final String DFS_LEGACY_DELETE_ENABLE_KEY =
-      "dfs.namenode.legacy-delete.enable";
-  public static final boolean DFS_LEGACY_DELETE_ENABLE_DEFAULT = false;
-
-  public static final String DFS_LEGACY_RENAME_ENABLE_KEY =
-      "dfs.namenode.legacy-rename.enable";
-  public static final boolean DFS_LEGACY_RENAME_ENABLE_DEFAULT = false;
-
-  public static final String DFS_LEGACY_CONTENT_SUMMARY_ENABLE_KEY =
-      "dfs.namenode.legacy-content-summary.enable";
-  public static final boolean DFS_LEGACY_CONTENT_SUMMARY_ENABLE_DEFAULT = false;
   
   public static final String DFS_NDC_ENABLED_KEY = "dfs.ndc.enable";
   public static final boolean DFS_NDC_ENABLED_DEFAULT = false;
-
-  public static final String DFS_LEGACY_SET_QUOTA_ENABLE_KEY =
-      "dfs.namenode.legacy-set-quota.enable";
-  public static final boolean DFS_LEGACY_SET_QUOTA_ENABLE_DEFAULT = false;
 
   public static final String DFS_SUBTREE_EXECUTOR_LIMIT_KEY =
       "dfs.namenode.subtree-executor-limit";
