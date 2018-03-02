@@ -4,9 +4,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ipc.Client;
+import org.apache.hadoop.ipc.ClientCache;
+import org.apache.hadoop.ipc.RpcWritable;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.SSLCertificateException;
+import org.apache.hadoop.security.ssl.HopsSSLTestUtils;
 import org.apache.hadoop.util.envVars.EnvironmentVariables;
 import org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -32,8 +36,9 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
-public class TestHopsSSLConfiguration {
+public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     private final Log LOG = LogFactory.getLog(TestHopsSSLConfiguration.class);
     private final String BASEDIR =
         System.getProperty("test.build.dir", "target/test-dir") + "/" +
@@ -451,6 +456,27 @@ public class TestHopsSSLConfiguration {
         assertEquals(pass, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
         assertEquals(tstore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
         assertEquals(pass, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+    }
+    
+    @Test
+    public void testClientCacheWithNewCertificate() throws Exception {
+        super.filesToPurge = prepareCryptoMaterial(conf, BASEDIR);
+        setCryptoConfig(conf);
+        
+        ClientCache clientCache = new ClientCache();
+        Client client = clientCache.getClient(conf, NetUtils.getDefaultSocketFactory(conf), RpcWritable.Buffer.class);
+        
+        purgeFiles();
+        Configuration newConf = new Configuration();
+        passwd = "another_password";
+        super.filesToPurge = prepareCryptoMaterial(newConf, BASEDIR);
+        setCryptoConfig(newConf);
+        
+        Client anotherClient = clientCache.getClient(newConf, NetUtils.getDefaultSocketFactory(newConf),
+            RpcWritable.Buffer.class);
+        assertNotEquals(client, anotherClient);
+        clientCache.stopClient(client);
+        clientCache.stopClient(anotherClient);
     }
     
     private String touchFile(String file) throws IOException {
