@@ -31,7 +31,7 @@ import java.util.List;
 final class IndividualINodeLock extends BaseINodeLock {
 
   private static final INodeIdentifier NON_EXISTING_INODE =
-      new INodeIdentifier(INode.NON_EXISTING_ID);
+      new INodeIdentifier();
   
   private final TransactionLockTypes.INodeLockType lockType;
   private final INodeIdentifier inodeIdentifier;

@@ -522,13 +522,12 @@ public class TestBlockManager {
         new LightWeightRequestHandler(HDFSOperationType.TEST) {
           @Override
           public INodeFile performTask() throws IOException {
-            INodeFile file = new INodeFile(new PermissionStatus(USER, GROUP,
+            INodeFile file = new INodeFile(inode_id, new PermissionStatus(USER, GROUP,
                 new FsPermission((short) 0777)), null, (short) 3,
                 System.currentTimeMillis(), System.currentTimeMillis(), 1000l, (byte) 0);
             file.setLocalNameNoPersistance("hop");
             file.setParentIdNoPersistance(INodeDirectory.ROOT_ID);
             file.setPartitionIdNoPersistance(INodeDirectory.ROOT_ID);
-            file.setIdNoPersistance(inode_id);
             List<INode> newed = new ArrayList<>();
             newed.add(file);
             INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory

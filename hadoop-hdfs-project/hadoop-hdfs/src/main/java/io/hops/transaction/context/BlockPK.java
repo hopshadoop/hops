@@ -21,10 +21,11 @@ import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
 class BlockPK {
   private long blockId = Long.MIN_VALUE;
-  private int inodeId = INode.NON_EXISTING_ID;
+  private int inodeId = BlockInfo.NON_EXISTING_ID;
 
   BlockPK(long blockId) {
     this.blockId = blockId;
@@ -44,7 +45,7 @@ class BlockPK {
   }
 
   boolean hasINodeId() {
-    return this.inodeId != INode.NON_EXISTING_ID;
+    return this.inodeId != BlockInfo.NON_EXISTING_ID;
   }
 
   long getBlockId() {

@@ -215,7 +215,7 @@ class InvalidateBlocks {
         List<InvalidatedBlock> invblks = new ArrayList<>();
         for (Block blk : blocks) {
           invblks.add(new InvalidatedBlock(storage.getSid(), blk.getBlockId(),
-              blk.getGenerationStamp(), blk.getNumBytes(), INode.NON_EXISTING_ID));
+              blk.getGenerationStamp(), blk.getNumBytes(), BlockInfo.NON_EXISTING_ID));
         }
         da.prepare(Collections.EMPTY_LIST, invblks, Collections.EMPTY_LIST);
         return null;

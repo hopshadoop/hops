@@ -185,8 +185,7 @@ public class TestFsLimits {
               fs = new MockFSDirectory();
             }
 
-            INode child = new INodeDirectory(name, perms);
-            child.setIdNoPersistance(id++);
+            INode child = new INodeDirectory(id++, name, perms, true);
             child.setLocalName(name);
             child.setPartitionIdNoPersistance(INodeDirectory.ROOT_ID);
 

@@ -279,8 +279,7 @@ public class JsonUtil {
         DFSUtil.string2Bytes((String) m.get("symlink"));
 
     final long fileId = m.containsKey("fileId") ?
-        (Long) m.get("fileId") :
-        INode.NON_EXISTING_ID;
+        (Long) m.get("fileId") : -1;
     final long len = (Long) m.get("length");
     final String owner = (String) m.get("owner");
     final String group = (String) m.get("group");

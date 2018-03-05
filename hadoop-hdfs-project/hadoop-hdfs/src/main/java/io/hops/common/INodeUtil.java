@@ -110,10 +110,10 @@ public class INodeUtil {
     isPathFullyResolved[0] = preTxResolvedINodes.size() == components.length;
   }
 
-  public static void findPathINodesById(int inodeId,
+  public static void findPathINodesById(int inodeId, boolean inTree,
       LinkedList<INode> preTxResolvedINodes, boolean[] isPreTxPathFullyResolved)
       throws StorageException {
-    if (inodeId != INode.NON_EXISTING_ID) {
+    if (inTree) {
       INode inode = indexINodeScanById(inodeId);
       if (inode == null) {
         isPreTxPathFullyResolved[0] = false;

@@ -60,11 +60,18 @@ public class INodeFileUnderConstruction extends INodeFile
   private long lastBlockId = -1;
   private long penultimateBlockId = -1;
 
-  public INodeFileUnderConstruction(PermissionStatus permissions,
+  public INodeFileUnderConstruction(int id, PermissionStatus permissions,
       short replication, long preferredBlockSize, long modTime,
-      String clientName, String clientMachine, DatanodeID clientNode, byte storagePolicy)
+      String clientName, String clientMachine, DatanodeID clientNode, byte storagePolicy) throws IOException {
+    this(id, permissions, replication, preferredBlockSize, modTime, clientName, clientMachine, clientNode, storagePolicy,
+        false);
+  }
+  
+  public INodeFileUnderConstruction(int id, PermissionStatus permissions,
+      short replication, long preferredBlockSize, long modTime,
+      String clientName, String clientMachine, DatanodeID clientNode, byte storagePolicy, boolean inTree)
       throws IOException {
-    super(permissions, null, replication, modTime, modTime, preferredBlockSize, storagePolicy);
+    super(id, permissions, null, replication, modTime, modTime, preferredBlockSize, storagePolicy,inTree);
     this.clientName = clientName;
     this.clientMachine = clientMachine;
     this.clientNode = clientNode;
@@ -78,17 +85,16 @@ public class INodeFileUnderConstruction extends INodeFile
     this.clientNode = other.getClientNode();
   }
 
-  public INodeFileUnderConstruction(byte[] name, short blockReplication,
+  public INodeFileUnderConstruction(int id, byte[] name, short blockReplication,
       long modificationTime, long preferredBlockSize, BlockInfo[] blocks,
       PermissionStatus perm, String clientName, String clientMachine,
-      DatanodeID clientNode, int inodeId, int pid, byte storagePolicy) throws IOException {
-    super(perm, blocks, blockReplication, modificationTime, modificationTime,
-        preferredBlockSize, storagePolicy);
+      DatanodeID clientNode, int inodeId, int pid, byte storagePolicy, boolean inTree) throws IOException {
+    super(id, perm, blocks, blockReplication, modificationTime, modificationTime,
+        preferredBlockSize, storagePolicy, inTree);
     setLocalNameNoPersistance(name);
     this.clientName = clientName;
     this.clientMachine = clientMachine;
     this.clientNode = clientNode;
-    this.id = inodeId;
     this.parentId = pid;
     //throw new UnsupportedOperationException("HOP: This constructor should not be used"); // The only reason it is here that it is called in some FSImage Classes that are not deleted.
   }

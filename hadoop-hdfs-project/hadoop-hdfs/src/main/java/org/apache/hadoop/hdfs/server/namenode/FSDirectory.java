@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.resolvingcache.Cache;
@@ -120,7 +121,7 @@ public class FSDirectory implements Closeable {
 
     namesystem = ns;
 
-    createRootInode(ns.createFsOwnerPermissions(new FsPermission((short) 0755)),
+    createRoot(ns.createFsOwnerPermissions(new FsPermission((short) 0755)),
         false /*dont overwrite if root inode already existes*/);
 
     int configuredLimit = conf.getInt(DFSConfigKeys.DFS_LIST_LIMIT,
@@ -220,8 +221,9 @@ public class FSDirectory implements Closeable {
     if (!mkdirs(parent.toString(), permissions, true, modTime)) {
       return null;
     }
+    int id =  IDsGeneratorFactory.getInstance().getUniqueINodeID();
     INodeFileUnderConstruction newNode =
-        new INodeFileUnderConstruction(permissions, replication,
+        new INodeFileUnderConstruction(id, permissions, replication,
             preferredBlockSize, modTime, clientName, clientMachine, clientNode, (byte) 0);
 
     boolean added = false;
@@ -1408,7 +1410,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     for (; i < inodes.length; i++) {
       pathbuilder.append(Path.SEPARATOR + names[i]);
       String cur = pathbuilder.toString();
-      unprotectedMkdir(inodesInPath, i, components[i],
+      unprotectedMkdir(IDsGeneratorFactory.getInstance().getUniqueINodeID(), inodesInPath, i, components[i],
           (i < lastInodeIndex) ? parentPermissions : permissions, now);
       if (inodes[i] == null) {
         return false;
@@ -1427,14 +1429,14 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return true;
   }
 
-  INode unprotectedMkdir(String src, PermissionStatus permissions,
+  INode unprotectedMkdir(int inodeId, String src, PermissionStatus permissions,
       long timestamp)
       throws IOException {
     byte[][] components = INode.getPathComponents(src);
     INodesInPath inodesInPath = getRootDir().getExistingPathINodes(components,
         components.length, false);
     INode[] inodes = inodesInPath.getINodes();
-    unprotectedMkdir(inodesInPath, inodes.length - 1, components[inodes.length - 1],
+    unprotectedMkdir(inodeId, inodesInPath, inodes.length - 1, components[inodes.length - 1],
         permissions, timestamp);
     return inodes[inodes.length - 1];
   }
@@ -1444,10 +1446,10 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * The parent path to the directory is at [0, pos-1].
    * All ancestors exist. Newly created one stored at index pos.
    */
-  private void unprotectedMkdir(INodesInPath inodesInPath, int pos, byte[] name,
+  private void unprotectedMkdir(int inodeId, INodesInPath inodesInPath, int pos, byte[] name,
       PermissionStatus permission, long timestamp)
       throws IOException {
-    final INodeDirectory dir = new INodeDirectory(name, permission, timestamp);
+    final INodeDirectory dir = new INodeDirectory(inodeId, name, permission, timestamp);
     if (addChild(inodesInPath, pos, dir, true)) {
       inodesInPath.setINode(pos, dir);
     }
@@ -2024,7 +2026,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    */
   void reset() throws IOException {
     setReady(false);
-    createRootInode(
+    createRoot(
         namesystem.createFsOwnerPermissions(new FsPermission((short) 0755)),
         true);
     nameCache.reset();
@@ -2147,7 +2149,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       }
     }
     final String userName = dirPerms.getUserName();
-    INodeSymlink newNode = unprotectedAddSymlink(path, target, modTime, modTime,
+    int id = IDsGeneratorFactory.getInstance().getUniqueINodeID();
+    INodeSymlink newNode = unprotectedAddSymlink(id, path, target, modTime, modTime,
         new PermissionStatus(userName, null, FsPermission.getDefault()));
 
     if (newNode == null) {
@@ -2166,10 +2169,10 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * Add the specified path into the namespace. Invoked from edit log
    * processing.
    */
-  INodeSymlink unprotectedAddSymlink(String path, String target, long mtime,
+  INodeSymlink unprotectedAddSymlink(int id, String path, String target, long mtime,
       long atime, PermissionStatus perm)
       throws IOException {
-    final INodeSymlink symlink = new INodeSymlink(target, mtime, atime, perm);
+    final INodeSymlink symlink = new INodeSymlink(id, target, mtime, atime, perm);
     return addINode(path, symlink)? symlink: null;
   }
   
@@ -2201,7 +2204,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   }
   
   //add root inode if its not there
-  public INodeDirectoryWithQuota createRootInode(
+  public INodeDirectoryWithQuota createRoot(
       final PermissionStatus ps, final boolean overwrite) throws IOException {
     LightWeightRequestHandler addRootINode =
         new LightWeightRequestHandler(HDFSOperationType.SET_ROOT) {

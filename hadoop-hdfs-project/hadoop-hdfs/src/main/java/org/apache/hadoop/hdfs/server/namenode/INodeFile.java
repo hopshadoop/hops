@@ -69,19 +69,26 @@ public class INodeFile extends INode implements BlockCollection {
     return true;
   }
 
-  public INodeFile(PermissionStatus permissions, BlockInfo[] blklist,
+  public INodeFile(int id, PermissionStatus permissions, BlockInfo[] blklist,
       short replication, long modificationTime, long atime,
       long preferredBlockSize, byte storagePolicyID) throws IOException {
-    super(permissions, modificationTime, atime);
+    this(id, permissions, blklist, replication, modificationTime, atime, preferredBlockSize, storagePolicyID, false);
+  }
+
+  public INodeFile(int id, PermissionStatus permissions, BlockInfo[] blklist,
+      short replication, long modificationTime, long atime,
+      long preferredBlockSize, byte storagePolicyID, boolean inTree) throws IOException {
+    super(id, permissions, modificationTime, atime, inTree);
     header = HeaderFormat.combineReplication(header, replication);
     header = HeaderFormat.combinePreferredBlockSize(header, preferredBlockSize);
     this.setFileStoredInDBNoPersistence(false); // it is set when the data is stored in the database
     this.setBlockStoragePolicyIDNoPersistance(storagePolicyID);
   }
-
-  public INodeFile(PermissionStatus permissions, long header,
-      long modificationTime, long atime, boolean isFileStoredInDB, byte storagepolicy) throws IOException {
-    super(permissions, modificationTime, atime);
+ 
+  public INodeFile(int id, PermissionStatus permissions, long header,
+      long modificationTime, long atime, boolean isFileStoredInDB, byte storagepolicy, boolean inTree) throws
+      IOException {
+    super(id, permissions, modificationTime, atime, inTree);
     this.header = header;
     this.isFileStoredInDB = isFileStoredInDB;
     this.blockStoragePolicyID = storagepolicy;
@@ -482,7 +489,7 @@ public class INodeFile extends INode implements BlockCollection {
 
   protected List<BlockInfo> getBlocksOrderedByIndex()
       throws TransactionContextException, StorageException {
-    if (getId() == INode.NON_EXISTING_ID) {
+    if (!isInTree()) {
       return null;
     }
     List<BlockInfo> blocks = (List<BlockInfo>) EntityManager

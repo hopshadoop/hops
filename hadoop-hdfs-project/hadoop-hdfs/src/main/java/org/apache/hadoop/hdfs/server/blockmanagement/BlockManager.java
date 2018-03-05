@@ -4556,8 +4556,8 @@ public class BlockManager {
     BlockInfo binfo = blocksMap.getStoredBlock(b);
     if (binfo == null) {
       LOG.error("ERROR: Dangling Block. bid=" + b.getBlockId() +
-          " setting inodeId to be " + INode.NON_EXISTING_ID);
-      binfo = new BlockInfo(b, INode.NON_EXISTING_ID);
+          " setting inodeId to be " + BlockInfo.NON_EXISTING_ID);
+      binfo = new BlockInfo(b, BlockInfo.NON_EXISTING_ID);
     }
     return binfo;
   }

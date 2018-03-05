@@ -48,7 +48,7 @@ public class INodeAttributesContext
   @Override
   public void update(INodeAttributes iNodeAttributes)
       throws TransactionContextException {
-    if (iNodeAttributes.getInodeId() != INode.NON_EXISTING_ID) {
+    if (iNodeAttributes.isInTree()) {
       super.update(iNodeAttributes);
       if(isLogDebugEnabled()){
         log("updated-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getDsQuota(),"DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getNsQuota(), "NS", iNodeAttributes.getNsCount());

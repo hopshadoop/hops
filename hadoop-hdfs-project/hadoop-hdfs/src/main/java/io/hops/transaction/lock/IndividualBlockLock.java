@@ -32,12 +32,12 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
 
   public IndividualBlockLock() {
     this.blockId = NON_EXISTING_BLOCK;
-    this.inodeId = INode.NON_EXISTING_ID;
+    this.inodeId = BlockInfo.NON_EXISTING_ID;
   }
 
   IndividualBlockLock(long blockId, INodeIdentifier inode) {
     this.blockId = blockId;
-    this.inodeId = inode == null ? INode.NON_EXISTING_ID : inode.getInodeId();
+    this.inodeId = inode == null ? BlockInfo.NON_EXISTING_ID : inode.getInodeId();
   }
 
   @Override

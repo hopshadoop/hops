@@ -79,8 +79,8 @@ public class TestDatanodeDescriptor {
 
     DatanodeDescriptor datanode = DFSTestUtil.getLocalDatanodeDescriptor(true);
     assertEquals(0, datanode.numBlocks());
-    BlockInfo blk = new BlockInfo(new Block(1L), INode.NON_EXISTING_ID);
-    BlockInfo blk1 = new BlockInfo(new Block(2L), INode.NON_EXISTING_ID);
+    BlockInfo blk = new BlockInfo(new Block(1L), 2);
+    BlockInfo blk1 = new BlockInfo(new Block(2L), 3);
     DatanodeStorageInfo[] storages = datanode.getStorageInfos();
     assertTrue(storages.length > 0);
 
@@ -127,8 +127,8 @@ public class TestDatanodeDescriptor {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        blocksMap.addBlockCollection(blk, new INodeFile(new PermissionStatus
-            ("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1, (byte) 0));
+        blocksMap.addBlockCollection(blk, new INodeFile(blk.getInodeId(), 
+            new PermissionStatus("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1, (byte) 0));
         return storage.addBlock(blk);
       }
 

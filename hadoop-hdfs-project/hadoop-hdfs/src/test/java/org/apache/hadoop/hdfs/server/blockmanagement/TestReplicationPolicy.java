@@ -1175,7 +1175,7 @@ public class TestReplicationPolicy {
       public Object performTask() throws StorageException, IOException {
         EntityManager.add(new BlockInfo(block,
             inodeIdentifier != null ? inodeIdentifier.getInodeId() :
-                INode.NON_EXISTING_ID));
+                BlockInfo.NON_EXISTING_ID));
         return queue
             .add(block, curReplicas, decomissionedReplicas, expectedReplicas);
       }

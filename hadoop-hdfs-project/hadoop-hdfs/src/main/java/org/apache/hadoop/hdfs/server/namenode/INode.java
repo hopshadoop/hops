@@ -116,9 +116,8 @@ public abstract class INode implements Comparable<byte[]> {
   protected byte blockStoragePolicyID;
   
 
-  public static final int NON_EXISTING_ID = 0;
-  protected int id = NON_EXISTING_ID;
-  protected int parentId = NON_EXISTING_ID;
+  protected boolean inTree = false;
+  protected int parentId = 0;
   public static int RANDOM_PARTITIONING_MAX_LEVEL=1;
   protected Integer partitionId;
 
@@ -227,6 +226,11 @@ public abstract class INode implements Comparable<byte[]> {
   private int logicalTime;
 
   /**
+   * The inode id
+   */
+  final protected int id;
+  
+  /**
    * The inode name is in java UTF8 encoding;
    * The name in HdfsFileStatus should keep the same encoding as this.
    * if this encoding is changed, implicitly getFileInfo and listStatus in
@@ -239,8 +243,9 @@ public abstract class INode implements Comparable<byte[]> {
   protected long modificationTime = 0L;
   protected long accessTime = 0L;
 
-  INode(byte[] name, PermissionStatus permission, INodeDirectory parent,
-      long modificationTime, long accessTime) throws IOException{
+  INode(int id, byte[] name, PermissionStatus permission, INodeDirectory parent,
+      long modificationTime, long accessTime, boolean inTree) throws IOException{
+    this.id = id;
     this.name = name;
     this.permission = permission.getPermission();
     this.userName = permission.getUserName();
@@ -250,27 +255,45 @@ public abstract class INode implements Comparable<byte[]> {
     this.parent = parent;
     this.modificationTime = modificationTime;
     this.accessTime = accessTime;
+    this.inTree = inTree;
   }
 
-  INode(PermissionStatus permissions, long mtime, long atime) throws IOException{
-    this(null, permissions, null, mtime, atime);
+  INode(int id, byte[] name, PermissionStatus permission, INodeDirectory parent,
+      long modificationTime, long accessTime) throws IOException{
+     this(id, name, permission, parent, modificationTime, accessTime, false);
   }
   
-  protected INode(String name, PermissionStatus permissions)
+  INode(int id, PermissionStatus permissions, long mtime, long atime) throws IOException{
+    this(id, permissions, mtime, atime, false);
+  }
+  
+  INode(int id, PermissionStatus permissions, long mtime, long atime, boolean inTree) throws IOException{
+    this(id, null, permissions, null, mtime, atime, inTree);
+  }
+  
+  protected INode(int id, String name, PermissionStatus permissions) throws IOException {
+    this(id, name, permissions, false);
+  }
+  
+  protected INode(int id, String name, PermissionStatus permissions, boolean inTree)
       throws IOException {
-    this(DFSUtil.string2Bytes(name), permissions, null, 0L, 0L);
+    this(id, DFSUtil.string2Bytes(name), permissions, null, 0L, 0L, inTree);
   }
   
   /** @param other Other node to be copied */
   INode(INode other) throws IOException {
-    this(other.getLocalNameBytes(), other.getPermissionStatus(), other.
+    this(other.getId(), other.getLocalNameBytes(), other.getPermissionStatus(), other.
         getParent(),
-        other.getModificationTime(), other.getAccessTime());
+        other.getModificationTime(), other.getAccessTime(), other.inTree);
     this.header = other.header;
     this.partitionId = other.partitionId;
-    this.id = other.id;
     this.parentId = other.parentId;    
     this.logicalTime = other.logicalTime;
+  }
+
+  /** Get inode id */
+  public int getId() {
+    return this.id;
   }
 
   /**
@@ -686,14 +709,6 @@ public abstract class INode implements Comparable<byte[]> {
     return Arrays.hashCode(this.name);
   }
 
-  public final void setIdNoPersistance(int id) {
-    this.id = id;
-  }
-
-  public int getId() {
-    return this.id;
-  }
-  
   public void setParent(INodeDirectory p)
       throws StorageException, TransactionContextException {
     setParentNoPersistance(p);
@@ -790,10 +805,14 @@ public abstract class INode implements Comparable<byte[]> {
     save();
   }
   
-  public boolean exists() {
-    return id != NON_EXISTING_ID;
+  public void inTree() {
+    inTree = true;
   }
 
+  public boolean isInTree() {
+    return inTree;
+  }
+  
   protected void save() throws StorageException, TransactionContextException {
     save(this);
   }
@@ -960,10 +979,6 @@ public abstract class INode implements Comparable<byte[]> {
   }
 
   public short myDepth() throws TransactionContextException, StorageException {
-    if(id == NON_EXISTING_ID){
-      throw new IllegalStateException("INode is not connected to the file system tree yet");
-    }
-
     if(id == INodeDirectory.ROOT_ID){
       return INodeDirectory.ROOT_DIR_DEPTH;
     }

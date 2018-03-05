@@ -59,28 +59,33 @@ public class INodeDirectory extends INode {
   public final static String ROOT_NAME = "";
 
   public final static int ROOT_ID = 1;
-  public final static int ROOT_PARENT_ID = NON_EXISTING_ID;
+  public final static int ROOT_PARENT_ID = 0;
   public static final int ROOT_DIR_PARTITION_KEY = ROOT_PARENT_ID;
   public static final short ROOT_DIR_DEPTH =0;
 
   private boolean metaEnabled;
 
-  public INodeDirectory(String name, PermissionStatus permissions)
+  public INodeDirectory(int id, String name, PermissionStatus permissions)
       throws IOException {
-    super(name, permissions);
+    super(id, name, permissions);
+  }
+  
+  public INodeDirectory(int id, String name, PermissionStatus permissions, boolean inTree)
+      throws IOException {
+    super(id, name, permissions, inTree);
   }
 
-  public INodeDirectory(PermissionStatus permissions, long mTime)
+  public INodeDirectory(int id, PermissionStatus permissions, long mTime)
       throws IOException {
-    super(permissions, mTime, 0);
+    super(id, permissions, mTime, 0);
   }
 
   /**
    * constructor
    */
-  INodeDirectory(byte[] name, PermissionStatus permissions, long mtime)
+  INodeDirectory(int id, byte[] name, PermissionStatus permissions, long mtime)
       throws IOException {
-    super(name, permissions, null, mtime, 0L);
+    super(id, name, permissions, null, mtime, 0L);
   }
   
   /**
@@ -157,7 +162,7 @@ public class INodeDirectory extends INode {
     INode existingInode = EntityManager
         .find(Finder.ByNameParentIdAndPartitionId, DFSUtil.bytes2String(name),
             getId(), childPartitionId);
-    if (existingInode != null && existingInode.exists()) {
+    if (existingInode != null && existingInode.isInTree()) {
       return existingInode;
     }
     return null;
@@ -337,9 +342,8 @@ public class INodeDirectory extends INode {
       return false;
     }
 
-    if (!node.exists()) {
-      Integer inodeID = IDsGeneratorFactory.getInstance().getUniqueINodeID();
-      node.setIdNoPersistance(inodeID);
+    if (!node.isInTree()) {
+      node.inTree();
       node.setParentNoPersistance(this);
       short childDepth = (short)(myDepth()+1);
       node.setPartitionIdNoPersistance(INode.calculatePartitionId(node.getParentId(), node.getLocalName(), childDepth));
@@ -410,7 +414,7 @@ public class INodeDirectory extends INode {
   DirCounts spaceConsumedInTree(DirCounts counts)
       throws StorageException, TransactionContextException {
     counts.nsCount += 1;
-    if (getId() != INode.NON_EXISTING_ID) {
+    if (isInTree()) {
       List<INode> children = getChildren();
       if (children != null) {
         for (INode child : children) {
@@ -470,7 +474,7 @@ public class INodeDirectory extends INode {
    */
   private List<INode> getChildren()
       throws StorageException, TransactionContextException {
-    if (getId() == INode.NON_EXISTING_ID) {
+    if (!isInTree()) {
       return null;
     }
 

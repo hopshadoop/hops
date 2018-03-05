@@ -63,9 +63,13 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
   /**
    * constructor with no quota verification
    */
-  public INodeDirectoryWithQuota(String name, PermissionStatus permissions)
+  public INodeDirectoryWithQuota(int id, String name, PermissionStatus permissions) throws IOException{
+    super(id, name, permissions);
+  }
+      
+  public INodeDirectoryWithQuota(int id, String name, PermissionStatus permissions, boolean inTree)
       throws IOException {
-    super(name, permissions);
+    super(id, name, permissions, inTree);
   }
   
   public INodeDirectoryWithQuota(INodeDirectoryWithQuota other) throws IOException{
@@ -194,8 +198,8 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
 
   public static INodeDirectoryWithQuota createRootDir(
       PermissionStatus permissions) throws IOException {
-    INodeDirectoryWithQuota newRootINode = new INodeDirectoryWithQuota(ROOT_NAME, permissions);
-    newRootINode.setIdNoPersistance(ROOT_ID);
+    INodeDirectoryWithQuota newRootINode = new INodeDirectoryWithQuota(ROOT_ID, ROOT_NAME, permissions);
+    newRootINode.inTree();
     newRootINode.setParentIdNoPersistance(ROOT_PARENT_ID);
     newRootINode.setPartitionIdNoPersistance(getRootDirPartitionKey());
     return newRootINode;
@@ -216,7 +220,7 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
   private void createINodeAttributes(Long nsQuota, Long nsCount, Long dsQuota,
       Long diskspace) throws StorageException, TransactionContextException {
     INodeAttributes attr =
-        new INodeAttributes(id, nsQuota, nsCount, dsQuota, diskspace);
+        new INodeAttributes(id, inTree, nsQuota, nsCount, dsQuota, diskspace);
     EntityManager.add(attr);
   }
   
@@ -233,9 +237,9 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
     }
   }
   
-  protected void changeAttributesPkNoPersistance(Integer id)
+  protected void changeAttributesPkNoPersistance(Integer id, boolean inTree)
       throws StorageException, TransactionContextException {
-    getINodeAttributes().setInodeIdNoPersistance(id);
+    getINodeAttributes().setInodeIdNoPersistance(id, inTree);
   }
 
   @Override
