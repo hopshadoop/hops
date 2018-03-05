@@ -36,8 +36,10 @@ import org.junit.Test;
 import java.io.FileNotFoundException;
 import java.io.IOException; 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 
@@ -369,32 +371,54 @@ public class TestINodeFile {
   public void TestInodeId() throws IOException {
 
     Configuration conf = new Configuration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
-        .build();
-    cluster.waitActive();
-    
-    int initialId = IDsGeneratorFactory.getInstance().getUniqueINodeID();
+    MiniDFSCluster cluster = null;
+    try {    
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
 
-    // Create one directory and the last inode id should increase to 1002
-    FileSystem fs = cluster.getFileSystem();
-    Path path = new Path("/test1");
-    assertTrue(fs.mkdirs(path));
-    assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 2);//we can't check the id witout increasing it
+      int initialId = IDsGeneratorFactory.getInstance().getUniqueINodeID();
 
-    Path filePath = new Path("/test1/file");
-    fs.create(filePath);
-    assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() ==  initialId + 4); //we can't check the id witout increasing it
+      // Create one directory and the last inode id should increase to 1002
+      FileSystem fs = cluster.getFileSystem();
+      Path path = new Path("/test1");
+      assertTrue(fs.mkdirs(path));
+      assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 2);//we can't check the id witout increasing it
 
-    // Rename doesn't increase inode id
-    Path renamedPath = new Path("/test2");
-    fs.rename(path, renamedPath);
-    assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 5);//we can't check the id witout increasing it
+      int fileLen = 1024;
+      Path filePath = new Path("/test1/file");
+      DFSTestUtil.createFile(fs, filePath, fileLen, (short) 1, 0);
+      assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 4); //we can't check the id witout increasing it
 
-    cluster.restartNameNode();
-    cluster.waitActive();
-    // Make sure empty editlog can be handled
-    cluster.restartNameNode();
-    cluster.waitActive();
-    assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 6);//we can't check the id witout increasing it
+      // Rename doesn't increase inode id
+      Path renamedPath = new Path("/test2");
+      fs.rename(path, renamedPath);
+      assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 5);//we can't check the id witout increasing it
+
+      cluster.restartNameNode();
+      cluster.waitActive();
+      // Make sure empty editlog can be handled
+      cluster.restartNameNode();
+      cluster.waitActive();
+      assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 6);//we can't check the id witout increasing it
+
+      DFSTestUtil.createFile(fs, new Path("/test2/file2"), fileLen, (short) 1,
+          0);
+      long id = IDsGeneratorFactory.getInstance().getUniqueINodeID();
+      assertTrue(id == initialId + 8);
+      fs.delete(new Path("/test2"), true);
+      // create a file under construction
+      FSDataOutputStream outStream = fs.create(new Path("/test3/file"));
+      assertTrue(outStream != null);
+      assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 11);
+
+      // The lastInodeId in fsimage should remain 1006 after reboot
+      cluster.restartNameNode();
+      cluster.waitActive();
+      assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 12);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
   }
 }
