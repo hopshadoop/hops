@@ -101,7 +101,8 @@ public class LayoutVersion {
         "Serialize block lists with delta-encoded variable length ints, " +
             "add OP_UPDATE_BLOCKS"),
     RESERVED_REL1_2_0(-41, -32, "Reserved for release 1.2.0", true, CONCAT),
-    ADD_DATANODE_AND_STORAGE_UUIDS(-42, "Replace StorageID with DatanodeUuid."
+    ADD_INODE_ID(-42, -40, "Assign a unique inode id for each inode", false),
+    ADD_DATANODE_AND_STORAGE_UUIDS(-43, "Replace StorageID with DatanodeUuid."
         + " Use distinct StorageUuid per storage directory.");
     
     final int lv;
