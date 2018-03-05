@@ -57,7 +57,7 @@ public class INodeFile extends INode implements BlockCollection {
     return (INodeFile) inode;
   }
 
-  private int generationStamp = (int) GenerationStamp.FIRST_VALID_STAMP;
+  private int generationStamp = (int) GenerationStamp.LAST_RESERVED_STAMP;
   private long size = 0;
   private boolean isFileStoredInDB = false;
   

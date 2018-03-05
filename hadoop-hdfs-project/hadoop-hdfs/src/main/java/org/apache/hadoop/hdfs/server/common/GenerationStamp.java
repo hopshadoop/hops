@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.common;
 
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.util.SequentialNumber;
 
 /**
  * *************************************************************
@@ -26,11 +27,11 @@ import org.apache.hadoop.classification.InterfaceAudience;
  * **************************************************************
  */
 @InterfaceAudience.Private
-public class GenerationStamp implements Comparable<GenerationStamp> {
+public class GenerationStamp extends SequentialNumber {
   /**
-   * The first valid generation stamp.
+   * The last reserved generation stamp.
    */
-  public static final long FIRST_VALID_STAMP = 1000L;
+  public static final long LAST_RESERVED_STAMP = 1000L;
 
   /**
    * Generation stamp of blocks that pre-date the introduction
@@ -41,23 +42,9 @@ public class GenerationStamp implements Comparable<GenerationStamp> {
   private long genstamp;
 
   /**
-   * Create a new instance, initialized to FIRST_VALID_STAMP.
+   * Create a new instance, initialized to {@link #LAST_RESERVED_STAMP}.
    */
   public GenerationStamp() {
-    this(GenerationStamp.FIRST_VALID_STAMP);
-  }
-
-  /**
-   * Create a new instance, initialized to the specified value.
-   */
-  public GenerationStamp(long stamp) {
-    genstamp = stamp;
-  }
-
-  @Override // Comparable
-  public int compareTo(GenerationStamp that) {
-    long stamp1 = this.genstamp;
-    long stamp2 = that.genstamp;
-    return stamp1 < stamp2 ? -1 : stamp1 > stamp2 ? 1 : 0;
+    super(LAST_RESERVED_STAMP);
   }
 }

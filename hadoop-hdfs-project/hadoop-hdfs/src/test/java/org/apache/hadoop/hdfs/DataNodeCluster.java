@@ -196,7 +196,7 @@ public class DataNodeCluster {
         for (int i_dn = 0; i_dn < numDataNodes; ++i_dn) {
           for (int i = 0; i < blocks.length; ++i) {
             blocks[i] =
-                new Block(blkid++, blockSize, GenerationStamp.FIRST_VALID_STAMP
+                new Block(blkid++, blockSize, GenerationStamp.LAST_RESERVED_STAMP
                     //HOP                CreateEditsLog.BLOCK_GENERATION_STAMP
                 );
           }
