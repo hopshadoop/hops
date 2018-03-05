@@ -52,6 +52,7 @@ public class INodeAttributes {
   }
 
   private Integer inodeId;
+  private boolean inTree;
   private Long nsQuota; /// NameSpace quota
   private Long nsCount;
   private Long dsQuota; /// disk space quota
@@ -59,7 +60,13 @@ public class INodeAttributes {
 
   public INodeAttributes(Integer inodeId, Long nsQuota, Long nsCount,
       Long dsQuota, Long diskspace) {
+    this(inodeId, true, nsQuota, nsCount, dsQuota, diskspace);
+  }
+  
+  public INodeAttributes(Integer inodeId, boolean inTree, Long nsQuota, Long nsCount,
+      Long dsQuota, Long diskspace) {
     this.inodeId = inodeId;
+    this.inTree = inTree;
     if (nsQuota != null) {
       this.nsQuota = nsQuota;
     } else {
@@ -88,6 +95,10 @@ public class INodeAttributes {
     return inodeId;
   }
 
+  public boolean isInTree() {
+    return inTree;
+  }
+  
   public Long getNsQuota() {
     return nsQuota;
   }
@@ -104,9 +115,9 @@ public class INodeAttributes {
     return diskspace;
   }
 
-  public void setInodeId(Integer inodeId)
+  public void setInodeId(Integer inodeId, boolean inTree)
       throws StorageException, TransactionContextException {
-    setInodeIdNoPersistance(inodeId);
+    setInodeIdNoPersistance(inodeId, inTree);
     saveAttributes();
   }
 
@@ -150,8 +161,9 @@ public class INodeAttributes {
     this.diskspace = diskspace;
   }
 
-  public void setInodeIdNoPersistance(Integer inodeId) {
+  public void setInodeIdNoPersistance(Integer inodeId, boolean inTree) {
     this.inodeId = inodeId;
+    this.inTree = inTree;
   }
 
   protected void saveAttributes()

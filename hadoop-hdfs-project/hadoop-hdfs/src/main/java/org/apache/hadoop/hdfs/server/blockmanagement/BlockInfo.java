@@ -144,11 +144,12 @@ public class BlockInfo extends Block {
     }
   }
 
+  public static int NON_EXISTING_ID = -1;
   private BlockCollection bc;
   private int blockIndex = -1;
   private long timestamp = 1;
   
-  protected int inodeId = INode.NON_EXISTING_ID;
+  protected int inodeId = NON_EXISTING_ID;
   
   public BlockInfo(Block blk, int inodeId) {
     super(blk);
@@ -192,7 +193,7 @@ public class BlockInfo extends Block {
         .find(INodeFile.Finder.ByINodeIdFTIS, inodeId);
     this.bc = bc;
     if (bc == null) {
-      this.inodeId = INode.NON_EXISTING_ID;
+      this.inodeId = NON_EXISTING_ID;
     }
     return bc;
   }

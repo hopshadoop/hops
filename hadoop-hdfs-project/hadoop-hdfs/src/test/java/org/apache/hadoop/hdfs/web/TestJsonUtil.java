@@ -45,7 +45,7 @@ public class TestJsonUtil {
     final long now = Time.now();
     final String parent = "/dir";
     final HdfsFileStatus status =
-        new HdfsFileStatus(INode.NON_EXISTING_ID, 1001L, false, 3, 1L << 26, now, now + 10,
+        new HdfsFileStatus(-1, 1001L, false, 3, 1L << 26, now, now + 10,
             new FsPermission((short) 0644), "user", "group",
             DFSUtil.string2Bytes("bar"), DFSUtil.string2Bytes("foo"),false/*not stored in the database*/, (byte) 0);
     final FileStatus fstatus = toFileStatus(status, parent);

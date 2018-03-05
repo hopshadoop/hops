@@ -6444,7 +6444,7 @@ public class FSNamesystem
             EncodingStatus status = EntityManager.find(
                 EncodingStatus.Finder.ByInodeId, dstNode.getId());
             EncodingStatus newStatus = new EncodingStatus(status);
-            newStatus.setInodeId(srcNode.getId());
+            newStatus.setInodeId(srcNode.getId(), srcNode.isInTree());
             EntityManager.add(newStatus);
             EntityManager.remove(status);
             break;
@@ -7151,10 +7151,10 @@ public class FSNamesystem
    *    the path
    * @throws IOException
    */
-  public String getPath(int id) throws IOException {
+  public String getPath(int id, boolean inTree) throws IOException {
     LinkedList<INode> resolvedInodes = new LinkedList<>();
     boolean resolved[] = new boolean[1];
-    INodeUtil.findPathINodesById(id, resolvedInodes, resolved);
+    INodeUtil.findPathINodesById(id, inTree, resolvedInodes, resolved);
 
     if (!resolved[0]) {
       throw new IOException(
@@ -7225,8 +7225,8 @@ public class FSNamesystem
           throw new IOException("Attempting to request encoding for an" +
               "encoded file");
         }
-        int inodeId = dir.getINode(sourcePath).getId();
-        EncodingStatus encodingStatus = new EncodingStatus(inodeId, status,
+        INode inode = dir.getINode(sourcePath);
+        EncodingStatus encodingStatus = new EncodingStatus(inode.getId(),  inode.isInTree(), status,
             policy, System.currentTimeMillis());
         EntityManager.add(encodingStatus);
         return null;

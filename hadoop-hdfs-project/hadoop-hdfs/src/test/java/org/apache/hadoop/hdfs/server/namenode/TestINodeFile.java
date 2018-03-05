@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -35,8 +36,10 @@ import org.junit.Test;
 import java.io.FileNotFoundException;
 import java.io.IOException; 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -62,11 +65,11 @@ public class TestINodeFile {
   }
   
   INodeFile createINodeFile(short replication, long preferredBlockSize) throws IOException {
-    return new INodeFile(perm, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
+    return new INodeFile(0, perm, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
   }
     
   private static INodeFile createINodeFile(byte storagePolicyID) throws IOException {
-    return new INodeFile(perm, null, (short) 3, 0L, 0L, 1024L, storagePolicyID);
+    return new INodeFile(0, perm, null, (short) 3, 0L, 0L, 1024L, storagePolicyID);
   }
 
   @Test
@@ -168,8 +171,8 @@ public class TestINodeFile {
     INodeFile inf =createINodeFile(replication, preferredBlockSize);
     inf.setLocalName("f");
 
-    INodeDirectory root = new INodeDirectory(INodeDirectory.ROOT_NAME, perms);
-    INodeDirectory dir = new INodeDirectory("d", perms);
+    INodeDirectory root = new INodeDirectory(INodeDirectory.ROOT_ID ,INodeDirectory.ROOT_NAME, perms);
+    INodeDirectory dir = new INodeDirectory(IDsGeneratorFactory.getInstance().getUniqueINodeID() ,"d", perms);
 
     assertEquals("f", inf.getFullPathName());
     assertEquals("", inf.getLocalParentDir());
@@ -234,7 +237,7 @@ public class TestINodeFile {
       PermissionStatus perms =
           new PermissionStatus(userName, null, FsPermission.getDefault());
       iNodes[i] =
-          new INodeFile(perms, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
+          new INodeFile(IDsGeneratorFactory.getInstance().getUniqueINodeID(), perms, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
       iNodes[i].setLocalNameNoPersistance(fileNamePrefix + Integer.toString(i));
       BlockInfo newblock = new BlockInfo();
       newblock.setBlockId(blkid++);
@@ -288,7 +291,7 @@ public class TestINodeFile {
 
     {//cast from INodeFile
       final INode from =
-          new INodeFile(perm, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
+          new INodeFile(0, perm, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
       
       //cast to INodeFile, should success
       final INodeFile f = INodeFile.valueOf(from, path);
@@ -312,7 +315,7 @@ public class TestINodeFile {
 
     {//cast from INodeFileUnderConstruction
       final INode from =
-          new INodeFileUnderConstruction(perm, replication, 0L, 0L, "client",
+          new INodeFileUnderConstruction(0, perm, replication, 0L, 0L, "client",
               "machine", null, (byte) 0);
       
       //cast to INodeFile, should success
@@ -333,7 +336,7 @@ public class TestINodeFile {
     }
 
     {//cast from INodeDirectory
-      final INode from = new INodeDirectory(perm, 0L);
+      final INode from = new INodeDirectory(0, perm, 0L);
 
       //cast to INodeFile, should fail
       try {
@@ -355,5 +358,43 @@ public class TestINodeFile {
       final INodeDirectory d = INodeDirectory.valueOf(from, path);
       assertTrue(d == from);
     }
+  }
+  
+  /**
+   * Verify root always has inode id 1001 and new formated fsimage has last
+   * allocated inode id 1000. Validate correct lastInodeId is persisted.
+   * @throws IOException
+   */
+  @Test
+  public void TestInodeId() throws IOException {
+
+    Configuration conf = new Configuration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .build();
+    cluster.waitActive();
+    
+    int initialId = IDsGeneratorFactory.getInstance().getUniqueINodeID();
+
+    // Create one directory and the last inode id should increase to 1002
+    FileSystem fs = cluster.getFileSystem();
+    Path path = new Path("/test1");
+    assertTrue(fs.mkdirs(path));
+    assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 2);//we can't check the id witout increasing it
+
+    Path filePath = new Path("/test1/file");
+    fs.create(filePath);
+    assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() ==  initialId + 4); //we can't check the id witout increasing it
+
+    // Rename doesn't increase inode id
+    Path renamedPath = new Path("/test2");
+    fs.rename(path, renamedPath);
+    assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 5);//we can't check the id witout increasing it
+
+    cluster.restartNameNode();
+    cluster.waitActive();
+    // Make sure empty editlog can be handled
+    cluster.restartNameNode();
+    cluster.waitActive();
+    assertTrue(IDsGeneratorFactory.getInstance().getUniqueINodeID() == initialId + 6);//we can't check the id witout increasing it
   }
 }

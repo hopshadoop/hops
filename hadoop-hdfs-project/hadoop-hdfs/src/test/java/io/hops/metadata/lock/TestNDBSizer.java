@@ -75,10 +75,9 @@ public class TestNDBSizer {
 
     final List<INode> newFiles = new LinkedList<>();
     for (int i = 0; i < NUM_INODES; i++) {
-      INodeDirectory dir = new INodeDirectoryWithQuota("",
+      INodeDirectory dir = new INodeDirectoryWithQuota(i, "",
           new PermissionStatus("salman", "usr",
-              new FsPermission((short) 0777)));
-      dir.setIdNoPersistance(i);
+              new FsPermission((short) 0777)), true);
       dir.setLocalNameNoPersistance(filename + Integer.toString(i));
       dir.setParentIdNoPersistance(i);
       newFiles.add(dir);

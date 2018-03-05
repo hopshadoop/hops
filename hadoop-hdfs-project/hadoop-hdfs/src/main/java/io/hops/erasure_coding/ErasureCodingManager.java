@@ -353,7 +353,7 @@ public class ErasureCodingManager extends Configured {
           continue;
         }
 
-        String path = namesystem.getPath(iNode.getId());
+        String path = namesystem.getPath(iNode.getId(), iNode.isInTree());
         if (iNode == null) {
           continue;
         }
@@ -512,7 +512,7 @@ public class ErasureCodingManager extends Configured {
           continue;
         }
 
-        String path = namesystem.getPath(encodingStatus.getInodeId());
+        String path = namesystem.getPath(encodingStatus.getInodeId(), encodingStatus.isInTree());
         // Set status before doing something. In case the file is recovered inbetween we don't have an invalid status.
         // If starting repair fails somehow then this should be detected by a timeout later.
         namesystem.updateEncodingStatus(path,
@@ -568,7 +568,7 @@ public class ErasureCodingManager extends Configured {
           continue;
         }
 
-        String path = namesystem.getPath(encodingStatus.getInodeId());
+        String path = namesystem.getPath(encodingStatus.getInodeId(), encodingStatus.isInTree());
         // Set status before doing something. In case the file is recovered inbetween we don't have an invalid status.
         // If starting repair fails somehow then this should be detected by a timeout later.
         namesystem.updateEncodingStatus(path,
@@ -628,7 +628,7 @@ public class ErasureCodingManager extends Configured {
         (Collection<EncodingStatus>) findHandler.handle();
     for (EncodingStatus status : markedAsRevoked) {
       LOG.info("Checking replication for revoked status: " + status);
-      String path = namesystem.getPath(status.getInodeId());
+      String path = namesystem.getPath(status.getInodeId(), status.isInTree());
       int replication = namesystem.getFileInfo(path, true).getReplication();
       LocatedBlocks blocks = namesystem.getBlockLocations(path, 0,
           Long.MAX_VALUE, false, true, true);

@@ -1108,7 +1108,7 @@ public class DFSTestUtil {
             da.prepare(INode.EMPTY_LIST, newINodes, INode.EMPTY_LIST);
 
             INodeAttributes inodeAttributes =
-                new INodeAttributes(newRootINode.getId(), Long.MAX_VALUE, 1L, -1L, 0L);
+                new INodeAttributes(newRootINode.getId(), newRootINode.isInTree(), Long.MAX_VALUE, 1L, -1L, 0L);
             INodeAttributesDataAccess ida =
                 (INodeAttributesDataAccess) HdfsStorageFactory
                     .getDataAccess(INodeAttributesDataAccess.class);
