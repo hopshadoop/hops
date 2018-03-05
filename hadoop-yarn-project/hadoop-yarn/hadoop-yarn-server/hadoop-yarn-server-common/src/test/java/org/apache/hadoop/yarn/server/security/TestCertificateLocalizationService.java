@@ -274,7 +274,34 @@ public class TestCertificateLocalizationService {
     TimeUnit.MILLISECONDS.sleep(10);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePass, trustStorePass, false);
   }
-  
+
+  @Test
+  public void testMultipleReadsCryptoBuffers() throws Exception {
+    byte[] randomK = "Some_random_keystore_stuff".getBytes();
+    byte[] randomT = "Some_random_truststore_stuff".getBytes();
+    ByteBuffer bfk = ByteBuffer.wrap(randomK);
+    ByteBuffer bft = ByteBuffer.wrap(randomT);
+    String username = "Dr.Who";
+    String userFolder = "userfolder";
+    String keyStorePass = "keyStorePass";
+    String trustStorePass = "trustStorePass";
+
+    materializeCertificateUtil(certLocSrv, username, userFolder, bfk, keyStorePass, bft, trustStorePass);
+    CryptoMaterial cryptoMaterial = certLocSrv.getMaterialLocation(username);
+
+    assertTrue(bfk.equals(cryptoMaterial.getKeyStoreMem()));
+    assertTrue(bft.equals(cryptoMaterial.getTrustStoreMem()));
+
+    // Read twice to make sure reads are idempotent
+    assertTrue(bfk.equals(cryptoMaterial.getKeyStoreMem()));
+    assertTrue(bft.equals(cryptoMaterial.getTrustStoreMem()));
+
+    // Cleanup
+    certLocSrv.removeMaterial(username);
+  }
+
+
+
   @Test
   public void testMaterializationWithMultipleApplications() throws Exception {
     byte[] randomK = "Some_random_keystore_stuff".getBytes();

@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.security;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
@@ -77,6 +78,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.ReentrantLock;
 
+@InterfaceAudience.LimitedPrivate({"Hive"})
 public class CertificateLocalizationService extends AbstractService
     implements CertificateLocalization, CertificateLocalizationProtocol, CertificateLocalizationMBean {
   
@@ -116,7 +118,9 @@ public class CertificateLocalizationService extends AbstractService
 
   public enum ServiceType {
     RM("RM"),
-    NM("NM");
+    NM("NM"),
+    HS2("HS2"),
+    HM("HM");
 
     private final String service;
 
@@ -600,10 +604,12 @@ public class CertificateLocalizationService extends AbstractService
       FileChannel kstoreChannel = new FileOutputStream(kStorePath.toFile(), false)
           .getChannel();
       kstoreChannel.write(kstore);
+      kstore.rewind(); // Set the position to 0 so other clients can read the buffer later on
       kstoreChannel.close();
       FileChannel tstoreChannel = new FileOutputStream(tStorePath.toFile(), false)
           .getChannel();
       tstoreChannel.write(tstore);
+      tstore.rewind(); // Set the position to 0 so other clients can read the buffer later on
       tstoreChannel.close();
       FileUtils.writeStringToFile(passwdPath.toFile(), kstorePass);
 
