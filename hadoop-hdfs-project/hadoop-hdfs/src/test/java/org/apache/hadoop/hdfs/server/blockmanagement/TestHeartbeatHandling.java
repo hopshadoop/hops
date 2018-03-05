@@ -88,7 +88,7 @@ public class TestHeartbeatHandling {
       synchronized (hm) {
         for (int i = 0; i < MAX_REPLICATE_BLOCKS; i++) {
           dd.addBlockToBeReplicated(
-              new Block(i, 0, GenerationStamp.FIRST_VALID_STAMP), ONE_TARGET);
+              new Block(i, 0, GenerationStamp.LAST_RESERVED_STAMP), ONE_TARGET);
         }
         DatanodeCommand[] cmds =
             NameNodeAdapter.sendHeartBeat(nodeReg, dd, namesystem)
@@ -101,7 +101,7 @@ public class TestHeartbeatHandling {
         ArrayList<Block> blockList =
             new ArrayList<>(MAX_INVALIDATE_BLOCKS);
         for (int i = 0; i < MAX_INVALIDATE_BLOCKS; i++) {
-          blockList.add(new Block(i, 0, GenerationStamp.FIRST_VALID_STAMP));
+          blockList.add(new Block(i, 0, GenerationStamp.LAST_RESERVED_STAMP));
         }
         dd.addBlocksToBeInvalidated(blockList);
         cmds = NameNodeAdapter.sendHeartBeat(nodeReg, dd, namesystem)
