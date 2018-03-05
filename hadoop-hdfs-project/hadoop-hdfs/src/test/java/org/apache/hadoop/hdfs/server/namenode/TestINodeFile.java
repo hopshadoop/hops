@@ -26,6 +26,7 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -38,8 +39,10 @@ import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.hdfs.DFSTestUtil;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 
@@ -47,6 +50,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Before;
+import org.junit.Ignore;
 
 public class TestINodeFile {
 
@@ -162,7 +166,9 @@ public class TestINodeFile {
     createINodeFile(replication, preferredBlockSize);
   }
 
-  //  @Test
+  
+  @Test
+  @Ignore
   public void testGetFullPathName()
       throws IOException {
     PermissionStatus perms =
@@ -193,7 +199,76 @@ public class TestINodeFile {
     
   }
   
-  //  @Test
+  /**
+   * FSDirectory#unprotectedSetQuota creates a new INodeDirectoryWithQuota to
+   * replace the original INodeDirectory. Before HDFS-4243, the parent field of
+   * all the children INodes of the target INodeDirectory is not changed to
+   * point to the new INodeDirectoryWithQuota. This testcase tests this
+   * scenario.
+   */
+  @Test
+  public void testGetFullPathNameAfterSetQuota() throws Exception {
+    long fileLen = 1024;
+    replication = 3;
+    Configuration conf = new Configuration();
+    MiniDFSCluster cluster = null;
+
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(
+          replication).build();
+      cluster.waitActive();
+      FSNamesystem fsn = cluster.getNamesystem();
+      FSDirectory fsdir = fsn.getFSDirectory();
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      // Create a file for test
+      final Path dir = new Path("/dir");
+      final Path file = new Path(dir, "file");
+      DFSTestUtil.createFile(dfs, file, fileLen, replication, 0L);
+
+      // Check the full path name of the INode associating with the file
+      checkFullPathName(fsdir, file, cluster);
+
+      // Call FSDirectory#unprotectedSetQuota which calls
+      // INodeDirectory#replaceChild
+      dfs.setQuota(dir, Long.MAX_VALUE - 1, replication * fileLen * 10);
+      final Path newDir = new Path("/newdir");
+      final Path newFile = new Path(newDir, "file");
+      // Also rename dir
+      dfs.rename(dir, newDir, Options.Rename.OVERWRITE);
+      // /dir/file now should be renamed to /newdir/file
+      // getFullPathName can return correct result only if the parent field of
+      // child node is set correctly
+      checkFullPathName(fsdir, newFile, cluster);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  private void checkFullPathName(final FSDirectory fsdir, final Path file, final MiniDFSCluster cluster) throws IOException {
+    new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getINodeLock(cluster.getNameNode(),
+            TransactionLockTypes.INodeLockType.WRITE,
+            TransactionLockTypes.INodeResolveType.PATH, file.toString()))
+            .add(lf.getBlockLock());
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        INode fnode = fsdir.getINode(file.toString());
+        assertEquals(file.toString(), fnode.getFullPathName());
+        return null;
+      }
+    }.handle();
+  }
+  
+  @Test  
+  @Ignore
   public void testAppendBlocks()
       throws IOException {
     INodeFile origFile = createINodeFiles(1, "origfile")[0];
