@@ -46,9 +46,9 @@ public class CryptoMaterial {
     this.trustStoreSize = tstore.capacity();
     this.passwdLocation = passwdLocation;
     
-    this.keyStoreMem = kStore.asReadOnlyBuffer();
+    this.keyStoreMem = kStore;
     this.keyStorePass = kStorePass;
-    this.trustStoreMem = tstore.asReadOnlyBuffer();
+    this.trustStoreMem = tstore;
     this.trustStorePass = tstorePass;
     
     requestedApplications = 1;
@@ -77,7 +77,7 @@ public class CryptoMaterial {
   }
   
   public ByteBuffer getKeyStoreMem() {
-    return keyStoreMem;
+    return keyStoreMem.asReadOnlyBuffer();
   }
   
   public String getKeyStorePass() {
@@ -85,7 +85,7 @@ public class CryptoMaterial {
   }
   
   public ByteBuffer getTrustStoreMem() {
-    return trustStoreMem;
+    return trustStoreMem.asReadOnlyBuffer();
   }
   
   public String getTrustStorePass() {
