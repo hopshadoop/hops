@@ -2364,7 +2364,7 @@ public class FSNamesystem
    * are replicated.  Will return an empty 2-elt array if we want the
    * client to "try again later".
    */
-  LocatedBlock getAdditionalBlock(final String src, final String clientName,
+  LocatedBlock getAdditionalBlock(final String src, final long fileId, final String clientName,
       final ExtendedBlock previous, final Set<Node> excludedNodes,
       final List<String> favoredNodes) throws IOException {
     HopsTransactionalRequestHandler additionalBlockHandler =
@@ -2397,7 +2397,7 @@ public class FSNamesystem
             LocatedBlock[] onRetryBlock = new LocatedBlock[1];
             final INodesInPath inodesInPath;
             try {
-              inodesInPath = analyzeFileState(src, clientName,
+              inodesInPath = analyzeFileState(src, fileId, clientName,
                 previous, onRetryBlock);
             } catch(IOException e) {
               throw e;
@@ -2435,7 +2435,7 @@ public class FSNamesystem
             long offset;
             LocatedBlock[] onRetryBlock2 = new LocatedBlock[1];
             INodesInPath iNodesInPath2 =
-                analyzeFileState(src, clientName, previous, onRetryBlock2);
+                analyzeFileState(src, fileId, clientName, previous, onRetryBlock2);
             INode[] inodes2 = iNodesInPath2.getINodes();
             final INodeFileUnderConstruction pendingFile2 =
                 (INodeFileUnderConstruction) inodes2[inodes2.length - 1];
@@ -2483,7 +2483,7 @@ public class FSNamesystem
     return (LocatedBlock) additionalBlockHandler.handle(this);
   }
 
-  private INodesInPath analyzeFileState(String src, String clientName,
+  private INodesInPath analyzeFileState(String src, long fileId, String clientName,
       ExtendedBlock previous, LocatedBlock[] onRetryBlock)
       throws IOException {
 
@@ -2500,7 +2500,7 @@ public class FSNamesystem
     final INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, true);
     final INode[] inodes = inodesInPath.getINodes();
     final INodeFileUnderConstruction pendingFile =
-        checkLease(src, clientName, inodes[inodes.length - 1]);
+        checkLease(src, fileId, clientName, inodes[inodes.length - 1]);
     BlockInfo lastBlockInFile = pendingFile.getLastBlock();
     if (!Block.matchingIdAndGenStamp(previousBlock, lastBlockInFile)) {
       // The block that the client claims is the current last block
@@ -2699,26 +2699,34 @@ public class FSNamesystem
   // make sure that we still have the lease on this file.
   private INodeFileUnderConstruction checkLease(String src, String holder)
       throws LeaseExpiredException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    return checkLease(src, holder, true);
+      TransactionContextException, FileNotFoundException {
+    return checkLease(src, INodeDirectory.ROOT_PARENT_ID, holder, true);
   }
+  
   private INodeFileUnderConstruction checkLease(String src, String holder,
       boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
       UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    return checkLease(src, holder, dir.getINode(src), updateLastTwoBlocksInFile);
+      TransactionContextException, FileNotFoundException {
+    return checkLease(src, INodeDirectory.ROOT_PARENT_ID, holder, updateLastTwoBlocksInFile);
+  }
+  
+  private INodeFileUnderConstruction checkLease(String src, int fileId, String holder,
+      boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
+      UnresolvedLinkException, StorageException,
+      TransactionContextException, FileNotFoundException {
+    return checkLease(src, fileId, holder, dir.getINode(src), updateLastTwoBlocksInFile);
   }
 
-  private INodeFileUnderConstruction checkLease(String src, String holder,
+  private INodeFileUnderConstruction checkLease(String src, long fileId, String holder,
       INode file) throws LeaseExpiredException, StorageException,
-      TransactionContextException {
-    return checkLease(src, holder, file, true);
+      TransactionContextException, FileNotFoundException {
+    return checkLease(src, fileId, holder, file, true);
   }
 
-  private INodeFileUnderConstruction checkLease(String src, String holder,
+  private INodeFileUnderConstruction checkLease(String src, long fileId, String holder,
       INode file, boolean updateLastTwoBlocksInFile) throws
       LeaseExpiredException, StorageException,
-      TransactionContextException {
+      TransactionContextException, FileNotFoundException {
     if (file == null || !(file instanceof INodeFile)) {
       Lease lease = leaseManager.getLease(holder);
       throw new LeaseExpiredException(
@@ -2743,6 +2751,7 @@ public class FSNamesystem
     if(updateLastTwoBlocksInFile) {
       pendingFile.updateLastTwoBlocks(leaseManager.getLease(holder), src);
     }
+    INode.checkId(fileId, pendingFile);
     return pendingFile;
   }
 

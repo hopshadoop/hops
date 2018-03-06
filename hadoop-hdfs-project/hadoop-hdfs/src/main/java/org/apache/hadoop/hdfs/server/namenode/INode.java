@@ -28,6 +28,7 @@ import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
+import java.io.FileNotFoundException;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
@@ -124,7 +125,20 @@ public abstract class INode implements Comparable<byte[]> {
   protected boolean subtreeLocked;
   protected long subtreeLockOwner;
 
-
+  public final static int ROOT_PARENT_ID = 0;
+  
+  /**
+   * To check if the request id is the same as saved id. Don't check fileId
+   * with GRANDFATHER_INODE_ID for backward compatibility.
+   */
+  public static void checkId(long requestId, INode inode)
+      throws FileNotFoundException {
+    if (requestId != ROOT_PARENT_ID && requestId != inode.getId()) {
+      throw new FileNotFoundException(
+          "ID mismatch. Request id and saved id: " + requestId + " , "
+          + inode.getId());
+    }
+  }
   
   
   public static class HeaderFormat {

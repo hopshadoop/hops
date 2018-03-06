@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -49,7 +50,16 @@ import java.security.PrivilegedExceptionAction;
 import org.apache.hadoop.hdfs.server.namenode.TestSubtreeLock;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
+import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.io.EnumSetWritable;
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.anyShort;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
@@ -358,6 +368,20 @@ public class TestLease {
     for (int i = 0; i < ugi.length; i++) {
       ugi[i] = UserGroupInformation.createUserForTesting("user" + i, groups);
     }
+
+    Mockito.doReturn(
+        new HdfsFileStatus(0, false, 1, 1024, 0, 0, new FsPermission(
+            (short) 777), "owner", "group", new byte[0], new byte[0],
+            1010, false, (byte) 0)).when(mcp).getFileInfo(anyString());
+    Mockito
+        .doReturn(
+            new HdfsFileStatus(0, false, 1, 1024, 0, 0, new FsPermission(
+                (short) 777), "owner", "group", new byte[0], new byte[0],
+                1010, false, (byte) 0))
+        .when(mcp)
+        .create(anyString(), (FsPermission) anyObject(), anyString(),
+            (EnumSetWritable<CreateFlag>) anyObject(), anyBoolean(),
+            anyShort(), anyLong(), any(EncodingPolicy.class));
 
     final Configuration conf = new Configuration();
     final DFSClient c1 = createDFSClientAs(ugi[0], conf);

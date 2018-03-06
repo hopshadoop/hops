@@ -467,11 +467,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // ClientProtocol
   public LocatedBlock addBlock(String src, String clientName,
-      ExtendedBlock previous, DatanodeInfo[] excludedNodes, String[] favoredNodes) throws IOException {
+      ExtendedBlock previous, DatanodeInfo[] excludedNodes, long fileId, String[] favoredNodes) throws IOException {
 
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug(
-          "*BLOCK* NameNode.addBlock: file " + src + " for " + clientName);
+          "*BLOCK* NameNode.addBlock: file " + src + " fileId=" + fileId + " for " + clientName);
     }
     HashSet<Node> excludedNodesSet = null;
 
@@ -484,7 +484,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     List<String> favoredNodesList = (favoredNodes == null) ? null
         : Arrays.asList(favoredNodes);
     LocatedBlock locatedBlock = namesystem
-        .getAdditionalBlock(src, clientName, previous, excludedNodesSet, favoredNodesList);
+        .getAdditionalBlock(src, fileId, clientName, previous, excludedNodesSet, favoredNodesList);
     if (locatedBlock != null) {
       metrics.incrAddBlockOps();
     }

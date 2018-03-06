@@ -189,7 +189,8 @@ message AddBlockRequestProto {
   required string clientName = 2;
   optional ExtendedBlockProto previous = 3;
   repeated DatanodeInfoProto excludeNodes = 4;
-  repeated string favoredNodes = 5; //the set of datanodes to use for the block
+  optional uint64 fileId = 5 [default = 0];  // default as a bogus id
+  repeated string favoredNodes = 6; //the set of datanodes to use for the block
 }
 
 message AddBlockResponseProto {

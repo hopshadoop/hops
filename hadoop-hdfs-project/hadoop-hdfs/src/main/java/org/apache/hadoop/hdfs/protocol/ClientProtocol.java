@@ -523,6 +523,8 @@ public interface ClientProtocol {
    * @param excludeNodes
    *     a list of nodes that should not be
    *     allocated for the current block
+   * @param fileId the id uniquely identifying a file
+   * 
    * @return LocatedBlock allocated block information.
    * @throws AccessControlException
    *     If access is denied
@@ -541,7 +543,7 @@ public interface ClientProtocol {
    */
   @Idempotent
   public LocatedBlock addBlock(String src, String clientName,
-      ExtendedBlock previous, DatanodeInfo[] excludeNodes, String[] favoredNodes)
+      ExtendedBlock previous, DatanodeInfo[] excludeNodes, long fileId, String[] favoredNodes)
       throws AccessControlException, FileNotFoundException,
       NotReplicatedYetException, SafeModeException, UnresolvedLinkException,
       IOException;

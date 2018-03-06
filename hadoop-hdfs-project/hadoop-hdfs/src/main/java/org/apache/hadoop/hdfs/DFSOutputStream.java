@@ -129,6 +129,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   private volatile boolean closed = false;
 
   private String src;
+   private final long fileId;
   private final long blockSize;
   private final DataChecksum checksum;
   // both dataQueue and ackQueue are protected by dataQueue lock
@@ -1391,7 +1392,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
         while (true) {
           try {
             return dfsClient
-                    .addBlock(src, dfsClient.clientName, block, excludedNodes, favoredNodes);
+                    .addBlock(src, dfsClient.clientName, block, excludedNodes, fileId, favoredNodes);
           } catch (RemoteException e) {
             IOException ue =
                     e.unwrapRemoteException(FileNotFoundException.class,
@@ -1507,16 +1508,16 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     return value;
   }
 
-  private DFSOutputStream(DFSClient dfsClient, String src, long blockSize,
-                          Progressable progress, DataChecksum checksum, short replication, boolean saveSmallFilesInDB,
-                          final int dbFileMaxSize)
+  private DFSOutputStream(DFSClient dfsClient, String src, Progressable progress, HdfsFileStatus stat,
+      DataChecksum checksum, boolean saveSmallFilesInDB,
+      final int dbFileMaxSize)
           throws IOException {
     super(checksum, checksum.getBytesPerChecksum(), checksum.getChecksumSize());
-    int bytesPerChecksum = checksum.getBytesPerChecksum();
     this.dfsClient = dfsClient;
     this.src = src;
-    this.blockSize = blockSize;
-    this.blockReplication = replication;
+    this.fileId = stat.getFileId();
+    this.blockSize = stat.getBlockSize();
+    this.blockReplication = stat.getReplication();
     this.progress = progress;
     this.saveSmallFilesInDB = saveSmallFilesInDB;
     if (saveSmallFilesInDB) {
@@ -1528,6 +1529,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
               .debug("Set non-null progress callback on DFSOutputStream " + src);
     }
 
+    final int bytesPerChecksum = checksum.getBytesPerChecksum();
     if (bytesPerChecksum < 1 || blockSize % bytesPerChecksum != 0) {
       throw new IOException("io.bytes.per.checksum(" + bytesPerChecksum +
               ") and blockSize(" + blockSize +
@@ -1543,13 +1545,12 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   /**
    * Construct a new output stream for creating a file.
    */
-  private DFSOutputStream(DFSClient dfsClient, String src, FsPermission masked,
-                          EnumSet<CreateFlag> flag, boolean createParent, short replication,
-                          long blockSize, Progressable progress, int buffersize,
+  private DFSOutputStream(DFSClient dfsClient, String src, HdfsFileStatus stat,
+                          EnumSet<CreateFlag> flag, Progressable progress,
                           DataChecksum checksum, String[] favoredNodes,
                           EncodingPolicy policy, boolean saveSmallFilesInDB, final int dbFileMaxSize)
           throws IOException {
-    this(dfsClient, src, blockSize, progress, checksum, replication, saveSmallFilesInDB, dbFileMaxSize);
+    this(dfsClient, src, progress, stat, checksum, saveSmallFilesInDB, dbFileMaxSize);
     this.shouldSyncBlock = flag.contains(CreateFlag.SYNC_BLOCK);
 
     if (policy != null) {
@@ -1563,8 +1564,21 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     computePacketChunkSize(dfsClient.getConf().writePacketSize,
             checksum.getBytesPerChecksum());
 
+    streamer = new DataStreamer();
+    if (favoredNodes != null && favoredNodes.length != 0) {
+      streamer.setFavoredNodes(favoredNodes);
+    }
+  }
+  
+  static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
+      FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
+      short replication, long blockSize, Progressable progress, int buffersize,
+      DataChecksum checksum, String[] favoredNodes,
+      EncodingPolicy policy, boolean saveSmallFilesInDB,
+      final int dbFileMaxSize) throws IOException {
+    final HdfsFileStatus stat;
     try {
-      dfsClient.create(src, masked, dfsClient.clientName,
+      stat = dfsClient.create(src, masked, dfsClient.clientName,
           new EnumSetWritable<>(flag), createParent, replication,
               blockSize, policy);
     } catch (RemoteException re) {
@@ -1574,35 +1588,35 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
               NSQuotaExceededException.class, SafeModeException.class,
               UnresolvedPathException.class);
     }
-    streamer = new DataStreamer();
-    if (favoredNodes != null && favoredNodes.length != 0) {
-      streamer.setFavoredNodes(favoredNodes);
-    }
-  }
-
-  static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
-                                            FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
-                                            short replication, long blockSize, Progressable progress, int buffersize,
-                                            DataChecksum checksum, String[] favoredNodes,
-                                            boolean saveSmallFilesInDB, final int dbFileMaxSize) throws IOException {
-    return newStreamForCreate(dfsClient, src, masked, flag, createParent,
-            replication, blockSize, progress, buffersize, checksum, favoredNodes, null, saveSmallFilesInDB, dbFileMaxSize);
-  }
-
-  static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
-                                            FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
-                                            short replication, long blockSize, Progressable progress, int buffersize,
-                                            DataChecksum checksum, String[] favoredNodes,
-                                            EncodingPolicy policy, boolean saveSmallFilesInDB,
-                                            final int dbFileMaxSize) throws IOException {
-    final DFSOutputStream out =
-            new DFSOutputStream(dfsClient, src, masked, flag, createParent,
-                    replication, blockSize, progress, buffersize, checksum, favoredNodes,
-                    policy, saveSmallFilesInDB, dbFileMaxSize);
-    out.streamer.start();
+    final DFSOutputStream out = new DFSOutputStream(dfsClient, src, stat,
+        flag, progress, checksum,favoredNodes, policy,saveSmallFilesInDB, dbFileMaxSize);
+    out.start();
     return out;
   }
 
+//  static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
+//                                            FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
+//                                            short replication, long blockSize, Progressable progress, int buffersize,
+//                                            DataChecksum checksum, String[] favoredNodes,
+//                                            boolean saveSmallFilesInDB, final int dbFileMaxSize) throws IOException {
+//    return newStreamForCreate(dfsClient, src, masked, flag, createParent,
+//            replication, blockSize, progress, buffersize, checksum, favoredNodes, null, saveSmallFilesInDB, dbFileMaxSize);
+//  }
+//
+//  static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
+//                                            FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
+//                                            short replication, long blockSize, Progressable progress, int buffersize,
+//                                            DataChecksum checksum, String[] favoredNodes,
+//                                            EncodingPolicy policy, boolean saveSmallFilesInDB,
+//                                            final int dbFileMaxSize) throws IOException {
+//    final DFSOutputStream out =
+//            new DFSOutputStream(dfsClient, src, masked, flag, createParent,
+//                    replication, blockSize, progress, buffersize, checksum, favoredNodes,
+//                    policy, saveSmallFilesInDB, dbFileMaxSize);
+//    out.streamer.start();
+//    return out;
+//  }
+//
   static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
                                             FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
                                             short replication, long blockSize, Progressable progress, int buffersize,
@@ -1614,12 +1628,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   /**
    * Construct a new output stream for append.
    */
-  private DFSOutputStream(DFSClient dfsClient, String src, int buffersize,
+  private DFSOutputStream(DFSClient dfsClient, String src,
                           Progressable progress, LocatedBlock lastBlock, HdfsFileStatus stat,
                           DataChecksum checksum, boolean saveSmallFilesInDB, final int dbFileMaxSize)
       throws IOException {
-    this(dfsClient, src, stat.getBlockSize(), progress, checksum, stat.getReplication(), saveSmallFilesInDB,
-        dbFileMaxSize);
+    this(dfsClient, src, progress, stat, checksum, saveSmallFilesInDB,  dbFileMaxSize);
 
     initialFileSize = stat.getLen(); // length of file when opened
     if (!stat.isFileStoredInDB()) {
@@ -1627,9 +1640,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     } else {
       isThisFileStoredInDB = true;
     }
-    //
+    
     // The last partial block of the file has to be filled.
-    //
     if (lastBlock != null && !isThisFileStoredInDB) {
       LOG.debug("Stuffed Inode:  appending to a file stored on datanodes");
       // indicate that we are appending to an existing block
@@ -1674,20 +1686,19 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
 
 
     final DFSOutputStream out =
-            new DFSOutputStream(dfsClient, src, buffersize, progress, lastBlock,
+            new DFSOutputStream(dfsClient, src, progress, lastBlock,
                     stat, checksum, saveSmallFilesInDB, dbFileMaxSize);
-    out.streamer.start();
+    out.start();
     return out;
   }
 
   /**
    * Construct a new output stream for a single block.
    */
-  private DFSOutputStream(DFSClient dfsClient, String src, int buffersize,
-                          Progressable progress, LocatedBlock lb, DataChecksum checksum)
+  private DFSOutputStream(DFSClient dfsClient, String src, 
+                          Progressable progress, HdfsFileStatus stat, LocatedBlock lb, DataChecksum checksum)
           throws IOException {
-    this(dfsClient, src, lb.getBlockSize(), progress, checksum,
-            (short) lb.getLocations().length, false, -1);
+    this(dfsClient, src, progress, stat, checksum, false, -1);
     singleBlock = true;
 
     computePacketChunkSize(dfsClient.getConf().writePacketSize,
@@ -1697,11 +1708,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
 
   static DFSOutputStream newStreamForSingleBlock(DFSClient dfsClient,
                                                  String src, int buffersize, Progressable progress, LocatedBlock block,
-                                                 DataChecksum checksum) throws IOException {
+                                                 DataChecksum checksum, HdfsFileStatus stat) throws IOException {
     final DFSOutputStream out =
-            new DFSOutputStream(dfsClient, src, buffersize, progress, block,
+            new DFSOutputStream(dfsClient, src, progress, stat, block, 
                     checksum);
-    out.streamer.start();
+    out.start();
     return out;
   }
 
@@ -2119,6 +2130,9 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     }
   }
 
+  private synchronized void start() {
+    streamer.start();
+  }
   /**
    * Aborts this output stream and releases any system
    * resources associated with this stream.
