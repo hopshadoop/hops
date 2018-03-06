@@ -36,7 +36,7 @@ public class HdfsFileStatus extends FileStatus {
 
   private byte[] path;  // local name of the inode that's encoded in java UTF8
   private byte[] symlink; // symlink target encoded in java UTF8 or null
-
+  
   private final long fileId;
   private boolean isFileStoredInDB;
   private final byte storagePolicy;
@@ -46,8 +46,6 @@ public class HdfsFileStatus extends FileStatus {
   /**
    * Constructor
    *
-   * @param fileid
-   *    the inode id of the file
    * @param length
    *     the number of bytes the file has
    * @param isdir
@@ -68,17 +66,19 @@ public class HdfsFileStatus extends FileStatus {
    *     the group of the path
    * @param path
    *     the local name in java UTF8 encoding the same as that in-memory
+   * @param fileid
+   *    the inode id of the file
    */
-  public HdfsFileStatus(long fileid, long length, boolean isdir, int block_replication,
+  public HdfsFileStatus(long length, boolean isdir, int block_replication,
       long blocksize, long modification_time, long access_time,
       FsPermission permission, String owner, String group, byte[] symlink,
-      byte[] path, boolean isFileStoredInDB, byte storagePolicy) {
+      byte[] path, long fileId, boolean isFileStoredInDB, byte storagePolicy) {
 
     super(length, isdir, block_replication, blocksize, modification_time,
         access_time, permission, owner, group,
         path == null || path.length == 0 ? null : new Path(DFSUtil.bytes2String(path)));
 
-    this.fileId = fileid;
+    this.fileId = fileId;
     this.symlink = symlink;
     this.path = path;
     this.isFileStoredInDB = isFileStoredInDB;

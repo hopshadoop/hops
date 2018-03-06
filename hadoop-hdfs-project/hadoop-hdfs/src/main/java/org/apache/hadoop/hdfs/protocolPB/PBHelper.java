@@ -151,6 +151,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 
 /**
  * Utilities for converting protobuf classes to and from implementation classes
@@ -1173,7 +1174,6 @@ public class PBHelper {
       return null;
     }
     return new HdfsLocatedFileStatus(
-        fs.getFileId(),
         fs.getLength(),
         fs.getFileType().equals(FileType.IS_DIR),
         fs.getBlockReplication(),
@@ -1185,6 +1185,7 @@ public class PBHelper {
         fs.getGroup(),
         fs.getFileType().equals(FileType.IS_SYMLINK) ? fs.getSymlink().toByteArray() : null,
         fs.getPath().toByteArray(),
+        fs.hasFileId()? fs.getFileId(): INodeDirectory.ROOT_PARENT_ID,
         fs.hasLocations() ? PBHelper.convert(fs.getLocations()) : null,
         fs.hasIsFileStoredInDB() ? fs.getIsFileStoredInDB() : false,
         fs.hasStoragePolicy() ? (byte) fs.getStoragePolicy(): BlockStoragePolicySuite.ID_UNSPECIFIED);
@@ -1212,6 +1213,7 @@ public class PBHelper {
         setPermission(PBHelper.convert(fs.getPermission())).
         setOwner(fs.getOwner()).
         setGroup(fs.getGroup()).
+        setFileId(fs.getFileId()).
         setPath(ByteString.copyFrom(fs.getLocalNameInBytes())).
         setIsFileStoredInDB(fs.isFileStoredInDB()).
         setStoragePolicy(fs.getStoragePolicy());

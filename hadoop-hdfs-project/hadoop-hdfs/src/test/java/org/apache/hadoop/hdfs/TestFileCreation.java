@@ -62,6 +62,7 @@ import java.util.logging.Logger;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
+import org.apache.hadoop.hdfs.server.namenode.INode;
 import static org.junit.Assert.*;
 import static org.junit.Assume.assumeTrue;
 
@@ -535,7 +536,7 @@ public class TestFileCreation {
 
       // add one block to the file
       LocatedBlock location = client.getNamenode()
-          .addBlock(file1.toString(), client.clientName, null, null, null);
+          .addBlock(file1.toString(), client.clientName, null, null, INode.ROOT_PARENT_ID, null);
       System.out.println(
           "testFileCreationError2: " + "Added block " + location.getBlock());
 
@@ -590,7 +591,7 @@ public class TestFileCreation {
       createFile(dfs, f, 3);
       try {
         cluster.getNameNodeRpc()
-            .addBlock(f.toString(), client.clientName, null, null, null);
+            .addBlock(f.toString(), client.clientName, null, null, INode.ROOT_PARENT_ID, null);
         fail();
       } catch (IOException ioe) {
         FileSystem.LOG.info("GOOD!", ioe);

@@ -59,7 +59,6 @@ public class INodeDirectory extends INode {
   public final static String ROOT_NAME = "";
 
   public final static int ROOT_ID = 1;
-  public final static int ROOT_PARENT_ID = 0;
   public static final int ROOT_DIR_PARTITION_KEY = ROOT_PARENT_ID;
   public static final short ROOT_DIR_DEPTH =0;
 

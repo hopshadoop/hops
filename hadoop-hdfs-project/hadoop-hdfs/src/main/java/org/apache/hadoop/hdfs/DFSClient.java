@@ -1560,9 +1560,15 @@ public class DFSClient implements java.io.Closeable {
   public DFSOutputStream sendBlock(String src, LocatedBlock block,
       Progressable progress, ChecksumOpt checksumOpt) throws IOException {
     checkOpen();
+    HdfsFileStatus stat = getFileInfo(src);
+    if (stat == null) { // No file found
+      throw new FileNotFoundException(
+          "failed to append to non-existent file " + src + " on client " +
+              clientName);
+    }
     final DFSOutputStream result = DFSOutputStream
         .newStreamForSingleBlock(this, src, dfsClientConf.ioBufferSize,
-            progress, block, dfsClientConf.createChecksum(checksumOpt));
+            progress, block, dfsClientConf.createChecksum(checksumOpt), stat);
     return result;
   }
 
@@ -3074,7 +3080,7 @@ public class DFSClient implements java.io.Closeable {
   }
 
   public LocatedBlock addBlock(final String src, final String clientName,
-      final ExtendedBlock previous, final DatanodeInfo[] excludeNodes, final String[] favoredNodes)
+      final ExtendedBlock previous, final DatanodeInfo[] excludeNodes, final long fileId, final String[] favoredNodes)
       throws AccessControlException, FileNotFoundException,
       NotReplicatedYetException, SafeModeException, UnresolvedLinkException,
       IOException {
@@ -3082,13 +3088,13 @@ public class DFSClient implements java.io.Closeable {
       @Override
       public Object doAction(ClientProtocol namenode)
           throws RemoteException, IOException {
-        return namenode.addBlock(src, clientName, previous, excludeNodes, favoredNodes);
+        return namenode.addBlock(src, clientName, previous, excludeNodes, fileId, favoredNodes);
       }
     };
     return (LocatedBlock) doClientActionWithRetry(handler, "addBlock");
   }
 
-  public void create(final String src, final FsPermission masked,
+  public HdfsFileStatus create(final String src, final FsPermission masked,
       final String clientName, final EnumSetWritable<CreateFlag> flag,
       final boolean createParent, final short replication, final long blockSize)
       throws AccessControlException, AlreadyBeingCreatedException,
@@ -3106,10 +3112,10 @@ public class DFSClient implements java.io.Closeable {
         return null;
       }
     };
-    doClientActionWithRetry(handler, "create");
+    return (HdfsFileStatus) doClientActionWithRetry(handler, "create");
   }
 
-  public void create(final String src, final FsPermission masked,
+  public HdfsFileStatus create(final String src, final FsPermission masked,
       final String clientName, final EnumSetWritable<CreateFlag> flag,
       final boolean createParent, final short replication, final long blockSize,
       final EncodingPolicy policy)
@@ -3122,13 +3128,12 @@ public class DFSClient implements java.io.Closeable {
       @Override
       public Object doAction(ClientProtocol namenode)
           throws RemoteException, IOException {
-        namenode
+        return namenode
             .create(src, masked, clientName, flag, createParent, replication,
                 blockSize, policy);
-        return null;
       }
     };
-    doClientActionWithRetry(handler, "create");
+    return (HdfsFileStatus) doClientActionWithRetry(handler, "create");
   }
 
   public void fsync(final String src, final String client,

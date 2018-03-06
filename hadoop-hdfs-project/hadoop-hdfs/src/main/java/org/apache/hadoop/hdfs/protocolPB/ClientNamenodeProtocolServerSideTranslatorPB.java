@@ -356,11 +356,10 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
         return CreateResponseProto.newBuilder().setFs(PBHelper.convert(result))
             .build();
       }
+      return VOID_CREATE_RESPONSE;
     } catch (IOException e) {
       throw new ServiceException(e);
     }
-
-    return VOID_CREATE_RESPONSE;
   }
   
   @Override
@@ -499,8 +498,8 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       List<String> favor = req.getFavoredNodesList();
       LocatedBlock result = server.addBlock(req.getSrc(), req.getClientName(),
           req.hasPrevious() ? PBHelper.convert(req.getPrevious()) : null,
-          (excl == null || excl.size() == 0) ? null : PBHelper
-              .convert(excl.toArray(new DatanodeInfoProto[excl.size()])),
+          (excl == null || excl.size() == 0) ? null : PBHelper.convert(excl
+              .toArray(new DatanodeInfoProto[excl.size()])), req.getFileId(),
           (favor == null || favor.size() == 0) ? null : favor
               .toArray(new String[favor.size()]));
 

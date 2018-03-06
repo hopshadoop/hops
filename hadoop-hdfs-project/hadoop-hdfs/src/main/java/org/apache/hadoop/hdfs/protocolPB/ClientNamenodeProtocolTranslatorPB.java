@@ -411,12 +411,12 @@ public class ClientNamenodeProtocolTranslatorPB
 
   @Override
   public LocatedBlock addBlock(String src, String clientName,
-      ExtendedBlock previous, DatanodeInfo[] excludeNodes, String[] favoredNodes)
+      ExtendedBlock previous, DatanodeInfo[] excludeNodes, long fileId, String[] favoredNodes)
       throws AccessControlException, FileNotFoundException,
       NotReplicatedYetException, SafeModeException, UnresolvedLinkException,
       IOException {
     AddBlockRequestProto.Builder req =
-        AddBlockRequestProto.newBuilder().setSrc(src).setClientName(clientName);
+        AddBlockRequestProto.newBuilder().setSrc(src).setClientName(clientName).setFileId(fileId);
     if (previous != null) {
       req.setPrevious(PBHelper.convert(previous));
     }

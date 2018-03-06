@@ -2076,7 +2076,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       isStoredInDB = fileNode.isFileStoredInDB();
     }
     // TODO Add encoding status
-    return new HdfsFileStatus(node.getId(),
+    return new HdfsFileStatus(
         size,
         node.isDirectory(),
         replication,
@@ -2088,6 +2088,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         node.getGroupName(),
         node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null,
         path,
+        node.getId(),
         isStoredInDB,
         storagePolicy);
   }
@@ -2127,10 +2128,10 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       }
 
     }
-    return new HdfsLocatedFileStatus(node.getId(), size, node.isDirectory(), replication,
+    return new HdfsLocatedFileStatus(size, node.isDirectory(), replication,
         blocksize, node.getModificationTime(), node.getAccessTime(),
         node.getFsPermission(), node.getUserName(), node.getGroupName(),
-        node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path,
+        node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path,node.getId(),
         loc, isFileStoredInDB, storagePolicy);
   }
 

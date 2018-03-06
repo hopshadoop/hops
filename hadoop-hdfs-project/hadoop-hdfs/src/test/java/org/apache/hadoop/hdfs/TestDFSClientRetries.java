@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs;
 
 import com.google.common.base.Joiner;
+import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -76,14 +77,20 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.fs.CreateFlag;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.io.EnumSetWritable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.anyShort;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -209,7 +216,7 @@ public class TestDFSClientRetries {
    * Verify that client will correctly give up after the specified number
    * of times trying to add a block
    */
-  @SuppressWarnings("serial")
+  @SuppressWarnings({ "serial", "unchecked" })
   @Test
   public void testNotYetReplicatedErrors() throws IOException {
     final String exceptionMsg = "Nope, not replicated yet...";
@@ -236,7 +243,21 @@ public class TestDFSClientRetries {
       }
     };
     when(mockNN.addBlock(anyString(), anyString(), any(ExtendedBlock.class),
-        any(DatanodeInfo[].class),  Mockito.<String[]> any())).thenAnswer(answer);
+        any(DatanodeInfo[].class), anyLong(), Mockito.<String[]> any())).thenAnswer(answer);
+    
+    Mockito.doReturn(
+            new HdfsFileStatus(0, false, 1, 1024, 0, 0, new FsPermission(
+                (short) 777), "owner", "group", new byte[0], new byte[0],
+                1010, false, (byte) 0)).when(mockNN).getFileInfo(anyString());
+    
+    Mockito.doReturn(
+            new HdfsFileStatus(0, false, 1, 1024, 0, 0, new FsPermission(
+                (short) 777), "owner", "group", new byte[0], new byte[0],
+                1010, false, (byte) 0))
+        .when(mockNN)
+        .create(anyString(), (FsPermission) anyObject(), anyString(),
+            (EnumSetWritable<CreateFlag>) anyObject(), anyBoolean(),
+            anyShort(), anyLong(), any(EncodingPolicy.class));
 
     final DFSClient client = new DFSClient(null, mockNN, conf, null);
     OutputStream os = client.create("testfile", true);
@@ -374,7 +395,7 @@ public class TestDFSClientRetries {
           return ret2;
         }
       }).when(spyNN).addBlock(Mockito.anyString(), Mockito.anyString(),
-          Mockito.<ExtendedBlock>any(), Mockito.<DatanodeInfo[]>any(),  Mockito.<String[]> any());
+          Mockito.<ExtendedBlock>any(), Mockito.<DatanodeInfo[]>any(), Mockito.anyLong(), Mockito.<String[]> any());
 
       doAnswer(new Answer<Boolean>() {
 
@@ -415,7 +436,7 @@ public class TestDFSClientRetries {
       // Make sure the mock was actually properly injected.
       Mockito.verify(spyNN, Mockito.atLeastOnce())
           .addBlock(Mockito.anyString(), Mockito.anyString(),
-              Mockito.<ExtendedBlock>any(), Mockito.<DatanodeInfo[]>any(), Mockito.<String[]> any());
+              Mockito.<ExtendedBlock>any(), Mockito.<DatanodeInfo[]>any(), Mockito.anyLong(), Mockito.<String[]> any());
       Mockito.verify(spyNN, Mockito.atLeastOnce())
           .complete(Mockito.anyString(), Mockito.anyString(),
               Mockito.<ExtendedBlock>any(),Mockito.<byte[]>any());

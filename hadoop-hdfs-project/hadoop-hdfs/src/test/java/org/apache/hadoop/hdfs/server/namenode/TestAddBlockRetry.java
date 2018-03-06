@@ -121,7 +121,7 @@ public class TestAddBlockRetry {
         count++;
         if (count == 1) { // run second addBlock()
           LOG.info("Starting second addBlock for " + src);
-          nn.addBlock(src, "clientName", null, null, null);
+          nn.addBlock(src, "clientName", null, null, INode.ROOT_PARENT_ID, null);
           LocatedBlocks lbs = nn.getBlockLocations(src, 0, Long.MAX_VALUE);
           assertEquals("Must be one block", 1, lbs.getLocatedBlocks().size());
           lb2 = lbs.get(0);
@@ -141,7 +141,7 @@ public class TestAddBlockRetry {
 
     // start first addBlock()
     LOG.info("Starting first addBlock for " + src);
-    nn.addBlock(src, "clientName", null, null, null);
+    nn.addBlock(src, "clientName", null, null, INode.ROOT_PARENT_ID, null);
 
     // check locations
     LocatedBlocks lbs = nn.getBlockLocations(src, 0, Long.MAX_VALUE);

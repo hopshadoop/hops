@@ -1121,7 +1121,7 @@ public class NNThroughputBenchmark {
       ExtendedBlock prevBlock = null;
       for (int jdx = 0; jdx < blocksPerFile; jdx++) {
         LocatedBlock loc =
-            nameNodeProto.addBlock(fileName, clientName, prevBlock, null, null);
+            nameNodeProto.addBlock(fileName, clientName, prevBlock, null, INode.ROOT_PARENT_ID, null);
         prevBlock = loc.getBlock();
         for (DatanodeInfo dnInfo : loc.getLocations()) {
           int dnIdx = Arrays.binarySearch(datanodes, dnInfo.getXferAddr());
