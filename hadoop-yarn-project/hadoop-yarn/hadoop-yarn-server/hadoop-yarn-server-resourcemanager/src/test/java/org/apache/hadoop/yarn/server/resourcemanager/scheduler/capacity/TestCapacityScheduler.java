@@ -147,6 +147,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.CapacitySchedule
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.DominantResourceCalculator;
+import org.apache.hadoop.yarn.util.resource.DominantResourceCalculatorGPU;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.junit.After;
 import org.junit.Assert;
@@ -2325,6 +2326,87 @@ public class TestCapacityScheduler {
           attempt1.getAppAttemptId());
     Assert.assertEquals(1, allocResponse.getAllocatedContainers().size());
     Assert.assertEquals(0, report.getNumReservedContainers());
+    rm.stop();
+  }
+
+  // Test to ensure that we don't carry out reservation on nodes
+  // that have no CPU available when using the DominantResourceCalculator
+  @Test(timeout = 30000)
+  public void testAppReservationWithDominantResourceCalculatorGPU() throws Exception {
+    CapacitySchedulerConfiguration csconf =
+            new CapacitySchedulerConfiguration();
+    csconf.setResourceComparator(DominantResourceCalculatorGPU.class);
+
+    YarnConfiguration conf = new YarnConfiguration(csconf);
+    conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
+            ResourceScheduler.class);
+
+    MockRM rm = new MockRM(conf);
+    rm.start();
+
+    MockNM nm1 = rm.registerNode("127.0.0.1:1234", 10 * GB, 4, 0);
+
+    // register extra nodes to bump up cluster resource
+    MockNM nm2 = rm.registerNode("127.0.0.1:1235", 10 * GB, 4, 4);
+
+    RMApp app1 = rm.submitApp(1024);
+    // kick the scheduling
+    nm1.nodeHeartbeat(true);
+    RMAppAttempt attempt1 = app1.getCurrentAppAttempt();
+    MockAM am1 = rm.sendAMLaunched(attempt1.getAppAttemptId());
+    am1.registerAppAttempt();
+    SchedulerNodeReport report_nm1 =
+            rm.getResourceScheduler().getNodeReport(nm1.getNodeId());
+
+    // check node report
+    Assert.assertEquals(1 * GB, report_nm1.getUsedResource().getMemorySize());
+    Assert.assertEquals(9 * GB, report_nm1.getAvailableResource().getMemorySize());
+
+    // add request for containers
+    am1.addRequests(new String[] { "127.0.0.1", "127.0.0.2" }, 1 * GB, 1, 5);
+    am1.getRequests().get(0).getCapability().setGPUs(1);
+    am1.schedule(); // send the request
+
+    // kick the scheduler, container reservation should not happen
+    nm1.nodeHeartbeat(true);
+    Thread.sleep(1000);
+    AllocateResponse allocResponse = am1.schedule();
+    ApplicationResourceUsageReport report =
+            rm.getResourceScheduler().getAppResourceUsageReport(
+                    attempt1.getAppAttemptId());
+    Assert.assertEquals(0, allocResponse.getAllocatedContainers().size());
+    Assert.assertEquals(0, report.getNumReservedContainers());
+
+    // container should get allocated on this node
+    nm1.nodeHeartbeat(true);
+    nm2.nodeHeartbeat(true);
+
+    while (allocResponse.getAllocatedContainers().size() == 0) {
+      Thread.sleep(100);
+      allocResponse = am1.schedule();
+    }
+    report =
+            rm.getResourceScheduler().getAppResourceUsageReport(
+                    attempt1.getAppAttemptId());
+    Assert.assertEquals(4, allocResponse.getAllocatedContainers().size());
+    Assert.assertEquals(nm2.getNodeId(), allocResponse.getAllocatedContainers().get(0).getNodeId());
+    Assert.assertEquals(nm2.getNodeId(), allocResponse.getAllocatedContainers().get(1).getNodeId());
+    Assert.assertEquals(nm2.getNodeId(), allocResponse.getAllocatedContainers().get(2).getNodeId());
+    Assert.assertEquals(nm2.getNodeId(), allocResponse.getAllocatedContainers().get(3).getNodeId());
+    Assert.assertEquals(1, report.getNumReservedContainers());
+    Assert.assertEquals(1, report.getReservedResources().getGPUs());
+
+    report_nm1 =
+            rm.getResourceScheduler().getNodeReport(nm1.getNodeId());
+    SchedulerNodeReport report_nm2 =
+            rm.getResourceScheduler().getNodeReport(nm2.getNodeId());
+
+    Assert.assertEquals(1 * GB, report_nm1.getUsedResource().getMemorySize());
+    Assert.assertEquals(0, report_nm1.getUsedResource().getGPUs());
+
+    Assert.assertEquals(4, report_nm2.getUsedResource().getGPUs());
+    Assert.assertEquals(4 * GB, report_nm2.getUsedResource().getMemorySize());
+
     rm.stop();
   }
 
