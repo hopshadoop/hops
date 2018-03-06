@@ -189,7 +189,7 @@ The following provides more details on the included cryptographic software: Hado
 
 <ul>
 <li><a href="https://twitter.com/hopshadoop">Follow our Twitter account.</a></li>
-<li><a href="https://gitter.im/hopshadoop/hops">Chat with Hops developers in Gitter.</a></li>
+<li><a href="https://gitter.im/hopshadoop/hopsworks">Chat with Hops developers in Gitter.</a></li>
 <li><a href="https://groups.google.com/forum/#!forum/hopshadoop">Join our developer mailing list.</a></li>
 <li><a href="https://cloud17.sics.se/jenkins/view/develop/">Checkout the current build status.</a></li>
 </ul>
