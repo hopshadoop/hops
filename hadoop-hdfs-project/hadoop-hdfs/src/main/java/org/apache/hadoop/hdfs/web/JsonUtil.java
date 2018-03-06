@@ -279,7 +279,7 @@ public class JsonUtil {
         DFSUtil.string2Bytes((String) m.get("symlink"));
 
     final long fileId = m.containsKey("fileId") ?
-        (Long) m.get("fileId") : -1;
+        (Long) m.get("fileId") : INode.ROOT_PARENT_ID;
     final long len = (Long) m.get("length");
     final String owner = (String) m.get("owner");
     final String group = (String) m.get("group");
