@@ -147,7 +147,15 @@ public class TestDataTransferKeepalive {
       stm.read();
       assertXceiverCount(1);
 
-      Thread.sleep(WRITE_TIMEOUT + 1000);
+      // Poll for 0 running xceivers.  Allow up to 5 seconds for some slack.
+      long totalSleepTime = 0;
+      long sleepTime = WRITE_TIMEOUT + 100;
+      while (getXceiverCountWithoutServer() > 0 && totalSleepTime < 5000) {
+        Thread.sleep(sleepTime);
+        totalSleepTime += sleepTime;
+        sleepTime = 100;
+      }
+
       // DN should time out in sendChunks, and this should force
       // the xceiver to exit.
       assertXceiverCount(0);
@@ -204,5 +212,15 @@ public class TestDataTransferKeepalive {
       fail("Expected " + expected + " xceivers, found " +
           count);
     }
+  }
+  
+  /**
+   * Returns the datanode's xceiver count, but subtracts 1, since the
+   * DataXceiverServer counts as one.
+   * 
+   * @return int xceiver count, not including DataXceiverServer
+   */
+  private int getXceiverCountWithoutServer() {
+    return dn.getXceiverCount() - 1;
   }
 }
