@@ -437,6 +437,11 @@ public class RegularContainerAllocator extends AbstractContainerAllocator {
           + " node total capability : " + node.getTotalResource());
       // Skip this locality request
       return ContainerAllocation.LOCALITY_SKIPPED;
+    } else if(node.getTotalResource().getGPUs() < capability.getGPUs()) {
+      LOG.warn("Node : " + node.getNodeID()
+              + " does not have sufficient resource for request : " + request
+              + " node total capability : " + node.getTotalResource());
+      return ContainerAllocation.LOCALITY_SKIPPED;
     }
 
     boolean shouldAllocOrReserveNewContainer = shouldAllocOrReserveNewContainer(

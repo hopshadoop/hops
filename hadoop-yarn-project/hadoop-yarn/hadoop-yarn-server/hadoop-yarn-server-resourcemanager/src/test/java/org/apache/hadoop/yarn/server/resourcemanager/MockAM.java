@@ -144,6 +144,10 @@ public class MockAM {
     requests.addAll(createReq(hosts, memory, priority, containers));
   }
 
+  public List<ResourceRequest> getRequests() {
+    return requests;
+  }
+
   public AllocateResponse schedule() throws Exception {
     AllocateResponse response = allocate(requests, releases);
     requests.clear();
