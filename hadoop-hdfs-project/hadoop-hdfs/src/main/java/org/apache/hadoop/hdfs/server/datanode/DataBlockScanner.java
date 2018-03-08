@@ -266,7 +266,10 @@ public class DataBlockScanner implements Runnable {
   }
   
   public synchronized void removeBlockPool(String blockPoolId) {
-    blockPoolScannerMap.remove(blockPoolId);
+    BlockPoolSliceScanner bpss = blockPoolScannerMap.remove(blockPoolId);
+    if (bpss != null) {
+      bpss.shutdown();
+    }
     LOG.info("Removed bpid=" + blockPoolId + " from blockPoolScannerMap");
   }
   
