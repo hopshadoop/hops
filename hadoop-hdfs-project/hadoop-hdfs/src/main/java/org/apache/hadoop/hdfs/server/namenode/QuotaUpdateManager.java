@@ -42,6 +42,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Daemon that is asynchronously updating the quota counts of directories.
@@ -275,7 +276,7 @@ public class QuotaUpdateManager {
               " and diskspace delta " + diskspaceDelta);
         }
 
-        if (dir != null && dir.getId() != INodeDirectory.ROOT_ID) {
+        if (dir != null && dir.getId() != INodeDirectory.ROOT_INODE_ID) {
           QuotaUpdate parentUpdate =
               new QuotaUpdate(nextId(), dir.getParentId(), namespaceDelta,
                   diskspaceDelta);

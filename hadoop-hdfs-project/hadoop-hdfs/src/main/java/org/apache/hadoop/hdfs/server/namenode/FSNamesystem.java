@@ -820,10 +820,11 @@ public class FSNamesystem
    *
    * @throws IOException
    */
-  void setPermissionSTO(final String src, final FsPermission permission)
+  void setPermissionSTO(final String src1, final FsPermission permission)
       throws
       IOException {
-
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     boolean txFailed = true;
     INodeIdentifier inode = null;
     try {
@@ -891,9 +892,11 @@ public class FSNamesystem
    *
    * @throws IOException
    */
-  void setPermission(final String src, final FsPermission permission)
+  void setPermission(final String src1, final FsPermission permission)
       throws
       IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_PERMISSION, src) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -934,10 +937,11 @@ public class FSNamesystem
    *
    * @throws IOException
    */
-  void setOwnerSTO(final String src, final String username, final String group)
+  void setOwnerSTO(final String src1, final String username, final String group)
       throws
       IOException {
-
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     boolean txFailed = true;
     INodeIdentifier inode = null;;
     try{
@@ -1040,9 +1044,11 @@ public class FSNamesystem
       IOException {
     HdfsFileStatus resultingStat;
     FSPermissionChecker pc = getPermissionChecker();
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src);
     if (isInSafeMode()) {
       throw new SafeModeException("Cannot set owner for " + src, safeMode);
     }
+    src = FSDirectory.resolvePath(src, pathComponents, dir);
     checkOwner(pc, src);
     if (!pc.isSuperUser()) {
       if (username != null && !pc.getUser().equals(username)) {
@@ -1079,8 +1085,10 @@ public class FSNamesystem
     }
   }
 
-  LocatedBlocks getBlockLocationsWithLock(final String clientMachine, final String src,
+  LocatedBlocks getBlockLocationsWithLock(final String clientMachine, final String src1,
                                           final long offset, final long length, final INodeLockType lockType) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler getBlockLocationsHandler =
             new HopsTransactionalRequestHandler(
                     HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
@@ -1126,10 +1134,12 @@ public class FSNamesystem
    *     UnresolvedLinkException, IOException
    * @see ClientProtocol#getBlockLocations(String, long, long)
    */
-  public LocatedBlocks getBlockLocations(final String src, final long offset,
+  public LocatedBlocks getBlockLocations(final String src1, final long offset,
       final long length, final boolean doAccessTime,
       final boolean needBlockToken, final boolean checkSafeMode)
       throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler getBlockLocationsHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
@@ -1171,18 +1181,6 @@ public class FSNamesystem
     }
   }
 
-  public boolean isFileCorrupt(final String filePath) throws IOException {
-    LocatedBlocks blocks =
-        getBlockLocationsInternal(filePath, 0, Long.MAX_VALUE, true, true,
-            true);
-    for (LocatedBlock b : blocks.getLocatedBlocks()) {
-      if (b.isCorrupt() ||
-          (b.getLocations().length == 0 && b.getBlockSize() > 0)) {
-        return true;
-      }
-    }
-    return false;
-  }
 
   private LocatedBlocks getBlockLocationsInt(FSPermissionChecker pc, String src,
       long offset, long length, boolean doAccessTime, boolean needBlockToken,
@@ -1263,12 +1261,10 @@ public class FSNamesystem
   private LocatedBlocks getBlockLocationsUpdateTimes(String src, long offset,
       long length, boolean doAccessTime, boolean needBlockToken)
       throws IOException {
-
       // if the namenode is in safe mode, then do not update access time
       if (isInSafeMode()) {
         doAccessTime = false;
       }
-
       long now = now();
       final INodeFile inode = INodeFile.valueOf(dir.getINode(src), src);
       if (doAccessTime && isAccessTimeSupported()) {
@@ -1284,6 +1280,7 @@ public class FSNamesystem
    * To avoid rollbacks we will verify validity of ALL of the args
    * before we start actual move.
    *
+   * This does not support ".inodes" relative path
    * @param target
    * @param srcs
    * @throws IOException
@@ -1478,8 +1475,10 @@ public class FSNamesystem
    * The access time is precise up to an hour. The transaction, if needed, is
    * written to the edits log but is not flushed.
    */
-  void setTimes(final String src, final long mtime, final long atime)
+  void setTimes(final String src1, final long mtime, final long atime)
       throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_TIMES, src) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -1528,9 +1527,11 @@ public class FSNamesystem
   /**
    * Create a symbolic link.
    */
-  void createSymlink(final String target, final String link,
+  void createSymlink(final String target, final String link1,
       final PermissionStatus dirPerms, final boolean createParent)
       throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(link1);
+    final String link = FSDirectory.resolvePath(link1, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.CREATE_SYM_LINK,
         link) {
       @Override
@@ -1579,6 +1580,9 @@ public class FSNamesystem
     if (isInSafeMode()) {
       throw new SafeModeException("Cannot create symlink " + link, safeMode);
     }
+    if (FSDirectory.isReservedName(target)) {
+      throw new InvalidPathException("Invalid target name: " + target);
+    }
     if (!DFSUtil.isValidName(link)) {
       throw new InvalidPathException("Invalid file name: " + link);
     }
@@ -1611,8 +1615,10 @@ public class FSNamesystem
    * false if file does not exist or is a directory
    * @see ClientProtocol#setReplication(String, short)
    */
-  boolean setReplication(final String src, final short replication)
+  boolean setReplication(final String src1, final short replication)
       throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler setReplicationHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.SET_REPLICATION,
             src) {
@@ -1813,7 +1819,9 @@ public class FSNamesystem
     return blockManager.getStoragePolicies();
   }
 
-  long getPreferredBlockSize(final String filename) throws IOException {
+  long getPreferredBlockSize(final String filename1) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(filename1);
+    final String filename = FSDirectory.resolvePath(filename1, pathComponents, dir);
     HopsTransactionalRequestHandler getPreferredBlockSizeHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_PREFERRED_BLOCK_SIZE, filename) {
@@ -1861,10 +1869,12 @@ public class FSNamesystem
    * For description of parameters and exceptions thrown see
    * {@link ClientProtocol#create}
    */
-  HdfsFileStatus startFile(final String src, final PermissionStatus permissions,
+  HdfsFileStatus startFile(final String src1, final PermissionStatus permissions,
       final String holder, final String clientMachine,
       final EnumSet<CreateFlag> flag, final boolean createParent,
       final short replication, final long blockSize) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     return (HdfsFileStatus) new HopsTransactionalRequestHandler(
         HDFSOperationType.START_FILE, src) {
       @Override
@@ -1941,9 +1951,6 @@ public class FSNamesystem
               ", clientMachine=" + clientMachine + ", createParent=" +
               createParent + ", replication=" + replication + ", createFlag=" +
               flag.toString());
-    }
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot create file" + src, safeMode);
     }
     if (!DFSUtil.isValidName(src)) {
       throw new InvalidPathException(src);
@@ -2099,8 +2106,10 @@ public class FSNamesystem
    * @return true if the file is already closed
    * @throws IOException
    */
-  boolean recoverLease(final String src, final String holder,
+  boolean recoverLease(final String src1, final String holder,
       final String clientMachine) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler recoverLeaseHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.RECOVER_LEASE,
             src) {
@@ -2269,8 +2278,10 @@ public class FSNamesystem
     return newConf;
   }
 
-  private LocatedBlock appendFileHopFS(final String src, final String holder,
+  private LocatedBlock appendFileHopFS(final String src1, final String holder,
       final String clientMachine) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler appendFileHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.APPEND_FILE,
             src) {
@@ -2340,6 +2351,11 @@ public class FSNamesystem
   private LocatedBlock appendFileInt(String src, String holder,
       String clientMachine) throws
       IOException {
+    if (NameNode.stateChangeLog.isDebugEnabled()) {
+      NameNode.stateChangeLog.debug("DIR* NameSystem.appendFile: src=" + src
+          + ", holder=" + holder
+          + ", clientMachine=" + clientMachine);
+    }
     if (!supportAppends) {
       throw new UnsupportedOperationException(
           "Append is not enabled on this NameNode. Use the " +
@@ -2376,9 +2392,11 @@ public class FSNamesystem
    * are replicated.  Will return an empty 2-elt array if we want the
    * client to "try again later".
    */
-  LocatedBlock getAdditionalBlock(final String src, final long fileId, final String clientName,
+  LocatedBlock getAdditionalBlock(final String src1, final long fileId, final String clientName,
       final ExtendedBlock previous, final Set<Node> excludedNodes,
       final List<String> favoredNodes) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler additionalBlockHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_ADDITIONAL_BLOCK, src) {
@@ -2607,10 +2625,12 @@ public class FSNamesystem
   /**
    * @see ClientProtocol#getAdditionalDatanode(String, ExtendedBlock, DatanodeInfo[], String[], DatanodeInfo[], int, String)
    */
-  LocatedBlock getAdditionalDatanode(final String src, final ExtendedBlock blk,
+  LocatedBlock getAdditionalDatanode(final String src1, final ExtendedBlock blk,
       final DatanodeInfo[] existings, final String[] storageIDs,
       final HashSet<Node> excludes, final int numAdditionalNodes,
       final String clientName) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler getAdditionalDatanodeHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_ADDITIONAL_DATANODE, src) {
@@ -2666,8 +2686,10 @@ public class FSNamesystem
   /**
    * The client would like to let go of the given block
    */
-  boolean abandonBlock(final ExtendedBlock b, final String src,
+  boolean abandonBlock(final ExtendedBlock b, final String src1,
       final String holder) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler abandonBlockHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.ABANDON_BLOCK,
             src) {
@@ -2781,8 +2803,10 @@ public class FSNamesystem
    * @throws IOException
    *     on error (eg lease mismatch, file not open, file deleted)
    */
-  boolean completeFile(final String src, final String holder,
+  boolean completeFile(final String src1, final String holder,
       final ExtendedBlock last, final byte[] data) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler completeFileHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.COMPLETE_FILE, src) {
           @Override
@@ -3011,8 +3035,10 @@ public class FSNamesystem
    * @see ClientProtocol#delete(String, boolean) for detailed descriptoin and
    * description of exceptions
    */
-  public boolean deleteWithTransaction(final String src,
+  public boolean deleteWithTransaction(final String src1,
       final boolean recursive) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler deleteHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.DELETE, src) {
           @Override
@@ -3164,8 +3190,10 @@ public class FSNamesystem
    * @throws UnresolvedLinkException
    *     if a symlink is encountered.
    */
-  public HdfsFileStatus getFileInfo(final String src, final boolean resolveLink)
+  public HdfsFileStatus getFileInfo(final String src1, final boolean resolveLink)
       throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler getFileInfoHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.GET_FILE_INFO,
             src) {
@@ -3204,8 +3232,10 @@ public class FSNamesystem
   /**
    * Create all the necessary directories
    */
-  boolean mkdirs(final String src, final PermissionStatus permissions,
+  boolean mkdirs(final String src1, final PermissionStatus permissions,
       final boolean createParent) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     final boolean resolvedLink = false;
     HopsTransactionalRequestHandler mkdirsHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.MKDIRS, src) {
@@ -3711,9 +3741,11 @@ public class FSNamesystem
    * @throws IOException
    *     if other I/O error occurred
    */
-  DirectoryListing getListing(final String src, final byte[] startAfter,
+  DirectoryListing getListing(final String src1, final byte[] startAfter,
       final boolean needLocation)
       throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler getListingHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.GET_LISTING,
             src) {
@@ -6068,6 +6100,7 @@ public class FSNamesystem
    * The subtree is locked during these operations in order to prevent any
    * concurrent modification.
    *
+   * Note: This does not support ".inodes" relative path.
    * @param path
    *    the path of the directory where the quota should be set
    * @param nsQuota
@@ -6076,11 +6109,11 @@ public class FSNamesystem
    *    the diskspace quota to be set
    * @throws IOException, UnresolvedLinkException
    */
-  void multiTransactionalSetQuota(final String path, final long nsQuota,
+  void multiTransactionalSetQuota(final String path1, final long nsQuota,
       final long dsQuota) throws IOException {
     checkSuperuserPrivilege();
     if (isInSafeMode()) {
-      throw new SafeModeException("Cannot set quota on " + path, safeMode);
+      throw new SafeModeException("Cannot set quota on " + path1, safeMode);
     }
     if (!isLeader()) {
       throw new RuntimeException("Asked non leading node to setQuota");
@@ -6088,8 +6121,9 @@ public class FSNamesystem
 
     INodeIdentifier subtreeRoot;
     boolean removeSTOLock = false;
-
-    try {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
+    final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
+    try {      
       PathInformation pathInfo = getPathExistingINodesFromDB(path,
           false, null, null, null, null);
       INode lastComp = pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1];
@@ -6176,10 +6210,11 @@ public class FSNamesystem
   // I have removed sub tree locking from the content summary for now
   // TODO : fix content summary sub tree locking
   //
-  private ContentSummary multiTransactionalGetContentSummary(final String path)
+  private ContentSummary multiTransactionalGetContentSummary(final String path1)
       throws
       IOException {
-
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
+    final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
       PathInformation pathInfo = getPathExistingINodesFromDB(path,
               false, null, null, null, null);
       if(pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1] == null){
@@ -6218,8 +6253,12 @@ public class FSNamesystem
    *    the destination
    * @throws IOException
    */
-  void multiTransactionalRename(final String src, final String dst,
+  void multiTransactionalRename(final String src1, final String dst1,
       final Options.Rename... options) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
+    final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug(
           "DIR* NameSystem.multiTransactionalRename: with options - " + src
@@ -6405,12 +6444,16 @@ public class FSNamesystem
     return null;
   }
 
-  private void renameTo(final String src, final String dst, final INode.DirCounts srcCounts,
+  private void renameTo(final String src1, final String dst1, final INode.DirCounts srcCounts,
       final INode.DirCounts dstCounts, final boolean isUsingSubTreeLocks, final String subTreeLockDst,
       final Collection<MetadataLogEntry> logEntries,
       final Options.Rename... options
   )
       throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
+    final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
     new HopsTransactionalRequestHandler(
         isUsingSubTreeLocks?HDFSOperationType.SUBTREE_RENAME:
             HDFSOperationType.RENAME, src) {
@@ -6509,8 +6552,12 @@ public class FSNamesystem
   }
 
   @Deprecated
-  boolean multiTransactionalRename(final String src, final String dst)
+  boolean multiTransactionalRename(final String src1, final String dst1)
       throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
+    final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug(
           "DIR* NameSystem.multiTransactionalRename: with options - " + src +
@@ -6655,10 +6702,14 @@ public class FSNamesystem
    * instead.
    */
   @Deprecated
-  boolean renameTo(final String src, final String dst, final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
+  boolean renameTo(final String src1, final String dst1, final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
       final boolean isUsingSubTreeLocks, final String subTreeLockDst,
       final Collection<MetadataLogEntry> logEntries)
       throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
+    final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
     HopsTransactionalRequestHandler renameToHandler =
         new HopsTransactionalRequestHandler(
             isUsingSubTreeLocks ? HDFSOperationType.SUBTREE_DEPRICATED_RENAME :
@@ -6749,8 +6800,10 @@ public class FSNamesystem
     return ret;
   }
 
-  private boolean multiTransactionalDeleteInternal(final String path,
+  private boolean multiTransactionalDeleteInternal(final String path1,
       final boolean recursive) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
+    final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
     if (isInSafeMode()) {
       throw new SafeModeException("Cannot delete " + path, safeMode);
     }
@@ -6827,7 +6880,7 @@ public class FSNamesystem
   }
 
   private boolean deleteTreeLevel(final String subtreeRootPath,
-      final AbstractFileTree.FileTree fileTree, int level) {
+      final AbstractFileTree.FileTree fileTree, int level) throws TransactionContextException, IOException {
     ArrayList<Future> barrier = new ArrayList<>();
 
      for (final ProjectedINode dir : fileTree.getDirsByLevel(level)) {
@@ -6865,7 +6918,10 @@ public class FSNamesystem
     return result;
   }
 
-  private Future multiTransactionDeleteInternal(final String path){
+  private Future multiTransactionDeleteInternal(final String path1) throws StorageException, TransactionContextException,
+      IOException {
+   byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
+   final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
    return  subtreeOperationsExecutor.submit(new Callable<Boolean>() {
         @Override
         public Boolean call() throws Exception {

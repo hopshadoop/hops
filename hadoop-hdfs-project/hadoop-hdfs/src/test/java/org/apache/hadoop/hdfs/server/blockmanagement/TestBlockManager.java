@@ -526,8 +526,8 @@ public class TestBlockManager {
                 new FsPermission((short) 0777)), null, (short) 3,
                 System.currentTimeMillis(), System.currentTimeMillis(), 1000l, (byte) 0);
             file.setLocalNameNoPersistance("hop");
-            file.setParentIdNoPersistance(INodeDirectory.ROOT_ID);
-            file.setPartitionIdNoPersistance(INodeDirectory.ROOT_ID);
+            file.setParentIdNoPersistance(INodeDirectory.ROOT_INODE_ID);
+            file.setPartitionIdNoPersistance(INodeDirectory.ROOT_INODE_ID);
             List<INode> newed = new ArrayList<>();
             newed.add(file);
             INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory

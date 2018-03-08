@@ -198,7 +198,7 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
 
   public static INodeDirectoryWithQuota createRootDir(
       PermissionStatus permissions) throws IOException {
-    INodeDirectoryWithQuota newRootINode = new INodeDirectoryWithQuota(ROOT_ID, ROOT_NAME, permissions);
+    INodeDirectoryWithQuota newRootINode = new INodeDirectoryWithQuota(ROOT_INODE_ID, ROOT_NAME, permissions);
     newRootINode.inTree();
     newRootINode.setParentIdNoPersistance(ROOT_PARENT_ID);
     newRootINode.setPartitionIdNoPersistance(getRootDirPartitionKey());
@@ -208,7 +208,7 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
   public static INodeDirectoryWithQuota getRootDir()
       throws StorageException, TransactionContextException {
     INode inode = EntityManager
-        .find(INode.Finder.ByINodeIdFTIS, ROOT_ID);
+        .find(INode.Finder.ByINodeIdFTIS, ROOT_INODE_ID);
     return (INodeDirectoryWithQuota) inode;
   }
   
