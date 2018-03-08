@@ -45,8 +45,10 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    * Block state. See {@link BlockUCState}
    */
   private BlockUCState blockUCState;
+
   /**
-   * A data-node responsible for block recovery.
+   * Index of the primary data node doing the recovery. Useful for log
+   * messages.
    */
   private int primaryNodeIndex = -1;
   /**
@@ -186,19 +188,45 @@ public class BlockInfoUnderConstruction extends BlockInfo {
               " No blocks found, lease removed.");
     }
 
-    int previous = primaryNodeIndex;
-    for (int i = 1; i <= replicas.size(); i++) {
-      int j = (previous + i) % replicas.size();
-      ReplicaUnderConstruction replica = replicas.get(j);
-      DatanodeDescriptor primary =
-          datanodeMgr.getDatanodeBySid(replica.getStorageId());
-      if (primary.isAlive) {
-        primaryNodeIndex = j;
-        primary.addBlockToBeRecovered(this);
-        NameNode.blockStateChangeLog
-            .info("BLOCK* " + this + " recovery started, primary=" + primary);
-        return;
+    boolean allLiveReplicasTriedAsPrimary = true;
+    for (int i = 0; i < replicas.size(); i++) {
+      // Check if all replicas have been tried or not.
+      ReplicaUnderConstruction replica = replicas.get(i);
+      DatanodeDescriptor dn = datanodeMgr.getDatanodeBySid(replica.getStorageId());
+      if (dn !=null && dn.isAlive) {
+        allLiveReplicasTriedAsPrimary = (allLiveReplicasTriedAsPrimary && replicas.get(i).getChosenAsPrimary());
       }
+    }
+    if (allLiveReplicasTriedAsPrimary) {
+      // Just set all the replicas to be chosen whether they are alive or not.
+      for (int i = 0; i < replicas.size(); i++) {
+        replicas.get(i).setChosenAsPrimary(false);
+      }
+    }
+    long mostRecentLastUpdate = 0;
+    ReplicaUnderConstruction primary = null;
+    DatanodeDescriptor primaryDn = null;
+    primaryNodeIndex = -1;
+    for (int i = 0; i < replicas.size(); i++) {
+      // Skip alive replicas which have been chosen for recovery.
+      ReplicaUnderConstruction replica = replicas.get(i);
+      DatanodeDescriptor dn = datanodeMgr.getDatanodeBySid(replica.getStorageId());
+      if (!(dn!= null && dn.isAlive && !replicas.get(i).getChosenAsPrimary())) {
+        continue;
+      }
+      if (dn.getLastUpdate() > mostRecentLastUpdate) {
+        primary = replicas.get(i);
+        primaryNodeIndex = i;
+        primaryDn = dn;
+        mostRecentLastUpdate = primaryDn.getLastUpdate();
+      }
+    }
+    if (primary != null) {
+      primaryDn.addBlockToBeRecovered(this);
+      primary.setChosenAsPrimary(true);
+      update(primary);
+      NameNode.blockStateChangeLog.info("BLOCK* " + this
+          + " recovery started, primary=" + primary);
     }
   }
   

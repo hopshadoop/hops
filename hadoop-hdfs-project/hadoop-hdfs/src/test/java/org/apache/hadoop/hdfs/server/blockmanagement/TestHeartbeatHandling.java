@@ -17,10 +17,14 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.common.INodeUtil;
+import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
+import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
@@ -45,8 +49,8 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
-import static io.hops.transaction.lock.LockFactory.getInstance;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -138,5 +142,156 @@ public class TestHeartbeatHandling {
     } finally {
       cluster.shutdown();
     }
+  }
+  
+  /**
+   * Test if
+   * {@link FSNamesystem#handleHeartbeat}
+   * correctly selects data node targets for block recovery.
+   */
+  @Test
+  public void testHeartbeatBlockRecovery() throws Exception {
+    final Configuration conf = new HdfsConfiguration();
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    try {
+      cluster.waitActive();
+      final FSNamesystem namesystem = cluster.getNamesystem();
+      final HeartbeatManager hm = namesystem.getBlockManager().getDatanodeManager().getHeartbeatManager();
+      final String poolId = namesystem.getBlockPoolId();
+      final DatanodeRegistration nodeReg1 = DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(0),
+          poolId);
+      final DatanodeDescriptor dd1 = NameNodeAdapter.getDatanode(namesystem, nodeReg1);
+      final DatanodeRegistration nodeReg2 = DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(1),
+          poolId);
+      final DatanodeDescriptor dd2 = NameNodeAdapter.getDatanode(namesystem, nodeReg2);
+      final DatanodeRegistration nodeReg3 = DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(2),
+          poolId);
+      final DatanodeDescriptor dd3 = NameNodeAdapter.getDatanode(namesystem, nodeReg3);
+
+      try {
+        synchronized (hm) {
+          NameNodeAdapter.sendHeartBeat(nodeReg1, dd1, namesystem);
+          NameNodeAdapter.sendHeartBeat(nodeReg2, dd2, namesystem);
+          NameNodeAdapter.sendHeartBeat(nodeReg3, dd3, namesystem);
+
+          // Test with all alive nodes.
+          dd1.setLastUpdate(System.currentTimeMillis());
+          dd2.setLastUpdate(System.currentTimeMillis());
+          dd3.setLastUpdate(System.currentTimeMillis());
+          final DatanodeStorageInfo[] storages = {
+            dd1.getStorageInfos()[0],
+            dd2.getStorageInfos()[0],
+            dd3.getStorageInfos()[0]};
+          BlockInfoUnderConstruction blockInfo = createBlockInfoUnderConstruction(storages);
+          dd1.addBlockToBeRecovered(blockInfo);
+          DatanodeCommand[] cmds = NameNodeAdapter.sendHeartBeat(nodeReg1, dd1, namesystem).getCommands();
+          assertEquals(1, cmds.length);
+          assertEquals(DatanodeProtocol.DNA_RECOVERBLOCK, cmds[0].getAction());
+          BlockRecoveryCommand recoveryCommand = (BlockRecoveryCommand) cmds[0];
+          assertEquals(1, recoveryCommand.getRecoveringBlocks().size());
+          DatanodeInfo[] recoveringNodes = recoveryCommand.getRecoveringBlocks()
+              .toArray(new BlockRecoveryCommand.RecoveringBlock[0])[0].getLocations();
+          assertEquals(3, recoveringNodes.length);
+          List<DatanodeInfo> dds = new ArrayList<>();
+          dds.add(dd1);
+          dds.add(dd2);
+          dds.add(dd3);
+          for(DatanodeInfo di: recoveringNodes){
+            dds.remove(di);
+          }
+          assertEquals(dds.size(), 0);
+
+          // Test with one stale node.
+          dd1.setLastUpdate(System.currentTimeMillis());
+          // More than the default stale interval of 30 seconds.
+          dd2.setLastUpdate(System.currentTimeMillis() - 40 * 1000);
+          dd3.setLastUpdate(System.currentTimeMillis());
+          blockInfo = createBlockInfoUnderConstruction(storages);
+          dd1.addBlockToBeRecovered(blockInfo);
+          cmds = NameNodeAdapter.sendHeartBeat(nodeReg1, dd1, namesystem).getCommands();
+          assertEquals(1, cmds.length);
+          assertEquals(DatanodeProtocol.DNA_RECOVERBLOCK, cmds[0].getAction());
+          recoveryCommand = (BlockRecoveryCommand) cmds[0];
+          assertEquals(1, recoveryCommand.getRecoveringBlocks().size());
+          recoveringNodes = recoveryCommand.getRecoveringBlocks()
+              .toArray(new BlockRecoveryCommand.RecoveringBlock[0])[0].getLocations();
+          assertEquals(2, recoveringNodes.length);
+          // dd2 is skipped.
+          dds = new ArrayList<>();
+          dds.add(dd1);
+          dds.add(dd3);
+          for(DatanodeInfo di: recoveringNodes){
+            dds.remove(di);
+          }
+          assertEquals(dds.size(), 0);
+
+          // Test with all stale node.
+          dd1.setLastUpdate(System.currentTimeMillis() - 60 * 1000);
+          // More than the default stale interval of 30 seconds.
+          dd2.setLastUpdate(System.currentTimeMillis() - 40 * 1000);
+          dd3.setLastUpdate(System.currentTimeMillis() - 80 * 1000);
+          blockInfo = createBlockInfoUnderConstruction(storages);
+          dd1.addBlockToBeRecovered(blockInfo);
+          cmds = NameNodeAdapter.sendHeartBeat(nodeReg1, dd1, namesystem).getCommands();
+          assertEquals(1, cmds.length);
+          assertEquals(DatanodeProtocol.DNA_RECOVERBLOCK, cmds[0].getAction());
+          recoveryCommand = (BlockRecoveryCommand) cmds[0];
+          assertEquals(1, recoveryCommand.getRecoveringBlocks().size());
+          recoveringNodes = recoveryCommand.getRecoveringBlocks()
+              .toArray(new BlockRecoveryCommand.RecoveringBlock[0])[0].getLocations();
+          // Only dd1 is included since it heart beated and hence its not stale
+          // when the list of recovery blocks is constructed.
+          assertEquals(3, recoveringNodes.length);
+          dds = new ArrayList<>();
+          dds.add(dd1);
+          dds.add(dd2);
+          dds.add(dd3);
+          for(DatanodeInfo di: recoveringNodes){
+            dds.remove(di);
+          }
+          assertEquals(dds.size(), 0);
+        }
+      } finally {
+      }
+    } finally {
+      cluster.shutdown();
+    }
+  }
+  
+  private BlockInfoUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages) throws
+      IOException {
+    return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
+        HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
+      INodeIdentifier inodeIdentifier = new INodeIdentifier(3);
+
+      @Override
+      public void setUp() throws StorageException {
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(
+            lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
+            .add(
+                lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+            .add(lf.getBlockLock(10, inodeIdentifier))
+            .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
+                LockFactory.BLK.UR));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        Block block = new Block(10, 0, GenerationStamp.LAST_RESERVED_STAMP);
+        EntityManager.add(new BlockInfo(block,
+            inodeIdentifier != null ? inodeIdentifier.getInodeId() : BlockInfo.NON_EXISTING_ID));
+        BlockInfoUnderConstruction blockInfo = new BlockInfoUnderConstruction(
+            block, 3,
+            HdfsServerConstants.BlockUCState.UNDER_RECOVERY, storages);
+        return blockInfo;
+      }
+
+    }.handle();
   }
 }

@@ -1042,6 +1042,11 @@ public class DFSTestUtil {
     return new DatanodeDescriptor(storageMap, dnId, rackLocation);
   }
 
+  public static DatanodeStorageInfo createDatanodeStorageInfo(
+      String storageID, String ip) throws IOException {
+    return createDatanodeStorageInfo(storageID, ip, "defaultRack", "host");
+  }
+
   public static DatanodeStorageInfo[] createDatanodeStorageInfos(String[] racks) throws IOException {
     return createDatanodeStorageInfos(racks, null);
   }

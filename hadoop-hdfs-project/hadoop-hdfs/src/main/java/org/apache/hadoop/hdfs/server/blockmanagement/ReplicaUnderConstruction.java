@@ -15,8 +15,11 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.Replica;
+import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
@@ -68,11 +71,17 @@ public class ReplicaUnderConstruction extends Replica {
   }
 
   HdfsServerConstants.ReplicaState state;
+  private boolean chosenAsPrimary;
 
   public ReplicaUnderConstruction(ReplicaState state, int storageId,
       long blockId, int inodeId, int bucketId) {
+    this(state, storageId, blockId, inodeId, bucketId, false);
+  }
+  public ReplicaUnderConstruction(ReplicaState state, int storageId,
+      long blockId, int inodeId, int bucketId, boolean chosenAsPrimary) {
     super(storageId, blockId, inodeId, bucketId);
     this.state = state;
+    this.chosenAsPrimary = chosenAsPrimary;
   }
 
   public DatanodeStorageInfo getExpectedStorageLocation(DatanodeManager
@@ -84,7 +93,21 @@ public class ReplicaUnderConstruction extends Replica {
     return state;
   }
 
+  /**
+   * Whether the replica was chosen for recovery.
+   */
+  public boolean getChosenAsPrimary() {
+    return chosenAsPrimary;
+  }
+
   public void setState(ReplicaState state) {
     this.state = state;
+  }
+  
+  /**
+   * Set whether this replica was chosen for recovery.
+   */
+  void setChosenAsPrimary(boolean chosenAsPrimary) throws TransactionContextException, StorageException {
+    this.chosenAsPrimary = chosenAsPrimary;
   }
 }
