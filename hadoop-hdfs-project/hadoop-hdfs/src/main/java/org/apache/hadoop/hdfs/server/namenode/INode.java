@@ -50,6 +50,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
 
 /**
  * We keep an in-memory representation of the file/block hierarchy.
@@ -57,7 +58,7 @@ import java.util.logging.Logger;
  * directory inodes.
  */
 @InterfaceAudience.Private
-public abstract class INode implements Comparable<byte[]> {
+public abstract class INode implements Comparable<byte[]>, LinkedElement {
   
   public static final List<INode> EMPTY_LIST =
       Collections.unmodifiableList(new ArrayList<INode>());
@@ -126,6 +127,7 @@ public abstract class INode implements Comparable<byte[]> {
   protected long subtreeLockOwner;
 
   public final static int ROOT_PARENT_ID = 0;
+  public final static int ROOT_INODE_ID = 1;
   
   /**
    * To check if the request id is the same as saved id. Don't check fileId
@@ -256,7 +258,8 @@ public abstract class INode implements Comparable<byte[]> {
   protected INodeDirectory parent = null;
   protected long modificationTime = 0L;
   protected long accessTime = 0L;
-
+  protected LinkedElement next = null;
+  
   INode(int id, byte[] name, PermissionStatus permission, INodeDirectory parent,
       long modificationTime, long accessTime, boolean inTree) throws IOException{
     this.id = id;
@@ -710,17 +713,12 @@ public abstract class INode implements Comparable<byte[]> {
     if (that == null || !(that instanceof INode)) {
       return false;
     }
-    if (Arrays.equals(this.name, ((INode) that).name) &&
-        this.id == ((INode) that).id &&
-        this.parentId == ((INode) that).parentId) {
-      return true;
-    }
-    return false;
+    return id == ((INode) that).id;
   }
 
   @Override
   public final int hashCode() {
-    return Arrays.hashCode(this.name);
+    return (int)(id^(id>>>32));  
   }
 
   public void setParent(INodeDirectory p)
@@ -993,7 +991,7 @@ public abstract class INode implements Comparable<byte[]> {
   }
 
   public short myDepth() throws TransactionContextException, StorageException {
-    if(id == INodeDirectory.ROOT_ID){
+    if(id == INodeDirectory.ROOT_INODE_ID){
       return INodeDirectory.ROOT_DIR_DEPTH;
     }
 
@@ -1107,4 +1105,14 @@ public abstract class INode implements Comparable<byte[]> {
   }
   
   public abstract INode cloneInode() throws IOException;
+  
+  @Override
+  public void setNext(LinkedElement next) {
+    this.next = next;
+  }
+
+  @Override
+  public LinkedElement getNext() {
+    return next;
+  }
 }

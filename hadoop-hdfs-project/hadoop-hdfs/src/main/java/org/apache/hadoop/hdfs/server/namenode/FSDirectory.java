@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.hops.common.IDsGeneratorFactory;
+import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.resolvingcache.Cache;
@@ -27,13 +28,18 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import io.hops.security.Users;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
 import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
@@ -80,8 +86,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
+import org.apache.hadoop.hdfs.DFSUtil;
 
 import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
+import org.apache.hadoop.hdfs.util.GSet;
+import org.apache.hadoop.hdfs.util.LightWeightGSet;
 import static org.apache.hadoop.util.Time.now;
 
 /**
@@ -97,12 +106,21 @@ import static org.apache.hadoop.util.Time.now;
  */
 public class FSDirectory implements Closeable {
 
+  @VisibleForTesting
+  static boolean CHECK_RESERVED_FILE_NAMES = true;
+  public final static String DOT_RESERVED_STRING = ".reserved";
+  public final static String DOT_RESERVED_PATH_PREFIX = Path.SEPARATOR
+      + DOT_RESERVED_STRING;
+  public final static byte[] DOT_RESERVED = 
+      DFSUtil.string2Bytes(DOT_RESERVED_STRING);
+  public final static String DOT_INODES_STRING = ".inodes";
+  public final static byte[] DOT_INODES = 
+      DFSUtil.string2Bytes(DOT_INODES_STRING);
   private final FSNamesystem namesystem;
   private volatile boolean ready = false;
   private final int maxComponentLength;
   private final int maxDirItems;
   private final int lsLimit;  // max list limit
-
 
   private boolean quotaEnabled;
 
@@ -123,7 +141,7 @@ public class FSDirectory implements Closeable {
 
     createRoot(ns.createFsOwnerPermissions(new FsPermission((short) 0755)),
         false /*dont overwrite if root inode already existes*/);
-
+    
     int configuredLimit = conf.getInt(DFSConfigKeys.DFS_LIST_LIMIT,
         DFSConfigKeys.DFS_LIST_LIMIT_DEFAULT);
     this.lsLimit = configuredLimit > 0 ? configuredLimit :
@@ -221,9 +239,8 @@ public class FSDirectory implements Closeable {
     if (!mkdirs(parent.toString(), permissions, true, modTime)) {
       return null;
     }
-    int id =  IDsGeneratorFactory.getInstance().getUniqueINodeID();
     INodeFileUnderConstruction newNode =
-        new INodeFileUnderConstruction(id, permissions, replication,
+        new INodeFileUnderConstruction(IDsGeneratorFactory.getInstance().getUniqueINodeID(), permissions, replication,
             preferredBlockSize, modTime, clientName, clientMachine, clientNode, (byte) 0);
 
     boolean added = false;
@@ -1454,7 +1471,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       inodesInPath.setINode(pos, dir);
     }
   }
-  
+    
   /**
    * Add the given child to the namespace.
    * @param src The full path name of the child node.
@@ -1654,6 +1671,17 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       INode.DirCounts counts, boolean checkQuota)
       throws IOException {
     final INode[] inodes = inodesInPath.getINodes();
+    // Disallow creation of /.reserved. This may be created when loading
+    // editlog/fsimage during upgrade since /.reserved was a valid name in older
+    // release. This may also be called when a user tries to create a file
+    // or directory /.reserved.
+    if (pos == 1 && inodes[0] == getRootDir() && isReservedName(child)) {
+      throw new HadoopIllegalArgumentException(
+          "File name \"" + child.getLocalName() + "\" is reserved and cannot "
+              + "be created. If this is during upgrade change the name of the "
+              + "existing file or directory to another name before upgrading "
+              + "to the new release.");
+    }
     // The filesystem limits are not really quotas, so this check may appear
     // odd.  It's because a rename operation deletes the src, tries to add
     // to the dest, if that fails, re-adds the src from whence it came.
@@ -1671,7 +1699,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     final boolean added = ((INodeDirectory)inodes[pos-1]).addChild(child, true);
     if (!added) {
       updateCount(inodesInPath, pos, -counts.getNsCount(), -counts.getDsCount(), true);
-    }
+    } 
 
     if (added) {
       if (!child.isDirectory()) {
@@ -1807,7 +1835,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   void updateCountForINodeWithQuota()
       throws StorageException, TransactionContextException {
     // HOP If this one is used for something then we need to modify it to use the QuotaUpdateManager
-    updateCountForINodeWithQuota(getRootDir(), new INode.DirCounts(),
+    updateCountForINodeWithQuota(this, getRootDir(), new INode.DirCounts(),
         new ArrayList<INode>(50));
   }
   
@@ -1825,7 +1853,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * @param nodesInPath
    *     INodes for the each of components in the path.
    */
-  private static void updateCountForINodeWithQuota(INodeDirectory dir,
+  private static void updateCountForINodeWithQuota(FSDirectory fsd, INodeDirectory dir,
       INode.DirCounts counts, ArrayList<INode> nodesInPath)
       throws StorageException, TransactionContextException {
     long parentNamespace = counts.nsCount;
@@ -1840,7 +1868,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
 
     for (INode child : dir.getChildrenList()) {
       if (child.isDirectory()) {
-        updateCountForINodeWithQuota((INodeDirectory) child, counts,
+        updateCountForINodeWithQuota(fsd, (INodeDirectory) child, counts,
             nodesInPath);
       } else if (child.isSymlink()) {
         counts.nsCount += 1;
@@ -1986,17 +2014,17 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   void setTimes(String src, INode inode, long mtime, long atime, boolean force)
       throws StorageException, TransactionContextException,
       AccessControlException {
-    unprotectedSetTimes(src, inode, mtime, atime, force);
+    unprotectedSetTimes(inode, mtime, atime, force);
   }
 
   boolean unprotectedSetTimes(String src, long mtime, long atime, boolean force)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException, AccessControlException {
     INode inode = getINode(src);
-    return unprotectedSetTimes(src, inode, mtime, atime, force);
+    return unprotectedSetTimes(inode, mtime, atime, force);
   }
 
-  private boolean unprotectedSetTimes(String src, INode inode, long mtime,
+  private boolean unprotectedSetTimes(INode inode, long mtime,
       long atime, boolean force)
       throws StorageException, TransactionContextException,
       AccessControlException {
@@ -2194,6 +2222,136 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
   }
   
+
+  /**
+   * Given an INode get all the path complents leading to it from the root.
+   * If an Inode corresponding to C is given in /A/B/C, the returned
+   * patch components will be {root, A, B, C}
+   */
+  static byte[][] getPathComponents(INode inode) throws StorageException, TransactionContextException {
+    List<byte[]> components = new ArrayList<byte[]>();
+    components.add(0, inode.getLocalNameBytes());
+    while (inode.getParent() != null) {
+      components.add(0, inode.getParent().getLocalNameBytes());
+      inode = inode.getParent();
+    }
+    return components.toArray(new byte[components.size()][]);
+  }
+
+  /**
+   * @return path components for reserved path, else null.
+   */
+  static byte[][] getPathComponentsForReservedPath(String src) {
+    return !isReservedName(src) ? null : INode.getPathComponents(src);
+  }
+
+  /**
+   * Resolve the path of /.reserved/.inodes/<inodeid>/... to a regular path
+   *
+   * @param src path that is being processed
+   * @param pathComponents path components corresponding to the path
+   * @param fsd FSDirectory
+   * @return if the path indicates an inode, return path after replacing upto
+   * <inodeid> with the corresponding path of the inode, else the path
+   * in {@code src} as is.
+   * @throws FileNotFoundException if inodeid is invalid
+   */
+  static String resolvePath(String src, byte[][] pathComponents, FSDirectory fsd)
+      throws FileNotFoundException, StorageException, TransactionContextException, IOException {
+    if (pathComponents == null || pathComponents.length <= 3) {
+      return src;
+    }
+    // Not /.reserved/.inodes
+    if (!Arrays.equals(DOT_RESERVED, pathComponents[1])
+        || !Arrays.equals(DOT_INODES, pathComponents[2])) { // Not .inodes path
+      return src;
+    }
+    final String inodeId = DFSUtil.bytes2String(pathComponents[3]);
+    int id = 0;
+    try {
+      id = Integer.valueOf(inodeId);
+    } catch (NumberFormatException e) {
+      throw new FileNotFoundException(
+          "File for given inode path does not exist: " + src);
+    }
+    if (id == INode.ROOT_INODE_ID && pathComponents.length == 4) {
+      return Path.SEPARATOR;
+    }
+    StringBuilder path = id == INode.ROOT_INODE_ID ? new StringBuilder()
+        : new StringBuilder(fsd.getFullPathName(id));
+    for (int i = 4; i < pathComponents.length; i++) {
+      path.append(Path.SEPARATOR).append(DFSUtil.bytes2String(pathComponents[i]));
+    }
+    if (NameNode.LOG.isDebugEnabled()) {
+      NameNode.LOG.debug("Resolved path is " + path);
+    }
+    return path.toString();
+  }
+  
+//  @VisibleForTesting
+//  INode getInode(final int id) throws IOException {
+//    return (INode) (new HopsTransactionalRequestHandler(HDFSOperationType.GET_INODE) {
+//      INodeIdentifier inodeIdentifier;
+//
+//      @Override
+//      public void setUp() throws StorageException {
+//        inodeIdentifier = new INodeIdentifier(id);
+//      }
+//
+//      @Override
+//      public void acquireLock(TransactionLocks locks) throws IOException {
+//        LockFactory lf = LockFactory.getInstance();
+//        locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED, inodeIdentifier));
+//      }
+//
+//      @Override
+//      public Object performTask() throws IOException {
+//        return EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
+//      }
+//    }).handle();
+//  }
+  
+  String getFullPathName(final int id) throws IOException {
+    HopsTransactionalRequestHandler getFullPathNameHandler =
+        new HopsTransactionalRequestHandler(
+            HDFSOperationType.GET_INODE) {
+          INodeIdentifier inodeIdentifier;
+
+          @Override
+          public void setUp() throws StorageException {
+            inodeIdentifier = new INodeIdentifier(id);
+          }
+
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            LockFactory lf = LockFactory.getInstance();
+            locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED, inodeIdentifier, true));
+          }
+
+          @Override
+          public Object performTask() throws IOException {
+            INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
+            
+            return inode.getFullPathName();
+          }
+        };
+    return (String) getFullPathNameHandler.handle();
+  }
+
+  /**
+   * Check if a given inode name is reserved
+   */
+  public static boolean isReservedName(INode inode) {
+    return CHECK_RESERVED_FILE_NAMES
+        && Arrays.equals(inode.getLocalNameBytes(), DOT_RESERVED);
+  }
+
+  /**
+   * Check if a given path is reserved
+   */
+  public static boolean isReservedName(String src) {
+    return src.startsWith(DOT_RESERVED_PATH_PREFIX);
+  }
 
   public INodeDirectoryWithQuota getRootDir()
       throws StorageException, TransactionContextException {

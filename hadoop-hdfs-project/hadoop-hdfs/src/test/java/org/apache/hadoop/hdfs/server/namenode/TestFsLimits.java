@@ -162,7 +162,7 @@ public class TestFsLimits {
     addChildWithName("4444", null);
   }
 
-  private static int id = 1 + INodeDirectory.ROOT_ID;
+  private static int id = 1 + INodeDirectory.ROOT_INODE_ID;
 
   private void addChildWithName(final String name, final Class<?> expected)
       throws Exception {
@@ -187,7 +187,7 @@ public class TestFsLimits {
 
             INode child = new INodeDirectory(id++, name, perms, true);
             child.setLocalName(name);
-            child.setPartitionIdNoPersistance(INodeDirectory.ROOT_ID);
+            child.setPartitionIdNoPersistance(INodeDirectory.ROOT_INODE_ID);
 
             Class<?> generated = null;
             try {

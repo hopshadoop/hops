@@ -58,7 +58,6 @@ public class INodeDirectory extends INode {
   protected static final int DEFAULT_FILES_PER_DIRECTORY = 5;
   public final static String ROOT_NAME = "";
 
-  public final static int ROOT_ID = 1;
   public static final int ROOT_DIR_PARTITION_KEY = ROOT_PARENT_ID;
   public static final short ROOT_DIR_DEPTH =0;
 
@@ -514,7 +513,7 @@ public class INodeDirectory extends INode {
   }
 
   public static INodeIdentifier getRootIdentifier(){
-    INodeIdentifier rootINodeIdentifier = new INodeIdentifier(INodeDirectory.ROOT_ID,INodeDirectory.ROOT_PARENT_ID, INodeDirectory.ROOT_NAME,
+    INodeIdentifier rootINodeIdentifier = new INodeIdentifier(INodeDirectory.ROOT_INODE_ID,INodeDirectory.ROOT_PARENT_ID, INodeDirectory.ROOT_NAME,
         INodeDirectory.getRootDirPartitionKey());
     rootINodeIdentifier.setDepth(INodeDirectory.ROOT_DIR_DEPTH);
     return rootINodeIdentifier;
@@ -601,5 +600,5 @@ public class INodeDirectory extends INode {
   @Override
   public INode cloneInode () throws IOException{
     return new INodeDirectory(this);
-  }
+  }  
 }
