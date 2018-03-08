@@ -26,6 +26,11 @@
     <value>simple</value>
   </property>
 
+  <!-- Disable min block size since most tests use tiny blocks -->
+  <property>
+    <name>dfs.namenode.fs-limits.min-block-size</name>
+    <value>0</value>
+  </property>
   <!-- for testing only set the hops-metadata-dal-impl-ndb jarfile !-->
   <property>
     <name>dfs.storage.driver.jarFile</name>

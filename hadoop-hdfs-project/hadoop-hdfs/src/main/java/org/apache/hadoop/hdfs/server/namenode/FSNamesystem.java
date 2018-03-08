@@ -390,6 +390,9 @@ public class FSNamesystem
 
   private final long maxFsObjects;          // maximum number of fs objects
 
+  private final long minBlockSize;         // minimum block size
+  private final long maxBlocksPerFile;     // maximum # of blocks per file
+  
   // precision of access times.
   private final long accessTimePrecision;
 
@@ -561,6 +564,10 @@ public class FSNamesystem
       this.maxFsObjects = conf.getLong(DFS_NAMENODE_MAX_OBJECTS_KEY,
           DFS_NAMENODE_MAX_OBJECTS_DEFAULT);
 
+      this.minBlockSize = conf.getLong(DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY,
+          DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_DEFAULT);
+      this.maxBlocksPerFile = conf.getLong(DFSConfigKeys.DFS_NAMENODE_MAX_BLOCKS_PER_FILE_KEY,
+          DFSConfigKeys.DFS_NAMENODE_MAX_BLOCKS_PER_FILE_DEFAULT);
       this.accessTimePrecision =
           conf.getLong(DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT);
       this.supportAppends =
@@ -1942,6 +1949,11 @@ public class FSNamesystem
       throw new InvalidPathException(src);
     }
 
+    if (blockSize < minBlockSize) {
+      throw new IOException("Specified block size is less than configured" + " minimum value ("
+          + DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY
+          + "): " + blockSize + " < " + minBlockSize);
+    }
     // Verify that the destination does not exist as a directory already.
     boolean pathExists = dir.exists(src);
     if (pathExists && dir.isDir(src)) {
@@ -2411,6 +2423,12 @@ public class FSNamesystem
               return onRetryBlock[0];
             }
 
+            if (pendingFile.getBlocks().length >= maxBlocksPerFile) {
+              throw new IOException("File has reached the limit on maximum number of"
+                  + " blocks (" + DFSConfigKeys.DFS_NAMENODE_MAX_BLOCKS_PER_FILE_KEY
+                  + "): " + pendingFile.getBlocks().length + " >= "
+                  + maxBlocksPerFile);
+            }
             blockSize = pendingFile.getPreferredBlockSize();
 
             String host = pendingFile.getClientMachine();
