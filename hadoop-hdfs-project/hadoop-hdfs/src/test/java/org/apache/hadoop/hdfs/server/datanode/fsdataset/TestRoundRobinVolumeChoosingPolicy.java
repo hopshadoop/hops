@@ -32,6 +32,14 @@ public class TestRoundRobinVolumeChoosingPolicy {
   // Test the Round-Robin block-volume choosing algorithm.
   @Test
   public void testRR() throws Exception {
+    @SuppressWarnings("unchecked")
+    final RoundRobinVolumeChoosingPolicy<FsVolumeSpi> policy = 
+        ReflectionUtils.newInstance(RoundRobinVolumeChoosingPolicy.class, null);
+    testRR(policy);
+  }
+  
+  public static void testRR(VolumeChoosingPolicy<FsVolumeSpi> policy)
+      throws Exception {
     final List<FsVolumeSpi> volumes = new ArrayList<>();
 
     // First volume, with 100 bytes of space.
@@ -42,9 +50,6 @@ public class TestRoundRobinVolumeChoosingPolicy {
     volumes.add(Mockito.mock(FsVolumeSpi.class));
     Mockito.when(volumes.get(1).getAvailable()).thenReturn(200L);
 
-    @SuppressWarnings("unchecked")
-    final RoundRobinVolumeChoosingPolicy<FsVolumeSpi> policy =
-        ReflectionUtils.newInstance(RoundRobinVolumeChoosingPolicy.class, null);
     
     // Test two rounds of round-robin choosing
     Assert.assertEquals(volumes.get(0), policy.chooseVolume(volumes, 0));
@@ -69,6 +74,13 @@ public class TestRoundRobinVolumeChoosingPolicy {
   // with volume and block sizes in exception message.
   @Test
   public void testRRPolicyExceptionMessage() throws Exception {
+    final RoundRobinVolumeChoosingPolicy<FsVolumeSpi> policy
+        = new RoundRobinVolumeChoosingPolicy<FsVolumeSpi>();
+    testRRPolicyExceptionMessage(policy);
+  }
+  
+  public static void testRRPolicyExceptionMessage(
+      VolumeChoosingPolicy<FsVolumeSpi> policy) throws Exception {
     final List<FsVolumeSpi> volumes = new ArrayList<>();
 
     // First volume, with 500 bytes of space.
@@ -79,8 +91,6 @@ public class TestRoundRobinVolumeChoosingPolicy {
     volumes.add(Mockito.mock(FsVolumeSpi.class));
     Mockito.when(volumes.get(1).getAvailable()).thenReturn(600L);
 
-    final RoundRobinVolumeChoosingPolicy<FsVolumeSpi> policy =
-        new RoundRobinVolumeChoosingPolicy<>();
     int blockSize = 700;
     try {
       policy.chooseVolume(volumes, blockSize);
