@@ -176,7 +176,6 @@ public class TestLeaseRenewer {
     Assert.assertFalse("Renewer not initially running", renewer.isRunning());
     
     // Pretend to open a file
-    Mockito.doReturn(false).when(MOCK_DFSCLIENT).isFilesBeingWrittenEmpty();
     renewer.put(filePath, mockStream, MOCK_DFSCLIENT);
     
     Assert
@@ -187,8 +186,8 @@ public class TestLeaseRenewer {
     Assert.assertEquals("LeaseRenewer:myuser@hdfs://nn1/", threadName);
     
     // Pretend to close the file
-    Mockito.doReturn(true).when(MOCK_DFSCLIENT).isFilesBeingWrittenEmpty();
     renewer.closeFile(filePath, MOCK_DFSCLIENT);
+    renewer.setEmptyTime(Time.now());
     
     // Should stop the renewer running within a few seconds
     long failTime = Time.now() + 5000;
