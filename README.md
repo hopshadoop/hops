@@ -5,7 +5,7 @@
 
 <a href=""><img src="http://www.hops.io/sites/default/files/hops-50x50.png" align="left" hspace="10" vspace="6"></a>
 
-**Hops** (<b>H</b>adoop <b>O</b>pen <b>P</b>latform-as-a-<b>S</b>ervice) is a next generation distribution of [Apache Hadoop](http://hadoop.apache.org/core/) with scalable, highly available, customizable metadata. Hops consists internally of two main sub projects, HopsFs and HopsYarn. <b>HopsFS</b> is a new implementation of the the Hadoop Filesystem (HDFS), that supports multiple stateless NameNodes, where the metadata is stored in [MySQL Cluster](https://www.mysql.com/products/cluster/), an in-memory distributed database. HopsFS enables more scalable clusters than Apache HDFS (up to ten times larger clusters), and enables NameNode metadata to be both customized and analyzed, because it can now be easily accessed via a SQL API. <b>HopsYARN</b> introduces a distributed stateless Resource Manager, whose state is migrated to MySQL Cluster. This enables our YARN architecture to have no down-time, with failover of a ResourceManager happening in a few seconds. Together, HopsFS and HopsYARN enable Hadoop clusters to scale to larger volumes and higher throughput.
+**Hops** (<b>H</b>adoop <b>O</b>pen <b>P</b>latform-as-a-<b>S</b>ervice) is a next generation distribution of [Apache Hadoop](http://hadoop.apache.org/core/) with scalable, highly available, customizable metadata. Hops consists internally of two main sub projects, HopsFs and HopsYarn. <b>HopsFS</b> is a new implementation of the Hadoop Filesystem (HDFS), that supports multiple stateless NameNodes, where the metadata is stored in [MySQL Cluster](https://www.mysql.com/products/cluster/), an in-memory distributed database. HopsFS enables more scalable clusters than Apache HDFS (up to ten times larger clusters), and enables NameNode metadata to be both customized and analyzed, because it can now be easily accessed via a SQL API. <b>HopsYARN</b> introduces a distributed stateless Resource Manager, whose state is migrated to MySQL Cluster. This enables our YARN architecture to have no down-time, with failover of a ResourceManager happening in a few seconds. Together, HopsFS and HopsYARN enable Hadoop clusters to scale to larger volumes and higher throughput.
 
 
 # Online Documentation
@@ -31,7 +31,7 @@ Perform the following steps in the following order to compile the Hops Hadoop Di
 ```sh
 git clone https://github.com/hopshadoop/hops-metadata-dal
 ```
-The `master` branch represents most stable version of Hops Hadoop and the `develop` branch contains all the newly developed features and bug fixes. If you choose to use `master` branch then also checkout the `master` branch in the other Hops Projects and vice versa.   
+The `master` branch contains all the newly developed features and bug fixes. For more stable version you can use the branches corresponding to releases. If you choose to use a release branch then also checkout the corresponding release branch in the other Hops Projects.
 
 ```sh
 git checkout master
@@ -47,14 +47,26 @@ mvn clean install -DskipTests
 This project also contains c++ code that requires NDB `libndbclient.so` library. Download the [MySQL Cluster Distribution](https://dev.mysql.com/downloads/cluster/) and extract the `libndbclient.so` library. Alternatively you can download a custom MySQL Cluster library from our servers. Our custom library supports binding I/O threads to CPU cores for better performance.		
 ```sh
 cd tmp
-wget http://kompics.sics.se/maven/repository/com/mysql/ndb/clusterj-native/7.5.4/clusterj-native-7.5.4-natives-linux.jar
-unzip clusterj-native-7.5.4-natives-linux.jar
+wget http://kompics.sics.se/maven/repository/com/mysql/ndb/clusterj-native/7.5.6/clusterj-native-7.5.6-natives-linux.jar
+unzip clusterj-native-7.5.6-natives-linux.jar
 cp libndbclient.so /usr/lib
 ```
 
 See this [section](#connecting-the-driver-to-the-database) for specifying the database `URI` and `username/password`. 
 
+#### GPU Abstraction Layer
+```sh
+git clone https://github.com/hopshadoop/hops-gpu-management
+git checkout master
+mvn clean install -DskipTests
+```
 
+#### GPU Abstraction Layer Implementation
+```sh
+git clone https://github.com/hopshadoop/hops-gpu-management-impl-nvidia
+git checkout master
+mvn clean install -DskipTests
+```
 
 #### Building Hops Hadoop 
 ```sh
