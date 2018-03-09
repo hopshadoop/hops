@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.api;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -42,6 +43,13 @@ public class ApplicationInitializationContext {
   private final ApplicationId applicationId;
   private ByteBuffer appDataForService;
 
+  @VisibleForTesting
+  public ApplicationInitializationContext(String user, ApplicationId applicationId,
+      ByteBuffer appDataForService) {
+    this(user, applicationId, appDataForService, user);
+    
+  }
+  
   @Private
   @Unstable
   public ApplicationInitializationContext(String user, ApplicationId applicationId,
