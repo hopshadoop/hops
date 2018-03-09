@@ -135,21 +135,19 @@ class FSPermissionChecker {
    */
   void checkPermission(String path, INodeDirectory root, boolean doCheckOwner,
       FsAction ancestorAccess, FsAction parentAccess, FsAction access,
-      FsAction subAccess)
-      throws IOException {
+      FsAction subAccess, boolean resolveLink) throws AccessControlException, UnresolvedLinkException, StorageException,
+      TransactionContextException, IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("ACCESS CHECK: " + this + ", doCheckOwner=" + doCheckOwner +
           ", ancestorAccess=" + ancestorAccess + ", parentAccess=" +
-          parentAccess + ", access=" + access + ", subAccess=" + subAccess);
+          parentAccess + ", access=" + access + ", subAccess=" + subAccess + ", resolveLink=" + resolveLink);
     }
     // check if (parentAccess != null) && file exists, then check sb
-    // Resolve symlinks, the check is performed on the link target.
-    final INode[] inodes = root.getExistingPathINodes(path, true).getINodes();
+    // If resolveLink, the check is performed on the link target.
+    final INode[] inodes = root.getExistingPathINodes(path, resolveLink).getINodes();
     int ancestorIndex = inodes.length - 2;
     for (; ancestorIndex >= 0 && inodes[ancestorIndex] == null;
-         ancestorIndex--) {
-      ;
-    }
+        ancestorIndex--);
     checkTraverse(inodes, ancestorIndex);
 
     if (parentAccess != null && parentAccess.implies(FsAction.WRITE) &&

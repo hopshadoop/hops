@@ -3032,7 +3032,7 @@ public class FSNamesystem
   /**
    * Remove the indicated file from namespace.
    *
-   * @see ClientProtocol#delete(String, boolean) for detailed descriptoin and
+   * @see ClientProtocol#delete(String, boolean) for detailed description and
    * description of exceptions
    */
   public boolean deleteWithTransaction(final String src1,
@@ -3119,7 +3119,7 @@ public class FSNamesystem
       throw new IOException(src + " is non empty");
     }
     if (enforcePermission && isPermissionEnabled) {
-      checkPermission(pc, src, false, null, FsAction.WRITE, null, FsAction.ALL);
+      checkPermission(pc, src, false, null, FsAction.WRITE, null, FsAction.ALL, false);
     }
     // Unlink the target directory from directory tree
     if (!dir.delete(src, collectedBlocks)) {
@@ -4873,11 +4873,24 @@ public class FSNamesystem
    */
   private void checkPermission(FSPermissionChecker pc, String path,
       boolean doCheckOwner, FsAction ancestorAccess, FsAction parentAccess,
-      FsAction access, FsAction subAccess)
-      throws IOException {
+      FsAction access, FsAction subAccess)throws AccessControlException, UnresolvedLinkException, IOException{
+    checkPermission(pc, path, doCheckOwner, ancestorAccess,
+        parentAccess, access, subAccess, true);
+  }
+  
+  /**
+   * Check whether current user have permissions to access the path. For more
+   * details of the parameters, see
+   * {@link FSPermissionChecker#checkPermission()}.
+   */
+  private void checkPermission(FSPermissionChecker pc,
+      String path, boolean doCheckOwner, FsAction ancestorAccess,
+      FsAction parentAccess, FsAction access, FsAction subAccess,
+      boolean resolveLink) throws AccessControlException, UnresolvedLinkException, TransactionContextException,
+      IOException {
     if (!pc.isSuperUser()) {
       pc.checkPermission(path, dir.getRootDir(), doCheckOwner, ancestorAccess,
-          parentAccess, access, subAccess);
+          parentAccess, access, subAccess, resolveLink);
     }
   }
 
@@ -7034,7 +7047,7 @@ public class FSNamesystem
         FSPermissionChecker pc = getPermissionChecker();
         if (isPermissionEnabled && !pc.isSuperUser()) {
           pc.checkPermission(path, dir.getRootDir(), doCheckOwner,
-              ancestorAccess, parentAccess, access, subAccess);
+              ancestorAccess, parentAccess, access, subAccess, true);
         }
 
         INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(path, false);
@@ -7701,7 +7714,7 @@ public class FSNamesystem
             FSPermissionChecker pc = getPermissionChecker();
             if (isPermissionEnabled && !pc.isSuperUser()) {
               pc.checkPermission(path, dir.getRootDir(), doCheckOwner,
-                  ancestorAccess, parentAccess, access, subAccess);
+                  ancestorAccess, parentAccess, access, subAccess, true);
             }
 
             byte[][] pathComponents = INode.getPathComponents(path);
