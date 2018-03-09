@@ -973,7 +973,7 @@ public class TestINodeFile {
     INode inode = createTreeOfInodes(path);
     // For an any inode look up return inode corresponding to "c" from /a/b/c
     FSDirectory fsd = Mockito.mock(FSDirectory.class);
-    Mockito.doReturn(inode.getFullPathName()).when(fsd).getFullPathName(Mockito.anyInt());
+    Mockito.doReturn(inode.getFullPathName()).when(fsd).getFullPathName(Mockito.anyInt(), Mockito.anyString());
     
     // Null components
     assertEquals("/test", FSDirectory.resolvePath("/test", null, fsd));
