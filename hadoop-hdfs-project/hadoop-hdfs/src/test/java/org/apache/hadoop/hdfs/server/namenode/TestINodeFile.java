@@ -476,6 +476,8 @@ public class TestINodeFile {
   public void testInodeId() throws IOException, Exception {
 
     Configuration conf = new Configuration();
+    conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY,
+        DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT);
     MiniDFSCluster cluster = null;
     try {    
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
@@ -511,7 +513,20 @@ public class TestINodeFile {
       // Delete test2/file and test2 and ensure inode map size decreases
       assertTrue(fs.delete(renamedPath, true));
 
-      // Make sure empty editlog can be handled
+      // Create and concat /test/file1 /test/file2
+      // Create /test1/file1 and /test1/file2
+      String file1 = "/test1/file1";
+      String file2 = "/test1/file2";
+      DFSTestUtil.createFile(fs, new Path(file1), 512, (short) 1, 0);
+      DFSTestUtil.createFile(fs, new Path(file2), 512, (short) 1, 0);
+      expectedLastInodeId += 4;
+      assertEquals(expectedLastInodeId, IDsGeneratorFactory.getInstance().getUniqueINodeID());
+      // Concat the /test1/file1 /test1/file2 into /test1/file2
+      nnrpc.concat(file2, new String[] {file1});
+      assertEquals(++expectedLastInodeId, IDsGeneratorFactory.getInstance().getUniqueINodeID());
+      assertTrue(fs.delete(new Path("/test1"), true));
+
+      // Make sure editlog is loaded correctly 
       cluster.restartNameNode();
       cluster.waitActive();
       assertEquals(++expectedLastInodeId, IDsGeneratorFactory.getInstance().getUniqueINodeID());
