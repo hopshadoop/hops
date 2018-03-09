@@ -2271,14 +2271,13 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     try {
       id = Integer.valueOf(inodeId);
     } catch (NumberFormatException e) {
-      throw new FileNotFoundException(
-          "File for given inode path does not exist: " + src);
+      throw new FileNotFoundException("Invalid inode path: " + src);
     }
     if (id == INode.ROOT_INODE_ID && pathComponents.length == 4) {
       return Path.SEPARATOR;
     }
     StringBuilder path = id == INode.ROOT_INODE_ID ? new StringBuilder()
-        : new StringBuilder(fsd.getFullPathName(id));
+        : new StringBuilder(fsd.getFullPathName(id, src));
     for (int i = 4; i < pathComponents.length; i++) {
       path.append(Path.SEPARATOR).append(DFSUtil.bytes2String(pathComponents[i]));
     }
@@ -2311,7 +2310,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
 //    }).handle();
 //  }
   
-  String getFullPathName(final int id) throws IOException {
+  String getFullPathName(final int id, final String src) throws IOException {
     HopsTransactionalRequestHandler getFullPathNameHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_INODE) {
@@ -2331,7 +2330,10 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
           @Override
           public Object performTask() throws IOException {
             INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
-            
+            if (inode == null) {
+              throw new FileNotFoundException(
+                  "File for given inode path does not exist: " + src);
+            }
             return inode.getFullPathName();
           }
         };
