@@ -86,6 +86,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import org.junit.Before;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyLong;
@@ -107,7 +108,7 @@ public class TestDFSClientRetries {
   final static private int MIN_SLEEP_TIME = 1000;
   public static final Log LOG =
       LogFactory.getLog(TestDFSClientRetries.class.getName());
-  final static private Configuration conf = new HdfsConfiguration();
+  static private Configuration conf = null;
 
   private static class TestServer extends Server {
     private boolean sleep;
@@ -157,6 +158,11 @@ public class TestDFSClientRetries {
     }
   }
   
+  @Before
+  public void setupConf(){
+    conf = new HdfsConfiguration();
+  }
+
   /**
    * This makes sure that when DN closes clients socket after client had
    * successfully connected earlier, the data can still be fetched.
