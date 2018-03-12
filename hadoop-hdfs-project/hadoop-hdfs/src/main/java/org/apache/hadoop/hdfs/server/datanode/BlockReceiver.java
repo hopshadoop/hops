@@ -395,7 +395,8 @@ class BlockReceiver implements Closeable {
       clientChecksum.verifyChunkedSums(dataBuf, checksumBuf, clientname, 0);
     } catch (ChecksumException ce) {
       LOG.warn("Checksum error in block " + block + " from " + inAddr, ce);
-      if (srcDataNode != null) {
+      // No need to report to namenode when client is writing.
+      if (srcDataNode != null && isDatanode) {
         try {
           LOG.info("report corrupt " + block + " from datanode " +
               srcDataNode + " to namenode");
@@ -423,6 +424,19 @@ class BlockReceiver implements Closeable {
     diskChecksum.calculateChunkedSums(dataBuf, checksumBuf);
   }
 
+  /** 
+   * Check whether checksum needs to be verified.
+   * Skip verifying checksum iff this is not the last one in the 
+   * pipeline and clientName is non-null. i.e. Checksum is verified
+   * on all the datanodes when the data is being written by a 
+   * datanode rather than a client. Whe client is writing the data, 
+   * protocol includes acks and only the last datanode needs to verify 
+   * checksum.
+   * @return true if checksum verification is needed, otherwise false.
+   */
+  private boolean shouldVerifyChecksum() {
+    return (mirrorOut == null || isDatanode || needsChecksumTranslation);
+  }
 
   /**
    * Receives and processes a packet. It can contain many chunks.
@@ -470,9 +484,9 @@ class BlockReceiver implements Closeable {
     }
     
     // put in queue for pending acks, unless sync was requested
-    if (responder != null && !syncBlock) {
+    if (responder != null && !syncBlock && !shouldVerifyChecksum()) {
       ((PacketResponder) responder.getRunnable())
-          .enqueue(seqno, lastPacketInBlock, offsetInBlock);
+          .enqueue(seqno, lastPacketInBlock, offsetInBlock, Status.SUCCESS);
     }
 
     //First write the packet to the mirror:
@@ -506,15 +520,23 @@ class BlockReceiver implements Closeable {
             "length " + checksumLen);
       }
 
-      /* skip verifying checksum iff this is not the last one in the 
-       * pipeline and clientName is non-null. i.e. Checksum is verified
-       * on all the datanodes when the data is being written by a 
-       * datanode rather than a client. Whe client is writing the data, 
-       * protocol includes acks and only the last datanode needs to verify 
-       * checksum.
-       */
-      if (mirrorOut == null || isDatanode || needsChecksumTranslation) {
-        verifyChunks(dataBuf, checksumBuf);
+      if (shouldVerifyChecksum()) {
+        try {
+          verifyChunks(dataBuf, checksumBuf);
+        } catch (IOException ioe) {
+          // checksum error detected locally. there is no reason to continue.
+          if (responder != null) {
+            try {
+              ((PacketResponder) responder.getRunnable()).enqueue(seqno,
+                  lastPacketInBlock, offsetInBlock,
+                  Status.ERROR_CHECKSUM);
+              // Wait until the responder sends back the response
+              // and interrupt this thread.
+              Thread.sleep(3000);
+            } catch (InterruptedException e) { }
+          }
+          throw new IOException("Terminating due to a checksum error." + ioe);
+        }
         if (needsChecksumTranslation) {
           // overwrite the checksums in the packet buffer with the
           // appropriate polynomial for the disk storage.
@@ -605,9 +627,9 @@ class BlockReceiver implements Closeable {
 
     // if sync was requested, put in queue for pending acks here
     // (after the fsync finished)
-    if (responder != null && syncBlock) {
+    if (responder != null && (syncBlock || shouldVerifyChecksum())) {
       ((PacketResponder) responder.getRunnable())
-          .enqueue(seqno, lastPacketInBlock, offsetInBlock);
+          .enqueue(seqno, lastPacketInBlock, offsetInBlock, Status.SUCCESS);
     }
 
     if (throttler != null) { // throttle I/O
@@ -659,11 +681,7 @@ class BlockReceiver implements Closeable {
         responder.start(); // start thread to processes responses
       }
 
-      /* 
-       * Receive until the last packet.
-       */
-      while (receivePacket() >= 0) {
-      }
+      while (receivePacket() >= 0) { /* Receive until the last packet */ }
 
       // wait for all outstanding packet responses. And then
       // indicate responder to gracefully shutdown.
@@ -747,7 +765,7 @@ class BlockReceiver implements Closeable {
   static private long checksum2long(byte[] checksum) {
     long crc = 0L;
     for (int i = 0; i < checksum.length; i++) {
-      crc |= (0xffL & (long) checksum[i]) << ((checksum.length - i - 1) * 8);
+      crc |= (0xffL&checksum[i])<<((checksum.length-i-1)*8);
     }
     return crc;
   }
@@ -808,25 +826,22 @@ class BlockReceiver implements Closeable {
     HAS_DOWNSTREAM_IN_PIPELINE
   }
   
+  private static Status[] MIRROR_ERROR_STATUS = {Status.SUCCESS, Status.ERROR};
+  
   /**
-   * Processed responses from downstream datanodes in the pipeline
+   * Processes responses from downstream datanodes in the pipeline
    * and sends back replies to the originator.
    */
   class PacketResponder implements Runnable, Closeable {
 
-    /**
-     * queue for packets waiting for ack
-     */
+    /** queue for packets waiting for ack - synchronization using monitor lock */
     private final LinkedList<Packet> ackQueue = new LinkedList<>();
     /**
      * the thread that spawns this responder
      */
     private final Thread receiverThread = Thread.currentThread();
-    /**
-     * is this responder running?
-     */
+    /** is this responder running? - synchronization using monitor lock */
     private volatile boolean running = true;
-
     /**
      * input from the next downstream datanode
      */
@@ -835,7 +850,6 @@ class BlockReceiver implements Closeable {
      * output to upstream datanode/client
      */
     private final DataOutputStream upstreamOut;
-
     /**
      * The type of this responder
      */
@@ -869,6 +883,10 @@ class BlockReceiver implements Closeable {
       this.myString = b.toString();
     }
 
+    private boolean isRunning() {
+      return running && datanode.shouldRun;
+    }
+    
     /**
      * enqueue the seqno that is still be to acked by the downstream datanode.
      *
@@ -876,17 +894,32 @@ class BlockReceiver implements Closeable {
      * @param lastPacketInBlock
      * @param offsetInBlock
      */
-    synchronized void enqueue(final long seqno, final boolean lastPacketInBlock,
-        final long offsetInBlock) {
-      if (running) {
-        final Packet p = new Packet(seqno, lastPacketInBlock, offsetInBlock,
-            System.nanoTime());
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(myString + ": enqueue " + p);
-        }
-        ackQueue.addLast(p);
-        notifyAll();
+    void enqueue(final long seqno, final boolean lastPacketInBlock,
+        final long offsetInBlock, final Status ackStatus) {
+      final Packet p = new Packet(seqno, lastPacketInBlock, offsetInBlock,
+          System.nanoTime(), ackStatus);
+      if(LOG.isDebugEnabled()) {
+        LOG.debug(myString + ": enqueue " + p);
       }
+      synchronized(this) {
+        if (running) {
+          ackQueue.addLast(p);
+          notifyAll();
+        }
+      }
+    }
+    
+    
+    /** Wait for a packet with given {@code seqno} to be enqueued to ackQueue */
+    synchronized Packet waitForAckHead(long seqno) throws InterruptedException {
+      while (isRunning() && ackQueue.size() == 0) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(myString + ": seqno=" + seqno +
+                    " waiting for local datanode to finish write.");
+        }
+        wait();
+      }
+      return isRunning() ? ackQueue.getFirst() : null;
     }
 
     /**
@@ -894,7 +927,7 @@ class BlockReceiver implements Closeable {
      */
     @Override
     public synchronized void close() {
-      while (running && ackQueue.size() != 0 && datanode.shouldRun) {
+      while (isRunning() && ackQueue.size() != 0) {
         try {
           wait();
         } catch (InterruptedException e) {
@@ -917,9 +950,8 @@ class BlockReceiver implements Closeable {
     @Override
     public void run() {
       boolean lastPacketInBlock = false;
-      final long startTime =
-          ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
-      while (running && datanode.shouldRun && !lastPacketInBlock) {
+      final long startTime = ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
+      while (isRunning() && !lastPacketInBlock) {
 
         long totalAckTimeNanos = 0;
         boolean isInterrupted = false;
@@ -939,48 +971,38 @@ class BlockReceiver implements Closeable {
               }
               seqno = ack.getSeqno();
             }
-            if (seqno != PipelineAck.UNKOWN_SEQNO ||
-                type == PacketResponderType.LAST_IN_PIPELINE) {
-              synchronized (this) {
-                while (running && datanode.shouldRun && ackQueue.size() == 0) {
-                  if (LOG.isDebugEnabled()) {
-                    LOG.debug(myString + ": seqno=" + seqno +
-                        " waiting for local datanode to finish write.");
-                  }
-                  wait();
-                }
-                if (!running || !datanode.shouldRun) {
-                  break;
-                }
-                pkt = ackQueue.getFirst();
-                expected = pkt.seqno;
-                if (type == PacketResponderType.HAS_DOWNSTREAM_IN_PIPELINE &&
-                    seqno != expected) {
-                  throw new IOException(
-                      myString + "seqno: expected=" + expected + ", received=" +
-                          seqno);
-                }
-                if (type == PacketResponderType.HAS_DOWNSTREAM_IN_PIPELINE) {
-                  // The total ack time includes the ack times of downstream nodes.
-                  // The value is 0 if this responder doesn't have a downstream
-                  // DN in the pipeline.
-                  totalAckTimeNanos = ackRecvNanoTime - pkt.ackEnqueueNanoTime;
-                  // Report the elapsed time from ack send to ack receive minus
-                  // the downstream ack time.
-                  long ackTimeNanos =
-                      totalAckTimeNanos - ack.getDownstreamAckTimeNanos();
-                  if (ackTimeNanos < 0) {
-                    if (LOG.isDebugEnabled()) {
-                      LOG.debug("Calculated invalid ack time: " + ackTimeNanos +
-                          "ns.");
-                    }
-                  } else {
-                    datanode.metrics
-                        .addPacketAckRoundTripTimeNanos(ackTimeNanos);
-                  }
-                }
-                lastPacketInBlock = pkt.lastPacketInBlock;
+            if (seqno != PipelineAck.UNKOWN_SEQNO
+                || type == PacketResponderType.LAST_IN_PIPELINE) {
+              pkt = waitForAckHead(seqno);
+              if (!isRunning()) {
+                break;
               }
+              expected = pkt.seqno;
+              if (type == PacketResponderType.HAS_DOWNSTREAM_IN_PIPELINE
+                  && seqno != expected) {
+                throw new IOException(myString + "seqno: expected=" + expected
+                    + ", received=" + seqno);
+              }
+              if (type == PacketResponderType.HAS_DOWNSTREAM_IN_PIPELINE) {
+                // The total ack time includes the ack times of downstream
+                // nodes.
+                // The value is 0 if this responder doesn't have a downstream
+                // DN in the pipeline.
+                totalAckTimeNanos = ackRecvNanoTime - pkt.ackEnqueueNanoTime;
+                // Report the elapsed time from ack send to ack receive minus
+                // the downstream ack time.
+                long ackTimeNanos = totalAckTimeNanos
+                    - ack.getDownstreamAckTimeNanos();
+                if (ackTimeNanos < 0) {
+                  if (LOG.isDebugEnabled()) {
+                    LOG.debug("Calculated invalid ack time: " + ackTimeNanos
+                        + "ns.");
+                  }
+                } else {
+                  datanode.metrics.addPacketAckRoundTripTimeNanos(ackTimeNanos);
+                }
+              }
+              lastPacketInBlock = pkt.lastPacketInBlock;
             }
           } catch (InterruptedException ine) {
             isInterrupted = true;
@@ -997,73 +1019,30 @@ class BlockReceiver implements Closeable {
           }
 
           if (Thread.interrupted() || isInterrupted) {
-              /* The receiver thread cancelled this thread. 
-               * We could also check any other status updates from the 
-               * receiver thread (e.g. if it is ok to write to replyOut). 
-               * It is prudent to not send any more status back to the client
-               * because this datanode has a problem. The upstream datanode
-               * will detect that this datanode is bad, and rightly so.
-               */
+            /*
+             * The receiver thread cancelled this thread. We could also check
+             * any other status updates from the receiver thread (e.g. if it is
+             * ok to write to replyOut). It is prudent to not send any more
+             * status back to the client because this datanode has a problem.
+             * The upstream datanode will detect that this datanode is bad, and
+             * rightly so.
+             */
             LOG.info(myString + ": Thread is interrupted.");
             running = false;
             continue;
           }
 
-          // If this is the last packet in block, then close block
-          // file and finalize the block before responding success
           if (lastPacketInBlock) {
-            BlockReceiver.this.close();
-            final long endTime = ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
-            block.setNumBytes(replicaInfo.getNumBytes());
-            datanode.data.finalizeBlock(block);
-            datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT, replicaInfo.getStorageUuid());
-            if (ClientTraceLog.isInfoEnabled() && isClient) {
-              long offset = 0;
-              DatanodeRegistration dnR =
-                  datanode.getDNRegistrationForBP(block.getBlockPoolId());
-              ClientTraceLog.info(String
-                  .format(DN_CLIENTTRACE_FORMAT, inAddr, myAddr,
-                      block.getNumBytes(), "HDFS_WRITE", clientname, offset,
-                      dnR.getDatanodeUuid(), block, endTime - startTime));
-            } else {
-              LOG.info("Received " + block + " size " + block.getNumBytes() +
-                  " from " + inAddr);
-            }
+            // Finalize the block and close the block file
+            finalizeBlock(startTime);
           }
 
-          // construct my ack message
-          Status[] replies = null;
-          if (mirrorError) { // ack read error
-            replies = new Status[2];
-            replies[0] = Status.SUCCESS;
-            replies[1] = Status.ERROR;
-          } else {
-            short ackLen = type == PacketResponderType.LAST_IN_PIPELINE ? 0 :
-                ack.getNumOfReplies();
-            replies = new Status[1 + ackLen];
-            replies[0] = Status.SUCCESS;
-            for (int i = 0; i < ackLen; i++) {
-              replies[i + 1] = ack.getReply(i);
-            }
-          }
-          PipelineAck replyAck =
-              new PipelineAck(expected, replies, totalAckTimeNanos);
-
-          if (replyAck.isSuccess() &&
-              pkt.offsetInBlock > replicaInfo.getBytesAcked()) {
-            replicaInfo.setBytesAcked(pkt.offsetInBlock);
-          }
-
-          // send my ack back to upstream datanode
-          replyAck.write(upstreamOut);
-          upstreamOut.flush();
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(myString + ", replyAck=" + replyAck);
-          }
+          sendAckUpstream(ack, expected, totalAckTimeNanos,
+              (pkt != null ? pkt.offsetInBlock : 0), 
+              (pkt != null ? pkt.ackStatus : Status.SUCCESS));
           if (pkt != null) {
             // remove the packet from the ack queue
             removeAckHead();
-            // update bytes acked
           }
         } catch (IOException e) {
           LOG.warn("IOException in BlockReceiver.run(): ", e);
@@ -1091,6 +1070,83 @@ class BlockReceiver implements Closeable {
     }
     
     /**
+     * Finalize the block and close the block file
+     *
+     * @param startTime time when BlockReceiver started receiving the block
+     */
+    private void finalizeBlock(long startTime) throws IOException {
+      BlockReceiver.this.close();
+      final long endTime = ClientTraceLog.isInfoEnabled() ? System.nanoTime()
+          : 0;
+      block.setNumBytes(replicaInfo.getNumBytes());
+      datanode.data.finalizeBlock(block);
+      datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT, replicaInfo.getStorageUuid());
+      if (ClientTraceLog.isInfoEnabled() && isClient) {
+        long offset = 0;
+        DatanodeRegistration dnR = datanode.getDNRegistrationForBP(block
+            .getBlockPoolId());
+        ClientTraceLog.info(String.format(DN_CLIENTTRACE_FORMAT, inAddr,
+            myAddr, block.getNumBytes(), "HDFS_WRITE", clientname, offset,
+            dnR.getDatanodeUuid(), block, endTime - startTime));
+      } else {
+        LOG.info("Received " + block + " size " + block.getNumBytes()
+            + " from " + inAddr);
+      }
+    }
+
+    /**
+     * @param ack Ack received from downstream
+     * @param seqno sequence number of ack to be sent upstream
+     * @param totalAckTimeNanos total ack time including all the downstream
+     * nodes
+     * @param offsetInBlock offset in block for the data in packet
+     */
+    private void sendAckUpstream(PipelineAck ack, long seqno,
+        long totalAckTimeNanos, long offsetInBlock, Status myStatus) throws IOException {
+      Status[] replies = null;
+      if (mirrorError) { // ack read error
+        replies = MIRROR_ERROR_STATUS;
+      } else {
+        short ackLen = type == PacketResponderType.LAST_IN_PIPELINE ? 0 : ack
+            .getNumOfReplies();
+        replies = new Status[1 + ackLen];
+        replies[0] = myStatus;
+        for (int i = 0; i < ackLen; i++) {
+          replies[i + 1] = ack.getReply(i);
+        }
+        // If the mirror has reported that it received a corrupt packet,
+        // do self-destruct to mark myself bad, instead of making the 
+        // mirror node bad. The mirror is guaranteed to be good without
+        // corrupt data on disk.
+        if (ackLen > 0 && replies[1] == Status.ERROR_CHECKSUM) {
+          throw new IOException("Shutting down writer and responder "
+              + "since the down streams reported the data sent by this "
+              + "thread is corrupt");
+        }
+      }
+      PipelineAck replyAck = new PipelineAck(seqno, replies,
+          totalAckTimeNanos);
+      if (replyAck.isSuccess()
+          && offsetInBlock > replicaInfo.getBytesAcked()) {
+        replicaInfo.setBytesAcked(offsetInBlock);
+      }
+
+      // send my ack back to upstream datanode
+      replyAck.write(upstreamOut);
+      upstreamOut.flush();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(myString + ", replyAck=" + replyAck);
+      }
+      // If a corruption was detected in the received data, terminate after
+      // sending ERROR_CHECKSUM back. 
+      if (myStatus == Status.ERROR_CHECKSUM) {
+        throw new IOException("Shutting down writer and responder "
+            + "due to a checksum error in received data. The error "
+            + "response has been sent upstream.");
+      }
+    }
+
+    /**
      * Remove a packet from the head of the ack queue
      * <p/>
      * This should be called only when the ack queue is not empty
@@ -1109,20 +1165,22 @@ class BlockReceiver implements Closeable {
     final boolean lastPacketInBlock;
     final long offsetInBlock;
     final long ackEnqueueNanoTime;
+    final Status ackStatus;
 
     Packet(long seqno, boolean lastPacketInBlock, long offsetInBlock,
-        long ackEnqueueNanoTime) {
+        long ackEnqueueNanoTime, Status ackStatus) {
       this.seqno = seqno;
       this.lastPacketInBlock = lastPacketInBlock;
       this.offsetInBlock = offsetInBlock;
       this.ackEnqueueNanoTime = ackEnqueueNanoTime;
+      this.ackStatus = ackStatus;
     }
 
     @Override
     public String toString() {
       return getClass().getSimpleName() + "(seqno=" + seqno +
           ", lastPacketInBlock=" + lastPacketInBlock + ", offsetInBlock=" +
-          offsetInBlock + ", ackEnqueueNanoTime=" + ackEnqueueNanoTime + ")";
+          offsetInBlock + ", ackEnqueueNanoTime=" + ackEnqueueNanoTime + ", ackStatus=" + ackStatus + ")";
     }
   }
 }
