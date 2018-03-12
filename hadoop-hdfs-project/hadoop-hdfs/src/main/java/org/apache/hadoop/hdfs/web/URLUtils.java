@@ -18,12 +18,12 @@
 
 package org.apache.hadoop.hdfs.web;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
+
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * Utilities for handling URLs
@@ -34,20 +34,27 @@ public class URLUtils {
   /**
    * Timeout for socket connects and reads
    */
-  public static int SOCKET_TIMEOUT = 1 * 60 * 1000; // 1 minute
+  public static int SOCKET_TIMEOUT = 1*60*1000; // 1 minute
 
   /**
    * Opens a url with read and connect timeouts
-   *
-   * @param url
-   *     to open
+   * @param url to open
    * @return URLConnection
    * @throws IOException
    */
   public static URLConnection openConnection(URL url) throws IOException {
     URLConnection connection = url.openConnection();
+    setTimeouts(connection);
+    return connection;    
+  }
+
+  /**
+   * Sets timeout parameters on the given URLConnection.
+   * 
+   * @param connection URLConnection to set
+   */
+  static void setTimeouts(URLConnection connection) {
     connection.setConnectTimeout(SOCKET_TIMEOUT);
     connection.setReadTimeout(SOCKET_TIMEOUT);
-    return connection;
   }
 }

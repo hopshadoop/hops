@@ -17,89 +17,66 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
-import javax.ws.rs.core.Response;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import javax.ws.rs.core.Response;
 
-/**
- * Http operation parameter.
- */
+
+/** Http operation parameter. */
 public abstract class HttpOpParam<E extends Enum<E> & HttpOpParam.Op>
     extends EnumParam<E> {
-  /**
-   * Parameter name.
-   */
+  /** Parameter name. */
   public static final String NAME = "op";
 
-  /**
-   * Default parameter value.
-   */
+  /** Default parameter value. */
   public static final String DEFAULT = NULL;
 
-  /**
-   * Http operation types
-   */
+  /** Http operation types */
   public static enum Type {
-    GET,
-    PUT,
-    POST,
-    DELETE;
+    GET, PUT, POST, DELETE;
   }
 
-  /**
-   * Http operation interface.
-   */
+  /** Http operation interface. */
   public static interface Op {
-    /**
-     * @return the Http operation type.
-     */
+    /** @return the Http operation type. */
     public Type getType();
 
-    /**
-     * @return true if the operation will do output.
-     */
+    /** @return true if the operation cannot use a token */
+    public boolean getRequireAuth();
+    
+    /** @return true if the operation will do output. */
     public boolean getDoOutput();
 
-    /**
-     * @return true if the operation will be redirected.
-     */
+    /** @return true if the operation will be redirected. */
     public boolean getRedirect();
 
-    /**
-     * @return true the expected http response code.
-     */
+    /** @return true the expected http response code. */
     public int getExpectedHttpResponseCode();
 
-    /**
-     * @return a URI query string.
-     */
+    /** @return a URI query string. */
     public String toQueryString();
   }
 
-  /**
-   * Expects HTTP response 307 "Temporary Redirect".
-   */
+  /** Expects HTTP response 307 "Temporary Redirect". */
   public static class TemporaryRedirectOp implements Op {
-    static final TemporaryRedirectOp CREATE =
-        new TemporaryRedirectOp(PutOpParam.Op.CREATE);
-    static final TemporaryRedirectOp APPEND =
-        new TemporaryRedirectOp(PostOpParam.Op.APPEND);
-    static final TemporaryRedirectOp OPEN =
-        new TemporaryRedirectOp(GetOpParam.Op.OPEN);
-    static final TemporaryRedirectOp GETFILECHECKSUM =
-        new TemporaryRedirectOp(GetOpParam.Op.GETFILECHECKSUM);
+    static final TemporaryRedirectOp CREATE = new TemporaryRedirectOp(
+        PutOpParam.Op.CREATE);
+    static final TemporaryRedirectOp APPEND = new TemporaryRedirectOp(
+        PostOpParam.Op.APPEND);
+    static final TemporaryRedirectOp OPEN = new TemporaryRedirectOp(
+        GetOpParam.Op.OPEN);
+    static final TemporaryRedirectOp GETFILECHECKSUM = new TemporaryRedirectOp(
+        GetOpParam.Op.GETFILECHECKSUM);
     
-    static final List<TemporaryRedirectOp> values = Collections
-        .unmodifiableList(Arrays.asList(
+    static final List<TemporaryRedirectOp> values
+        = Collections.unmodifiableList(Arrays.asList(
             new TemporaryRedirectOp[]{CREATE, APPEND, OPEN, GETFILECHECKSUM}));
 
-    /**
-     * Get an object for the given op.
-     */
+    /** Get an object for the given op. */
     public static TemporaryRedirectOp valueOf(final Op op) {
-      for (TemporaryRedirectOp t : values) {
+      for(TemporaryRedirectOp t : values) {
         if (op == t.op) {
           return t;
         }
@@ -119,6 +96,11 @@ public abstract class HttpOpParam<E extends Enum<E> & HttpOpParam.Op>
     }
 
     @Override
+    public boolean getRequireAuth() {
+      return op.getRequireAuth();
+    }
+
+    @Override
     public boolean getDoOutput() {
       return op.getDoOutput();
     }
@@ -128,9 +110,7 @@ public abstract class HttpOpParam<E extends Enum<E> & HttpOpParam.Op>
       return false;
     }
 
-    /**
-     * Override the original expected response with "Temporary Redirect".
-     */
+    /** Override the original expected response with "Temporary Redirect". */
     @Override
     public int getExpectedHttpResponseCode() {
       return Response.Status.TEMPORARY_REDIRECT.getStatusCode();
@@ -142,9 +122,7 @@ public abstract class HttpOpParam<E extends Enum<E> & HttpOpParam.Op>
     }
   }
 
-  /**
-   * @return the parameter value as a string
-   */
+  /** @return the parameter value as a string */
   @Override
   public String getValueString() {
     return value.toString();
