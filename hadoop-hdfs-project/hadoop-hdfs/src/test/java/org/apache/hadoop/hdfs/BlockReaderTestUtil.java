@@ -34,6 +34,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.List;
 import java.util.Random;
+import org.apache.hadoop.hdfs.net.TcpPeerServer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -153,11 +154,11 @@ public class BlockReaderTestUtil {
     sock.connect(targetAddr, HdfsServerConstants.READ_TIMEOUT);
     sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
 
-    return BlockReaderFactory.newBlockReader(new DFSClient.Conf(conf), sock,
+    return BlockReaderFactory.newBlockReader(conf,
         targetAddr.toString() + ":" + block.getBlockId(), block,
         testBlock.getBlockToken(), offset, lenToRead,
-        conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
-        true, "", null, null);
+        true, "BlockReaderTestUtil", TcpPeerServer.peerFromSocket(sock),
+        nodes[0], null, false);
   }
 
   /**

@@ -55,6 +55,8 @@ import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
@@ -64,11 +66,15 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Arrays;
+import org.apache.hadoop.hdfs.net.Peer;
 
 import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.ERROR;
 import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.ERROR_ACCESS_TOKEN;
 import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.SUCCESS;
+import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.ERROR_UNSUPPORTED;
 import static org.apache.hadoop.hdfs.server.datanode.DataNode.DN_CLIENTTRACE_FORMAT;
+import static org.apache.hadoop.hdfs.server.datanode.DataNode.ShortCircuitFdsVersionException;
+import static org.apache.hadoop.hdfs.server.datanode.DataNode.ShortCircuitFdsUnsupportedException;
 import static org.apache.hadoop.util.Time.now;
 
 
@@ -79,8 +85,7 @@ class DataXceiver extends Receiver implements Runnable {
   public static final Log LOG = DataNode.LOG;
   static final Log ClientTraceLog = DataNode.ClientTraceLog;
   
-  private final Socket s;
-  private final boolean isLocal; //is a local connection?
+  private final Peer peer;
   private final String remoteAddress; // address of remote side
   private final String localAddress;  // local address of this daemon
   private final DataNode datanode;
@@ -88,7 +93,7 @@ class DataXceiver extends Receiver implements Runnable {
   private final DataXceiverServer dataXceiverServer;
   private final boolean connectToDnViaHostname;
   private long opStartTime; //the start time of receiving an Op
-  private final SocketInputWrapper socketIn;
+  private final InputStream socketIn;
   private OutputStream socketOut;
 
   /**
@@ -97,24 +102,23 @@ class DataXceiver extends Receiver implements Runnable {
    */
   private String previousOpClientName;
   
-  public static DataXceiver create(Socket s, DataNode dn,
+  public static DataXceiver create(Peer peer, DataNode dn,
       DataXceiverServer dataXceiverServer) throws IOException {
-    return new DataXceiver(s, dn, dataXceiverServer);
+    return new DataXceiver(peer, dn, dataXceiverServer);
   }
   
-  private DataXceiver(Socket s, DataNode datanode,
+  private DataXceiver(Peer peer, DataNode datanode,
       DataXceiverServer dataXceiverServer) throws IOException {
 
-    this.s = s;
+    this.peer = peer;
     this.dnConf = datanode.getDnConf();
-    this.socketIn = NetUtils.getInputStream(s);
-    this.socketOut = NetUtils.getOutputStream(s, dnConf.socketWriteTimeout);
-    this.isLocal = s.getInetAddress().equals(s.getLocalAddress());
+    this.socketIn = peer.getInputStream();
+    this.socketOut = peer.getOutputStream();
     this.datanode = datanode;
     this.dataXceiverServer = dataXceiverServer;
     this.connectToDnViaHostname = datanode.getDnConf().connectToDnViaHostname;
-    remoteAddress = s.getRemoteSocketAddress().toString();
-    localAddress = s.getLocalSocketAddress().toString();
+    remoteAddress = peer.getRemoteAddressString();
+    localAddress = peer.getLocalAddressString();
 
     if (LOG.isDebugEnabled()) {
       LOG.debug(
@@ -159,10 +163,9 @@ class DataXceiver extends Receiver implements Runnable {
     int opsProcessed = 0;
     Op op = null;
     
-    dataXceiverServer.childSockets.add(s);
-    
+    dataXceiverServer.addPeer(peer);
     try {
-      
+      peer.setWriteTimeout(datanode.getDnConf().socketWriteTimeout);
       InputStream input = socketIn;
       if (dnConf.encryptDataTransfer) {
         IOStreamPair encryptedStreams = null;
@@ -172,10 +175,8 @@ class DataXceiver extends Receiver implements Runnable {
                   datanode.blockPoolTokenSecretManager,
                   dnConf.encryptionAlgorithm);
         } catch (InvalidMagicNumberException imne) {
-          LOG.info("Failed to read expected encryption handshake from client " +
-              "at " + s.getInetAddress() +
-              ". Perhaps the client is running an " +
-              "older version of Hadoop which does not support encryption");
+          LOG.info("Failed to read expected encryption handshake from client " + "at " + peer.getRemoteAddressString()
+              + ". Perhaps the client " + "is running an older version of Hadoop which does not support " + "encryption");
           return;
         }
         input = encryptedStreams.in;
@@ -194,9 +195,9 @@ class DataXceiver extends Receiver implements Runnable {
         try {
           if (opsProcessed != 0) {
             assert dnConf.socketKeepaliveTimeout > 0;
-            socketIn.setTimeout(dnConf.socketKeepaliveTimeout);
+            peer.setReadTimeout(dnConf.socketKeepaliveTimeout);
           } else {
-            socketIn.setTimeout(dnConf.socketTimeout);
+            peer.setReadTimeout(dnConf.socketTimeout);
           }
           op = readOp();
         } catch (InterruptedIOException ignored) {
@@ -208,7 +209,7 @@ class DataXceiver extends Receiver implements Runnable {
               err instanceof ClosedChannelException)) {
             if (LOG.isDebugEnabled()) {
               LOG.debug(
-                  "Cached " + s.toString() + " closing after " + opsProcessed +
+                  "Cached " + peer + " closing after " + opsProcessed +
                       " ops");
             }
           } else {
@@ -219,13 +220,13 @@ class DataXceiver extends Receiver implements Runnable {
 
         // restore normal timeout
         if (opsProcessed != 0) {
-          s.setSoTimeout(dnConf.socketTimeout);
+          peer.setReadTimeout(dnConf.socketTimeout);
         }
 
         opStartTime = now();
         processOp(op);
         ++opsProcessed;
-      } while (!s.isClosed() && dnConf.socketKeepaliveTimeout > 0);
+      } while (!peer.isClosed() && dnConf.socketKeepaliveTimeout > 0);
     } catch (Throwable t) {
       String s = datanode.getDisplayName() + ":DataXceiver error processing "
           + ((op == null) ? "unknown" : op.name()) + " operation "
@@ -249,9 +250,70 @@ class DataXceiver extends Receiver implements Runnable {
                 datanode.getXceiverCount());
       }
       updateCurrentThreadName("Cleaning up");
+      dataXceiverServer.closePeer(peer);
       IOUtils.closeStream(in);
-      IOUtils.closeSocket(s);
-      dataXceiverServer.childSockets.remove(s);
+    }
+  }
+
+  @Override
+  public void requestShortCircuitFds(final ExtendedBlock blk,
+      final Token<BlockTokenIdentifier> token,
+      int maxVersion) throws IOException {
+    updateCurrentThreadName("Passing file descriptors for block " + blk);
+    BlockOpResponseProto.Builder bld = BlockOpResponseProto.newBuilder();
+    FileInputStream fis[] = null;
+    try {
+      if (peer.getDomainSocket() == null) {
+        throw new IOException("You cannot pass file descriptors over " +
+            "anything but a UNIX domain socket.");
+      }
+      fis = datanode.requestShortCircuitFdsForRead(blk, token, maxVersion);
+      bld.setStatus(SUCCESS);
+      bld.setShortCircuitAccessVersion(DataNode.CURRENT_BLOCK_FORMAT_VERSION);
+    } catch (ShortCircuitFdsVersionException e) {
+      bld.setStatus(ERROR_UNSUPPORTED);
+      bld.setShortCircuitAccessVersion(DataNode.CURRENT_BLOCK_FORMAT_VERSION);
+      bld.setMessage(e.getMessage());
+    } catch (ShortCircuitFdsUnsupportedException e) {
+      bld.setStatus(ERROR_UNSUPPORTED);
+      bld.setMessage(e.getMessage());
+    } catch (InvalidToken e) {
+      bld.setStatus(ERROR_ACCESS_TOKEN);
+      bld.setMessage(e.getMessage());
+    } catch (IOException e) {
+      bld.setStatus(ERROR);
+      bld.setMessage(e.getMessage());
+    }
+    try {
+      bld.build().writeDelimitedTo(socketOut);
+      if (fis != null) {
+        FileDescriptor fds[] = new FileDescriptor[fis.length];
+        for (int i = 0; i < fds.length; i++) {
+          fds[i] = fis[i].getFD();
+        }
+        byte buf[] = new byte[] { (byte)0 };
+        peer.getDomainSocket().
+          sendFileDescriptors(fds, buf, 0, buf.length);
+      }
+    } finally {
+      if (ClientTraceLog.isInfoEnabled()) {
+        DatanodeRegistration dnR = datanode.getDNRegistrationForBP(blk
+            .getBlockPoolId());
+        BlockSender.ClientTraceLog.info(String.format(
+          String.format(
+            "src: %s, dest: %s, op: %s, blockid: %s, srvID: %s, " +
+              "success: %b",
+            "127.0.0.1",                   // src IP
+            "127.0.0.1",                   // dst IP
+            "REQUEST_SHORT_CIRCUIT_FDS",   // operation
+            blk.getBlockId(),             // block id
+            dnR.getDatanodeUuid(),
+            (fis != null)
+          )));
+      }
+      if (fis != null) {
+        IOUtils.cleanup(LOG, fis);
+      }  
     }
   }
 
@@ -304,9 +366,9 @@ class DataXceiver extends Receiver implements Runnable {
           ClientReadStatusProto stat =
               ClientReadStatusProto.parseFrom(PBHelper.vintPrefixed(in));
           if (!stat.hasStatus()) {
-            LOG.warn("Client " + s.getInetAddress() +
-                " did not send a valid status " +
-                "code after reading. Will close connection.");
+            LOG.warn("Client " + peer.getRemoteAddressString() +
+                " did not send a valid status code after reading. " +
+                "Will close connection.");
             IOUtils.closeStream(out);
           }
         } catch (IOException ioe) {
@@ -341,7 +403,7 @@ class DataXceiver extends Receiver implements Runnable {
 
     //update metrics
     datanode.metrics.addReadBlockOp(elapsed());
-    datanode.metrics.incrReadsFromClient(isLocal);
+    datanode.metrics.incrReadsFromClient(peer.isLocal());
   }
 
   @Override
@@ -382,8 +444,8 @@ class DataXceiver extends Receiver implements Runnable {
               Arrays.asList(targetStorageTypes));
       LOG.debug("isDatanode=" + isDatanode + ", isClient=" + isClient +
           ", isTransfer=" + isTransfer);
-      LOG.debug("writeBlock receive buf size " + s.getReceiveBufferSize() +
-          " tcp no delay " + s.getTcpNoDelay());
+      LOG.debug("writeBlock receive buf size " + peer.getReceiveBufferSize() +
+                " tcp no delay " + peer.getTcpNoDelay());
     }
 
     // We later mutate block's generation stamp and length, but we need to
@@ -415,8 +477,8 @@ class DataXceiver extends Receiver implements Runnable {
         // open a block receiver
         blockReceiver =
             new BlockReceiver(block, storageType, in,
-                s.getRemoteSocketAddress().toString(),
-                s.getLocalSocketAddress().toString(), stage,
+                peer.getRemoteAddressString(),
+                peer.getLocalAddressString(), stage,
                 latestGenerationStamp, minBytesRcvd, maxBytesRcvd, clientname,
                 srcDataNode, datanode, requestedChecksum);
 
@@ -570,7 +632,7 @@ class DataXceiver extends Receiver implements Runnable {
 
     //update metrics
     datanode.metrics.addWriteBlockOp(elapsed());
-    datanode.metrics.incrWritesFromClient(isLocal);
+    datanode.metrics.incrWritesFromClient(peer.isLocal());
   }
 
   @Override
@@ -579,7 +641,7 @@ class DataXceiver extends Receiver implements Runnable {
       final String clientName,
       final DatanodeInfo[] targets,
       final StorageType[] targetStorageTypes) throws IOException {
-    checkAccess(null, true, blk, blockToken, Op.TRANSFER_BLOCK,
+    checkAccess(socketOut, true, blk, blockToken, Op.TRANSFER_BLOCK,
         BlockTokenSecretManager.AccessMode.COPY);
     previousOpClientName = clientName;
     updateCurrentThreadName(Op.TRANSFER_BLOCK + " " + blk);
@@ -664,8 +726,9 @@ class DataXceiver extends Receiver implements Runnable {
     }
 
     if (!dataXceiverServer.balanceThrottler.acquire()) { // not able to start
-      String msg = "Not able to copy block " + block.getBlockId() + " to " +
-          s.getRemoteSocketAddress() + " because threads quota is exceeded.";
+      String msg = "Not able to copy block " + block.getBlockId() + " " +
+          "to " + peer.getRemoteAddressString() + " because threads " +
+          "quota is exceeded.";
       LOG.info(msg);
       sendResponse(ERROR, msg);
       return;
@@ -694,7 +757,7 @@ class DataXceiver extends Receiver implements Runnable {
       datanode.metrics.incrBytesRead((int) read);
       datanode.metrics.incrBlocksRead();
       
-      LOG.info("Copied " + block + " to " + s.getRemoteSocketAddress());
+      LOG.info("Copied " + block + " to " + peer.getRemoteAddressString());
     } catch (IOException ioe) {
       isOpSuccess = false;
       LOG.info("opCopyBlock " + block + " received exception " + ioe);
@@ -740,10 +803,9 @@ class DataXceiver extends Receiver implements Runnable {
     }
 
     if (!dataXceiverServer.balanceThrottler.acquire()) { // not able to start
-      String msg =
-          "Not able to receive block " + block.getBlockId() + " from " +
-              s.getRemoteSocketAddress() +
-              " because threads quota is exceeded.";
+      String msg = "Not able to receive block " + block.getBlockId() +
+          " from " + peer.getRemoteAddressString() + " because threads " +
+          "quota is exceeded.";
       LOG.warn(msg);
       sendResponse(ERROR, msg);
       return;
@@ -821,7 +883,7 @@ class DataXceiver extends Receiver implements Runnable {
       datanode.notifyNamenodeReceivedBlock(block, delHint,
           blockReceiver.getStorageUuid());
 
-      LOG.info("Moved " + block + " from " + s.getRemoteSocketAddress());
+      LOG.info("Moved " + block + " from " + peer.getRemoteAddressString());
       
     } catch (IOException ioe) {
       opStatus = ERROR;
@@ -844,7 +906,7 @@ class DataXceiver extends Receiver implements Runnable {
       try {
         sendResponse(opStatus, errMsg);
       } catch (IOException ioe) {
-        LOG.warn("Error writing reply back to " + s.getRemoteSocketAddress());
+        LOG.warn("Error writing reply back to " + peer.getRemoteAddressString());
       }
       IOUtils.closeStream(proxyOut);
       IOUtils.closeStream(blockReceiver);
@@ -897,7 +959,7 @@ class DataXceiver extends Receiver implements Runnable {
   }
   
 
-  private void checkAccess(DataOutputStream out, final boolean reply,
+  private void checkAccess(OutputStream out, final boolean reply,
       final ExtendedBlock blk, final Token<BlockTokenIdentifier> t, final Op op,
       final BlockTokenSecretManager.AccessMode mode) throws IOException {
     if (datanode.isBlockTokenEnabled) {
@@ -910,11 +972,6 @@ class DataXceiver extends Receiver implements Runnable {
       } catch (InvalidToken e) {
         try {
           if (reply) {
-            if (out == null) {
-              out = new DataOutputStream(
-                  NetUtils.getOutputStream(s, dnConf.socketWriteTimeout));
-            }
-            
             BlockOpResponseProto.Builder resp =
                 BlockOpResponseProto.newBuilder().setStatus(ERROR_ACCESS_TOKEN);
             if (mode == BlockTokenSecretManager.AccessMode.WRITE) {

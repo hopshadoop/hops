@@ -2,13 +2,8 @@ package org.apache.hadoop.hdfs;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 
 import java.io.*;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.ByteBuffer;
 
 /**
@@ -17,28 +12,17 @@ import java.nio.ByteBuffer;
 public class BlockReaderDB implements  BlockReader{
     public static final Log LOG = LogFactory.getLog(BlockReaderDB.class);
 
-    private  final InetSocketAddress dnAddr;
-    private  final DatanodeInfo  dnInfo;
-    private  final LocatedBlock locBlock;
-    private  final byte[] data;
-    private  final int startOffset;
     private  final ByteArrayInputStream bis;
 
-    public BlockReaderDB(InetSocketAddress dnAddr, DatanodeInfo dnInfo, LocatedBlock locBlock, byte[] data,
-                         final int startOffset) {
-        this.dnAddr = dnAddr;
-        this.dnInfo = dnInfo;
-        this.locBlock = locBlock;
-        this.data = data;
-        bis = new ByteArrayInputStream(data);
+  public BlockReaderDB(byte[] data, final int startOffset) {
+    bis = new ByteArrayInputStream(data);
 
-        this.startOffset  = startOffset;
-        if(startOffset>0){
-            long skipped = bis.skip(startOffset);
-            assert  skipped == startOffset;
-        }
-
+    if (startOffset > 0) {
+      long skipped = bis.skip(startOffset);
+      assert skipped == startOffset;
     }
+
+  }
 
     @Override
     public int read(byte[] buf, int off, int len) throws IOException {
@@ -57,7 +41,8 @@ public class BlockReaderDB implements  BlockReader{
     }
 
     @Override
-    public void close() throws IOException {
+    public void close(PeerCache peerCache,
+      FileInputStreamCache fisCache) throws IOException {
 //      LOG.debug("Stuffed Inode:  closing the BlockReaderDB");
       bis.close();
     }
@@ -95,30 +80,6 @@ public class BlockReaderDB implements  BlockReader{
     public int readAll(byte[] buf, int offset, int len) throws IOException {
 //      LOG.debug("Stuffed Inode:  BlockReaderDB readAll called. Offset: "+offset+" len: "+len);
       return bis.read(buf, offset, len);
-    }
-    /**
-     * Take the socket used to talk to the DN.
-     */
-    @Override
-    public Socket takeSocket() {
-      return null;
-    }
-
-    /**
-     * Whether the BlockReader has reached the end of its input stream
-     * and successfully sent a status code back to the datanode.
-     */
-    @Override
-    public boolean hasSentStatusCode() {
-      return false;
-    }
-
-    /**
-     * @return a reference to the streams this block reader is using.
-     */
-    @Override
-    public IOStreamPair getStreams() {
-      return null;
     }
 
     /**
@@ -158,4 +119,9 @@ public class BlockReaderDB implements  BlockReader{
       return actuallyRead;
     }
 
+  public int available() throws IOException {
+    // An optimistic estimate of how much data is available
+    // to us without doing network I/O.
+    return DFSClient.TCP_WINDOW_SIZE;
+  }
 }

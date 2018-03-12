@@ -2188,6 +2188,19 @@ public class MiniDFSCluster {
   }
 
   /**
+   * Get the latest metadata file correpsonding to a block
+   * @param storageDir storage directory
+   * @param blk the block
+   * @return metadata file corresponding to the block
+   */
+  public static File getBlockMetadataFile(File storageDir, ExtendedBlock blk) {
+    return new File(getFinalizedDir(storageDir, blk.getBlockPoolId()), 
+        blk.getBlockName() + "_" + blk.getGenerationStamp() +
+        Block.METADATA_EXTENSION);
+    
+  }
+
+  /**
    * Shut down a cluster if it is not null
    *
    * @param cluster
@@ -2221,7 +2234,7 @@ public class MiniDFSCluster {
   }
   
   /**
-   * Get files related to a block for a given datanode
+   * Get the block data file for a block from a given datanode
    *
    * @param dnIndex
    *     Index of the datanode to get block files for
@@ -2240,6 +2253,24 @@ public class MiniDFSCluster {
     return null;
   }
   
+  /**
+   * Get the block metadata file for a block from a given datanode
+   * 
+   * @param dnIndex Index of the datanode to get block files for
+   * @param block block for which corresponding files are needed
+   */
+  public static File getBlockMetadataFile(int dnIndex, ExtendedBlock block) {
+    // Check for block file in the two storage directories of the datanode
+    for (int i = 0; i <=1 ; i++) {
+      File storageDir = MiniDFSCluster.getStorageDir(dnIndex, i);
+      File blockMetaFile = getBlockMetadataFile(storageDir, block);
+      if (blockMetaFile.exists()) {
+        return blockMetaFile;
+      }
+    }
+    return null;
+  }
+
   /**
    * Throw an exception if the MiniDFSCluster is not started with a single
    * namenode
