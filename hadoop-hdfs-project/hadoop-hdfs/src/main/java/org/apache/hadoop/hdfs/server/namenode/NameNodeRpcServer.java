@@ -122,13 +122,20 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.hadoop.HadoopIllegalArgumentException;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.InvalidPathException;
+import org.apache.hadoop.fs.ParentNotDirectoryException;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY;
+import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_DEPTH;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_LENGTH;
+import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
+import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.tukaani.xz.UnsupportedOptionsException;
 
 /**
@@ -280,6 +287,20 @@ class NameNodeRpcServer implements NamenodeProtocols {
     minimumDataNodeVersion =
         conf.get(DFSConfigKeys.DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_KEY,
             DFSConfigKeys.DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_DEFAULT);
+    
+     // Set terse exception whose stack trace won't be logged
+    clientRpcServer.addTerseExceptions(SafeModeException.class,
+        FileNotFoundException.class,
+        HadoopIllegalArgumentException.class,
+        FileAlreadyExistsException.class,
+        InvalidPathException.class,
+        ParentNotDirectoryException.class,
+        UnresolvedLinkException.class,
+        AlreadyBeingCreatedException.class,
+        QuotaExceededException.class,
+        RecoveryInProgressException.class,
+        AccessControlException.class,
+        InvalidToken.class);
   }
   
   /**
