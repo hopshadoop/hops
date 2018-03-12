@@ -19,13 +19,9 @@ package org.apache.hadoop.hdfs.web.resources;
 
 import java.net.HttpURLConnection;
 
-/**
- * Http POST operation parameter.
- */
+/** Http POST operation parameter. */
 public class PutOpParam extends HttpOpParam<PutOpParam.Op> {
-  /**
-   * Put operations.
-   */
+  /** Put operations. */
   public static enum Op implements HttpOpParam.Op {
     CREATE(true, HttpURLConnection.HTTP_CREATED),
 
@@ -38,22 +34,34 @@ public class PutOpParam extends HttpOpParam<PutOpParam.Op> {
     SETPERMISSION(false, HttpURLConnection.HTTP_OK),
     SETTIMES(false, HttpURLConnection.HTTP_OK),
     
-    RENEWDELEGATIONTOKEN(false, HttpURLConnection.HTTP_OK),
-    CANCELDELEGATIONTOKEN(false, HttpURLConnection.HTTP_OK),
+    RENEWDELEGATIONTOKEN(false, HttpURLConnection.HTTP_OK, true),
+    CANCELDELEGATIONTOKEN(false, HttpURLConnection.HTTP_OK, true),
     
     NULL(false, HttpURLConnection.HTTP_NOT_IMPLEMENTED);
 
     final boolean doOutputAndRedirect;
     final int expectedHttpResponseCode;
+    final boolean requireAuth;
 
     Op(final boolean doOutputAndRedirect, final int expectedHttpResponseCode) {
+      this(doOutputAndRedirect, expectedHttpResponseCode, false);
+    }
+    
+    Op(final boolean doOutputAndRedirect, final int expectedHttpResponseCode,
+       final boolean requireAuth) {
       this.doOutputAndRedirect = doOutputAndRedirect;
       this.expectedHttpResponseCode = expectedHttpResponseCode;
+      this.requireAuth = requireAuth;
     }
 
     @Override
     public HttpOpParam.Type getType() {
       return HttpOpParam.Type.PUT;
+    }
+    
+    @Override
+    public boolean getRequireAuth() {
+      return requireAuth;
     }
 
     @Override
@@ -77,13 +85,11 @@ public class PutOpParam extends HttpOpParam<PutOpParam.Op> {
     }
   }
 
-  private static final Domain<Op> DOMAIN = new Domain<>(NAME, Op.class);
+  private static final Domain<Op> DOMAIN = new Domain<Op>(NAME, Op.class);
 
   /**
    * Constructor.
-   *
-   * @param str
-   *     a string representation of the parameter value.
+   * @param str a string representation of the parameter value.
    */
   public PutOpParam(final String str) {
     super(DOMAIN, DOMAIN.parse(str));

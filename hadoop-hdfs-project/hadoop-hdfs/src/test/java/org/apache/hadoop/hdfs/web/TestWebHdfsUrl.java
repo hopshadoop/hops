@@ -18,20 +18,24 @@
 
 package org.apache.hadoop.hdfs.web;
 
+import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.mockito.Mockito.mock;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.util.Arrays;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.web.resources.DelegationParam;
-import org.apache.hadoop.hdfs.web.resources.DoAsParam;
-import org.apache.hadoop.hdfs.web.resources.FsActionParam;
-import org.apache.hadoop.hdfs.web.resources.GetOpParam;
-import org.apache.hadoop.hdfs.web.resources.PutOpParam;
-import org.apache.hadoop.hdfs.web.resources.TokenArgumentParam;
-import org.apache.hadoop.hdfs.web.resources.UserParam;
+import org.apache.hadoop.hdfs.web.resources.*;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
@@ -39,19 +43,7 @@ import org.apache.hadoop.security.SecurityUtilTestHelper;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.net.URI;
-import java.net.URL;
-import java.util.Arrays;
-
-import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.mockito.Mockito.mock;
+import org.junit.*;
 
 public class TestWebHdfsUrl {
   // NOTE: port is never used 
@@ -62,7 +54,7 @@ public class TestWebHdfsUrl {
     UserGroupInformation.setConfiguration(new Configuration());
   }
   
-  @Test(timeout = 4000)
+  @Test(timeout=60000)
   public void testSimpleAuthParamsInUrl() throws IOException {
     Configuration conf = new Configuration();
 
@@ -75,11 +67,15 @@ public class TestWebHdfsUrl {
 
     // send user+token
     URL fileStatusUrl = webhdfs.toUrl(GetOpParam.Op.GETFILESTATUS, fsPath);
-    checkQueryParams(new String[]{GetOpParam.Op.GETFILESTATUS.toQueryString(),
-            new UserParam(ugi.getShortUserName()).toString()}, fileStatusUrl);
+    checkQueryParams(
+        new String[]{
+            GetOpParam.Op.GETFILESTATUS.toQueryString(),
+            new UserParam(ugi.getShortUserName()).toString()
+        },
+        fileStatusUrl);
   }
 
-  @Test(timeout = 4000)
+  @Test(timeout=60000)
   public void testSimpleProxyAuthParamsInUrl() throws IOException {
     Configuration conf = new Configuration();
 
@@ -93,12 +89,16 @@ public class TestWebHdfsUrl {
 
     // send real+effective
     URL fileStatusUrl = webhdfs.toUrl(GetOpParam.Op.GETFILESTATUS, fsPath);
-    checkQueryParams(new String[]{GetOpParam.Op.GETFILESTATUS.toQueryString(),
+    checkQueryParams(
+        new String[]{
+            GetOpParam.Op.GETFILESTATUS.toQueryString(),
             new UserParam(ugi.getRealUser().getShortUserName()).toString(),
-            new DoAsParam(ugi.getShortUserName()).toString()}, fileStatusUrl);
+            new DoAsParam(ugi.getShortUserName()).toString()
+    },
+        fileStatusUrl);
   }
 
-  @Test(timeout = 4000)
+  @Test(timeout=60000)
   public void testSecureAuthParamsInUrl() throws IOException {
     Configuration conf = new Configuration();
     // fake turning on security so api thinks it should use tokens
@@ -112,57 +112,73 @@ public class TestWebHdfsUrl {
 
     WebHdfsFileSystem webhdfs = getWebHdfsFileSystem(ugi, conf);
     Path fsPath = new Path("/");
-    String tokenString = webhdfs.getRenewToken().encodeToUrlString();
+    String tokenString = webhdfs.getDelegationToken().encodeToUrlString();
 
     // send user
     URL getTokenUrl = webhdfs.toUrl(GetOpParam.Op.GETDELEGATIONTOKEN, fsPath);
     checkQueryParams(
-        new String[]{GetOpParam.Op.GETDELEGATIONTOKEN.toQueryString(),
-            new UserParam(ugi.getShortUserName()).toString()}, getTokenUrl);
+        new String[]{
+            GetOpParam.Op.GETDELEGATIONTOKEN.toQueryString(),
+            new UserParam(ugi.getShortUserName()).toString()
+        },
+        getTokenUrl);
 
     // send user
-    URL renewTokenUrl = webhdfs
-        .toUrl(PutOpParam.Op.RENEWDELEGATIONTOKEN, fsPath,
-            new TokenArgumentParam(tokenString));
+    URL renewTokenUrl = webhdfs.toUrl(PutOpParam.Op.RENEWDELEGATIONTOKEN,
+        fsPath, new TokenArgumentParam(tokenString));
     checkQueryParams(
-        new String[]{PutOpParam.Op.RENEWDELEGATIONTOKEN.toQueryString(),
-            new UserParam(ugi.getShortUserName()).toString(),
-            new TokenArgumentParam(tokenString).toString(),}, renewTokenUrl);
-
-    // send user+token
-    URL cancelTokenUrl = webhdfs
-        .toUrl(PutOpParam.Op.CANCELDELEGATIONTOKEN, fsPath,
-            new TokenArgumentParam(tokenString));
-    checkQueryParams(
-        new String[]{PutOpParam.Op.CANCELDELEGATIONTOKEN.toQueryString(),
+        new String[]{
+            PutOpParam.Op.RENEWDELEGATIONTOKEN.toQueryString(),
             new UserParam(ugi.getShortUserName()).toString(),
             new TokenArgumentParam(tokenString).toString(),
-            new DelegationParam(tokenString).toString()}, cancelTokenUrl);
-    
-    // send user+token
-    URL fileStatusUrl = webhdfs.toUrl(GetOpParam.Op.GETFILESTATUS, fsPath);
-    checkQueryParams(new String[]{GetOpParam.Op.GETFILESTATUS.toQueryString(),
+        },
+        renewTokenUrl);
+
+    // send token
+    URL cancelTokenUrl = webhdfs.toUrl(PutOpParam.Op.CANCELDELEGATIONTOKEN,
+        fsPath, new TokenArgumentParam(tokenString));
+    checkQueryParams(
+        new String[]{
+            PutOpParam.Op.CANCELDELEGATIONTOKEN.toQueryString(),
             new UserParam(ugi.getShortUserName()).toString(),
-            new DelegationParam(tokenString).toString()}, fileStatusUrl);
+            new TokenArgumentParam(tokenString).toString(),
+        },
+        cancelTokenUrl);
+    
+    // send token
+    URL fileStatusUrl = webhdfs.toUrl(GetOpParam.Op.GETFILESTATUS, fsPath);
+    checkQueryParams(
+        new String[]{
+            GetOpParam.Op.GETFILESTATUS.toQueryString(),
+            new DelegationParam(tokenString).toString()
+        },
+        fileStatusUrl);
 
     // wipe out internal token to simulate auth always required
     webhdfs.setDelegationToken(null);
 
     // send user
-    cancelTokenUrl = webhdfs.toUrl(PutOpParam.Op.CANCELDELEGATIONTOKEN, fsPath,
-        new TokenArgumentParam(tokenString));
+    cancelTokenUrl = webhdfs.toUrl(PutOpParam.Op.CANCELDELEGATIONTOKEN,
+        fsPath, new TokenArgumentParam(tokenString));
     checkQueryParams(
-        new String[]{PutOpParam.Op.CANCELDELEGATIONTOKEN.toQueryString(),
+        new String[]{
+            PutOpParam.Op.CANCELDELEGATIONTOKEN.toQueryString(),
             new UserParam(ugi.getShortUserName()).toString(),
-            new TokenArgumentParam(tokenString).toString(),}, cancelTokenUrl);
+            new TokenArgumentParam(tokenString).toString(),
+        },
+        cancelTokenUrl);
 
     // send user
     fileStatusUrl = webhdfs.toUrl(GetOpParam.Op.GETFILESTATUS, fsPath);
-    checkQueryParams(new String[]{GetOpParam.Op.GETFILESTATUS.toQueryString(),
-            new UserParam(ugi.getShortUserName()).toString()}, fileStatusUrl);
+    checkQueryParams(
+        new String[]{
+            GetOpParam.Op.GETFILESTATUS.toQueryString(),
+            new UserParam(ugi.getShortUserName()).toString()
+        },
+        fileStatusUrl);    
   }
 
-  @Test(timeout = 4000)
+  @Test(timeout=60000)
   public void testSecureProxyAuthParamsInUrl() throws IOException {
     Configuration conf = new Configuration();
     // fake turning on security so api thinks it should use tokens
@@ -177,58 +193,75 @@ public class TestWebHdfsUrl {
 
     WebHdfsFileSystem webhdfs = getWebHdfsFileSystem(ugi, conf);
     Path fsPath = new Path("/");
-    String tokenString = webhdfs.getRenewToken().encodeToUrlString();
+    String tokenString = webhdfs.getDelegationToken().encodeToUrlString();
 
     // send real+effective
     URL getTokenUrl = webhdfs.toUrl(GetOpParam.Op.GETDELEGATIONTOKEN, fsPath);
     checkQueryParams(
-        new String[]{GetOpParam.Op.GETDELEGATIONTOKEN.toQueryString(),
+        new String[]{
+            GetOpParam.Op.GETDELEGATIONTOKEN.toQueryString(),
             new UserParam(ugi.getRealUser().getShortUserName()).toString(),
-            new DoAsParam(ugi.getShortUserName()).toString()}, getTokenUrl);
+            new DoAsParam(ugi.getShortUserName()).toString()
+        },
+        getTokenUrl);
 
     // send real+effective
-    URL renewTokenUrl = webhdfs
-        .toUrl(PutOpParam.Op.RENEWDELEGATIONTOKEN, fsPath,
-            new TokenArgumentParam(tokenString));
+    URL renewTokenUrl = webhdfs.toUrl(PutOpParam.Op.RENEWDELEGATIONTOKEN,
+        fsPath, new TokenArgumentParam(tokenString));
     checkQueryParams(
-        new String[]{PutOpParam.Op.RENEWDELEGATIONTOKEN.toQueryString(),
+        new String[]{
+            PutOpParam.Op.RENEWDELEGATIONTOKEN.toQueryString(),
             new UserParam(ugi.getRealUser().getShortUserName()).toString(),
             new DoAsParam(ugi.getShortUserName()).toString(),
-            new TokenArgumentParam(tokenString).toString(),}, renewTokenUrl);
-
-    // send effective+token
-    URL cancelTokenUrl = webhdfs
-        .toUrl(PutOpParam.Op.CANCELDELEGATIONTOKEN, fsPath,
-            new TokenArgumentParam(tokenString));
-    checkQueryParams(
-        new String[]{PutOpParam.Op.CANCELDELEGATIONTOKEN.toQueryString(),
-            new UserParam(ugi.getShortUserName()).toString(),
             new TokenArgumentParam(tokenString).toString(),
-            new DelegationParam(tokenString).toString()}, cancelTokenUrl);
+        },
+        renewTokenUrl);
+
+    // send token
+    URL cancelTokenUrl = webhdfs.toUrl(PutOpParam.Op.CANCELDELEGATIONTOKEN,
+        fsPath, new TokenArgumentParam(tokenString));
+    checkQueryParams(
+        new String[]{
+            PutOpParam.Op.CANCELDELEGATIONTOKEN.toQueryString(),
+            new UserParam(ugi.getRealUser().getShortUserName()).toString(),
+            new DoAsParam(ugi.getShortUserName()).toString(),
+            new TokenArgumentParam(tokenString).toString(),
+        },
+        cancelTokenUrl);
     
-    // send effective+token
+    // send token
     URL fileStatusUrl = webhdfs.toUrl(GetOpParam.Op.GETFILESTATUS, fsPath);
-    checkQueryParams(new String[]{GetOpParam.Op.GETFILESTATUS.toQueryString(),
-            new UserParam(ugi.getShortUserName()).toString(),
-            new DelegationParam(tokenString).toString()}, fileStatusUrl);
+    checkQueryParams(
+        new String[]{
+            GetOpParam.Op.GETFILESTATUS.toQueryString(),
+            new DelegationParam(tokenString).toString()
+        },
+        fileStatusUrl);
 
     // wipe out internal token to simulate auth always required
     webhdfs.setDelegationToken(null);
     
     // send real+effective
-    cancelTokenUrl = webhdfs.toUrl(PutOpParam.Op.CANCELDELEGATIONTOKEN, fsPath,
-        new TokenArgumentParam(tokenString));
+    cancelTokenUrl = webhdfs.toUrl(PutOpParam.Op.CANCELDELEGATIONTOKEN,
+        fsPath, new TokenArgumentParam(tokenString));
     checkQueryParams(
-        new String[]{PutOpParam.Op.CANCELDELEGATIONTOKEN.toQueryString(),
+        new String[]{
+            PutOpParam.Op.CANCELDELEGATIONTOKEN.toQueryString(),
             new UserParam(ugi.getRealUser().getShortUserName()).toString(),
             new DoAsParam(ugi.getShortUserName()).toString(),
-            new TokenArgumentParam(tokenString).toString()}, cancelTokenUrl);
+            new TokenArgumentParam(tokenString).toString()
+        },
+        cancelTokenUrl);
     
     // send real+effective
     fileStatusUrl = webhdfs.toUrl(GetOpParam.Op.GETFILESTATUS, fsPath);
-    checkQueryParams(new String[]{GetOpParam.Op.GETFILESTATUS.toQueryString(),
+    checkQueryParams(
+        new String[]{
+            GetOpParam.Op.GETFILESTATUS.toQueryString(),
             new UserParam(ugi.getRealUser().getShortUserName()).toString(),
-            new DoAsParam(ugi.getShortUserName()).toString()}, fileStatusUrl);
+            new DoAsParam(ugi.getShortUserName()).toString()
+        },
+        fileStatusUrl);    
   }
   
   private void checkQueryParams(String[] expected, URL url) {
@@ -241,31 +274,28 @@ public class TestWebHdfsUrl {
   private WebHdfsFileSystem getWebHdfsFileSystem(UserGroupInformation ugi,
       Configuration conf) throws IOException {
     if (UserGroupInformation.isSecurityEnabled()) {
-      DelegationTokenIdentifier dtId =
-          new DelegationTokenIdentifier(new Text(ugi.getUserName()), null,
-              null);
+      DelegationTokenIdentifier dtId = new DelegationTokenIdentifier(new Text(
+          ugi.getUserName()), null, null);
       FSNamesystem namesystem = mock(FSNamesystem.class);
-      DelegationTokenSecretManager dtSecretManager =
-          new DelegationTokenSecretManager(86400000, 86400000, 86400000,
-              86400000, namesystem);
+      DelegationTokenSecretManager dtSecretManager = new DelegationTokenSecretManager(
+          86400000, 86400000, 86400000, 86400000, namesystem);
       dtSecretManager.startThreads();
-      Token<DelegationTokenIdentifier> token =
-          new Token<>(dtId, dtSecretManager);
-      SecurityUtil.setTokenService(token,
-          NetUtils.createSocketAddr(uri.getAuthority()));
+      Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>(
+          dtId, dtSecretManager);
+      SecurityUtil.setTokenService(
+          token, NetUtils.createSocketAddr(uri.getAuthority()));
       token.setKind(WebHdfsFileSystem.TOKEN_KIND);
       ugi.addToken(token);
     }
     return (WebHdfsFileSystem) FileSystem.get(uri, conf);
   }
   
-  @Test(timeout = 4000)
+  @Test(timeout=60000)
   public void testSelectHdfsDelegationToken() throws Exception {
     SecurityUtilTestHelper.setTokenServiceUseIp(true);
 
     Configuration conf = new Configuration();
-    conf.setClass("fs.webhdfs.impl", MyWebHdfsFileSystem.class,
-        FileSystem.class);
+    conf.setClass("fs.webhdfs.impl", MyWebHdfsFileSystem.class, FileSystem.class);
     
     // test with implicit default port 
     URI fsUri = URI.create("webhdfs://localhost");
@@ -273,51 +303,30 @@ public class TestWebHdfsUrl {
     checkTokenSelection(fs, conf);
 
     // test with explicit default port
-    fsUri = URI.create("webhdfs://localhost:" + fs.getDefaultPort());
+    fsUri = URI.create("webhdfs://localhost:"+fs.getDefaultPort());
     fs = (MyWebHdfsFileSystem) FileSystem.get(fsUri, conf);
     checkTokenSelection(fs, conf);
     
     // test with non-default port
-    fsUri = URI.create("webhdfs://localhost:" + (fs.getDefaultPort() - 1));
+    fsUri = URI.create("webhdfs://localhost:"+(fs.getDefaultPort()-1));
     fs = (MyWebHdfsFileSystem) FileSystem.get(fsUri, conf);
     checkTokenSelection(fs, conf);
 
   }
-
-  @Test(timeout=60000)
-  public void testCheckAccessUrl() throws IOException {
-    Configuration conf = new Configuration();
-
-    UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser("test-user");
-    UserGroupInformation.setLoginUser(ugi);
-
-    WebHdfsFileSystem webhdfs = getWebHdfsFileSystem(ugi, conf);
-    Path fsPath = new Path("/p1");
-
-    URL checkAccessUrl = webhdfs.toUrl(GetOpParam.Op.CHECKACCESS,
-        fsPath, new FsActionParam(FsAction.READ_WRITE));
-    checkQueryParams(
-        new String[]{
-            GetOpParam.Op.CHECKACCESS.toQueryString(),
-            new UserParam(ugi.getShortUserName()).toString(),
-            FsActionParam.NAME + "=" + FsAction.READ_WRITE.SYMBOL
-        },
-        checkAccessUrl);
-  }
-
-  private void checkTokenSelection(MyWebHdfsFileSystem fs, Configuration conf)
-      throws IOException {
+  
+  private void checkTokenSelection(MyWebHdfsFileSystem fs,
+                                   Configuration conf) throws IOException {
     int port = fs.getCanonicalUri().getPort();
     // can't clear tokens from ugi, so create a new user everytime
-    UserGroupInformation ugi = UserGroupInformation
-        .createUserForTesting(fs.getUri().getAuthority(), new String[]{});
+    UserGroupInformation ugi =
+        UserGroupInformation.createUserForTesting(fs.getUri().getAuthority(), new String[]{});
 
     // use ip-based tokens
     SecurityUtilTestHelper.setTokenServiceUseIp(true);
 
     // test fallback to hdfs token
-    Token<?> hdfsToken = new Token<>(new byte[0], new byte[0],
+    Token<?> hdfsToken = new Token<TokenIdentifier>(
+        new byte[0], new byte[0],
         DelegationTokenIdentifier.HDFS_DELEGATION_KIND,
         new Text("127.0.0.1:8020"));
     ugi.addToken(hdfsToken);
@@ -328,8 +337,9 @@ public class TestWebHdfsUrl {
     assertEquals(hdfsToken, token);
 
     // test webhdfs is favored over hdfs
-    Token<?> webHdfsToken = new Token<>(new byte[0], new byte[0],
-        WebHdfsFileSystem.TOKEN_KIND, new Text("127.0.0.1:" + port));
+    Token<?> webHdfsToken = new Token<TokenIdentifier>(
+        new byte[0], new byte[0],
+        WebHdfsFileSystem.TOKEN_KIND, new Text("127.0.0.1:"+port));
     ugi.addToken(webHdfsToken);
     token = fs.selectDelegationToken(ugi);
     assertNotNull(token);
@@ -341,7 +351,8 @@ public class TestWebHdfsUrl {
     assertNull(token);
     
     // test fallback to hdfs token
-    hdfsToken = new Token<>(new byte[0], new byte[0],
+    hdfsToken = new Token<TokenIdentifier>(
+        new byte[0], new byte[0],
         DelegationTokenIdentifier.HDFS_DELEGATION_KIND,
         new Text("localhost:8020"));
     ugi.addToken(hdfsToken);
@@ -350,8 +361,9 @@ public class TestWebHdfsUrl {
     assertEquals(hdfsToken, token);
 
     // test webhdfs is favored over hdfs
-    webHdfsToken = new Token<>(new byte[0], new byte[0],
-        WebHdfsFileSystem.TOKEN_KIND, new Text("localhost:" + port));
+    webHdfsToken = new Token<TokenIdentifier>(
+        new byte[0], new byte[0],
+        WebHdfsFileSystem.TOKEN_KIND, new Text("localhost:"+port));
     ugi.addToken(webHdfsToken);
     token = fs.selectDelegationToken(ugi);
     assertNotNull(token);
@@ -363,15 +375,9 @@ public class TestWebHdfsUrl {
     public URI getCanonicalUri() {
       return super.getCanonicalUri();
     }
-
     @Override
     public int getDefaultPort() {
       return super.getDefaultPort();
-    }
-
-    // don't automatically get a token
-    @Override
-    protected void initDelegationToken() throws IOException {
     }
   }
 }

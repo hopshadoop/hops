@@ -19,13 +19,9 @@ package org.apache.hadoop.hdfs.web.resources;
 
 import java.net.HttpURLConnection;
 
-/**
- * Http POST operation parameter.
- */
+/** Http POST operation parameter. */
 public class PostOpParam extends HttpOpParam<PostOpParam.Op> {
-  /**
-   * Post operations.
-   */
+  /** Post operations. */
   public static enum Op implements HttpOpParam.Op {
     APPEND(true, HttpURLConnection.HTTP_OK),
 
@@ -45,6 +41,11 @@ public class PostOpParam extends HttpOpParam<PostOpParam.Op> {
     public Type getType() {
       return Type.POST;
     }
+    
+    @Override
+    public boolean getRequireAuth() {
+      return false;
+    }
 
     @Override
     public boolean getDoOutput() {
@@ -61,23 +62,18 @@ public class PostOpParam extends HttpOpParam<PostOpParam.Op> {
       return expectedHttpResponseCode;
     }
 
-    /**
-     * @return a URI query string.
-     */
+    /** @return a URI query string. */
     @Override
     public String toQueryString() {
       return NAME + "=" + this;
     }
   }
 
-  private static final Domain<Op> DOMAIN =
-      new Domain<>(NAME, Op.class);
+  private static final Domain<Op> DOMAIN = new Domain<PostOpParam.Op>(NAME, Op.class);
 
   /**
    * Constructor.
-   *
-   * @param str
-   *     a string representation of the parameter value.
+   * @param str a string representation of the parameter value.
    */
   public PostOpParam(final String str) {
     super(DOMAIN, DOMAIN.parse(str));
