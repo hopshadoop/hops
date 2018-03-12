@@ -42,6 +42,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.net.NetUtils;
 
 
 /**
@@ -86,6 +87,11 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
    * at the beginning so that the read can begin on a chunk boundary.
    */
   private final long bytesNeededToFinish;
+
+  /**
+   * True if we are reading from a local DataNode.
+   */
+  private final boolean isLocal;
 
   private boolean eos = false;
   private boolean sentStatusCode = false;
@@ -332,6 +338,9 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
         1, verifyChecksum, checksum.getChecksumSize() > 0 ? checksum : null,
         checksum.getBytesPerChecksum(), checksum.getChecksumSize());
     
+    this.isLocal = DFSClient.isLocalAddress(NetUtils.
+        createSocketAddr(datanodeID.getXferAddr()));
+    
     this.peer = peer;
     this.datanodeID = datanodeID;
     this.in = in;
@@ -488,4 +497,13 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     return DFSClient.TCP_WINDOW_SIZE;
   }
 
+  @Override
+  public boolean isLocal() {
+    return isLocal;
+  }
+  
+  @Override
+  public boolean isShortCircuit() {
+    return false;
+  }
 }
