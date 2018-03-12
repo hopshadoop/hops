@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.FSInputChecker;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtoUtil;
-import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
@@ -30,9 +29,7 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ReadOpChecksumIn
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DataChecksum;
 
@@ -42,7 +39,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.ByteBuffer;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -100,6 +96,8 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
    * Amount of unread data in the current received packet
    */
   int dataLeft = 0;
+  
+  private final PeerCache peerCache;
   
   /* FSInputChecker interface */
   
@@ -328,7 +326,7 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
   private RemoteBlockReader(String file, String bpid, long blockId,
       DataInputStream in, DataChecksum checksum, boolean verifyChecksum,
       long startOffset, long firstChunkOffset, long bytesToRead, Peer peer,
-      DatanodeID datanodeID) {
+      DatanodeID datanodeID, PeerCache peerCache) {
     // Path is used only for printing block and file information in debug
     super(new Path("/blk_" + blockId + ":" + bpid + ":of:" + file)/*too non path-like?*/,
         1, verifyChecksum, checksum.getChecksumSize() > 0 ? checksum : null,
@@ -352,6 +350,7 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
 
     bytesPerChecksum = this.checksum.getBytesPerChecksum();
     checksumSize = this.checksum.getChecksumSize();
+    this.peerCache = peerCache;
   }
 
   /**
@@ -383,7 +382,7 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
       ExtendedBlock block, Token<BlockTokenIdentifier> blockToken,
       long startOffset, long len, int bufferSize, boolean verifyChecksum,
       String clientName, Peer peer,
-      DatanodeID datanodeID) throws IOException {
+      DatanodeID datanodeID, PeerCache peerCache) throws IOException {
     // in and out will be closed when sock is closed (by the caller)
     final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(peer.getOutputStream()));
     new Sender(out).readBlock(block, blockToken, clientName, startOffset, len,
@@ -416,12 +415,11 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
 
     return new RemoteBlockReader(file, block.getBlockPoolId(),
         block.getBlockId(), in, checksum, verifyChecksum, startOffset,
-        firstChunkOffset, len, peer, datanodeID);
+        firstChunkOffset, len, peer, datanodeID, peerCache);
   }
 
   @Override
-  public synchronized void close(PeerCache peerCache,
-      FileInputStreamCache fisCache) throws IOException {
+  public synchronized void close() throws IOException {
     startOffset = -1;
     checksum = null;
     if (peerCache != null & sentStatusCode) {

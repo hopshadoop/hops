@@ -601,7 +601,7 @@ public class NamenodeFsck {
             .newBlockReader(conf, file, block, lblock.getBlockToken(), 0, -1, true, "fsck",
                 TcpPeerServer.peerFromSocketAndKey(s, namenode.getRpcServer().
                     getDataEncryptionKey()),
-                chosenNode, null, false);
+                chosenNode, null, null, null, false);
         
       } catch (IOException ex) {
         // Put chosen node into dead list, continue
