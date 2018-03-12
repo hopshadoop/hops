@@ -53,6 +53,7 @@ import java.net.Socket;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Random;
+import org.apache.hadoop.hdfs.net.TcpPeerServer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -147,8 +148,9 @@ public class TestBlockTokenWithDFS {
       String file = BlockReaderFactory
           .getFileName(targetAddr, "test-blockpoolid", block.getBlockId());
       blockReader = BlockReaderFactory
-          .newBlockReader(conf, s, file, block, lblock.getBlockToken(), 0, -1,
-              null);
+          .newBlockReader(conf, file, block, lblock.getBlockToken(), 0, -1,
+          true, "TestBlockTokenWithDFS", TcpPeerServer.peerFromSocket(s),
+          nodes[0], null, false);
 
     } catch (IOException ex) {
       if (ex instanceof InvalidBlockTokenException) {

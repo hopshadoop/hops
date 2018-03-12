@@ -72,6 +72,8 @@ import java.util.TreeSet;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.DEFAULT_HADOOP_HTTP_STATIC_USER;
 import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_HTTP_STATIC_USER;
+import org.apache.hadoop.hdfs.net.TcpPeerServer;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 
 @InterfaceAudience.Private
 public class JspHelper {
@@ -214,9 +216,12 @@ public class JspHelper {
 
     // Use the block name for file name.
     String file = BlockReaderFactory.getFileName(addr, poolId, blockId);
-    BlockReader blockReader = BlockReaderFactory.newBlockReader(conf, s, file,
+    BlockReader blockReader = BlockReaderFactory.newBlockReader(conf, file,
         new ExtendedBlock(poolId, blockId, 0, genStamp), blockToken,
-        offsetIntoBlock, amtToRead, encryptionKey);
+        offsetIntoBlock, amtToRead,  true,
+        "JspHelper", TcpPeerServer.peerFromSocketAndKey(s, encryptionKey),
+        new DatanodeID(addr.getAddress().toString(),              
+            addr.getHostName(), poolId, addr.getPort(), 0, 0), null, false);
 
     byte[] buf = new byte[(int) amtToRead];
     int readOffset = 0;

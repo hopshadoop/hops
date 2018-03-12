@@ -50,6 +50,8 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdfs.BlockReader;
+import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 
 import static org.junit.Assert.assertEquals;
@@ -348,11 +350,11 @@ public class TestDataNodeVolumeFailure {
 
     String file = BlockReaderFactory
         .getFileName(targetAddr, "test-blockpoolid", block.getBlockId());
-    BlockReaderFactory
-        .newBlockReader(conf, s, file, block, lblock.getBlockToken(), 0, -1,
-            null);
-
-    // nothing - if it fails - it will throw and exception
+    BlockReader blockReader = BlockReaderFactory
+        .newBlockReader(conf, file, block,
+            lblock.getBlockToken(), 0, -1, true, "TestDataNodeVolumeFailure",
+            TcpPeerServer.peerFromSocket(s), datanode, null, false);
+    blockReader.close(null, null);
   }
 
   /**

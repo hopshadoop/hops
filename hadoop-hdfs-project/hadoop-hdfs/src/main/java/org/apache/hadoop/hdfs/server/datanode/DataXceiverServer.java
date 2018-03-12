@@ -34,6 +34,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import org.apache.hadoop.hdfs.net.Peer;
+import org.apache.hadoop.hdfs.net.PeerServer;
 
 
 /**
@@ -45,11 +47,10 @@ import java.util.Set;
 class DataXceiverServer implements Runnable {
   public static final Log LOG = DataNode.LOG;
   
-  ServerSocket ss;
-  DataNode datanode;
-  // Record all sockets opened for data transfer
-  Set<Socket> childSockets = Collections.synchronizedSet(new HashSet<Socket>());
-  
+  private final PeerServer peerServer;
+  private final DataNode datanode;
+  private final Set<Peer> peers = new HashSet<Peer>();
+
   /**
    * Maximal number of concurrent xceivers per node.
    * Enforcing the limit is required in order to avoid data-node
@@ -114,9 +115,9 @@ class DataXceiverServer implements Runnable {
   long estimateBlockSize;
   
   
-  DataXceiverServer(ServerSocket ss, Configuration conf, DataNode datanode) {
+  DataXceiverServer(PeerServer peerServer, Configuration conf, DataNode datanode) {
     
-    this.ss = ss;
+    this.peerServer = peerServer;
     this.datanode = datanode;
     
     this.maxXceiverCount =
@@ -136,12 +137,10 @@ class DataXceiverServer implements Runnable {
 
   @Override
   public void run() {
+    Peer peer = null;
     while (datanode.shouldRun) {
-      Socket s = null;
       try {
-        s = ss.accept();
-        s.setTcpNoDelay(true);
-        // Timeouts are set within DataXceiver.run()
+        peer = peerServer.accept();
 
         // Make sure the xceiver count is not exceeded
         int curXceiverCount = datanode.getXceiverCount();
@@ -150,7 +149,7 @@ class DataXceiverServer implements Runnable {
               " exceeds the limit of concurrent xcievers: " + maxXceiverCount);
         }
 
-        new Daemon(datanode.threadGroup, DataXceiver.create(s, datanode, this))
+        new Daemon(datanode.threadGroup, DataXceiver.create(peer, datanode, this))
             .start();
       } catch (SocketTimeoutException ignored) {
         // wake up to see if should continue to run
@@ -161,10 +160,10 @@ class DataXceiverServer implements Runnable {
           LOG.warn(datanode.getDisplayName() + ":DataXceiverServer: ", ace);
         }
       } catch (IOException ie) {
-        IOUtils.closeSocket(s);
+        IOUtils.cleanup(null, peer);
         LOG.warn(datanode.getDisplayName() + ":DataXceiverServer: ", ie);
       } catch (OutOfMemoryError ie) {
-        IOUtils.closeSocket(s);
+        IOUtils.cleanup(null, peer);
         // DataNode can run out of memory if there is too many transfers.
         // Log the event, Sleep for 30 seconds, other transfers may complete by
         // then.
@@ -181,8 +180,13 @@ class DataXceiverServer implements Runnable {
         datanode.shouldRun = false;
       }
     }
+    synchronized (this) {
+      for (Peer p : peers) {
+        IOUtils.cleanup(LOG, p);
+      }
+    }
     try {
-      ss.close();
+      peerServer.close();
     } catch (IOException ie) {
       LOG.warn(
           datanode.getDisplayName() + " :DataXceiverServer: close exception",
@@ -194,19 +198,18 @@ class DataXceiverServer implements Runnable {
     assert datanode.shouldRun ==
         false : "shoudRun should be set to false before killing";
     try {
-      this.ss.close();
+      this.peerServer.close();
     } catch (IOException ie) {
       LOG.warn(datanode.getDisplayName() + ":DataXceiverServer.kill(): ", ie);
     }
+  }
+  
+  synchronized void addPeer(Peer peer) {
+    peers.add(peer);
+  }
 
-    // close all the sockets that were accepted earlier
-    synchronized (childSockets) {
-      for (Socket thissock : childSockets) {
-        try {
-          thissock.close();
-        } catch (IOException e) {
-        }
-      }
-    }
+  synchronized void closePeer(Peer peer) {
+    peers.remove(peer);
+    IOUtils.cleanup(null, peer);
   }
 }

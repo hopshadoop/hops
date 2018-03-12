@@ -17,28 +17,30 @@
  */
 package org.apache.hadoop.hdfs;
 
+import org.apache.hadoop.net.unix.DomainSocket;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-public class TestParallelRead extends TestParallelReadUtil {
+public class TestParallelShortCircuitLegacyRead extends TestParallelReadUtil {
   @BeforeClass
   static public void setupCluster() throws Exception {
-    // This is a test of the normal (TCP) read path.  For this reason, we turn
-    // off both short-circuit local reads and UNIX domain socket data traffic.
+    DFSInputStream.tcpReadsDisabledForTesting = true;
     HdfsConfiguration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY, false);
-    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_DOMAIN_SOCKET_DATA_TRAFFIC,
-        false);
-    // dfs.domain.socket.path should be ignored because the previous two keys
-    // were set to false.  This is a regression test for HDFS-4473.
-    conf.set(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY, "/will/not/be/created");
-
-    setupCluster(DEFAULT_REPLICATION_FACTOR, conf);
+    conf.set(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY, "");
+    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL, true);
+    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_DOMAIN_SOCKET_DATA_TRAFFIC, false);
+    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY, true);
+    conf.setBoolean(DFSConfigKeys.
+        DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY, false);
+    conf.set(DFSConfigKeys.DFS_BLOCK_LOCAL_PATH_ACCESS_USER_KEY,
+        UserGroupInformation.getCurrentUser().getShortUserName());
+    DomainSocket.disableBindPathValidation();
+    setupCluster(1, conf);
   }
 
   @AfterClass
   static public void teardownCluster() throws Exception {
     TestParallelReadUtil.teardownCluster();
   }
-
 }
