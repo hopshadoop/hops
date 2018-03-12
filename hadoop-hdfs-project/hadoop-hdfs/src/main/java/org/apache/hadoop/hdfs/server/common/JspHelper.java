@@ -220,7 +220,7 @@ public class JspHelper {
         new ExtendedBlock(poolId, blockId, 0, genStamp), blockToken,
         offsetIntoBlock, amtToRead,  true,
         "JspHelper", TcpPeerServer.peerFromSocketAndKey(s, encryptionKey),
-        new DatanodeID(addr.getAddress().toString(),              
+        new DatanodeID(addr.getAddress().getHostAddress(),              
             addr.getHostName(), poolId, addr.getPort(), 0, 0), null, null, null, false);
 
     byte[] buf = new byte[(int) amtToRead];

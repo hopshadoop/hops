@@ -123,4 +123,14 @@ public class BlockReaderDB implements  BlockReader{
     // to us without doing network I/O.
     return DFSClient.TCP_WINDOW_SIZE;
   }
+  
+  @Override
+  public boolean isLocal() {
+    return false;
+  }
+  
+  @Override
+  public boolean isShortCircuit() {
+    return false;
+  }
 }
