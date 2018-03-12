@@ -458,7 +458,4 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
   public HdfsBlocksMetadata getHdfsBlocksMetadata(List<ExtendedBlock> blocks)
       throws IOException;
 
-  FileInputStream[] getShortCircuitFdsForRead(ExtendedBlock block) 
-     throws IOException;
-
 }

@@ -158,7 +158,7 @@ public class BlockReaderTestUtil {
         targetAddr.toString() + ":" + block.getBlockId(), block,
         testBlock.getBlockToken(), offset, lenToRead,
         true, "BlockReaderTestUtil", TcpPeerServer.peerFromSocket(sock),
-        nodes[0], null, false);
+        nodes[0], null, null, null, false);
   }
 
   /**

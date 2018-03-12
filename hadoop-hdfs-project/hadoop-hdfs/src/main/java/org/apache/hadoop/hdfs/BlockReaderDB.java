@@ -41,8 +41,7 @@ public class BlockReaderDB implements  BlockReader{
     }
 
     @Override
-    public void close(PeerCache peerCache,
-      FileInputStreamCache fisCache) throws IOException {
+    public void close() throws IOException {
 //      LOG.debug("Stuffed Inode:  closing the BlockReaderDB");
       bis.close();
     }

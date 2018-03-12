@@ -46,4 +46,8 @@ public class LengthInputStream extends FilterInputStream {
   public long getLength() {
     return length;
   }
+  
+  public InputStream getWrappedStream() {
+    return in;
+  }
 }
