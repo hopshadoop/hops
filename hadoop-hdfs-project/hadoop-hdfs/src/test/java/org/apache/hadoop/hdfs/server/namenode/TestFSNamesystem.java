@@ -38,6 +38,7 @@ import org.junit.After;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import org.mockito.Mockito;
 
 public class TestFSNamesystem {
 
@@ -102,5 +103,30 @@ public class TestFSNamesystem {
         + "isInStartupSafeMode still returned true", !fsn.isInStartupSafeMode());
     assertTrue("After entering safemode due to low resources FSNamesystem."
         + "isInSafeMode still returned false", fsn.isInSafeMode());
+  }
+  
+  @Test
+  public void testReplQueuesActiveAfterStartupSafemode() throws IOException, InterruptedException {
+    Configuration conf = new HdfsConfiguration();
+    NameNode.initMetrics(conf, NamenodeRole.NAMENODE);
+    DFSTestUtil.formatNameNode(conf);
+    FSNamesystem fsNamesystem = FSNamesystem.loadFromDisk(conf, null);
+    FSNamesystem fsn = Mockito.spy(fsNamesystem);
+
+    //Make NameNode.getNameNodeMetrics() not return null
+    NameNode.initMetrics(conf, NamenodeRole.NAMENODE);
+
+    fsn.enterSafeMode(false);
+    assertTrue("FSNamesystem didn't enter safemode", fsn.isInSafeMode());
+    assertTrue("Replication queues were being populated during very first "
+        + "safemode", !fsn.isPopulatingReplQueues());
+    fsn.leaveSafeMode();
+    assertTrue("FSNamesystem didn't leave safemode", !fsn.isInSafeMode());
+    assertTrue("Replication queues weren't being populated even after leaving "
+        + "safemode", fsn.isPopulatingReplQueues());
+    fsn.enterSafeMode(false);
+    assertTrue("FSNamesystem didn't enter safemode", fsn.isInSafeMode());
+    assertTrue("Replication queues weren't being populated after entering "
+        + "safemode 2nd time", fsn.isPopulatingReplQueues());
   }
 }
