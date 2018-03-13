@@ -4175,7 +4175,6 @@ public class FSNamesystem
       this.safeReplication = Short.MAX_VALUE + 1; // more than maxReplication
       this.replicationQueueThreshold = 1.5f; // can never be reached
       this.blockTotal = -1;
-      this.reached = -1;
       this.resourcesLow = resourcesLow;
       enter();
       reportStatus("STATE* Safe mode is ON.", true);
@@ -4298,7 +4297,7 @@ public class FSNamesystem
      * @throws IOException
      */
     private void tryToHelpToGetOut() {
-      if (isManual()) {
+      if (isManual() && !resourcesLow) {
         return;
       }
       startSafeModeMonitor();
@@ -4416,7 +4415,7 @@ public class FSNamesystem
      * when disk space is low).
      */
     private boolean isManual() {
-      return extension == Integer.MAX_VALUE && !resourcesLow;
+      return extension == Integer.MAX_VALUE;
     }
 
     /**
@@ -4456,7 +4455,7 @@ public class FSNamesystem
       } else {
         leaveMsg = "Safe mode will be turned off automatically";
       }
-      if (isManual()) {
+      if (isManual() && !areResourcesLow()) {
         leaveMsg =
             "Use \"hdfs dfsadmin -safe mode leave\" to turn safe mode off";
       }
@@ -4502,8 +4501,9 @@ public class FSNamesystem
         }
         msg += " " + leaveMsg;
       }
+      // threshold is not reached or manual or resources low
       if (reached == 0 ||
-          isManual()) {  // threshold is not reached or manual
+          (isManual() && !areResourcesLow())) {  // threshold is not reached or manual
         return msg + ".";
       }
       // extension period is in progress
@@ -4695,7 +4695,12 @@ public class FSNamesystem
     if (safeMode == null) {
       return false;
     }
-    return !safeMode.isManual() && safeMode.isOn();
+    // If the NN is in safemode, and not due to manual / low resources, we
+    // assume it must be because of startup. If the NN had low resources during
+    // startup, we assume it came out of startup safemode and it is now in low
+    // resources safemode
+    return !safeMode.isManual() && !safeMode.areResourcesLow()
+      && safeMode.isOn();
   }
 
   @Override
@@ -4782,7 +4787,7 @@ public class FSNamesystem
   }
 
   /**
-   * Enter safe mode manually.
+   * Enter safe mode. If resourcesLow is false, then we assume it is manual
    *
    * @throws IOException
    */
@@ -4798,8 +4803,9 @@ public class FSNamesystem
     }
     if (resourcesLow) {
       safeMode.setResourcesLow();
+    } else {
+      safeMode.setManual();
     }
-    safeMode.setManual();
 
     NameNode.stateChangeLog
         .info("STATE* Safe mode is ON" + safeMode.getTurnOffTip());

@@ -37,6 +37,7 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.After;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TestFSNamesystem {
 
@@ -77,5 +78,29 @@ public class TestFSNamesystem {
         return null;
       }
     }.handle();
+  }
+  
+  @Test
+  /**
+   * Test that isInStartupSafemode returns true only during startup safemode
+   * and not also during low-resource safemode
+   */
+  public void testStartupSafemode() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    NameNode.initMetrics(conf, NamenodeRole.NAMENODE);
+    DFSTestUtil.formatNameNode(conf);
+    FSNamesystem fsn = FSNamesystem.loadFromDisk(conf, null);
+
+    fsn.leaveSafeMode();
+    assertTrue("After leaving safemode FSNamesystem.isInStartupSafeMode still "
+        + "returned true", !fsn.isInStartupSafeMode());
+    assertTrue("After leaving safemode FSNamesystem.isInSafeMode still returned"
+        + " true", !fsn.isInSafeMode());
+
+    fsn.enterSafeMode(true);
+    assertTrue("After entering safemode due to low resources FSNamesystem."
+        + "isInStartupSafeMode still returned true", !fsn.isInStartupSafeMode());
+    assertTrue("After entering safemode due to low resources FSNamesystem."
+        + "isInSafeMode still returned false", fsn.isInSafeMode());
   }
 }
