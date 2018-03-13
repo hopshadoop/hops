@@ -4271,18 +4271,18 @@ public class BlockManager {
             LOG.warn("Namesystem is not leader: will not run replication monitor");
           }
           Thread.sleep(replicationRecheckInterval);
-        } catch (InterruptedException ie) {
-          LOG.warn("ReplicationMonitor thread received InterruptedException.",
-              ie);
-          break;
-        } catch (StorageException e) {
-          LOG.warn("ReplicationMonitor thread received StorageException.", e);
-          if(e instanceof TransientStorageException){
+        } catch (Throwable t) {
+          if(t instanceof TransientStorageException){
             continue;
           }
-
-          terminate(1, e);
-        } catch (Throwable t) {
+          if (!namesystem.isRunning()) {
+            LOG.info("Stopping ReplicationMonitor.");
+            if (!(t instanceof InterruptedException)) {
+              LOG.info("ReplicationMonitor received an exception"
+                  + " while shutting down.", t);
+            }
+            break;
+          }
           LOG.fatal("ReplicationMonitor thread received Runtime exception. ",
               t);
           terminate(1, t);
