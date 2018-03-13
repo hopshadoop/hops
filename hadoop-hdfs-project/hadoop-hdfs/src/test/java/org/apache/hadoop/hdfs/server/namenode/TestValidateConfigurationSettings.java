@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import java.io.File;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -25,6 +26,9 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.junit.Test;
 
 import java.io.IOException;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.junit.After;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -34,6 +38,11 @@ import static org.junit.Assert.fail;
  * to the NameNode
  */
 public class TestValidateConfigurationSettings {
+
+  @After
+  public void cleanUp() {
+    FileUtil.fullyDeleteContents(new File(MiniDFSCluster.getBaseDirectory()));
+  }
 
   /**
    * Tests setting the rpc port to the same as the web port to test that
