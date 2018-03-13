@@ -2873,7 +2873,7 @@ public class BlockManager {
       return storedBlock;
     }
 
-    // do not try to handle over/under-replicated blocks during safe mode
+    // do not try to handle over/under-replicated blocks during first safe mode
     if (!namesystem.isPopulatingReplQueues()) {
       return storedBlock;
     }

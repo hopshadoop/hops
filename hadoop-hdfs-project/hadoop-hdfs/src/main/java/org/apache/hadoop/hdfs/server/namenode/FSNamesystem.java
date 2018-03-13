@@ -4168,7 +4168,7 @@ public class FSNamesystem
      *
      * @see SafeModeInfo
      */
-    private SafeModeInfo(boolean resourcesLow) throws IOException {
+    private SafeModeInfo(boolean resourcesLow, boolean isReplQueuesInited) throws IOException {
       this.threshold = 1.5f;  // this threshold can never be reached
       this.datanodeThreshold = Integer.MAX_VALUE;
       this.extension = Integer.MAX_VALUE;
@@ -4176,6 +4176,7 @@ public class FSNamesystem
       this.replicationQueueThreshold = 1.5f; // can never be reached
       this.blockTotal = -1;
       this.resourcesLow = resourcesLow;
+      this.initializedReplicationQueues = isReplQueuesInited;
       enter();
       reportStatus("STATE* Safe mode is ON.", true);
     }
@@ -4703,6 +4704,10 @@ public class FSNamesystem
       && safeMode.isOn();
   }
 
+  /**
+   * Check if replication queues are to be populated
+   * @return true when node is HAState.Active and not in the very first safemode
+   */
   @Override
   public boolean isPopulatingReplQueues() {
     if (!shouldPopulateReplicationQueues()) {
@@ -4797,7 +4802,7 @@ public class FSNamesystem
     stopSecretManager();
 
     if (!isInSafeMode()) {
-      safeMode = new SafeModeInfo(resourcesLow);
+      safeMode = new SafeModeInfo(resourcesLow, isPopulatingReplQueues());
       HdfsVariables.enterClusterSafeMode();
       return;
     }

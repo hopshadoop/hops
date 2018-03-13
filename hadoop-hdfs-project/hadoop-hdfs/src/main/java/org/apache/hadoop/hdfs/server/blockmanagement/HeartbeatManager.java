@@ -257,7 +257,7 @@ class HeartbeatManager implements DatanodeStatistics {
     final DatanodeManager dm = blockManager.getDatanodeManager();
     // It's OK to check safe mode w/o taking the lock here, we re-check
     // for safe mode after taking the lock before removing a datanode.
-    if (namesystem.isInSafeMode()) {
+    if (namesystem.isInStartupSafeMode()) {
       return;
     }
     boolean allAlive = false;
@@ -299,7 +299,7 @@ class HeartbeatManager implements DatanodeStatistics {
       allAlive = dead == null && failedStorage == null;;
       if (dead != null) {
         // acquire the fsnamesystem lock, and then remove the dead node.
-        if (namesystem.isInSafeMode()) {
+        if (namesystem.isInStartupSafeMode()) {
           return;
         }
         synchronized (this) {
