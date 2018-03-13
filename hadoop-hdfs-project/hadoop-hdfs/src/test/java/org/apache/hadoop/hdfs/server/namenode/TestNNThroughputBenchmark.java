@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import java.io.File;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -25,8 +26,16 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.junit.Test;
 
 import java.util.Arrays;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.junit.After;
 
 public class TestNNThroughputBenchmark {
+
+  @After
+  public void cleanUp() {
+    FileUtil.fullyDeleteContents(new File(MiniDFSCluster.getBaseDirectory()));
+  }
 
   /**
    * This test runs all benchmarks defined in {@link NNThroughputBenchmark}.
