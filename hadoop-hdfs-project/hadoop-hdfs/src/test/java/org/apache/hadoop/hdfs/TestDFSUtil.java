@@ -93,7 +93,7 @@ public class TestDFSUtil {
         DFSUtil.substituteForWildcardAddress("127.0.0.1:12345", "foo"));
   }
   
-  @Test
+  @Test (timeout=15000)
   public void testIsValidName() {
     assertFalse(DFSUtil.isValidName("/foo/../bar"));
     assertFalse(DFSUtil.isValidName("/foo//bar"));
