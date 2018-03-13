@@ -256,7 +256,7 @@ public class HftpFileSystem extends FileSystem
       throws IOException {
     try {
       //Renew TGT if needed
-      ugi.reloginFromKeytab();
+      ugi.checkTGTAndReloginFromKeytab();
       return ugi.doAs(new PrivilegedExceptionAction<Token<?>>() {
         @Override
         public Token<?> run() throws IOException {
@@ -722,7 +722,7 @@ public class HftpFileSystem extends FileSystem
     @Override
     public long renew(Token<?> token, Configuration conf) throws IOException {
       // update the kerberos credentials, if they are coming from a keytab
-      UserGroupInformation.getLoginUser().reloginFromKeytab();
+      UserGroupInformation.getLoginUser().checkTGTAndReloginFromKeytab();
       // use http to renew the token
       InetSocketAddress serviceAddr = SecurityUtil.getTokenServiceAddr(token);
       return DelegationTokenFetcher.renewDelegationToken(
