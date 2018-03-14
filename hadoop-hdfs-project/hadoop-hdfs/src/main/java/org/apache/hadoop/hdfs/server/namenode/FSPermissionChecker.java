@@ -47,6 +47,23 @@ import java.util.Stack;
  */
 class FSPermissionChecker {
   static final Log LOG = LogFactory.getLog(UserGroupInformation.class);
+  
+  /** @return a string for throwing {@link AccessControlException} */
+  private static String toAccessControlString(INode inode) throws StorageException, TransactionContextException,
+      IOException {
+    return "\"" + inode.getLocalName() + "\":"
+          + inode.getUserName() + ":" + inode.getGroupName()
+          + ":" + (inode.isDirectory()? "d": "-") + inode.getFsPermission();
+  }
+  
+  /** @return a string for throwing {@link AccessControlException} */
+  private static String toAccessControlString(ProjectedINode inode) throws StorageException, TransactionContextException,
+      IOException {
+    return "\"" + inode.getName() + "\":"
+          + inode.getUserName() + ":" + inode.getGroupName()
+          + ":" + (inode.isDirectory()? "d": "-") + new FsPermission(inode.getPermission());
+  }
+
   private final UserGroupInformation ugi;
   private final String user;
   /**
@@ -144,31 +161,32 @@ class FSPermissionChecker {
     }
     // check if (parentAccess != null) && file exists, then check sb
     // If resolveLink, the check is performed on the link target.
-    final INode[] inodes = root.getExistingPathINodes(path, resolveLink).getINodes();
-    int ancestorIndex = inodes.length - 2;
-    for (; ancestorIndex >= 0 && inodes[ancestorIndex] == null;
-        ancestorIndex--);
-    checkTraverse(inodes, ancestorIndex);
+      final INode[] inodes = root.getExistingPathINodes(path, resolveLink).getINodes();
+      int ancestorIndex = inodes.length - 2;
+      for(; ancestorIndex >= 0 && inodes[ancestorIndex] == null;
+          ancestorIndex--);
+      checkTraverse(inodes, ancestorIndex);
 
-    if (parentAccess != null && parentAccess.implies(FsAction.WRITE) &&
-        inodes.length > 1 && inodes[inodes.length - 1] != null) {
-      checkStickyBit(inodes[inodes.length - 2], inodes[inodes.length - 1]);
-    }
-    if (ancestorAccess != null && inodes.length > 1) {
-      check(inodes, ancestorIndex, ancestorAccess);
-    }
-    if (parentAccess != null && inodes.length > 1) {
-      check(inodes, inodes.length - 2, parentAccess);
-    }
-    if (access != null) {
-      check(inodes[inodes.length - 1], access);
-    }
-    if (subAccess != null) {
-      checkSubAccess(inodes[inodes.length - 1], subAccess);
-    }
-    if (doCheckOwner) {
-      checkOwner(inodes[inodes.length - 1]);
-    }
+      final INode last = inodes[inodes.length - 1];
+      if (parentAccess != null && parentAccess.implies(FsAction.WRITE)
+          && inodes.length > 1 && last != null) {
+        checkStickyBit(inodes[inodes.length - 2], last);
+      }
+      if (ancestorAccess != null && inodes.length > 1) {
+        check(inodes, ancestorIndex, ancestorAccess);
+      }
+      if (parentAccess != null && inodes.length > 1) {
+        check(inodes, inodes.length - 2, parentAccess);
+      }
+      if (access != null) {
+        check(last, access);
+      }
+      if (subAccess != null) {
+        checkSubAccess(last, subAccess);
+      }
+      if (doCheckOwner) {
+        checkOwner(last);
+      }
   }
 
   /**
@@ -202,13 +220,13 @@ class FSPermissionChecker {
     }
 
     Stack<INodeDirectory> directories = new Stack<>();
-    for (directories.push((INodeDirectory) inode); !directories.isEmpty(); ) {
+    for (directories.push(inode.asDirectory()); !directories.isEmpty(); ) {
       INodeDirectory d = directories.pop();
       check(d, access);
 
       for (INode child : d.getChildrenList()) {
         if (child.isDirectory()) {
-          directories.push((INodeDirectory) child);
+          directories.push(child.asDirectory());
         }
       }
     }
@@ -231,7 +249,7 @@ class FSPermissionChecker {
       return;
     }
     FsPermission mode = inode.getFsPermission();
-    check(inode.getId(), access, mode, inode.getUserName(),
+    check(inode, access, mode, inode.getUserName(),
         inode.getGroupName());
   }
 
@@ -239,29 +257,38 @@ class FSPermissionChecker {
     if (inode == null) {
       return;
     }
-
-    check(inode.getId(), access, new FsPermission(inode.getPermission()), inode
-        .getUserName(), inode.getGroupName());
+    
+    if(!check(inode.getId(), access, new FsPermission(inode.getPermission()), inode
+        .getUserName(), inode.getGroupName())){
+      throw new AccessControlException(
+          "Permission denied: user=" + user + ", access=" + access + ", inode=" + toAccessControlString(inode));
+    }
   }
 
-  void check(int inodeId, FsAction access, FsPermission mode, String userName,
-      String groupName) throws AccessControlException {
+  void check(INode inode, FsAction access, FsPermission mode, String userName,
+      String groupName) throws AccessControlException, TransactionContextException, IOException {
+    if (!check(inode.getId(), access, mode, userName, groupName)) {
+      throw new AccessControlException(
+          "Permission denied: user=" + user + ", access=" + access + ", inode=" + toAccessControlString(inode));
+    }
+  }
+  
+  boolean check(int inodeId, FsAction access, FsPermission mode, String userName,
+      String groupName) throws AccessControlException, TransactionContextException, IOException {
     if (user.equals(userName)) { //user class
       if (mode.getUserAction().implies(access)) {
-        return;
+        return true;
       }
     } else if (groups.contains(groupName)) { //group class
       if (mode.getGroupAction().implies(access)) {
-        return;
+        return true;
       }
     } else { //other class
       if (mode.getOtherAction().implies(access)) {
-        return;
+        return true;
       }
     }
-    throw new AccessControlException(
-        "Permission denied: user=" + user + ", access=" + access + ", inode=" +
-            inodeId);
+    return false;
   }
 
   /**
