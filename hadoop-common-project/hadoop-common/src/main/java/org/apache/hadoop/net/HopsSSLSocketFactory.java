@@ -51,10 +51,6 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   public static final String FORCE_CONFIGURE = "client.rpc.ssl.force.configure";
   public static final boolean DEFAULT_FORCE_CONFIGURE = false;
   
-  @Deprecated
-  public static final String HOPSWORKS_REST_ENDPOINT_KEY =
-      "client.hopsworks.rest.endpoint";
-  
   private static final String KEY_STORE_FILEPATH_DEFAULT = "client.keystore.jks";
   private static final String KEY_STORE_PASSWORD_DEFAULT = "";
   private static final String KEY_PASSWORD_DEFAULT = "";

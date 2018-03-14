@@ -48,6 +48,8 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.*;
 import java.util.concurrent.*;
@@ -96,6 +98,8 @@ import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
+import org.apache.hadoop.security.ssl.CRLValidator;
+import org.apache.hadoop.security.ssl.CRLValidatorFactory;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
@@ -433,6 +437,7 @@ public abstract class Server {
   private Handler[] handlers = null;
 
   private final boolean isSSLEnabled;
+  private final CRLValidator crlValidator;
   private SSLFactory sslFactory = null;
   private String proxySuperuser = null;
   private Set<String> trustedHostnames;
@@ -1109,7 +1114,7 @@ public abstract class Server {
       }
     }
 
-    void doAccept(SelectionKey key) throws InterruptedException, IOException,  OutOfMemoryError {
+    void doAccept(SelectionKey key) throws InterruptedException, IOException, OutOfMemoryError {
       ServerSocketChannel server = (ServerSocketChannel) key.channel();
       SocketChannel channel;
       while ((channel = server.accept()) != null) {
@@ -1123,17 +1128,48 @@ public abstract class Server {
         Connection c = connectionManager.register(channel, sslEngine);
         if (c != null) {
           boolean handshakeDone = false;
+          boolean crlValidationPassed = false;
           if (isSSLEnabled) {
             if (!c.doHandshake()) {
               // SSL handshake failed
-              LOG.error("SSL handshake for " + c.getHostAddress() + " failed");
+              LOG.error("TLS handshake for " + c.getHostAddress() + " failed");
               connectionManager.close(c);
             } else {
               handshakeDone = true;
+              LOG.debug("TLS handshake for " + c.getHostAddress() + " succeed");
+              if (crlValidator != null) {
+                LOG.debug("Checking certificate validity against CRL");
+                try {
+                  c.checkCRLValidity();
+                  crlValidationPassed = true;
+                } catch (FatalRpcServerException ex) {
+                  LOG.debug(ex.getMessage(), ex);
+                  
+                  // use the wrapped exception if there is one.
+                  Throwable t = (ex.getCause() != null) ? ex.getCause() : ex;
+                  final RpcCall call = new RpcCall(c, -1, 0);
+                  setupResponse(call,
+                      ex.getRpcStatusProto(), ex.getRpcErrorCodeProto(), null,
+                      t.getClass().getName(), t.getMessage());
+                  c.sendResponse(call);
+                  
+                  connectionManager.close(c);
+                }
+              }
             }
           }
 
-          if (!isSSLEnabled || handshakeDone) {
+          boolean addToReader = false;
+          if (!isSSLEnabled) {
+            addToReader = true;
+          } else {
+            if (crlValidator != null && handshakeDone && crlValidationPassed) {
+              addToReader = true;
+            } else if (crlValidator == null && handshakeDone) {
+              addToReader = true;
+            }
+          }
+          if (addToReader) {
             Reader reader = getReader();
             key.attach(c); // so closeCurrentConnection can get the object
             reader.addConnection(c);
@@ -2190,7 +2226,28 @@ public abstract class Server {
         connectionManager.incrUserConnections(user.getShortUserName());
       }
     }
-
+  
+    /**
+     * Checks client's certificate against CRL from RevocationListFetcherServer
+     * @throws FatalRpcServerException
+     */
+    private void checkCRLValidity() throws FatalRpcServerException {
+      if (!isSSLEnabled || crlValidator == null) {
+        return;
+      }
+  
+      try {
+        Certificate[] peerChain = ((ServerRpcSSLEngineImpl) rpcSSLEngine).sslEngine.getSession().getPeerCertificates();
+        crlValidator.validate(peerChain);
+      } catch (SSLPeerUnverifiedException ex) {
+        LOG.warn("Connection " + hostAddress + " cannot be verified", ex);
+        throw new FatalRpcServerException(RpcErrorCodeProto.FATAL_UNAUTHORIZED, ex);
+      } catch (CertificateException ex) {
+        LOG.warn("Connection " + hostAddress + " has revoked certificate", ex);
+        throw new FatalRpcServerException(RpcErrorCodeProto.FATAL_UNAUTHORIZED, ex.getMessage());
+      }
+    }
+    
       /**
        * Checks whether the CN from the client's certificate subject
        * matches the username supplied by the RPC call
@@ -2851,6 +2908,20 @@ public abstract class Server {
       }
 
       trustedHostnames = new ConcurrentSkipListSet<>();
+      
+      if (conf.getBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY,
+          CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_DEFAULT)) {
+        try {
+          crlValidator = CRLValidatorFactory.getInstance().getValidator(CRLValidatorFactory.TYPE.NORMAL, conf, null);
+        } catch (GeneralSecurityException ex) {
+          LOG.error("Error while constructing CRL validator for server at " + bindAddress + ":" + port);
+          throw new IOException(ex);
+        }
+      } else {
+        crlValidator = null;
+      }
+    } else {
+      crlValidator = null;
     }
 
     // Create the responder here

@@ -28,7 +28,6 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.RetryNTimes;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
@@ -43,6 +42,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
+import org.apache.hadoop.security.ssl.RevocationListFetcherService;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.service.CompositeService;
@@ -107,7 +107,6 @@ import org.apache.hadoop.yarn.server.webproxy.AppReportFetcher;
 import org.apache.hadoop.yarn.server.webproxy.ProxyUriUtils;
 import org.apache.hadoop.yarn.server.webproxy.WebAppProxy;
 import org.apache.hadoop.yarn.server.webproxy.WebAppProxyServlet;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
 import org.apache.hadoop.yarn.webapp.WebApps.Builder;
@@ -176,6 +175,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected ContainersLogsService containersLogsService;
   protected PriceMultiplicatiorService priceMultiplicatiorService;
   protected CertificateLocalizationService certificateLocalizationService;
+  protected RevocationListFetcherService revocationListFetcherService;
   protected ReservationSystem reservationSystem;
   private ClientRMService clientRM;
   protected ApplicationMasterService masterService;
@@ -272,6 +272,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
 
     validateConfigs(this.conf);
+  
+    createAndInitCRLFetcherService();
     
     // Set HA configuration should be done before login
     this.rmContext.setHAEnabled(HAUtil.isHAEnabled(this.conf));
@@ -1351,6 +1353,7 @@ LOG.info("+");
     resourceTrackingServiceStartStopLock.lock();
     LOG.info("locked resourceTrackingServiceStart");
     try{
+    startCRLFetcherService();
     if (this.rmContext.isHAEnabled() || this.rmContext.isDistributed()) {
       transitionToStandby(true);
       if ((HAUtil.isAutomaticFailoverEnabled(conf) && HAUtil.isHopsRMFailoverProxy(conf))
@@ -1412,6 +1415,7 @@ LOG.info("+");
       curator.close();
     }
     transitionToStandby(false);
+    stopCRLFetcherService();
     rmContext.setHAServiceState(HAServiceState.STOPPING);
     }finally{
       LOG.info("unlocked resourceTrackingServiceStart");
@@ -1460,6 +1464,32 @@ LOG.info("+");
 
   protected GroupMembershipService createGroupMembershipService() {
     return new GroupMembershipService(this, rmContext);
+  }
+  
+  private void createAndInitCRLFetcherService() {
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      if (conf.getBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY,
+          CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_DEFAULT)) {
+        LOG.info("Creating CertificateRevocationList Fetcher service");
+        revocationListFetcherService = new RevocationListFetcherService();
+        revocationListFetcherService.init(conf);
+      } else {
+        LOG.warn("RPC TLS is enabled but CRL validation is disabled");
+      }
+    }
+  }
+  
+  private void startCRLFetcherService() {
+    if (revocationListFetcherService != null) {
+      revocationListFetcherService.start();
+    }
+  }
+  
+  private void stopCRLFetcherService() {
+    if (revocationListFetcherService != null) {
+      revocationListFetcherService.stop();
+    }
   }
   
   private void createCertificateLocalizationService() {

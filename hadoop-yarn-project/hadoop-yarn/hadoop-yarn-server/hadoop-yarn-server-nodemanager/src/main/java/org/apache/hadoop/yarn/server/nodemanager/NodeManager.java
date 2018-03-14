@@ -39,6 +39,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
+import org.apache.hadoop.security.ssl.RevocationListFetcherService;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.ExitUtil;
@@ -108,6 +109,7 @@ public class NodeManager extends CompositeService
   private boolean shouldExitOnShutdownEvent = false;
   
   private CertificateLocalizationService certificateLocalizationService;
+  private RevocationListFetcherService revocationListFetcherService;
 
   public NodeManager() {
     super(NodeManager.class.getName());
@@ -166,7 +168,7 @@ public class NodeManager extends CompositeService
     }
     return provider;
   }
-
+  
   protected NodeResourceMonitor createNodeResourceMonitor() {
     return new NodeResourceMonitorImpl();
   }
@@ -287,6 +289,8 @@ public class NodeManager extends CompositeService
         YarnConfiguration.DEFAULT_RM_WORK_PRESERVING_RECOVERY_ENABLED);
 
     initAndStartRecoveryStore(conf);
+  
+    createCRLFetcherService(conf);
 
     NMContainerTokenSecretManager containerTokenSecretManager =
         new NMContainerTokenSecretManager(conf, nmStore);
@@ -375,7 +379,21 @@ public class NodeManager extends CompositeService
     super.serviceInit(conf);
     // TODO add local dirs to del
   }
-
+  
+  private void createCRLFetcherService(Configuration conf) {
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      if (conf.getBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY,
+          CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_DEFAULT)) {
+        LOG.info("Creating CertificateRevocationList Fetcher service");
+        revocationListFetcherService = new RevocationListFetcherService();
+        addService(revocationListFetcherService);
+      } else {
+        LOG.warn("RPC TLS is enabled but CRL validation is disabled");
+      }
+    }
+  }
+  
   @Override
   protected void serviceStart() throws Exception {
     try {

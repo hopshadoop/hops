@@ -24,10 +24,7 @@ import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.SSLFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Set;
 
 /**
@@ -92,70 +89,30 @@ public abstract class AbstractHopsSSLCheck implements HopsSSLCheck, Comparable<H
   protected HopsSSLCryptoMaterial readSuperuserMaterialFromFile(Configuration configuration) throws IOException {
     Configuration sslConf = new Configuration(false);
     String sslConfResource = configuration.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml");
-    
-    File sslConfFile = new File(sslConfResource);
-    if (!sslConfFile.exists()) {
-      String hadoopConfDir = System.getenv("HADOOP_CONF_DIR");
-      if (hadoopConfDir == null) {
-        hadoopConfDir = System.getProperty("HADOOP_CONF_DIR");
-      }
-      if (hadoopConfDir == null) {
-        throw new IOException("JVM property -DHADOOP_CONF_DIR or " +
-            "environment variable is not exported and " + sslConfResource +
-            " is not in classpath");
-      }
-      Path sslConfPath = Paths.get(hadoopConfDir, sslConfResource);
-      sslConfFile = sslConfPath.toFile();
+  
+    sslConf.addResource(sslConfResource);
+  
+    String keystoreLocation = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY));
+    String keystorePassword = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
+    String truststoreLocation = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
+    String truststorePassword = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
+  
+    File keystoreFd = new File(keystoreLocation);
+    File truststoreFd = new File(truststoreLocation);
+    if (!keystoreFd.exists() || !truststoreFd.exists()) {
+      throw new IOException("Keystore or Truststore specified in " + sslConfResource + " does not exist! " +
+          "Check your configuration.");
     }
-    
-    if (!sslConfFile.exists()) {
-      throw new IOException("Could not locate ssl-server.xml. Export " +
-          "JVM property -DHADOOP_CONF_DIR or environment variable or add " +
-          sslConfResource + " to classpath.");
-    }
-    FileInputStream sslConfIn = null;
-    
-    try {
-      try {
-        sslConfIn = new FileInputStream(sslConfFile);
-        sslConf.addResource(sslConfIn);
-      } catch (IOException ex) {
-        sslConf.addResource(sslConfFile.getAbsolutePath());
-      }
-      
-      String keystoreLocation = sslConf.get(
-          FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-              FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY));
-      String keystorePassword = sslConf.get(
-          FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-              FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
-      String truststoreLocation = sslConf.get(
-          FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-              FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
-      String truststorePassword = sslConf.get(
-          FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-              FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
-      
-      File keystoreFd = new File(keystoreLocation);
-      File truststoreFd = new File(truststoreLocation);
-      if (!keystoreFd.exists() || !truststoreFd.exists()) {
-        throw new IOException("Keystore or Truststore specified in " + sslConfFile.toString() + " does not exist! " +
-            "Check your configuration.");
-      }
-      
-      keystoreFd = null;
-      truststoreFd = null;
-      
-      return new HopsSSLCryptoMaterial(keystoreLocation, keystorePassword, truststoreLocation, truststorePassword);
-    } finally {
-      if (null != sslConfIn) {
-        try {
-          sslConfIn.close();
-        } catch (IOException ex) {
-          // Ignore errors when closing the file
-        }
-      }
-    }
+  
+    return new HopsSSLCryptoMaterial(keystoreLocation, keystorePassword, truststoreLocation, truststorePassword);
   }
   
   private boolean isCryptoMaterialSet(Configuration conf, String username) {

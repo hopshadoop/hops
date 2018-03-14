@@ -11,19 +11,20 @@ import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.SSLCertificateException;
 import org.apache.hadoop.security.ssl.HopsSSLTestUtils;
+import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.util.envVars.EnvironmentVariables;
 import org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
-import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -44,6 +45,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
         System.getProperty("test.build.dir", "target/test-dir") + "/" +
             TestHopsSSLConfiguration.class.getSimpleName();
     private File baseDirFile;
+    private static File classPathDir;
     
     @Rule
     public final ExpectedException rule = ExpectedException.none();
@@ -52,6 +54,11 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     HopsSSLSocketFactory hopsFactory;
     final List<String> filesToPurge = new ArrayList<>();
 
+    @BeforeClass
+    public static void beforeClass() throws Exception {
+        classPathDir = new File(KeyStoreTestUtil.getClasspathDir(TestHopsSSLConfiguration.class));
+    }
+    
     @Before
     public void setUp() {
         conf = new Configuration();
@@ -69,6 +76,17 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
         }
         purgeFiles();
         EnvironmentVariablesFactory.setInstance(null);
+    }
+    
+    @AfterClass
+    public static void afterClass() throws Exception {
+        if (classPathDir != null) {
+            File sslServerConf = Paths.get(classPathDir.getAbsolutePath(), TestHopsSSLConfiguration.class.getSimpleName() +
+                ".ssl-server.xml").toFile();
+            if (sslServerConf.exists()) {
+                sslServerConf.delete();
+            }
+        }
     }
     
     @Test
@@ -392,35 +410,12 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     
     private void createServerSSLConfig(String keystoreLocation, String keyStorePassword,
         String truststoreLocation, String trustStorePassword, Configuration conf) throws IOException {
-        
-        Configuration sslConf = new Configuration(false);
-        
-        File sslConfFile = new File(Paths.get(BASEDIR, "ssl-server.xml")
-            .toString());
-        conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFile.getAbsolutePath());
-        filesToPurge.add(sslConfFile.toString());
-        sslConf.set(
-            FileBasedKeyStoresFactory.resolvePropertyName(
-                SSLFactory.Mode.SERVER,
-                FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY), keystoreLocation);
-        sslConf.set(
-            FileBasedKeyStoresFactory.resolvePropertyName(
-                SSLFactory.Mode.SERVER,
-                FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY),
-            keyStorePassword);
-        sslConf.set(
-            FileBasedKeyStoresFactory.resolvePropertyName(
-                SSLFactory.Mode.SERVER,
-                FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY), truststoreLocation);
-        sslConf.set(
-            FileBasedKeyStoresFactory.resolvePropertyName(
-                SSLFactory.Mode.SERVER,
-                FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY),
-            trustStorePassword);
-        
-        try (FileWriter fw = new FileWriter(sslConfFile, false)) {
-            sslConf.writeXml(fw);
-        }
+        Configuration sslConf = KeyStoreTestUtil.createServerSSLConfig(keystoreLocation, keyStorePassword,
+            keyStorePassword, truststoreLocation, trustStorePassword, "");
+        File sslConfFile = Paths.get(classPathDir.getAbsolutePath(), TestHopsSSLConfiguration.class.getSimpleName() +
+            ".ssl-server.xml").toFile();
+        KeyStoreTestUtil.saveConfig(sslConfFile, sslConf);
+        conf.set(SSLFactory.SSL_SERVER_CONF_KEY, TestHopsSSLConfiguration.class.getSimpleName() + ".ssl-server.xml");
     }
     
     @Test

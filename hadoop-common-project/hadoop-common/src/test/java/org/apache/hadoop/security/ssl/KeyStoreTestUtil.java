@@ -40,6 +40,10 @@ import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.Certificate;
+import java.security.cert.X509CRL;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,7 +58,11 @@ import java.security.cert.X509Certificate;
 import javax.security.auth.x500.X500Principal;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.DERObjectIdentifier;
+import org.bouncycastle.asn1.x509.CRLNumber;
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.x509.X509V1CertificateGenerator;
+import org.bouncycastle.x509.X509V2CRLGenerator;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 import org.bouncycastle.x509.extension.AuthorityKeyIdentifierStructure;
 import org.bouncycastle.x509.extension.SubjectKeyIdentifierStructure;
@@ -139,7 +147,7 @@ public class KeyStoreTestUtil {
   public static KeyPair generateKeyPair(String algorithm)
       throws NoSuchAlgorithmException {
     KeyPairGenerator keyGen = KeyPairGenerator.getInstance(algorithm);
-    keyGen.initialize(1024);
+    keyGen.initialize(2048);
     return keyGen.genKeyPair();
   }
 
@@ -160,7 +168,7 @@ public class KeyStoreTestUtil {
       out.close();
     }
   }
-
+  
   public static void createKeyStore(String filename,
       String password, String alias,
       Key privateKey, Certificate cert)
@@ -192,7 +200,7 @@ public class KeyStoreTestUtil {
         new Certificate[]{cert});
     saveKeyStore(ks, filename, password);
   }
-
+  
   public static void createTrustStore(String filename,
       String password, String alias,
       Certificate cert)
@@ -211,7 +219,39 @@ public class KeyStoreTestUtil {
     }
     saveKeyStore(ks, filename, password);
   }
-
+  
+  public static X509CRL generateCRL(X509Certificate caCert, PrivateKey caPrivateKey, String signAlgorith,
+      X509CRL existingCRL, BigInteger serialNumberToRevoke)
+    throws GeneralSecurityException {
+    X509V2CRLGenerator crlGenerator = new X509V2CRLGenerator();
+    LocalDate currentTime = LocalDate.now();
+    Date nowDate = Date.from(currentTime.atStartOfDay(ZoneId.systemDefault()).toInstant());
+    LocalDate nextUpdate = currentTime.plus(1, ChronoUnit.WEEKS);
+    Date nextUpdateDate = Date.from(nextUpdate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+    
+    crlGenerator.setIssuerDN(caCert.getSubjectX500Principal());
+    crlGenerator.setThisUpdate(nowDate);
+    crlGenerator.setNextUpdate(nextUpdateDate);
+    crlGenerator.setSignatureAlgorithm(signAlgorith);
+    
+    if (existingCRL != null) {
+      crlGenerator.addCRL(existingCRL);
+    }
+    //crlGenerator.addCRLEntry(BigInteger.ONE, nowDate, CRLReason.aACompromise);
+    if (serialNumberToRevoke != null) {
+      crlGenerator.addCRLEntry(serialNumberToRevoke, nowDate, CRLReason.aACompromise);
+    }
+    
+    // Hadoop Common and Hadoop Yarn use older version of BC than HDFS. In the later some fields have
+    // been deprecated such as X509Extensions.AuthorityKeyIdentifier and X509Extensions.CRLNumber
+    // AuthorityKeyIdentifier
+    crlGenerator.addExtension(new DERObjectIdentifier("2.5.29.35"), false, new AuthorityKeyIdentifierStructure(caCert));
+    // CRLNumber
+    crlGenerator.addExtension(new DERObjectIdentifier("2.5.29.20"), false, new CRLNumber(BigInteger.ONE));
+    
+    return crlGenerator.generate(caPrivateKey);
+  }
+  
   public static void cleanupSSLConfig(String keystoresDir, String sslConfDir)
       throws Exception {
     File f = new File(keystoresDir + "/clientKS.jks");

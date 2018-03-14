@@ -109,10 +109,12 @@ public class HopsSSLTestUtils {
 
         Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(serverKeyStore.toString(),
                 passwd, passwd, serverTrustStore.toString(), passwd, "");
-        Path sslServerPath = Paths.get(outDir, "ssl-server.xml");
+        String classPathDir = KeyStoreTestUtil.getClasspathDir(HopsSSLTestUtils.class);
+        Path sslServerPath = Paths.get(classPathDir, HopsSSLTestUtils.class.getSimpleName() + ".ssl-server.xml");
         filesToPurge.add(sslServerPath);
         File sslServer = new File(sslServerPath.toUri());
         KeyStoreTestUtil.saveConfig(sslServer, sslServerConf);
+        conf.set(SSLFactory.SSL_SERVER_CONF_KEY, HopsSSLTestUtils.class.getSimpleName() + ".ssl-server.xml");
 
         // Set the client certificate with correct CN and signed by the CA
         conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(), c_clientKeyStore.toString());
