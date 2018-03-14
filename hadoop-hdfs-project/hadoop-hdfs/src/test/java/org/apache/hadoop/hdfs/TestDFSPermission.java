@@ -180,8 +180,8 @@ public class TestDFSPermission {
     } catch (AccessControlException e) {
       assertTrue("Permission denied messages must carry the username",
           e.getMessage().contains(USER1_NAME));
-      assertTrue("Permission denied messages must carry the inode id",
-          e.getMessage().contains(String.valueOf(inodeId)));
+      assertTrue("Permission denied messages must carry the inode path",
+          e.getMessage().contains(String.valueOf("p2")));
     }
   }
 
