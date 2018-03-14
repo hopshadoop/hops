@@ -194,7 +194,7 @@ public abstract class ChecksumFs extends FilterFs {
         sums.close();
       }
       set(fs.verifyChecksum, null, 1, 0);
-    }
+      }
     
     @Override
     public boolean seekToNewSource(long targetPos) throws IOException {
