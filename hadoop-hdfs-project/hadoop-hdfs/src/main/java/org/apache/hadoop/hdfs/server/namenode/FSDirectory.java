@@ -2124,45 +2124,47 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   /**
    * Create FileStatus with location info by file INode
    */
-  private HdfsLocatedFileStatus createLocatedFileStatus(byte[] path, INode node, byte storagePolicy) throws IOException,
-      StorageException {
-    long size = 0;     // length is zero for directories
+  private HdfsLocatedFileStatus createLocatedFileStatus(byte[] path,
+      INode node, byte storagePolicy) throws IOException {
+    long size = 0; // length is zero for directories
     short replication = 0;
     long blocksize = 0;
     LocatedBlocks loc = null;
     boolean isFileStoredInDB = false;
-    if (node instanceof INodeFile) {
-      INodeFile fileNode = (INodeFile) node;
+    if (node.isFile()) {
+      final INodeFile fileNode = node.asFile();
       isFileStoredInDB = fileNode.isFileStoredInDB();
-
+      
       if(isFileStoredInDB){
         size = fileNode.getSize();
-      }else{
+      } else {
         size = fileNode.computeFileSize(true);
       }
-
+      
       replication = fileNode.getBlockReplication();
       blocksize = fileNode.getPreferredBlockSize();
-      if(isFileStoredInDB){
-        loc = getFSNamesystem().getBlockManager().createPhantomLocatedBlocks(fileNode,null,fileNode.isUnderConstruction(),false);
-      }else {
-        loc = getFSNamesystem().getBlockManager()
-                .createLocatedBlocks(fileNode.getBlocks(),
-                        fileNode.computeFileSize(false), fileNode.isUnderConstruction(),
-                        0L, size, false);
+
+      final boolean isUc = fileNode.isUnderConstruction();
+      final long fileSize = isUc ? 
+          fileNode.computeFileSizeNotIncludingLastUcBlock() : size;
+      
+      if (isFileStoredInDB) {
+        loc = getFSNamesystem().getBlockManager().createPhantomLocatedBlocks(fileNode,null,isUc,false);
+      } else {
+        loc = getFSNamesystem().getBlockManager().createLocatedBlocks(
+            fileNode.getBlocks(), fileSize, isUc, 0L, size, false);
       }
       if (loc == null) {
         loc = new LocatedBlocks();
       }
-
     }
     return new HdfsLocatedFileStatus(size, node.isDirectory(), replication,
-        blocksize, node.getModificationTime(), node.getAccessTime(),
-        node.getFsPermission(), node.getUserName(), node.getGroupName(),
-        node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path,node.getId(),
-        loc, isFileStoredInDB, storagePolicy);
+        blocksize, node.getModificationTime(),
+        node.getAccessTime(), node.getFsPermission(),
+        node.getUserName(), node.getGroupName(),
+        node.isSymlink() ? node.asSymlink().getSymlink() : null, path,
+        node.getId(), loc, isFileStoredInDB, storagePolicy);
   }
-
 
   /**
    * Add the given symbolic link to the fs. Record it in the edits log.

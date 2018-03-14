@@ -1270,9 +1270,12 @@ public class FSNamesystem
       if (doAccessTime && isAccessTimeSupported()) {
         dir.setTimes(src, inode, -1, now, false);
       }
+      final long fileSize = inode.computeFileSizeNotIncludingLastUcBlock();
+      boolean isUc = inode.isUnderConstruction();
+
       return blockManager
-          .createLocatedBlocks(inode.getBlocks(), inode.computeFileSize(false),
-              inode.isUnderConstruction(), offset, length, needBlockToken);
+          .createLocatedBlocks(inode.getBlocks(), fileSize,
+              isUc, offset, length, needBlockToken);
   }
 
   /**
