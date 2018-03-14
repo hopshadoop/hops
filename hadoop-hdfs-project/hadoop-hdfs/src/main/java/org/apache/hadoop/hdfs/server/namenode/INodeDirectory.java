@@ -106,6 +106,14 @@ public class INodeDirectory extends INode {
     return true;
   }
 
+  /**
+   * @return this object.
+   */
+  @Override
+  public final INodeDirectory asDirectory() {
+    return this;
+  }
+
   public boolean isMetaEnabled() {
     return metaEnabled;
   }

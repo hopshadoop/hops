@@ -830,6 +830,22 @@ public class BlockManager {
         results.size() < nrBlocksToReturn);
     return results;
   }
+  
+  private LocatedBlock createLocatedBlock(final BlockInfo[] blocks,
+      final long endPos, final AccessMode mode) throws IOException {
+    int curBlk = 0;
+    long curPos = 0;
+    int nrBlocks = (blocks[0].getNumBytes() == 0) ? 0 : blocks.length;
+    for (curBlk = 0; curBlk < nrBlocks; curBlk++) {
+      long blkSize = blocks[curBlk].getNumBytes();
+      if (curPos + blkSize >= endPos) {
+        break;
+      }
+      curPos += blkSize;
+    }
+    
+    return createLocatedBlock(blocks[curBlk], curPos, mode);
+  }
 
   private List<LocatedBlock> createPhantomLocatedBlockList(INodeFile file, final byte[] data,
       final AccessMode mode) throws IOException, StorageException {
@@ -977,17 +993,17 @@ public class BlockManager {
         LOG.debug("blocks = " + java.util.Arrays.asList(blocks));
       }
       final AccessMode mode = needBlockToken ? AccessMode.READ : null;
-      final List<LocatedBlock> locatedblocks =
-          createLocatedBlockList(blocks, offset, length, Integer.MAX_VALUE,
-              mode);
+      final List<LocatedBlock> locatedblocks = createLocatedBlockList(blocks, offset, length, Integer.MAX_VALUE,
+          mode);
 
       final BlockInfo last = blocks[blocks.length - 1];
-      final long lastPos = last.isComplete() ?
-          fileSizeExcludeBlocksUnderConstruction - last.getNumBytes() :
-          fileSizeExcludeBlocksUnderConstruction;
+      final long lastPos = last.isComplete() ? fileSizeExcludeBlocksUnderConstruction - last.getNumBytes()
+          : fileSizeExcludeBlocksUnderConstruction;
       final LocatedBlock lastlb = createLocatedBlock(last, lastPos, mode);
+      final boolean isComplete = last.isComplete();
+
       return new LocatedBlocks(fileSizeExcludeBlocksUnderConstruction,
-          isFileUnderConstruction, locatedblocks, lastlb, last.isComplete());
+          isFileUnderConstruction, locatedblocks, lastlb, isComplete);
     }
   }
 

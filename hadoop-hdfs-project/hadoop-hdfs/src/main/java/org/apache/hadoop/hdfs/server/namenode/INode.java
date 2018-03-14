@@ -405,12 +405,43 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   }
 
   /**
+   * Cast this inode to an {@link INodeFile}.
+   */
+  public INodeFile asFile() throws StorageException, TransactionContextException {
+    throw new IllegalStateException("Current inode is not a file: "
+        + this.toDetailString());
+  }
+
+  /**
    * Check whether it's a directory
    */
   public boolean isDirectory() {
     return false;
   }
 
+  /**
+   * Cast this inode to an {@link INodeDirectory}.
+   */
+  public INodeDirectory asDirectory() throws StorageException, TransactionContextException {
+    throw new IllegalStateException("Current inode is not a directory: "
+        + this.toDetailString());
+  }
+
+  /**
+   * Check whether it's a symlink
+   */
+  public boolean isSymlink() {
+    return false;
+  }
+
+  /**
+   * Cast this inode to an {@link INodeSymlink}.
+   */
+  public INodeSymlink asSymlink() throws StorageException, TransactionContextException {
+    throw new IllegalStateException("Current inode is not a symlink: "
+        + this.toDetailString());
+  }
+  
   /**
    * Collect all the blocks in all children of this INode.
    * Count and return the number of files in the sub tree.
@@ -526,6 +557,30 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     return null;
   }
 
+  @VisibleForTesting
+  public final String getObjectString() {
+    return getClass().getSimpleName() + "@"
+        + Integer.toHexString(super.hashCode());
+  }
+
+  /**
+   * @return a string description of the parent.
+   */
+  @VisibleForTesting
+  public final String getParentString() throws StorageException, TransactionContextException {
+    final INodeDirectory parentDir = getParent();
+    if (parentDir != null) {
+      return "parentDir=" + parentDir.getLocalName() + "/";
+    } else {
+      return "parent=null";
+    }
+  }
+
+  @VisibleForTesting
+  public String toDetailString() throws StorageException, TransactionContextException {
+    return toString() + "(" + getObjectString() + "), " + getParentString();
+  }
+
   /**
    * Get parent directory
    *
@@ -613,13 +668,6 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    * Is this inode being constructed?
    */
   public boolean isUnderConstruction() {
-    return false;
-  }
-
-  /**
-   * Check whether it's a symlink
-   */
-  public boolean isSymlink() {
     return false;
   }
 

@@ -56,6 +56,14 @@ public class INodeSymlink extends INode {
     return true;
   }
 
+  /**
+   * @return this object.
+   */
+  @Override
+  public INodeSymlink asSymlink() {
+    return this;
+  }
+
   public String getSymlinkString() {
     return DFSUtil.bytes2String(symlink);
   }

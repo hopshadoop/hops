@@ -69,6 +69,14 @@ public class INodeFile extends INode implements BlockCollection {
     return true;
   }
 
+  /**
+   * @return this object.
+   */
+  @Override
+  public final INodeFile asFile() {
+    return this;
+  }
+
   public INodeFile(int id, PermissionStatus permissions, BlockInfo[] blklist,
       short replication, long modificationTime, long atime,
       long preferredBlockSize, byte storagePolicyID) throws IOException {
@@ -299,6 +307,16 @@ public class INodeFile extends INode implements BlockCollection {
     summary[1]++;
     summary[3] += diskspaceConsumed();
     return summary;
+  }
+
+  /**
+   * Compute file size of the current file size
+   * but not including the last block if it is under construction.
+   * @throws io.hops.exception.StorageException
+   * @throws io.hops.exception.TransactionContextException
+   */
+  public final long computeFileSizeNotIncludingLastUcBlock() throws StorageException, TransactionContextException {
+    return computeFileSize(false);
   }
 
   /**
