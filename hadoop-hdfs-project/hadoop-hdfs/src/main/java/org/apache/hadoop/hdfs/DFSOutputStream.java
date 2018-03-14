@@ -1512,13 +1512,6 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     return sock;
   }
 
-  private void isClosed() throws IOException {
-    if (closed) {
-      IOException e = lastException;
-      throw e != null ? e : new IOException("DFSOutputStream is closed");
-    }
-  }
-
   //
   // returns the list of targets, if any, that is being currently used.
   //
@@ -1827,7 +1820,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
           break;
         }
       }
-      isClosed();
+      checkClosed();
       queueCurrentPacket();
     }
   }
@@ -1837,7 +1830,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   protected synchronized void writeChunk(byte[] b, int offset, int len,
                                          byte[] checksum) throws IOException {
     dfsClient.checkOpen();
-    isClosed();
+    checkClosed();
 
     int cklen = checksum.length;
     int bytesPerChecksum = this.checksum.getBytesPerChecksum();
@@ -1970,7 +1963,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   private void flushOrSync(boolean isSync, EnumSet<SyncFlag> syncFlags)
           throws IOException {
     dfsClient.checkOpen();
-    isClosed();
+    checkClosed();
     syncOrFlushCalled = true;
     try {
 
@@ -2059,7 +2052,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
           // If we got an error here, it might be because some other thread called
           // close before our hflush completed. In that case, we should throw an
           // exception that the stream is closed.
-          isClosed();
+          checkClosed();
           // If we aren't closed but failed to sync, we should expose that to the
           // caller.
           throw ioe;
@@ -2104,7 +2097,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
    */
   public synchronized int getCurrentBlockReplication() throws IOException {
     dfsClient.checkOpen();
-    isClosed();
+    checkClosed();
     if (streamer == null) {
       return blockReplication; // no pipeline, return repl factor of file
     }
@@ -2123,7 +2116,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     long toWaitFor;
     synchronized (this) {
       dfsClient.checkOpen();
-      isClosed();
+      checkClosed();
       //
       // If there is data in the current buffer, send it across
       //
@@ -2143,7 +2136,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       }
       synchronized (dataQueue) {
         while (!closed) {
-          isClosed();
+          checkClosed();
           if (lastAckedSeqno >= seqno) {
             break;
           }
@@ -2156,7 +2149,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
           }
         }
       }
-      isClosed();
+      checkClosed();
     }
   }
 
