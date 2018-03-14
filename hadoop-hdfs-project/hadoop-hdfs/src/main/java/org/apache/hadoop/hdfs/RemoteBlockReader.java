@@ -38,7 +38,6 @@ import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -468,22 +467,6 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     }
   }
   
-  /**
-   * File name to print when accessing a block directly (from servlets)
-   *
-   * @param s
-   *     Address of the block location
-   * @param poolId
-   *     Block pool ID of the block
-   * @param blockId
-   *     Block ID of the block
-   * @return string that has a file name for debug purposes
-   */
-  public static String getFileName(final InetSocketAddress s,
-      final String poolId, final long blockId) {
-    return s.toString() + ":" + poolId + ":" + blockId;
-  }
-
   @Override
   public int read(ByteBuffer buf) throws IOException {
     throw new UnsupportedOperationException(

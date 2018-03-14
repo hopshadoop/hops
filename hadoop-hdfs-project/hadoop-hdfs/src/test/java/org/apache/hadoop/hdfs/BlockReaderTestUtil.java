@@ -154,7 +154,7 @@ public class BlockReaderTestUtil {
     sock.connect(targetAddr, HdfsServerConstants.READ_TIMEOUT);
     sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
 
-    return BlockReaderFactory.newBlockReader(conf,
+    return BlockReaderFactory.newBlockReader( new DFSClient.Conf(conf),
         targetAddr.toString() + ":" + block.getBlockId(), block,
         testBlock.getBlockToken(), offset, lenToRead,
         true, "BlockReaderTestUtil", TcpPeerServer.peerFromSocket(sock),

@@ -79,7 +79,6 @@ public class DFSInputStream extends FSInputStream
   private boolean closed = false;
 
   private final String src;
-  private final long prefetchSize;
   private BlockReader blockReader = null;
   private final boolean verifyChecksum;
   private LocatedBlocks locatedBlocks = null;
@@ -172,7 +171,6 @@ public class DFSInputStream extends FSInputStream
    * capped at maxBlockAcquireFailures
    */
   private int failures = 0;
-  private final int timeWindow;
 
   /* XXX Use of CocurrentHashMap is temp fix. Need to fix 
    * parallel accesses to DFSInputStream (through ptreads) properly */
@@ -181,8 +179,6 @@ public class DFSInputStream extends FSInputStream
   private int buffersize = 1;
   
   private final byte[] oneByteBuf = new byte[1]; // used for 'int read()'
-
-  private final int nCachedConnRetry;
 
   void addToDeadNodes(DatanodeInfo dnInfo) {
     deadNodes.put(dnInfo, dnInfo);
@@ -196,13 +192,8 @@ public class DFSInputStream extends FSInputStream
     this.src = src;
     this.peerCache = dfsClient.peerCache;
     this.fileInputStreamCache = new FileInputStreamCache(
-        dfsClient.conf.getInt(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_SIZE_KEY,
-            DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_SIZE_DEFAULT),
-        dfsClient.conf.getLong(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_EXPIRY_MS_KEY,
-            DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_EXPIRY_MS_DEFAULT));
-    prefetchSize = dfsClient.getConf().prefetchSize;
-    timeWindow = dfsClient.getConf().timeWindow;
-    nCachedConnRetry = dfsClient.getConf().nCachedConnRetry;
+        dfsClient.getConf().shortCircuitStreamsCacheSize,
+        dfsClient.getConf().shortCircuitStreamsCacheExpiryMs);
     this.emulateHdfsClient = emulateHdfsClient;
     openInfo();
   }
@@ -243,7 +234,7 @@ public class DFSInputStream extends FSInputStream
   }
 
   private long fetchLocatedBlocksAndGetLastBlockLength() throws IOException {
-    LocatedBlocks newInfo = dfsClient.getLocatedBlocks(src, 0, prefetchSize);
+    final LocatedBlocks newInfo = dfsClient.getLocatedBlocks(src, 0);
     if (DFSClient.LOG.isDebugEnabled()) {
       DFSClient.LOG.debug("newInfo = " + newInfo);
     }
@@ -290,10 +281,9 @@ public class DFSInputStream extends FSInputStream
       ClientDatanodeProtocol cdp = null;
       
       try {
-        cdp = DFSUtil
-            .createClientDatanodeProtocolProxy(datanode, dfsClient.conf,
-                dfsClient.getConf().socketTimeout,
-                dfsClient.getConf().connectToDnViaHostname, locatedblock);
+        cdp = DFSUtil.createClientDatanodeProtocolProxy(datanode,
+            dfsClient.getConfiguration(), dfsClient.getConf().socketTimeout,
+            dfsClient.getConf().connectToDnViaHostname, locatedblock);
         
         final long n = cdp.getReplicaVisibleLength(locatedblock.getBlock());
         
@@ -398,8 +388,7 @@ public class DFSInputStream extends FSInputStream
       if (targetBlockIdx < 0) { // block is not cached
         targetBlockIdx = LocatedBlocks.getInsertIndex(targetBlockIdx);
         // fetch more blocks
-        LocatedBlocks newBlocks;
-        newBlocks = dfsClient.getLocatedBlocks(src, offset, prefetchSize);
+        final LocatedBlocks newBlocks = dfsClient.getLocatedBlocks(src, offset);
         assert (newBlocks != null) : "Could not find target position " + offset;
         locatedBlocks.insertRange(targetBlockIdx, newBlocks.getLocatedBlocks());
       }
@@ -424,8 +413,7 @@ public class DFSInputStream extends FSInputStream
       targetBlockIdx = LocatedBlocks.getInsertIndex(targetBlockIdx);
     }
     // fetch blocks
-    LocatedBlocks newBlocks;
-    newBlocks = dfsClient.getLocatedBlocks(src, offset, prefetchSize);
+    final LocatedBlocks newBlocks = dfsClient.getLocatedBlocks(src, offset);
     if (newBlocks == null) {
       throw new IOException("Could not find target position " + offset);
     }
@@ -854,7 +842,7 @@ public class DFSInputStream extends FSInputStream
       try {
         DatanodeInfo chosenNode = bestNode(nodes, deadNodes);
         final String dnAddr =
-            chosenNode.getXferAddr(dfsClient.connectToDnViaHostname());
+            chosenNode.getXferAddr(dfsClient.getConf().connectToDnViaHostname);
         if (DFSClient.LOG.isDebugEnabled()) {
           DFSClient.LOG.debug("Connecting to datanode " + dnAddr);
         }
@@ -883,6 +871,7 @@ public class DFSInputStream extends FSInputStream
           // alleviating the request rate from the server. Similarly the 3rd retry
           // will wait 6000ms grace period before retry and the waiting window is
           // expanded to 9000ms. 
+          final int timeWindow = dfsClient.getConf().timeWindow;
           double waitTime = timeWindow * failures +
               // grace period for the last round of attempt
               timeWindow * (failures + 1) * DFSUtil.getRandom()
@@ -1049,7 +1038,7 @@ public class DFSInputStream extends FSInputStream
       if (DFSClient.LOG.isDebugEnabled()) {
         DFSClient.LOG.debug("got FileInputStreams for " + locBlock + " from " + "the FileInputStreamCache.");
       }
-      return new BlockReaderLocal(dfsClient.conf, file,
+      return new BlockReaderLocal(dfsClient.getConf(), file,
           locBlock.getBlock(), startOffset, len, fis[0], fis[1], chosenNode, verifyChecksum, fileInputStreamCache);
     }
 
@@ -1058,9 +1047,8 @@ public class DFSInputStream extends FSInputStream
     // reader implements local reads in the style first introduced by HDFS-2246.
     if ((dfsClient.useLegacyBlockReaderLocal()) && DFSClient.isLocalAddress(dnAddr) && (!shortCircuitForbidden())) {
       try {
-        return BlockReaderFactory.getLegacyBlockReaderLocal(dfsClient.ugi,
-            dfsClient.conf, clientName, locBlock.getBlock(), blockToken, chosenNode,
-            dfsClient.hdfsTimeout, startOffset, dfsClient.connectToDnViaHostname());
+        return BlockReaderFactory.getLegacyBlockReaderLocal(dfsClient,
+            clientName, locBlock.getBlock(), blockToken, chosenNode, startOffset);
       } catch (IOException e) {
         DFSClient.LOG.warn("error creating legacy BlockReaderLocal.  " + "Disabling legacy local reads.", e);
         dfsClient.disableLegacyBlockReaderLocal();
@@ -1071,6 +1059,7 @@ public class DFSInputStream extends FSInputStream
     int cacheTries = 0;
     DomainSocketFactory dsFactory = dfsClient.getDomainSocketFactory();
     BlockReader reader = null;
+    final int nCachedConnRetry = dfsClient.getConf().nCachedConnRetry;
     for (; cacheTries < nCachedConnRetry; ++cacheTries) {
       Peer peer = peerCache.get(chosenNode, true);
       if (peer == null) {
@@ -1079,7 +1068,7 @@ public class DFSInputStream extends FSInputStream
       try {
         boolean allowShortCircuitLocalReads = dfsClient.getConf().shortCircuitLocalReads && (!shortCircuitForbidden());
         reader = BlockReaderFactory.newBlockReader(
-            dfsClient.conf, file, locBlock.getBlock(), blockToken, startOffset,
+            dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
             len, verifyChecksum, clientName, peer, chosenNode,
             dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads);
         return reader;
@@ -1099,7 +1088,7 @@ public class DFSInputStream extends FSInputStream
       try {
         boolean allowShortCircuitLocalReads = dfsClient.getConf().shortCircuitLocalReads && (!shortCircuitForbidden());
         reader = BlockReaderFactory.newBlockReader(
-            dfsClient.conf, file, locBlock.getBlock(), blockToken, startOffset,
+            dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
             len, verifyChecksum, clientName, peer, chosenNode,
             dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads);
         return reader;
@@ -1124,7 +1113,7 @@ public class DFSInputStream extends FSInputStream
       }
       try {
         reader = BlockReaderFactory.newBlockReader(
-            dfsClient.conf, file, locBlock.getBlock(), blockToken, startOffset,
+            dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
             len, verifyChecksum, clientName, peer, chosenNode,
             dsFactory, peerCache, fileInputStreamCache, false);
         return reader;
@@ -1142,7 +1131,7 @@ public class DFSInputStream extends FSInputStream
     // Try to create a new remote peer.
     Peer peer = newTcpPeer(dnAddr);
     return BlockReaderFactory.newBlockReader(
-        dfsClient.conf, file, locBlock.getBlock(), blockToken, startOffset,
+        dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
         len, verifyChecksum, clientName, peer, chosenNode,
         dsFactory, peerCache, fileInputStreamCache, false);
   }

@@ -598,7 +598,7 @@ public class NamenodeFsck {
             .getFileName(targetAddr, block.getBlockPoolId(),
                 block.getBlockId());
         blockReader = BlockReaderFactory
-            .newBlockReader(conf, file, block, lblock.getBlockToken(), 0, -1, true, "fsck",
+            .newBlockReader(dfs.getConf(), file, block, lblock.getBlockToken(), 0, -1, true, "fsck",
                 TcpPeerServer.peerFromSocketAndKey(s, namenode.getRpcServer().
                     getDataEncryptionKey()),
                 chosenNode, null, null, null, false);
