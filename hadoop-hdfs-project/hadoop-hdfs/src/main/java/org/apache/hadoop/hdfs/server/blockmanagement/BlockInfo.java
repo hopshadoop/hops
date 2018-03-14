@@ -43,7 +43,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 
 /**
- * Internal class for block metadata. BlockInfo class maintains for a given
+ * BlockInfo class maintains for a given
  * block the {@link BlockCollection} it is part of and datanodes where the
  * replicas of the block are stored.
  */

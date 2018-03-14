@@ -951,17 +951,8 @@ public class DFSClient implements java.io.Closeable {
       return cached;
     }
 
-    // Check if the address is any local or loop back
-    boolean local = addr.isAnyLocalAddress() || addr.isLoopbackAddress();
-
-    // Check if the address is defined on any interface
-    if (!local) {
-      try {
-        local = NetworkInterface.getByInetAddress(addr) != null;
-      } catch (SocketException e) {
-        local = false;
-      }
-    }
+    boolean local = NetUtils.isLocalAddress(addr);
+    
     if (LOG.isTraceEnabled()) {
       LOG.trace("Address " + targetAddr +
           (local ? " is local" : " is not local"));
