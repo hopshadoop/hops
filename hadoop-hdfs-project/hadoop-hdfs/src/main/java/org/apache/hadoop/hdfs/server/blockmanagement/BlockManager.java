@@ -4034,8 +4034,9 @@ public class BlockManager {
     corruptReplicas.removeFromCorruptReplicasMap(getBlockInfo(block));
     BlockInfo storedBlock = getBlockInfo(block);
     blocksMap.removeBlock(block);
-    // Remove the block from pendingReplications
+    // Remove the block from pendingReplications and neededReplications
     pendingReplications.remove(storedBlock);
+    neededReplications.remove(storedBlock, UnderReplicatedBlocks.LEVEL);
     if (postponedMisreplicatedBlocks.remove(block)) {
       postponedMisreplicatedBlocksCount.decrementAndGet();
     }
