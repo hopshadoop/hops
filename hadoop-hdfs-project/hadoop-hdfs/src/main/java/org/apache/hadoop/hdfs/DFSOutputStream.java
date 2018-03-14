@@ -2305,7 +2305,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
 
     try {
       fileComplete =
-              dfsClient.complete(src, dfsClient.clientName, last, data);
+              dfsClient.complete(src, dfsClient.clientName, last, fileId, data);
     } catch (RemoteException e) {
       IOException nonRetirableExceptions =
               e.unwrapRemoteException(NSQuotaExceededException.class,

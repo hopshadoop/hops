@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -162,7 +163,7 @@ public class TestFileAppend4 {
       GenericTestUtils.DelayAnswer delayer =
           new GenericTestUtils.DelayAnswer(LOG);
       doAnswer(delayer).when(spyNN)
-          .complete(anyString(), anyString(), (ExtendedBlock) anyObject(), Mockito.<byte[]>any());
+          .complete(anyString(), anyString(), (ExtendedBlock) anyObject(), anyLong(), Mockito.<byte[]>any());
 
       DFSClient client = new DFSClient(null, spyNN, conf, null);
       file1 = new Path("/testRecoverFinalized");
@@ -237,7 +238,7 @@ public class TestFileAppend4 {
       GenericTestUtils.DelayAnswer delayer =
           new GenericTestUtils.DelayAnswer(LOG);
       doAnswer(delayer).when(spyNN).complete(anyString(), anyString(),
-          (ExtendedBlock) anyObject(), Mockito.<byte[]>any());
+          (ExtendedBlock) anyObject(), anyLong(), Mockito.<byte[]>any());
 
       DFSClient client = new DFSClient(null, spyNN, conf, null);
       file1 = new Path("/testCompleteOtherLease");
