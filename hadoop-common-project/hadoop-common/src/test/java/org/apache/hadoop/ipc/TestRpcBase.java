@@ -72,7 +72,7 @@ public class TestRpcBase {
     UserGroupInformation.setConfiguration(conf);
   }
 
-  protected static RPC.Builder newServerBuilder(
+  public static RPC.Builder newServerBuilder(
       Configuration serverConf) throws IOException {
     // Create server side implementation
     PBServerImpl serverImpl = new PBServerImpl();
@@ -109,7 +109,7 @@ public class TestRpcBase {
     return setupTestServer(builder);
   }
 
-  protected static RPC.Server setupTestServer(RPC.Builder builder) throws IOException {
+  public static RPC.Server setupTestServer(RPC.Builder builder) throws IOException {
     RPC.Server server = builder.build();
 
     server.start();
@@ -119,7 +119,7 @@ public class TestRpcBase {
     return server;
   }
 
-  protected static TestRpcService getClient(InetSocketAddress serverAddr,
+  public static TestRpcService getClient(InetSocketAddress serverAddr,
                                      Configuration clientConf)
       throws ServiceException {
     try {

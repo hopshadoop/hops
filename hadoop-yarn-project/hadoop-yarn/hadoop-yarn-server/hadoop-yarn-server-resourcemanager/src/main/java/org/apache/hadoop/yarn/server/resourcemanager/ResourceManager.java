@@ -43,6 +43,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
+import org.apache.hadoop.security.ssl.RevocationListFetcherService;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.service.CompositeService;
@@ -176,6 +177,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected ContainersLogsService containersLogsService;
   protected PriceMultiplicatiorService priceMultiplicatiorService;
   protected CertificateLocalizationService certificateLocalizationService;
+  protected RevocationListFetcherService revocationListFetcherService;
   protected ReservationSystem reservationSystem;
   private ClientRMService clientRM;
   protected ApplicationMasterService masterService;
@@ -272,6 +274,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
 
     validateConfigs(this.conf);
+  
+    createCRLFetcherService();
     
     // Set HA configuration should be done before login
     this.rmContext.setHAEnabled(HAUtil.isHAEnabled(this.conf));
@@ -1460,6 +1464,20 @@ LOG.info("+");
 
   protected GroupMembershipService createGroupMembershipService() {
     return new GroupMembershipService(this, rmContext);
+  }
+  
+  private void createCRLFetcherService() {
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      if (conf.getBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY,
+          CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_DEFAULT)) {
+        LOG.info("Creating CertificateRevocationList Fetcher service");
+        revocationListFetcherService = new RevocationListFetcherService();
+        addService(revocationListFetcherService);
+      } else {
+        LOG.warn("RPC TLS is enabled but CRL validation is disabled");
+      }
+    }
   }
   
   private void createCertificateLocalizationService() {
