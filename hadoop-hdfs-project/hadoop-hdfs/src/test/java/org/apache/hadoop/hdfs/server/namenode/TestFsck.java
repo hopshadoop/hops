@@ -109,6 +109,8 @@ public class TestFsck {
   static final Pattern numCorruptBlocksPattern =
       Pattern.compile(".*Corrupt blocks:\t\t([0123456789]*).*");
   
+  private static final String LINE_SEPARATOR = System.getProperty("line.separator");
+  
   static String runFsck(Configuration conf, int expectedErrCode,
       boolean checkErrorCode, String... path) throws Exception {
     ByteArrayOutputStream bStream = new ByteArrayOutputStream();
@@ -355,7 +357,7 @@ public class TestFsck {
       while (true) {
         outStr = runFsck(conf, 1, false, "/");
         String numCorrupt = null;
-        for (String line : outStr.split("\n")) {
+        for (String line : outStr.split(LINE_SEPARATOR)) {
           Matcher m = numCorruptBlocksPattern.matcher(line);
           if (m.matches()) {
             numCorrupt = m.group(1);
