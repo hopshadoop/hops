@@ -64,24 +64,7 @@ public abstract class AbstractHopsSSLCheck implements HopsSSLCheck, Comparable<H
     }
     return 0;
   }
-  
-  /**
-   * Checks if the RPC TLS properties of the supplied configuration are already configured for normal users
-   * @param username Username of the current user
-   * @param configuration Hadoop configuration
-   * @throws SSLMaterialAlreadyConfiguredException If the supplied Hadoop configuration is already configured
-   */
-  protected void isConfigurationNeededForNormalUser(String username, Configuration configuration)
-    throws SSLMaterialAlreadyConfiguredException {
-    // If already configured
-    if (isCryptoMaterialSet(configuration, username)
-        && !configuration.getBoolean(HopsSSLSocketFactory.FORCE_CONFIGURE,
-        HopsSSLSocketFactory.DEFAULT_FORCE_CONFIGURE)) {
-      throw new SSLMaterialAlreadyConfiguredException("Crypto material for user <" + username + "> has already been" +
-          " configured");
-    }
-  }
-  
+
   /**
    * Checks if the RPC TLS properties of the supplied configuration are already configured for proxy superusers
    * @param username Username of the current superuser

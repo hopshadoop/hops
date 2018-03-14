@@ -39,9 +39,7 @@ public class EnvVariableHopsSSLCheck extends AbstractHopsSSLCheck {
   
   @Override
   public HopsSSLCryptoMaterial check(String username, Set<String> proxySuperUsers, Configuration configuration,
-      CertificateLocalization certificateLocalization) throws IOException, SSLMaterialAlreadyConfiguredException {
-    
-    isConfigurationNeededForNormalUser(username, configuration);
+      CertificateLocalization certificateLocalization) throws IOException {
     
     String cryptoMaterialDir = EnvironmentVariablesFactory.getInstance().getEnv(HopsSSLSocketFactory
         .CRYPTO_MATERIAL_ENV_VAR);

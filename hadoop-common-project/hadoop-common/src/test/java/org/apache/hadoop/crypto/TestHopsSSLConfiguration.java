@@ -73,10 +73,11 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     
     @Test
     public void testExistingConfIsPreserved() throws Exception {
-        String kstore = "someDir/project__user__kstore.jks";
+        String hostname = NetUtils.getLocalHostname();
+        String kstore = "someDir/" + hostname + "__kstore.jks";
         String kstorePass = "somePassword";
         String keyPass = "anotherPassword";
-        String tstore = "someDir/project__user__tstore.jks";
+        String tstore = "someDir/" + hostname + "__tstore.jks";
         String tstorePass = "somePassword";
         conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(), kstore);
         conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue(), kstorePass);
@@ -84,7 +85,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
         conf.set(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue(), tstore);
         conf.set(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue(), tstorePass);
 
-        UserGroupInformation ugi = UserGroupInformation.createRemoteUser("project__user");
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser("superuser");
         final Set<String> superusers = new HashSet<>(1);
         superusers.add("superuser");
         ugi.doAs(new PrivilegedExceptionAction<Object>() {

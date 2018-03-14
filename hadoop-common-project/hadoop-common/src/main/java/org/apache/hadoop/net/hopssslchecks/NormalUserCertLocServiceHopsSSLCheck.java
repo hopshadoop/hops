@@ -38,12 +38,10 @@ public class NormalUserCertLocServiceHopsSSLCheck extends AbstractHopsSSLCheck {
   @Override
   public HopsSSLCryptoMaterial check(String username, Set<String> proxySuperUsers, Configuration configuration,
       CertificateLocalization certificateLocalization)
-      throws IOException, SSLMaterialAlreadyConfiguredException {
+      throws IOException {
     if (username.matches(HopsSSLSocketFactory.USERNAME_PATTERN)
         || !proxySuperUsers.contains(username)) {
   
-      isConfigurationNeededForNormalUser(username, configuration);
-      
       if (certificateLocalization != null) {
         try {
           CryptoMaterial material = certificateLocalization.getMaterialLocation(username);

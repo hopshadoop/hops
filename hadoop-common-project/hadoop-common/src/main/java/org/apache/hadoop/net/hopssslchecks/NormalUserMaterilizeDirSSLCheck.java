@@ -46,12 +46,10 @@ public class NormalUserMaterilizeDirSSLCheck extends AbstractHopsSSLCheck {
   @Override
   public HopsSSLCryptoMaterial check(String username, Set<String> proxySuperUsers, Configuration configuration,
       CertificateLocalization certificateLocalization)
-      throws IOException, SSLMaterialAlreadyConfiguredException {
+      throws IOException {
     
     if (username.matches(HopsSSLSocketFactory.USERNAME_PATTERN)
       || !proxySuperUsers.contains(username)) {
-      
-      isConfigurationNeededForNormalUser(username, configuration);
       
       String hopsworksMaterializeDir = configuration.get(
           HopsSSLSocketFactory.CryptoKeys.CLIENT_MATERIALIZE_DIR.getValue(),
