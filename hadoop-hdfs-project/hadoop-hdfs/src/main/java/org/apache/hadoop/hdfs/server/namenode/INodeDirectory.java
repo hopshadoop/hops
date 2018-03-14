@@ -175,6 +175,14 @@ public class INodeDirectory extends INode {
   }
 
   /**
+   * @return the {@link INodesInPath} containing only the last inode.
+   */
+  INodesInPath getLastINodeInPath(String path, boolean resolveLink
+  ) throws UnresolvedLinkException, StorageException, TransactionContextException {
+    return getExistingPathINodes(getPathComponents(path), 1,resolveLink);
+  }
+
+  /**
    * @return the INode of the last component in components, or null if the last
    * component does not exist.
    */
@@ -596,6 +604,10 @@ public class INodeDirectory extends INode {
       return inodes;
     }
     
+    public INode getINode(int i) {
+      return inodes[i >= 0 ? i : inodes.length + i];
+    }
+
     void setINode(int i, INode inode) {
       inodes[i] = inode;
     }

@@ -3176,14 +3176,14 @@ public class DFSClient implements java.io.Closeable {
   }
 
   public boolean complete(final String src, final String clientName,
-      final ExtendedBlock last, final byte[] data)
+      final ExtendedBlock last, final long fileId, final byte[] data)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
     ClientActionHandler handler = new ClientActionHandler() {
       @Override
       public Object doAction(ClientProtocol namenode)
           throws RemoteException, IOException {
-        return namenode.complete(src, clientName, last, data);
+        return namenode.complete(src, clientName, last, fileId, data);
       }
     };
     return (Boolean) doClientActionWithRetry(handler, "complete");

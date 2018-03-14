@@ -2807,7 +2807,7 @@ public class FSNamesystem
    *     on error (eg lease mismatch, file not open, file deleted)
    */
   boolean completeFile(final String src1, final String holder,
-      final ExtendedBlock last, final byte[] data) throws IOException {
+      final ExtendedBlock last, final long fileId, final byte[] data) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler completeFileHandler =
@@ -2831,14 +2831,14 @@ public class FSNamesystem
           public Object performTask() throws IOException {
             checkBlock(last);
             return completeFileInternal(src, holder,
-                ExtendedBlock.getLocalBlock(last), data);
+                ExtendedBlock.getLocalBlock(last), fileId, data);
           }
         };
 
     return (Boolean) completeFileHandler.handle(this);
   }
 
-  private boolean completeFileInternal(String src, String holder, Block last,
+  private boolean completeFileInternal(String src, String holder, Block last, long fileId,
       final byte[] data)
       throws IOException {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
@@ -2855,18 +2855,19 @@ public class FSNamesystem
             "Trying to store the file data in the database. Last block of the file should" +
                 " have been null");
       }
-      return completeFileStoredInDataBase(src, holder, data);
+      return completeFileStoredInDataBase(src, holder,fileId, data);
     } else {
-      return completeFileStoredOnDataNodes(src, holder, last);
+      return completeFileStoredOnDataNodes(src, holder, last, fileId);
     }
   }
 
   private boolean completeFileStoredOnDataNodes(String src, String holder,
-      Block last)
+      Block last, long fileId)
       throws IOException {
+    final INodesInPath iip = dir.getLastINodeInPath(src);
     INodeFileUnderConstruction pendingFile;
     try {
-      pendingFile = checkLease(src, holder);
+      pendingFile = checkLease(src,fileId, holder, iip.getINode(0));
     } catch (LeaseExpiredException lee) {
       final INode inode = dir.getINode(src);
       if (inode != null && inode instanceof INodeFile &&
@@ -2903,12 +2904,12 @@ public class FSNamesystem
   }
 
 
-  private boolean completeFileStoredInDataBase(String src, String holder,
+  private boolean completeFileStoredInDataBase(String src, String holder, long fileId,
       final byte[] data)
       throws IOException {
     INodeFileUnderConstruction pendingFile;
-
-    pendingFile = checkLease(src, holder);
+    final INodesInPath iip = dir.getRootDir().getLastINodeInPath(src, true);
+    pendingFile = checkLease(src,fileId, holder, iip.getINode(0));
 
     //in case of appending to small files. we might have to migrate the file from
     //in-memory to on disk

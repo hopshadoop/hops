@@ -1177,7 +1177,14 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return getRootDir().getExistingPathINodes(path, true);
   }
   
-  
+  /**
+   * Get {@link INode} associated with the file / directory.
+   */
+  public INodesInPath getLastINodeInPath(String src)
+      throws UnresolvedLinkException, StorageException, TransactionContextException {
+    return getRootDir().getLastINodeInPath(src, true);
+  }
+
   /**
    * Check whether the filepath could be created
    */

@@ -136,6 +136,7 @@ import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.namenode.INode;
 
 
 /**
@@ -539,7 +540,9 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       CompleteRequestProto req) throws ServiceException {
     try {
       boolean result = server.complete(req.getSrc(), req.getClientName(),
-          req.hasLast() ? PBHelper.convert(req.getLast()) : null, req.hasData() ? req.getData().toByteArray() : null);
+          req.hasLast() ? PBHelper.convert(req.getLast()) : null,
+          req.hasFileId() ? req.getFileId() : INode.ROOT_PARENT_ID,
+          req.hasData() ? req.getData().toByteArray() : null);
       return CompleteResponseProto.newBuilder().setResult(result).build();
     } catch (IOException e) {
       throw new ServiceException(e);

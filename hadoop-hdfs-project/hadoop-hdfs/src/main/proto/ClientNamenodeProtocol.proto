@@ -215,7 +215,8 @@ message CompleteRequestProto {
   required string src = 1;
   required string clientName = 2;
   optional ExtendedBlockProto last = 3;
-  optional bytes data = 4;
+  optional uint64 fileId = 4 [default = 0];  // default to GRANDFATHER_INODE_ID
+  optional bytes data = 5;
 }
 
 message CompleteResponseProto {
