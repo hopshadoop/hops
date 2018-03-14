@@ -53,6 +53,7 @@ import org.apache.hadoop.io.IOUtils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 /**
  * Test when RBW block is removed. Invalidation of the corrupted block happens
@@ -98,6 +99,9 @@ public class TestRBWBlockInvalidation {
   @Test(timeout = 60000)
   public void testBlockInvalidationWhenRBWReplicaMissedInDN()
       throws IOException, InterruptedException {
+    // This test cannot pass on Windows due to file locking enforcement.  It will
+    // reject the attempt to delete the block file from the RBW folder.
+    assumeTrue(!Path.WINDOWS);
     Configuration conf = new HdfsConfiguration();
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 2);
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 300);
