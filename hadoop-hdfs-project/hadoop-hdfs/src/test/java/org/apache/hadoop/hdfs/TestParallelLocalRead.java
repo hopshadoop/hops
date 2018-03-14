@@ -17,31 +17,40 @@
  */
 package org.apache.hadoop.hdfs;
 
+import java.io.File;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import static org.apache.hadoop.hdfs.TestParallelReadUtil.setupCluster;
+import org.apache.hadoop.net.unix.DomainSocket;
+import org.apache.hadoop.net.unix.TemporarySocketDirectory;
 
 public class TestParallelLocalRead extends TestParallelReadUtil {
 
+  private static TemporarySocketDirectory sockDir;
+  
   @BeforeClass
   static public void setupCluster() throws Exception {
     HdfsConfiguration conf = new HdfsConfiguration();
-
+    sockDir = new TemporarySocketDirectory();
+    conf.set(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
+      new File(sockDir.getDir(), "TestParallelLocalRead.%d.sock").getAbsolutePath());
     conf.setBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY, true);
     conf.setBoolean(
         DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY, false);
     conf.set(DFSConfigKeys.DFS_BLOCK_LOCAL_PATH_ACCESS_USER_KEY,
         UserGroupInformation.getCurrentUser().getShortUserName());
-
+    DomainSocket.disableBindPathValidation();
     setupCluster(1, conf);
   }
 
   @AfterClass
   static public void teardownCluster() throws Exception {
     TestParallelReadUtil.teardownCluster();
+    sockDir.close();
   }
 
   /**

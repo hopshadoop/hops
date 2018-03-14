@@ -51,6 +51,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdfs.BlockReader;
+import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 
@@ -351,7 +352,7 @@ public class TestDataNodeVolumeFailure {
     String file = BlockReaderFactory
         .getFileName(targetAddr, "test-blockpoolid", block.getBlockId());
     BlockReader blockReader = BlockReaderFactory
-        .newBlockReader(conf, file, block,
+        .newBlockReader(new DFSClient.Conf(conf), file, block,
             lblock.getBlockToken(), 0, -1, true, "TestDataNodeVolumeFailure",
             TcpPeerServer.peerFromSocket(s), datanode, null, null, null, false);
     blockReader.close();
