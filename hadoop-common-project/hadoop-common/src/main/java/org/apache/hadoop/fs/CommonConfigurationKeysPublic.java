@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs;
 
+import java.nio.file.Paths;
 import java.util.Arrays;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -430,6 +431,26 @@ public class CommonConfigurationKeysPublic {
     "hadoop.rpc.socket.factory.class.default";
   public static final String  HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_DEFAULT =
     "org.apache.hadoop.net.StandardSocketFactory";
+  
+  public static final String HOPS_CRL_VALIDATION_ENABLED_KEY = "hops.crl.validation.enabled";
+  public static final boolean HOPS_CRL_VALIDATION_ENABLED_DEFAULT = false;
+  
+  /**
+   * Certificate Revocation List fetcher class
+   */
+  public static final String HOPS_CRL_FETCHER_CLASS_KEY = "hops.crl.fetcher.class";
+  public static final String HOPS_CRL_FETCHER_CLASS_DEFAULT = "org.apache.hadoop.security.ssl.RemoteCRLFetcher";
+  
+  public static final String HOPS_CRL_INPUT_URI_KEY = "hops.crl.input.uri";
+  
+  public static final String HOPS_CRL_OUTPUT_FILE_KEY = "hops.crl.output.file";
+  public static final String HOPS_CRL_OUTPUT_FILE_DEFAULT = Paths.get(System.getProperty("java.io.tmpdir"),
+      "crl.pem").toString();
+  
+  public static final String HOPS_CRL_FETCHER_INTERVAL_KEY = "hops.crl.fetcher.interval";
+  // 720 Minutes - 12 hours
+  public static final long HOPS_CRL_FETCHER_INTERVAL_DEFAULT = 720;
+  
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">

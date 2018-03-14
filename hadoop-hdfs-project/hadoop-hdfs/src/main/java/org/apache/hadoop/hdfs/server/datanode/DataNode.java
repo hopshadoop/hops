@@ -28,6 +28,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -105,6 +106,7 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authorize.AccessControlList;
+import org.apache.hadoop.security.ssl.RevocationListFetcherService;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Daemon;
@@ -299,6 +301,8 @@ public class DataNode extends Configured
   private Object checkDiskErrorMutex = new Object();
   private long lastDiskErrorCheck = 0;
 
+  private RevocationListFetcherService revocationListFetcherService;
+  
   /**
    * Create the DataNode given a configuration, an array of dataDirs,
    * and a namenode proxy
@@ -788,6 +792,13 @@ public class DataNode extends Configured
 
     storage = new DataStorage();
     
+    try {
+      createAndStartCRLFetcherService(conf);
+    } catch (Exception ex) {
+      LOG.error("Error starting CRL fetcher service", ex);
+      throw new IOException(ex);
+    }
+    
     // global DN settings
     registerMXBean();
     initDataXceiver(conf);
@@ -806,7 +817,22 @@ public class DataNode extends Configured
     // exit without having to explicitly shutdown its thread pool.
     readaheadPool = ReadaheadPool.getInstance();
   }
-
+  
+  private void createAndStartCRLFetcherService(Configuration conf) throws Exception {
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      if (conf.getBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY,
+          CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_DEFAULT)) {
+        LOG.info("Creating CertificateRevocationList Fetcher service");
+        revocationListFetcherService = new RevocationListFetcherService();
+        revocationListFetcherService.serviceInit(conf);
+        revocationListFetcherService.serviceStart();
+      } else {
+        LOG.warn("RPC TLS is enabled but CRL validation is disabled");
+      }
+    }
+  }
+  
   public static String generateUuid() {
     return UUID.randomUUID().toString();
   }
@@ -1356,6 +1382,14 @@ public class DataNode extends Configured
     }
     if (metrics != null) {
       metrics.shutdown();
+    }
+    
+    if (revocationListFetcherService != null) {
+      try {
+        revocationListFetcherService.serviceStop();
+      } catch (Exception ex) {
+        LOG.warn("Exception while stopping CRL fetcher service, but we are shutting down anyway");
+      }
     }
   }
   
