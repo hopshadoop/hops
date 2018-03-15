@@ -297,6 +297,9 @@ public class BlockManager {
   private BlockPlacementPolicy blockplacement;
   private final BlockStoragePolicySuite storagePolicySuite;
   
+  /** Check whether name system is running before terminating */
+  private boolean checkNSRunning = true;
+
   /**
    * Number of blocks to process at one batch
    */
@@ -465,6 +468,12 @@ public class BlockManager {
   @VisibleForTesting
   public BlockTokenSecretManager getBlockTokenSecretManager() {
     return blockTokenSecretManager;
+  }
+
+  /** Allow silent termination of replication monitor for testing */
+  @VisibleForTesting
+  void enableRMTerminationForTesting() {
+    checkNSRunning = false;
   }
 
   private boolean isBlockTokenEnabled() {
@@ -4298,6 +4307,9 @@ public class BlockManager {
               LOG.info("ReplicationMonitor received an exception"
                   + " while shutting down.", t);
             }
+            break;
+          } else if (!checkNSRunning && t instanceof InterruptedException) {
+            LOG.info("Stopping ReplicationMonitor for testing.");
             break;
           }
           LOG.fatal("ReplicationMonitor thread received Runtime exception. ",
