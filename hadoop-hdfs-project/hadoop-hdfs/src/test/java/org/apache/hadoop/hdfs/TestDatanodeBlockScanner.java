@@ -441,20 +441,20 @@ public class TestDatanodeBlockScanner {
     }
   }
 
-  private static final String BASE_PATH = (new File("/data/current/finalized"))
-      .getAbsolutePath();
+//  private static final String BASE_PATH = (new File("/data/current/finalized"))
+//      .getAbsolutePath();
+//
+//  @Test
+//  public void testReplicaInfoParsing() throws Exception {
+//    testReplicaInfoParsingSingle(BASE_PATH);
+//    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1");
+//    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1/subdir2/subdir3");
+//  }
 
-  @Test
-  public void testReplicaInfoParsing() throws Exception {
-    testReplicaInfoParsingSingle(BASE_PATH);
-    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1");
-    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1/subdir2/subdir3");
-  }
-
-  private static void testReplicaInfoParsingSingle(String subDirPath) {
-    File testFile = new File(subDirPath);
-    assertEquals(BASE_PATH, ReplicaInfo.parseBaseDir(testFile).baseDirPath);
-  }
+//  private static void testReplicaInfoParsingSingle(String subDirPath) {
+//    File testFile = new File(subDirPath);
+//    assertEquals(BASE_PATH, ReplicaInfo.parseBaseDir(testFile).baseDirPath);
+//  }
 
   @Test
   public void testDuplicateScans() throws Exception {
@@ -494,5 +494,24 @@ public class TestDatanodeBlockScanner {
       IOUtils.closeStream(fs);
       cluster.shutdown();
     }
+  }
+  
+  private static final String BASE_PATH = "/data/current/finalized";
+  
+  @Test
+  public void testReplicaInfoParsing() throws Exception {
+    testReplicaInfoParsingSingle(BASE_PATH, new int[0]);
+    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1", new int[]{1});
+    testReplicaInfoParsingSingle(BASE_PATH + "/subdir43", new int[]{43});
+    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1/subdir2/subdir3", new int[]{1, 2, 3});
+    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1/subdir2/subdir43", new int[]{1, 2, 43});
+    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1/subdir23/subdir3", new int[]{1, 23, 3});
+    testReplicaInfoParsingSingle(BASE_PATH + "/subdir13/subdir2/subdir3", new int[]{13, 2, 3});
+  }
+  
+  private static void testReplicaInfoParsingSingle(String subDirPath, int[] expectedSubDirs) {
+    File testFile = new File(subDirPath);
+    assertArrayEquals(expectedSubDirs, ReplicaInfo.parseSubDirs(testFile).subDirs);
+    assertEquals(BASE_PATH, ReplicaInfo.parseSubDirs(testFile).baseDirPath);
   }
 }
