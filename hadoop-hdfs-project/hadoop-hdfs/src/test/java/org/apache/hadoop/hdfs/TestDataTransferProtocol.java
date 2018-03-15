@@ -205,6 +205,7 @@ public class TestDataTransferProtocol {
   //  @Test
   public void testOpWrite() throws IOException {
     int numDataNodes = 1;
+    final long BLOCK_ID_FUDGE = 128;
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).format(true).numDataNodes(numDataNodes)
@@ -255,8 +256,9 @@ public class TestDataTransferProtocol {
           newGS, "Recover failed close to a finalized replica", false);
       firstBlock.setGenerationStamp(newGS);
 
-      /* Test writing to a new block */
-      long newBlockId = firstBlock.getBlockId() + 1;
+      // Test writing to a new block. Don't choose the next sequential
+      // block ID to avoid conflicting with IDs chosen by the NN.
+      long newBlockId = firstBlock.getBlockId() + BLOCK_ID_FUDGE;
       ExtendedBlock newBlock =
           new ExtendedBlock(firstBlock.getBlockPoolId(), newBlockId, 0,
               firstBlock.getGenerationStamp());
