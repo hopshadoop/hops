@@ -309,6 +309,13 @@ public class NamenodeFsck {
       } while (thisListing.hasMore());
       return;
     }
+    if (file.isSymlink()) {
+      if (showFiles) {
+        out.println(path + " <symlink>");
+      }
+      res.totalSymlinks++;
+      return;
+    }
     long fileLen = file.getLen();
     // Get block locations without updating the file access time 
     // and without block access tokens
@@ -715,6 +722,7 @@ public class NamenodeFsck {
     long totalFiles = 0L;
     long totalOpenFiles = 0L;
     long totalDirs = 0L;
+    long totalSymlinks = 0L;
     long totalSize = 0L;
     long totalOpenFilesSize = 0L;
     long totalReplicas = 0L;
@@ -762,6 +770,7 @@ public class NamenodeFsck {
       }
       res.append("\n Total dirs:\t").append(totalDirs)
           .append("\n Total files:\t").append(totalFiles);
+      res.append("\n Total symlinks:\t\t").append(totalSymlinks);
       if (totalOpenFiles != 0) {
         res.append(" (Files currently being written: ").append(totalOpenFiles)
             .append(")");
