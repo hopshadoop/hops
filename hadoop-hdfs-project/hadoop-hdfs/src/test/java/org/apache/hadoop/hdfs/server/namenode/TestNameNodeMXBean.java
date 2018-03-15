@@ -106,6 +106,16 @@ public class TestNameNodeMXBean {
       String deadnodeinfo =
           (String) (mbs.getAttribute(mxbeanName, "DeadNodes"));
       assertEquals(fsn.getDeadNodes(), deadnodeinfo);
+      // get attribute NodeUsage
+      String nodeUsage = (String) (mbs.getAttribute(mxbeanName,
+          "NodeUsage"));
+      assertEquals("Bad value for NodeUsage", fsn.getNodeUsage(), nodeUsage);
+      // get attribute "NNStarted"
+      String nnStarted = (String) mbs.getAttribute(mxbeanName, "NNStarted");
+      assertEquals("Bad value for NNStarted", fsn.getNNStarted(), nnStarted);
+      // get attribute "CompileInfo"
+      String compileInfo = (String) mbs.getAttribute(mxbeanName, "CompileInfo");
+      assertEquals("Bad value for CompileInfo", fsn.getCompileInfo(), compileInfo);
     } finally {
       if (cluster != null) {
         cluster.shutdown();

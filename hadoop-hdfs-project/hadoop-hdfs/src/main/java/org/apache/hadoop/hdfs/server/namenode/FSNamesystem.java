@@ -238,6 +238,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_KEY;
+import org.apache.hadoop.util.StringUtils;
 import static org.apache.hadoop.util.Time.now;
 
 /**
@@ -5032,6 +5033,28 @@ public class FSNamesystem
   }
 
   @Override // FSNamesystemMBean
+  public int getNumDecomLiveDataNodes() {
+    final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
+    getBlockManager().getDatanodeManager().fetchDatanodes(live, null, true);
+    int liveDecommissioned = 0;
+    for (DatanodeDescriptor node : live) {
+      liveDecommissioned += node.isDecommissioned() ? 1 : 0;
+    }
+    return liveDecommissioned;
+  }
+
+  @Override // FSNamesystemMBean
+  public int getNumDecomDeadDataNodes() {
+    final List<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+    getBlockManager().getDatanodeManager().fetchDatanodes(dead, null, true);
+    int deadDecommissioned = 0;
+    for (DatanodeDescriptor node : dead) {
+      deadDecommissioned += node.isDecommissioned() ? 1 : 0;
+    }
+    return deadDecommissioned;
+  }
+
+  @Override // FSNamesystemMBean
   @Metric({"StaleDataNodes",
       "Number of datanodes marked stale due to delayed heartbeat"})
   public int getNumStaleDataNodes() {
@@ -5820,6 +5843,59 @@ public class FSNamesystem
         "HOP: there are no name dirs any more");
   }
 
+  @Override // NameNodeMXBean
+  public String getNodeUsage() {
+    float median = 0;
+    float max = 0;
+    float min = 0;
+    float dev = 0;
+
+    final Map<String, Map<String,Object>> info =
+        new HashMap<String, Map<String,Object>>();
+    final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
+    blockManager.getDatanodeManager().fetchDatanodes(live, null, true);
+
+    if (live.size() > 0) {
+      float totalDfsUsed = 0;
+      float[] usages = new float[live.size()];
+      int i = 0;
+      for (DatanodeDescriptor dn : live) {
+        usages[i++] = dn.getDfsUsedPercent();
+        totalDfsUsed += dn.getDfsUsedPercent();
+      }
+      totalDfsUsed /= live.size();
+      Arrays.sort(usages);
+      median = usages[usages.length / 2];
+      max = usages[usages.length - 1];
+      min = usages[0];
+
+      for (i = 0; i < usages.length; i++) {
+        dev += (usages[i] - totalDfsUsed) * (usages[i] - totalDfsUsed);
+      }
+      dev = (float) Math.sqrt(dev / usages.length);
+    }
+
+    final Map<String, Object> innerInfo = new HashMap<String, Object>();
+    innerInfo.put("min", StringUtils.format("%.2f%%", min));
+    innerInfo.put("median", StringUtils.format("%.2f%%", median));
+    innerInfo.put("max", StringUtils.format("%.2f%%", max));
+    innerInfo.put("stdDev", StringUtils.format("%.2f%%", dev));
+    info.put("nodeUsage", innerInfo);
+
+    return JSON.toString(info);
+  }
+
+  @Override  // NameNodeMXBean
+  public String getNNStarted() {
+    return getStartTime().toString();
+  }
+
+  @Override  // NameNodeMXBean
+  public String getCompileInfo() {
+    return VersionInfo.getDate() + " by " + VersionInfo.getUser() +
+        " from " + VersionInfo.getBranch();
+  }
+  
   /**
    * @return the block manager.
    */
