@@ -294,7 +294,9 @@ public class JsonUtil {
     final byte storagePolicy = m.containsKey("storagePolicy") ?
         (byte) (long) (Long) m.get("storagePolicy") :
         BlockStoragePolicySuite.ID_UNSPECIFIED;
-    final int childrenNum = (int) (long) (Long) m.get("childrenNum");
+    Long childrenNumLong = (Long) m.get("childrenNum");
+    final int childrenNum = (childrenNumLong == null) ? 0
+            : childrenNumLong.intValue();
     return new HdfsFileStatus(len, type == PathType.DIRECTORY, replication,
         blockSize, mTime, aTime, permission, owner, group, symlink,
         DFSUtil.string2Bytes(localName), fileId, childrenNum, isFileStoredInDB, storagePolicy);
