@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.hops.common.IDsGeneratorFactory;
-import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.resolvingcache.Cache;
@@ -57,7 +56,6 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.FSLimitException;
 import org.apache.hadoop.hdfs.protocol.FSLimitException.MaxDirectoryItemsExceededException;
@@ -89,8 +87,6 @@ import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.hdfs.DFSUtil;
 
 import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
-import org.apache.hadoop.hdfs.util.GSet;
-import org.apache.hadoop.hdfs.util.LightWeightGSet;
 import static org.apache.hadoop.util.Time.now;
 
 /**
@@ -539,7 +535,9 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
                   " is renamed to " + dst);
         }
         srcInodes[srcInodes.length - 2].setModificationTime(timestamp);
+        srcInodes[srcInodes.length - 2].asDirectory().decreaseChildrenNum();
         dstInodes[dstInodes.length - 2].setModificationTime(timestamp);
+        srcInodes[srcInodes.length - 2].asDirectory().increaseChildrenNum();
         // update moved lease with new filename
         getFSNamesystem().unprotectedChangeLease(src, dst);
 
@@ -698,7 +696,9 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         }
         // update modification time of dst and the parent of src
         srcInodes[srcInodes.length - 2].setModificationTime(timestamp);
+        srcInodes[srcInodes.length - 2].asDirectory().decreaseChildrenNum();
         dstInodes[dstInodes.length - 2].setModificationTime(timestamp);
+        srcInodes[srcInodes.length - 2].asDirectory().increaseChildrenNum();
         // update moved leases with new filename
         getFSNamesystem().unprotectedChangeLease(src, dst);
 
@@ -1033,7 +1033,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
     // set the parent's modification time
     inodes[inodes.length - 2].setModificationTime(mtime);
-
+    inodes[inodes.length - 2].asDirectory().decreaseChildrenNum();
+    
     int filesRemoved = targetNode.collectSubtreeBlocksAndClear(collectedBlocks);
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog
@@ -2110,6 +2111,9 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       blocksize = fileNode.getPreferredBlockSize();
       isStoredInDB = fileNode.isFileStoredInDB();
     }
+    
+    int childrenNum = node.isDirectory() ? node.asDirectory().getChildrenNum() : 0;
+
     // TODO Add encoding status
     return new HdfsFileStatus(
         size,
@@ -2124,6 +2128,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null,
         path,
         node.getId(),
+        childrenNum,
         isStoredInDB,
         storagePolicy);
   }
@@ -2165,12 +2170,15 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         loc = new LocatedBlocks();
       }
     }
+
+    int childrenNum = node.isDirectory() ? node.asDirectory().getChildrenNum() : 0;
+    
     return new HdfsLocatedFileStatus(size, node.isDirectory(), replication,
         blocksize, node.getModificationTime(),
         node.getAccessTime(), node.getFsPermission(),
         node.getUserName(), node.getGroupName(),
         node.isSymlink() ? node.asSymlink().getSymlink() : null, path,
-        node.getId(), loc, isFileStoredInDB, storagePolicy);
+        node.getId(), loc, childrenNum, isFileStoredInDB, storagePolicy);
   }
 
   /**
