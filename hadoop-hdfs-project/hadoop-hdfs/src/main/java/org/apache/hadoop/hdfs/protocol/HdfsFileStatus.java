@@ -38,6 +38,10 @@ public class HdfsFileStatus extends FileStatus {
   private byte[] symlink; // symlink target encoded in java UTF8 or null
   
   private final long fileId;
+  
+  // Used by dir, not including dot and dotdot. Always zero for a regular file.
+  private int childrenNum;
+  
   private boolean isFileStoredInDB;
   private final byte storagePolicy;
 
@@ -72,7 +76,7 @@ public class HdfsFileStatus extends FileStatus {
   public HdfsFileStatus(long length, boolean isdir, int block_replication,
       long blocksize, long modification_time, long access_time,
       FsPermission permission, String owner, String group, byte[] symlink,
-      byte[] path, long fileId, boolean isFileStoredInDB, byte storagePolicy) {
+      byte[] path, long fileId, int childrenNum, boolean isFileStoredInDB, byte storagePolicy) {
 
     super(length, isdir, block_replication, blocksize, modification_time,
         access_time, permission, owner, group,
@@ -83,6 +87,7 @@ public class HdfsFileStatus extends FileStatus {
     this.path = path;
     this.isFileStoredInDB = isFileStoredInDB;
     this.storagePolicy = storagePolicy;
+    this.childrenNum = childrenNum;
   }
 
   /**
@@ -179,6 +184,10 @@ public class HdfsFileStatus extends FileStatus {
   }
 
   final public long getFileId() { return fileId; }
+  
+  final public int getChildrenNum() {
+    return childrenNum;
+  }
 
   final public boolean isFileStoredInDB(){ return isFileStoredInDB; }
 

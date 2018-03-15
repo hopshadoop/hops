@@ -63,6 +63,8 @@ public class INodeDirectory extends INode {
 
   private boolean metaEnabled;
 
+  private int childrenNum;
+  
   public INodeDirectory(int id, String name, PermissionStatus permissions)
       throws IOException {
     super(id, name, permissions);
@@ -375,6 +377,7 @@ public class INodeDirectory extends INode {
     if (setModTime) {
       setModificationTime(node.getModificationTime());
     }
+    increaseChildrenNum();
     if (node.getGroupName() == null) {
       node.setGroup(getGroupName());
     }
@@ -621,4 +624,22 @@ public class INodeDirectory extends INode {
   public INode cloneInode () throws IOException{
     return new INodeDirectory(this);
   }  
+  
+  public int getChildrenNum() {
+    return childrenNum;
+  }
+  
+  public void setChildrenNum(int childrenNum){
+    this.childrenNum = childrenNum;
+  }
+  
+  public void decreaseChildrenNum() throws StorageException, TransactionContextException{
+    childrenNum--;
+    save();
+  }
+  
+  public void increaseChildrenNum() throws StorageException, TransactionContextException{
+    childrenNum++;
+    save();
+  }
 }

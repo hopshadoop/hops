@@ -257,6 +257,7 @@ public class JsonUtil {
     m.put("blockSize", status.getBlockSize());
     m.put("replication", status.getReplication());
     m.put("fileId", status.getFileId());
+    m.put("childrenNum", status.getChildrenNum());
     m.put("isFileStoredInDB", status.isFileStoredInDB());
     return includeType ? toJsonString(FileStatus.class, m) : JSON.toString(m);
   }
@@ -293,9 +294,10 @@ public class JsonUtil {
     final byte storagePolicy = m.containsKey("storagePolicy") ?
         (byte) (long) (Long) m.get("storagePolicy") :
         BlockStoragePolicySuite.ID_UNSPECIFIED;
+    final int childrenNum = (int) (long) (Long) m.get("childrenNum");
     return new HdfsFileStatus(len, type == PathType.DIRECTORY, replication,
         blockSize, mTime, aTime, permission, owner, group, symlink,
-        DFSUtil.string2Bytes(localName), fileId, isFileStoredInDB, storagePolicy);
+        DFSUtil.string2Bytes(localName), fileId, childrenNum, isFileStoredInDB, storagePolicy);
   }
 
   /**
