@@ -35,7 +35,7 @@ public class SafeModeException extends IOException {
   public SafeModeException() {
   }
 
-  public SafeModeException(String text, FSNamesystem.SafeModeInfo mode) {
+  public SafeModeException(String text, FSNamesystem.SafeModeInfo mode) throws IOException {
     super(text + ". Name node is in safe mode.\n" + mode.getTurnOffTip());
   }
 
