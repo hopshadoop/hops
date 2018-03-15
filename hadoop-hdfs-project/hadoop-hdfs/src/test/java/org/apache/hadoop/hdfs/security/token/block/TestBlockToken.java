@@ -458,7 +458,7 @@ public class TestBlockToken {
     }
 
     @Override
-    public boolean isGenStampInFuture(long generationStamp)
+    public boolean isGenStampInFuture(Block block)
         throws StorageException {
       throw new UnsupportedOperationException("Not supported yet.");
     }

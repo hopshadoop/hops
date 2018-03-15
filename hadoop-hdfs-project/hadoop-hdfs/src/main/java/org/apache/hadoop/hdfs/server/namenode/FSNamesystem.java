@@ -2968,8 +2968,8 @@ public class FSNamesystem
    */
   private Block createNewBlock(INodeFile pendingFile)
       throws IOException {
-    Block b = new Block(IDsGeneratorFactory.getInstance().getUniqueBlockID()
-        , 0, 0); // HOP. previous code was getFSImage().getUniqueBlockId()
+    Block b = new Block(nextBlockId()
+        , 0, 0); 
     // Increment the generation stamp for every new block.
     b.setGenerationStampNoPersistance(pendingFile.nextGenerationStamp());
     return b;
@@ -5061,6 +5061,14 @@ public class FSNamesystem
     return getBlockManager().getDatanodeManager().getNumStaleNodes();
   }
 
+  private long nextBlockId() throws IOException{
+    if (isInSafeMode()) {
+      throw new SafeModeException(
+          "Cannot get next block ID", safeMode);
+    }
+    return IDsGeneratorFactory.getInstance().getUniqueBlockID();
+  }
+  
   private INodeFileUnderConstruction checkUCBlock(ExtendedBlock block,
       String clientName) throws IOException {
     if (isInSafeMode()) {
@@ -5923,7 +5931,7 @@ public class FSNamesystem
   }
 
   @Override
-  public boolean isGenStampInFuture(long genStamp) throws StorageException {
+  public boolean isGenStampInFuture(Block block) throws StorageException {
     throw new UnsupportedOperationException("Not supported anymore.");
   }
 

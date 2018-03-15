@@ -23,6 +23,7 @@ import org.apache.hadoop.security.AccessControlException;
 
 import java.io.IOException;
 import java.util.Set;
+import org.apache.hadoop.hdfs.protocol.Block;
 
 /**
  * Namesystem operations.
@@ -44,7 +45,7 @@ public interface Namesystem extends SafeMode {
    */
   public String getBlockPoolId();
 
-  public boolean isGenStampInFuture(long generationStamp)
+  public boolean isGenStampInFuture(Block block)
       throws StorageException;
 
   public void adjustSafeModeBlockTotals(int deltaSafe, int deltaTotal)
