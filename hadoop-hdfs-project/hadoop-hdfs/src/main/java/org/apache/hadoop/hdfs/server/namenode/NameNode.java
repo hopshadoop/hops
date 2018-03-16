@@ -84,6 +84,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROU
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMetrics;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -247,7 +249,11 @@ public class NameNode {
   }
 
   static NameNodeMetrics metrics;
-
+  private static final StartupProgress startupProgress = new StartupProgress();
+  static {
+    StartupProgressMetrics.register(startupProgress);
+  }
+  
   /**
    * Return the {@link FSNamesystem} object.
    *
@@ -267,6 +273,15 @@ public class NameNode {
 
   public static NameNodeMetrics getNameNodeMetrics() {
     return metrics;
+  }
+
+  /**
+   * Returns object used for reporting namenode startup progress.
+   * 
+   * @return StartupProgress for reporting namenode startup progress
+   */
+  public static StartupProgress getStartupProgress() {
+    return startupProgress;
   }
 
   public static InetSocketAddress getAddress(String address) {
@@ -452,16 +467,12 @@ public class NameNode {
     Users.addUserToGroupTx(fsOwnerShortUserName, superGroup);
 
     NameNode.initMetrics(conf, this.getRole());
+    startHttpServer(conf);
+    validateConfigurationSettingsOrAbort(conf);
     loadNamesystem(conf);
 
     rpcServer = createRpcServer(conf);
-
-    try {
-      validateConfigurationSettings(conf);
-    } catch (IOException e) {
-      LOG.fatal(e.toString());
-      throw e;
-    }
+    httpServer.setNameNodeAddress(getNameNodeAddress());
 
     startCommonServices(conf);
   }
@@ -499,10 +510,26 @@ public class NameNode {
   }
 
   /**
+   * Validate NameNode configuration.  Log a fatal error and abort if
+   * configuration is invalid.
+   * 
+   * @param conf Configuration to validate
+   * @throws IOException thrown if conf is invalid
+   */
+  private void validateConfigurationSettingsOrAbort(Configuration conf)
+      throws IOException {
+    try {
+      validateConfigurationSettings(conf);
+    } catch (IOException e) {
+      LOG.fatal(e.toString());
+      throw e;
+    }
+  }
+
+  /**
    * Start the services common to active and standby states
    */
   private void startCommonServices(Configuration conf) throws IOException {
-    startHttpServer(conf);
 
     startLeaderElectionService();
 
@@ -583,6 +610,7 @@ public class NameNode {
   private void startHttpServer(final Configuration conf) throws IOException {
     httpServer = new NameNodeHttpServer(conf, this, getHttpServerAddress(conf));
     httpServer.start();
+    httpServer.setStartupProgress(startupProgress);
     setHttpServerAddress(conf);
   }
 

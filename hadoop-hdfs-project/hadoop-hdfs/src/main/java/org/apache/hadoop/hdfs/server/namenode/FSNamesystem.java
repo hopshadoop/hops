@@ -38,6 +38,7 @@ import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
@@ -238,6 +239,12 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_KEY;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.Phase;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress.Counter;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.Status;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.Step;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.StepType;
 import org.apache.hadoop.util.StringUtils;
 import static org.apache.hadoop.util.Time.now;
 
@@ -342,6 +349,9 @@ public class FSNamesystem
   private final DelegationTokenSecretManager dtSecretManager;
   private final boolean alwaysUseDelegationTokensForTests;
 
+  private static final Step STEP_AWAITING_REPORTED_BLOCKS =
+    new Step(StepType.AWAITING_REPORTED_BLOCKS);
+  
   // Tracks whether the default audit logger is the only configured audit
   // logger; this allows isAuditEnabled() to return false in case the
   // underlying logger is disabled, and avoid some unnecessary work.
@@ -664,13 +674,17 @@ public class FSNamesystem
   void startCommonServices(Configuration conf) throws IOException {
     this.registerMBean(); // register the MBean for the FSNamesystemState
     IDsMonitor.getInstance().start();
+    RootINodeCache.start();
     if (isClusterInSafeMode()) {
       assert safeMode != null && !safeMode.isPopulatingReplicationQueues();
+      StartupProgress prog = NameNode.getStartupProgress();
+      prog.beginPhase(Phase.SAFEMODE);
+      prog.setTotal(Phase.SAFEMODE, STEP_AWAITING_REPORTED_BLOCKS,
+        getCompleteBlocksTotal());
       setBlockTotal();
       performPendingSafeModeOperation();
     }
     blockManager.activate(conf);
-    RootINodeCache.start();
     if (dir.isQuotaEnabled()) {
       quotaUpdateManager.activate();
     }
@@ -4124,6 +4138,8 @@ public class FSNamesystem
      * Was safe mode entered automatically because available resources were low.
      */
     private boolean resourcesLow = false;
+    /** counter for tracking startup progress of reported blocks */
+    private Counter awaitingReportedBlocksCounter;
 
     public ThreadLocal<Boolean> safeModePendingOperation =
         new ThreadLocal<>();
@@ -4252,6 +4268,12 @@ public class FSNamesystem
           blockManager.numOfUnderReplicatedBlocks() + " blocks");
 
       startSecretManagerIfNecessary();
+      // If startup has not yet completed, end safemode phase.
+      StartupProgress prog = NameNode.getStartupProgress();
+      if (prog.getStatus(Phase.SAFEMODE) != Status.COMPLETE) {
+        prog.endStep(Phase.SAFEMODE, STEP_AWAITING_REPORTED_BLOCKS);
+        prog.endPhase(Phase.SAFEMODE);
+      }
     }
 
     /**
@@ -4399,6 +4421,17 @@ public class FSNamesystem
      */
     private void incrementSafeBlockCount(Block blk) throws IOException {
       addSafeBlock(blk.getBlockId());
+      
+      // Report startup progress only if we haven't completed startup yet.
+        StartupProgress prog = NameNode.getStartupProgress();
+        if (prog.getStatus(Phase.SAFEMODE) != Status.COMPLETE) {
+          if (this.awaitingReportedBlocksCounter == null) {
+            this.awaitingReportedBlocksCounter = prog.getCounter(Phase.SAFEMODE,
+              STEP_AWAITING_REPORTED_BLOCKS);
+          }
+          this.awaitingReportedBlocksCounter.increment();
+        }
+
       setSafeModePendingOperation(true);
     }
 
@@ -4794,6 +4827,74 @@ public class FSNamesystem
     return blockManager.getTotalBlocks();
   }
 
+  /**
+   * Get the total number of COMPLETE blocks in the system.
+   * For safe mode only complete blocks are counted.
+   */
+  private long getCompleteBlocksTotal() throws IOException {
+
+    // Calculate number of blocks under construction
+    long numUCBlocks = 0;
+    for (final Lease lease : leaseManager.getSortedLeases()) {
+
+      final HopsTransactionalRequestHandler ucBlocksHandler = new HopsTransactionalRequestHandler(
+          HDFSOperationType.GET_LISTING) {
+        private Set<String> leasePaths = null;
+
+        @Override
+        public void setUp() throws StorageException {
+          String holder = lease.getHolder();
+          leasePaths = INodeUtil.findPathsByLeaseHolder(holder);
+          if (leasePaths != null) {
+            LOG.debug("Total Paths " + leasePaths.size() + " Paths: " + Arrays.toString(leasePaths.toArray()));
+          }
+        }
+
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          String holder = lease.getHolder();
+          LockFactory lf = LockFactory.getInstance();
+          locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,
+              INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, leasePaths.toArray(new String[leasePaths.size()])))
+              .add(lf.getLeaseLock(LockType.READ, holder))
+              .add(lf.getLeasePathLock(LockType.READ)).add(lf.getBlockLock())
+              .add(
+                  lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
+        }
+
+        @Override
+        public Object performTask() throws IOException {
+          int numUCBlocks = 0;
+          for (LeasePath leasePath : lease.getPaths()) {
+            final String path = leasePath.getPath();
+            INodeFileUnderConstruction cons;
+            try {
+              cons = INodeFileUnderConstruction.valueOf(dir.getINode(path), path);
+            } catch (UnresolvedLinkException e) {
+              throw new AssertionError("Lease files should reside on this FS");
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+            BlockInfo[] blocks = cons.getBlocks();
+            if (blocks == null) {
+              continue;
+            }
+            for (BlockInfo b : blocks) {
+              if (!b.isComplete()) {
+                numUCBlocks++;
+              }
+            }
+          }
+          return numUCBlocks;
+        }
+      };
+
+      numUCBlocks += (int) ucBlocksHandler.handle();
+    }
+    LOG.info("Number of blocks under construction: " + numUCBlocks);
+    return getBlocksTotal() - numUCBlocks;
+  }
+  
   /**
    * Enter safe mode. If resourcesLow is false, then we assume it is manual
    *
@@ -5558,21 +5659,6 @@ public class FSNamesystem
     cancelDelegationTokenHandler.handle(this);
   }
 
-  /**
-   * @param out
-   *     save state of the secret manager
-   */
-  void saveSecretManagerState(DataOutputStream out) throws IOException {
-    dtSecretManager.saveSecretManagerState(out);
-  }
-
-  /**
-   * @param in
-   *     load the state of secret manager from input stream
-   */
-  void loadSecretManagerState(DataInputStream in) throws IOException {
-    dtSecretManager.loadSecretManagerState(in);
-  }
 
   /**
    * Log the updateMasterKey operation to edit logs

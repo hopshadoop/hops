@@ -105,42 +105,7 @@ public class DelegationTokenSecretManager
       throw new IOException("No delegation token found for this identifier");
     }
   }
-  
-  /**
-   * Load SecretManager state from fsimage.
-   *
-   * @param in
-   *     input stream to read fsimage
-   * @throws IOException
-   */
-  public synchronized void loadSecretManagerState(DataInputStream in)
-      throws IOException {
-    if (running) {
-      // a safety check
-      throw new IOException(
-          "Can't load state from image in a running SecretManager.");
-    }
-    currentId = in.readInt();
-    loadAllKeys(in);
-    delegationTokenSequenceNumber = in.readInt();
-    loadCurrentTokens(in);
-  }
-  
-  /**
-   * Store the current state of the SecretManager for persistence
-   *
-   * @param out
-   *     Output stream for writing into fsimage.
-   * @throws IOException
-   */
-  public synchronized void saveSecretManagerState(DataOutputStream out)
-      throws IOException {
-    out.writeInt(currentId);
-    saveAllKeys(out);
-    out.writeInt(delegationTokenSequenceNumber);
-    saveCurrentTokens(out);
-  }
-  
+      
   /**
    * This method is intended to be used only while reading edit logs.
    *
@@ -242,59 +207,6 @@ public class DelegationTokenSecretManager
    */
   public synchronized int getNumberOfKeys() {
     return allKeys.size();
-  }
-
-  /**
-   * Private helper methods to save delegation keys and tokens in fsimage
-   */
-  private synchronized void saveCurrentTokens(DataOutputStream out)
-      throws IOException {
-    out.writeInt(currentTokens.size());
-    for (DelegationTokenIdentifier id : currentTokens.keySet()) {
-      id.write(out);
-      DelegationTokenInformation info = currentTokens.get(id);
-      out.writeLong(info.getRenewDate());
-    }
-  }
-  
-  /*
-   * Save the current state of allKeys
-   */
-  private synchronized void saveAllKeys(DataOutputStream out)
-      throws IOException {
-    out.writeInt(allKeys.size());
-    for (Integer key : allKeys.keySet()) {
-      allKeys.get(key).write(out);
-    }
-  }
-  
-  /**
-   * Private helper methods to load Delegation tokens from fsimage
-   */
-  private synchronized void loadCurrentTokens(DataInputStream in)
-      throws IOException {
-    int numberOfTokens = in.readInt();
-    for (int i = 0; i < numberOfTokens; i++) {
-      DelegationTokenIdentifier id = new DelegationTokenIdentifier();
-      id.readFields(in);
-      long expiryTime = in.readLong();
-      addPersistedDelegationToken(id, expiryTime);
-    }
-  }
-
-  /**
-   * Private helper method to load delegation keys from fsimage.
-   *
-   * @param in
-   * @throws IOException
-   */
-  private synchronized void loadAllKeys(DataInputStream in) throws IOException {
-    int numberOfKeys = in.readInt();
-    for (int i = 0; i < numberOfKeys; i++) {
-      DelegationKey value = new DelegationKey();
-      value.readFields(in);
-      addKey(value);
-    }
   }
 
   /**
