@@ -519,7 +519,7 @@ public class TestFileCreation {
     DistributedFileSystem dfs = null;
     try {
       cluster.waitActive();
-      dfs = (DistributedFileSystem) cluster.getFileSystem();
+      dfs = cluster.getFileSystem();
       DFSClient client = dfs.dfs;
 
       // create a new file.
@@ -583,7 +583,7 @@ public class TestFileCreation {
     DistributedFileSystem dfs = null;
     try {
       cluster.waitActive();
-      dfs = (DistributedFileSystem) cluster.getFileSystem();
+      dfs = cluster.getFileSystem();
       DFSClient client = dfs.dfs;
 
       // create a new file.
@@ -726,7 +726,7 @@ public class TestFileCreation {
       stm4.close();
 
       // verify that new block is associated with this file
-      DFSClient client = ((DistributedFileSystem) fs).dfs;
+      DFSClient client = (fs).dfs;
       LocatedBlocks locations = client.getNamenode()
           .getBlockLocations(file1.toString(), 0, Long.MAX_VALUE);
       System.out.println("locations = " + locations.locatedBlockCount());
@@ -993,7 +993,7 @@ public class TestFileCreation {
     DistributedFileSystem dfs = null;
     try {
       cluster.waitActive();
-      dfs = (DistributedFileSystem) cluster.getFileSystem();
+      dfs = cluster.getFileSystem();
 
       // create a new file.
       final String f = DIR + "foo";
@@ -1060,7 +1060,7 @@ public class TestFileCreation {
     DistributedFileSystem dfs = null;
     try {
       cluster.waitActive();
-      dfs = (DistributedFileSystem) cluster.getFileSystem();
+      dfs = cluster.getFileSystem();
 
       // create a new file.
       final String f = DIR + "foofs";
@@ -1095,7 +1095,7 @@ public class TestFileCreation {
     DistributedFileSystem dfs = null;
     try {
       cluster.waitActive();
-      dfs = (DistributedFileSystem) cluster.getFileSystem();
+      dfs = cluster.getFileSystem();
 
       // create a new file.
       final String f = DIR + "testFsCloseAfterClusterShutdown";
@@ -1827,7 +1827,7 @@ public class TestFileCreation {
     DistributedFileSystem dfs = null;
     try {
       cluster.waitActive();
-      dfs = (DistributedFileSystem) cluster.getFileSystem();
+      dfs = cluster.getFileSystem();
       DFSClient client = dfs.dfs;
 
       final Path f = new Path("/testFileIdMismatch.txt");

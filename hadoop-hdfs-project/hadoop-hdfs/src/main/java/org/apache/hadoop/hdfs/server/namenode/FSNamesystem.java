@@ -1934,35 +1934,6 @@ public class FSNamesystem
       throws
       IOException {
     FSPermissionChecker pc = getPermissionChecker();
-    startFileInternal(pc, src, permissions, holder, clientMachine, flag,
-        createParent, replication, blockSize);
-    final HdfsFileStatus stat = dir.getFileInfoForCreate(src, false, true);
-    logAuditEvent(true, "create", src, null,
-        (isAuditEnabled() && isExternalInvocation()) ? stat : null);
-    return stat;
-  }
-
-  /**
-   * Create new or open an existing file for append.<p>
-   * <p/>
-   * In case of opening the file for append, the method returns the last
-   * block of the file if this is a partial block, which can still be used
-   * for writing more data. The client uses the returned block locations
-   * to form the data pipeline for this block.<br>
-   * The method returns null if the last block is full or if this is a
-   * new file. The client then allocates a new block with the next call
-   * using {@link NameNodeRpcServer#addBlock}.<p>
-   * <p/>
-   * For description of parameters and exceptions thrown see
-   * {@link ClientProtocol#create}
-   *
-   * @return the last block locations if the block is partial or null otherwise
-   */
-  private LocatedBlock startFileInternal(FSPermissionChecker pc, String src,
-      PermissionStatus permissions, String holder, String clientMachine,
-      EnumSet<CreateFlag> flag, boolean createParent, short replication,
-      long blockSize) throws
-      IOException {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug(
           "DIR* NameSystem.startFile: src=" + src + ", holder=" + holder +
@@ -1973,23 +1944,47 @@ public class FSNamesystem
     if (!DFSUtil.isValidName(src)) {
       throw new InvalidPathException(src);
     }
-
+    
     if (blockSize < minBlockSize) {
       throw new IOException("Specified block size is less than configured" + " minimum value ("
           + DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY
           + "): " + blockSize + " < " + minBlockSize);
     }
+    
+    boolean create = flag.contains(CreateFlag.CREATE);
+    boolean overwrite = flag.contains(CreateFlag.OVERWRITE);
+
+    startFileInternal(pc, src, permissions, holder, clientMachine, create, overwrite,
+        createParent, replication, blockSize);
+    final HdfsFileStatus stat = dir.getFileInfoForCreate(src, false, true);
+    logAuditEvent(true, "create", src, null,
+        (isAuditEnabled() && isExternalInvocation()) ? stat : null);
+    return stat;
+  }
+
+  /**
+   * Create a new file or overwrite an existing file<br>
+   * 
+   * Once the file is create the client then allocates a new block with the next
+   * call using {@link NameNode#addBlock()}.
+   * <p>
+   * For description of parameters and exceptions thrown see
+   * {@link ClientProtocol#create}
+   */
+  private void startFileInternal(FSPermissionChecker pc, String src,
+      PermissionStatus permissions, String holder, String clientMachine,
+      boolean create, boolean overwrite, boolean createParent, short replication,
+      long blockSize) throws
+      IOException {
+    
     // Verify that the destination does not exist as a directory already.
     boolean pathExists = dir.exists(src);
     if (pathExists && dir.isDir(src)) {
       throw new FileAlreadyExistsException(
           "Cannot create file " + src + "; already exists as a directory.");
     }
-
-    boolean overwrite = flag.contains(CreateFlag.OVERWRITE);
-    boolean append = flag.contains(CreateFlag.APPEND);
     if (isPermissionEnabled) {
-      if (append || (overwrite && pathExists)) {
+      if (overwrite && pathExists) {
         checkPathAccess(pc, src, FsAction.WRITE);
       } else {
         checkAncestorAccess(pc, src, FsAction.WRITE);
@@ -2001,76 +1996,99 @@ public class FSNamesystem
     }
 
     try {
-      blockManager.verifyReplication(src, replication, clientMachine);
-      boolean create = flag.contains(CreateFlag.CREATE);
       final INode myFile = dir.getINode(src);
       if (myFile == null) {
         if (!create) {
-          throw new FileNotFoundException(
-              "failed to overwrite or append to non-existent file " + src +
-                  " on client " + clientMachine);
+          throw new FileNotFoundException("failed to overwrite non-existent file "
+             + src + " on client " + clientMachine);
         }
       } else {
-        // File exists - must be one of append or overwrite
         if (overwrite) {
-          delete(src, true);
+          delete(src, true); // File exists - delete if overwrite
         } else {
-          // Opening an existing file for write - may need to recover lease.
+          // If lease soft limit time is expired, recover the lease
           recoverLeaseInternal(myFile, src, holder, clientMachine, false);
-
-          if (!append) {
-            throw new FileAlreadyExistsException(
-                "failed to create file " + src + " on client " + clientMachine +
-                    " because the file exists");
-          }
+          throw new FileAlreadyExistsException("failed to create file " + src
+              + " on client " + clientMachine + " because the file exists");
         }
       }
 
-      final DatanodeDescriptor clientNode =
-          blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
+      checkFsObjectLimit();
+      final DatanodeDescriptor clientNode = blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
 
-      if (append && myFile != null) {
-        final INodeFile f = INodeFile.valueOf(myFile, src);
+      INodeFileUnderConstruction newNode = dir.addFile(src, permissions,
+          replication, blockSize, holder, clientMachine, clientNode);
+      if (newNode == null) {
+        throw new IOException("DIR* NameSystem.startFile: " + "Unable to add file to namespace.");
+      }
+      leaseManager.addLease(newNode.getClientName(), src);
 
-        final BlockInfo lastBlock = f.getLastBlock();
-        // Check that the block has at least minimum replication.
-        if(lastBlock != null && lastBlock.isComplete() &&
-            !getBlockManager().isSufficientlyReplicated(lastBlock)) {
-          throw new IOException("append: lastBlock=" + lastBlock +
-              " of src=" + src + " is not sufficiently replicated yet.");
-        }
-
-        return prepareFileForWrite(src, f, holder, clientMachine, clientNode);
-      } else {
-        // Now we can add the name to the filesystem. This file has no
-        // blocks associated with it.
-        //
-        checkFsObjectLimit();
-
-        // increment global generation stamp
-        //HOP[M] generationStamp is not used for inodes
-        INodeFileUnderConstruction newNode =
-            dir.addFile(src, permissions, replication, blockSize, holder,
-                clientMachine, clientNode);
-        if (newNode == null) {
-          throw new IOException("DIR* NameSystem.startFile: " +
-              "Unable to add file to namespace.");
-        }
-        leaseManager.addLease(newNode.getClientName(), src);
-
-        if (NameNode.stateChangeLog.isDebugEnabled()) {
-          NameNode.stateChangeLog.debug(
-              "DIR* NameSystem.startFile: " + "add " + src +
-                  " to namespace for " + holder);
-        }
+      if (NameNode.stateChangeLog.isDebugEnabled()) {
+        NameNode.stateChangeLog.debug("DIR* NameSystem.startFile: "
+            + "add " + src + " to namespace for " + holder);
       }
     } catch (IOException ie) {
       NameNode.stateChangeLog
           .warn("DIR* NameSystem.startFile: " + ie.getMessage());
       throw ie;
     }
-    return null;
   }
+
+  /**
+   * Append to an existing file for append.
+   * <p>
+   * 
+   * The method returns the last block of the file if this is a partial block,
+   * which can still be used for writing more data. The client uses the returned
+   * block locations to form the data pipeline for this block.<br>
+   * The method returns null if the last block is full. The client then
+   * allocates a new block with the next call using {@link NameNode#addBlock()}.
+   * <p>
+   * 
+   * For description of parameters and exceptions thrown see
+   * {@link ClientProtocol#append(String, String)}
+   * 
+   * @return the last block locations if the block is partial or null otherwise
+   */
+  private LocatedBlock appendFileInternal(FSPermissionChecker pc, String src,
+      String holder, String clientMachine) throws AccessControlException,
+      UnresolvedLinkException, FileNotFoundException, IOException {
+    // Verify that the destination does not exist as a directory already.
+    boolean pathExists = dir.exists(src);
+    if (pathExists && dir.isDir(src)) {
+      throw new FileAlreadyExistsException("Cannot append to directory " + src
+          + "; already exists as a directory.");
+    }
+    if (isPermissionEnabled) {
+      checkPathAccess(pc, src, FsAction.WRITE);
+    }
+
+    try {
+      final INode inode = dir.getINode(src);
+      if (inode == null) {
+        throw new FileNotFoundException("failed to append to non-existent file "
+          + src + " on client " + clientMachine);
+      }
+      final INodeFile myFile = INodeFile.valueOf(inode, src);
+      
+      final BlockInfo lastBlock = myFile.getLastBlock();
+      // Check that the block has at least minimum replication.
+      if (lastBlock != null && lastBlock.isComplete() && !getBlockManager().isSufficientlyReplicated(lastBlock)) {
+        throw new IOException("append: lastBlock=" + lastBlock + " of src=" + src
+            + " is not sufficiently replicated yet.");
+      }
+
+      // Opening an existing file for write - may need to recover lease.
+      recoverLeaseInternal(myFile, src, holder, clientMachine, false);
+
+      final DatanodeDescriptor clientNode = 
+          blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
+      return prepareFileForWrite(src, myFile, holder, clientMachine, clientNode);
+    } catch (IOException ie) {
+      NameNode.stateChangeLog.warn("DIR* NameSystem.append: " +ie.getMessage());
+      throw ie;
+    }
+   }
 
   /**
    * Replace current node with a INodeUnderConstruction.
@@ -2369,11 +2387,7 @@ public class FSNamesystem
   private LocatedBlock appendFileInt(String src, String holder,
       String clientMachine) throws
       IOException {
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* NameSystem.appendFile: src=" + src
-          + ", holder=" + holder
-          + ", clientMachine=" + clientMachine);
-    }
+    
     if (!supportAppends) {
       throw new UnsupportedOperationException(
           "Append is not enabled on this NameNode. Use the " +
@@ -2381,8 +2395,7 @@ public class FSNamesystem
     }
     LocatedBlock lb;
     FSPermissionChecker pc = getPermissionChecker();
-    lb = startFileInternal(pc, src, null, holder, clientMachine,
-        EnumSet.of(CreateFlag.APPEND), false, blockManager.maxReplication, 0);
+    lb = appendFileInternal(pc, src, holder, clientMachine);
     if (lb != null) {
       if (NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug(
