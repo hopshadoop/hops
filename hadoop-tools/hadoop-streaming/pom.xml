@@ -97,11 +97,6 @@
       <groupId>io.hops</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.hops</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
-      <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
