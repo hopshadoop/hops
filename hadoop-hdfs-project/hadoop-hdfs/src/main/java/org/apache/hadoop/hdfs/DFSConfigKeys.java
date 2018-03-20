@@ -703,7 +703,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final boolean DFS_SUPPORT_APPEND_DEFAULT = true;
   public static final String DFS_HTTPS_ENABLE_KEY = "dfs.https.enable";
   public static final boolean DFS_HTTPS_ENABLE_DEFAULT = false;
-  public static final String DFS_HTTPS_PORT_KEY = "dfs.https.port";
   public static final String DFS_DEFAULT_CHUNK_VIEW_SIZE_KEY =
       "dfs.default.chunk.view.size";
   public static final int DFS_DEFAULT_CHUNK_VIEW_SIZE_DEFAULT = 32 * 1024;

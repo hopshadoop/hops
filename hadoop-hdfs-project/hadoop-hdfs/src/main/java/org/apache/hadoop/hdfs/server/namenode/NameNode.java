@@ -1209,7 +1209,7 @@ public class NameNode {
     String httpAddress;
     if (conf.getBoolean(DFSConfigKeys.DFS_HTTPS_ENABLE_KEY, DFS_HTTPS_ENABLE_DEFAULT)) {
       httpAddress = httpServer.getHttpAddress().getAddress().getHostAddress() + ":" + conf.getInt(DFSConfigKeys
-          .DFS_HTTPS_PORT_KEY, DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT);
+          .DFS_NAMENODE_HTTPS_PORT_KEY, DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT);
     } else {
       httpAddress = httpServer.getHttpAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpAddress()
           .getPort() ;
