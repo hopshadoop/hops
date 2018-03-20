@@ -28,6 +28,8 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.security.KerberosInfo;
 
 import java.io.IOException;
+import org.apache.hadoop.io.retry.AtMostOnce;
+import org.apache.hadoop.io.retry.Idempotent;
 
 /**
  * *******************************************************************
@@ -87,6 +89,7 @@ public interface DatanodeProtocol {
    * updated registration information
    * @see org.apache.hadoop.hdfs.server.namenode.FSNamesystem#registerDatanode(DatanodeRegistration)
    */
+  @Idempotent
   public DatanodeRegistration registerDatanode(
       DatanodeRegistration registration) throws IOException;
   
@@ -111,6 +114,7 @@ public interface DatanodeProtocol {
    * @throws IOException
    *     on error
    */
+  @Idempotent
   public HeartbeatResponse sendHeartbeat(DatanodeRegistration registration,
       StorageReport[] reports, int xmitsInProgress, int xceiverCount,
       int failedVolumes) throws IOException;
@@ -134,6 +138,7 @@ public interface DatanodeProtocol {
    * @return - the next command for DN to process.
    * @throws IOException
    */
+  @Idempotent
   public DatanodeCommand blockReport(DatanodeRegistration registration,
       String poolId, StorageBlockReport[] reports) throws IOException;
 
@@ -147,6 +152,7 @@ public interface DatanodeProtocol {
    * writes a new Block here, or another DataNode copies a Block to
    * this DataNode, it will call blockReceived().
    */
+  @AtMostOnce
   public void blockReceivedAndDeleted(DatanodeRegistration registration,
       String poolId, StorageReceivedDeletedBlocks[] rcvdAndDeletedBlocks)
       throws IOException;
@@ -155,20 +161,24 @@ public interface DatanodeProtocol {
    * errorReport() tells the NameNode about something that has gone
    * awry.  Useful for debugging.
    */
+  @Idempotent
   public void errorReport(DatanodeRegistration registration, int errorCode,
       String msg) throws IOException;
 
+  @Idempotent
   public NamespaceInfo versionRequest() throws IOException;
 
   /**
    * same as {@link org.apache.hadoop.hdfs.protocol.ClientProtocol#reportBadBlocks(LocatedBlock[])}
    * }
    */
+  @Idempotent
   public void reportBadBlocks(LocatedBlock[] blocks) throws IOException;
   
   /**
    * Commit block synchronization in lease recovery
    */
+  @AtMostOnce
   public void commitBlockSynchronization(ExtendedBlock block,
       long newgenerationstamp, long newlength, boolean closeFile,
       boolean deleteblock, DatanodeID[] newtargets, String[] newtargetstorages)
@@ -180,6 +190,7 @@ public interface DatanodeProtocol {
    * actively running namenodes
    * @return sorted list of active namenodes
    */
+  @Idempotent
   public SortedActiveNodeList getActiveNamenodes() throws IOException;
 
   /**
@@ -188,6 +199,7 @@ public interface DatanodeProtocol {
    * namenodes
    * @return active namenode to send the next block report to
    */
+  @Idempotent
   public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks) throws IOException;
 
   /**
@@ -196,6 +208,7 @@ public interface DatanodeProtocol {
    * @return data
    * @throws IOException
    */
+  @Idempotent
   public byte[] getSmallFileData(int id) throws IOException;
 
 }

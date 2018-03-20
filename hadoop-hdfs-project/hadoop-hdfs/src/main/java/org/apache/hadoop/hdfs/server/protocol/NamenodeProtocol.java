@@ -25,6 +25,7 @@ import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.security.KerberosInfo;
 
 import java.io.IOException;
+import org.apache.hadoop.io.retry.Idempotent;
 
 /**
  * **************************************************************************
@@ -77,6 +78,7 @@ public interface NamenodeProtocol {
    *     datanode does not exist
    * @see org.apache.hadoop.hdfs.server.balancer.Balancer
    */
+  @Idempotent
   public BlocksWithLocations getBlocks(DatanodeInfo datanode, long size)
       throws IOException;
 
@@ -86,6 +88,7 @@ public interface NamenodeProtocol {
    * @return ExportedBlockKeys containing current block keys
    * @throws IOException
    */
+  @Idempotent
   public ExportedBlockKeys getBlockKeys() throws IOException;
 
   /**
@@ -95,6 +98,7 @@ public interface NamenodeProtocol {
    * of the name-node
    * @throws IOException
    */
+  @Idempotent
   public NamespaceInfo versionRequest() throws IOException;
 }
 
