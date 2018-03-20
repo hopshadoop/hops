@@ -3125,7 +3125,11 @@ public class FSNamesystem
 
   FSPermissionChecker getPermissionChecker()
       throws AccessControlException {
-      return new FSPermissionChecker(fsOwnerShortUserName, superGroup);
+    try {
+      return new FSPermissionChecker(fsOwnerShortUserName, superGroup, getRemoteUser());
+    } catch (IOException ioe) {
+      throw new AccessControlException(ioe);
+    }
   }
 
   /**
@@ -5739,11 +5743,7 @@ public class FSNamesystem
   // optimize ugi lookup for RPC operations to avoid a trip through
   // UGI.getCurrentUser which is synced
   private static UserGroupInformation getRemoteUser() throws IOException {
-    UserGroupInformation ugi = null;
-    if (Server.isRpcInvocation()) {
-      ugi = Server.getRemoteUser();
-    }
-    return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
+    return NameNode.getRemoteUser();
   }
 
   /**
