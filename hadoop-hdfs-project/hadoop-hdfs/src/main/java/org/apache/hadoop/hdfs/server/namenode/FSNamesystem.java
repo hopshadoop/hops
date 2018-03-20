@@ -2750,7 +2750,10 @@ public class FSNamesystem
                   "Cannot abandon block " + b + " for fle" + src, safeMode);
             }
             INodeFileUnderConstruction file = checkLease(src, holder, false);
-            dir.removeBlock(src, file, ExtendedBlock.getLocalBlock(b));
+            boolean removed = dir.removeBlock(src, file, ExtendedBlock.getLocalBlock(b));
+            if (!removed) {
+              return true;
+            }
             leaseManager.getLease(holder).updateLastTwoBlocksInLeasePath(src,
                 file.getLastBlock(), file.getPenultimateBlock());
 
@@ -3668,7 +3671,12 @@ public class FSNamesystem
         INodeFileUnderConstruction pendingFile = (INodeFileUnderConstruction) iFile;
 
         if (deleteBlock) {
-          pendingFile.removeLastBlock(ExtendedBlock.getLocalBlock(lastBlock));
+          Block blockToDel = ExtendedBlock.getLocalBlock(lastBlock);
+          boolean remove = pendingFile.removeLastBlock(blockToDel);
+          if (!remove) {
+            throw new IOException("Trying to delete non-existant block "
+                + blockToDel);
+          }
           blockManager.removeBlockFromMap(storedBlock);
         } else {
           // update last block
