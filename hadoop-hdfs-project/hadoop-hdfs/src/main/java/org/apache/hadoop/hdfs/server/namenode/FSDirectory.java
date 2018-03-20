@@ -323,16 +323,20 @@ public class FSDirectory implements Closeable {
 
   /**
    * Remove a block from the file.
+   * @return Whether the block exists in the corresponding file
    */
-  void removeBlock(String path, INodeFileUnderConstruction fileNode,
+  boolean removeBlock(String path, INodeFileUnderConstruction fileNode,
       Block block) throws IOException, StorageException {
-    unprotectedRemoveBlock(path, fileNode, block);
+    return unprotectedRemoveBlock(path, fileNode, block);
   }
   
-  void unprotectedRemoveBlock(String path, INodeFileUnderConstruction fileNode,
+  boolean unprotectedRemoveBlock(String path, INodeFileUnderConstruction fileNode,
       Block block) throws IOException, StorageException {
     // modify file-> block and blocksMap
-    fileNode.removeLastBlock(block);
+    boolean removed = fileNode.removeLastBlock(block);
+    if (!removed) {
+      return false;
+    }
     getBlockManager().removeBlockFromMap(block);
 
     if (NameNode.stateChangeLog.isDebugEnabled()) {
@@ -347,6 +351,7 @@ public class FSDirectory implements Closeable {
     updateCount(inodesInPath, inodes.length-1, 0,
         -fileNode.getPreferredBlockSize() * fileNode.getBlockReplication(),
         true);
+    return true;
   }
 
   /**

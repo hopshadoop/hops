@@ -167,17 +167,18 @@ public class INodeFileUnderConstruction extends INodeFile
    * Remove a block from the block list. This block should be
    * the last one on the list.
    */
-  void removeLastBlock(Block oldblock) throws IOException, StorageException {
+  boolean removeLastBlock(Block oldblock) throws IOException, StorageException {
     final BlockInfo[] blocks = getBlocks();
-    if (blocks == null) {
-      throw new IOException("Trying to delete non-existant block " + oldblock);
-    }
+    if (blocks == null || blocks.length == 0) {
+      return false;
+     }
     int size_1 = blocks.length - 1;
     if (!blocks[size_1].equals(oldblock)) {
-      throw new IOException("Trying to delete non-last block " + oldblock);
+      return false;
     }
     
     removeBlock(blocks[blocks.length - 1]);
+    return true;
   }
 
   /**
