@@ -51,6 +51,7 @@ import org.apache.hadoop.security.token.TokenInfo;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
+import org.apache.hadoop.io.retry.AtMostOnce;
 
 /**
  * *******************************************************************
@@ -145,6 +146,7 @@ public interface ClientProtocol {
    * @throws UnresolvedLinkException
    * @throws IOException
    */
+  @Idempotent
   public LocatedBlocks getMissingBlockLocations(String filePath)
       throws AccessControlException, FileNotFoundException,
       UnresolvedLinkException, IOException;
@@ -162,6 +164,7 @@ public interface ClientProtocol {
    *    the checksum
    * @throws IOException
    */
+  @Idempotent
   public void addBlockChecksum(String src, int blockIndex, long checksum)
       throws IOException;
 
@@ -178,6 +181,7 @@ public interface ClientProtocol {
    *    the checksum of the requested block
    * @throws IOException
    */
+  @Idempotent
   public long getBlockChecksum(String src, int blockIndex) throws IOException;
 
   /**
@@ -204,7 +208,7 @@ public interface ClientProtocol {
    * <p/>
    * Blocks have a maximum size.  Clients that intend to create
    * multi-block files must also use
-   * {@link #addBlock(String, String, ExtendedBlock, DatanodeInfo[])}
+   * {@link #addBlock}
    *
    * @param src
    *     path of the file being created.
@@ -253,7 +257,10 @@ public interface ClientProtocol {
    *     RuntimeExceptions:
    * @throws InvalidPathException
    *     Path <code>src</code> is invalid
+   * <p>
+   * <em>Note that create with {@link CreateFlag#OVERWRITE} is idempotent.</em>
    */
+  @AtMostOnce
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
       short replication, long blockSize, EncodingPolicy policy)
@@ -325,6 +332,7 @@ public interface ClientProtocol {
    * @throws InvalidPathException
    *     Path <code>src</code> is invalid
    */
+  @AtMostOnce
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
       short replication, long blockSize)
@@ -368,6 +376,7 @@ public interface ClientProtocol {
    * @throws UnsupportedOperationException
    *     if append is not supported
    */
+  @AtMostOnce
   public LocatedBlock append(String src, String clientName)
       throws AccessControlException, DSQuotaExceededException,
       FileNotFoundException, SafeModeException, UnresolvedLinkException,
@@ -652,6 +661,7 @@ public interface ClientProtocol {
    * @throws IOException
    *     an I/O error occurred
    */
+  @AtMostOnce
   public boolean rename(String src, String dst)
       throws UnresolvedLinkException, IOException;
 
@@ -668,6 +678,7 @@ public interface ClientProtocol {
    *     if <code>trg</code> or <code>srcs</code>
    *     contains a symlink
    */
+  @AtMostOnce
   public void concat(String trg, String[] srcs)
       throws IOException, UnresolvedLinkException;
 
@@ -717,6 +728,7 @@ public interface ClientProtocol {
    * @throws IOException
    *     If an I/O error occurred
    */
+  @AtMostOnce
   public void rename2(String src, String dst, Options.Rename... options)
       throws AccessControlException, DSQuotaExceededException,
       FileAlreadyExistsException, FileNotFoundException,
@@ -747,6 +759,7 @@ public interface ClientProtocol {
    * @throws IOException
    *     If an I/O error occurred
    */
+  @AtMostOnce
   public boolean delete(String src, boolean recursive)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException;
@@ -986,6 +999,7 @@ public interface ClientProtocol {
    *
    * @throws IOException
    */
+  @Idempotent
   public void refreshNodes() throws IOException;
 
   /**
@@ -1192,6 +1206,7 @@ public interface ClientProtocol {
    * @throws IOException
    *     If an I/O error occurred
    */
+  @AtMostOnce
   public void createSymlink(String target, String link, FsPermission dirPerm,
       boolean createParent)
       throws AccessControlException, FileAlreadyExistsException,
@@ -1251,6 +1266,7 @@ public interface ClientProtocol {
    * @throws IOException
    *     if any error occurs
    */
+  @AtMostOnce
   public void updatePipeline(String clientName, ExtendedBlock oldBlock,
       ExtendedBlock newBlock, DatanodeID[] newNodes, String[] newStorages)
       throws IOException;
@@ -1286,6 +1302,7 @@ public interface ClientProtocol {
    *     delegation token
    * @throws IOException
    */
+  @Idempotent
   public void cancelDelegationToken(Token<DelegationTokenIdentifier> token)
       throws IOException;
   
@@ -1294,6 +1311,7 @@ public interface ClientProtocol {
    * DataTransferProtocol to/from DataNodes.
    * @throws IOException
    */
+  @Idempotent
   public DataEncryptionKey getDataEncryptionKey() throws IOException;
   
 
@@ -1301,6 +1319,7 @@ public interface ClientProtocol {
    * Ping RPC to check if the namenode is alive
    * @throws IOException
    */
+  @Idempotent
   public void ping() throws IOException;
 
   /**
@@ -1309,6 +1328,7 @@ public interface ClientProtocol {
    * @return sorted list of active namenodes
    * @throws IOException
    */
+  @Idempotent
   public SortedActiveNodeList getActiveNamenodesForClient()
       throws IOException;  // clinet get a updated list of NNs
 
@@ -1320,6 +1340,7 @@ public interface ClientProtocol {
    *      new values for props
    * @throws IOException
    */
+  @Idempotent
   public void changeConf(List<String> props, List<String> newVals)
       throws IOException;
 
@@ -1331,6 +1352,7 @@ public interface ClientProtocol {
    *         the group name to flush its data in the cache, could be null.
    * @throws IOException
    */
+  @Idempotent
   public void flushCache(String userName, String groupName) throws IOException;
 
   ///////////////////////////////////////
@@ -1346,6 +1368,7 @@ public interface ClientProtocol {
    *    the encoding status of the file
    * @throws IOException
    */
+  @Idempotent
   public EncodingStatus getEncodingStatus(String filePath) throws IOException;
 
   /**
@@ -1359,6 +1382,7 @@ public interface ClientProtocol {
    *    the erasure coding policy to be applied
    * @throws IOException
    */
+  @AtMostOnce
   public void encodeFile(String filePath, EncodingPolicy policy)
       throws IOException;
 
@@ -1373,6 +1397,7 @@ public interface ClientProtocol {
    *    the replication factor to be applied after revoking the encoding
    * @throws IOException
    */
+  @AtMostOnce
   public void revokeEncoding(String filePath, short replication)
       throws IOException;
 
@@ -1393,6 +1418,7 @@ public interface ClientProtocol {
    *    a LocatedBlock including the requested locations
    * @throws IOException
    */
+  @Idempotent
   public LocatedBlock getRepairedBlockLocations(String sourcePath,
       String parityPath, LocatedBlock block, boolean isParity)
       throws IOException;
