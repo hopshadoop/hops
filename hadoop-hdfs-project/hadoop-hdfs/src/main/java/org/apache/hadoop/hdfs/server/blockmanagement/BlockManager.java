@@ -291,6 +291,9 @@ public class BlockManager {
   // whether or not to issue block encryption keys.
   final boolean encryptDataTransfer;
 
+  // Max number of blocks to log info about during a block report.
+  private final long maxNumBlocksToLog;
+  
   /**
    * for block replicas placement
    */
@@ -388,6 +391,10 @@ public class BlockManager {
         conf.getBoolean(DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_KEY,
             DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_DEFAULT);
 
+    this.maxNumBlocksToLog =
+        conf.getLong(DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_KEY,
+            DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_DEFAULT);
+    
     this.processReportBatchSize =
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE,
             DFSConfigKeys.DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE_DEFAULT);
@@ -407,8 +414,9 @@ public class BlockManager {
     LOG.info("shouldCheckForEnoughRacks  = " + shouldCheckForEnoughRacks);
     LOG.info("replicationRecheckInterval = " + replicationRecheckInterval);
     LOG.info("encryptDataTransfer        = " + encryptDataTransfer);
+    LOG.info("maxNumBlocksToLog          = " + maxNumBlocksToLog);
     LOG.info("misReplicatedBatchSize     = " + processMisReplicatedBatchSize);
-    LOG.info("misReplicatedNoOfBatchs     = " + processMisReplicatedNoOfBatchs);
+    LOG.info("misReplicatedNoOfBatchs     = " + processMisReplicatedNoOfBatchs);   
   }
 
   private NameNodeBlockTokenSecretManager createBlockTokenSecretManager(
@@ -2167,27 +2175,34 @@ public class BlockManager {
 
     // Process the blocks on each queue
     for (StatefulBlockInfo b : toUC) {
-        if (firstBlockReport) {
-      addStoredBlockUnderConstructionImmediateTx(b.storedBlock, storage, b.reportedState);
-     } else {
+      if (firstBlockReport) {
+        addStoredBlockUnderConstructionImmediateTx(b.storedBlock, storage, b.reportedState);
+      } else {
         addStoredBlockUnderConstructionTx(b.storedBlock, storage, b.reportedState);
-      } 
+      }
     }
   
   
     final List<Callable<Object>> addTasks = new ArrayList<>();
+    int numBlocksLogged = 0;
     for (final BlockInfo b : toAdd) {
       if (firstBlockReport) {
-        addStoredBlockImmediateTx(b, storage);
+        addStoredBlockImmediateTx(b, storage, numBlocksLogged < maxNumBlocksToLog);
       } else {
+        final boolean logIt =  numBlocksLogged < maxNumBlocksToLog;
         addTasks.add(new Callable<Object>() {
           @Override
           public Object call() throws Exception {
-            addStoredBlockTx(b, storage, null, true);
+            addStoredBlockTx(b, storage, null, logIt);
             return null;
           }
         });
       }
+      numBlocksLogged++;
+    }
+    if (numBlocksLogged > maxNumBlocksToLog) {
+      blockLog.info("BLOCK* processReport: logged info for " + maxNumBlocksToLog
+          + " of " + numBlocksLogged + " reported.");
     }
     try {
       List<Future<Object>> futures = ((FSNamesystem) namesystem).getExecutorService().invokeAll(addTasks);
@@ -2794,11 +2809,11 @@ public class BlockManager {
    */
   private void addStoredBlockImmediate(
       BlockInfo storedBlock,
-      DatanodeStorageInfo storage) throws IOException {
+      DatanodeStorageInfo storage, boolean logEveryBlock) throws IOException {
     assert (storedBlock != null);
     if (!namesystem.isInStartupSafeMode() ||
         namesystem.isPopulatingReplQueues()) {
-      addStoredBlock(storedBlock, storage, null, false);
+      addStoredBlock(storedBlock, storage, null, logEveryBlock);
       return;
     }
 
@@ -3628,11 +3643,15 @@ public class BlockManager {
     for (StatefulBlockInfo b : toUC) {
       addStoredBlockUnderConstruction(b.storedBlock, storage, b.reportedState);
     }
-
+    long numBlocksLogged = 0;
     for (BlockInfo b : toAdd) {
-      addStoredBlock(b, storage, delHintNode, true);
+      addStoredBlock(b, storage, delHintNode, numBlocksLogged < maxNumBlocksToLog);
+      numBlocksLogged++;
     }
-
+    if (numBlocksLogged > maxNumBlocksToLog) {
+      blockLog.info("BLOCK* addBlock: logged info for " + maxNumBlocksToLog
+          + " of " + numBlocksLogged + " reported.");
+    }
     for (Block b : toInvalidate) {
       blockLog.info("BLOCK* addBlock: block " + b + " on " + storage + " size " +
           b.getNumBytes() + " does not belong to any file");
@@ -4739,7 +4758,7 @@ public class BlockManager {
         //and fall through to next clause
         //add replica if appropriate
         if (reportedState == ReplicaState.FINALIZED) {
-          addStoredBlockImmediate(block, storage);
+          addStoredBlockImmediate(block, storage, false);
         }
         return null;
       }
@@ -4747,7 +4766,7 @@ public class BlockManager {
   }
 
   private void addStoredBlockImmediateTx(final BlockInfo block,
-      final DatanodeStorageInfo storage) throws IOException {
+      final DatanodeStorageInfo storage, final boolean logEveryBlock) throws IOException {
     new HopsTransactionalRequestHandler(
         HDFSOperationType.AFTER_PROCESS_REPORT_ADD_BLK_IMMEDIATE) {
       INodeIdentifier inodeIdentifier;
@@ -4774,7 +4793,7 @@ public class BlockManager {
 
       @Override
       public Object performTask() throws IOException {
-        addStoredBlockImmediate(block, storage);
+        addStoredBlockImmediate(block, storage, logEveryBlock);
         return null;
       }
     }.handle();
