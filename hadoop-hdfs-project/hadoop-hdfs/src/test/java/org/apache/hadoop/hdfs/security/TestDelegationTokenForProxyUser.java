@@ -45,9 +45,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.token.Token;
 import org.apache.log4j.Level;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import javax.servlet.http.HttpServletResponse;
@@ -65,18 +65,20 @@ import java.util.Map;
 import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
 
 public class TestDelegationTokenForProxyUser {
-  private MiniDFSCluster cluster;
-  Configuration config;
+  private static MiniDFSCluster cluster;
+  private static Configuration config;
   final private static String GROUP1_NAME = "group1";
   final private static String GROUP2_NAME = "group2";
   final private static String[] GROUP_NAMES =
       new String[]{GROUP1_NAME, GROUP2_NAME};
   final private static String REAL_USER = "RealUser";
   final private static String PROXY_USER = "ProxyUser";
+  private static UserGroupInformation ugi;
+  private static UserGroupInformation proxyUgi;
   
   private static final Log LOG = LogFactory.getLog(TestDoAsEffectiveUser.class);
   
-  private void configureSuperUserIPAddresses(Configuration conf,
+  private static void configureSuperUserIPAddresses(Configuration conf,
       String superUserShortName) throws IOException {
     ArrayList<String> ipList = new ArrayList<>();
     Enumeration<NetworkInterface> netInterfaceList =
@@ -101,8 +103,8 @@ public class TestDelegationTokenForProxyUser {
         builder.toString());
   }
   
-  @Before
-  public void setUp() throws Exception {
+  @BeforeClass
+  public static void setUp() throws Exception {
     config = new HdfsConfiguration();
     config.setBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY, true);
     config.setLong(DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_KEY,
@@ -121,20 +123,20 @@ public class TestDelegationTokenForProxyUser {
     cluster = new MiniDFSCluster.Builder(config).build();
     cluster.waitActive();
     ProxyUsers.refreshSuperUserGroupsConfiguration(config);
+    ugi = UserGroupInformation.createRemoteUser(REAL_USER);
+    proxyUgi = UserGroupInformation.createProxyUserForTesting(PROXY_USER, ugi,
+        GROUP_NAMES);
   }
 
-  @After
-  public void tearDown() throws Exception {
+   @AfterClass
+  public static void tearDown() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  @Test
+  @Test(timeout=20000)
   public void testDelegationTokenWithRealUser() throws IOException {
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(REAL_USER);
-    final UserGroupInformation proxyUgi = UserGroupInformation
-        .createProxyUserForTesting(PROXY_USER, ugi, GROUP_NAMES);
     try {
       Token<?>[] tokens =
           proxyUgi.doAs(new PrivilegedExceptionAction<Token<?>[]>() {
@@ -156,13 +158,11 @@ public class TestDelegationTokenForProxyUser {
     }
   }
   
-  @Test
+  @Test(timeout=20000)
   public void testWebHdfsDoAs() throws Exception {
     WebHdfsTestUtil.LOG.info("START: testWebHdfsDoAs()");
     ((Log4JLogger) NamenodeWebHdfsMethods.LOG).getLogger().setLevel(Level.ALL);
     ((Log4JLogger) ExceptionHandler.LOG).getLogger().setLevel(Level.ALL);
-    final UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(REAL_USER);
     WebHdfsTestUtil.LOG
         .info("ugi.getShortUserName()=" + ugi.getShortUserName());
     final UserGroupInformation proxyUgi = UserGroupInformation
