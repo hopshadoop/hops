@@ -72,13 +72,9 @@ class FSPermissionChecker {
   private final Set<String> groups;
   private final boolean isSuper;
   
-  FSPermissionChecker(String fsOwner, String supergroup)
-      throws AccessControlException {
-    try {
-      ugi = UserGroupInformation.getCurrentUser();
-    } catch (IOException e) {
-      throw new AccessControlException(e);
-    }
+  FSPermissionChecker(String fsOwner, String supergroup,
+      UserGroupInformation callerUgi) {
+    ugi = callerUgi;
     HashSet<String> s = new HashSet<>(Arrays.asList(ugi.getGroupNames()));
     groups = Collections.unmodifiableSet(s);
     user = ugi.getShortUserName();

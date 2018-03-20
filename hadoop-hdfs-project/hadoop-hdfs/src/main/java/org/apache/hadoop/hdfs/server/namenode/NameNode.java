@@ -86,6 +86,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMetrics;
+import org.apache.hadoop.ipc.Server;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -422,6 +423,14 @@ public class NameNode {
         StorageInfo.getStorageInfoFromDB(),
         getRole());   //HOP change. previous code was getFSImage().getStorage()
     return nodeRegistration;
+  }
+
+  /* optimize ugi lookup for RPC operations to avoid a trip through
+   * UGI.getCurrentUser which is synch'ed
+   */
+  public static UserGroupInformation getRemoteUser() throws IOException {
+    UserGroupInformation ugi = Server.getRemoteUser();
+    return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
   }
 
   /**

@@ -343,6 +343,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
     return clientRpcAddress;
   }
 
+  private static UserGroupInformation getRemoteUser() throws IOException {
+    return NameNode.getRemoteUser();
+  }
+  
+  
   /////////////////////////////////////////////////////
   // NamenodeProtocol
   /////////////////////////////////////////////////////
@@ -410,7 +415,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
               " characters, " + MAX_PATH_DEPTH + " levels.");
     }
     HdfsFileStatus stat = namesystem.startFile(src, new PermissionStatus(
-            UserGroupInformation.getCurrentUser().getShortUserName(), null,
+            getRemoteUser().getShortUserName(), null,
             masked), clientName, clientMachine, flag.get(), createParent,
         replication, blockSize);
     metrics.incrFilesCreated();
@@ -687,7 +692,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
               " characters, " + MAX_PATH_DEPTH + " levels.");
     }
     return namesystem.mkdirs(src, new PermissionStatus(
-            UserGroupInformation.getCurrentUser().getShortUserName(), null,
+            getRemoteUser().getShortUserName(), null,
             masked), createParent);
   }
 
@@ -823,7 +828,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     if ("".equals(target)) {
       throw new IOException("Invalid symlink target");
     }
-    final UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    final UserGroupInformation ugi = getRemoteUser();
     namesystem.createSymlink(target, link,
         new PermissionStatus(ugi.getShortUserName(), null, dirPerms),
         createParent);
@@ -981,7 +986,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // RefreshAuthorizationPolicyProtocol
   public void refreshUserToGroupsMappings() throws IOException {
     LOG.info("Refreshing all user-to-groups mappings. Requested by user: " +
-        UserGroupInformation.getCurrentUser().getShortUserName());
+        getRemoteUser().getShortUserName());
     Groups.getUserToGroupsMappingService().refresh();
   }
 
