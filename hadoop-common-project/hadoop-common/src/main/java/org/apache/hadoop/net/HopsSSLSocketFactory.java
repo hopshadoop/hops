@@ -60,7 +60,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   private static final String KEY_PASSWORD_DEFAULT = "";
   private static final String TRUST_STORE_FILEPATH_DEFAULT = "client.truststore.jks";
   private static final String TRUST_STORE_PASSWORD_DEFAULT = "";
-  private static final String SOCKET_ENABLED_PROTOCOL_DEFAULT = "TLSv1";
+  private static final String SOCKET_ENABLED_PROTOCOL_DEFAULT = "TLSv1.2";
   
   public static final String LOCALIZED_PASSWD_FILE_NAME = "material_passwd";
   public static final String LOCALIZED_KEYSTORE_FILE_NAME = "k_certificate";
