@@ -614,7 +614,7 @@ class NamenodeJspHelper {
     String fqdn = InetAddress.getByName(nodeToRedirect).getCanonicalHostName();
     int httpPort = -1;
     if (nn.conf.getBoolean(DFSConfigKeys.DFS_HTTPS_ENABLE_KEY, DFSConfigKeys.DFS_HTTPS_ENABLE_DEFAULT)) {
-      httpPort = nn.conf.getInt(DFSConfigKeys.DFS_HTTPS_PORT_KEY, DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT);
+      httpPort = nn.conf.getInt(DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_KEY, DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT);
     } else {
       httpPort = nn.getHttpAddress().getPort();
     }
