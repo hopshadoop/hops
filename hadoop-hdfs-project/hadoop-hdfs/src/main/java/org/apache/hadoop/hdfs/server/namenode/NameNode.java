@@ -87,6 +87,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMetrics;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.metrics2.util.MBeans;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -130,7 +131,7 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
  * ********************************************************
  */
 @InterfaceAudience.Private
-public class NameNode {
+public class NameNode implements NameNodeStatusMXBean {
 
   static {
     HdfsConfiguration.init();
@@ -543,7 +544,7 @@ public class NameNode {
     startLeaderElectionService();
 
     namesystem.startCommonServices(conf);
-
+    registerNNSMXBean();
     rpcServer.start();
     plugins = conf.getInstances(DFS_NAMENODE_PLUGINS_KEY, ServicePlugin.class);
     for (ServicePlugin p : plugins) {
@@ -558,6 +559,33 @@ public class NameNode {
       LOG.info(getRole() + " service RPC up at: " +
           rpcServer.getServiceRpcAddress());
     }
+  }
+
+  /**
+   * Register NameNodeStatusMXBean
+   */
+  private void registerNNSMXBean() {
+    MBeans.register("NameNode", "NameNodeStatus", this);
+  }
+
+  @Override // NameNodeStatusMXBean
+  public String getNNRole() {
+    String roleStr = "";
+    NamenodeRole role = getRole();
+    if (null != role) {
+      roleStr = role.toString();
+    }
+    return roleStr;
+  }
+
+  @Override // NameNodeStatusMXBean
+  public String getHostAndPort() {
+    return getNameNodeAddressHostPortString();
+  }
+
+  @Override // NameNodeStatusMXBean
+  public boolean isSecurityEnabled() {
+    return UserGroupInformation.isSecurityEnabled();
   }
 
   private void stopCommonServices() {
