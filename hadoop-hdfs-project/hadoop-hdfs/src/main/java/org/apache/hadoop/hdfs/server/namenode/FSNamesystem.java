@@ -209,6 +209,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_DEFAULT;
@@ -218,6 +220,10 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MIN_
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPL_QUEUE_THRESHOLD_PCT_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_HEAP_PERCENT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_HEAP_PERCENT_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DATANODES_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DATANODES_KEY;
@@ -245,6 +251,10 @@ import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress.Co
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Status;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Step;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StepType;
+import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
+import org.apache.hadoop.ipc.RetryCache;
+import org.apache.hadoop.ipc.RetryCache.CacheEntry;
+import org.apache.hadoop.ipc.RetryCache.CacheEntryWithPayload;
 import org.apache.hadoop.util.StringUtils;
 import static org.apache.hadoop.util.Time.now;
 
@@ -276,6 +286,7 @@ public class FSNamesystem
         }
       };
 
+  @VisibleForTesting
   private boolean isAuditEnabled() {
     return !isDefaultAuditLogger || auditLog.isInfoEnabled();
   }
@@ -423,6 +434,8 @@ public class FSNamesystem
   private static int DB_IN_MEMORY_FILE_MAX_SIZE;
   private final long BIGGEST_DELETABLE_DIR;
 
+  private final RetryCache retryCache;
+  
   /**
    * Clear all loaded data
    */
@@ -600,11 +613,34 @@ public class FSNamesystem
       this.auditLoggers = initAuditLoggers(conf);
       this.isDefaultAuditLogger = auditLoggers.size() == 1 &&
           auditLoggers.get(0) instanceof DefaultAuditLogger;
+      this.retryCache = initRetryCache(conf);
     } catch (IOException | RuntimeException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
       close();
       throw e;
     }
+  }
+
+  @VisibleForTesting
+  static RetryCache initRetryCache(Configuration conf) {
+    boolean enable = conf.getBoolean(DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY,
+        DFS_NAMENODE_ENABLE_RETRY_CACHE_DEFAULT);
+    LOG.info("Retry cache on namenode is " + (enable ? "enabled" : "disabled"));
+    if (enable) {
+      float heapPercent = conf.getFloat(
+          DFS_NAMENODE_RETRY_CACHE_HEAP_PERCENT_KEY,
+          DFS_NAMENODE_RETRY_CACHE_HEAP_PERCENT_DEFAULT);
+      long entryExpiryMillis = conf.getLong(
+          DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY,
+          DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_DEFAULT);
+      LOG.info("Retry cache will use " + heapPercent
+          + " of total heap and retry cache entry expiry time is "
+          + entryExpiryMillis + " millis");
+      long entryExpiryNanos = entryExpiryMillis * 1000 * 1000;
+      return new RetryCache("Namenode Retry Cache", heapPercent,
+          entryExpiryNanos);
+    }
+    return null;
   }
 
   private List<AuditLogger> initAuditLoggers(Configuration conf) {
@@ -705,6 +741,7 @@ public class FSNamesystem
       quotaUpdateManager.close();
     }
     RootINodeCache.stop();
+    RetryCache.clear(retryCache);
   }
 
   /**
@@ -1304,6 +1341,12 @@ public class FSNamesystem
    * @throws IOException
    */
   void concat(final String target, final String[] srcs) throws IOException {
+    final CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return; // Return previous response
+    }
+    
+    // Either there is no previous request in progres or it has failed
     final String[] paths = new String[srcs.length + 1];
     System.arraycopy(srcs, 0, paths, 0, srcs.length);
     paths[srcs.length] = target;
@@ -1323,11 +1366,15 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
+        boolean success = false;
         try {
           concatInt(target, srcs);
+          success = true;
         } catch (AccessControlException e) {
           logAuditEvent(false, "concat", Arrays.toString(srcs), target, null);
           throw e;
+        } finally {
+          RetryCache.setState(cacheEntry, success);
         }
         return null;
       }
@@ -1548,6 +1595,10 @@ public class FSNamesystem
   void createSymlink(final String target, final String link1,
       final PermissionStatus dirPerms, final boolean createParent)
       throws IOException {
+    final CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return; // Return previous response
+    }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(link1);
     final String link = FSDirectory.resolvePath(link1, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.CREATE_SYM_LINK,
@@ -1561,11 +1612,15 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
+        boolean success = false;
         try {
           createSymlinkInt(target, link, dirPerms, createParent);
+          success = true;
         } catch (AccessControlException e) {
           logAuditEvent(false, "createSymlink", link, target, null);
           throw e;
+        } finally {
+          RetryCache.setState(cacheEntry, success);
         }
         return null;
       }
@@ -1885,47 +1940,65 @@ public class FSNamesystem
    * Create a new file entry in the namespace.
    * <p/>
    * For description of parameters and exceptions thrown see
-   * {@link ClientProtocol#create}
+   * {@link ClientProtocol#create()}, except it returns valid file status upon
+   * success
+   * 
+   * For retryCache handling details see -
+   * {@link #getFileStatus(boolean, CacheEntryWithPayload)}
+   * 
    */
   HdfsFileStatus startFile(final String src1, final PermissionStatus permissions,
       final String holder, final String clientMachine,
       final EnumSet<CreateFlag> flag, final boolean createParent,
       final short replication, final long blockSize) throws IOException {
+    HdfsFileStatus status = null;
+    CacheEntryWithPayload cacheEntry = RetryCache.waitForCompletion(retryCache,
+        null);
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return (HdfsFileStatus) cacheEntry.getPayload();
+    }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
-    return (HdfsFileStatus) new HopsTransactionalRequestHandler(
-        HDFSOperationType.START_FILE, src) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        locks.add(
-                //if quota is disabled then do not read the INode Attributes table
-            lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/,nameNode, INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                INodeResolveType.PATH, false, src)).add(lf.getBlockLock())
-            .add(lf.getLeaseLock(LockType.WRITE, holder))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
-            lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE,
-                BLK.IV));
+    try {
+      status = (HdfsFileStatus) new HopsTransactionalRequestHandler(
+          HDFSOperationType.START_FILE, src) {
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          LockFactory lf = getInstance();
+          locks.add(
+              //if quota is disabled then do not read the INode Attributes table
+              lf.getINodeLock(!dir.isQuotaEnabled()/*
+                   * skip INode Attr Lock
+                   */, nameNode, INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                  INodeResolveType.PATH, false, src)).add(lf.getBlockLock())
+              .add(lf.getLeaseLock(LockType.WRITE, holder))
+              .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
+              lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE,
+                  BLK.IV));
 
-        if (flag.contains(CreateFlag.OVERWRITE) && dir.isQuotaEnabled()) {
-          locks.add(lf.getQuotaUpdateLock(src));
+          if (flag.contains(CreateFlag.OVERWRITE) && dir.isQuotaEnabled()) {
+            locks.add(lf.getQuotaUpdateLock(src));
+          }
+          if (flag.contains(CreateFlag.OVERWRITE) && erasureCodingEnabled) {
+            locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
+          }
         }
-        if (flag.contains(CreateFlag.OVERWRITE) && erasureCodingEnabled) {
-          locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
-        }
-      }
 
-      @Override
-      public Object performTask() throws IOException {
-        try {
-          return startFileInt(src, permissions, holder, clientMachine, flag,
-              createParent, replication, blockSize);
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "create", src);
-          throw e;
+        @Override
+        public Object performTask() throws IOException {
+          try {
+            return startFileInt(src, permissions, holder, clientMachine, flag,
+                createParent, replication, blockSize);
+          } catch (AccessControlException e) {
+            logAuditEvent(false, "create", src);
+            throw e;
+          }
         }
-      }
-    }.handle(this);
+      }.handle(this);
+    } finally {
+      RetryCache.setState(cacheEntry, status != null, status);
+    }
+    return status;
   }
 
   private HdfsFileStatus startFileInt(String src, PermissionStatus permissions,
@@ -2004,7 +2077,12 @@ public class FSNamesystem
         }
       } else {
         if (overwrite) {
-          delete(src, true); // File exists - delete if overwrite
+          try {
+            deleteInt(src, true); // File exists - delete if overwrite
+          } catch (AccessControlException e) {
+            logAuditEvent(false, "delete", src);
+            throw e;
+          }
         } else {
           // If lease soft limit time is expired, recover the lease
           recoverLeaseInternal(myFile, src, holder, clientMachine, false);
@@ -2271,11 +2349,23 @@ public class FSNamesystem
 
   LocatedBlock appendFile(final String src, final String holder,
                           final String clientMachine) throws IOException {
+    LocatedBlock lb = null;
+    CacheEntryWithPayload cacheEntry = RetryCache.waitForCompletion(retryCache,
+        null);
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return (LocatedBlock) cacheEntry.getPayload();
+    }
+      
+    boolean success = false;
     try{
-      return appendFileHopFS(src, holder, clientMachine);
+      lb = appendFileHopFS(src, holder, clientMachine);
+      success = true;
+      return lb;
     } catch(HDFSClientAppendToDBFileException e){
       LOG.debug(e);
       return moveToDNsAndAppend(src, holder, clientMachine);
+    } finally {
+      RetryCache.setState(cacheEntry, success, lb);
     }
   }
 
@@ -4965,6 +5055,11 @@ public class FSNamesystem
     return safeMode.getTurnOffTip();
   }
 
+  public void processIncrementalBlockReport(DatanodeRegistration nodeReg, StorageReceivedDeletedBlocks r)
+      throws IOException {
+      blockManager.processIncrementalBlockReport(nodeReg, r);
+  }
+
   PermissionStatus createFsOwnerPermissions(FsPermission permission) {
     return new PermissionStatus(fsOwner.getShortUserName(), superGroup,
         permission);
@@ -5325,6 +5420,12 @@ public class FSNamesystem
   void updatePipeline(final String clientName, final ExtendedBlock oldBlock,
       final ExtendedBlock newBlock, final DatanodeID[] newNodes, final String[] newStorageIDs)
       throws IOException {
+    CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return; // Return previous response
+    }
+    boolean success = false;
+    try{
     new HopsTransactionalRequestHandler(HDFSOperationType.UPDATE_PIPELINE) {
       INodeIdentifier inodeIdentifier;
 
@@ -5368,6 +5469,10 @@ public class FSNamesystem
         return null;
       }
     }.handle(this);
+    success = true;
+    } finally {
+      RetryCache.setState(cacheEntry, success);
+    }
   }
 
   /**
@@ -6472,22 +6577,30 @@ public class FSNamesystem
    */
   void multiTransactionalRename(final String src1, final String dst1,
       final Options.Rename... options) throws IOException {
+    CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return; // Return previous response
+    }
+    if (NameNode.stateChangeLog.isDebugEnabled()) {
+      NameNode.stateChangeLog.debug(
+          "DIR* NameSystem.multiTransactionalRename: with options - " + src1
+              + " to " + dst1);
+    }
+    if (!DFSUtil.isValidName(dst1)) {
+      throw new InvalidPathException("Invalid name: " + dst1);
+    }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
     final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug(
-          "DIR* NameSystem.multiTransactionalRename: with options - " + src
-              + " to " + dst);
-    }
-
+    
+    boolean success = false;
+    
+    try {
     if (isInSafeMode()) {
       throw new SafeModeException("Cannot rename " + src, safeMode);
     }
-    if (!DFSUtil.isValidName(dst)) {
-      throw new InvalidPathException("Invalid name: " + dst);
-    }
+    
     if (dst.equals(src)) {
       throw new FileAlreadyExistsException(
           "The source " + src + " and destination " + dst + " are the same");
@@ -6643,6 +6756,10 @@ public class FSNamesystem
         }
       }
     }
+      success = true;
+    } finally {
+      RetryCache.setState(cacheEntry, success);
+    }
   }
 
   private boolean pathIsMetaEnabled(INode[] pathComponents) {
@@ -6688,7 +6805,7 @@ public class FSNamesystem
         }
         if(!isUsingSubTreeLocks){
           locks.add(lf.getLeaseLock(LockType.WRITE))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
+              .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
         }else{
           locks.add(lf.getLeaseLock(LockType.WRITE))
               .add(lf.getLeasePathLock(LockType.WRITE, src));
@@ -6769,8 +6886,22 @@ public class FSNamesystem
   }
 
   @Deprecated
-  boolean multiTransactionalRename(final String src1, final String dst1)
+  boolean multiTransactionalRename(final String src, final String dst)
       throws IOException {
+    CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return true; // Return previous response
+    }
+    boolean ret = false;
+    try{
+      ret = renameToInt(src, dst);
+    } finally {
+      RetryCache.setState(cacheEntry, ret);
+    }
+    return ret;
+   }
+
+   private boolean renameToInt(final String src1, final String dst1) throws IOException{
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
@@ -6982,7 +7113,7 @@ public class FSNamesystem
           }
         };
     return (Boolean) renameToHandler.handle(this);
-  }
+    }
 
   /**
    * Delete a directory tree in multiple transactions. Deleting a large directory
@@ -7001,18 +7132,24 @@ public class FSNamesystem
    */
   boolean multiTransactionalDelete(final String path, final boolean recursive)
       throws IOException {
+    CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return true; // Return previous response
+    }
+    boolean ret = false;
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog
           .debug("DIR* NameSystem.multiTransactionalDelete: " + path);
     }
 
-    boolean ret;
     try {
       ret = multiTransactionalDeleteInternal(path, recursive);
       logAuditEvent(ret, "delete", path);
     } catch (IOException e) {
       logAuditEvent(false, "delete", path);
       throw e;
+    } finally {
+      RetryCache.setState(cacheEntry, ret);
     }
     return ret;
   }
@@ -7497,6 +7634,31 @@ public class FSNamesystem
   public void addEncodingStatus(final String sourcePath,
       final EncodingPolicy policy, final EncodingStatus.Status status)
       throws IOException {
+    CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return; // Return previous response
+    }
+    boolean success = false;
+    try {
+      addEncodingStatusInt(sourcePath, policy, status);
+      success = true;
+    } finally {
+      RetryCache.setState(cacheEntry, success);
+    }
+  }
+  
+  /**
+   * Add and encoding status for a file without checking the retry cache.
+   *
+   * @param sourcePath
+   *    the file path
+   * @param policy
+   *    the policy to be used
+   * @throws IOException
+   */
+  public void addEncodingStatusInt(final String sourcePath,
+      final EncodingPolicy policy, final EncodingStatus.Status status)
+      throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.ADD_ENCODING_STATUS) {
 
       @Override
@@ -7514,7 +7676,7 @@ public class FSNamesystem
           if (isPermissionEnabled) {
             checkPathAccess(pc, sourcePath, FsAction.WRITE);
           }
-        } catch (AccessControlException e){
+        } catch (AccessControlException e) {
           logAuditEvent(false, "encodeFile", sourcePath);
           throw e;
         }
@@ -7522,11 +7684,10 @@ public class FSNamesystem
         EncodingStatus existing = EntityManager.find(
             EncodingStatus.Finder.ByInodeId, target.getId());
         if (existing != null) {
-          throw new IOException("Attempting to request encoding for an" +
-              "encoded file");
+          throw new IOException("Attempting to request encoding for an" + "encoded file");
         }
         INode inode = dir.getINode(sourcePath);
-        EncodingStatus encodingStatus = new EncodingStatus(inode.getId(),  inode.isInTree(), status,
+        EncodingStatus encodingStatus = new EncodingStatus(inode.getId(), inode.isInTree(), status,
             policy, System.currentTimeMillis());
         EntityManager.add(encodingStatus);
         return null;

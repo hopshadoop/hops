@@ -911,7 +911,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }
 
     for(StorageReceivedDeletedBlocks r : receivedAndDeletedBlocks) {
-      namesystem.getBlockManager().processIncrementalBlockReport(nodeReg, r);
+      namesystem.processIncrementalBlockReport(nodeReg, r);
     }
   }
   
@@ -1108,7 +1108,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
             " was disabled");
       }
       LOG.info("Create file " + src + " with policy " + policy.toString());
-      namesystem.addEncodingStatus(src, policy,
+      namesystem.addEncodingStatusInt(src, policy,
           EncodingStatus.Status.ENCODING_REQUESTED);
     }
     return stat;
