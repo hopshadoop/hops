@@ -1397,7 +1397,7 @@ public interface ClientProtocol {
    *    the replication factor to be applied after revoking the encoding
    * @throws IOException
    */
-  @AtMostOnce
+  @Idempotent
   public void revokeEncoding(String filePath, short replication)
       throws IOException;
 

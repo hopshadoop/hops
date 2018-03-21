@@ -131,7 +131,7 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 public class BlockManager {
 
   static final Log LOG = LogFactory.getLog(BlockManager.class);
-  static final Log blockLog = NameNode.blockStateChangeLog;
+  public static final Log blockLog = NameNode.blockStateChangeLog;
 
   /**
    * Default load factor of map

@@ -46,6 +46,8 @@ import org.apache.hadoop.net.NetUtils;
 
 import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
+import java.nio.ByteBuffer;
+import java.util.UUID;
 
 /**
  * General string utils
@@ -1167,6 +1169,17 @@ public class StringUtils {
     // don't check non-null against s2 to make the semantics same as
     // s1.equals(s2)
     return s1.equalsIgnoreCase(s2);
+  }
+  
+  /**
+   * Return a new UUID as byte[]
+   */
+  public static byte[] getUuidBytes() {
+    UUID uuid = UUID.randomUUID();
+    ByteBuffer buf = ByteBuffer.wrap(new byte[16]);
+    buf.putLong(uuid.getMostSignificantBits());
+    buf.putLong(uuid.getLeastSignificantBits());
+    return buf.array();
   }
 
 }
