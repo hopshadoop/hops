@@ -31,6 +31,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.ha.ServiceFailedException;
@@ -55,6 +56,7 @@ import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
+import org.apache.hadoop.security.ssl.RevocationListFetcherService;
 import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.util.ExitUtil.ExitException;
 import org.apache.hadoop.util.ServicePlugin;
@@ -233,7 +235,8 @@ public class NameNode {
 
 
   protected LeaderElection leaderElection;
-
+  
+  protected RevocationListFetcherService revocationListFetcherService;
   /**
    * for block report load balancing
    */
@@ -277,7 +280,7 @@ public class NameNode {
 
   /**
    * Returns object used for reporting namenode startup progress.
-   * 
+   *
    * @return StartupProgress for reporting namenode startup progress
    */
   public static StartupProgress getStartupProgress() {
@@ -512,7 +515,7 @@ public class NameNode {
   /**
    * Validate NameNode configuration.  Log a fatal error and abort if
    * configuration is invalid.
-   * 
+   *
    * @param conf Configuration to validate
    * @throws IOException thrown if conf is invalid
    */
@@ -530,9 +533,15 @@ public class NameNode {
    * Start the services common to active and standby states
    */
   private void startCommonServices(Configuration conf) throws IOException {
-
+    try {
+      createAndStartCRLFetcherService(conf);
+    } catch (Exception ex) {
+      LOG.error("Error starting CRL fetcher service", ex);
+      throw new IOException(ex);
+    }
+    
     startLeaderElectionService();
-
+    
     namesystem.startCommonServices(conf);
 
     rpcServer.start();
@@ -570,6 +579,15 @@ public class NameNode {
         }
       }
     }
+    
+    if (revocationListFetcherService != null) {
+      try {
+        revocationListFetcherService.serviceStop();
+      } catch (Exception ex) {
+        LOG.warn("Exception while stopping CRL fetcher service, but we are shutting down anyway");
+      }
+    }
+    
     stopHttpServer();
   }
 
@@ -1225,6 +1243,21 @@ public class NameNode {
       leaderElection.waitActive();
     } catch (InterruptedException e) {
       LOG.warn("NN was interrupted");
+    }
+  }
+  
+  private void createAndStartCRLFetcherService(Configuration conf) throws Exception {
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      if (conf.getBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY,
+          CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_DEFAULT)) {
+        LOG.info("Creating CertificateRevocationList Fetcher service");
+        revocationListFetcherService = new RevocationListFetcherService();
+        revocationListFetcherService.serviceInit(conf);
+        revocationListFetcherService.serviceStart();
+      } else {
+        LOG.warn("RPC TLS is enabled but CRL validation is disabled");
+      }
     }
   }
 }
