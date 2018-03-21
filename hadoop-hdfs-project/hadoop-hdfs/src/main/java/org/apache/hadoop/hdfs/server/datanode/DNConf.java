@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
@@ -27,7 +29,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
  * Simple class encapsulating all of the configuration that the DataNode
  * loads at startup time.
  */
-class DNConf {
+@InterfaceAudience.Private
+public class DNConf {
   final int socketTimeout;
   final int socketWriteTimeout;
   final int socketKeepaliveTimeout;
@@ -50,6 +53,8 @@ class DNConf {
 
   final String minimumNameNodeVersion;
   final String encryptionAlgorithm;
+  
+  final long xceiverStopTimeout;
 
   final int iBRDispatherTPSize;
 
@@ -115,6 +120,10 @@ class DNConf {
         DFS_ENCRYPT_DATA_TRANSFER_DEFAULT);
     this.encryptionAlgorithm = conf.get(DFS_DATA_ENCRYPTION_ALGORITHM_KEY);
 
+    this.xceiverStopTimeout = conf.getLong(
+        DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_KEY,
+        DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+    
     this.iBRDispatherTPSize = conf.getInt(DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_KEY,
             DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_DEFAULT);
   }
@@ -122,5 +131,9 @@ class DNConf {
   // We get minimumNameNodeVersion via a method so it can be mocked out in tests.
   String getMinimumNameNodeVersion() {
     return this.minimumNameNodeVersion;
+  }
+  
+  public long getXceiverStopTimeout() {
+    return xceiverStopTimeout;
   }
 }
