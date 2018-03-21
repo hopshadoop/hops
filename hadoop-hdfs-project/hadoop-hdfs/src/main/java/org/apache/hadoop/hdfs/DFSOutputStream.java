@@ -90,8 +90,10 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.fs.CanSetDropBehind;
 
 import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.SUCCESS;
+import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 
 /**
@@ -119,7 +121,7 @@ import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.SU
  * **************************************************************
  */
 @InterfaceAudience.Private
-public class DFSOutputStream extends FSOutputSummer implements Syncable {
+public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetDropBehind {
   public static final Log LOG = LogFactory.getLog(DFSOutputStream.class);
 
   private final DFSClient dfsClient;
@@ -154,6 +156,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   private Progressable progress;
   private final short blockReplication; // replication factor of file
   private boolean shouldSyncBlock = false; // force blocks to disk upon close
+  private CachingStrategy cachingStrategy;
   private boolean singleBlock = false;
 
   private boolean erasureCodingSourceStream = false;
@@ -1344,7 +1347,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
                   .writeBlock(block, nodeStorageTypes[0], accessToken,
               dfsClient.clientName, nodes, nodeStorageTypes, null,
               bcs, nodes.length, block.getNumBytes(), bytesSent, newGS,
-              checksum);
+              checksum, cachingStrategy);
 
           // receive ack for connect
           BlockOpResponseProto resp = BlockOpResponseProto
@@ -1543,6 +1546,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     this.blockSize = stat.getBlockSize();
     this.blockReplication = stat.getReplication();
     this.progress = progress;
+    this.cachingStrategy =
+        dfsClient.getDefaultWriteCachingStrategy().duplicate();
     this.saveSmallFilesInDB = saveSmallFilesInDB;
     if (saveSmallFilesInDB) {
       isThisFileStoredInDB = true; // treat the current file as small file
@@ -2414,5 +2419,10 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   private static <T> void arraycopy(T[] srcs, T[] dsts, int skipIndex) {
     System.arraycopy(srcs, 0, dsts, 0, skipIndex);
     System.arraycopy(srcs, skipIndex+1, dsts, skipIndex, dsts.length-skipIndex);
+  }
+  
+  @Override
+  public void setDropBehind(Boolean dropBehind) throws IOException {
+    this.cachingStrategy.setDropBehind(dropBehind);
   }
 }

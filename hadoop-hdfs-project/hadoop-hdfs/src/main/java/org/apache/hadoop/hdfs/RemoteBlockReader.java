@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.net.NetUtils;
 
 
@@ -390,11 +391,11 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
       ExtendedBlock block, Token<BlockTokenIdentifier> blockToken,
       long startOffset, long len, int bufferSize, boolean verifyChecksum,
       String clientName, Peer peer,
-      DatanodeID datanodeID, PeerCache peerCache) throws IOException {
+      DatanodeID datanodeID, PeerCache peerCache, CachingStrategy cachingStrategy) throws IOException {
     // in and out will be closed when sock is closed (by the caller)
     final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(peer.getOutputStream()));
     new Sender(out).readBlock(block, blockToken, clientName, startOffset, len,
-        verifyChecksum);
+        verifyChecksum, cachingStrategy);
     
     //
     // Get bytes in block, set streams

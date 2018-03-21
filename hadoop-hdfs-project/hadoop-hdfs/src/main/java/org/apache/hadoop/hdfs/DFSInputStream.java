@@ -58,9 +58,12 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.fs.CanSetDropBehind;
+import org.apache.hadoop.fs.CanSetReadahead;
 import org.apache.hadoop.hdfs.net.DomainPeer;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
+import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.net.unix.DomainSocket;
 
 /**
@@ -71,7 +74,7 @@ import org.apache.hadoop.net.unix.DomainSocket;
  */
 @InterfaceAudience.Private
 public class DFSInputStream extends FSInputStream
-    implements ByteBufferReadable {
+    implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead {
   @VisibleForTesting
   static boolean tcpReadsDisabledForTesting = false;
   private final PeerCache peerCache;
@@ -87,6 +90,7 @@ public class DFSInputStream extends FSInputStream
   private LocatedBlock currentLocatedBlock = null;
   private long pos = 0;
   private long blockEnd = -1;
+  private CachingStrategy cachingStrategy;
   private final ReadStatistics readStatistics = new ReadStatistics();
   private boolean emulateHdfsClient = false;
 
@@ -195,6 +199,8 @@ public class DFSInputStream extends FSInputStream
         dfsClient.getConf().shortCircuitStreamsCacheSize,
         dfsClient.getConf().shortCircuitStreamsCacheExpiryMs);
     this.emulateHdfsClient = emulateHdfsClient;
+    this.cachingStrategy =
+        dfsClient.getDefaultReadCachingStrategy().duplicate();
     openInfo();
   }
 
@@ -1070,7 +1076,7 @@ public class DFSInputStream extends FSInputStream
         reader = BlockReaderFactory.newBlockReader(
             dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
             len, verifyChecksum, clientName, peer, chosenNode,
-            dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads);
+            dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads, cachingStrategy);
         return reader;
       } catch (IOException ex) {
         DFSClient.LOG.debug("Error making BlockReader with DomainSocket. " + "Closing stale " + peer, ex);
@@ -1090,7 +1096,7 @@ public class DFSInputStream extends FSInputStream
         reader = BlockReaderFactory.newBlockReader(
             dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
             len, verifyChecksum, clientName, peer, chosenNode,
-            dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads);
+            dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads, cachingStrategy);
         return reader;
       } catch (IOException e) {
         DFSClient.LOG.warn("failed to connect to " + domSock, e);
@@ -1115,7 +1121,7 @@ public class DFSInputStream extends FSInputStream
         reader = BlockReaderFactory.newBlockReader(
             dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
             len, verifyChecksum, clientName, peer, chosenNode,
-            dsFactory, peerCache, fileInputStreamCache, false);
+            dsFactory, peerCache, fileInputStreamCache, false, cachingStrategy);
         return reader;
       } catch (IOException ex) {
         DFSClient.LOG.debug("Error making BlockReader. Closing stale " + peer, ex);
@@ -1133,7 +1139,7 @@ public class DFSInputStream extends FSInputStream
     return BlockReaderFactory.newBlockReader(
         dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
         len, verifyChecksum, clientName, peer, chosenNode,
-        dsFactory, peerCache, fileInputStreamCache, false);
+        dsFactory, peerCache, fileInputStreamCache, false, cachingStrategy);
   }
 
 
@@ -1404,5 +1410,31 @@ public class DFSInputStream extends FSInputStream
       this.info = info;
       this.addr = addr;
     }
+  }
+  
+  private synchronized void closeCurrentBlockReader() {
+    if (blockReader == null) return;
+    // Close the current block reader so that the new caching settings can 
+    // take effect immediately.
+    try {
+      blockReader.close();
+    } catch (IOException e) {
+      DFSClient.LOG.error("error closing blockReader", e);
+    }
+    blockReader = null;
+  }
+
+  @Override
+  public synchronized void setReadahead(Long readahead)
+      throws IOException {
+    this.cachingStrategy.setReadahead(readahead);
+    closeCurrentBlockReader();
+  }
+
+  @Override
+  public synchronized void setDropBehind(Boolean dropBehind)
+      throws IOException {
+    this.cachingStrategy.setDropBehind(dropBehind);
+    closeCurrentBlockReader();
   }
 }

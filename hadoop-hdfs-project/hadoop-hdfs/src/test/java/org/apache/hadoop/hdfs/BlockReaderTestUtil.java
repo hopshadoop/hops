@@ -35,6 +35,7 @@ import java.net.Socket;
 import java.util.List;
 import java.util.Random;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
+import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -158,7 +159,7 @@ public class BlockReaderTestUtil {
         targetAddr.toString() + ":" + block.getBlockId(), block,
         testBlock.getBlockToken(), offset, lenToRead,
         true, "BlockReaderTestUtil", TcpPeerServer.peerFromSocket(sock),
-        nodes[0], null, null, null, false);
+        nodes[0], null, null, null, false, CachingStrategy.newDefaultStrategy());
   }
 
   /**

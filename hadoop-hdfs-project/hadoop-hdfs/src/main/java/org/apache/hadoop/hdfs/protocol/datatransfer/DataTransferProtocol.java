@@ -29,6 +29,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DataChecksum;
 
 import java.io.IOException;
+import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 /**
  * Transfer data to/from datanode using a streaming protocol.
@@ -68,7 +69,7 @@ public interface DataTransferProtocol {
    */
   public void readBlock(final ExtendedBlock blk,
       final Token<BlockTokenIdentifier> blockToken, final String clientName,
-      final long blockOffset, final long length, final boolean sendChecksum)
+      final long blockOffset, final long length, final boolean sendChecksum, final CachingStrategy cachingStrategy)
       throws IOException;
 
   /**
@@ -117,7 +118,7 @@ public interface DataTransferProtocol {
       final long minBytesRcvd,
       final long maxBytesRcvd,
       final long latestGenerationStamp,
-      final DataChecksum requestedChecksum)
+      final DataChecksum requestedChecksum, final CachingStrategy cachingStrategy)
       throws IOException;
 
   /**

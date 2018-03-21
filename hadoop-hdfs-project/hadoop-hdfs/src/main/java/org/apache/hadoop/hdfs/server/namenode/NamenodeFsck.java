@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
+import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 /**
  * This class provides rudimentary checking of DFS volumes for errors and
@@ -608,7 +609,7 @@ public class NamenodeFsck {
             .newBlockReader(dfs.getConf(), file, block, lblock.getBlockToken(), 0, -1, true, "fsck",
                 TcpPeerServer.peerFromSocketAndKey(s, namenode.getRpcServer().
                     getDataEncryptionKey()),
-                chosenNode, null, null, null, false);
+                chosenNode, null, null, null, false, CachingStrategy.newDropBehind());
         
       } catch (IOException ex) {
         // Put chosen node into dead list, continue

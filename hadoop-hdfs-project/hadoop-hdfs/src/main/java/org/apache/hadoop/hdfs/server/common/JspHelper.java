@@ -75,6 +75,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_HTTP_STATIC_US
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 @InterfaceAudience.Private
 public class JspHelper {
@@ -221,8 +222,9 @@ public class JspHelper {
         new ExtendedBlock(poolId, blockId, 0, genStamp), blockToken,
         offsetIntoBlock, amtToRead,  true,
         "JspHelper", TcpPeerServer.peerFromSocketAndKey(s, encryptionKey),
-        new DatanodeID(addr.getAddress().getHostAddress(),              
-            addr.getHostName(), poolId, addr.getPort(), 0, 0), null, null, null, false);
+        new DatanodeID(addr.getAddress().getHostAddress(),
+            addr.getHostName(), poolId, addr.getPort(), 0, 0), null, null, null, false, CachingStrategy.
+        newDefaultStrategy());
 
     final byte[] buf = new byte[amtToRead];
     int readOffset = 0;
