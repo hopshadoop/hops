@@ -110,9 +110,19 @@ class FsVolumeList {
   }
 
   void getVolumeMap(String bpid, ReplicaMap volumeMap) throws IOException {
+    long totalStartTime = System.currentTimeMillis();
     for (FsVolumeImpl v : volumes.get()) {
+      FsDatasetImpl.LOG.info("Adding replicas to map for block pool " + bpid +
+          " on volume " + v + "...");
+      long startTime = System.currentTimeMillis();
       v.getVolumeMap(bpid, volumeMap);
+      long timeTaken = System.currentTimeMillis() - startTime;
+      FsDatasetImpl.LOG.info("Time to add replicas to map for block pool " + bpid +
+          " on volume " + v + ": " + timeTaken + "ms");
     }
+    long totalTimeTaken = System.currentTimeMillis() - totalStartTime;
+    FsDatasetImpl.LOG.info("Total time to add all replicas to map: "
+        + totalTimeTaken + "ms");
   }
 
   /**
