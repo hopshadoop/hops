@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This class defines a replica in a pipeline, which
@@ -172,12 +173,17 @@ public class ReplicaInPipeline extends ReplicaInfo
    * @throws IOException
    *     the waiting is interrupted
    */
-  public void stopWriter() throws IOException {
+  public void stopWriter(long xceiverStopTimeout) throws IOException {
     if (writer != null && writer != Thread.currentThread() &&
         writer.isAlive()) {
       writer.interrupt();
       try {
-        writer.join();
+         writer.join(xceiverStopTimeout);
+        if (writer.isAlive()) {
+          final String msg = "Join on writer thread " + writer + " timed out";
+          DataNode.LOG.warn(msg + "\n" + StringUtils.getStackTrace(writer));
+          throw new IOException(msg);
+        }
       } catch (InterruptedException e) {
         throw new IOException("Waiting for writer thread is interrupted.");
       }

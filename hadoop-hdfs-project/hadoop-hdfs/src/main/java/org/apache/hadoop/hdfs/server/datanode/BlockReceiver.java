@@ -54,6 +54,7 @@ import java.util.LinkedList;
 import java.util.zip.Checksum;
 
 import static org.apache.hadoop.hdfs.server.datanode.DataNode.DN_CLIENTTRACE_FORMAT;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * A class that receives a block and writes to its own disk, meanwhile
@@ -744,7 +745,13 @@ class BlockReceiver implements Closeable {
       }
       if (responder != null) {
         try {
-          responder.join();
+          responder.join(datanode.getDnConf().getXceiverStopTimeout());
+          if (responder.isAlive()) {
+            String msg = "Join on responder thread " + responder
+                + " timed out";
+            LOG.warn(msg + "\n" + StringUtils.getStackTrace(responder));
+            throw new IOException(msg);
+          }
         } catch (InterruptedException e) {
           responder.interrupt();
           throw new IOException("Interrupted receiveBlock");
