@@ -3340,7 +3340,7 @@ public class FSNamesystem
             try {
               boolean isSuperUser = true;
               if (isPermissionEnabled) {
-                checkTraverse(pc, src);
+                checkPermission(pc, src, false, null, null, null, null, resolveLink);
                 isSuperUser = pc.isSuperUser();
               }
               stat = dir.getFileInfo(src, resolveLink, isSuperUser);
