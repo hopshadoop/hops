@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
@@ -166,13 +167,20 @@ class BlockSender implements java.io.Closeable {
 
   // Cache-management related fields
   private final long readaheadLength;
-  private boolean shouldDropCacheBehindRead;
   private ReadaheadRequest curReadahead;
+  
+  private final boolean alwaysReadahead;
+  
+  private final boolean dropCacheBehindLargeReads;
+  
+  private final boolean dropCacheBehindAllReads;
+
   private long lastCacheDropOffset;
-  private static final long CACHE_DROP_INTERVAL_BYTES = 1024 * 1024; // 1MB
+  
+  @VisibleForTesting
+  static long CACHE_DROP_INTERVAL_BYTES = 1024 * 1024; // 1MB
   /**
-   * Minimum length of read below which management of the OS
-   * buffer cache is disabled.
+   * See {{@link BlockSender#isLongRead()}
    */
   private static final long LONG_READ_THRESHOLD_BYTES = 256 * 1024;
   
@@ -199,15 +207,40 @@ class BlockSender implements java.io.Closeable {
    */
   BlockSender(ExtendedBlock block, long startOffset, long length,
       boolean corruptChecksumOk, boolean verifyChecksum, boolean sendChecksum,
-      DataNode datanode, String clientTraceFmt) throws IOException {
+      DataNode datanode, String clientTraceFmt, CachingStrategy cachingStrategy) throws IOException {
     try {
       this.block = block;
       this.corruptChecksumOk = corruptChecksumOk;
       this.verifyChecksum = verifyChecksum;
       this.clientTraceFmt = clientTraceFmt;
-      this.readaheadLength = datanode.getDnConf().readaheadLength;
-      this.shouldDropCacheBehindRead =
-          datanode.getDnConf().dropCacheBehindReads;
+      
+      /*
+       * If the client asked for the cache to be dropped behind all reads,
+       * we honor that.  Otherwise, we use the DataNode defaults.
+       * When using DataNode defaults, we use a heuristic where we only
+       * drop the cache for large reads.
+       */
+      if (cachingStrategy.getDropBehind() == null) {
+        this.dropCacheBehindAllReads = false;
+        this.dropCacheBehindLargeReads =
+            datanode.getDnConf().dropCacheBehindReads;
+      } else {
+        this.dropCacheBehindAllReads =
+            this.dropCacheBehindLargeReads =
+                 cachingStrategy.getDropBehind().booleanValue();
+      }
+      /*
+       * Similarly, if readahead was explicitly requested, we always do it.
+       * Otherwise, we read ahead based on the DataNode settings, and only
+       * when the reads are large.
+       */
+      if (cachingStrategy.getReadahead() == null) {
+        this.alwaysReadahead = false;
+        this.readaheadLength = datanode.getDnConf().readaheadLength;
+      } else {
+        this.alwaysReadahead = true;
+        this.readaheadLength = cachingStrategy.getReadahead().longValue();
+      }
       this.datanode = datanode;
       
       if (verifyChecksum) {
@@ -382,8 +415,9 @@ class BlockSender implements java.io.Closeable {
    */
   @Override
   public void close() throws IOException {
-    if (blockInFd != null && shouldDropCacheBehindRead && isLongRead()) {
-      // drop the last few MB of the file from cache
+    if (blockInFd != null &&
+        ((dropCacheBehindAllReads) ||
+         (dropCacheBehindLargeReads && isLongRead()))) {
       try {
         NativeIO.POSIX.getCacheManipulator()
             .posixFadviseIfPossible(block.getBlockName(), blockInFd,
@@ -786,14 +820,13 @@ class BlockSender implements java.io.Closeable {
    * and drop-behind.
    */
   private void manageOsCache() throws IOException {
-    if (!isLongRead() || blockInFd == null) {
-      // don't manage cache manually for short-reads, like
-      // HBase random read workloads.
-      return;
-    }
+    // We can't manage the cache for this block if we don't have a file
+    // descriptor to work with.
+    if (blockInFd == null) return;
 
     // Perform readahead if necessary
-    if (readaheadLength > 0 && datanode.readaheadPool != null) {
+    if ((readaheadLength > 0) && (datanode.readaheadPool != null) &&
+          (alwaysReadahead || isLongRead())) {
       curReadahead = datanode.readaheadPool
           .readaheadStream(clientTraceFmt, blockInFd, offset, readaheadLength,
               Long.MAX_VALUE, curReadahead);
@@ -801,21 +834,33 @@ class BlockSender implements java.io.Closeable {
 
     // Drop what we've just read from cache, since we aren't
     // likely to need it again
-    long nextCacheDropOffset = lastCacheDropOffset + CACHE_DROP_INTERVAL_BYTES;
-    if (shouldDropCacheBehindRead && offset >= nextCacheDropOffset) {
-      long dropLength = offset - lastCacheDropOffset;
-      if (dropLength >= 1024) {
-        NativeIO.POSIX.getCacheManipulator()
-            .posixFadviseIfPossible(block.getBlockName(), blockInFd,
-                lastCacheDropOffset, dropLength,
+    if (dropCacheBehindAllReads ||
+        (dropCacheBehindLargeReads && isLongRead())) {
+      long nextCacheDropOffset = lastCacheDropOffset + CACHE_DROP_INTERVAL_BYTES;
+      if (offset >= nextCacheDropOffset) {
+        long dropLength = offset - lastCacheDropOffset;
+        NativeIO.POSIX.getCacheManipulator().posixFadviseIfPossible(block.getBlockName(),
+            blockInFd, lastCacheDropOffset, dropLength,
                 NativeIO.POSIX.POSIX_FADV_DONTNEED);
+        lastCacheDropOffset = offset;
       }
-      lastCacheDropOffset += CACHE_DROP_INTERVAL_BYTES;
     }
   }
 
+  /**
+   * Returns true if we have done a long enough read for this block to qualify
+   * for the DataNode-wide cache management defaults.  We avoid applying the
+   * cache management defaults to smaller reads because the overhead would be
+   * too high.
+   *
+   * Note that if the client explicitly asked for dropBehind, we will do it
+   * even on short reads.
+   * 
+   * This is also used to determine when to invoke
+   * posix_fadvise(POSIX_FADV_SEQUENTIAL).
+   */
   private boolean isLongRead() {
-    return (endOffset - offset) > LONG_READ_THRESHOLD_BYTES;
+    return (endOffset - initialOffset) > LONG_READ_THRESHOLD_BYTES;
   }
 
   /**

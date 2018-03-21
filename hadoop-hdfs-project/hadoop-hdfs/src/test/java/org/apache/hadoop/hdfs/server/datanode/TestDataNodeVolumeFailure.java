@@ -354,7 +354,7 @@ public class TestDataNodeVolumeFailure {
     BlockReader blockReader = BlockReaderFactory
         .newBlockReader(new DFSClient.Conf(conf), file, block,
             lblock.getBlockToken(), 0, -1, true, "TestDataNodeVolumeFailure",
-            TcpPeerServer.peerFromSocket(s), datanode, null, null, null, false);
+            TcpPeerServer.peerFromSocket(s), datanode, null, null, null, false, CachingStrategy.newDefaultStrategy());
     blockReader.close();
   }
 

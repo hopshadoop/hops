@@ -60,6 +60,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.Random;
+import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -432,14 +433,14 @@ public class TestDataTransferProtocol {
       recvBuf.reset();
       blk.setBlockId(blkid - 1);
       sender.readBlock(blk, BlockTokenSecretManager.DUMMY_TOKEN, "cl", 0L,
-          fileLen, true);
+          fileLen, true, CachingStrategy.newDefaultStrategy());
       sendRecvData("Wrong block ID " + newBlockId + " for read", false);
 
       // negative block start offset -1L
       sendBuf.reset();
       blk.setBlockId(blkid);
       sender.readBlock(blk, BlockTokenSecretManager.DUMMY_TOKEN, "cl", -1L,
-          fileLen, true);
+          fileLen, true, CachingStrategy.newDefaultStrategy());
       sendRecvData(
           "Negative start-offset for read for block " + firstBlock.getBlockId(),
           false);
@@ -447,7 +448,7 @@ public class TestDataTransferProtocol {
       // bad block start offset
       sendBuf.reset();
       sender.readBlock(blk, BlockTokenSecretManager.DUMMY_TOKEN, "cl", fileLen,
-          fileLen, true);
+          fileLen, true, CachingStrategy.newDefaultStrategy());
       sendRecvData(
           "Wrong start-offset for reading block " + firstBlock.getBlockId(),
           false);
@@ -462,7 +463,7 @@ public class TestDataTransferProtocol {
 
       sendBuf.reset();
       sender.readBlock(blk, BlockTokenSecretManager.DUMMY_TOKEN, "cl", 0L,
-          -1L - random.nextInt(oneMil), true);
+          -1L - random.nextInt(oneMil), true, CachingStrategy.newDefaultStrategy());
       sendRecvData(
           "Negative length for reading block " + firstBlock.getBlockId(),
           false);
@@ -475,14 +476,14 @@ public class TestDataTransferProtocol {
               " ( blockLen 4096 )", recvOut);
       sendBuf.reset();
       sender.readBlock(blk, BlockTokenSecretManager.DUMMY_TOKEN, "cl", 0L,
-          fileLen + 1, true);
+          fileLen + 1, true, CachingStrategy.newDefaultStrategy());
       sendRecvData("Wrong length for reading block " + firstBlock.getBlockId(),
           false);
 
       //At the end of all this, read the file to make sure that succeeds finally.
       sendBuf.reset();
       sender.readBlock(blk, BlockTokenSecretManager.DUMMY_TOKEN, "cl", 0L,
-          fileLen, true);
+          fileLen, true, CachingStrategy.newDefaultStrategy());
       readFile(fileSys, file, fileLen);
     } finally {
       cluster.shutdown();
@@ -526,6 +527,6 @@ public class TestDataTransferProtocol {
         BlockTokenSecretManager.DUMMY_TOKEN, "cl",
         new DatanodeInfo[1], new StorageType[1], null, stage,
         0, block.getNumBytes(), block.getNumBytes(), newGS,
-        checksum);
+        checksum, CachingStrategy.newDefaultStrategy());
   }
 }

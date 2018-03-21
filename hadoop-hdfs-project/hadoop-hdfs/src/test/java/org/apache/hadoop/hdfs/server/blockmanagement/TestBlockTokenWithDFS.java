@@ -54,6 +54,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Random;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
+import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -150,7 +151,7 @@ public class TestBlockTokenWithDFS {
       blockReader = BlockReaderFactory
           .newBlockReader(new DFSClient.Conf(conf), file, block, lblock.getBlockToken(), 0, -1,
           true, "TestBlockTokenWithDFS", TcpPeerServer.peerFromSocket(s),
-          nodes[0], null, null, null, false);
+          nodes[0], null, null, null, false, CachingStrategy.newDefaultStrategy());
 
     } catch (IOException ex) {
       if (ex instanceof InvalidBlockTokenException) {
