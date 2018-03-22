@@ -388,6 +388,14 @@ message GetFileInfoResponseProto {
   optional HdfsFileStatusProto fs = 1;
 }
 
+message IsFileClosedRequestProto {
+  required string src = 1;
+}
+
+message IsFileClosedResponseProto {
+  required bool result = 1;
+}
+
 message GetFileLinkInfoRequestProto {
   required string src = 1;
 }
@@ -649,6 +657,8 @@ service ClientNamenodeProtocol {
   rpc cancelDelegationToken (hadoop.common.CancelDelegationTokenRequestProto) returns (hadoop.common.CancelDelegationTokenResponseProto);
   rpc setBalancerBandwidth (SetBalancerBandwidthRequestProto) returns (SetBalancerBandwidthResponseProto);
   rpc getDataEncryptionKey (GetDataEncryptionKeyRequestProto) returns (GetDataEncryptionKeyResponseProto);
+  rpc isFileClosed(IsFileClosedRequestProto)
+      returns(IsFileClosedResponseProto);
 
   rpc getActiveNamenodesForClient (ActiveNamenodeListRequestProto) returns (ActiveNamenodeListResponseProto);
   rpc ping (PingRequestProto) returns (PingResponseProto);

@@ -2072,6 +2072,28 @@ public class DFSClient implements java.io.Closeable {
   }
 
   /**
+   * Close status of a file
+   * @return true if file is already closed
+   */
+  public boolean isFileClosed(final String src) throws IOException{
+    checkOpen();
+    try {
+      ClientActionHandler handler = new ClientActionHandler() {
+        @Override
+        public Object doAction(ClientProtocol namenode)
+            throws RemoteException, IOException {
+          return namenode.isFileClosed(src);
+        }
+      };
+      return (boolean) doClientActionWithRetry(handler, "isFileClosed");
+    } catch(RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+                                     FileNotFoundException.class,
+                                     UnresolvedPathException.class);
+    }
+  }
+
+  /**
    * Get the file info for a specific file or directory. If src
    * refers to a symlink then the FileStatus of the link is returned.
    *
