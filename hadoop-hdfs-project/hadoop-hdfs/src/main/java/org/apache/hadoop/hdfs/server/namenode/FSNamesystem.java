@@ -3357,6 +3357,42 @@ public class FSNamesystem
     }
     return (HdfsFileStatus) getFileInfoHandler.handle(this);
   }
+  
+  /**
+   * Returns true if the file is closed
+   */
+  boolean isFileClosed(final String src)
+      throws AccessControlException, UnresolvedLinkException,
+      StandbyException, IOException {
+    HopsTransactionalRequestHandler isFileClosedHandler = new HopsTransactionalRequestHandler(
+        HDFSOperationType.GET_FILE_INFO,
+        src) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,INodeResolveType.PATH, src));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        try {
+          if (isPermissionEnabled) {
+            checkTraverse(pc, src);
+          }
+          return !INodeFile.valueOf(dir.getINode(src), src).isUnderConstruction();
+        } catch (AccessControlException e) {
+          if (isAuditEnabled() && isExternalInvocation()) {
+            logAuditEvent(false, UserGroupInformation.getCurrentUser(),
+                getRemoteIp(),
+                "isFileClosed", src, null, null);
+          }
+          throw e;
+        }
+      }
+    };
+    return (boolean) isFileClosedHandler.handle();
+  }
 
   /**
    * Create all the necessary directories
