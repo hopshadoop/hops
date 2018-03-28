@@ -69,6 +69,7 @@ import java.util.*;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
+import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 
 @InterfaceAudience.Private
 public class DFSUtil {
@@ -198,13 +199,20 @@ public class DFSUtil {
     String[] components = StringUtils.split(src, '/');
     for (int i = 0; i < components.length; i++) {
       String element = components[i];
-      if (element.equals("..") ||
-          element.equals(".") ||
+      if (element.equals(".")  ||
           (element.indexOf(":") >= 0) ||
           (element.indexOf("/") >= 0)) {
         return false;
       }
-      
+      // ".." is allowed in path starting with /.reserved/.inodes
+      if (element.equals("..")) {
+        if (components.length > 4
+            && components[1].equals(FSDirectory.DOT_RESERVED_STRING)
+            && components[2].equals(FSDirectory.DOT_INODES_STRING)) {
+          continue;
+        }
+        return false;
+      }
       // The string may start or end with a /, but not have
       // "//" in the middle.
       if (element.isEmpty() && i != components.length - 1 &&

@@ -23,10 +23,10 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
-import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -40,12 +40,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException; 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -56,6 +54,7 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -65,22 +64,25 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
-import static org.apache.hadoop.hdfs.server.namenode.TestFsLimits.fs;
-import static org.apache.hadoop.hdfs.server.namenode.TestFsLimits.perms;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
-import org.apache.hadoop.io.EnumSetWritable;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assert.assertSame;
 import org.junit.Before;
 import org.junit.Ignore;
 import static org.mockito.Matchers.anyObject;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.junit.Assert.assertSame;
+import static org.mockito.Mockito.mock;
 
 public class TestINodeFile {
   public static final Log LOG = LogFactory.getLog(TestINodeFile.class);
@@ -1016,4 +1018,94 @@ public class TestINodeFile {
     resolvedPath = FSDirectory.resolvePath(testPath, components, fsd);
     assertEquals(testPath, resolvedPath);
   }
+  
+  /**
+   * Test whether the inode in inodeMap has been replaced after regular inode
+   * replacement
+   */
+  @Test
+  public void testInodeReplacement() throws Exception {
+    final Configuration conf = new Configuration();
+    MiniDFSCluster cluster = null;
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      final DistributedFileSystem hdfs = cluster.getFileSystem();
+      final FSDirectory fsdir = cluster.getNamesystem().getFSDirectory();
+
+      final Path dir = new Path("/dir");
+      hdfs.mkdirs(dir);
+      INode dirNode = getINode(dir.toString(), fsdir, cluster);
+      INode dirNodeFromNode = fsdir.getInode(dirNode.getId());
+      assertEquals(dirNode, dirNodeFromNode);
+
+      // set quota to dir, which leads to node replacement
+      hdfs.setQuota(dir, Long.MAX_VALUE - 1, Long.MAX_VALUE - 1);
+      dirNode = getINode(dir.toString(), fsdir, cluster);
+      assertTrue(dirNode instanceof INodeDirectoryWithQuota);
+      // the inode in inodeMap should also be replaced
+      dirNodeFromNode = fsdir.getInode(dirNode.getId());
+      assertEquals(dirNode, dirNodeFromNode);
+
+      hdfs.setQuota(dir, -1, -1);
+      dirNode = getINode(dir.toString(), fsdir, cluster);
+      assertTrue(dirNode instanceof INodeDirectory);
+      // the inode in inodeMap should also be replaced
+      dirNodeFromNode = fsdir.getInode(dirNode.getId());
+      assertEquals(dirNode, dirNodeFromNode);
+    } finally {
+      cluster.shutdown();
+    }
+  }
+  
+  @Test
+  public void testDotdotInodePath() throws Exception {
+    final Configuration conf = new Configuration();
+    MiniDFSCluster cluster = null;
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      final DistributedFileSystem hdfs = cluster.getFileSystem();
+      final FSDirectory fsdir = cluster.getNamesystem().getFSDirectory();
+
+      final Path dir = new Path("/dir");
+      hdfs.mkdirs(dir);
+      long dirId = getINode(dir.toString(), fsdir, cluster).getId();
+      long parentId = getINode("/", fsdir, cluster).getId();
+      String testPath = "/.reserved/.inodes/" + dirId + "/..";
+
+      DFSClient client = new DFSClient(NameNode.getAddress(conf), conf);
+      HdfsFileStatus status = client.getFileInfo(testPath);
+      assertTrue(parentId == status.getFileId());
+      
+      // Test root's parent is still root
+      testPath = "/.reserved/.inodes/" + parentId + "/..";
+      status = client.getFileInfo(testPath);
+      assertTrue(parentId == status.getFileId());
+      
+    } finally {
+      cluster.shutdown();
+    }
+  }
+  
+  public INode getINode(final String src, final FSDirectory fsdir, final MiniDFSCluster cluster) throws IOException {
+    HopsTransactionalRequestHandler getInodeHandler = new HopsTransactionalRequestHandler(
+        HDFSOperationType.GET_INODE) {
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getINodeLock(cluster.getNameNode(), TransactionLockTypes.INodeLockType.READ,
+            TransactionLockTypes.INodeResolveType.PATH, src));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        return fsdir.getINode(src);
+
+      }
+    };
+    return (INode) getInodeHandler.handle();
+  }
+  
 }
