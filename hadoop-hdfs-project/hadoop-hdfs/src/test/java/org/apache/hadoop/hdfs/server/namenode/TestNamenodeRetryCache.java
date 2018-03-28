@@ -102,7 +102,7 @@ public class TestNamenodeRetryCache {
    * @throws AccessControlException */
   @After
   public void cleanup() throws IOException {
-    namesystem.multiTransactionalDelete("/", true);
+    cluster.shutdown();
   }
   
   public static void incrementCallId() {
