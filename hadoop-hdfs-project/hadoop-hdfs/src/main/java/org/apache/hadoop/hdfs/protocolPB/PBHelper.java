@@ -1187,7 +1187,7 @@ public class PBHelper {
         fs.getPath().toByteArray(),
         fs.hasFileId()? fs.getFileId(): INodeDirectory.ROOT_PARENT_ID,
         fs.hasLocations() ? PBHelper.convert(fs.getLocations()) : null,
-        fs.hasChildrenNum() ? fs.getChildrenNum() : 0,
+        fs.hasChildrenNum() ? fs.getChildrenNum() : -1,
         fs.hasIsFileStoredInDB() ? fs.getIsFileStoredInDB() : false,
         fs.hasStoragePolicy() ? (byte) fs.getStoragePolicy(): BlockStoragePolicySuite.ID_UNSPECIFIED);
   }

@@ -258,7 +258,7 @@ message HdfsFileStatusProto {
   optional uint64 blocksize = 11 [default = 0];
   optional LocatedBlocksProto locations = 12; // suppled only if asked by client
   optional uint64 fileId = 13 [default = 0]; // default as an invalid id
-  optional uint32 childrenNum = 14 [default = 0];
+  optional int32 childrenNum = 14 [default = -1];
   optional bool isFileStoredInDB = 15; // false if not supplied
   optional uint32 storagePolicy = 16 [default = 0]; // block storage policy id
 }
