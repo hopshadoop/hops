@@ -68,7 +68,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
@@ -680,10 +679,10 @@ class NamenodeJspHelper {
       int idx =
           (suffix != null && name.endsWith(suffix)) ? name.indexOf(suffix) : -1;
 
-      out.print(rowTxt() + "<td class=\"name\"><a title=\"" + d.getXferAddr() +
+      out.print(rowTxt() + "<td class=\"name\"> <a title=\"" + url +
           "\" href=\"" + url + "\">" +
           ((idx > 0) ? name.substring(0, idx) : name) + "</a>" +
-          ((alive) ? "" : "\n"));
+          ((alive) ? "" : "\n") + "<td class=\"address\">" + d.getXferAddr());
     }
 
     void generateDecommissioningNodeData(JspWriter out, DatanodeDescriptor d,
@@ -718,10 +717,10 @@ class NamenodeJspHelper {
       /*
        * Say the datanode is dn1.hadoop.apache.org with ip 192.168.0.5 we use:
        * 1) d.getHostName():d.getRpcServerPort() to display. Domain and port are stripped
-       *    if they are common across the nodes. i.e. "dn1"
-       * 2) d.getHost():d.Port() for "title". i.e. "192.168.0.5:50010"
-       * 3) d.getHostName():d.getInfoPort() for url.
+       *    if they are common across the nodes. i.e. "dn1" 
+       * 2) d.getHostName():d.getInfoPort() for url and title.
        *    i.e. "http://dn1.hadoop.apache.org:50075/..."
+       * 3) d.getXferAddr() for "Transferring Address". i.e. "192.168.0.5:50010"
        * Note that "d.getHost():d.getRpcServerPort()" is what DFS clients use to
        * interact with datanodes.
        */
@@ -848,9 +847,11 @@ class NamenodeJspHelper {
               diskByteStr = "TB";
             }
 
-            out.print("<tr class=\"headerRow\"> <th " + nodeHeaderStr("name") +
-                "> Node <th " + nodeHeaderStr("lastcontact") +
-                "> Last <br>Contact <th " + nodeHeaderStr("adminstate") +
+            out.print("<tr class=\"headerRow\"> <th " + nodeHeaderStr("name") 
+                + "> Node <th " + nodeHeaderStr("address")
+                + "> Transferring<br>Address <th "
+                + nodeHeaderStr("lastcontact")
+                + "> Last <br>Contact <th " + nodeHeaderStr("adminstate") +
                 "> Admin State <th " + nodeHeaderStr("capacity") +
                 "> Configured <br>Capacity (" + diskByteStr + ") <th " +
                 nodeHeaderStr("used") + "> Used <br>(" + diskByteStr +
@@ -862,9 +863,10 @@ class NamenodeJspHelper {
                 nodeHeaderStr("pcremaining") + "> Remaining <br>(%) <th " +
                 nodeHeaderStr("blocks") + "> Blocks <th " +
                 nodeHeaderStr("bpused") + "> Block Pool<br>Used (" +
-                diskByteStr + ") <th " + nodeHeaderStr("pcbpused") +
-                "> Block Pool<br>Used (%)" + "> Blocks <th " +
-                nodeHeaderStr("volfails") + "> Failed Volumes\n");
+                diskByteStr + ") <th " + nodeHeaderStr("pcbpused") 
+                + "> Block Pool<br>Used (%)" + " <th "
+                + nodeHeaderStr("volfails")
+                + "> Failed Volumes\n");
 
             JspHelper.sortNodeList(live, sorterField, sorterOrder);
             for (DatanodeDescriptor aLive : live) {
@@ -901,8 +903,11 @@ class NamenodeJspHelper {
               "</a><br><br>\n");
           if (decommissioning.size() > 0) {
             out.print("<table border=1 cellspacing=0> <tr class=\"headRow\"> " +
-                    "<th " + nodeHeaderStr("name") + "> Node <th " +
-                    nodeHeaderStr("lastcontact") + "> Last <br>Contact <th " +
+                    "<th " + nodeHeaderStr("name") 
+                + "> Node <th " + nodeHeaderStr("address")
+                + "> Transferring<br>Address <th "
+                + nodeHeaderStr("lastcontact")
+                + "> Last <br>Contact <th " +
                     nodeHeaderStr("underreplicatedblocks") +
                     "> Under Replicated Blocks <th " +
                     nodeHeaderStr("blockswithonlydecommissioningreplicas") +
