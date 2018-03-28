@@ -102,9 +102,11 @@ public class LayoutVersion {
             "add OP_UPDATE_BLOCKS"),
     RESERVED_REL1_2_0(-41, -32, "Reserved for release 1.2.0", true, CONCAT),
     ADD_INODE_ID(-42, -40, "Assign a unique inode id for each inode", false),
-    SEQUENTIAL_BLOCK_ID(-43, "Allocate block IDs sequentially and store " +
+    SEQUENTIAL_BLOCK_ID(-43, "Allocate block IDs sequentially and store " +       //match 45 of apache hadop
         "block IDs in the edits log and image files"),
-    ADD_DATANODE_AND_STORAGE_UUIDS(-44, "Replace StorageID with DatanodeUuid."
+    EDITLOG_SUPPORT_RETRYCACHE(-44, "Record ClientId and CallId in editlog to "  //match 46 of apache hadoop
+        + "enable rebuilding retry cache in case of HA failover"),
+    ADD_DATANODE_AND_STORAGE_UUIDS(-45, "Replace StorageID with DatanodeUuid."
         + " Use distinct StorageUuid per storage directory.");
     
     final int lv;

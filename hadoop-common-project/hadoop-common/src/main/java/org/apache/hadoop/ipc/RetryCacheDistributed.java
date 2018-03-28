@@ -18,20 +18,16 @@
 package org.apache.hadoop.ipc;
 
 
-import java.util.Arrays;
-import java.util.UUID;
-import java.util.concurrent.locks.ReentrantLock;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.ipc.metrics.RetryCacheMetrics;
-import org.apache.hadoop.util.LightWeightCache;
+import org.apache.hadoop.util.LightWeightCacheDistributed;
 import org.apache.hadoop.util.LightWeightGSet;
-import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
-
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
+import io.hops.metadata.hdfs.entity.RetryCacheEntry;
+import io.hops.transaction.EntityManager;
+import java.util.Queue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Maintains a cache of non-idempotent requests that have been successfully
@@ -43,136 +39,30 @@ import com.google.common.base.Preconditions;
  * To look an implementation using this cache, see HDFS FSNamesystem class.
  */
 @InterfaceAudience.Private
-public class RetryCache {
-  public static final Log LOG = LogFactory.getLog(RetryCache.class);
-  protected final RetryCacheMetrics retryCacheMetrics;
-  protected static final int MAX_CAPACITY = 16;
+public class RetryCacheDistributed extends RetryCache{
 
-  /**
-   * CacheEntry is tracked using unique client ID and callId of the RPC request
-   */
-  public static class CacheEntry implements LightWeightCache.Entry {
-    /**
-     * Processing state of the requests
-     */
-    public final static byte INPROGRESS = 0;
-    public final static byte SUCCESS = 1;
-    public final static byte FAILED = 2;
-
-    protected byte state = INPROGRESS;
-    
-    // Store uuid as two long for better memory utilization
-    protected final long clientIdMsb; // Most signficant bytes
-    protected final long clientIdLsb; // Least significant bytes
-    protected final byte[] clientIdByte;
-        
-    protected final int callId;
-    private final long expirationTime;
-    private LightWeightGSet.LinkedElement next;
-
-    CacheEntry(byte[] clientId, int callId, long expirationTime) {
-      // ClientId must be a UUID - that is 16 octets.
-      Preconditions.checkArgument(clientId.length == ClientId.BYTE_LENGTH,
-          "Invalid clientId - length is " + clientId.length
-              + " expected length " + ClientId.BYTE_LENGTH);
-      // Convert UUID bytes to two longs
-      clientIdMsb = ClientId.getMsb(clientId);
-      clientIdLsb = ClientId.getLsb(clientId);
-      this.callId = callId;
-      this.expirationTime = expirationTime;
-      this.clientIdByte = clientId;
-    }
-
-    CacheEntry(byte[] clientId, int callId, long expirationTime,
-        boolean success) {
-      this(clientId, callId, expirationTime);
-      this.state = success ? SUCCESS : FAILED;
-    }
-
-    public byte getState() {
-      return state;
-    }
-
-    public int getCallId() {
-      return callId;
-    }
-
-    public byte[] getClientId() {
-      return clientIdByte;
-    }
-    
-    private static int hashCode(long value) {
-      return (int)(value ^ (value >>> 32));
-    }
-    
-    @Override
-    public int hashCode() {
-      return (hashCode(clientIdMsb) * 31 + hashCode(clientIdLsb)) * 31 + callId;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (this == obj) {
-        return true;
-      }
-      if (!(obj instanceof CacheEntry)) {
-        return false;
-      }
-      CacheEntry other = (CacheEntry) obj;
-      return callId == other.callId && clientIdMsb == other.clientIdMsb
-          && clientIdLsb == other.clientIdLsb;
-    }
-
-    @Override
-    public void setNext(LinkedElement next) {
-      this.next = next;
-    }
-
-    @Override
-    public LinkedElement getNext() {
-      return next;
-    }
-
-    synchronized void completed(boolean success) {
-      state = success ? SUCCESS : FAILED;
-      this.notifyAll();
-    }
-
-    public synchronized boolean isSuccess() {
-      return state == SUCCESS;
-    }
-
-    @Override
-    public void setExpirationTime(long timeNano) {
-      // expiration time does not change
-    }
-
-    @Override
-    public long getExpirationTime() {
-      return expirationTime;
-    }
-    
-    @Override
-    public String toString() {
-      return (new UUID(this.clientIdMsb, this.clientIdLsb)).toString() + ":"
-          + this.callId + ":" + this.state;
-    }
-  }
-
-  /**
+  
+   /**
    * CacheEntry with payload that tracks the previous response or parts of
    * previous response to be used for generating response for retried requests.
    */
   public static class CacheEntryWithPayload extends CacheEntry {
-    private Object payload;
-
-    CacheEntryWithPayload(byte[] clientId, int callId, Object payload,
+    private byte[] payload;
+    
+    CacheEntryWithPayload(byte[] clientId, int callId, byte[] payload,
         long expirationTime) {
       super(clientId, callId, expirationTime);
       this.payload = payload;
     }
 
-    CacheEntryWithPayload(byte[] clientId, int callId, Object payload,
+    public CacheEntryWithPayload(byte[] clientId, int callId, byte[] payload,
+        long expirationTime, byte state) {
+      super(clientId, callId, expirationTime);
+      this.payload = payload;
+      this.state = state;
+    }
+    
+    CacheEntryWithPayload(byte[] clientId, int callId, byte[] payload,
         long expirationTime, boolean success) {
      super(clientId, callId, expirationTime, success);
      this.payload = payload;
@@ -190,67 +80,24 @@ public class RetryCache {
       return super.hashCode();
     }
 
-    public Object getPayload() {
+    public byte[] getPayload() {
       return payload;
     }
   }
-
-  protected LightWeightGSet<CacheEntry, CacheEntry> set;
-  protected final long expirationTime;
-  private String cacheName;
-
-  protected final ReentrantLock lock = new ReentrantLock();
-
+  
+//  private LightWeightGSet<CacheEntry, CacheEntry> set;
+  
   /**
    * Constructor
    * @param cacheName name to identify the cache by
    * @param percentage percentage of total java heap space used by this cache
    * @param expirationTime time for an entry to expire in nanoseconds
    */
-  public RetryCache(String cacheName, double percentage, long expirationTime) {
+  public RetryCacheDistributed(String cacheName, double percentage, long expirationTime) {
+    super(cacheName, percentage, expirationTime);
     int capacity = LightWeightGSet.computeCapacity(percentage, cacheName);
     capacity = capacity > MAX_CAPACITY ? capacity : MAX_CAPACITY;
-    this.set = new LightWeightCache<CacheEntry, CacheEntry>(capacity, capacity,
-        expirationTime, 0);
-    this.expirationTime = expirationTime;
-    this.cacheName = cacheName;
-    this.retryCacheMetrics =  RetryCacheMetrics.create(this);
-  }
-
-  protected static boolean skipRetryCache() {
-    // Do not track non RPC invocation or RPC requests with
-    // invalid callId or clientId in retry cache
-    return !Server.isRpcInvocation() || Server.getCallId() < 0
-        || Arrays.equals(Server.getClientId(), RpcConstants.DUMMY_CLIENT_ID);
-  }
-
-  public void lock() {
-    this.lock.lock();
-  }
-
-  public void unlock() {
-    this.lock.unlock();
-  }
-
-  protected void incrCacheClearedCounter() {
-    retryCacheMetrics.incrCacheCleared();
-  }
-
-  @VisibleForTesting
-  public LightWeightGSet<CacheEntry, CacheEntry> getCacheSet() {
-    return set;
-  }
-
-  @VisibleForTesting
-  public RetryCacheMetrics getMetricsForTests() {
-    return retryCacheMetrics;
-  }
-
-  /**
-   * This method returns cache name for metrics.
-   */
-  public String getCacheName() {
-    return cacheName;
+    this.set = new LightWeightCacheDistributed(capacity, capacity, expirationTime, 0);
   }
 
   /**
@@ -274,7 +121,7 @@ public class RetryCache {
     CacheEntry mapEntry = null;
     lock.lock();
     try {
-      mapEntry = set.get(newEntry);
+      mapEntry = (CacheEntry) set.get(newEntry);
       // If an entry in the cache does not exist, add a new one
       if (mapEntry == null) {
         if (LOG.isTraceEnabled()) {
@@ -330,7 +177,7 @@ public class RetryCache {
   }
   
   public void addCacheEntryWithPayload(byte[] clientId, int callId,
-      Object payload) {
+      byte[] payload) {
     // since the entry is loaded from editlog, we can assume it succeeded.    
     CacheEntry newEntry = new CacheEntryWithPayload(clientId, callId, payload,
         System.nanoTime() + expirationTime, true);
@@ -348,14 +195,14 @@ public class RetryCache {
         System.nanoTime() + expirationTime);
   }
 
-  private static CacheEntryWithPayload newEntry(Object payload,
+  private static CacheEntryWithPayload newEntry(byte[] payload,
       long expirationTime) {
     return new CacheEntryWithPayload(Server.getClientId(), Server.getCallId(),
         payload, System.nanoTime() + expirationTime);
   }
-
+  
   /** Static method that provides null check for retryCache */
-  public static CacheEntry waitForCompletion(RetryCache cache) {
+  public static CacheEntry waitForCompletion(RetryCacheDistributed cache) {
     if (skipRetryCache()) {
       return null;
     }
@@ -364,8 +211,8 @@ public class RetryCache {
   }
 
   /** Static method that provides null check for retryCache */
-  public static CacheEntryWithPayload waitForCompletion(RetryCache cache,
-      Object payload) {
+  public static CacheEntryWithPayload waitForCompletion(RetryCacheDistributed cache,
+      byte[] payload) {
     if (skipRetryCache()) {
       return null;
     }
@@ -378,21 +225,32 @@ public class RetryCache {
       return;
     }
     e.completed(success);
+    try{
+    EntityManager.update(new RetryCacheEntry(e.getClientId(), e.getCallId(), null, e.getExpirationTime(),
+        e.getState()));
+    }catch(StorageException | TransactionContextException ex){
+      LOG.error("did not persist cach to the database", ex);
+    }
   }
 
-  public static void setState(CacheEntryWithPayload e, boolean success,
-      Object payload) {
+  public static void setState(CacheEntryWithPayload e, boolean success, byte[] payload) throws TransactionContextException, StorageException {
     if (e == null) {
       return;
     }
     e.payload = payload;
     e.completed(success);
+    EntityManager.update(new RetryCacheEntry(e.getClientId(), e.getCallId(), e.getPayload(), e.getExpirationTime(),
+        e.getState()));
   }
 
-  public static void clear(RetryCache cache) {
+  public static void clear(RetryCacheDistributed cache) {
     if (cache != null) {
       cache.set.clear();
       cache.incrCacheClearedCounter();
     }
+  }
+  
+  public LinkedBlockingQueue<CacheEntry> getToRemove(){
+    return ((LightWeightCacheDistributed)set).getToRemove();
   }
 }

@@ -113,7 +113,7 @@ public class NamenodeSelector {
   private static Log LOG = LogFactory.getLog(NamenodeSelector.class);
   private final URI defaultUri;
   private final NamenodeSelector.NNSelectionPolicy policy;
-  private NamenodeSelector.NamenodeHandle stickyHandle = null; //only used if
+  private static NamenodeSelector.NamenodeHandle stickyHandle = null; //only used if
   // RANDOM_STICKY policy is used
   protected final Configuration conf;
   private final int namenodeListUpdateTimePeriod;
@@ -532,7 +532,7 @@ public class NamenodeSelector {
    * @param handle
    *      the namenode to black list
    */
-  public void blackListNamenode(NamenodeSelector.NamenodeHandle handle) {
+  public synchronized void blackListNamenode(NamenodeSelector.NamenodeHandle handle) {
     if (!this.blackListedNamenodes.contains(handle)) {
       this.blackListedNamenodes.add(handle);
     }

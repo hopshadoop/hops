@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -314,7 +315,8 @@ public class NameNodeProxies {
   /**
    * Gets the configured Failover proxy provider's class
    */
-  private static <T> Class<FailoverProxyProvider<T>> getFailoverProxyProviderClass(
+  @VisibleForTesting
+  public static <T> Class<FailoverProxyProvider<T>> getFailoverProxyProviderClass(
       Configuration conf, URI nameNodeUri, Class<T> xface) throws IOException {
     if (nameNodeUri == null) {
       return null;
@@ -355,7 +357,8 @@ public class NameNodeProxies {
    * Creates the Failover proxy provider instance
    */
   @SuppressWarnings("unchecked")
-  private static <T> FailoverProxyProvider<T> createFailoverProxyProvider(
+  @VisibleForTesting
+  public static <T> FailoverProxyProvider<T> createFailoverProxyProvider(
       Configuration conf,
       Class<FailoverProxyProvider<T>> failoverProxyProviderClass,
       Class<T> xface, URI nameNodeUri) throws IOException {
