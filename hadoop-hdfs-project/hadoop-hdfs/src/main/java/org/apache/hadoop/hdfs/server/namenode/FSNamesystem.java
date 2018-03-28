@@ -706,7 +706,7 @@ public class FSNamesystem
     if (auditLoggers.isEmpty()) {
       auditLoggers.add(new DefaultAuditLogger());
     }
-    return auditLoggers;
+    return Collections.unmodifiableList(auditLoggers);
   }
 
   private void startSecretManager() {
