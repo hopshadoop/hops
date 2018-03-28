@@ -502,7 +502,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_KEY =
       "dfs.namenode.min.supported.datanode.version";
   public static final String
-      DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_DEFAULT = "2.0.0-SNAPSHOT";
+      DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_DEFAULT = "2.1.0-beta";
   
   public static final String DFS_LIST_LIMIT = "dfs.ls.limit";
   public static final int DFS_LIST_LIMIT_DEFAULT = Integer.MAX_VALUE; //1000; [HopsFS] Jira Hops-45
@@ -724,7 +724,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_DATANODE_MIN_SUPPORTED_NAMENODE_VERSION_KEY =
       "dfs.datanode.min.supported.namenode.version";
   public static final String
-      DFS_DATANODE_MIN_SUPPORTED_NAMENODE_VERSION_DEFAULT = "2.0.0-SNAPSHOT";
+      DFS_DATANODE_MIN_SUPPORTED_NAMENODE_VERSION_DEFAULT = "2.1.0-beta";
 
   public static final String DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY =
       "dfs.block.access.token.enable";
