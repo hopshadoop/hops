@@ -132,8 +132,10 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_KE
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
+import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_DEPTH;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_LENGTH;
+import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.tukaani.xz.UnsupportedOptionsException;
@@ -300,7 +302,10 @@ class NameNodeRpcServer implements NamenodeProtocols {
         QuotaExceededException.class,
         RecoveryInProgressException.class,
         AccessControlException.class,
-        InvalidToken.class);
+        InvalidToken.class,
+        LeaseExpiredException.class,
+        NSQuotaExceededException.class,
+        DSQuotaExceededException.class);
   }
   
   /**
