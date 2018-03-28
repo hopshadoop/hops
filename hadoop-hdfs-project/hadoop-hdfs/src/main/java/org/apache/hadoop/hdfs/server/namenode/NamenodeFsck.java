@@ -320,8 +320,13 @@ public class NamenodeFsck {
     long fileLen = file.getLen();
     // Get block locations without updating the file access time 
     // and without block access tokens
-    LocatedBlocks blocks = namenode.getNamesystem()
-        .getBlockLocations(path, 0, fileLen, false, false, false);
+    LocatedBlocks blocks;
+    try {
+      blocks = namenode.getNamesystem().getBlockLocations(path, 0,
+          fileLen, false, false, false);
+    } catch (FileNotFoundException fnfe) {
+      blocks = null;
+    }
     if (blocks == null) { // the file is deleted
       return;
     }
