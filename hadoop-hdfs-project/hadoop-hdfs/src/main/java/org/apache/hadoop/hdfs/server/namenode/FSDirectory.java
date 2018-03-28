@@ -2285,6 +2285,19 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     if (id == INode.ROOT_INODE_ID && pathComponents.length == 4) {
       return Path.SEPARATOR;
     }
+    
+    // Handle single ".." for NFS lookup support.
+    if ((pathComponents.length > 4)
+        && DFSUtil.bytes2String(pathComponents[4]).equals("..")) {
+      INode parent = fsd.getParent(id, src);
+      if (parent == null || parent.getId() == INode.ROOT_INODE_ID) {
+        // inode is root, or its parent is root.
+        return Path.SEPARATOR;
+      } else {
+        return fsd.getFullPathName(parent.getId(), src);
+      }
+    }
+    
     StringBuilder path = id == INode.ROOT_INODE_ID ? new StringBuilder()
         : new StringBuilder(fsd.getFullPathName(id, src));
     for (int i = 4; i < pathComponents.length; i++) {
@@ -2347,6 +2360,62 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
           }
         };
     return (String) getFullPathNameHandler.handle();
+  }
+
+  INode getParent(final int id, final String src) throws IOException {
+    HopsTransactionalRequestHandler getParentHandler =
+        new HopsTransactionalRequestHandler(
+            HDFSOperationType.GET_INODE) {
+          INodeIdentifier inodeIdentifier;
+
+          @Override
+          public void setUp() throws StorageException {
+            inodeIdentifier = new INodeIdentifier(id);
+          }
+
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            LockFactory lf = LockFactory.getInstance();
+            locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED, inodeIdentifier, true));
+          }
+
+          @Override
+          public Object performTask() throws IOException {
+            INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
+            if (inode == null) {
+              throw new FileNotFoundException(
+                  "File for given inode path does not exist: " + src);
+            }
+            return inode.getParent();
+          }
+        };
+    return (INode) getParentHandler.handle();
+  }
+  
+  INode getInode(final int id) throws IOException {
+    HopsTransactionalRequestHandler getInodeHandler =
+        new HopsTransactionalRequestHandler(
+            HDFSOperationType.GET_INODE) {
+          INodeIdentifier inodeIdentifier;
+
+          @Override
+          public void setUp() throws StorageException {
+            inodeIdentifier = new INodeIdentifier(id);
+          }
+
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            LockFactory lf = LockFactory.getInstance();
+            locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED, inodeIdentifier, true));
+          }
+
+          @Override
+          public Object performTask() throws IOException {
+            return EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
+            
+          }
+        };
+    return (INode) getInodeHandler.handle();
   }
 
   /**
