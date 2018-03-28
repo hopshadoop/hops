@@ -1170,16 +1170,4 @@ public class StringUtils {
     // s1.equals(s2)
     return s1.equalsIgnoreCase(s2);
   }
-  
-  /**
-   * Return a new UUID as byte[]
-   */
-  public static byte[] getUuidBytes() {
-    UUID uuid = UUID.randomUUID();
-    ByteBuffer buf = ByteBuffer.wrap(new byte[16]);
-    buf.putLong(uuid.getMostSignificantBits());
-    buf.putLong(uuid.getLeastSignificantBits());
-    return buf.array();
-  }
-
 }

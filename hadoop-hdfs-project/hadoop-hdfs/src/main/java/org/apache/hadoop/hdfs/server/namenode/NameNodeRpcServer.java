@@ -1113,8 +1113,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
             " was disabled");
       }
       LOG.info("Create file " + src + " with policy " + policy.toString());
-      namesystem.addEncodingStatusInt(src, policy,
-          EncodingStatus.Status.ENCODING_REQUESTED);
+      namesystem.addEncodingStatus(src, policy,
+          EncodingStatus.Status.ENCODING_REQUESTED, false);
     }
     return stat;
   }
@@ -1138,7 +1138,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
           " was disabled");
     }
     namesystem.addEncodingStatus(filePath, policy,
-        EncodingStatus.Status.COPY_ENCODING_REQUESTED);
+        EncodingStatus.Status.COPY_ENCODING_REQUESTED, true);
   }
 
   @Override

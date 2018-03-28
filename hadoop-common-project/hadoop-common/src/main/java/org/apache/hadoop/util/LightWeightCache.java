@@ -90,11 +90,11 @@ public class LightWeightCache<K, E extends K> extends LightWeightGSet<K, E> {
    * balanced tree. However, we do not yet have a low memory footprint balanced
    * tree implementation.
    */
-  private final PriorityQueue<Entry> queue;
+  protected final PriorityQueue<Entry> queue;
   private final long creationExpirationPeriod;
-  private final long accessExpirationPeriod;
+  protected final long accessExpirationPeriod;
   private final int sizeLimit;
-  private final Timer timer;
+  protected final Timer timer;
 
   /**
    * @param recommendedLength Recommended size of the internal array.
@@ -150,7 +150,7 @@ public class LightWeightCache<K, E extends K> extends LightWeightGSet<K, E> {
     return now > e.getExpirationTime();
   }
 
-  private E evict() {
+  protected E evict() {
     @SuppressWarnings("unchecked")
     final E polled = (E)queue.poll();
     final E removed = super.remove(polled);
@@ -159,7 +159,7 @@ public class LightWeightCache<K, E extends K> extends LightWeightGSet<K, E> {
   }
 
   /** Evict expired entries. */
-  private void evictExpiredEntries() {
+  protected void evictExpiredEntries() {
     final long now = timer.monotonicNowNanos();
     for(int i = 0; i < EVICTION_LIMIT; i++) {
       final Entry peeked = queue.peek();
@@ -198,6 +198,10 @@ public class LightWeightCache<K, E extends K> extends LightWeightGSet<K, E> {
 
   @Override
   public E put(final E entry) {
+    return put(entry,  creationExpirationPeriod);
+  }
+  
+  public E put(final E entry, long period) {
     if (!(entry instanceof Entry)) {
       throw new HadoopIllegalArgumentException(
           "!(entry instanceof Entry), entry.getClass()=" + entry.getClass());
@@ -211,13 +215,13 @@ public class LightWeightCache<K, E extends K> extends LightWeightGSet<K, E> {
     }
 
     final Entry e = (Entry)entry;
-    setExpirationTime(e, creationExpirationPeriod);
+    setExpirationTime(e, period);
     queue.offer(e);
     
     evictEntries();
     return existing;
   }
-
+  
   @Override
   public E remove(K key) {
     evictExpiredEntries();

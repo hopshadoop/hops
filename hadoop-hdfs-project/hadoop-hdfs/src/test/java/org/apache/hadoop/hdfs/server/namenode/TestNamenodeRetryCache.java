@@ -17,34 +17,45 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import static io.hops.transaction.lock.LockFactory.getInstance;
+import io.hops.transaction.lock.TransactionLocks;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY;
 import org.apache.hadoop.hdfs.DFSTestUtil;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.ipc.ClientId;
 import org.apache.hadoop.ipc.RPC.RpcKind;
-import org.apache.hadoop.ipc.RetryCache;
+import org.apache.hadoop.ipc.RetryCache.CacheEntry;
 import org.apache.hadoop.ipc.RpcConstants;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.LightWeightCache;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -61,20 +72,23 @@ import org.junit.Test;
  * request, a new callId is generated using {@link #newCall()}.
  */
 public class TestNamenodeRetryCache {
-  private static final byte[] CLIENT_ID = StringUtils.getUuidBytes();
+  private static final byte[] CLIENT_ID = ClientId.getClientId();
   private static MiniDFSCluster cluster;
   private static FSNamesystem namesystem;
   private static PermissionStatus perm = new PermissionStatus(
       "TestNamenodeRetryCache", null, FsPermission.getDefault());
-  private static FileSystem filesystem;
+  private static DistributedFileSystem filesystem;
   private static int callId = 100;
+  private static Configuration conf = new HdfsConfiguration();
+  private static final int BlockSize = 512;
+  private static final int expirityTime = 30000;
   
   /** Start a cluster */
-  @BeforeClass
-  public static void setup() throws Exception {
-    Configuration conf = new HdfsConfiguration();
-    conf.set(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, "512");
+  @Before
+  public void setup() throws Exception {
+    conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BlockSize);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY, true);
+    conf.setLong(DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY, 30000);
     cluster = new MiniDFSCluster.Builder(conf).build();
     cluster.waitActive();
     namesystem = cluster.getNamesystem();
@@ -109,8 +123,8 @@ public class TestNamenodeRetryCache {
   }
   
   private void concatSetup(String file1, String file2) throws Exception {
-    DFSTestUtil.createFile(filesystem, new Path(file1), 512, (short)1, 0L);
-    DFSTestUtil.createFile(filesystem, new Path(file2), 512, (short)1, 0L);
+    DFSTestUtil.createFile(filesystem, new Path(file1), BlockSize, (short)1, 0L);
+    DFSTestUtil.createFile(filesystem, new Path(file2), BlockSize, (short)1, 0L);
   }
   
   /**
@@ -192,19 +206,19 @@ public class TestNamenodeRetryCache {
     // Two retried calls succeed
     newCall();
     HdfsFileStatus status = namesystem.startFile(src, perm, "holder",
-        "clientmachine", EnumSet.of(CreateFlag.CREATE), true, (short) 1, 512);
-    Assert.assertEquals(status, namesystem.startFile(src, perm, 
+        "clientmachine", EnumSet.of(CreateFlag.CREATE), true, (short) 1, BlockSize);
+    Assert.assertEquals(status.getFileId(), namesystem.startFile(src, perm, 
         "holder", "clientmachine", EnumSet.of(CreateFlag.CREATE), 
-        true, (short) 1, 512));
-    Assert.assertEquals(status, namesystem.startFile(src, perm, 
+        true, (short) 1, BlockSize).getFileId());
+    Assert.assertEquals(status.getFileId(), namesystem.startFile(src, perm, 
         "holder", "clientmachine", EnumSet.of(CreateFlag.CREATE), 
-        true, (short) 1, 512));
+        true, (short) 1, BlockSize).getFileId());
     
     // A non-retried call fails
     newCall();
     try {
       namesystem.startFile(src, perm, "holder", "clientmachine",
-          EnumSet.of(CreateFlag.CREATE), true, (short) 1, 512);
+          EnumSet.of(CreateFlag.CREATE), true, (short) 1, BlockSize);
       Assert.fail("testCreate - expected exception is not thrown");
     } catch (IOException e) {
       // expected
@@ -224,8 +238,10 @@ public class TestNamenodeRetryCache {
     // Retried append requests succeed
     newCall();
     LocatedBlock b = namesystem.appendFile(src, "holder", "clientMachine");
-    Assert.assertEquals(b, namesystem.appendFile(src, "holder", "clientMachine"));
-    Assert.assertEquals(b, namesystem.appendFile(src, "holder", "clientMachine"));
+    Assert.assertEquals(b.getBlock().getBlockId(), namesystem.appendFile(src, "holder", "clientMachine").getBlock().
+        getBlockId());
+    Assert.assertEquals(b.getBlock().getBlockId(), namesystem.appendFile(src, "holder", "clientMachine").getBlock().
+        getBlockId());
     
     // non-retried call fails
     newCall();
@@ -296,4 +312,98 @@ public class TestNamenodeRetryCache {
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY, false);
     Assert.assertNull(FSNamesystem.initRetryCache(conf));
   }
+  
+  /**
+   * After run a set of operations, restart NN and check if the retry cache has
+   * been rebuilt based on the editlog.
+   */
+  @Test
+  public void testRetryCacheRebuild() throws Exception {
+    DFSTestUtil.runOperations(cluster, filesystem, conf, BlockSize, 0);
+    
+    LightWeightCache<CacheEntry, CacheEntry> cacheSet = 
+        (LightWeightCache<CacheEntry, CacheEntry>) namesystem.getRetryCache().getCacheSet();
+    assertEquals(11, cacheSet.size());
+    
+    Map<CacheEntry, CacheEntry> oldEntries = 
+        new HashMap<CacheEntry, CacheEntry>();
+    Iterator<CacheEntry> iter = cacheSet.iterator();
+    while (iter.hasNext()) {
+      CacheEntry entry = iter.next();
+      oldEntries.put(entry, entry);
+    }
+    
+    // restart NameNode
+    cluster.restartNameNode();
+    cluster.waitActive();
+    namesystem = cluster.getNamesystem();
+    
+    // check retry cache
+    assertTrue(namesystem.hasRetryCache());
+    fillCacheFromDB(oldEntries);
+    cacheSet = (LightWeightCache<CacheEntry, CacheEntry>) namesystem
+        .getRetryCache().getCacheSet();
+    assertEquals(11, cacheSet.size());
+    iter = cacheSet.iterator();
+    while (iter.hasNext()) {
+      CacheEntry entry = iter.next();
+      assertTrue(oldEntries.containsKey(entry));
+    }
+  }
+  
+  private void fillCacheFromDB(Map<CacheEntry, CacheEntry> oldEntries) throws IOException {
+    for (final CacheEntry entry : oldEntries.keySet()) {
+      HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType.CONCAT) {
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          LockFactory lf = getInstance();
+          locks.add(lf.getRetryCacheEntryLock(entry.getClientId(), entry.getCallId()));
+        }
+
+        @Override
+        public Object performTask() throws IOException {
+          namesystem.getRetryCache().getCacheSet().get(entry);
+          return null;
+        }
+      };
+      rh.handle();
+
+    }
+  }
+  
+  /**
+   * After run a set of operations, restart NN and check if the retry cache has
+   * been rebuilt based on the editlog.
+   */
+  @Test
+  public void testRetryCacheCleaning() throws Exception {
+    DFSTestUtil.runOperations(cluster, filesystem, conf, BlockSize, 0);
+    
+    LightWeightCache<CacheEntry, CacheEntry> cacheSet = 
+        (LightWeightCache<CacheEntry, CacheEntry>) namesystem.getRetryCache().getCacheSet();
+    assertEquals(11, cacheSet.size());
+    
+    Map<CacheEntry, CacheEntry> oldEntries = 
+        new HashMap<CacheEntry, CacheEntry>();
+    Iterator<CacheEntry> iter = cacheSet.iterator();
+    while (iter.hasNext()) {
+      CacheEntry entry = iter.next();
+      oldEntries.put(entry, entry);
+    }
+    
+    // restart NameNode
+    cluster.restartNameNode();
+    cluster.waitActive();
+    namesystem = cluster.getNamesystem();
+    
+    Thread.sleep(expirityTime*3);
+    
+    // check retry cache
+    assertTrue(namesystem.hasRetryCache());
+    fillCacheFromDB(oldEntries);
+    cacheSet = (LightWeightCache<CacheEntry, CacheEntry>) namesystem
+        .getRetryCache().getCacheSet();
+    assertEquals(0, cacheSet.size());
+  }
+  
 }
