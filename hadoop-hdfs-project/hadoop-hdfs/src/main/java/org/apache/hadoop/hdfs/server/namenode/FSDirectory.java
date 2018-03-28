@@ -1134,19 +1134,6 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
   }
 
-  HdfsFileStatus getFileInfoForCreate(String src, boolean resolveLink, boolean includeStoragePolicy)
-      throws IOException {
-    String srcs = normalizePath(src);
-    INode targetNode = getRootDir().getNode(srcs, resolveLink);
-    if (targetNode == null) {
-      return null;
-    } else {
-      byte policyId = includeStoragePolicy && targetNode != null && !targetNode.isSymlink() ? targetNode.
-          getStoragePolicyID() : BlockStoragePolicySuite.ID_UNSPECIFIED;
-      return createFileStatus(HdfsFileStatus.EMPTY_NAME, targetNode, policyId);
-    }
-  }
-
   /**
    * Get the blocks associated with the file.
    */

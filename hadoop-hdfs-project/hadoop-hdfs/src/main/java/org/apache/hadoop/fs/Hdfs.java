@@ -149,7 +149,7 @@ public class Hdfs extends AbstractFileSystem {
     return new FileStatus(f.getLen(), f.isDir(), f.getReplication(),
         f.getBlockSize(), f.getModificationTime(), f.getAccessTime(),
         f.getPermission(), f.getOwner(), f.getGroup(),
-        f.isSymlink() ? f.getSymlink() : null, (f.getFullPath(parent))
+        f.isSymlink() ? new Path(f.getSymlink()) : null, (f.getFullPath(parent))
         .makeQualified(getUri(), null)); // fully-qualify path
   }
 
@@ -158,7 +158,7 @@ public class Hdfs extends AbstractFileSystem {
     return new LocatedFileStatus(f.getLen(), f.isDir(), f.getReplication(),
         f.getBlockSize(), f.getModificationTime(), f.getAccessTime(),
         f.getPermission(), f.getOwner(), f.getGroup(),
-        f.isSymlink() ? f.getSymlink() : null,
+        f.isSymlink() ? new Path(f.getSymlink()) : null,
         (f.getFullPath(parent)).makeQualified(getUri(), null),
         // fully-qualify path
         DFSUtil.locatedBlocks2Locations(f.getBlockLocations()));

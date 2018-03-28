@@ -88,9 +88,14 @@ public class HdfsLocatedFileStatus extends HdfsFileStatus {
    * for examples.
    */
   public final LocatedFileStatus makeQualifiedLocated(URI defaultUri, Path path)
-    throws IOException {
-    makeQualified(defaultUri, path);
-    return new LocatedFileStatus(this,
+      throws IOException {
+    return new LocatedFileStatus(getLen(), isDir(), getReplication(),
+        getBlockSize(), getModificationTime(),
+        getAccessTime(),
+        getPermission(), getOwner(), getGroup(),
+        isSymlink() ? new Path(getSymlink()) : null,
+        (getFullPath(path)).makeQualified(
+        defaultUri, null), // fully-qualify path
         DFSUtil.locatedBlocks2Locations(getBlockLocations()));
   }
 
