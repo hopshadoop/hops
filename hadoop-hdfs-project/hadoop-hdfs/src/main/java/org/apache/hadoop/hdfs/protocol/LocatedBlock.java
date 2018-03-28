@@ -93,6 +93,11 @@ public class LocatedBlock {
 
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs,
       StorageType[] storageTypes, long startOffset, boolean corrupt) {
+      this(b, locs, storageIDs, storageTypes, startOffset, corrupt, new Token<BlockTokenIdentifier>());
+  }
+  
+  public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs,
+      StorageType[] storageTypes, long startOffset, boolean corrupt, Token<BlockTokenIdentifier> blockToken) {
     this.b = b;
     this.offset = startOffset;
     this.corrupt = corrupt;
@@ -104,6 +109,7 @@ public class LocatedBlock {
     this.storageIDs = storageIDs;
     this.storageTypes = storageTypes;
     this.data = null;
+    this.blockToken = blockToken;
   }
 
   public void setData(byte[] data) {

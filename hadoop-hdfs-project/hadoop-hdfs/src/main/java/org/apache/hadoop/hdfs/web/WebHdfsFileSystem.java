@@ -645,7 +645,7 @@ public class WebHdfsFileSystem extends FileSystem
     return new FileStatus(f.getLen(), f.isDir(), f.getReplication(),
         f.getBlockSize(), f.getModificationTime(), f.getAccessTime(),
         f.getPermission(), f.getOwner(), f.getGroup(),
-        f.isSymlink() ? f.getSymlink() : null,
+        f.isSymlink() ? new Path(f.getSymlink()) : null,
         f.getFullPath(parent).makeQualified(getUri(), getWorkingDirectory()));
   }
 

@@ -26,7 +26,6 @@ import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ipc.RpcServerException;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -532,7 +531,7 @@ public class NamenodeSelector {
    * @param handle
    *      the namenode to black list
    */
-  public void blackListNamenode(NamenodeSelector.NamenodeHandle handle) {
+  public synchronized void blackListNamenode(NamenodeSelector.NamenodeHandle handle) {
     if (!this.blackListedNamenodes.contains(handle)) {
       this.blackListedNamenodes.add(handle);
     }

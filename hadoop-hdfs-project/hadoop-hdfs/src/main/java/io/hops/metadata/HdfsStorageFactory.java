@@ -61,6 +61,7 @@ import io.hops.metadata.hdfs.dal.PendingBlockDataAccess;
 import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaUnderConstructionDataAccess;
+import io.hops.metadata.hdfs.dal.RetryCacheEntryDataAccess;
 import io.hops.metadata.hdfs.dal.UnderReplicatedBlockDataAccess;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
@@ -72,6 +73,7 @@ import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
+import io.hops.metadata.hdfs.entity.RetryCacheEntry;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
 import io.hops.security.Users;
@@ -96,6 +98,7 @@ import io.hops.transaction.context.PendingBlockContext;
 import io.hops.transaction.context.QuotaUpdateContext;
 import io.hops.transaction.context.ReplicaContext;
 import io.hops.transaction.context.ReplicaUnderConstructionContext;
+import io.hops.transaction.context.RetryCacheEntryContext;
 import io.hops.transaction.context.SubTreeOperationsContext;
 import io.hops.transaction.context.TransactionsStats;
 import io.hops.transaction.context.UnderReplicatedBlockContext;
@@ -318,7 +321,8 @@ public class HdfsStorageFactory {
                 getDataAccess(OngoingSubTreeOpsDataAccess.class)));
 		entityContexts.put(HashBucket.class, new HashBucketContext(
         (HashBucketDataAccess) getDataAccess(HashBucketDataAccess.class)));
-
+    entityContexts.put(RetryCacheEntry.class, new RetryCacheEntryContext(
+        (RetryCacheEntryDataAccess) getDataAccess(RetryCacheEntryDataAccess.class)));
         return entityContexts;
       }
 

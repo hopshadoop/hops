@@ -25,6 +25,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.ipc.RetryCache;
 
 public class LockFactory {
 
@@ -329,6 +330,14 @@ public class LockFactory {
   
   public Lock getLastBlockHashBucketsLock(){
     return new LastBlockReplicasHashBucketLock();
+  }
+  
+  public Lock getRetryCacheEntryLock(byte[] clientId, int callId){
+    return new RetryCacheEntryLock(clientId, callId);
+  }
+  
+  public Lock getRetryCacheEntryLock(List<RetryCache.CacheEntry> entries){
+    return new RetryCacheEntryLock(entries);
   }
   
   public Collection<Lock> getBlockRelated(BLK... relatedBlks) {
