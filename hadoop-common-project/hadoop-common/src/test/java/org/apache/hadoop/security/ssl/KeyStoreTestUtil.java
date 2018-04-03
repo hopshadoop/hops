@@ -39,7 +39,9 @@ import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.Security;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.security.cert.X509CRL;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -55,19 +57,30 @@ import java.security.SignatureException;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
-import javax.security.auth.x500.X500Principal;
 
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.DERObjectIdentifier;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.CRLNumber;
 import org.bouncycastle.asn1.x509.CRLReason;
-import org.bouncycastle.x509.X509V1CertificateGenerator;
-import org.bouncycastle.x509.X509V2CRLGenerator;
-import org.bouncycastle.x509.X509V3CertificateGenerator;
-import org.bouncycastle.x509.extension.AuthorityKeyIdentifierStructure;
-import org.bouncycastle.x509.extension.SubjectKeyIdentifierStructure;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.cert.CertIOException;
+import org.bouncycastle.cert.X509CRLHolder;
+import org.bouncycastle.cert.X509v2CRLBuilder;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
+import org.bouncycastle.cert.jcajce.JcaX509CRLHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
 public class KeyStoreTestUtil {
+  static {
+    Security.addProvider(new BouncyCastleProvider());
+  }
+
   public static String getClasspathDir(Class klass) throws Exception {
     String file = klass.getName();
     file = file.replace('.', '/') + ".class";
@@ -89,58 +102,51 @@ public class KeyStoreTestUtil {
    */
   public static X509Certificate generateCertificate(String dn, KeyPair pair, int days, String algorithm)
       throws CertificateEncodingException,
-             InvalidKeyException,
-             IllegalStateException,
-             NoSuchProviderException, NoSuchAlgorithmException, SignatureException{
-
+      InvalidKeyException,
+      IllegalStateException,
+      NoSuchProviderException, NoSuchAlgorithmException, SignatureException{
+  
     Date from = new Date();
     Date to = new Date(from.getTime() + days * 86400000l);
     BigInteger sn = new BigInteger(64, new SecureRandom());
     KeyPair keyPair = pair;
-    X509V1CertificateGenerator certGen = new X509V1CertificateGenerator();
-    X500Principal  dnName = new X500Principal(dn);
-
-    certGen.setSerialNumber(sn);
-    certGen.setIssuerDN(dnName);
-    certGen.setNotBefore(from);
-    certGen.setNotAfter(to);
-    certGen.setSubjectDN(dnName);
-    certGen.setPublicKey(keyPair.getPublic());
-    certGen.setSignatureAlgorithm(algorithm);
-
-    X509Certificate cert = certGen.generate(pair.getPrivate());
-    return cert;
+  
+    X500Name x500Name = new X500Name(dn);
+    try {
+      ContentSigner sigGen = new JcaContentSignerBuilder(algorithm).setProvider("BC").build(pair.getPrivate());
+      X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(x500Name, sn, from, to, x500Name,
+          pair.getPublic());
+      return new JcaX509CertificateConverter().setProvider("BC").getCertificate(certGen.build(sigGen));
+    } catch (OperatorCreationException | CertificateException ex) {
+      throw new InvalidKeyException(ex);
+    }
   }
-
-  @SuppressWarnings("deprecation")
+  
   public static X509Certificate generateSignedCertificate(String dn, KeyPair pair, int days, String algorithm,
-          PrivateKey caKey, X509Certificate caCert) throws CertificateParsingException,
-                                                            CertificateEncodingException,
-                                                            NoSuchAlgorithmException,
-                                                            SignatureException,
-                                                            InvalidKeyException,
-                                                            NoSuchProviderException {
+      PrivateKey caKey, X509Certificate caCert) throws CertificateParsingException,
+      CertificateEncodingException,
+      NoSuchAlgorithmException,
+      SignatureException,
+      InvalidKeyException,
+      NoSuchProviderException {
     Date from = new Date();
     Date to = new Date(from.getTime() + days * 86400000l);
     BigInteger sn = new BigInteger(64, new SecureRandom());
-    X509V3CertificateGenerator certGen = new X509V3CertificateGenerator();
-
-    X500Principal subjectName = new X500Principal(dn);
-
-    certGen.setSerialNumber(sn);
-    certGen.setIssuerDN(caCert.getSubjectX500Principal());
-    certGen.setNotBefore(from);
-    certGen.setNotAfter(to);
-    certGen.setSubjectDN(subjectName);
-    certGen.setPublicKey(pair.getPublic());
-    certGen.setSignatureAlgorithm(algorithm);
-
-    certGen.addExtension(new ASN1ObjectIdentifier("2.5.29.35"), false,
-            new AuthorityKeyIdentifierStructure(caCert));
-    certGen.addExtension(new ASN1ObjectIdentifier("2.5.29.14"), false,
-            new SubjectKeyIdentifierStructure(pair.getPublic()));
-
-    return certGen.generate(caKey);
+  
+    X500Name x500Name = new X500Name(dn);
+    X500Name issuer = new X500Name(caCert.getSubjectX500Principal().getName());
+    try {
+      JcaX509ExtensionUtils extUtil = new JcaX509ExtensionUtils();
+      ContentSigner sigGen = new JcaContentSignerBuilder(algorithm).setProvider("BC").build(caKey);
+      X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer, sn, from, to, x500Name,
+          pair.getPublic())
+          .addExtension(Extension.authorityKeyIdentifier, false, extUtil.createAuthorityKeyIdentifier(caCert
+              .getPublicKey()))
+          .addExtension(Extension.subjectKeyIdentifier, false, extUtil.createSubjectKeyIdentifier(pair.getPublic()));
+      return new JcaX509CertificateConverter().setProvider("BC").getCertificate(certGen.build(sigGen));
+    } catch (OperatorCreationException | CertificateException | CertIOException ex) {
+      throw new InvalidKeyException(ex);
+    }
   }
 
   public static KeyPair generateKeyPair(String algorithm)
@@ -221,34 +227,32 @@ public class KeyStoreTestUtil {
   
   public static X509CRL generateCRL(X509Certificate caCert, PrivateKey caPrivateKey, String signAlgorith,
       X509CRL existingCRL, BigInteger serialNumberToRevoke)
-    throws GeneralSecurityException {
-    X509V2CRLGenerator crlGenerator = new X509V2CRLGenerator();
+      throws GeneralSecurityException {
     LocalDate currentTime = LocalDate.now();
     Date nowDate = Date.from(currentTime.atStartOfDay(ZoneId.systemDefault()).toInstant());
     LocalDate nextUpdate = currentTime.plus(1, ChronoUnit.WEEKS);
     Date nextUpdateDate = Date.from(nextUpdate.atStartOfDay(ZoneId.systemDefault()).toInstant());
     
-    crlGenerator.setIssuerDN(caCert.getSubjectX500Principal());
-    crlGenerator.setThisUpdate(nowDate);
-    crlGenerator.setNextUpdate(nextUpdateDate);
-    crlGenerator.setSignatureAlgorithm(signAlgorith);
-    
+    X509v2CRLBuilder crlBuilder = new X509v2CRLBuilder(new X500Name(caCert.getSubjectX500Principal().getName()),
+        nowDate);
+    crlBuilder.setNextUpdate(nextUpdateDate);
     if (existingCRL != null) {
-      crlGenerator.addCRL(existingCRL);
+      crlBuilder.addCRL(new JcaX509CRLHolder(existingCRL));
     }
-    //crlGenerator.addCRLEntry(BigInteger.ONE, nowDate, CRLReason.aACompromise);
     if (serialNumberToRevoke != null) {
-      crlGenerator.addCRLEntry(serialNumberToRevoke, nowDate, CRLReason.aACompromise);
+      crlBuilder.addCRLEntry(serialNumberToRevoke, nowDate, CRLReason.privilegeWithdrawn);
     }
-    
-    // Hadoop Common and Hadoop Yarn use older version of BC than HDFS. In the later some fields have
-    // been deprecated such as X509Extensions.AuthorityKeyIdentifier and X509Extensions.CRLNumber
-    // AuthorityKeyIdentifier
-    crlGenerator.addExtension(new DERObjectIdentifier("2.5.29.35"), false, new AuthorityKeyIdentifierStructure(caCert));
-    // CRLNumber
-    crlGenerator.addExtension(new DERObjectIdentifier("2.5.29.20"), false, new CRLNumber(BigInteger.ONE));
-    
-    return crlGenerator.generate(caPrivateKey);
+    JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
+    try {
+      crlBuilder.addExtension(Extension.authorityKeyIdentifier, false, extUtils.createAuthorityKeyIdentifier(caCert
+          .getPublicKey()));
+      crlBuilder.addExtension(Extension.cRLNumber, false, new CRLNumber(BigInteger.ONE));
+      X509CRLHolder crlHolder = crlBuilder.build(new JcaContentSignerBuilder(signAlgorith).setProvider("BC").build
+          (caPrivateKey));
+      return new JcaX509CRLConverter().setProvider("BC").getCRL(crlHolder);
+    } catch (CertIOException | OperatorCreationException ex) {
+      throw new GeneralSecurityException(ex);
+    }
   }
   
   public static void cleanupSSLConfig(String keystoresDir, String sslConfDir)

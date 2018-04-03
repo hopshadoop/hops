@@ -278,7 +278,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
           .getCertificateLocalization();
 
       try {
-        certFolder = certificateLocalization.getMaterialLocation(user).getCertFolder();
+        certFolder = certificateLocalization.getMaterialLocation(user, appId).getCertFolder();
       } catch (ExecutionException e) {
         throw new InterruptedException("Execution of CertificateMaterializer interrupted");
       }

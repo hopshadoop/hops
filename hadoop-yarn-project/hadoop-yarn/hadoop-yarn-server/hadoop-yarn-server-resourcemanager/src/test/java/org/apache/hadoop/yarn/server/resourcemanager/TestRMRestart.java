@@ -150,7 +150,7 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
   }
 
   @Before
-  public void setup() throws IOException {
+  public void setup() throws Exception {
     conf = getConf();
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
@@ -197,12 +197,54 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     return rm;
   }
   
+  @Test
+  public void testRMRestartWithCryptoMaterial() throws Exception {
+    conf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
+    
+    // Start RM
+    MockRM rm1 = createMockRM(conf);
+    rm1.start();
+    MockNM nm1 = new MockNM("127.0.0.1:1337", 1024 * 10, rm1.getResourceTrackerService());
+    nm1.registerNode();
+    
+    // Submit application
+    RMApp app0 = rm1.submitApp(1024);
+    nm1.nodeHeartbeat(true);
+    
+    // RMState should have the application with the crypto material
+    RMState rmState = rm1.getRMContext().getStateStore().loadState();
+    Map<ApplicationId, ApplicationStateData> rmAppState = rmState.getApplicationState();
+    assertCryptoMaterialStateNotEmpty(rmAppState.get(app0.getApplicationId()));
+    
+    // Stop RM
+    
+    // Start second RM
+    MockRM rm2 = createMockRM(conf);
+    rm2.start();
+    nm1.setResourceTrackerService(rm2.getResourceTrackerService());
+    nm1.nodeHeartbeat(true);
+    Map<ApplicationId, RMApp> rm2Apps = rm2.getRMContext().getRMApps();
+    Assert.assertEquals(1, rm2Apps.size());
+    
+    // Verify crypto material are recovered correctly
+    rmState = rm2.getRMContext().getStateStore().loadState();
+    rmAppState = rmState.getApplicationState();
+    assertCryptoMaterialStateNotEmpty(rmAppState.get(app0.getApplicationId()));
+    RMApp recoveredApp0 = rm2Apps.get(app0.getApplicationId());
+    assertAppCryptoMaterialNotEmpty(recoveredApp0);
+    
+    Assert.assertArrayEquals(app0.getKeyStore(), recoveredApp0.getKeyStore());
+    Assert.assertArrayEquals(app0.getKeyStorePassword(), recoveredApp0.getKeyStorePassword());
+    Assert.assertArrayEquals(app0.getTrustStore(), recoveredApp0.getTrustStore());
+    Assert.assertArrayEquals(app0.getTrustStorePassword(), recoveredApp0.getTrustStorePassword());
+  }
+  
   @SuppressWarnings("rawtypes")
   @Test (timeout=180000)
   public void testRMRestart() throws Exception {
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
         YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
-
+    conf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
     
     
     // PHASE 1: create state in an RM
@@ -245,6 +287,7 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     Assert.assertEquals(appState.getApplicationSubmissionContext()
         .getApplicationId(), app1.getApplicationSubmissionContext()
         .getApplicationId());
+    assertCryptoMaterialStateNotEmpty(appState);
 
     //kick the scheduling to allocate AM container
     nm1.nodeHeartbeat(true);
@@ -367,6 +410,10 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     Assert.assertEquals(1, loadedApp1.getAppAttempts().size());
     Assert.assertEquals(1, loadedApp2.getAppAttempts().size());
     
+    // Verify crypto material for recovered apps
+    assertAppCryptoMaterialNotEmpty(loadedApp1);
+    assertAppCryptoMaterialNotEmpty(loadedApp2);
+    
     // verify old AM is not accepted
     // change running AM to talk to new RM
     am1.setAMRMProtocol(rm2.getApplicationMasterService(), rm2.getRMContext());
@@ -483,6 +530,28 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     Assert.assertEquals(4, rmAppState.size());
   }
 
+  private void assertCryptoMaterialStateNotEmpty(ApplicationStateData appState) {
+    Assert.assertNotNull(appState.getKeyStore());
+    Assert.assertNotEquals(0, appState.getKeyStore().length);
+    Assert.assertNotNull(appState.getKeyStorePassword());
+    Assert.assertNotEquals(0, appState.getKeyStorePassword());
+    Assert.assertNotNull(appState.getTrustStore());
+    Assert.assertNotEquals(0, appState.getTrustStore().length);
+    Assert.assertNotNull(appState.getTrustStore());
+    Assert.assertNotEquals(0, appState.getTrustStorePassword().length);
+  }
+  
+  private void assertAppCryptoMaterialNotEmpty(RMApp app) {
+    Assert.assertNotNull(app.getKeyStore());
+    Assert.assertNotEquals(0, app.getKeyStore().length);
+    Assert.assertNotNull(app.getKeyStorePassword());
+    Assert.assertNotEquals(0, app.getKeyStorePassword());
+    Assert.assertNotNull(app.getTrustStore());
+    Assert.assertNotEquals(0, app.getTrustStore().length);
+    Assert.assertNotNull(app.getTrustStore());
+    Assert.assertNotEquals(0, app.getTrustStorePassword().length);
+  }
+  
   @Test (timeout = 60000)
   public void testRMRestartAppRunningAMFailed() throws Exception {
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,

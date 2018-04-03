@@ -30,7 +30,8 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMWriter;
+import org.bouncycastle.openssl.jcajce.JcaMiscPEMGenerator;
+import org.bouncycastle.util.io.pem.PemWriter;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -117,8 +118,8 @@ public class TestYarnStartupWithCRL {
     // Generate CRL
     X509CRL crl = KeyStoreTestUtil.generateCRL(cert, keyPair.getPrivate(), signatureAlgorithm, null, null);
     FileWriter fw = new FileWriter(inputCRLPath.toFile(), false);
-    PEMWriter pw = new PEMWriter(fw);
-    pw.writeObject(crl);
+    PemWriter pw = new PemWriter(fw);
+    pw.writeObject(new JcaMiscPEMGenerator(crl));
     pw.flush();
     fw.flush();
     pw.close();

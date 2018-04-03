@@ -90,6 +90,12 @@
       <groupId>io.hops</groupId>
       <artifactId>hadoop-minikdc</artifactId>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>  <!-- declare the exclusion here -->
+          <groupId>bouncycastle</groupId>
+          <artifactId>bcprov-jdk15</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
@@ -111,7 +117,7 @@
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk16</artifactId>
+      <artifactId>bcprov-jdk15on</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

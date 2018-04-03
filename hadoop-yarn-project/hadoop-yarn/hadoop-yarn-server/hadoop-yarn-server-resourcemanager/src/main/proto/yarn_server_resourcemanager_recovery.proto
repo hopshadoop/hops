@@ -49,15 +49,16 @@ enum RMAppAttemptStateProto {
 
 enum RMAppStateProto {
     RMAPP_NEW = 1;
-    RMAPP_NEW_SAVING = 2;
-    RMAPP_SUBMITTED = 3;
-    RMAPP_ACCEPTED = 4;
-    RMAPP_RUNNING = 5;
-    RMAPP_FINAL_SAVING = 6;
-    RMAPP_FINISHING = 7;
-    RMAPP_FINISHED = 8;
-    RMAPP_FAILED = 9;
-    RMAPP_KILLED = 10;
+    RMAPP_GENERATING_CERTS = 2;
+    RMAPP_NEW_SAVING = 3;
+    RMAPP_SUBMITTED = 4;
+    RMAPP_ACCEPTED = 5;
+    RMAPP_RUNNING = 6;
+    RMAPP_FINAL_SAVING = 7;
+    RMAPP_FINISHING = 8;
+    RMAPP_FINISHED = 9;
+    RMAPP_FAILED = 10;
+    RMAPP_KILLED = 11;
 }
 
 message ApplicationStateDataProto {
@@ -69,6 +70,10 @@ message ApplicationStateDataProto {
     optional string diagnostics = 6 [default = "N/A"];
     optional int64 finish_time = 7;
     optional hadoop.common.RPCCallerContextProto caller_context = 8;
+    optional bytes key_store = 9;
+    optional string key_store_password = 10;
+    optional bytes trust_store = 11;
+    optional string trust_store_password = 12;
 }
 
 message ApplicationAttemptStateDataProto {

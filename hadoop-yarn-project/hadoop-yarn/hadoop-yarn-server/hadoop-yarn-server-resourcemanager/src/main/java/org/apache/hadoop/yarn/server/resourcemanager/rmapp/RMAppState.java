@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
 public enum RMAppState {
   NEW,
+  GENERATING_CERTS,
   NEW_SAVING,
   SUBMITTED,
   ACCEPTED,

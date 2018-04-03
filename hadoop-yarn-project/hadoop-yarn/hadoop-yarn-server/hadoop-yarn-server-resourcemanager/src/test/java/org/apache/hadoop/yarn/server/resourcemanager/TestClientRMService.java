@@ -1043,7 +1043,7 @@ public class TestClientRMService {
             System.currentTimeMillis(), "YARN", null,
             BuilderUtils.newResourceRequest(
                 RMAppAttemptImpl.AM_CONTAINER_PRIORITY, ResourceRequest.ANY,
-                Resource.newInstance(1024, 1, 1), 1), null, null, null, null){
+                Resource.newInstance(1024, 1, 1), 1)){
                   @Override
                   public ApplicationReport createAndGetApplicationReport(
                       String clientUserName, boolean allowAccess) {

@@ -200,9 +200,16 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>${hamcrest.version}</version>
       <scope>test</scope>
     </dependency>
+
     <dependency>
       <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk16</artifactId>
+      <artifactId>bcprov-jdk15on</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk15on</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

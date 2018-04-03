@@ -59,6 +59,17 @@ public abstract class ApplicationStateData {
     return appState;
   }
 
+  public static ApplicationStateData newInstance(long submitTime, long startTime,
+      ApplicationSubmissionContext context, String user, CallerContext callerContext,
+      byte[] keyStore, char[] keyStorePassword, byte[] trustStore, char[] trustStorePassword) {
+    ApplicationStateData appState = newInstance(submitTime, startTime, context, user, callerContext);
+    appState.setKeyStore(keyStore);
+    appState.setKeyStorePassword(keyStorePassword);
+    appState.setTrustStore(trustStore);
+    appState.setTrustStorePassword(trustStorePassword);
+    return appState;
+  }
+  
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, ApplicationSubmissionContext context, String user,
       CallerContext callerContext) {
@@ -158,4 +169,20 @@ public abstract class ApplicationStateData {
   public abstract CallerContext getCallerContext();
   
   public abstract void setCallerContext(CallerContext callerContext);
+  
+  public abstract byte[] getKeyStore();
+  
+  public abstract void setKeyStore(byte[] keyStore);
+  
+  public abstract char[] getKeyStorePassword();
+  
+  public abstract void setKeyStorePassword(char[] keyStorePassword);
+  
+  public abstract byte[] getTrustStore();
+  
+  public abstract void setTrustStore(byte[] trustStore);
+  
+  public abstract char[] getTrustStorePassword();
+  
+  public abstract void setTrustStorePassword(char[] trustStorePassword);
 }

@@ -869,7 +869,7 @@ public class ContainerManagerImpl extends CompositeService implements
       ByteBuffer trustStore, String trustStorePass) throws IOException {
     
     if (context.getApplications().containsKey(appId)) {
-      LOG.error("Application reference exists, certificates should have " +
+      LOG.debug("Application reference exists, certificates should have " +
           "already been materialized");
       return;
     }
@@ -884,7 +884,7 @@ public class ContainerManagerImpl extends CompositeService implements
     // AMLauncher
     if (keyStorePass != null && !keyStorePass.isEmpty()
         && trustStorePass != null && !trustStorePass.isEmpty()) {
-      context.getCertificateLocalizationService().materializeCertificates(user, userFolder,
+      context.getCertificateLocalizationService().materializeCertificates(user, appId.toString(), userFolder,
           keyStore, keyStorePass, trustStore, trustStorePass);
     }
   }
@@ -940,7 +940,7 @@ public class ContainerManagerImpl extends CompositeService implements
 
     return builder.build();
   }
-
+  
   @SuppressWarnings("unchecked")
   private void startContainerInternal(NMTokenIdentifier nmTokenIdentifier,
       ContainerTokenIdentifier containerTokenIdentifier,
@@ -983,29 +983,9 @@ public class ContainerManagerImpl extends CompositeService implements
         }
       }
     }
-  
-    // Inject file to localize containing the certificates's password
-    if (getConfig() != null && getConfig().getBoolean(
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      String passwdLocation;
-      try {
-        CryptoMaterial cryptoMaterial = context
-            .getCertificateLocalizationService().getMaterialLocation(user);
-        passwdLocation = cryptoMaterial.getPasswdLocation();
-        if (passwdLocation != null) {
-          URL passwdURL = URL.newInstance("file", null, -1, passwdLocation);
-          File passwdFIle = new File(passwdLocation);
-          LocalResource passwdResource = LocalResource.newInstance(passwdURL,
-              LocalResourceType.FILE, LocalResourceVisibility.PRIVATE,
-              passwdFIle.length(), passwdFIle.lastModified());
-          launchContext.getLocalResources().put(
-              HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME, passwdResource);
-        }
-      } catch (InterruptedException | ExecutionException ex) {
-        throw new YarnException(ex);
-      }
-    }
+    
+    // Inject crypto material when RPC TLS is enabled as LocalResources
+    injectCryptoMaterialAsLocalResources(user, containerId, launchContext);
     
     // Sanity check for local resources
     for (Map.Entry<String, LocalResource> rsrc : launchContext
@@ -1076,7 +1056,55 @@ public class ContainerManagerImpl extends CompositeService implements
       this.readLock.unlock();
     }
   }
-
+  
+  private void addAsLocalResource(Map<File, String> resources, ContainerId containerId,
+      ContainerLaunchContext containerLaunchContext)
+    throws IOException {
+    for (Map.Entry<File, String> resource : resources.entrySet()) {
+      File localFile = resource.getKey();
+      if (!localFile.exists() || !localFile.canRead()) {
+        throw new IOException("Crypto material file " + localFile.getAbsolutePath() + " for container " +
+            containerId.toString() + " does not exist or cannot be read");
+      }
+      URL fileURL = URL.newInstance("file", null, -1, localFile.getAbsolutePath());
+      LocalResource localResource = LocalResource.newInstance(fileURL,
+          LocalResourceType.FILE, LocalResourceVisibility.PRIVATE,
+          localFile.length(), localFile.lastModified());
+      containerLaunchContext.getLocalResources().put(resource.getValue(), localResource);
+    }
+  }
+  
+  private void injectCryptoMaterialAsLocalResources(String applicationUser, ContainerId containerId,
+      ContainerLaunchContext containerLaunchContext)
+      throws YarnException, IOException {
+    if (getConfig() != null && getConfig().getBoolean(
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      try {
+        String applicationId = containerId.getApplicationAttemptId().getApplicationId().toString();
+        CryptoMaterial cryptoMaterial = context
+            .getCertificateLocalizationService().getMaterialLocation(applicationUser, applicationId);
+        String keyStoreLocation = cryptoMaterial.getKeyStoreLocation();
+        String trustStoreLocation = cryptoMaterial.getTrustStoreLocation();
+        String passwdLocation = cryptoMaterial.getPasswdLocation();
+        
+        if (keyStoreLocation == null || trustStoreLocation == null || passwdLocation == null) {
+          throw new YarnException("One of the crypto materials for container " + containerId.toString() + " has not " +
+              "been localized correctly and is null");
+        }
+        
+        Map<File, String> resources = new HashMap<>(3);
+        resources.put(new File(keyStoreLocation), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+        resources.put(new File(trustStoreLocation), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+        resources.put(new File(passwdLocation), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+        
+        addAsLocalResource(resources, containerId, containerLaunchContext);
+      } catch (InterruptedException | ExecutionException ex) {
+        throw new YarnException(ex);
+      }
+    }
+  }
+  
   protected ContainerTokenIdentifier verifyAndGetContainerTokenIdentifier(
       org.apache.hadoop.yarn.api.records.Token token,
       ContainerTokenIdentifier containerTokenIdentifier) throws YarnException,

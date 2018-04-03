@@ -22,6 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 import org.apache.hadoop.security.ssl.CryptoMaterial;
 
@@ -44,10 +45,10 @@ public class NormalUserMaterilizeDirSSLCheck extends AbstractHopsSSLCheck {
   }
   
   @Override
-  public HopsSSLCryptoMaterial check(String username, Set<String> proxySuperUsers, Configuration configuration,
+  public HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperUsers, Configuration configuration,
       CertificateLocalization certificateLocalization)
       throws IOException {
-    
+    String username = ugi.getUserName();
     if (username.matches(HopsSSLSocketFactory.USERNAME_PATTERN)
       || !proxySuperUsers.contains(username)) {
       

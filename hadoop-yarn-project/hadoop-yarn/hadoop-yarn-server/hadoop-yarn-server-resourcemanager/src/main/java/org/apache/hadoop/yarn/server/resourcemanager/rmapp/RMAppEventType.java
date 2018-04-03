@@ -25,6 +25,8 @@ public enum RMAppEventType {
   KILL,
   MOVE, // Move app to a new queue
 
+  CERTS_GENERATED,
+  
   // Source: Scheduler and RMAppManager
   APP_REJECTED,
 

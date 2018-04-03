@@ -60,6 +60,7 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 
+import io.hops.security.HopsUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -2252,7 +2253,7 @@ public abstract class Server {
        * Checks whether the CN from the client's certificate subject
        * matches the username supplied by the RPC call
        * @param protocolUser - UserGroupInformation for the user made the RPC call
-       * @throws WrappedRpcServerException
+       * @throws FatalRpcServerException
        */
     private void authenticateSSLConnection(UserGroupInformation protocolUser)
             throws FatalRpcServerException {
@@ -2273,13 +2274,17 @@ public abstract class Server {
                 .getClientCertificate();
 
         String subjectDN = clientCertificate.getSubjectX500Principal().getName("RFC2253");
-        String[] subjectTokens = subjectDN.split(",");
-        String[] cnTokens = subjectTokens[0].split("=", 2);
-        if (cnTokens.length != 2) {
+        String cn = HopsUtil.extractCNFromSubject(subjectDN);
+        if (cn == null) {
           throw new FatalRpcServerException(RpcErrorCodeProto.FATAL_UNAUTHORIZED,
-                  "Problematic CN in client certificate: " + subjectTokens[0]);
+              "Problematic CN in client certificate: " + subjectDN);
         }
-        String cn = cnTokens[1];
+        
+        // Hops X.509 certificates use O field for ApplicationID
+        String org = HopsUtil.extractOFromSubject(subjectDN);
+        if (org != null) {
+          protocolUser.addApplicationId(org);
+        }
 
         // If the CN of the certificate is equals to Hops superuser,
         // let it go through

@@ -20,6 +20,7 @@ package org.apache.hadoop.net.hopssslchecks;
 import io.hops.security.HopsUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 import org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
 
@@ -38,13 +39,14 @@ public class EnvVariableHopsSSLCheck extends AbstractHopsSSLCheck {
   }
   
   @Override
-  public HopsSSLCryptoMaterial check(String username, Set<String> proxySuperUsers, Configuration configuration,
+  public HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperUsers, Configuration configuration,
       CertificateLocalization certificateLocalization) throws IOException {
     
     String cryptoMaterialDir = EnvironmentVariablesFactory.getInstance().getEnv(HopsSSLSocketFactory
         .CRYPTO_MATERIAL_ENV_VAR);
     
     if (cryptoMaterialDir != null) {
+      String username = ugi.getUserName();
       File keystoreFd = Paths.get(cryptoMaterialDir, username + HopsSSLSocketFactory.KEYSTORE_SUFFIX).toFile();
       File trustStoreFd = Paths.get(cryptoMaterialDir, username + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX).toFile();
       File passwordFd = Paths.get(cryptoMaterialDir, username + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX).toFile();

@@ -20,23 +20,30 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Random;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.Credentials;
@@ -81,9 +88,16 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.AMRMTokenSecretMan
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.DelegationTokenRenewer;
 import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateActionsFactory;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions;
+import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -91,6 +105,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Matchers;
+import org.mockito.Mock;
+import org.mockito.verification.VerificationMode;
 
 
 @RunWith(value = Parameterized.class)
@@ -109,6 +125,9 @@ public class TestRMAppTransitions {
   private SystemMetricsPublisher publisher;
   private YarnScheduler scheduler;
   private TestSchedulerEventDispatcher schedulerDispatcher;
+  private RMAppCertificateManager rmAppCertificateManager;
+  private CertificateLocalizationService certificateLocalizationService;
+  private final char[] cryptoPassword = "password".toCharArray();
 
   // ignore all the RM application attempt events
   private static final class TestApplicationAttemptEventDispatcher implements
@@ -193,6 +212,7 @@ public class TestRMAppTransitions {
   @Before
   public void setUp() throws Exception {
     conf = new YarnConfiguration();
+    conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, isSecurityEnabled);
     AuthenticationMethod authMethod = AuthenticationMethod.SIMPLE;
     if (isSecurityEnabled) {
       authMethod = AuthenticationMethod.KERBEROS;
@@ -219,7 +239,12 @@ public class TestRMAppTransitions {
     publisher = mock(SystemMetricsPublisher.class);
     realRMContext.setSystemMetricsPublisher(publisher);
     realRMContext.setRMApplicationHistoryWriter(writer);
-
+  
+    certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM);
+    certificateLocalizationService.init(conf);
+    certificateLocalizationService.start();
+    ((RMContextImpl) realRMContext).setCertificateLocalizationService(certificateLocalizationService);
+    
     this.rmContext = spy(realRMContext);
 
     ResourceScheduler resourceScheduler = mock(ResourceScheduler.class);
@@ -240,10 +265,37 @@ public class TestRMAppTransitions {
     rmDispatcher.register(SchedulerEventType.class,
         schedulerDispatcher);
     
+    RMAppCertificateActionsFactory.getInstance().clear();
+    conf.set(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions");
+    rmAppCertificateManager = spy(new RMAppCertificateManager(rmContext));
+    rmAppCertificateManager.init(conf);
+    rmAppCertificateManager.start();
+    
+    when(rmAppCertificateManager.generateRandomPassword()).thenReturn(cryptoPassword);
+    doReturn(loadMockTrustStore()).when(rmAppCertificateManager).loadSystemTrustStore(any(Configuration.class));
+    
+    rmDispatcher.register(RMAppCertificateManagerEventType.class, rmAppCertificateManager);
+    
     rmDispatcher.init(conf);
     rmDispatcher.start();
   }
-
+  
+  @After
+  public void tearDown() throws Exception {
+    // Delete the tmp cert loc dir
+    if (certificateLocalizationService != null) {
+      certificateLocalizationService.stop();
+    }
+    RMAppCertificateActionsFactory.getInstance().clear();
+  }
+  
+  private KeyStore loadMockTrustStore() throws IOException, GeneralSecurityException {
+    KeyStore trustStore = KeyStore.getInstance("JKS");
+    trustStore.load(null, null);
+    return trustStore;
+  }
+  
   protected RMApp createNewTestApp(ApplicationSubmissionContext submissionContext) throws IOException {
     ApplicationId applicationId = MockApps.newAppID(appId++);
     String user = MockApps.newUserName();
@@ -265,7 +317,7 @@ public class TestRMAppTransitions {
 
     RMApp application = new RMAppImpl(applicationId, rmContext, conf, name,
         user, queue, submissionContext, scheduler, masterService,
-        System.currentTimeMillis(), "YARN", null, mock(ResourceRequest.class), null, null, null, null);
+        System.currentTimeMillis(), "YARN", null, mock(ResourceRequest.class));
 
     testAppStartState(applicationId, user, name, queue, application);
     this.rmContext.getRMApps().putIfAbsent(application.getApplicationId(),
@@ -383,36 +435,89 @@ public class TestRMAppTransitions {
     return application;
   }
 
-  protected RMApp testCreateAppSubmittedNoRecovery(
-      ApplicationSubmissionContext submissionContext) throws IOException {
+  protected RMApp testCreateAppGeneratingCerts(ApplicationSubmissionContext submissionContext) throws IOException {
     RMApp application = testCreateAppNewSaving(submissionContext);
-    // NEW_SAVING => SUBMITTED event RMAppEventType.APP_NEW_SAVED
+    // NEW_SAVING => GENERATING_CERTS event RMAppEventType.APP_NEW_SAVED
     RMAppEvent event =
         new RMAppEvent(application.getApplicationId(),
-        RMAppEventType.APP_NEW_SAVED);
+            RMAppEventType.APP_NEW_SAVED);
     application.handle(event);
+    // Application State here should be GENERATING_CERTS
+    // Since the state is changed by an external event, from RMAppCertificateManager,
+    // we might run into timing issues and the test will fail for no real reason
+    // assertAppState(RMAppState.GENERATING_CERTS, application);
     assertStartTimeSet(application);
+    return application;
+  }
+  
+  protected RMApp testCreateAppSubmittedNoRecovery(
+      ApplicationSubmissionContext submissionContext) throws IOException {
+    RMApp application = testCreateAppGeneratingCerts(submissionContext);
+    // GENERATING_CERTS => SUBMITTED event RMAppEventType.CERTS_GENERATED will be sent by RMAppCertificateManager
+    rmDispatcher.await();
+    verify(rmAppCertificateManager).generateCertificate(eq(application.getApplicationId()), eq(application.getUser()));
     assertAppState(RMAppState.SUBMITTED, application);
+    if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      Assert.assertNotNull(application.getKeyStore());
+      Assert.assertNotEquals(0, application.getKeyStore().length);
+      Assert.assertNotNull(application.getTrustStore());
+      Assert.assertNotEquals(0, application.getTrustStore().length);
+      Assert.assertNotNull(application.getKeyStorePassword());
+      Assert.assertNotEquals(0, application.getKeyStorePassword().length);
+      Assert.assertTrue(Arrays.equals(cryptoPassword, application.getKeyStorePassword()));
+      Assert.assertNotNull(application.getTrustStorePassword());
+      Assert.assertNotEquals(0, application.getTrustStorePassword().length);
+      Assert.assertTrue(Arrays.equals(cryptoPassword, application.getTrustStorePassword()));
+    }
     // verify sendATSCreateEvent() is get called during
     // AddApplicationToSchedulerTransition.
     verify(publisher).appCreated(eq(application), anyLong());
+    
     return application;
   }
 
   protected RMApp testCreateAppSubmittedRecovery(
-      ApplicationSubmissionContext submissionContext) throws IOException {
+      ApplicationSubmissionContext submissionContext, boolean cryptoRecovered) throws IOException {
     RMApp application = createNewTestApp(submissionContext);
-    // NEW => SUBMITTED event RMAppEventType.RECOVER
+    // NEW => GENERATING_CERTS event RMAppEventType.RECOVER
     RMState state = new RMState();
     ApplicationStateData appState =
         ApplicationStateData.newInstance(123, 123, null, "user", null);
+    if (cryptoRecovered) {
+      appState.setKeyStore("some_bytes".getBytes());
+      appState.setKeyStorePassword(new char[]{'a', 'b', 'c'});
+      appState.setTrustStore("some_bytes".getBytes());
+      appState.setTrustStorePassword(new char[]{'a', 'b', 'c'});
+    }
     state.getApplicationState().put(application.getApplicationId(), appState);
     RMAppEvent event =
         new RMAppRecoverEvent(application.getApplicationId(), state);
 
     application.handle(event);
     assertStartTimeSet(application);
-    assertAppState(RMAppState.SUBMITTED, application);
+    if (cryptoRecovered) {
+      // Cryptographic material for the application has been recovered, state should be SUBMITTED
+      assertAppState(RMAppState.SUBMITTED, application);
+      verify(rmAppCertificateManager, never())
+          .generateCertificate(any(ApplicationId.class), any(String.class));
+    } else {
+      // No crypto material stored in state store, so recovered state should be GENERATING_CERTS
+      // Application State here should be GENERATING_CERTS
+      // Since the state is changed by an external event, from RMAppCertificateManager,
+      // we might run into timing issues and the test will fail for no real reason
+      // assertAppState(RMAppState.GENERATING_CERTS, application);
+      rmDispatcher.await();
+      verify(rmAppCertificateManager).generateCertificate(eq(application.getApplicationId()), eq(application.getUser()));
+      assertAppState(RMAppState.SUBMITTED, application);
+    }
+    
+    if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      Assert.assertNotNull(application.getKeyStore());
+      Assert.assertNotEquals(0, application.getKeyStore());
+    }
+    
     return application;
   }
 
@@ -546,7 +651,7 @@ public class TestRMAppTransitions {
         ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
     clc.setTokens(securityTokens);
     sub.setAMContainerSpec(clc);
-    testCreateAppSubmittedRecovery(sub);
+    testCreateAppSubmittedRecovery(sub, false);
   }
 
   @Test (timeout = 30000)
@@ -1020,7 +1125,7 @@ public class TestRMAppTransitions {
             submissionContext.getApplicationTags(),
             BuilderUtils.newResourceRequest(
                 RMAppAttemptImpl.AM_CONTAINER_PRIORITY, ResourceRequest.ANY,
-                submissionContext.getResource(), 1), null, null, null, null);
+                submissionContext.getResource(), 1));
     Assert.assertEquals(RMAppState.NEW, application.getState());
 
     RMAppEvent recoverEvent =
@@ -1062,6 +1167,41 @@ public class TestRMAppTransitions {
             + "/"));
   }
 
+  @Test
+  public void testAppGeneratingCertsKill() throws IOException {
+    LOG.info("--- START: testAppGeneratingCertsKill ---");
+  
+    rmDispatcher.unregisterHandlerForEvent(RMAppCertificateManagerEventType.class, true);
+    RMApp app = testCreateAppGeneratingCerts(null);
+    assertAppState(RMAppState.GENERATING_CERTS, app);
+    RMAppEvent event = new RMAppKillByClientEvent(app.getApplicationId(),
+        "Application killed by user.",
+        UserGroupInformation.getCurrentUser(), Server.getRemoteIp());
+    app.handle(event);
+    rmDispatcher.await();
+    assertAppState(RMAppState.FINAL_SAVING, app);
+    sendAppUpdateSavedEvent(app);
+    assertKilled(app);
+    verifyApplicationFinished(RMAppState.KILLED);
+  }
+  
+  @Test
+  public void testGeneratingCertsRecoverWithCrypto() throws IOException {
+    LOG.info("--- testGeneratingCertsRecoverWithCrypto ---");
+    ApplicationSubmissionContext sub =
+        Records.newRecord(ApplicationSubmissionContext.class);
+    ContainerLaunchContext clc =
+        Records.newRecord(ContainerLaunchContext.class);
+    Credentials credentials = new Credentials();
+    DataOutputBuffer dob = new DataOutputBuffer();
+    credentials.writeTokenStorageToStream(dob);
+    ByteBuffer securityTokens =
+        ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
+    clc.setTokens(securityTokens);
+    sub.setAMContainerSpec(clc);
+    testCreateAppSubmittedRecovery(sub, true);
+  }
+  
   private void verifyApplicationFinished(RMAppState state) {
     ArgumentCaptor<RMAppState> finalState =
         ArgumentCaptor.forClass(RMAppState.class);

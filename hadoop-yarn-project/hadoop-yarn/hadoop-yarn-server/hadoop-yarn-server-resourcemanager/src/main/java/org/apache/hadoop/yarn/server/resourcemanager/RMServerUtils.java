@@ -388,6 +388,8 @@ public class RMServerUtils {
     switch (rmAppState) {
     case NEW:
       return YarnApplicationState.NEW;
+    case GENERATING_CERTS:
+      return YarnApplicationState.GENERATING_CERTS;
     case NEW_SAVING:
       return YarnApplicationState.NEW_SAVING;
     case SUBMITTED:

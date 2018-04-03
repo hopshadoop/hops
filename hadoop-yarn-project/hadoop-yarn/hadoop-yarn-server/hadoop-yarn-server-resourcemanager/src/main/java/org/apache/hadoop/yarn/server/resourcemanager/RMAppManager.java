@@ -405,9 +405,7 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
         submissionContext.getApplicationName(), user,
         submissionContext.getQueue(), submissionContext, this.scheduler,
         this.masterService, submitTime, submissionContext.getApplicationType(),
-        submissionContext.getApplicationTags(), amReq, submissionContext.getKeyStore(),
-        submissionContext.getKeyStorePassword(), submissionContext.getTrustStore(), submissionContext.
-        getTrustStorePassword());
+        submissionContext.getApplicationTags(), amReq);
 
     // Concurrent app submissions with same applicationId will fail here
     // Concurrent app submissions with different applicationIds will not

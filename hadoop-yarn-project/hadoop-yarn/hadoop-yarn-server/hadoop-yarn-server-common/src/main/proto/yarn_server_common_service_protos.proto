@@ -123,24 +123,3 @@ message SCMUploaderCanUploadRequestProto {
 message SCMUploaderCanUploadResponseProto {
   optional bool uploadable = 1;
 }
-
-message MaterializeCryptoKeysRequestProto {
-  required string username = 1;
-  required bytes keystore = 2;
-  required string keystore_password = 3;
-  required bytes truststore = 4;
-  required string truststore_password = 5;
-  required string user_folder = 6;
-}
-
-message MaterializeCryptoKeysResponseProto {
-  required bool success = 1;
-}
-
-message RemoveCryptoKeysRequestProto {
-  required string username = 1;
-}
-
-message RemoveCryptoKeysResponseProto {
-  required bool success = 1;
-}

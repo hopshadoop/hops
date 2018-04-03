@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.net.InetSocketAddress;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.token.Token;
@@ -31,21 +29,39 @@ import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManager;
+import org.mockito.Mockito;
+
+import java.net.InetSocketAddress;
 
 public class MockRMWithCustomAMLauncher extends MockRM {
 
   private final ContainerManagementProtocol containerManager;
+  private final boolean mockRMAppCertificateManager;
 
   public MockRMWithCustomAMLauncher(ContainerManagementProtocol containerManager) {
     this(new Configuration(), containerManager);
   }
 
+  public MockRMWithCustomAMLauncher(Configuration conf, ContainerManagementProtocol containerManager) {
+    this(conf, containerManager, false);
+  }
+  
   public MockRMWithCustomAMLauncher(Configuration conf,
-      ContainerManagementProtocol containerManager) {
+      ContainerManagementProtocol containerManager,
+      boolean mockRMAppCertificateManager) {
     super(conf);
     this.containerManager = containerManager;
+    this.mockRMAppCertificateManager = mockRMAppCertificateManager;
   }
-
+  
+  
+  @Override
+  protected RMAppCertificateManager createRMAppCertificateManager() throws Exception {
+    return mockRMAppCertificateManager ? Mockito.spy(new RMAppCertificateManager(rmContext)) :
+        super.createRMAppCertificateManager();
+  }
+  
   @Override
   protected ApplicationMasterLauncher createAMLauncher() {
     return new ApplicationMasterLauncher(getRMContext()) {

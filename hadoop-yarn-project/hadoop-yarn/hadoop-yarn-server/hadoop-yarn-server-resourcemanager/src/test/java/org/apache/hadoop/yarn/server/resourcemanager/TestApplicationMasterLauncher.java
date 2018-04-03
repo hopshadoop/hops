@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
@@ -31,6 +32,7 @@ import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
@@ -55,7 +57,6 @@ import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.SerializedException;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.exceptions.ApplicationAttemptNotFoundException;
 import org.apache.hadoop.yarn.exceptions.ApplicationMasterNotRegisteredException;
@@ -71,6 +72,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMaste
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -78,9 +80,12 @@ import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class TestApplicationMasterLauncher {
@@ -159,14 +164,33 @@ public class TestApplicationMasterLauncher {
       return null;
     }
   }
-
+  
+  @Test(timeout = 10000)
+  public void testAMLaunchWithCryptoMaterial() throws Exception {
+    conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
+    AtomicBoolean testPass = new AtomicBoolean(true);
+    MockRM rm = new TestCryptoMockRM(conf, testPass);
+    rm.start();
+    MockNM nm = rm.registerNode("127.0.0.1:1337", 15 * 1024);
+    RMApp app = rm.submitApp(1024);
+    nm.nodeHeartbeat(true);
+    
+    RMAppAttempt appAttempt = app.getCurrentAppAttempt();
+  
+    MockAM am = rm.sendAMLaunched(appAttempt.getAppAttemptId());
+    am.registerAppAttempt(true);
+    
+    nm.nodeHeartbeat(true);
+    Assert.assertTrue(testPass.get());
+    rm.stop();
+  }
+  
   @Test
   public void testAMLaunchAndCleanup() throws Exception {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
     MyContainerManagerImpl containerManager = new MyContainerManagerImpl();
-    MockRMWithCustomAMLauncher rm = new MockRMWithCustomAMLauncher(
-        containerManager);
+    MockRMWithCustomAMLauncher rm = new MockRMWithCustomAMLauncher(new Configuration(), containerManager, true);
     rm.start();
     MockNM nm1 = rm.registerNode("127.0.0.1:1234", 5120);
 
@@ -213,6 +237,9 @@ public class TestApplicationMasterLauncher {
     Assert.assertTrue(containerManager.cleanedup);
 
     am.waitForState(RMAppAttemptState.FINISHED);
+    
+    verify(rm.rmAppCertificateManager, Mockito.atMost(1))
+        .revokeCertificate(Mockito.eq(app.getApplicationId()), Mockito.eq(app.getUser()));
     rm.stop();
   }
 
@@ -225,7 +252,7 @@ public class TestApplicationMasterLauncher {
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
   }
-
+  
   @Test
   public void testRetriesOnFailures() throws Exception {
     final ContainerManagementProtocol mockProxy =
@@ -375,7 +402,7 @@ public class TestApplicationMasterLauncher {
       Assert.fail("EOFException should not happen.");
     }
   }
-
+  
   static class MyAMLauncher extends AMLauncher {
     int count;
     public MyAMLauncher(RMContext rmContext, RMAppAttempt application,
@@ -396,6 +423,46 @@ public class TestApplicationMasterLauncher {
     protected void setupTokens(ContainerLaunchContext container,
         ContainerId containerID) throws IOException {
       super.setupTokens(container, containerID);
+    }
+  }
+  
+  private class TestCryptoMockRM extends MockRM {
+    private final AtomicBoolean testPass;
+    
+    private TestCryptoMockRM(Configuration conf, AtomicBoolean testPass) {
+      super(conf);
+      this.testPass = testPass;
+    }
+    
+    @Override
+    protected ApplicationMasterLauncher createAMLauncher() {
+      return new ApplicationMasterLauncher(rmContext) {
+        @Override
+        protected Runnable createRunnableLauncher(RMAppAttempt application, AMLauncherEventType event) {
+          return new TestCryptoAMLauncher(rmContext, application, event, conf, testPass);
+        }
+      };
+    }
+  }
+  
+  private class TestCryptoAMLauncher extends AMLauncher {
+    private final AtomicBoolean testPass;
+    
+    public TestCryptoAMLauncher(RMContext rmContext,
+        RMAppAttempt application, AMLauncherEventType eventType, Configuration conf, AtomicBoolean testPass) {
+      super(rmContext, application, eventType, conf);
+      this.testPass = testPass;
+    }
+    
+    @Override
+    protected void setupCryptoMaterial(StartContainersRequest request, RMApp application) {
+      super.setupCryptoMaterial(request, application);
+      if (request.getKeyStore() == null || request.getKeyStore().limit() == 0
+          || request.getKeyStorePassword() == null
+          || request.getTrustStore() == null || request.getTrustStore().limit() == 0
+          || request.getTrustStorePassword() == null) {
+        testPass.compareAndSet(true, false);
+      }
     }
   }
 }

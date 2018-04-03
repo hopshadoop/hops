@@ -18,12 +18,8 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -32,18 +28,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import io.hops.security.HopsUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -149,8 +142,6 @@ public class YarnClientImpl extends YarnClient {
   protected boolean timelineServiceEnabled;
   protected boolean timelineServiceBestEffort;
   
-  private String certificatePassword = null;
-
   private static final String ROOT = "root";
 
   public YarnClientImpl() {
@@ -254,12 +245,6 @@ public class YarnClientImpl extends YarnClient {
           "ApplicationId is not provided in ApplicationSubmissionContext");
     }
     
-    if (getConfig().getBoolean(CommonConfigurationKeysPublic
-            .IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      setCryptoMaterial(appContext);
-    }
-    
     SubmitApplicationRequest request =
         Records.newRecord(SubmitApplicationRequest.class);
     request.setApplicationSubmissionContext(appContext);
@@ -327,58 +312,6 @@ public class YarnClientImpl extends YarnClient {
     }
 
     return applicationId;
-  }
-  
-  private void setCryptoMaterial(ApplicationSubmissionContext appContext)
-      throws IOException {
-    String username = UserGroupInformation.getCurrentUser().getUserName();
-    
-    String clientMaterializeDir = getConfig().get(HopsSSLSocketFactory
-        .CryptoKeys.CLIENT_MATERIALIZE_DIR.getValue(),
-        HopsSSLSocketFactory.CryptoKeys.CLIENT_MATERIALIZE_DIR
-            .getDefaultValue());
-    
-    Path kStore = Paths.get(clientMaterializeDir, username +
-        HopsSSLSocketFactory.KEYSTORE_SUFFIX);
-    Path tStore = Paths.get(clientMaterializeDir, username +
-        HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
-    
-    if (!kStore.toFile().exists() || !tStore.toFile().exists()) {
-      throw new IOException("Crypto material for user " + username
-          + " could not be found in " + clientMaterializeDir);
-    }
-    
-    byte[] keyStoreBin = Files.readAllBytes(kStore);
-    ByteBuffer kstoreBB = ByteBuffer.wrap(keyStoreBin);
-    ByteBuffer tstoreBB = ByteBuffer.wrap(Files.readAllBytes(tStore));
-    
-    
-    appContext.setKeyStore(kstoreBB);
-    appContext.setTrustStore(tstoreBB);
-  
-    // Passwords have not been set, read them from the file containing the
-    // password
-    if (appContext.getKeyStorePassword() == null || appContext
-        .getKeyStorePassword().isEmpty()
-        || appContext.getTrustStorePassword() == null || appContext
-        .getTrustStorePassword().isEmpty()) {
-      Path passwdFile = Paths.get(clientMaterializeDir, username
-          + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX);
-      String password = readCryptoMaterialPassword(passwdFile.toFile());
-      appContext.setKeyStorePassword(password);
-      appContext.setTrustStorePassword(password);
-    }
-  }
-  
-  private String readCryptoMaterialPassword(File passwdFile) throws
-      IOException {
-    if (null != certificatePassword) {
-      return certificatePassword;
-    }
-    
-    certificatePassword = HopsUtil.readCryptoMaterialPassword(passwdFile);
-    
-    return certificatePassword;
   }
   
   private void addTimelineDelegationToken(

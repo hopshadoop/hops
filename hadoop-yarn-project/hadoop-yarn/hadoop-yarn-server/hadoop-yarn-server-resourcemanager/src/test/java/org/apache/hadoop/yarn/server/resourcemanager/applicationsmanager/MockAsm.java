@@ -217,6 +217,26 @@ public abstract class MockAsm extends MockApps {
     public CallerContext getCallerContext() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+  
+    @Override
+    public byte[] getKeyStore() {
+      throw new UnsupportedOperationException("Not supported yet.");
+    }
+  
+    @Override
+    public char[] getKeyStorePassword() {
+      throw new UnsupportedOperationException("Not supported yet.");
+    }
+  
+    @Override
+    public byte[] getTrustStore() {
+      throw new UnsupportedOperationException("Not supported yet.");
+    }
+  
+    @Override
+    public char[] getTrustStorePassword() {
+      throw new UnsupportedOperationException("Not supported yet.");
+    }
   }
 
   public static RMApp newApplication(int i) {
@@ -319,7 +339,6 @@ public abstract class MockAsm extends MockApps {
             type, null);
         return report;
       }
-
     };
   }
 

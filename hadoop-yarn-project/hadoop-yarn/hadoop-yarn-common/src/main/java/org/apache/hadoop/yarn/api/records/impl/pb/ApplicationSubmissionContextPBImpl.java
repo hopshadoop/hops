@@ -65,8 +65,6 @@ extends ApplicationSubmissionContext {
   private ResourceRequest amResourceRequest = null;
   private LogAggregationContext logAggregationContext = null;
   private ReservationId reservationId = null;
-  private ByteBuffer keyStore = null;
-  private ByteBuffer trustStore = null;
 
   public ApplicationSubmissionContextPBImpl() {
     builder = ApplicationSubmissionContextProto.newBuilder();
@@ -134,12 +132,6 @@ extends ApplicationSubmissionContext {
     }
     if (this.reservationId != null) {
       builder.setReservationId(convertToProtoFormat(this.reservationId));
-    }
-    if (this.keyStore != null) {
-      builder.setKeyStore(convertToProtoFormat(this.keyStore));
-    }
-    if (this.trustStore != null) {
-      builder.setTrustStore(convertToProtoFormat(this.trustStore));
     }
   }
 
@@ -421,88 +413,6 @@ extends ApplicationSubmissionContext {
   public boolean getKeepContainersAcrossApplicationAttempts() {
     ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
     return p.getKeepContainersAcrossApplicationAttempts();
-  }
-  
-  @Override
-  public ByteBuffer getKeyStore() {
-    ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
-    if (this.keyStore != null) {
-      return this.keyStore;
-    }
-    if (!p.hasKeyStore()) {
-      return null;
-    }
-    this.keyStore = convertFromProtoFormat(p.getKeyStore());
-    return this.keyStore;
-  }
-  
-  @Override
-  public void setKeyStore(ByteBuffer keyStore) {
-    maybeInitBuilder();
-    if (keyStore == null) {
-      builder.clearKeyStore();
-    }
-    this.keyStore = keyStore;
-  }
-  
-  @Override
-  public String getKeyStorePassword() {
-    ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
-    if (!p.hasKeyStorePassword()) {
-      return null;
-    }
-    return p.getKeyStorePassword();
-  }
-  
-  @Override
-  public void setKeyStorePassword(String password) {
-    maybeInitBuilder();
-    if (password == null) {
-      builder.clearKeyStorePassword();
-      return;
-    }
-    builder.setKeyStorePassword(password);
-  }
-  
-  @Override
-  public ByteBuffer getTrustStore() {
-    ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
-    if (this.trustStore != null) {
-      return this.trustStore;
-    }
-    if (!p.hasTrustStore()) {
-      return null;
-    }
-    this.trustStore = convertFromProtoFormat(p.getTrustStore());
-    return this.trustStore;
-  }
-  
-  @Override
-  public void setTrustStore(ByteBuffer trustStore) {
-    maybeInitBuilder();
-    if (trustStore == null) {
-      builder.clearTrustStore();
-    }
-    this.trustStore = trustStore;
-  }
-  
-  @Override
-  public String getTrustStorePassword() {
-    ApplicationSubmissionContextProtoOrBuilder p = viaProto ? proto : builder;
-    if (!p.hasTrustStorePassword()) {
-      return null;
-    }
-    return p.getTrustStorePassword();
-  }
-  
-  @Override
-  public void setTrustStorePassword(String password) {
-    maybeInitBuilder();
-    if (password == null) {
-      builder.clearTrustStorePassword();
-      return;
-    }
-    builder.setTrustStorePassword(password);
   }
   
   private PriorityPBImpl convertFromProtoFormat(PriorityProto p) {

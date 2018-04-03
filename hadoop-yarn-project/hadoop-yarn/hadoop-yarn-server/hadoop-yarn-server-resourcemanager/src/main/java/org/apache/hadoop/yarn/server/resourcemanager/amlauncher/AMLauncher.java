@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.amlauncher;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -26,7 +25,6 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -38,8 +36,8 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.CryptoMaterial;
-import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEventType;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.util.StringUtils;
@@ -128,10 +126,9 @@ public class AMLauncher implements Runnable {
     
     if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      String user = rmContext.getRMApps().get(masterContainerID
-          .getApplicationAttemptId().getApplicationId()).getUser();
-      setupCryptoMaterial(allRequests, user, masterContainerID
-          .getApplicationAttemptId().getApplicationId().toString());
+      RMApp application = rmContext.getRMApps().get(masterContainerID
+          .getApplicationAttemptId().getApplicationId());
+      setupCryptoMaterial(allRequests, application);
     }
     
     StartContainersResponse response =
@@ -147,59 +144,37 @@ public class AMLauncher implements Runnable {
     }
   }
   
-  private void setupCryptoMaterial(StartContainersRequest request,
-      String user, String applicationId) throws FileNotFoundException,
-      YarnException {
-    try {
-      CryptoMaterial material = rmContext
-          .getCertificateLocalizationService().getMaterialLocation(user);
-      request.setKeyStore(material.getKeyStoreMem());
-      request.setKeyStorePassword(material.getKeyStorePass());
-      request.setTrustStore(material.getTrustStoreMem());
-      request.setTrustStorePassword(material.getTrustStorePass());
-    } catch (InterruptedException | ExecutionException e) {
-      throw new YarnException("Execution of CertificateMaterializer " +
-          "interrupted", e);
-    } catch (IOException e) {
-      throw new YarnException("RPC TLS is enabled but keystore or truststore " +
-          "could not be found", e);
-    }
+  @Private
+  @VisibleForTesting
+  protected void setupCryptoMaterial(StartContainersRequest request, RMApp application) {
+    request.setKeyStore(ByteBuffer.wrap(application.getKeyStore()));
+    request.setKeyStorePassword(String.valueOf(application.getKeyStorePassword()));
+    request.setTrustStore(ByteBuffer.wrap(application.getTrustStore()));
+    request.setTrustStorePassword(String.valueOf(application.getTrustStorePassword()));
   }
   
   private void cleanup() throws IOException, YarnException {
-    connect();
-    ContainerId containerId = masterContainer.getId();
-    List<ContainerId> containerIds = new ArrayList<ContainerId>();
-    containerIds.add(containerId);
-    StopContainersRequest stopRequest =
-        StopContainersRequest.newInstance(containerIds);
-    StopContainersResponse response =
-        containerMgrProxy.stopContainers(stopRequest);
-    
-    // The application is cleaned-up when completes successfully or killed
-    // If the application failed more times than allowed, the cryptograhic
-    // material is cleaned by RMAppImpl#AttemptFailedTransition
-    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      // Remove the cryptographic material only if the application is
-      // finished or killed
-      RMApp app = rmContext.getRMApps().get(application.getAppAttemptId()
-          .getApplicationId());
-      if (appFinalStates.contains(app.getState())) {
-        String user = rmContext.getRMApps().get(containerId
-            .getApplicationAttemptId().getApplicationId()).getUser();
-        try {
-          rmContext.getCertificateLocalizationService().removeMaterial(user);
-        } catch (InterruptedException | ExecutionException e) {
-          throw new IOException(e);
-        }
+    try {
+      connect();
+      ContainerId containerId = masterContainer.getId();
+      List<ContainerId> containerIds = new ArrayList<ContainerId>();
+      containerIds.add(containerId);
+      StopContainersRequest stopRequest =
+          StopContainersRequest.newInstance(containerIds);
+      StopContainersResponse response =
+          containerMgrProxy.stopContainers(stopRequest);
+  
+      if (response.getFailedRequests() != null
+          && response.getFailedRequests().containsKey(containerId)) {
+        Throwable t = response.getFailedRequests().get(containerId).deSerialize();
+        parseAndThrowException(t);
       }
-    }
-    
-    if (response.getFailedRequests() != null
-        && response.getFailedRequests().containsKey(containerId)) {
-      Throwable t = response.getFailedRequests().get(containerId).deSerialize();
-      parseAndThrowException(t);
+    } finally {
+      RMApp application = rmContext.getRMApps().get(
+          this.application.getAppAttemptId().getApplicationId());
+      RMAppCertificateManagerEvent certsCleanup = new RMAppCertificateManagerEvent(
+          application.getApplicationId(), application.getUser(), RMAppCertificateManagerEventType.REVOKE_CERTIFICATE);
+      handler.handle(certsCleanup);
     }
   }
   
@@ -239,6 +214,7 @@ public class AMLauncher implements Runnable {
             containerId.getApplicationAttemptId(), node, user);
     realUser.addToken(ConverterUtils.convertFromYarn(token,
         containerManagerConnectAddress));
+    realUser.addApplicationId(containerId.getApplicationAttemptId().getApplicationId().toString());
     // END OF Hops
     
     return NMProxy.createNMProxy(conf, ContainerManagementProtocol.class,

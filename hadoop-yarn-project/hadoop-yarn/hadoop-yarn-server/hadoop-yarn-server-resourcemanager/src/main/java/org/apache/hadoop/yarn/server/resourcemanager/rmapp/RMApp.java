@@ -257,4 +257,12 @@ public interface RMApp extends EventHandler<RMAppEvent> {
   String getAppNodeLabelExpression();
 
   CallerContext getCallerContext();
+  
+  byte[] getKeyStore();
+  
+  char[] getKeyStorePassword();
+  
+  byte[] getTrustStore();
+  
+  char[] getTrustStorePassword();
 }

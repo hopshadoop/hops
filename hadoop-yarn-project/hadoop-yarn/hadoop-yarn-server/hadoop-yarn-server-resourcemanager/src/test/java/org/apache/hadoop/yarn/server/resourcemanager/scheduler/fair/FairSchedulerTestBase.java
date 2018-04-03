@@ -230,11 +230,16 @@ public class FairSchedulerTestBase {
     RMApp rmApp = new RMAppImpl(appId, rmContext, conf,
         null, user, null, ApplicationSubmissionContext.newInstance(appId, null,
         queue, null, null, false, false, 0, amResource, null), scheduler, null,
-        0, null, null, null, null, null, null, null);
+        0, null, null, null);
     rmContext.getRMApps().put(appId, rmApp);
     RMAppEvent event = new RMAppEvent(appId, RMAppEventType.START);
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);
     event = new RMAppEvent(appId, RMAppEventType.APP_NEW_SAVED);
+    resourceManager.getRMContext().getRMApps().get(appId).handle(event);
+    // Application will also receive a CERTS_GENERATED event from RMAppCertificateManager later in
+    // an invalid RMApp state. Since the following call is blocking, and needs to send a Scheduler event
+    // it is OK to handle CERTS_GENERATED here also
+    event = new RMAppEvent(appId, RMAppEventType.CERTS_GENERATED);
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);
     event = new RMAppEvent(appId, RMAppEventType.APP_ACCEPTED);
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);

@@ -15,20 +15,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.api.protocolrecords;
+package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import org.apache.hadoop.yarn.util.Records;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.event.AbstractEvent;
 
-public abstract class MaterializeCryptoKeysResponse {
+public class RMAppCertificateManagerEvent extends AbstractEvent<RMAppCertificateManagerEventType> {
+  private final ApplicationId applicationId;
+  private final String applicationUser;
   
-  public static MaterializeCryptoKeysResponse newInstance(boolean success) {
-    MaterializeCryptoKeysResponse response = Records.newRecord
-        (MaterializeCryptoKeysResponse.class);
-    response.setSuccess(success);
-    return response;
+  public RMAppCertificateManagerEvent(
+      ApplicationId applicationId, String applicationUser,
+      RMAppCertificateManagerEventType rmAppCertificateManagerEventType) {
+    super(rmAppCertificateManagerEventType);
+    this.applicationId = applicationId;
+    this.applicationUser = applicationUser;
   }
   
-  public abstract boolean getSuccess();
+  public ApplicationId getApplicationId() {
+    return applicationId;
+  }
   
-  public abstract void setSuccess(boolean success);
+  public String getApplicationUser() {
+    return applicationUser;
+  }
 }
