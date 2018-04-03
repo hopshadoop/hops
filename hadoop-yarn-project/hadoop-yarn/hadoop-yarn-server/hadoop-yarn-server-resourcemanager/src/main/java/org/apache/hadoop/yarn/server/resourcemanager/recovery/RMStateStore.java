@@ -753,6 +753,11 @@ public abstract class RMStateStore extends AbstractService {
       ApplicationStateData appState) {
     dispatcher.getEventHandler().handle(new RMStateUpdateAppEvent(appState));
   }
+  
+  @SuppressWarnings("unchecked")
+  public void updateApplicationStateNoNotify(ApplicationStateData appState) {
+    dispatcher.getEventHandler().handle(new RMStateUpdateAppEvent(appState, false));
+  }
 
   public void updateApplicationStateSynchronously(
       ApplicationStateData appState, boolean notifyApp) {

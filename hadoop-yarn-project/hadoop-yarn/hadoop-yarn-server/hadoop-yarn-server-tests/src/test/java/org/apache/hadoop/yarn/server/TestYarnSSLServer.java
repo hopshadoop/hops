@@ -147,15 +147,6 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
         appCtx.setResource(Resource.newInstance(2048, 2));
         appCtx.setQueue("default");
     
-        //ByteBuffer[] material = getCryptoMaterial();
-        ByteBuffer kstore = ByteBuffer.allocate(5000);
-        ByteBuffer tstore = ByteBuffer.allocate(5000);
-        String pass = "password";
-        appCtx.setKeyStore(kstore);
-        appCtx.setKeyStorePassword(pass);
-        appCtx.setTrustStore(tstore);
-        appCtx.setTrustStorePassword(pass);
-    
         ApplicationClientProtocol client = ClientRMProxy.createRMProxy(conf,
             ApplicationClientProtocol.class, true);
         

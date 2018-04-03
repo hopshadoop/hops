@@ -111,13 +111,14 @@ message ContainerReportProto {
 
 enum YarnApplicationStateProto {
   NEW = 1;
-  NEW_SAVING = 2;
-  SUBMITTED = 3;
-  ACCEPTED = 4;
-  RUNNING = 5;
-  FINISHED = 6;
-  FAILED = 7;
-  KILLED = 8;
+  GENERATING_CERTS = 2;
+  NEW_SAVING = 3;
+  SUBMITTED = 4;
+  ACCEPTED = 5;
+  RUNNING = 6;
+  FINISHED = 7;
+  FAILED = 8;
+  KILLED = 9;
 }
 
 enum YarnApplicationAttemptStateProto {
@@ -359,10 +360,6 @@ message ApplicationSubmissionContextProto {
   optional ReservationIdProto reservation_id = 15;
   optional string node_label_expression = 16;
   optional ResourceRequestProto am_container_resource_request = 17;
-  optional bytes key_store = 18;
-  optional string key_store_password = 19;
-  optional bytes trust_store = 20;
-  optional string trust_store_password = 21;
 }
 
 message LogAggregationContextProto {

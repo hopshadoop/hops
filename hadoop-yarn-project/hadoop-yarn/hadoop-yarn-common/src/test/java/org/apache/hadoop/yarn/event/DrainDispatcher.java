@@ -48,4 +48,12 @@ public class DrainDispatcher extends AsyncDispatcher {
       Thread.yield();
     }
   }
+  
+  public boolean unregisterHandlerForEvent(Class<? extends Enum> eventType, boolean drain) {
+    if (drain) {
+      await();
+    }
+    EventHandler eventHandler = eventDispatchers.remove(eventType);
+    return eventHandler != null;
+  }
 }

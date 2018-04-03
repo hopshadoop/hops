@@ -22,4 +22,5 @@ import java.util.concurrent.ExecutionException;
 public interface CertificateLocalizationMBean {
   String getState();
   boolean forceRemoveMaterial(String username) throws InterruptedException, ExecutionException;
+  boolean forceRemoveMaterial(String username, String applicationId) throws InterruptedException, ExecutionException;
 }

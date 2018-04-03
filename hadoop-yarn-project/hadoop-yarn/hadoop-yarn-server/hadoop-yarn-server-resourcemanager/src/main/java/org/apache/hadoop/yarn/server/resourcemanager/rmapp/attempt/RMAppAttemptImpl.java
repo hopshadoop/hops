@@ -102,6 +102,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEventType;
 import org.apache.hadoop.yarn.server.webproxy.ProxyUriUtils;
 import org.apache.hadoop.yarn.state.InvalidStateTransitionException;
 import org.apache.hadoop.yarn.state.MultipleArcTransition;
@@ -1699,6 +1701,12 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
         // Tell the launcher to cleanup.
         appAttempt.eventHandler.handle(new AMLauncherEvent(
             AMLauncherEventType.CLEANUP, appAttempt));
+      } else {
+        // Tell RMAppCertificateManager to revoke the certificate and remove it from local cache
+        ApplicationId applicationId = appAttempt.applicationAttemptId.getApplicationId();
+        String user = appAttempt.rmContext.getRMApps().get(applicationId).getUser();
+        appAttempt.eventHandler.handle(new RMAppCertificateManagerEvent(
+            applicationId, user, RMAppCertificateManagerEventType.REVOKE_CERTIFICATE));
       }
     }
   }

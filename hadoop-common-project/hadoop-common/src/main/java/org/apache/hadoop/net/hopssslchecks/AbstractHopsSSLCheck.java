@@ -19,6 +19,7 @@ package org.apache.hadoop.net.hopssslchecks;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -39,7 +40,7 @@ public abstract class AbstractHopsSSLCheck implements HopsSSLCheck, Comparable<H
     this.priority = priority;
   }
   
-  public abstract HopsSSLCryptoMaterial check(String username, Set<String> proxySuperUsers,
+  public abstract HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperUsers,
       Configuration configuration, CertificateLocalization certificateLocalization)
       throws IOException, SSLMaterialAlreadyConfiguredException;
   

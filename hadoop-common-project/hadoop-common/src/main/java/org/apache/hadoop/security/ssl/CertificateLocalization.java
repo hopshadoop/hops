@@ -28,10 +28,20 @@ public interface CertificateLocalization {
       ByteBuffer keyStore, String keyStorePassword,
       ByteBuffer trustStore, String trustStorePassword) throws IOException;
   
+  void materializeCertificates(String username, String applicationId, String userFolder,
+      ByteBuffer keyStore, String keyStorePassword,
+      ByteBuffer trustStore, String trustStorePassword) throws IOException;
+  
   void removeMaterial(String username)
     throws InterruptedException, ExecutionException;
   
+  void removeMaterial(String username, String applicationId)
+      throws InterruptedException, ExecutionException;
+  
   CryptoMaterial getMaterialLocation(String username)
+      throws FileNotFoundException, InterruptedException, ExecutionException;
+  
+  CryptoMaterial getMaterialLocation(String username, String applicationId)
       throws FileNotFoundException, InterruptedException, ExecutionException;
   
   String getSuperKeystoreLocation();

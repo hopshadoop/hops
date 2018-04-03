@@ -18,6 +18,7 @@
 package org.apache.hadoop.net.hopssslchecks;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 
 import java.io.IOException;
@@ -30,7 +31,7 @@ public interface HopsSSLCheck {
   /**
    * Method that checks for proper keystore, truststore depending the username of the current user.
    *
-   * @param username Current user username
+   * @param ugi Current user username
    * @param proxySuperUsers Set of proxy superusers defined in core-site.xml
    * @param configuration Hadoop configuration
    * @param certificateLocalization If in ResourceManager or NodeManager, a CertificateLocalizationService reference,
@@ -40,7 +41,7 @@ public interface HopsSSLCheck {
    * @throws SSLMaterialAlreadyConfiguredException When the configuration already contains correct values for TLS
    * configuration properties
    */
-  HopsSSLCryptoMaterial check(String username, Set<String> proxySuperUsers, Configuration configuration,
+  HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperUsers, Configuration configuration,
       CertificateLocalization certificateLocalization)
       throws IOException, SSLMaterialAlreadyConfiguredException;
   Integer getPriority();

@@ -15,21 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.api.protocolrecords;
+package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import org.apache.hadoop.yarn.util.Records;
-
-public abstract class RemoveCryptoKeysResponse {
-  
-  public static RemoveCryptoKeysResponse newInstance(boolean success) {
-    RemoveCryptoKeysResponse response = Records.newRecord
-        (RemoveCryptoKeysResponse.class);
-    response.setSuccess(success);
-    
-    return response;
-  }
-  
-  public abstract boolean getSuccess();
-  
-  public abstract void setSuccess(boolean success);
+public enum RMAppCertificateManagerEventType {
+  GENERATE_CERTIFICATE,
+  REVOKE_CERTIFICATE,
+  REVOKE_GENERATE_CERTIFICATE
 }

@@ -19,6 +19,7 @@ package org.apache.hadoop.net.hopssslchecks;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 import org.apache.hadoop.security.ssl.CryptoMaterial;
 
@@ -32,19 +33,24 @@ import java.util.concurrent.ExecutionException;
  */
 public class NormalUserCertLocServiceHopsSSLCheck extends AbstractHopsSSLCheck {
   public NormalUserCertLocServiceHopsSSLCheck() {
-    super(90);
+    super(105);
   }
   
   @Override
-  public HopsSSLCryptoMaterial check(String username, Set<String> proxySuperUsers, Configuration configuration,
+  public HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperUsers, Configuration configuration,
       CertificateLocalization certificateLocalization)
       throws IOException {
+    String username = ugi.getUserName();
     if (username.matches(HopsSSLSocketFactory.USERNAME_PATTERN)
         || !proxySuperUsers.contains(username)) {
   
       if (certificateLocalization != null) {
         try {
-          CryptoMaterial material = certificateLocalization.getMaterialLocation(username);
+          String appId = ugi.getApplicationId();
+          if (appId == null) {
+            throw new IOException("UserGroupInformation does NOT contain the Application ID");
+          }
+          CryptoMaterial material = certificateLocalization.getMaterialLocation(username, appId);
           
           return new HopsSSLCryptoMaterial(
               material.getKeyStoreLocation(),

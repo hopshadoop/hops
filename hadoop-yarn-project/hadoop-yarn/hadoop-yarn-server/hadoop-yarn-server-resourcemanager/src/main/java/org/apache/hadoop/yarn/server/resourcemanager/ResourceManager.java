@@ -43,6 +43,8 @@ import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHa
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hadoop.security.ssl.RevocationListFetcherService;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEventType;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.service.CompositeService;
@@ -182,6 +184,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected NMLivelinessMonitor nmLivelinessMonitor;
   protected NodesListManager nodesListManager;
   protected RMAppManager rmAppManager;
+  protected RMAppCertificateManager rmAppCertificateManager;
   protected ApplicationACLsManager applicationACLsManager;
   protected QueueACLsManager queueACLsManager;
   private WebApp webApp;
@@ -509,6 +512,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
     return new RMAppManager(this.rmContext, this.scheduler, this.masterService,
       this.applicationACLsManager, this.conf);
   }
+  
+  protected RMAppCertificateManager createRMAppCertificateManager() throws Exception {
+    return new RMAppCertificateManager(this.rmContext);
+  }
 
   protected RMApplicationHistoryWriter createRMApplicationHistoryWriter() {
     return new RMApplicationHistoryWriter();
@@ -784,6 +791,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
       // Register event handler for RMAppManagerEvents
       rmDispatcher.register(RMAppManagerEventType.class, rmAppManager);
 
+      rmAppCertificateManager = createRMAppCertificateManager();
+      rmDispatcher.register(RMAppCertificateManagerEventType.class, rmAppCertificateManager);
+      addService(rmAppCertificateManager);
+      
       clientRM = createClientRMService();
       addService(clientRM);
       rmContext.setClientRMService(clientRM);
@@ -1301,9 +1312,6 @@ LOG.info("+");
 //    }
 
     rmContext.setHAServiceState(HAServiceProtocol.HAServiceState.ACTIVE);
-    if (null != certificateLocalizationService) {
-      certificateLocalizationService.transitionToActive();
-    }
     LOG.info("Transitioned to active state " + HAUtil.getRMHAId(conf));
     }finally{
       LOG.info("unlocked resourceTrackingServiceStart");
@@ -1337,9 +1345,6 @@ LOG.info("+");
         }
       }
       reinitialize(initialize);
-      if (null != certificateLocalizationService) {
-        certificateLocalizationService.transitionToStandby();
-      }
     }
     LOG.info("Transitioned to standby state " + HAUtil.getRMHAId(conf));
     }finally{
@@ -1498,8 +1503,7 @@ LOG.info("+");
         .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
       boolean isHAEnabled = rmContext.isHAEnabled();
       
-      certificateLocalizationService = new CertificateLocalizationService(isHAEnabled,
-          CertificateLocalizationService.ServiceType.RM);
+      certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM);
       CertificateLocalizationCtx.getInstance().setCertificateLocalization
           (certificateLocalizationService);
       addService(certificateLocalizationService);

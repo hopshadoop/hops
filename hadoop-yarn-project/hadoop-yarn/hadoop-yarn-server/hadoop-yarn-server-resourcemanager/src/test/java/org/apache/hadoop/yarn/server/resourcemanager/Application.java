@@ -170,16 +170,18 @@ public class Application {
     
     resourceManager.getClientRMService().submitApplication(request);
 
-    RMAppEvent event =
-        new RMAppEvent(this.applicationId, RMAppEventType.START);
+    RMAppEvent event = new RMAppEvent(this.applicationId, RMAppEventType.START);
     resourceManager.getRMContext().getRMApps().get(applicationId).handle(event);
     event =
         new RMAppEvent(this.applicationId, RMAppEventType.APP_NEW_SAVED);
     resourceManager.getRMContext().getRMApps().get(applicationId).handle(event);
     event =
+        new RMAppEvent(this.applicationId, RMAppEventType.CERTS_GENERATED);
+    resourceManager.getRMContext().getRMApps().get(applicationId).handle(event);
+    event =
         new RMAppEvent(this.applicationId, RMAppEventType.APP_ACCEPTED);
     resourceManager.getRMContext().getRMApps().get(applicationId).handle(event);
-
+    
     // Notify scheduler
     AppAddedSchedulerEvent addAppEvent =
         new AppAddedSchedulerEvent(this.applicationId, this.queue, "user");

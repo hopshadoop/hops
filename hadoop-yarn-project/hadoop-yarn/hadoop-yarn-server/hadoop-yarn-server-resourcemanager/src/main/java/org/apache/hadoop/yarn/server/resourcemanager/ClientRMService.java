@@ -573,11 +573,9 @@ public class ClientRMService extends AbstractService implements
     // in RMAppManager.
 
     String user = null;
-    String username = null;
     try {
       // Safety
       user = UserGroupInformation.getCurrentUser().getShortUserName();
-      username = UserGroupInformation.getCurrentUser().getUserName();
     } catch (IOException ie) {
       LOG.warn("Unable to get the current user.", ie);
       RMAuditLogger.logFailure(user, AuditConstants.SUBMIT_APP_REQUEST,
@@ -586,24 +584,6 @@ public class ClientRMService extends AbstractService implements
       throw RPCUtil.getRemoteException(ie);
     }
     
-    if (getConfig().getBoolean(CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED, CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-  
-      ByteBuffer kstore = submissionContext.getKeyStore();
-      String kstorePass = submissionContext.getKeyStorePassword();
-      ByteBuffer tstore = submissionContext.getTrustStore();
-      String tstorePass = submissionContext.getTrustStorePassword();
-
-      if (kstore == null || kstore.capacity() == 0 || tstore == null || tstore.capacity() == 0
-          || kstorePass.isEmpty() || tstorePass.isEmpty()) {
-        LOG.error("RPC TLS is enabled but either keystore or truststore is null or no password provided");
-        RMAuditLogger.logFailure(user, AuditConstants.SUBMIT_APP_REQUEST,
-            "RPC TLS is enabled but either keystore or truststore is null or no password provided", "ClientRMService",
-            "Exception in submitting application", applicationId);
-        throw new YarnException("RPC TLS is enabled but either keystore or truststore is null or no password provided");
-      }
-    }
     // Check whether app has already been put into rmContext,
     // If it is, simply return the response
     if (rmContext.getRMApps().get(applicationId) != null) {

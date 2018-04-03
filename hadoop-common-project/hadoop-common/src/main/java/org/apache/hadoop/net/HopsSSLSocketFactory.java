@@ -87,19 +87,19 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   /**
    * Configuration checks will run according to their priority
    * ENV_VARIABLE_CHECK - Priority: 110 - Checks if the crypto material exist in the specified environment variable
+   * NORMAL_USER_CERTIFICATE_LOCALIZATION - Priority: 105 - Checks if the crypto material has been localized by
+   *    the CertificateLocalizationService of ResourceManager or NodeManager
    * LOCAL_RESOURCE - Priority: 100 - Checks if the crypto material exist in the container's CWD
    * NORMAL_USER_MATERIALIZE_DIR - Priority: 95 - Checks if the crypto material exist in Hopsworks materialize
    *    directory. Certificates are materialized there by Hopsworks
-   * NORMAL_USER_CERTIFICATE_LOCALIZATION - Priority: 90 - Checks if the crypto material has been localized by
-   *    the CertificateLocalizationService of ResourceManager or NodeManager
    * SUPER_USER - Priority: -1 - Checks if the user is a super user and picks the machine certificates.
    *    NOTE: It should have the lowest priority
    */
   static {
     HOPS_SSL_CHECKS.add(ENV_VARIABLE_CHECK);
+    HOPS_SSL_CHECKS.add(NORMAL_USER_CERTIFICATE_LOCALIZATION);
     HOPS_SSL_CHECKS.add(LOCAL_RESOURCE);
     HOPS_SSL_CHECKS.add(NORMAL_USER_MATERIALIZE_DIR);
-    HOPS_SSL_CHECKS.add(NORMAL_USER_CERTIFICATE_LOCALIZATION);
     HOPS_SSL_CHECKS.add(SUPER_USER);
   }
   
@@ -171,15 +171,15 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   public void configureCryptoMaterial(CertificateLocalization certificateLocalization, Set<String> proxySuperusers)
       throws SSLCertificateException {
     
-    String username = null;
+    UserGroupInformation currentUser = null;
     try {
-      username = UserGroupInformation.getCurrentUser().getUserName();
+      currentUser = UserGroupInformation.getCurrentUser();
       HopsSSLCryptoMaterial sslCryptoMaterial = null;
       boolean configured = false;
       for (HopsSSLCheck checks : HOPS_SSL_CHECKS) {
         try {
           // Checks return null if they were not able to discover proper crypto material
-          sslCryptoMaterial = checks.check(username, proxySuperusers, conf, certificateLocalization);
+          sslCryptoMaterial = checks.check(currentUser, proxySuperusers, conf, certificateLocalization);
           if (sslCryptoMaterial != null) {
             configured = true;
             break;
@@ -195,7 +195,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
       }
       
       if (!configured) {
-        String message = "> HopsSSLSocketFactory could not determine cryptographic material for user <" + username +
+        String message = "> HopsSSLSocketFactory could not determine cryptographic material for user <" + currentUser.getUserName() +
             ">. Check your configuration!";
         SSLCertificateException ex = new SSLCertificateException(message);
         LOG.error(message, ex);
@@ -223,7 +223,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
       }
       conf.setBoolean(FORCE_CONFIGURE, false);
     } catch (IOException ex) {
-      String user = username != null ? username : "Could not find user from UGI";
+      String user = currentUser != null ? currentUser.getUserName() : "Could not find user from UGI";
       LOG.error("Error while configuring SocketFactory for user <" + user + "> " + ex.getMessage(), ex);
       throw new SSLCertificateException(ex);
     }

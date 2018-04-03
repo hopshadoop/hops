@@ -95,7 +95,7 @@ public class TestReloadingX509KeyManager {
       X509Certificate cert2 = KeyStoreTestUtil.generateCertificate("CN=cert2", keyPair, 2, CERTIFICATE_ALGORITHM);
       KeyStoreTestUtil.createKeyStore(keyStoreLocation, KEYSTORE_PASSWORD, "cert2", keyPair.getPrivate(), cert2);
       
-      reloadTimeUnit.sleep(reloadInterval);
+      reloadTimeUnit.sleep(reloadInterval * 2);
       
       certChain = keyManager.getCertificateChain("cert1");
       assertNull("Certificate chain for alias cert1 should be null", certChain);

@@ -85,7 +85,7 @@ public class TestCertificateLocalizationService {
   public void setUp() throws Exception {
     conf = new Configuration();
     conf.set(YarnConfiguration.NM_NONSECURE_MODE_LOCAL_USER_KEY, UserGroupInformation.getLoginUser().getUserName());
-    certLocSrv = new CertificateLocalizationService(false, service);
+    certLocSrv = new CertificateLocalizationService(service);
     certLocSrv.serviceInit(conf);
     certLocSrv.serviceStart();
   }
@@ -97,14 +97,6 @@ public class TestCertificateLocalizationService {
       File fd = certLocSrv.getMaterializeDirectory().toFile();
       assertFalse(fd.exists());
     }
-  }
-  
-  private void configure(String currentRMId, Configuration conf) {
-    conf.set(YarnConfiguration.RM_HA_ID, currentRMId);
-    conf.set(YarnConfiguration.RM_HA_IDS, "rm0,rm1,rm2");
-    conf.set(YarnConfiguration.RM_HA_CERT_LOC_ADDRESS + ".rm0", "0.0.0.0:8812");
-    conf.set(YarnConfiguration.RM_HA_CERT_LOC_ADDRESS + ".rm1", "0.0.0.0:8813");
-    conf.set(YarnConfiguration.RM_HA_CERT_LOC_ADDRESS + ".rm2", "0.0.0.0:8814");
   }
 
   private void verifyMaterialExistOrNot(CertificateLocalizationService certLocSrv,
@@ -155,88 +147,6 @@ public class TestCertificateLocalizationService {
     } else {
       certLocSrv.materializeCertificates(username, username, bfk, keyStorePass, bft, trustStorePass);
     }
-  }
-  
-  @Test(timeout = 10000)
-  public void testMaterialSyncService() throws Exception {
-    // Test HA only for the ResourceManager
-    if (service == CertificateLocalizationService.ServiceType.NM) {
-      return;
-    }
-
-    // Stop the Service started without HA
-    if (null != certLocSrv) {
-      certLocSrv.serviceStop();
-    }
-
-    CertificateLocalizationService certSyncLeader = new CertificateLocalizationService
-        (true, CertificateLocalizationService.ServiceType.RM);
-    configure("rm0", conf);
-    certSyncLeader.serviceInit(conf);
-    certSyncLeader.serviceStart();
-    certSyncLeader.transitionToActive();
-
-    Configuration conf2 = new Configuration();
-    CertificateLocalizationService certSyncSlave = new CertificateLocalizationService
-        (true, CertificateLocalizationService.ServiceType.RM);
-    configure("rm1", conf2);
-    certSyncSlave.serviceInit(conf2);
-    certSyncSlave.serviceStart();
-    certSyncSlave.transitionToStandby();
-
-    Configuration conf3 = new Configuration();
-    configure("rm2", conf3);
-    CertificateLocalizationService certSyncSlave2 = new
-        CertificateLocalizationService(true, CertificateLocalizationService.ServiceType.RM);
-    certSyncSlave2.serviceInit(conf3);
-    certSyncSlave2.serviceStart();
-    certSyncSlave2.transitionToStandby();
-
-    String username = "Dr.Who";
-    ByteBuffer kstore = ByteBuffer.wrap("some bytes".getBytes());
-    ByteBuffer tstore = ByteBuffer.wrap("some bytes".getBytes());
-    String kstorePass = "kstorePass";
-    String tstorePass = "tstorePass";
-
-    // For this test is safe to pass null as userFolder as only the RM case it's executed and both the
-    // materializeCertificateUtil and verifyMaterialExistOrNot will automatically use the username as userFolder
-    // (as the RM is supposed to work).
-    materializeCertificateUtil(certSyncLeader, username, null, kstore, kstorePass, tstore, tstorePass);
-
-    TimeUnit.SECONDS.sleep(2);
-    verifyMaterialExistOrNot(certSyncSlave, username, null, kstorePass, tstorePass, true);
-    verifyMaterialExistOrNot(certSyncSlave2, username, null, kstorePass, tstorePass, true);
-
-    certSyncLeader.removeMaterial(username);
-
-    TimeUnit.SECONDS.sleep(2);
-    verifyMaterialExistOrNot(certSyncSlave, username, null, kstorePass, tstorePass, false);
-    verifyMaterialExistOrNot(certSyncSlave2, username, null, kstorePass, tstorePass, false);
-
-    LOG.info("Switching roles");
-    // Switch roles
-    certSyncSlave.transitionToActive();
-    certSyncLeader.transitionToStandby();
-
-    username = "Amy";
-    kstorePass = "kstorePass2";
-    tstorePass = "tstorePass2";
-
-    materializeCertificateUtil(certSyncSlave, username, null, kstore, kstorePass, tstore, tstorePass);
-
-    TimeUnit.SECONDS.sleep(2);
-    verifyMaterialExistOrNot(certSyncLeader, username, null, kstorePass, tstorePass, true);
-    verifyMaterialExistOrNot(certSyncSlave2, username, null, kstorePass, tstorePass, true);
-
-    certSyncSlave.removeMaterial(username);
-
-    TimeUnit.SECONDS.sleep(2);
-    verifyMaterialExistOrNot(certSyncLeader, username, null, kstorePass, tstorePass, false);
-    verifyMaterialExistOrNot(certSyncSlave2, username, null, kstorePass, tstorePass, false);
-
-    certSyncSlave.serviceStop();
-    certSyncLeader.serviceStop();
-    certSyncSlave2.serviceStop();
   }
   
   @Test

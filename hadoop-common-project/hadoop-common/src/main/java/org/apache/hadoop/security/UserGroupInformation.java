@@ -440,6 +440,38 @@ public class UserGroupInformation {
     OS_PRINCIPAL_CLASS = getOsPrincipalClass();
   }
 
+  private static class ApplicationIdForUser implements Principal {
+    private final String applicationId;
+    
+    public ApplicationIdForUser(String applicationId) {
+      this.applicationId = applicationId;
+    }
+    
+    @Override
+    public String getName() {
+      return applicationId;
+    }
+  
+    @Override
+    public int hashCode() {
+      return applicationId.hashCode();
+    }
+    
+    @Override
+    public boolean equals(Object other) {
+      if (other == null || other.getClass() != getClass()) {
+        return false;
+      }
+      if (this == other) {
+        return true;
+      }
+      if (applicationId.equals(((ApplicationIdForUser) other).applicationId)) {
+        return true;
+      }
+      return true;
+    }
+  }
+  
   private static class RealUser implements Principal {
     private final UserGroupInformation realUser;
     
@@ -1730,7 +1762,7 @@ public class UserGroupInformation {
       getCredentialsInternal().addAll(credentials);
     }
   }
-
+  
   private synchronized Credentials getCredentialsInternal() {
     final Credentials credentials;
     final Set<Credentials> credentialsSet =
@@ -1743,7 +1775,23 @@ public class UserGroupInformation {
     }
     return credentials;
   }
-
+  
+  public void addApplicationId(String applicationId) {
+    synchronized (subject) {
+      subject.getPrincipals().add(new ApplicationIdForUser(applicationId));
+    }
+  }
+  
+  public String getApplicationId() {
+    synchronized (subject) {
+      Set<ApplicationIdForUser> appIdPrincipal = subject.getPrincipals(ApplicationIdForUser.class);
+      if (appIdPrincipal.size() == 1) {
+        return appIdPrincipal.iterator().next().applicationId;
+      }
+      return null;
+    }
+  }
+  
   /**
    * Get the group names for this user. {@link #getGroups()} is less
    * expensive alternative when checking for a contained element.

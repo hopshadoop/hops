@@ -484,12 +484,6 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_HA_IDS = RM_HA_PREFIX + "rm-ids";
   public static final String RM_HA_ID = RM_HA_PREFIX + "id";
   
-  public static final String RM_HA_CERT_LOC_ADDRESS = RM_HA_PREFIX + "cert" +
-      ".loc.address";
-  public static final int DEFAULT_CERTIFICATE_LOCALIZER_PORT = 8012;
-  public static final String DEFAULT_RM_HA_CERT_LOC_ADDRESS = "0.0.0.0:" +
-      DEFAULT_CERTIFICATE_LOCALIZER_PORT;
-  
   /** Store the related configuration files in File System */
   public static final String FS_BASED_RM_CONF_STORE = RM_PREFIX
       + "configuration.file-system-based-store";
@@ -2633,4 +2627,23 @@ public class YarnConfiguration extends Configuration {
   public static String USER_FOLDER_ALGO = YARN_PREFIX + "userfolder.algo";
   public static String DEFAULT_USER_FOLDER_ALGO = "SHA-256";
   
+  /**
+   * Actor class for signing and revoking application certificates
+   * Loaded by RMAppCertificateManager
+   */
+  public static final String HOPS_RM_CERTIFICATE_ACTOR_KEY = "hops.rm.certificate.actor.class";
+  public static String HOPS_RM_CERTIFICATE_ACTOR_DEFAULT = "org.apache.hadoop.yarn.server.resourcemanager" +
+      ".security.HopsworksRMAppCertificateActions";
+  
+  /**
+   * RMAppCertificateManager remote actions configuration
+   */
+  private static String HOPSWORKS_PREFIX = "hops.hopsworks";
+  public static final String HOPS_HOPSWORKS_HOST_KEY = HOPSWORKS_PREFIX + ".host";
+  public static final String HOPS_HOPSWORKS_LOGIN_ENDPOINT_KEY = HOPSWORKS_PREFIX + ".login.endpoint";
+  public static String DEFAULT_HOPS_HOPSWORKS_LOGIN_ENDPOINT = "hopsworks-api/api/auth/login";
+  public static final String HOPS_HOPSWORKS_SIGN_ENDPOINT_KEY = HOPSWORKS_PREFIX + ".sign.endpoint";
+  public static String DEFAULT_HOPS_HOPSWORKS_SIGN_ENDPOINT = "hopsworks-ca/ca/agentservice/sign/app";
+  public static final String HOPS_HOPSWORKS_REVOKE_ENDPOINT_KEY = HOPSWORKS_PREFIX + ".revoke.endpoint";
+  public static String DEFAULT_HOPS_HOPSWORKS_REVOKE_ENDPOINT = "hopsworks-ca/ca/agentservice/revoke";
 }

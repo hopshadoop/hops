@@ -21,6 +21,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 
 import java.io.IOException;
@@ -39,9 +40,10 @@ public class SuperUserHopsSSLCheck extends AbstractHopsSSLCheck {
   }
   
   @Override
-  public HopsSSLCryptoMaterial check(String username, Set<String> proxySuperUsers, Configuration configuration,
+  public HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperUsers, Configuration configuration,
       CertificateLocalization certificateLocalization) throws IOException, SSLMaterialAlreadyConfiguredException {
   
+    String username = ugi.getUserName();
     if (proxySuperUsers.contains(username)) {
       String hostname = NetUtils.getLocalHostname();
       isConfigurationNeededForSuperUser(username, hostname, configuration);

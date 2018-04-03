@@ -390,7 +390,7 @@ public class TestHadoopArchiveLogs {
         USER, "default", submissionContext, rmContext.getScheduler(),
         rmContext.getApplicationMasterService(),
         System.currentTimeMillis(), "test",
-        null, null, null, null, null, null) {
+        null, null) {
       @Override
       public ApplicationReport createAndGetApplicationReport(
           String clientUserName, boolean allowAccess) {

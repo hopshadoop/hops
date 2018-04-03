@@ -22,6 +22,7 @@ import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationSubmissionContextPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationStateDataProto;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationStateDataProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.RMAppStateProto;
@@ -31,6 +32,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.TextFormat;
 
+import java.nio.ByteBuffer;
+
 public class ApplicationStateDataPBImpl extends ApplicationStateData {
   ApplicationStateDataProto proto = 
             ApplicationStateDataProto.getDefaultInstance();
@@ -38,6 +41,8 @@ public class ApplicationStateDataPBImpl extends ApplicationStateData {
   boolean viaProto = false;
   
   private ApplicationSubmissionContext applicationSubmissionContext = null;
+  private byte[] keyStore;
+  private byte[] trustStore;
   
   public ApplicationStateDataPBImpl() {
     builder = ApplicationStateDataProto.newBuilder();
@@ -62,6 +67,12 @@ public class ApplicationStateDataPBImpl extends ApplicationStateData {
       builder.setApplicationSubmissionContext(
           ((ApplicationSubmissionContextPBImpl)applicationSubmissionContext)
           .getProto());
+    }
+    if (this.keyStore != null) {
+      builder.setKeyStore(ByteString.copyFrom(this.keyStore));
+    }
+    if (this.trustStore != null) {
+      builder.setTrustStore(ByteString.copyFrom(this.trustStore));
     }
   }
 
@@ -248,7 +259,92 @@ public class ApplicationStateDataPBImpl extends ApplicationStateData {
   public String toString() {
     return TextFormat.shortDebugString(getProto());
   }
-
+  
+  @Override
+  public byte[] getKeyStore() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    if (this.keyStore != null) {
+      return this.keyStore;
+    }
+    if (!p.hasKeyStore()) {
+      return null;
+    }
+    this.keyStore = p.getKeyStore().toByteArray();
+    return this.keyStore;
+  }
+  
+  @Override
+  public void setKeyStore(byte[] keyStore) {
+    maybeInitBuilder();
+    if (keyStore == null) {
+      builder.clearKeyStore();
+      return;
+    }
+    this.keyStore = keyStore;
+  }
+  
+  @Override
+  public char[] getKeyStorePassword() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasKeyStorePassword()) {
+      return null;
+    }
+    
+    return p.getKeyStorePassword().toCharArray();
+  }
+  
+  @Override
+  public void setKeyStorePassword(char[] keyStorePassword) {
+    maybeInitBuilder();
+    if (keyStorePassword == null) {
+      builder.clearKeyStorePassword();
+      return;
+    }
+    builder.setKeyStorePassword(String.valueOf(keyStorePassword));
+  }
+  
+  @Override
+  public byte[] getTrustStore() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    if (this.trustStore != null) {
+      return this.trustStore;
+    }
+    if (!p.hasTrustStore()) {
+      return null;
+    }
+    this.trustStore = p.getTrustStore().toByteArray();
+    return this.trustStore;
+  }
+  
+  @Override
+  public void setTrustStore(byte[] trustStore) {
+    maybeInitBuilder();
+    if (trustStore == null) {
+      builder.clearTrustStore();
+      return;
+    }
+    this.trustStore = trustStore;
+  }
+  
+  @Override
+  public char[] getTrustStorePassword() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasTrustStorePassword()) {
+      return null;
+    }
+    return p.getTrustStorePassword().toCharArray();
+  }
+  
+  @Override
+  public void setTrustStorePassword(char[] trustStorePassword) {
+    maybeInitBuilder();
+    if (trustStorePassword == null) {
+      builder.clearTrustStorePassword();
+      return;
+    }
+    builder.setTrustStorePassword(String.valueOf(trustStorePassword));
+  }
+  
   private static String RM_APP_PREFIX = "RMAPP_";
   public static RMAppStateProto convertToProtoFormat(RMAppState e) {
     return RMAppStateProto.valueOf(RM_APP_PREFIX + e.name());

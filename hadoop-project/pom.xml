@@ -975,9 +975,13 @@
      </dependency>
      <dependency>
        <groupId>org.bouncycastle</groupId>
-       <artifactId>bcprov-jdk16</artifactId>
-       <version>1.46</version>
-       <scope>test</scope>
+       <artifactId>bcprov-jdk15on</artifactId>
+       <version>1.56</version>
+     </dependency>
+      <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk15on</artifactId>
+      <version>1.56</version>
      </dependency>
       <dependency>
         <groupId>com.microsoft.azure</groupId>
@@ -995,12 +999,6 @@
           <artifactId>nimbus-jose-jwt</artifactId>
           <version>3.9</version>
           <scope>compile</scope>
-          <exclusions>
-          <exclusion>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcprov-jdk15on</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
 
       <dependency>

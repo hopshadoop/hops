@@ -37,7 +37,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -51,7 +50,6 @@ import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -76,6 +74,8 @@ import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.security.client.ClientToAMTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppManagerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger;
@@ -177,7 +177,12 @@ public class RMAppImpl implements RMApp, Recoverable {
   private Map<NodeId, List<String>> logAggregationFailureMessagesForNMs =
       new HashMap<NodeId, List<String>>();
   private final int maxLogAggregationDiagnosticsInMemory;
-
+  
+  private byte[] keyStore = null;
+  private char[] keyStorePassword = null;
+  private byte[] trustStore = null;
+  private char[] trustStorePassword = null;
+  
   // These states stored are only valid when app is at killing or final_saving.
   private RMAppState stateBeforeKilling;
   private RMAppState stateBeforeFinalSaving;
@@ -205,7 +210,8 @@ public class RMAppImpl implements RMApp, Recoverable {
         RMAppEventType.NODE_UPDATE, new RMAppNodeUpdateTransition())
     .addTransition(RMAppState.NEW, RMAppState.NEW_SAVING,
         RMAppEventType.START, new RMAppNewlySavingTransition())
-    .addTransition(RMAppState.NEW, EnumSet.of(RMAppState.SUBMITTED,
+     
+    .addTransition(RMAppState.NEW, EnumSet.of(RMAppState.GENERATING_CERTS, RMAppState.SUBMITTED,
             RMAppState.ACCEPTED, RMAppState.FINISHED, RMAppState.FAILED,
             RMAppState.KILLED, RMAppState.FINAL_SAVING),
         RMAppEventType.RECOVER, new RMAppRecoveredTransition())
@@ -215,23 +221,36 @@ public class RMAppImpl implements RMApp, Recoverable {
         RMAppEventType.APP_REJECTED,
         new FinalSavingTransition(new AppRejectedTransition(),
           RMAppState.FAILED))
-
+      
     // Transitions from NEW_SAVING state
     .addTransition(RMAppState.NEW_SAVING, RMAppState.NEW_SAVING,
         RMAppEventType.NODE_UPDATE, new RMAppNodeUpdateTransition())
-    .addTransition(RMAppState.NEW_SAVING, RMAppState.SUBMITTED,
-        RMAppEventType.APP_NEW_SAVED, new AddApplicationToSchedulerTransition())
+      
+    .addTransition(RMAppState.NEW_SAVING, RMAppState.GENERATING_CERTS,
+        RMAppEventType.APP_NEW_SAVED, new RMAppGeneratingCertsTransition())
+      
     .addTransition(RMAppState.NEW_SAVING, RMAppState.FINAL_SAVING,
         RMAppEventType.KILL,
         new FinalSavingTransition(
           new AppKilledTransition(), RMAppState.KILLED))
+      
     .addTransition(RMAppState.NEW_SAVING, RMAppState.FINAL_SAVING,
         RMAppEventType.APP_REJECTED,
           new FinalSavingTransition(new AppRejectedTransition(),
             RMAppState.FAILED))
+      
     .addTransition(RMAppState.NEW_SAVING, RMAppState.NEW_SAVING,
         RMAppEventType.MOVE, new RMAppMoveTransition())
-
+      
+     // Transitions from GENERATING_CERTS state
+     .addTransition(RMAppState.GENERATING_CERTS, RMAppState.GENERATING_CERTS,
+         RMAppEventType.NODE_UPDATE, new RMAppNodeUpdateTransition())
+     .addTransition(RMAppState.GENERATING_CERTS, RMAppState.SUBMITTED,
+         RMAppEventType.CERTS_GENERATED, new AddApplicationToSchedulerTransition())
+     .addTransition(RMAppState.GENERATING_CERTS, RMAppState.FINAL_SAVING,
+         RMAppEventType.KILL, new FinalSavingTransition(
+             new AppKilledTransition(), RMAppState.KILLED))
+      
      // Transitions from SUBMITTED state
     .addTransition(RMAppState.SUBMITTED, RMAppState.SUBMITTED,
         RMAppEventType.NODE_UPDATE, new RMAppNodeUpdateTransition())
@@ -403,7 +422,7 @@ public class RMAppImpl implements RMApp, Recoverable {
       ApplicationSubmissionContext submissionContext, YarnScheduler scheduler,
       ApplicationMasterService masterService, long submitTime,
       String applicationType, Set<String> applicationTags, 
-      ResourceRequest amReq, ByteBuffer kstore, String kstorePass, ByteBuffer tstore, String tstorePass) throws
+      ResourceRequest amReq) throws
       IOException {
 
     this.systemClock = new SystemClock();
@@ -424,15 +443,6 @@ public class RMAppImpl implements RMApp, Recoverable {
     this.applicationType = applicationType;
     this.applicationTags = applicationTags;
     this.amReq = amReq;
-    
-    if (config.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-
-      // The certificates in the RM_certLoc directory don't have to be accessed by the
-      // "yarnapp" user, so we don't need to hide in the random userfolder directory
-      rmContext.getCertificateLocalizationService().
-          materializeCertificates(user, user, kstore, kstorePass, tstore, tstorePass);
-    }
     
     int globalMaxAppAttempts = conf.getInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
         YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
@@ -599,6 +609,7 @@ public class RMAppImpl implements RMApp, Recoverable {
   private FinalApplicationStatus createFinalApplicationStatus(RMAppState state) {
     switch(state) {
     case NEW:
+    case GENERATING_CERTS:
     case NEW_SAVING:
     case SUBMITTED:
     case ACCEPTED:
@@ -848,6 +859,10 @@ public class RMAppImpl implements RMApp, Recoverable {
     this.storedFinishTime = appState.getFinishTime();
     this.startTime = appState.getStartTime();
     this.callerContext = appState.getCallerContext();
+    this.keyStore = appState.getKeyStore();
+    this.keyStorePassword = appState.getKeyStorePassword();
+    this.trustStore = appState.getTrustStore();
+    this.trustStorePassword = appState.getTrustStorePassword();
 
     // send the ATS create Event during RM recovery.
     // NOTE: it could be duplicated with events sent before RM get restarted.
@@ -1025,9 +1040,17 @@ public class RMAppImpl implements RMApp, Recoverable {
       // No existent attempts means the attempt associated with this app was not
       // started or started but not yet saved.
       if (app.attempts.isEmpty()) {
-        app.scheduler.handle(new AppAddedSchedulerEvent(app.user,
-            app.submissionContext, false));
-        return RMAppState.SUBMITTED;
+        
+        if (app.isCryptoMaterialPresent()) {
+          app.scheduler.handle(new AppAddedSchedulerEvent(app.user,
+              app.submissionContext, false));
+          return RMAppState.SUBMITTED;
+        } else {
+          RMAppCertificateManagerEvent revokeAndGenerateEvent = new RMAppCertificateManagerEvent(
+              app.applicationId, app.user, RMAppCertificateManagerEventType.REVOKE_GENERATE_CERTIFICATE);
+          app.handler.handle(revokeAndGenerateEvent);
+          return RMAppState.GENERATING_CERTS;
+        }
       }
 
       // Add application to scheduler synchronously to guarantee scheduler
@@ -1045,10 +1068,31 @@ public class RMAppImpl implements RMApp, Recoverable {
     }
   }
 
+  private boolean isCryptoMaterialPresent() {
+    return keyStore != null && keyStorePassword != null
+        && trustStore != null && trustStorePassword != null;
+  }
+  
+  private void updateApplicationWithCryptoMaterial(RMAppCertificateGeneratedEvent event) {
+    keyStore = event.getKeyStore();
+    keyStorePassword = event.getKeyStorePassword();
+    trustStore = event.getTrustStore();
+    trustStorePassword = event.getTrustStorePassword();
+  }
+  
   private static final class AddApplicationToSchedulerTransition extends
       RMAppTransition {
     @Override
     public void transition(RMAppImpl app, RMAppEvent event) {
+      if (event instanceof RMAppCertificateGeneratedEvent) {
+        app.updateApplicationWithCryptoMaterial((RMAppCertificateGeneratedEvent) event);
+        ApplicationStateData appNewState =
+            ApplicationStateData.newInstance(app.submitTime, app.startTime, app.submissionContext, app.user,
+                app.callerContext, app.keyStore, app.keyStorePassword,
+                app.trustStore, app.trustStorePassword);
+        app.rmContext.getStateStore().updateApplicationStateNoNotify(appNewState);
+      }
+      
       app.handler.handle(new AppAddedSchedulerEvent(app.user,
           app.submissionContext, false));
       // send the ATS create Event
@@ -1120,7 +1164,7 @@ public class RMAppImpl implements RMApp, Recoverable {
     }
     return msg;
   }
-
+  
   private static final class RMAppNewlySavingTransition extends RMAppTransition {
     @Override
     public void transition(RMAppImpl app, RMAppEvent event) {
@@ -1129,8 +1173,19 @@ public class RMAppImpl implements RMApp, Recoverable {
       // non-blocking call so make sure that RM has stored the information
       // needed to restart the AM after RM restart without further client
       // communication
+      
       LOG.info("Storing application with id " + app.applicationId);
       app.rmContext.getStateStore().storeNewApplication(app);
+    }
+  }
+  
+  private static final class RMAppGeneratingCertsTransition extends RMAppTransition {
+    @Override
+    public void transition(RMAppImpl app, RMAppEvent event) {
+      LOG.info("Generating certificates for application " + app.applicationId);
+      RMAppCertificateManagerEvent genCertsEvent = new RMAppCertificateManagerEvent(app.applicationId,
+          app.user, RMAppCertificateManagerEventType.GENERATE_CERTIFICATE);
+      app.handler.handle(genCertsEvent);
     }
   }
 
@@ -1342,7 +1397,7 @@ public class RMAppImpl implements RMApp, Recoverable {
           .applicationFinished(app, finalState);
       app.rmContext.getSystemMetricsPublisher()
           .appFinished(app, finalState, app.finishTime);
-    };
+    }
   }
 
   private int getNumFailedAppAttempts() {
@@ -1409,29 +1464,12 @@ public class RMAppImpl implements RMApp, Recoverable {
         if (numberOfFailure >= app.maxAppAttempts) {
           app.isNumAttemptsBeyondThreshold = true;
         }
+        app.handler.handle(new RMAppCertificateManagerEvent(app.applicationId, app.user,
+            RMAppCertificateManagerEventType.REVOKE_CERTIFICATE));
+        
         app.rememberTargetTransitionsAndStoreState(event,
           new AttemptFailedFinalStateSavedTransition(), RMAppState.FAILED,
           RMAppState.FAILED);
-        
-        // Application has failed and no more attempts are allowed
-        // Cleanup the cryptographic material
-        // In case of successful completion, the cryptographic material will
-        // be cleaned by AMLauncher#cleanup
-        ByteBuffer kstore = app.getApplicationSubmissionContext().getKeyStore();
-        ByteBuffer tstore = app.getApplicationSubmissionContext()
-            .getTrustStore();
-        
-        // Basically if TLS is enabled for RPC
-        if (kstore != null && tstore != null
-            && kstore.capacity() > 0 && tstore.capacity() > 0) {
-          try {
-            CertificateLocalizationCtx.getInstance().getCertificateLocalization()
-                .removeMaterial(app.getUser());
-          } catch (InterruptedException | ExecutionException ex) {
-            LOG.error("Error while deleting cryptographic material for user " +
-                app.getUser(), ex);
-          }
-        }
         return RMAppState.FINAL_SAVING;
       }
     }
@@ -1840,5 +1878,25 @@ public class RMAppImpl implements RMApp, Recoverable {
   private void sendATSCreateEvent() {
     rmContext.getRMApplicationHistoryWriter().applicationStarted(this);
     rmContext.getSystemMetricsPublisher().appCreated(this, this.startTime);
+  }
+  
+  @Override
+  public byte[] getKeyStore() {
+    return keyStore;
+  }
+  
+  @Override
+  public char[] getKeyStorePassword() {
+    return keyStorePassword;
+  }
+  
+  @Override
+  public byte[] getTrustStore() {
+    return trustStore;
+  }
+  
+  @Override
+  public char[] getTrustStorePassword() {
+    return trustStorePassword;
   }
 }

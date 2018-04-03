@@ -61,6 +61,10 @@ public class MockRMApp implements RMApp {
   RMAppAttempt attempt;
   int maxAppAttempts = 1;
   ResourceRequest amReq;
+  byte[] keyStore;
+  char[] keyStorePassword;
+  byte[] trustStore;
+  char[] trustStorePassword;
 
   public MockRMApp(int newid, long time, RMAppState newState) {
     finish = time;
@@ -300,5 +304,25 @@ public class MockRMApp implements RMApp {
 
   public CallerContext getCallerContext() {
     throw new UnsupportedOperationException("Not supported yet.");
+  }
+  
+  @Override
+  public byte[] getKeyStore() {
+    return keyStore;
+  }
+  
+  @Override
+  public char[] getKeyStorePassword() {
+    return keyStorePassword;
+  }
+  
+  @Override
+  public byte[] getTrustStore() {
+    return trustStore;
+  }
+  
+  @Override
+  public char[] getTrustStorePassword() {
+    return trustStorePassword;
   }
 }
