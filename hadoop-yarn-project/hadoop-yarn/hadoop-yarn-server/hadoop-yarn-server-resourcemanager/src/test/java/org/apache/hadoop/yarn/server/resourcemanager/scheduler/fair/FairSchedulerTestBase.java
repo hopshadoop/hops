@@ -232,7 +232,9 @@ public class FairSchedulerTestBase {
         queue, null, null, false, false, 0, amResource, null), scheduler, null,
         0, null, null, null, null, null, null, null);
     rmContext.getRMApps().put(appId, rmApp);
-    RMAppEvent event = new RMAppEvent(appId, RMAppEventType.START);
+    RMAppEvent event = new RMAppEvent(appId, RMAppEventType.GENERATE_CERTS);
+    resourceManager.getRMContext().getRMApps().get(appId).handle(event);
+    event = new RMAppEvent(appId, RMAppEventType.START);
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);
     event = new RMAppEvent(appId, RMAppEventType.APP_NEW_SAVED);
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);

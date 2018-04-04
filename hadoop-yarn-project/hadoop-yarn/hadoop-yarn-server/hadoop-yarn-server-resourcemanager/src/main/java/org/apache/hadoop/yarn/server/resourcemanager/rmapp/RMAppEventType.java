@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
 public enum RMAppEventType {
   // Source: ClientRMService
+  GENERATE_CERTS,
   START,
   RECOVER,
   KILL,

@@ -29,6 +29,9 @@ import org.apache.hadoop.classification.InterfaceStability.Stable;
 public enum YarnApplicationState {
   /** Application which was just created. */
   NEW,
+  
+  /** Application which is waiting for its X.509 certificates to be generated and signed */
+  GENERATING_CERTS,
 
   /** Application which is being saved. */
   NEW_SAVING,

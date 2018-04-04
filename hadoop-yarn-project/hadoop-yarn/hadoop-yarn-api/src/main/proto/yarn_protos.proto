@@ -111,13 +111,14 @@ message ContainerReportProto {
 
 enum YarnApplicationStateProto {
   NEW = 1;
-  NEW_SAVING = 2;
-  SUBMITTED = 3;
-  ACCEPTED = 4;
-  RUNNING = 5;
-  FINISHED = 6;
-  FAILED = 7;
-  KILLED = 8;
+  GENERATING_CERTS = 2;
+  NEW_SAVING = 3;
+  SUBMITTED = 4;
+  ACCEPTED = 5;
+  RUNNING = 6;
+  FINISHED = 7;
+  FAILED = 8;
+  KILLED = 9;
 }
 
 enum YarnApplicationAttemptStateProto {

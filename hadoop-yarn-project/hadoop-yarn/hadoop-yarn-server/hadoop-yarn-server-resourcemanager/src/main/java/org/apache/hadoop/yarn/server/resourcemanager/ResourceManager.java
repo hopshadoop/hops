@@ -182,6 +182,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected NMLivelinessMonitor nmLivelinessMonitor;
   protected NodesListManager nodesListManager;
   protected RMAppManager rmAppManager;
+  protected RMAppCertificateManager rmAppCertificateManager;
   protected ApplicationACLsManager applicationACLsManager;
   protected QueueACLsManager queueACLsManager;
   private WebApp webApp;
@@ -509,6 +510,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
     return new RMAppManager(this.rmContext, this.scheduler, this.masterService,
       this.applicationACLsManager, this.conf);
   }
+  
+  protected RMAppCertificateManager createRMAppCertificateManager() {
+    return new RMAppCertificateManager(this.rmContext, this.conf);
+  }
 
   protected RMApplicationHistoryWriter createRMApplicationHistoryWriter() {
     return new RMApplicationHistoryWriter();
@@ -784,6 +789,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
       // Register event handler for RMAppManagerEvents
       rmDispatcher.register(RMAppManagerEventType.class, rmAppManager);
 
+      rmAppCertificateManager = createRMAppCertificateManager();
+      rmDispatcher.register(RMAppCertificateManagerEventType.class, rmAppCertificateManager);
+      
       clientRM = createClientRMService();
       addService(clientRM);
       rmContext.setClientRMService(clientRM);

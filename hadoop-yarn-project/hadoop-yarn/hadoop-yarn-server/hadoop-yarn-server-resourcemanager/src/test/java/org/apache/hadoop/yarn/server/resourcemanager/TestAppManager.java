@@ -484,7 +484,7 @@ public class TestAppManager{
         timeoutSecs++ < 20) {
       Thread.sleep(1000);
     }
-    Assert.assertEquals("app event type sent is wrong", RMAppEventType.START,
+    Assert.assertEquals("app event type sent is wrong", RMAppEventType.GENERATE_CERTS,
         getAppEventType());
   }
 
@@ -540,7 +540,7 @@ public class TestAppManager{
         timeoutSecs++ < 20) {
       Thread.sleep(1000);
     }
-    Assert.assertEquals("app event type sent is wrong", RMAppEventType.START,
+    Assert.assertEquals("app event type sent is wrong", RMAppEventType.GENERATE_CERTS,
         getAppEventType());
     asContext.getAMContainerSpec().setTokens(null);
   }
@@ -693,7 +693,7 @@ public class TestAppManager{
     while ((getAppEventType() == RMAppEventType.KILL) && timeoutSecs++ < 20) {
       Thread.sleep(1000);
     }
-    Assert.assertEquals("app event type sent is wrong", RMAppEventType.START,
+    Assert.assertEquals("app event type sent is wrong", RMAppEventType.GENERATE_CERTS,
         getAppEventType());
   }
 
