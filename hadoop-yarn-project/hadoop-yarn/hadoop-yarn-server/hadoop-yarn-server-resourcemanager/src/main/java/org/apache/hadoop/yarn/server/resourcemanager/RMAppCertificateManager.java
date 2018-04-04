@@ -47,6 +47,7 @@ public class RMAppCertificateManager implements EventHandler<RMAppCertificateMan
   @SuppressWarnings("unchecked")
   private void generateCertificate(ApplicationId appId) {
     LOG.info("Generating certificate for application: " + appId);
+    
     handler.handle(new RMAppEvent(appId, RMAppEventType.START));
   }
   

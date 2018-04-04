@@ -3443,7 +3443,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
           queue, submissionContext, scheduler, masterService,
           System.currentTimeMillis(), "YARN", null, null, null, null, null, null);
     resourceManager.getRMContext().getRMApps().putIfAbsent(applicationId, application);
-    application.handle(new RMAppEvent(applicationId, RMAppEventType.START));
+    application.handle(new RMAppEvent(applicationId, RMAppEventType.GENERATE_CERTS));
 
     final int MAX_TRIES=20;
     int numTries = 0;
