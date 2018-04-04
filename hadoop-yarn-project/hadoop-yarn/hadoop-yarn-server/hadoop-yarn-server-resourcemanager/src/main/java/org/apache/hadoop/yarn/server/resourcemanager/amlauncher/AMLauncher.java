@@ -39,6 +39,8 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CryptoMaterial;
+import org.apache.hadoop.yarn.server.resourcemanager.RMAppCertificateManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.RMAppCertificateManagerRevokeEvent;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
@@ -71,6 +73,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptI
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+
+import javax.ws.rs.core.Application;
 
 /**
  * The launch of the AM itself.
@@ -167,39 +171,27 @@ public class AMLauncher implements Runnable {
   }
   
   private void cleanup() throws IOException, YarnException {
-    connect();
-    ContainerId containerId = masterContainer.getId();
-    List<ContainerId> containerIds = new ArrayList<ContainerId>();
-    containerIds.add(containerId);
-    StopContainersRequest stopRequest =
-        StopContainersRequest.newInstance(containerIds);
-    StopContainersResponse response =
-        containerMgrProxy.stopContainers(stopRequest);
-    
-    // The application is cleaned-up when completes successfully or killed
-    // If the application failed more times than allowed, the cryptograhic
-    // material is cleaned by RMAppImpl#AttemptFailedTransition
-    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      // Remove the cryptographic material only if the application is
-      // finished or killed
-      RMApp app = rmContext.getRMApps().get(application.getAppAttemptId()
-          .getApplicationId());
-      if (appFinalStates.contains(app.getState())) {
-        String user = rmContext.getRMApps().get(containerId
-            .getApplicationAttemptId().getApplicationId()).getUser();
-        try {
-          rmContext.getCertificateLocalizationService().removeMaterial(user);
-        } catch (InterruptedException | ExecutionException e) {
-          throw new IOException(e);
-        }
+    try {
+      connect();
+      ContainerId containerId = masterContainer.getId();
+      List<ContainerId> containerIds = new ArrayList<ContainerId>();
+      containerIds.add(containerId);
+      StopContainersRequest stopRequest =
+          StopContainersRequest.newInstance(containerIds);
+      StopContainersResponse response =
+          containerMgrProxy.stopContainers(stopRequest);
+  
+      if (response.getFailedRequests() != null
+          && response.getFailedRequests().containsKey(containerId)) {
+        Throwable t = response.getFailedRequests().get(containerId).deSerialize();
+        parseAndThrowException(t);
       }
-    }
-    
-    if (response.getFailedRequests() != null
-        && response.getFailedRequests().containsKey(containerId)) {
-      Throwable t = response.getFailedRequests().get(containerId).deSerialize();
-      parseAndThrowException(t);
+    } finally {
+      RMApp application = rmContext.getRMApps().get(
+          this.application.getAppAttemptId().getApplicationId());
+      RMAppCertificateManagerEvent certsCleanup = new RMAppCertificateManagerRevokeEvent(
+          application.getApplicationId(), application.getUser());
+      handler.handle(certsCleanup);
     }
   }
   

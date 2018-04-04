@@ -78,6 +78,7 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppCertificateManagerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppCertificateManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.RMAppCertificateManagerRevokeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppManagerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger;
@@ -206,8 +207,6 @@ public class RMAppImpl implements RMApp, Recoverable {
     .addTransition(RMAppState.NEW, RMAppState.NEW,
         RMAppEventType.NODE_UPDATE, new RMAppNodeUpdateTransition())
       
-      
-      
     .addTransition(RMAppState.NEW, RMAppState.GENERATING_CERTS,
         RMAppEventType.GENERATE_CERTS, new RMAppGeneratingCertsTransition())
       
@@ -225,10 +224,11 @@ public class RMAppImpl implements RMApp, Recoverable {
     // Transitions from GENERATING_CERTS
     .addTransition(RMAppState.GENERATING_CERTS, RMAppState.NEW_SAVING,
           RMAppEventType.START, new RMAppNewlySavingTransition())
-      
     .addTransition(RMAppState.GENERATING_CERTS, RMAppState.FINAL_SAVING,
         RMAppEventType.KILL, new FinalSavingTransition(
             new AppKilledTransition(), RMAppState.KILLED))
+    .addTransition(RMAppState.GENERATING_CERTS, RMAppState.GENERATING_CERTS,
+        RMAppEventType.NODE_UPDATE, new RMAppNodeUpdateTransition())
       
     // Transitions from NEW_SAVING state
     .addTransition(RMAppState.NEW_SAVING, RMAppState.NEW_SAVING,
@@ -1370,7 +1370,7 @@ public class RMAppImpl implements RMApp, Recoverable {
           .applicationFinished(app, finalState);
       app.rmContext.getSystemMetricsPublisher()
           .appFinished(app, finalState, app.finishTime);
-    };
+    }
   }
 
   private int getNumFailedAppAttempts() {
@@ -1440,26 +1440,6 @@ public class RMAppImpl implements RMApp, Recoverable {
         app.rememberTargetTransitionsAndStoreState(event,
           new AttemptFailedFinalStateSavedTransition(), RMAppState.FAILED,
           RMAppState.FAILED);
-        
-        // Application has failed and no more attempts are allowed
-        // Cleanup the cryptographic material
-        // In case of successful completion, the cryptographic material will
-        // be cleaned by AMLauncher#cleanup
-        ByteBuffer kstore = app.getApplicationSubmissionContext().getKeyStore();
-        ByteBuffer tstore = app.getApplicationSubmissionContext()
-            .getTrustStore();
-        
-        // Basically if TLS is enabled for RPC
-        if (kstore != null && tstore != null
-            && kstore.capacity() > 0 && tstore.capacity() > 0) {
-          try {
-            CertificateLocalizationCtx.getInstance().getCertificateLocalization()
-                .removeMaterial(app.getUser());
-          } catch (InterruptedException | ExecutionException ex) {
-            LOG.error("Error while deleting cryptographic material for user " +
-                app.getUser(), ex);
-          }
-        }
         return RMAppState.FINAL_SAVING;
       }
     }
