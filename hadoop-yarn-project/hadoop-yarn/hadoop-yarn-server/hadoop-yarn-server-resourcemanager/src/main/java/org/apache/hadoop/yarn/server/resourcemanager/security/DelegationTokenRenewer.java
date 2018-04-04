@@ -898,7 +898,7 @@ public class DelegationTokenRenewer extends AbstractService {
         // Setup tokens for renewal
         DelegationTokenRenewer.this.handleAppSubmitEvent(event);
         rmContext.getDispatcher().getEventHandler()
-            .handle(new RMAppEvent(event.getApplicationId(), RMAppEventType.START));
+            .handle(new RMAppEvent(event.getApplicationId(), RMAppEventType.GENERATE_CERTS));
       } catch (Throwable t) {
         LOG.warn(
             "Unable to add the application to the delegation token renewer.",

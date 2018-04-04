@@ -617,6 +617,7 @@ public class RMAppImpl implements RMApp, Recoverable {
   private FinalApplicationStatus createFinalApplicationStatus(RMAppState state) {
     switch(state) {
     case NEW:
+    case GENERATING_CERTS:
     case NEW_SAVING:
     case SUBMITTED:
     case ACCEPTED:
