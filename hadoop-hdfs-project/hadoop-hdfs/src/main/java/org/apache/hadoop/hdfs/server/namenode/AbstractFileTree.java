@@ -36,6 +36,8 @@ import io.hops.transaction.lock.SubtreeLockHelper;
 import io.hops.transaction.lock.SubtreeLockedException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.security.AccessControlException;
@@ -51,46 +53,34 @@ import java.util.concurrent.atomic.AtomicLong;
 @VisibleForTesting
 abstract class AbstractFileTree {
   public static final Log LOG = LogFactory.getLog(AbstractFileTree.class);
-
+  
   private final FSNamesystem namesystem;
   private final FSPermissionChecker fsPermissionChecker;
   private final INodeIdentifier subtreeRootId;
   private ConcurrentLinkedQueue<Future> activeCollectors = new ConcurrentLinkedQueue<>();
   private final FsAction subAccess;
   private volatile IOException exception;
-
+  private List<AclEntry> subtreeRootDefaultEntries;
+  
   public static class BuildingUpFileTreeFailedException extends IOException {
-
-    public BuildingUpFileTreeFailedException() {
-    }
-
-    public BuildingUpFileTreeFailedException(String message) {
+    BuildingUpFileTreeFailedException(String message) {
       super(message);
     }
-
-    public BuildingUpFileTreeFailedException(String message, Throwable cause) {
-      super(message, cause);
-    }
-
-    public BuildingUpFileTreeFailedException(Throwable cause) {
-      super(cause);
-    }
   }
-
+  
   private class ChildCollector implements Runnable {
-    private final int parentId;
+    private final ProjectedINode parent;
     private final short depth; //this is the depth of the inode in the file system tree
     private final int level;
-    private boolean quotaEnabledBranch;
-
-    private ChildCollector(int parentId, short depth, int level,
-        boolean quotaEnabledBranch) {
-      this.parentId = parentId;
+    private List<AclEntry> inheritedDefaultsAsAccess;
+    
+    private ChildCollector(ProjectedINode parent, short depth, int level, List<AclEntry> inheritedDefaultsAsAccess) {
+      this.parent = parent;
       this.level = level;
       this.depth = depth;
-      this.quotaEnabledBranch = quotaEnabledBranch;
+      this.inheritedDefaultsAsAccess = inheritedDefaultsAsAccess;
     }
-
+    
     @Override
     public void run() {
       LightWeightRequestHandler handler =
@@ -101,41 +91,48 @@ abstract class AbstractFileTree {
                   (INodeDataAccess) HdfsStorageFactory
                       .getDataAccess(INodeDataAccess.class);
               List<ProjectedINode> children = Collections.EMPTY_LIST;
-              if(INode.isTreeLevelRandomPartitioned(depth)){
-                children = dataAccess.findInodesForSubtreeOperationsWithWriteLockFTIS(parentId);
-              }else{
+              if (INode.isTreeLevelRandomPartitioned(depth)) {
+                children = dataAccess.findInodesForSubtreeOperationsWithWriteLockFTIS(parent.getId());
+              } else {
                 //then the partitioning key is the parent id
-                children = dataAccess.findInodesForSubtreeOperationsWithWriteLockPPIS(parentId,parentId);
+                children = dataAccess.findInodesForSubtreeOperationsWithWriteLockPPIS(parent.getId(), parent.getId());
               }
+              
               for (ProjectedINode child : children) {
                 if (namesystem.isPermissionEnabled() && subAccess != null) {
-                  checkAccess(child, subAccess);
+                  List<AclEntry> inodeAclNoTransaction = INodeUtil.getInodeOwnAclNoTransaction(child);
+                  if (inodeAclNoTransaction.isEmpty()){
+                    checkAccess(child, subAccess, asAccessEntries(inheritedDefaultsAsAccess));
+                  } else {
+                    checkAccess(child, subAccess, inodeAclNoTransaction);
+                  }
                 }
-                addChildNode(level, child, quotaEnabledBranch);
+                addChildNode(parent, level, child);
               }
-
+  
               if (exception != null) {
                 return null;
               }
-
-              for (ProjectedINode inode : children) {
+  
+              for (ProjectedINode child : children) {
                 List<ActiveNode> activeNamenodes = namesystem.getNameNode().
                     getActiveNameNodes().getActiveNodes();
-                if (SubtreeLockHelper.isSubtreeLocked(inode.isSubtreeLocked(),
-                    inode.getSubtreeLockOwner(), activeNamenodes)) {
-                  exception = new SubtreeLockedException(inode.getName(),
+                if (SubtreeLockHelper.isSubtreeLocked(child.isSubtreeLocked(),
+                    child.getSubtreeLockOwner(), activeNamenodes)) {
+                  exception = new SubtreeLockedException(child.getName(),
                       activeNamenodes);
                   return null;
                 }
-                if (inode.isDirectory()) {
-                  collectChildren(inode.getId(), ((short) (depth + 1)), level + 1,
-                          inode.isDirWithQuota());
+                List<AclEntry> newDefaults = filterAccessEntries(INodeUtil.getInodeOwnAclNoTransaction(child));
+                if (child.isDirectory()) {
+                  collectChildren(child, ((short) (depth + 1)), level + 1, newDefaults.isEmpty()
+                      ? inheritedDefaultsAsAccess : newDefaults);
                 }
               }
               return null;
             }
           };
-
+      
       try {
         handler.handle(this);
       } catch (IOException e) {
@@ -143,45 +140,46 @@ abstract class AbstractFileTree {
       }
     }
   }
-
+  
   public AbstractFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
       throws AccessControlException {
-    this(namesystem, subtreeRootId, null);
+    this(namesystem, subtreeRootId, null, null);
   }
-
+  
   public AbstractFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-      FsAction subAccess) throws AccessControlException {
+      FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
     this.namesystem = namesystem;
     this.fsPermissionChecker = namesystem.getPermissionChecker();
     this.subtreeRootId = subtreeRootId;
     this.subAccess = subAccess;
+    this.subtreeRootDefaultEntries = subtreeRootDefaultEntries;
   }
-
-  private void checkAccess(INode node, FsAction action)
+  
+  private void checkAccess(INode node, FsAction action,
+      List<AclEntry> aclEntries)
       throws IOException {
     if (!fsPermissionChecker.isSuperUser() && node.isDirectory()) {
-      fsPermissionChecker.check(node, action);
+      fsPermissionChecker.check(node, action, aclEntries);
     }
   }
-
-  private void checkAccess(ProjectedINode node, FsAction action)
+  
+  private void checkAccess(ProjectedINode node, FsAction action, List<AclEntry> aclEntries)
       throws IOException {
     if (!fsPermissionChecker.isSuperUser() && node.isDirectory()) {
       node.setUserName(UsersGroups.getUser(node.getUserID()));
       node.setGroupName(UsersGroups.getGroup(node.getGroupID()));
-      fsPermissionChecker.check(node, action);
+      fsPermissionChecker.check(node, action, aclEntries);
     }
   }
-
+  
   public void buildUp() throws IOException {
     INode subtreeRoot = readSubtreeRoot();
-    if (subtreeRoot.isDirectory() == false) {
+    if (!subtreeRoot.isDirectory()) {
       return;
     }
-
-    boolean quotaEnabled =
-        subtreeRoot instanceof INodeDirectoryWithQuota ? true : false;
-    collectChildren(subtreeRootId.getInodeId(), subtreeRootId.getDepth() ,2, quotaEnabled);
+    
+    
+    collectChildren(newProjectedInode(subtreeRoot, 0), subtreeRootId.getDepth(), 2, subtreeRootDefaultEntries);
     while (true) {
       try {
         Future future = activeCollectors.poll();
@@ -208,18 +206,17 @@ abstract class AbstractFileTree {
       throw exception;
     }
   }
-
+  
   protected synchronized void setExceptionIfNull(IOException e) {
     if (exception == null) {
       exception = e;
     }
   }
-
+  
   protected abstract void addSubtreeRoot(ProjectedINode node);
-
-  protected abstract void addChildNode(int level, ProjectedINode node,
-      boolean quotaEnabledBranch);
-
+  
+  protected abstract void addChildNode(ProjectedINode parent, int level, ProjectedINode child);
+  
   private INode readSubtreeRoot() throws IOException {
     return (INode) new LightWeightRequestHandler(
         HDFSOperationType.GET_SUBTREE_ROOT) {
@@ -230,52 +227,41 @@ abstract class AbstractFileTree {
                 .getDataAccess(INodeDataAccess.class);
         // No need to acquire a lock as the locking flag was already set
         INode subtreeRoot = null;
-        subtreeRoot = dataAccess.findInodeByNameParentIdAndPartitionIdPK(subtreeRootId.getName(),subtreeRootId
-            .getPid(),subtreeRootId.getPartitionId());
+        subtreeRoot = dataAccess.findInodeByNameParentIdAndPartitionIdPK(subtreeRootId.getName(), subtreeRootId
+            .getPid(), subtreeRootId.getPartitionId());
         if (subtreeRoot == null) {
           throw new BuildingUpFileTreeFailedException(
               "Subtree root does not exist");
         }
-
+  
+        List<AclEntry> inodeOwnAclNoTransaction = INodeUtil.getInodeOwnAclNoTransaction(subtreeRoot);
         if (namesystem.isPermissionEnabled() && subAccess != null) {
-          checkAccess(subtreeRoot, subAccess);
+          if (inodeOwnAclNoTransaction.isEmpty()){
+            
+            checkAccess(subtreeRoot, subAccess, asAccessEntries(subtreeRootDefaultEntries));
+          } else {
+            checkAccess(subtreeRoot, subAccess, inodeOwnAclNoTransaction);
+          }
         }
-
+  
         long size = 0;
-        if(subtreeRoot.isFile()){
-            size = ((INodeFile)subtreeRoot).getSize();
+        if (subtreeRoot.isFile()) {
+          size = ((INodeFile) subtreeRoot).getSize();
         }
-
-        ProjectedINode pin= new ProjectedINode(subtreeRoot.getId(),
-                subtreeRoot.getParentId(),
-                subtreeRoot.getLocalName(),
-                subtreeRoot.getPartitionId(),
-                subtreeRoot instanceof INodeDirectory ? true : false,
-                subtreeRoot.getFsPermissionShort(),
-                subtreeRoot.getUserID(),
-                subtreeRoot.getGroupID(),
-                subtreeRoot.getHeader(),
-                subtreeRoot.isSymlink(),
-                subtreeRoot instanceof INodeDirectoryWithQuota ? true : false,
-                subtreeRoot.isUnderConstruction(),
-                subtreeRoot.isSubtreeLocked(),
-                subtreeRoot.getSubtreeLockOwner(),
-                size,
-                subtreeRoot.getLogicalTime(),
-                subtreeRoot.getLocalStoragePolicyID());
-
+        
+        ProjectedINode pin = AbstractFileTree.newProjectedInode(subtreeRoot, size);
+  
         addSubtreeRoot(pin);
         return subtreeRoot;
       }
     }.handle(this);
   }
-
-  private void collectChildren(int parentId, short depth, int level,
-      boolean quotaEnabledBranch) {
+  
+  private void collectChildren(ProjectedINode parent, short depth, int level, List<AclEntry> inheritedDefaults) {
     activeCollectors.add(namesystem.getSubtreeOperationsExecutor().
-        submit(new ChildCollector(parentId, depth, level, quotaEnabledBranch)));
+        submit(new ChildCollector(parent, depth, level, inheritedDefaults)));
   }
-
+  
   /**
    * This method is for testing only! Do not rely on it.
    *
@@ -297,38 +283,37 @@ abstract class AbstractFileTree {
         nodes.getLast().getParentId(),
         nodes.getLast().getLocalName(),
         nodes.getLast().getPartitionId());
-    rootId.setDepth((short)(INodeDirectory.ROOT_DIR_DEPTH + (nodes.size()-1)));
+    rootId.setDepth((short) (INodeDirectory.ROOT_DIR_DEPTH + (nodes.size() - 1)));
     return new CountingFileTree(namesystem, rootId);
   }
-
+  
   @VisibleForTesting
   static class CountingFileTree extends AbstractFileTree {
     private final AtomicLong fileCount = new AtomicLong(0);
     private final AtomicLong directoryCount = new AtomicLong(0);
     private final AtomicLong diskspaceCount = new AtomicLong(0);
     private final AtomicLong fileSizeSummary = new AtomicLong(0);
-
+    
     public CountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
         throws AccessControlException {
-      this(namesystem, subtreeRootId, null);
+      super(namesystem, subtreeRootId);
     }
-
+    
     public CountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-        FsAction subAccess) throws AccessControlException {
-      super(namesystem, subtreeRootId, subAccess);
+        FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
+      super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
     }
-
+    
     @Override
     protected void addSubtreeRoot(ProjectedINode node) {
       addNode(node);
     }
-
+    
     @Override
-    protected void addChildNode(int level, ProjectedINode node,
-        boolean quotaEnabledBranch) {
+    protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
       addNode(node);
     }
-
+    
     protected void addNode(final ProjectedINode node) {
       if (node.isDirectory()) {
         directoryCount.addAndGet(1);
@@ -336,60 +321,58 @@ abstract class AbstractFileTree {
         fileCount.addAndGet(1);
       } else {
         fileCount.addAndGet(1);
-        diskspaceCount.addAndGet(node.getFileSize()*INode.HeaderFormat.getReplication(node.getHeader()));
+        diskspaceCount.addAndGet(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
         fileSizeSummary.addAndGet(node.getFileSize());
       }
     }
-
+    
     long getNamespaceCount() {
       return directoryCount.get() + fileCount.get();
     }
-
+    
     long getDiskspaceCount() {
       return diskspaceCount.get();
     }
-
+    
     long getFileSizeSummary() {
       return fileSizeSummary.get();
     }
-
+    
     public long getFileCount() {
       return fileCount.get();
     }
-
+    
     public long getDirectoryCount() {
       return directoryCount.get();
     }
   }
-
+  
   @VisibleForTesting
   static class QuotaCountingFileTree extends AbstractFileTree {
     private final AtomicLong namespaceCount = new AtomicLong(0);
     private final AtomicLong diskspaceCount = new AtomicLong(0);
-
+  
     public QuotaCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
         throws AccessControlException {
       super(namesystem, subtreeRootId);
     }
-
+  
     public QuotaCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-        FsAction subAccess) throws AccessControlException {
-      super(namesystem, subtreeRootId, subAccess);
+        FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
+      super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
     }
-
+  
     @Override
     protected void addSubtreeRoot(ProjectedINode node) {
       addNode(node);
     }
-
+  
     @Override
-    protected void addChildNode(int level, ProjectedINode node,
-        boolean quotaEnabledBranch) {
-      if (!quotaEnabledBranch) {
+    protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
+      if (!parent.isDirWithQuota())
         addNode(node);
-      }
     }
-
+  
     protected void addNode(final ProjectedINode node) {
       if (node.isDirWithQuota()) {
         LightWeightRequestHandler handler = new LightWeightRequestHandler(
@@ -406,7 +389,7 @@ abstract class AbstractFileTree {
             return null;
           }
         };
-
+  
         try {
           handler.handle();
         } catch (IOException e) {
@@ -415,239 +398,290 @@ abstract class AbstractFileTree {
       } else {
         namespaceCount.addAndGet(1);
         if (!node.isDirectory() && !node.isSymlink()) {
-          diskspaceCount.addAndGet(node.getFileSize()* INode.HeaderFormat.getReplication(node.getHeader()));
+          diskspaceCount.addAndGet(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
         }
       }
     }
-
+  
     long getNamespaceCount() {
       return namespaceCount.get();
     }
-
+  
     long getDiskspaceCount() {
       return diskspaceCount.get();
     }
+  
   }
-
-  static class LoggingQuotaCountingFileTree extends QuotaCountingFileTree {
-    private ConcurrentLinkedQueue<MetadataLogEntry> metadataLogEntries =
-        new ConcurrentLinkedQueue<>();
-    private final INode srcDataset;
-    private final INode dstDataset;
-    public LoggingQuotaCountingFileTree(
-        FSNamesystem namesystem, INodeIdentifier subtreeRootId, INode srcDataset,
-        INode dstDataset) throws AccessControlException {
-      super(namesystem, subtreeRootId);
-      this.srcDataset = srcDataset;
-      this.dstDataset = dstDataset;
-    }
-
-    public LoggingQuotaCountingFileTree(
-        FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-        FsAction subAccess, INode srcDataset,
-        INode dstDataset) throws AccessControlException {
-      super(namesystem, subtreeRootId, subAccess);
-      this.srcDataset = srcDataset;
-      this.dstDataset = dstDataset;
-    }
-
-    @Override
-    protected void addChildNode(int level, ProjectedINode node,
-        boolean quotaEnabledBranch) {
-      if (srcDataset != null) {
-        node.incrementLogicalTime();
-        metadataLogEntries.add(new MetadataLogEntry(srcDataset.getId(),
-            node.getId(), node.getPartitionId(), node.getParentId(), node
-            .getName(), node.getLogicalTime(), MetadataLogEntry.Operation
-            .DELETE));
+    static class LoggingQuotaCountingFileTree extends QuotaCountingFileTree {
+      private ConcurrentLinkedQueue<MetadataLogEntry> metadataLogEntries =
+          new ConcurrentLinkedQueue<>();
+      private final INode srcDataset;
+      private final INode dstDataset;
+      
+      public LoggingQuotaCountingFileTree(
+          FSNamesystem namesystem, INodeIdentifier subtreeRootId, INode srcDataset,
+          INode dstDataset) throws AccessControlException {
+        super(namesystem, subtreeRootId);
+        this.srcDataset = srcDataset;
+        this.dstDataset = dstDataset;
       }
-      if (dstDataset != null) {
-        node.incrementLogicalTime();
-        metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
-            node.getId(), node.getPartitionId(), node.getParentId(), node
-            .getName(), node.getLogicalTime(), MetadataLogEntry.Operation.ADD));
+      
+      public LoggingQuotaCountingFileTree(
+          FSNamesystem namesystem, INodeIdentifier subtreeRootId,
+          FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries, INode srcDataset,
+          INode dstDataset) throws AccessControlException {
+        super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
+        this.srcDataset = srcDataset;
+        this.dstDataset = dstDataset;
       }
-      super.addChildNode(level, node, quotaEnabledBranch);
-    }
-
-    public Collection<MetadataLogEntry> getMetadataLogEntries() {
-      return metadataLogEntries;
-    }
-
-    static void updateLogicalTime(final Collection<MetadataLogEntry> logEntries)
-        throws IOException {
-      new LightWeightRequestHandler(HDFSOperationType.UPDATE_LOGICAL_TIME){
-        @Override
-        public Object performTask() throws IOException {
-          INodeDataAccess<INode> dataAccess =
-              (INodeDataAccess) HdfsStorageFactory
-                  .getDataAccess(INodeDataAccess.class);
-          dataAccess.updateLogicalTime(logEntries);
-          return null;
+      
+      @Override
+      protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
+        if (srcDataset != null) {
+          node.incrementLogicalTime();
+          metadataLogEntries.add(new MetadataLogEntry(srcDataset.getId(),
+              node.getId(), node.getPartitionId(), node.getParentId(), node
+              .getName(), node.getLogicalTime(), MetadataLogEntry.Operation
+              .DELETE));
         }
-      }.handle();
-    }
-  }
-
-  @VisibleForTesting
-  static class FileTree extends AbstractFileTree {
-    public static final int ROOT_LEVEL = 1;
-
-    private final SetMultimap<Integer, ProjectedINode> inodesByParent;
-    private final SetMultimap<Integer, ProjectedINode> inodesByLevel;
-    private final SetMultimap<Integer, ProjectedINode> dirsByLevel;
-    private final ConcurrentHashMap<Integer, ProjectedINode> inodesById =
-        new ConcurrentHashMap<>();
-
-    public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
-        throws AccessControlException {
-      this(namesystem, subtreeRootId, null);
-    }
-
-    public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-        FsAction subAccess) throws AccessControlException {
-      super(namesystem, subtreeRootId, subAccess);
-      HashMultimap<Integer, ProjectedINode> parentMap = HashMultimap.create();
-      inodesByParent = Multimaps.synchronizedSetMultimap(parentMap);
-      HashMultimap<Integer, ProjectedINode> levelMap = HashMultimap.create();
-      inodesByLevel = Multimaps.synchronizedSetMultimap(levelMap);
-      HashMultimap<Integer, ProjectedINode> dirsLevelMap = HashMultimap.create();
-      dirsByLevel = Multimaps.synchronizedSetMultimap(dirsLevelMap);
-    }
-
-    @Override
-    protected void addSubtreeRoot(ProjectedINode node) {
-      inodesByLevel.put(ROOT_LEVEL, node);
-      inodesById.put(node.getId(), node);
-      dirsByLevel.put(ROOT_LEVEL, node);
-    }
-
-    @Override
-    protected void addChildNode(int level, ProjectedINode node,
-        boolean quotaEnabledBranch) {
-      inodesByParent.put(node.getParentId(), node);
-      inodesByLevel.put(level, node);
-      inodesById.put(node.getId(), node);
-      if(node.isDirectory()){
-        dirsByLevel.put(level,node);
+        if (dstDataset != null) {
+          node.incrementLogicalTime();
+          metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
+              node.getId(), node.getPartitionId(), node.getParentId(), node
+              .getName(), node.getLogicalTime(), MetadataLogEntry.Operation.ADD));
+        }
+        super.addChildNode(parent, level, node);
+      }
+      
+      public Collection<MetadataLogEntry> getMetadataLogEntries() {
+        return metadataLogEntries;
+      }
+      
+      static void updateLogicalTime(final Collection<MetadataLogEntry> logEntries)
+          throws IOException {
+        new LightWeightRequestHandler(HDFSOperationType.UPDATE_LOGICAL_TIME) {
+          @Override
+          public Object performTask() throws IOException {
+            INodeDataAccess<INode> dataAccess =
+                (INodeDataAccess) HdfsStorageFactory
+                    .getDataAccess(INodeDataAccess.class);
+            dataAccess.updateLogicalTime(logEntries);
+            return null;
+          }
+        }.handle();
       }
     }
-
-    public Collection<ProjectedINode> getAll() {
-      return inodesByLevel.values();
-    }
-
-    public Set<Integer> getAllINodesIds() {
-      return inodesById.keySet();
-    }
-
-    public Collection<ProjectedINode> getAllChildren() {
-      return inodesByParent.values();
-    }
-
-    public ProjectedINode getSubtreeRoot() {
-      return inodesByLevel.get(ROOT_LEVEL).iterator().next();
-    }
-
-    public int getHeight() {
-      return inodesByLevel.keySet().size();
-    }
-
-    public Collection<ProjectedINode> getChildren(int inodeId) {
-      return inodesByParent.get(inodeId);
-    }
-
-    public Collection<ProjectedINode> getInodesByLevel(int level) {
-      return inodesByLevel.get(level);
-    }
-
-    public Collection<ProjectedINode> getDirsByLevel(int level) {
-      return dirsByLevel.get(level);
-    }
-
-    public int countChildren(int inodeId){
-      return getChildren(inodeId).size();
-    }
-
-    public ProjectedINode getInodeById(int id) {
-      return inodesById.get(id);
-    }
-
-    public boolean isNonEmptyDirectory() {
-      return getSubtreeRoot().isDirectory() &&
-          !getChildren(getSubtreeRoot().getId()).isEmpty();
-    }
-
-    public String createAbsolutePath(String subtreeRootPath,
-        ProjectedINode inode) {
-      StringBuilder builder = new StringBuilder();
-      while (inode.equals(getSubtreeRoot()) == false) {
-        builder.insert(0, inode.getName());
-        builder.insert(0, "/");
-        inode = getInodeById(inode.getParentId());
+    
+    @VisibleForTesting
+    public static class FileTree extends AbstractFileTree {
+      public static final int ROOT_LEVEL = 1;
+      
+      private final SetMultimap<Integer, ProjectedINode> inodesByParent;
+      private final SetMultimap<Integer, ProjectedINode> inodesByLevel;
+      private final SetMultimap<Integer, ProjectedINode> dirsByLevel;
+      private final ConcurrentHashMap<Integer, ProjectedINode> inodesById =
+          new ConcurrentHashMap<>();
+      
+      public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
+          throws AccessControlException {
+        this(namesystem, subtreeRootId, null, null);
       }
-      builder.insert(0, subtreeRootPath);
-      return builder.toString();
+      
+      public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
+          FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
+        super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
+        HashMultimap<Integer, ProjectedINode> parentMap = HashMultimap.create();
+        inodesByParent = Multimaps.synchronizedSetMultimap(parentMap);
+        HashMultimap<Integer, ProjectedINode> levelMap = HashMultimap.create();
+        inodesByLevel = Multimaps.synchronizedSetMultimap(levelMap);
+        HashMultimap<Integer, ProjectedINode> dirsLevelMap = HashMultimap.create();
+        dirsByLevel = Multimaps.synchronizedSetMultimap(dirsLevelMap);
+      }
+      
+      
+      @Override
+      protected void addSubtreeRoot(ProjectedINode node) {
+        inodesByLevel.put(ROOT_LEVEL, node);
+        inodesById.put(node.getId(), node);
+        dirsByLevel.put(ROOT_LEVEL, node);
+      }
+      
+      @Override
+      protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
+        inodesByParent.put(parent.getId(), node);
+        inodesByLevel.put(level, node);
+        inodesById.put(node.getId(), node);
+        if (node.isDirectory()) {
+          dirsByLevel.put(level, node);
+        }
+      }
+      
+      public Collection<ProjectedINode> getAll() {
+        return inodesByLevel.values();
+      }
+      
+      public Set<Integer> getAllINodesIds() {
+        return inodesById.keySet();
+      }
+      
+      public Collection<ProjectedINode> getAllChildren() {
+        return inodesByParent.values();
+      }
+      
+      public ProjectedINode getSubtreeRoot() {
+        return inodesByLevel.get(ROOT_LEVEL).iterator().next();
+      }
+      
+      public int getHeight() {
+        return inodesByLevel.keySet().size();
+      }
+      
+      public Collection<ProjectedINode> getChildren(int inodeId) {
+        return inodesByParent.get(inodeId);
+      }
+      
+      public Collection<ProjectedINode> getInodesByLevel(int level) {
+        return inodesByLevel.get(level);
+      }
+      
+      public Collection<ProjectedINode> getDirsByLevel(int level) {
+        return dirsByLevel.get(level);
+      }
+      
+      public int countChildren(int inodeId) {
+        return getChildren(inodeId).size();
+      }
+      
+      public ProjectedINode getInodeById(int id) {
+        return inodesById.get(id);
+      }
+      
+      public boolean isNonEmptyDirectory() {
+        return getSubtreeRoot().isDirectory() &&
+            !getChildren(getSubtreeRoot().getId()).isEmpty();
+      }
+      
+      public String createAbsolutePath(String subtreeRootPath,
+          ProjectedINode inode) {
+        StringBuilder builder = new StringBuilder();
+        while (inode.equals(getSubtreeRoot()) == false) {
+          builder.insert(0, inode.getName());
+          builder.insert(0, "/");
+          inode = getInodeById(inode.getParentId());
+        }
+        builder.insert(0, subtreeRootPath);
+        return builder.toString();
+      }
     }
-  }
-
-  static class IdCollectingCountingFileTree extends CountingFileTree {
-    private LinkedList<Integer> ids = new LinkedList<>();
-    private List<Integer> synchronizedList = Collections.synchronizedList(ids);
-
-    public IdCollectingCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
-        throws AccessControlException {
-      super(namesystem, subtreeRootId);
+    
+    static class IdCollectingCountingFileTree extends CountingFileTree {
+      private LinkedList<Integer> ids = new LinkedList<>();
+      private List<Integer> synchronizedList = Collections.synchronizedList(ids);
+      
+      public IdCollectingCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
+          throws AccessControlException {
+        super(namesystem, subtreeRootId);
+      }
+      
+      public IdCollectingCountingFileTree(FSNamesystem namesystem,
+          INodeIdentifier subtreeRootId, FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws
+          AccessControlException {
+        super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
+      }
+      
+      @Override
+      protected void addSubtreeRoot(ProjectedINode node) {
+        synchronizedList.add(node.getId());
+        super.addSubtreeRoot(node);
+      }
+      
+      @Override
+      protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
+        synchronizedList.add(node.getId());
+        super.addChildNode(parent, level, node);
+      }
+      
+      /**
+       * @return A list that guarantees to includes parents before their children.
+       */
+      public LinkedList<Integer> getOrderedIds() {
+        return ids;
+      }
     }
-
-    public IdCollectingCountingFileTree(FSNamesystem namesystem,
-        INodeIdentifier subtreeRootId, FsAction subAccess) throws AccessControlException {
-      super(namesystem, subtreeRootId, subAccess);
-    }
-
-    @Override
-    protected void addSubtreeRoot(ProjectedINode node) {
-      synchronizedList.add(node.getId());
-      super.addSubtreeRoot(node);
-    }
-
-    @Override
-    protected void addChildNode(int level, ProjectedINode node,
-        boolean quotaEnabledBranch) {
-      synchronizedList.add(node.getId());
-      super.addChildNode(level, node, quotaEnabledBranch);
-    }
-
+    
     /**
-     * @return A list that guarantees to includes parents before their children.
+     * This method id for testing only! Do not rely on it.
+     *
+     * @param path
+     *     The path of the subtree
+     * @return A FileTree instance reprecenting the path
+     * @throws io.hops.exception.StorageException
+     * @throws UnresolvedPathException
      */
-    public LinkedList<Integer> getOrderedIds() {
-      return ids;
+    @VisibleForTesting
+    static FileTree createFileTreeFromPath(FSNamesystem namesystem, String path)
+        throws StorageException, UnresolvedPathException,
+        TransactionContextException, AccessControlException {
+      LinkedList<INode> nodes = new LinkedList<>();
+      boolean[] fullyResovled = new boolean[1];
+      INodeUtil.resolvePathWithNoTransaction(path, false, nodes, fullyResovled);
+      INodeIdentifier rootId = new INodeIdentifier(
+          nodes.getLast().getId(),
+          nodes.getLast().getParentId(),
+          nodes.getLast().getLocalName(),
+          nodes.getLast().getPartitionId());
+      rootId.setDepth((short) (INodeDirectory.ROOT_DIR_DEPTH + (nodes.size() - 1)));
+      return new FileTree(namesystem, rootId);
     }
+    
+  
+  private static List<AclEntry> asAccessEntries(List<AclEntry> defaults) {
+    List<AclEntry> accessEntries = new ArrayList<>();
+    for (AclEntry defaultEntry : defaults) {
+      accessEntries.add(new AclEntry.Builder().setScope(AclEntryScope.ACCESS).setType(defaultEntry.getType()).setName
+          (defaultEntry.getName()).setPermission(defaultEntry.getPermission()).build());
+    }
+    return accessEntries;
   }
-
-  /**
-   * This method id for testing only! Do not rely on it.
-   *
-   * @param path
-   *     The path of the subtree
-   * @return A FileTree instance reprecenting the path
-   * @throws io.hops.exception.StorageException
-   * @throws UnresolvedPathException
-   */
-  @VisibleForTesting
-  static FileTree createFileTreeFromPath(FSNamesystem namesystem, String path)
-      throws StorageException, UnresolvedPathException,
-      TransactionContextException, AccessControlException {
-    LinkedList<INode> nodes = new LinkedList<>();
-    boolean[] fullyResovled = new boolean[1];
-    INodeUtil.resolvePathWithNoTransaction(path, false, nodes, fullyResovled);
-    INodeIdentifier rootId = new INodeIdentifier(
-        nodes.getLast().getId(),
-        nodes.getLast().getParentId(),
-        nodes.getLast().getLocalName(),
-        nodes.getLast().getPartitionId());
-    rootId.setDepth((short)(INodeDirectory.ROOT_DIR_DEPTH + (nodes.size()-1)));
-    return new FileTree(namesystem, rootId);
+  
+  private static List<AclEntry> filterAccessEntries(List<AclEntry> maybeAccess){
+      List<AclEntry> onlyDefaults = new ArrayList<>();
+      for (AclEntry entry : maybeAccess){
+        if (entry.getScope().equals(AclEntryScope.DEFAULT)) {
+          onlyDefaults.add(entry);
+        }
+      }
+      return onlyDefaults;
+  }
+  private static List<AclEntry> filterDefaultEntries(List<AclEntry> maybeDefault){
+      List<AclEntry> onlyDefaults = new ArrayList<>();
+      for (AclEntry entry : maybeDefault){
+        if (entry.getScope().equals(AclEntryScope.ACCESS)) {
+          onlyDefaults.add(entry);
+        }
+      }
+      return onlyDefaults;
+  }
+  
+  private static ProjectedINode newProjectedInode(INode from, long size) {
+    ProjectedINode result = new ProjectedINode(from.getId(),
+        from.getParentId(),
+        from.getLocalName(),
+        from.getPartitionId(),
+        from instanceof INodeDirectory,
+        from.getFsPermissionShort(),
+        from.getUserID(),
+        from.getGroupID(),
+        from.getHeader(),
+        from.isSymlink(),
+        from instanceof INodeDirectoryWithQuota,
+        from.isUnderConstruction(),
+        from.isSubtreeLocked(),
+        from.getSubtreeLockOwner(),
+        size,
+        from.getLogicalTime(),
+        from.getLocalStoragePolicyID());
+    return result;
   }
 }
+

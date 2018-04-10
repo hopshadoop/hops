@@ -50,15 +50,21 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.ByteRangeInputStream;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.protocol.AclException;
+import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.hdfs.web.resources.AccessTimeParam;
+import org.apache.hadoop.hdfs.web.resources.AclPermissionParam;
 import org.apache.hadoop.hdfs.web.resources.BlockSizeParam;
 import org.apache.hadoop.hdfs.web.resources.BufferSizeParam;
 import org.apache.hadoop.hdfs.web.resources.ConcatSourcesParam;
@@ -189,11 +195,11 @@ public class WebHdfsFileSystem extends FileSystem
       throw new IllegalArgumentException(e);
     }
     this.nnAddr = NetUtils.createSocketAddr(uri.getAuthority(), getDefaultPort());
-    this.retryPolicy = 
+    this.retryPolicy =
         RetryUtils.getDefaultRetryPolicy(
-            conf, 
-            DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY, 
-            DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_DEFAULT, 
+            conf,
+            DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY,
+            DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_DEFAULT,
             DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY,
             DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_DEFAULT,
             SafeModeException.class);
@@ -208,7 +214,7 @@ public class WebHdfsFileSystem extends FileSystem
     // look for webhdfs token, then try hdfs
     Token<?> token = selectDelegationToken(ugi);
     if (token != null) {
-      LOG.debug("Found existing DT for " + token.getService());        
+      LOG.debug("Found existing DT for " + token.getService());
       setDelegationToken(token);
       hasInitedToken = true;
     }
@@ -270,7 +276,7 @@ public class WebHdfsFileSystem extends FileSystem
   public synchronized void setWorkingDirectory(final Path dir) {
     String result = makeAbsolute(dir).toUri().getPath();
     if (!DFSUtil.isValidName(result)) {
-      throw new IllegalArgumentException("Invalid DFS directory name " + 
+      throw new IllegalArgumentException("Invalid DFS directory name " +
                                          result);
     }
     workingDir = makeAbsolute(dir);
@@ -330,10 +336,10 @@ public class WebHdfsFileSystem extends FileSystem
 
   /**
    * Covert an exception to an IOException.
-   * 
+   *
    * For a non-IOException, wrap it with IOException.
    * For a RemoteException, unwrap it.
-   * For an IOException which is not a RemoteException, return it. 
+   * For an IOException which is not a RemoteException, return it.
    */
   private static IOException toIOException(Exception e) {
     if (!(e instanceof IOException)) {
@@ -366,7 +372,7 @@ public class WebHdfsFileSystem extends FileSystem
   }
   
   Param<?,?>[] getAuthParameters(final HttpOpParam.Op op) throws IOException {
-    List<Param<?,?>> authParams = Lists.newArrayList();    
+    List<Param<?,?>> authParams = Lists.newArrayList();
     // Skip adding delegation token for token operations because these
     // operations require authentication.
     Token<?> token = null;
@@ -405,7 +411,7 @@ public class WebHdfsFileSystem extends FileSystem
   /**
    * Run a http operation.
    * Connect to the http server, validate response, and obtain the JSON output.
-   * 
+   *
    * @param op http operation
    * @param fspath file system path
    * @param parameters parameters for the operation
@@ -545,7 +551,7 @@ public class WebHdfsFileSystem extends FileSystem
           if (a.action == RetryPolicy.RetryAction.RetryDecision.RETRY) {
             LOG.info("Retrying connect to namenode: " + nnAddr
                 + ". Already tried " + retry + " time(s); retry policy is "
-                + retryPolicy + ", delay " + a.delayMillis + "ms.");      
+                + retryPolicy + ", delay " + a.delayMillis + "ms.");
             Thread.sleep(a.delayMillis);
             return;
           }
@@ -559,9 +565,9 @@ public class WebHdfsFileSystem extends FileSystem
 
     /**
      * Two-step Create/Append:
-     * Step 1) Submit a Http request with neither auto-redirect nor data. 
+     * Step 1) Submit a Http request with neither auto-redirect nor data.
      * Step 2) Submit another Http request with the URL from the Location header with data.
-     * 
+     *
      * The reason of having two-step create/append is for preventing clients to
      * send out the data before the redirect. This issue is addressed by the
      * "Expect: 100-continue" header in HTTP/1.1; see RFC 2616, Section 8.2.3.
@@ -650,6 +656,17 @@ public class WebHdfsFileSystem extends FileSystem
   }
 
   @Override
+  public AclStatus getAclStatus(Path f) throws IOException {
+    final HttpOpParam.Op op = GetOpParam.Op.GETACLSTATUS;
+    final Map<?, ?> json = run(op, f);
+    AclStatus status = JsonUtil.toAclStatus(json);
+    if (status == null) {
+      throw new FileNotFoundException("File does not exist: " + f);
+    }
+    return status;
+  }
+
+  @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
     statistics.incrementWriteOps(1);
     final HttpOpParam.Op op = PutOpParam.Op.MKDIRS;
@@ -660,7 +677,7 @@ public class WebHdfsFileSystem extends FileSystem
 
   /**
    * Create a symlink pointing to the destination path.
-   * @see org.apache.hadoop.fs.Hdfs#createSymlink(Path, Path, boolean) 
+   * @see org.apache.hadoop.fs.Hdfs#createSymlink(Path, Path, boolean)
    */
   public void createSymlink(Path destination, Path f, boolean createParent
       ) throws IOException {
@@ -707,6 +724,44 @@ public class WebHdfsFileSystem extends FileSystem
     statistics.incrementWriteOps(1);
     final HttpOpParam.Op op = PutOpParam.Op.SETPERMISSION;
     run(op, p, new PermissionParam(permission));
+  }
+
+  @Override
+  public void modifyAclEntries(Path path, List<AclEntry> aclSpec)
+      throws IOException {
+    statistics.incrementWriteOps(1);
+    final HttpOpParam.Op op = PutOpParam.Op.MODIFYACLENTRIES;
+    run(op, path, new AclPermissionParam(aclSpec));
+  }
+
+  @Override
+  public void removeAclEntries(Path path, List<AclEntry> aclSpec)
+      throws IOException {
+    statistics.incrementWriteOps(1);
+    final HttpOpParam.Op op = PutOpParam.Op.REMOVEACLENTRIES;
+    run(op, path, new AclPermissionParam(aclSpec));
+  }
+
+  @Override
+  public void removeDefaultAcl(Path path) throws IOException {
+    statistics.incrementWriteOps(1);
+    final HttpOpParam.Op op = PutOpParam.Op.REMOVEDEFAULTACL;
+    run(op, path);
+  }
+
+  @Override
+  public void removeAcl(Path path) throws IOException {
+    statistics.incrementWriteOps(1);
+    final HttpOpParam.Op op = PutOpParam.Op.REMOVEACL;
+    run(op, path);
+  }
+
+  @Override
+  public void setAcl(final Path p, final List<AclEntry> aclSpec)
+      throws IOException {
+    statistics.incrementWriteOps(1);
+    final HttpOpParam.Op op = PutOpParam.Op.SETACL;
+    run(op, p, new AclPermissionParam(aclSpec));
   }
 
   @Override
@@ -773,7 +828,7 @@ public class WebHdfsFileSystem extends FileSystem
     statistics.incrementWriteOps(1);
 
     final HttpOpParam.Op op = PutOpParam.Op.CREATE;
-    return new Runner(op, f, 
+    return new Runner(op, f,
         new PermissionParam(applyUMask(permission)),
         new OverwriteParam(overwrite),
         new BufferSizeParam(bufferSize),
@@ -837,7 +892,7 @@ public class WebHdfsFileSystem extends FileSystem
       final URL offsetUrl = offset == 0L? url
           : new URL(url + "&" + new OffsetParam(offset));
       return new Runner(GetOpParam.Op.OPEN, offsetUrl, resolved).run().conn;
-    }  
+    }
   }
 
   private static final String OFFSET_PARAM_PREFIX = OffsetParam.NAME + "=";
@@ -909,7 +964,7 @@ public class WebHdfsFileSystem extends FileSystem
       final String renewer) throws IOException {
     final HttpOpParam.Op op = GetOpParam.Op.GETDELEGATIONTOKEN;
     final Map<?, ?> m = run(op, null, new RenewerParam(renewer));
-    final Token<DelegationTokenIdentifier> token = JsonUtil.toDelegationToken(m); 
+    final Token<DelegationTokenIdentifier> token = JsonUtil.toDelegationToken(m);
     SecurityUtil.setTokenService(token, nnAddr);
     return token;
   }
@@ -954,7 +1009,7 @@ public class WebHdfsFileSystem extends FileSystem
   }
 
   @Override
-  public BlockLocation[] getFileBlockLocations(final Path p, 
+  public BlockLocation[] getFileBlockLocations(final Path p,
       final long offset, final long length) throws IOException {
     statistics.incrementReadOps(1);
 
@@ -1039,7 +1094,7 @@ public class WebHdfsFileSystem extends FileSystem
       Token<DelegationTokenIdentifier> token =
           selectToken(SecurityUtil.buildTokenService(nnUri), tokens);
       if (token == null) {
-        token = hdfsTokenSelector.selectToken(nnUri, tokens, conf); 
+        token = hdfsTokenSelector.selectToken(nnUri, tokens, conf);
       }
       return token;
     }

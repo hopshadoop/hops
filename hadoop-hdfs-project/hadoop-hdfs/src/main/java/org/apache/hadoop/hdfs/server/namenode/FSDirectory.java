@@ -48,11 +48,15 @@ import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclEntryType;
+import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
@@ -261,7 +265,7 @@ public class FSDirectory implements Closeable {
       throws QuotaExceededException, StorageException,
       TransactionContextException, IOException {
     final INode[] inodes = inodesInPath.getINodes();
-      final INodeFileUnderConstruction fileINode = 
+      final INodeFileUnderConstruction fileINode =
           INodeFileUnderConstruction.valueOf(inodes[inodes.length-1], path);
 
     long diskspaceTobeConsumed = fileINode.getBlockDiskspace();
@@ -558,7 +562,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
           if(rmdst instanceof  INodeFile && !((INodeFile)rmdst).isFileStoredInDB()){
             Block [] blocks = ((INodeFile)rmdst).getBlocks();
             for(Block blk : blocks){
-              collectedBlocks.addDeleteBlock(blk);      
+              collectedBlocks.addDeleteBlock(blk);
             }
           }else if(rmdst instanceof  INodeFile && ((INodeFile)rmdst).isFileStoredInDB()){
             ((INodeFile)rmdst).deleteFileDataStoredInDB();
@@ -792,7 +796,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
 
   /**
    * @param path the file path
-   * @return the block size of the file. 
+   * @return the block size of the file.
    */
   long getPreferredBlockSize(String path)
       throws UnresolvedLinkException, FileNotFoundException, IOException,
@@ -1523,7 +1527,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
     int i = pos - 1;
     try {
-      // check existing components in the path  
+      // check existing components in the path
       for (; i >= 0; i--) {
         if (commonAncestor == inodes[i]) {
           // Moving an existing node. Stop checking for quota when common
@@ -1540,7 +1544,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       throw e;
     }
   }
-    
+  
   /**
    * Verify quota for rename operation where srcInodes[srcInodes.length-1]
    * moves
@@ -1642,7 +1646,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   /**
    * Add a node child to the inodes at index pos.
    * Its ancestors are stored at [0, pos-1].
-   * @return false if the child with this name already exists; 
+   * @return false if the child with this name already exists;
    *         otherwise return true;
    * @throw QuotaExceededException is thrown if it violates quota limit
    */
@@ -1739,7 +1743,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * Count of each ancestor with quota is also updated.
    * @return the removed node; null if the removal fails.
    */
-  private INode removeLastINode(final INodesInPath inodesInPath, boolean forRename, 
+  private INode removeLastINode(final INodesInPath inodesInPath, boolean forRename,
           final INode.DirCounts counts)
       throws StorageException, TransactionContextException {
     final INode[] inodes = inodesInPath.getINodes();
@@ -1792,7 +1796,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
     return removedNode;
   }
-    
+  
   private INode removeLastINode(final INodesInPath inodesInPath, final INode.DirCounts counts)
       throws StorageException, TransactionContextException {
     return removeLastINode(inodesInPath, false, counts);
@@ -1862,7 +1866,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     counts.nsCount = 1L;//for self. should not call node.spaceConsumedInTree()
     counts.dsCount = 0L;
     
-    /* We don't need nodesInPath if we could use 'parent' field in 
+    /* We don't need nodesInPath if we could use 'parent' field in
      * INode. using 'parent' is not currently recommended. */
     nodesInPath.add(dir);
 
@@ -1901,13 +1905,13 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       }
     }
 
-    // pop 
+    // pop
     nodesInPath.remove(nodesInPath.size() - 1);
     
     counts.nsCount += parentNamespace;
     counts.dsCount += parentDiskspace;
   }
-    
+  
   /**
    * See {@link ClientProtocol#setQuota(String, long, long)} for the contract.
    *
@@ -1934,7 +1938,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    *     greater than the given quota
    * @throws UnresolvedLinkException
    *     if a symlink is encountered in src.
-   */ 
+   */
   INodeDirectory unprotectedSetQuota(String src, long nsQuota, long dsQuota, long nsCount, long dsCount)
       throws FileNotFoundException, PathIsNotDirectoryException, IOException,
       QuotaExceededException, UnresolvedLinkException, StorageException, TransactionContextException {
@@ -2213,7 +2217,137 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     final INodeSymlink symlink = new INodeSymlink(id, target, mtime, atime, perm);
     return addINode(path, symlink)? symlink: null;
   }
+
+  void modifyAclEntries(String src, List<AclEntry> aclSpec) throws IOException {
+    unprotectedModifyAclEntries(src, aclSpec);
+  }
+
+  private List<AclEntry> unprotectedModifyAclEntries(String src,
+      List<AclEntry> aclSpec) throws IOException {
+    AclStorage.validateAclSpec(aclSpec);
+    INode inode = getINode(src);
+    if (inode == null){
+      throw new FileNotFoundException();
+    }
+    
+    if (aclSpec.size() == 1 && aclSpec.get(0).getType().equals(AclEntryType.MASK)){
+      //HOPS: We allow setting
+      FsPermission fsPermission = inode.getFsPermission();
+      inode.setPermission(new FsPermission(fsPermission.getUserAction(), aclSpec.get(0).getPermission(), fsPermission
+          .getOtherAction()));
+      return AclStorage.readINodeLogicalAcl(inode);
+    }
+    List<AclEntry> existingAcl;
+    if (AclStorage.hasOwnAcl(inode)){
+      existingAcl = AclStorage.readINodeLogicalAcl(inode);
+    } else {
+      existingAcl = AclStorage.getMinimalAcl(inode);
+    }
+    
+    List<AclEntry> newAcl = AclTransformation.mergeAclEntries(existingAcl,
+      aclSpec);
+    AclStorage.updateINodeAcl(inode, newAcl);
+    return newAcl;
+  }
+
+  void removeAclEntries(String src, List<AclEntry> aclSpec) throws IOException {
+    unprotectedRemoveAclEntries(src, aclSpec);
+  }
+
+  private List<AclEntry> unprotectedRemoveAclEntries(String src,
+      List<AclEntry> aclSpec) throws IOException {
+    AclStorage.validateAclSpec(aclSpec);
   
+    INode inode = getINode(src);
+    if (inode == null){
+      throw new FileNotFoundException();
+    }
+    List<AclEntry> existingAcl;
+    if (AclStorage.hasOwnAcl(inode)){
+      existingAcl = AclStorage.readINodeLogicalAcl(inode);
+    } else {
+      existingAcl = AclStorage.getMinimalAcl(inode);
+    }
+    List<AclEntry> newAcl = AclTransformation.filterAclEntriesByAclSpec(
+      existingAcl, aclSpec);
+    AclStorage.updateINodeAcl(inode, newAcl);
+    return newAcl;
+  }
+
+  void removeDefaultAcl(String src) throws IOException {
+    unprotectedRemoveDefaultAcl(src);
+  }
+
+  private List<AclEntry> unprotectedRemoveDefaultAcl(String src)
+      throws IOException {
+    INode inode = getINode(src);
+    if (inode == null){
+      throw new FileNotFoundException();
+    }
+    List<AclEntry> existingAcl;
+    if (AclStorage.hasOwnAcl(inode)){
+      existingAcl = AclStorage.readINodeLogicalAcl(inode);
+    } else {
+      existingAcl = AclStorage.getMinimalAcl(inode);
+    }
+    List<AclEntry> newAcl = AclTransformation.filterDefaultAclEntries(
+      existingAcl);
+    AclStorage.updateINodeAcl(inode, newAcl);
+    return newAcl;
+  }
+
+  void removeAcl(String src) throws IOException {
+    unprotectedRemoveAcl(src);
+  }
+
+  private void unprotectedRemoveAcl(String src) throws IOException {
+    INode inode = getINode(src);
+    if (inode == null){
+      throw new FileNotFoundException();
+    }
+    AclStorage.removeINodeAcl(inode);
+  }
+
+  void setAcl(String src, List<AclEntry> aclSpec) throws IOException {
+    unprotectedSetAcl(src, aclSpec);
+  }
+
+  List<AclEntry> unprotectedSetAcl(String src, List<AclEntry> aclSpec)
+      throws IOException {
+    AclStorage.validateAclSpec(aclSpec);
+  
+    // ACL removal is logged to edits as OP_SET_ACL with an empty list.
+    if (aclSpec.isEmpty()) {
+      unprotectedRemoveAcl(src);
+      return AclFeature.EMPTY_ENTRY_LIST;
+    }
+    
+    INode inode = getINode(src);
+    if (inode == null){
+      throw new FileNotFoundException();
+    }
+    List<AclEntry> existingAcl;
+    if (AclStorage.hasOwnAcl(inode)){
+      existingAcl = AclStorage.readINodeLogicalAcl(inode);
+    } else {
+      existingAcl = AclStorage.getMinimalAcl(inode);
+    }
+    List<AclEntry> newAcl = AclTransformation.replaceAclEntries(existingAcl, aclSpec);
+    AclStorage.updateINodeAcl(inode, newAcl);
+    return newAcl;
+  }
+
+  AclStatus getAclStatus(String src) throws IOException {
+    String srcs = normalizePath(src);
+    INode inode = getINode(srcs);
+    
+    List<AclEntry> acl = AclStorage.readINodeAcl(inode);
+    return new AclStatus.Builder()
+        .owner(inode.getUserName()).group(inode.getGroupName())
+        .stickyBit(inode.getFsPermission().getStickyBit())
+        .addEntries(acl).build();
+  }
+
   /**
    * Caches frequently used file names to reuse file name objects and
    * reduce heap size.

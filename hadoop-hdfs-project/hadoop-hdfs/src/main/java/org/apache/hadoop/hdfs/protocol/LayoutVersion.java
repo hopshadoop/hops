@@ -107,8 +107,9 @@ public class LayoutVersion {
     EDITLOG_SUPPORT_RETRYCACHE(-44, "Record ClientId and CallId in editlog to "  //match 46 of apache hadoop
         + "enable rebuilding retry cache in case of HA failover"),
     ADD_DATANODE_AND_STORAGE_UUIDS(-45, "Replace StorageID with DatanodeUuid."
-        + " Use distinct StorageUuid per storage directory.");
-    
+        + " Use distinct StorageUuid per storage directory."),
+    EXTENDED_ACL(-53, "Extended ACL");
+  
     final int lv;
     final int ancestorLV;
     final String description;

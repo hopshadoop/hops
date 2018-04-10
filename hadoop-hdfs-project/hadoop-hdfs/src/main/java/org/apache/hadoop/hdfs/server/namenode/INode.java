@@ -18,11 +18,13 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 import com.google.common.primitives.SignedBytes;
 import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
+import io.hops.metadata.hdfs.entity.Ace;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
@@ -33,9 +35,14 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclEntryScope;
+import org.apache.hadoop.fs.permission.AclEntryType;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.util.StringUtils;
@@ -45,6 +52,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -62,8 +70,6 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   
   public static final List<INode> EMPTY_LIST =
       Collections.unmodifiableList(new ArrayList<INode>());
-
-
   public enum Finder implements FinderType<INode> {
 
     ByINodeIdFTIS,//FTIS full table index scan
@@ -240,7 +246,9 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   private FsPermission permission;
 
   private int logicalTime;
-
+  
+  private int numAces;
+  
   /**
    * The inode id
    */
@@ -313,6 +321,18 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     return this.id;
   }
 
+  public AclFeature getAclFeature() throws TransactionContextException, StorageException, AclException {
+    return INodeAclHelper.getAclFeature(this);
+  }
+
+  public void addAclFeature(AclFeature aclFeature) throws TransactionContextException, StorageException, AclException {
+    INodeAclHelper.addAclFeature(this, aclFeature);
+  }
+  
+  public void removeAclFeature() throws TransactionContextException, StorageException {
+    INodeAclHelper.removeAclFeature(this);
+  }
+  
   /**
    * Check whether this is the root inode.
    */
@@ -766,7 +786,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
 
   @Override
   public final int hashCode() {
-    return (int)(id^(id>>>32));  
+    return (int)(id^(id>>>32));
   }
 
   public void setParent(INodeDirectory p)
@@ -863,6 +883,19 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
       throws StorageException, TransactionContextException {
     setModificationTimeForceNoPersistance(modtime);
     save();
+  }
+  
+  public int getNumAces(){
+    return numAces;
+  }
+  
+  public void setNumAces(int numAces) throws TransactionContextException, StorageException {
+    setNumAcesNoPersistence(numAces);
+    save();
+  }
+  
+  public void setNumAcesNoPersistence(int numAces){
+    this.numAces = numAces;
   }
   
   public void inTree() {

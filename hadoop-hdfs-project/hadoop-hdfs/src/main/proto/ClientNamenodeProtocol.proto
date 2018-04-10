@@ -30,6 +30,8 @@ import "Security.proto";
 
 import "hdfs.proto";
 
+import "acl.proto";
+
 import "ActiveNode.proto";
 /**
  * The ClientNamenodeProtocol Service defines the interface between a client 
@@ -587,21 +589,9 @@ message FlushUsersCacheRequestProto {
 message FlushUsersCacheResponseProto {
 }
 
-enum FsActionProto {
-  NONE          = 0x0;
-  EXECUTE       = 0x1;
-  WRITE         = 0x2;
-  WRITE_EXECUTE = 0x3;
-  READ          = 0x4;
-  READ_EXECUTE  = 0x5;
-  READ_WRITE    = 0x6;
-  PERM_ALL      = 0x7;
-}
-
-
 message CheckAccessRequestProto {
   required string path = 1;
-  required FsActionProto mode = 2;
+  required AclEntryProto.FsActionProto mode = 2;
 }
 
 message CheckAccessResponseProto { // void response
@@ -617,7 +607,7 @@ service ClientNamenodeProtocol {
   rpc append (AppendRequestProto) returns (AppendResponseProto);
   rpc setReplication (SetReplicationRequestProto) returns (SetReplicationResponseProto);
   rpc setStoragePolicy(SetStoragePolicyRequestProto) returns(SetStoragePolicyResponseProto);
-  rpc getStoragePolicy(GetStoragePolicyRequestProto) returns(GetStoragePolicyResponseProto);  
+  rpc getStoragePolicy(GetStoragePolicyRequestProto) returns(GetStoragePolicyResponseProto);
   rpc getStoragePolicies(GetStoragePoliciesRequestProto) returns(GetStoragePoliciesResponseProto);
   rpc setMetaEnabled (SetMetaEnabledRequestProto) returns (SetMetaEnabledResponseProto);
   rpc setPermission (SetPermissionRequestProto) returns (SetPermissionResponseProto);
@@ -657,8 +647,13 @@ service ClientNamenodeProtocol {
   rpc cancelDelegationToken (hadoop.common.CancelDelegationTokenRequestProto) returns (hadoop.common.CancelDelegationTokenResponseProto);
   rpc setBalancerBandwidth (SetBalancerBandwidthRequestProto) returns (SetBalancerBandwidthResponseProto);
   rpc getDataEncryptionKey (GetDataEncryptionKeyRequestProto) returns (GetDataEncryptionKeyResponseProto);
-  rpc isFileClosed(IsFileClosedRequestProto)
-      returns(IsFileClosedResponseProto);
+  rpc isFileClosed(IsFileClosedRequestProto) returns(IsFileClosedResponseProto);
+  rpc modifyAclEntries(ModifyAclEntriesRequestProto) returns(ModifyAclEntriesResponseProto);
+  rpc removeAclEntries(RemoveAclEntriesRequestProto) returns(RemoveAclEntriesResponseProto);
+  rpc removeDefaultAcl(RemoveDefaultAclRequestProto) returns(RemoveDefaultAclResponseProto);
+  rpc removeAcl(RemoveAclRequestProto) returns(RemoveAclResponseProto);
+  rpc setAcl(SetAclRequestProto) returns(SetAclResponseProto);
+  rpc getAclStatus(GetAclStatusRequestProto) returns(GetAclStatusResponseProto);
 
   rpc getActiveNamenodesForClient (ActiveNamenodeListRequestProto) returns (ActiveNamenodeListResponseProto);
   rpc ping (PingRequestProto) returns (PingResponseProto);
