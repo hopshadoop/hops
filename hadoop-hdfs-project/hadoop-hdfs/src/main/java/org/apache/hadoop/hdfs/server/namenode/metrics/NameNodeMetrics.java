@@ -80,9 +80,9 @@ public class NameNodeMetrics {
   MutableRate blockReport;
   MutableQuantiles[] blockReportQuantiles;
 
-  @Metric("Duration in SafeMode at startup")
+  @Metric("Duration in SafeMode at startup in msec")
   MutableGaugeInt safeModeTime;
-  @Metric("Time loading FS Image at startup")
+  @Metric("Time loading FS Image at startup in msec")
   MutableGaugeInt fsImageLoadTime;
 
   NameNodeMetrics(String processName, String sessionId, int[] intervals) {
