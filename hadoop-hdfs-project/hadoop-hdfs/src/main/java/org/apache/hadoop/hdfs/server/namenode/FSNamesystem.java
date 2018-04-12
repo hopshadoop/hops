@@ -392,7 +392,7 @@ public class FSNamesystem
 
   final LeaseManager leaseManager = new LeaseManager(this);
 
-  private Daemon smmthread = null;  // SafeModeMonitor thread
+  volatile private Daemon smmthread = null;  // SafeModeMonitor thread
 
   private Daemon nnrmthread = null; // NamenodeResourceMonitor thread
 
@@ -4115,7 +4115,7 @@ public class FSNamesystem
    */
   void registerDatanode(DatanodeRegistration nodeReg) throws IOException {
     getBlockManager().getDatanodeManager().registerDatanode(nodeReg);
-    checkSafeMode();
+      checkSafeMode();
   }
 
   /**
@@ -4598,11 +4598,11 @@ public class FSNamesystem
      * started.
      * @throws IOException
      */
-    private void tryToHelpToGetOut() {
+    private void tryToHelpToGetOut() throws IOException{
       if (isManual() && !resourcesLow) {
         return;
       }
-      startSafeModeMonitor();
+      checkMode();
     }
 
     /**
@@ -4633,9 +4633,10 @@ public class FSNamesystem
      */
 
     private void checkMode() throws IOException {
-      // Have to have write-lock since leaving safe mode initializes
-      // replication queues, which requires write lock
-      if (needEnter()) {
+
+      // if smmthread is already running, the block threshold must have been 
+      // reached before, there is no need to enter the safe mode again
+      if (smmthread == null && needEnter()) {
         enter();
         // check if we are ready to initialize replication queues
         if (canInitializeReplicationQueues() && !isPopulatingReplicationQueues()) {
@@ -4644,7 +4645,7 @@ public class FSNamesystem
         reportStatus("STATE* Safe mode ON.", false);
         return;
       }
-      // the threshold is reached
+      // the threshold is reached or was reached before
       if (!isOn() ||                           // safe mode is off
           extension <= 0 || threshold <= 0) {  // don't need to wait
         this.leave(); // leave safe mode
@@ -4666,10 +4667,11 @@ public class FSNamesystem
       }
     }
 
-    private synchronized void startSafeModeMonitor() {
+    private synchronized void startSafeModeMonitor() throws IOException{
       if (smmthread == null) {
         smmthread = new Daemon(new SafeModeMonitor());
         smmthread.start();
+        reportStatus("STATE* Safe mode extension entered.", true);
       }
     }
 
@@ -4932,13 +4934,13 @@ public class FSNamesystem
     public void run() {
       try {
         while (fsRunning) {
-          checkSafeMode();
-           if (safeMode == null) { // Not in safe mode.
+          if (safeMode == null) { // Not in safe mode.
             break;
           }
           if (safeMode.canLeave()) {
             // Leave safe mode.
             safeMode.leave();
+            smmthread = null;
             break;
           }
           try {
@@ -4949,7 +4951,6 @@ public class FSNamesystem
         if (!fsRunning) {
           LOG.info("NameNode is being shutdown, exit SafeModeMonitor thread");
         }
-        smmthread = null;
       } catch (IOException ex) {
         LOG.error(ex);
       }
@@ -5178,6 +5179,13 @@ public class FSNamesystem
     // try to write to the edit log
     stopSecretManager();
 
+    if (safeMode != null) {
+      if (resourcesLow) {
+        safeMode.setResourcesLow();
+      } else {
+        safeMode.setManual();
+      }
+    }
     if (!isInSafeMode()) {
       safeMode = new SafeModeInfo(resourcesLow, isPopulatingReplQueues());
       HdfsVariables.enterClusterSafeMode();
