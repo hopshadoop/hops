@@ -70,19 +70,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
 import java.util.List;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HTTPS_ENABLE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_PLUGINS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_STARTUP_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
@@ -161,8 +149,8 @@ public class NameNode implements NameNodeStatusMXBean {
    * nameservice.
    */
   public static final String[] NAMENODE_SPECIFIC_KEYS =
-      {DFS_NAMENODE_RPC_ADDRESS_KEY, DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
-          DFS_NAMENODE_HTTP_ADDRESS_KEY, DFS_NAMENODE_KEYTAB_FILE_KEY,
+      {DFS_NAMENODE_RPC_ADDRESS_KEY, DFS_NAMENODE_RPC_BIND_HOST_KEY, DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
+          DFS_NAMENODE_SERVICE_RPC_BIND_HOST_KEY, DFS_NAMENODE_HTTP_ADDRESS_KEY, DFS_NAMENODE_KEYTAB_FILE_KEY,
           DFS_NAMENODE_USER_NAME_KEY};
 
   private static final String USAGE =
@@ -378,6 +366,28 @@ public class NameNode implements NameNodeStatusMXBean {
 
   protected InetSocketAddress getRpcServerAddress(Configuration conf) {
     return getAddress(conf);
+  }
+
+  /** Given a configuration get the bind host of the service rpc server
+   *  If the bind host is not configured returns null.
+   */
+  protected String getServiceRpcServerBindHost(Configuration conf) {
+    String addr = conf.getTrimmed(DFS_NAMENODE_SERVICE_RPC_BIND_HOST_KEY);
+    if (addr == null || addr.isEmpty()) {
+      return null;
+    }
+    return addr;
+  }
+
+  /** Given a configuration get the bind host of the client rpc server
+   *  If the bind host is not configured returns null.
+   */
+  protected String getRpcServerBindHost(Configuration conf) {
+    String addr = conf.getTrimmed(DFS_NAMENODE_RPC_BIND_HOST_KEY);
+    if (addr == null || addr.isEmpty()) {
+      return null;
+    }
+    return addr;
   }
 
   /**
