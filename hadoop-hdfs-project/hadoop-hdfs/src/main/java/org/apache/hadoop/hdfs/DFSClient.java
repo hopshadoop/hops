@@ -492,7 +492,11 @@ public class DFSClient implements java.io.Closeable {
   
   /**
    * Create a new DFSClient connected to the given nameNodeUri or rpcNamenode.
-   * Exactly one of nameNodeUri or rpcNamenode must be null.
+   * If a positive value is set for 
+   * {@link DFSConfigKeys#DFS_CLIENT_TEST_DROP_NAMENODE_RESPONSE_NUM_KEY} in the
+   * configuration, the DFSClient will use {@link LossyRetryInvocationHandler}
+   * as its RetryInvocationHandler. Otherwise one of nameNodeUri or rpcNamenode 
+   * must be null.
    */
   @VisibleForTesting
   public DFSClient(URI nameNodeUri, ClientProtocol rpcNamenode, Configuration conf,
@@ -522,7 +526,20 @@ public class DFSClient implements java.io.Closeable {
     this.clientName = clientNamePrefix+ "_" + dfsClientConf.taskId + "_" +
         DFSUtil.getRandom().nextInt() + "_" + Thread.currentThread().getId();
     
-    if (rpcNamenode != null) {
+    int numResponseToDrop = conf.getInt(
+        DFSConfigKeys.DFS_CLIENT_TEST_DROP_NAMENODE_RESPONSE_NUM_KEY,
+        DFSConfigKeys.DFS_CLIENT_TEST_DROP_NAMENODE_RESPONSE_NUM_DEFAULT);
+    if (numResponseToDrop > 0) {
+      // This case is used for testing.
+      LOG.warn(DFSConfigKeys.DFS_CLIENT_TEST_DROP_NAMENODE_RESPONSE_NUM_KEY
+          + " is set to " + numResponseToDrop
+          + ", this hacked client will proactively drop responses");
+      NameNodeProxies.ProxyAndInfo<ClientProtocol> proxyInfo = NameNodeProxies
+          .createProxyWithLossyRetryHandler(conf, nameNodeUri,
+              ClientProtocol.class, numResponseToDrop);
+      this.dtService = proxyInfo.getDelegationTokenService();
+      namenodeSelector = new NamenodeSelector(conf, nameNodeUri, this.ugi);
+    } else if (rpcNamenode != null) {
       // This case is used for testing.
       Preconditions.checkArgument(nameNodeUri == null);
       namenodeSelector = new NamenodeSelector(conf, rpcNamenode, this.ugi);
