@@ -21,6 +21,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * This is the JMX management interface for namenode information
@@ -36,6 +37,12 @@ public interface NameNodeMXBean {
    */
   public String getVersion();
   
+  /**
+   * Get the version of software running on the Namenode
+   * @return a string representing the version
+   */
+  public String getSoftwareVersion();
+
   /**
    * Gets the used space by data nodes.
    *
@@ -203,4 +210,18 @@ public interface NameNodeMXBean {
    * @return the list of corrupt files, as a JSON string.
    */
   public String getCorruptFiles();
+  
+  /**
+   * Get the number of distinct versions of live datanodes
+   * 
+   * @return the number of distinct versions of live datanodes
+   */
+  public int getDistinctVersionCount();
+
+  /**
+   * Get the number of live datanodes for each distinct versions
+   * 
+   * @return the number of live datanodes for each distinct versions
+   */
+  public Map<String, Integer> getDistinctVersions();
 }
