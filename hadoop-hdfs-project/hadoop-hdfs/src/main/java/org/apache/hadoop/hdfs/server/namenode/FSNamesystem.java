@@ -3349,16 +3349,12 @@ public class FSNamesystem
    */
   private void removeBlocks(BlocksMapUpdateInfo blocks)
       throws StorageException, TransactionContextException {
-    int start = 0;
-    int end = 0;
     List<Block> toDeleteList = blocks.getToDeleteList();
-    while (start < toDeleteList.size()) {
-      end = BLOCK_DELETION_INCREMENT + start;
-      end = end > toDeleteList.size() ? toDeleteList.size() : end;
-      for (int i = start; i < end; i++) {
-        blockManager.removeBlock(toDeleteList.get(i));
+    Iterator<Block> iter = toDeleteList.iterator();
+    while (iter.hasNext()) {
+      for (int i = 0; i < BLOCK_DELETION_INCREMENT && iter.hasNext(); i++) {
+          blockManager.removeBlock(iter.next());
       }
-      start = end;
     }
   }
 
