@@ -145,7 +145,7 @@ public class BlockInfo extends Block {
   }
 
   public static int NON_EXISTING_ID = -1;
-  private BlockCollection bc;
+  protected BlockCollection bc;
   private int blockIndex = -1;
   private long timestamp = 1;
   

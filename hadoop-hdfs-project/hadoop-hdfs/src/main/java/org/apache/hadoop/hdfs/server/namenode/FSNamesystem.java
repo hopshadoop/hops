@@ -3849,15 +3849,27 @@ public class FSNamesystem
             newLength + ", newTargets=" + Arrays.asList(newTargets) +
             ", closeFile=" + closeFile + ", deleteBlock=" + deleteBlock + ")");
         final BlockInfo storedBlock =
-            blockManager.getStoredBlock(ExtendedBlock.getLocalBlock(lastBlock));
+            getStoredBlock(ExtendedBlock.getLocalBlock(lastBlock));
         if (storedBlock == null) {
-          throw new IOException("Block (=" + lastBlock + ") not found");
+          if (deleteBlock) {
+            // This may be a retry attempt so ignore the failure
+            // to locate the block.
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Block (=" + lastBlock + ") not found");
+            }
+            return null;
+          } else {
+            throw new IOException("Block (=" + lastBlock + ") not found");
+          }
         }
-        INodeFile iFile = (INodeFile) storedBlock.getBlockCollection();
+        INodeFile iFile = ((INode)storedBlock.getBlockCollection()).asFile();
         if (!iFile.isUnderConstruction() || storedBlock.isComplete()) {
-          throw new IOException(
-              "Unexpected block (=" + lastBlock + ") since the file (=" +
-                  iFile.getLocalName() + ") is not under construction");
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Unexpected block (=" + lastBlock
+                + ") since the file (=" + iFile.getLocalName()
+                + ") is not under construction");
+          }
+          return null;
         }
 
         long recoveryId =
@@ -3873,11 +3885,9 @@ public class FSNamesystem
         if (deleteBlock) {
           Block blockToDel = ExtendedBlock.getLocalBlock(lastBlock);
           boolean remove = pendingFile.removeLastBlock(blockToDel);
-          if (!remove) {
-            throw new IOException("Trying to delete non-existant block "
-                + blockToDel);
+          if (remove) {
+            blockManager.removeBlockFromMap(storedBlock);
           }
-          blockManager.removeBlockFromMap(storedBlock);
         } else {
           // update last block
           storedBlock.setGenerationStamp(newGenerationStamp);
@@ -3917,16 +3927,11 @@ public class FSNamesystem
           pendingFile.setLastBlock(storedBlock, trimmedStorageInfos);
         }
 
-        src = leaseManager.findPath(pendingFile);
         if (closeFile) {
-          // commit the last block and complete it if it has minimum replicas
-          commitOrCompleteLastBlock(pendingFile, storedBlock);
-
-          //remove lease, close file
-          finalizeINodeFileUnderConstruction(src, pendingFile);
+          src = closeFileCommitBlocks(pendingFile, storedBlock);
         } else {
           // If this commit does not want to close the file, persist blocks
-          dir.persistBlocks(src, pendingFile);
+          src = persistBlocks(pendingFile);
         }
         if (closeFile) {
           LOG.info(
@@ -3944,6 +3949,48 @@ public class FSNamesystem
     }.handle(this);
   }
 
+  /**
+   *
+   * @param pendingFile
+   * @param storedBlock
+   * @return Path of the file that was closed.
+   * @throws IOException
+   */
+  @VisibleForTesting
+  String closeFileCommitBlocks(INodeFileUnderConstruction pendingFile,
+      BlockInfo storedBlock)
+      throws IOException {
+
+    String src = leaseManager.findPath(pendingFile);
+
+    // commit the last block and complete it if it has minimum replicas
+    commitOrCompleteLastBlock(pendingFile, storedBlock);
+
+    //remove lease, close file
+    finalizeINodeFileUnderConstruction(src, pendingFile);
+
+    return src;
+  }
+
+  /**
+   * Persist the block list for the given file.
+   *
+   * @param pendingFile
+   * @return Path to the given file.
+   * @throws IOException
+   */
+  @VisibleForTesting
+  String persistBlocks(INodeFileUnderConstruction pendingFile)
+      throws IOException {
+    String src = leaseManager.findPath(pendingFile);
+    dir.persistBlocks(src, pendingFile);
+    return src;
+  }
+
+  @VisibleForTesting
+  BlockInfo getStoredBlock(Block block) throws StorageException, TransactionContextException{
+    return blockManager.getStoredBlock(block);
+  }
 
   /**
    * Renew the lease(s) held by the given client
@@ -5409,7 +5456,7 @@ public class FSNamesystem
 
     // check stored block state
     BlockInfo storedBlock =
-        blockManager.getStoredBlock(ExtendedBlock.getLocalBlock(block));
+        getStoredBlock(ExtendedBlock.getLocalBlock(block));
     if (storedBlock == null ||
         storedBlock.getBlockUCState() != BlockUCState.UNDER_CONSTRUCTION) {
       throw new IOException(block +
