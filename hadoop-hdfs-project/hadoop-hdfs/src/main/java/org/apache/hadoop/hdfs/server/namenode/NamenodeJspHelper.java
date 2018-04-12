@@ -111,6 +111,20 @@ class NamenodeJspHelper {
     }
   }
 
+  static String getRollingUpgradeText(FSNamesystem fsn) {
+    DatanodeManager dm = fsn.getBlockManager().getDatanodeManager();
+    Map<String, Integer> list = dm.getDatanodesSoftwareVersions();
+    if(list.size() > 1) {
+      StringBuffer status = new StringBuffer("Rolling upgrades in progress. " +
+      "There are " + list.size() + " versions of datanodes currently live: ");
+      for(Map.Entry<String, Integer> ver: list.entrySet()) {
+        status.append(ver.getKey() + "(" + ver.getValue() + "), ");
+      }
+      return status.substring(0, status.length()-2);
+    }
+    return "";
+  }
+  
   static String getInodeLimitText(FSNamesystem fsn) throws IOException {
     if (fsn == null) {
       return "";
@@ -769,7 +783,9 @@ class NamenodeJspHelper {
               fraction2String(bpUsed, diskBytes) +
               "<td align=\"right\" class=\"pcbpused\">" + percentBpUsed +
               "<td align=\"right\" class=\"volfails\">" +
-              d.getVolumeFailures() + "\n");
+              + d.getVolumeFailures()
+              + "<td align=\"right\" class=\"version\">"
+              + d.getSoftwareVersion() + "\n");
     }
 
     void generateNodesList(ServletContext context, JspWriter out,
@@ -866,7 +882,9 @@ class NamenodeJspHelper {
                 diskByteStr + ") <th " + nodeHeaderStr("pcbpused") 
                 + "> Block Pool<br>Used (%)" + " <th "
                 + nodeHeaderStr("volfails")
-                + "> Failed Volumes\n");
+                +"> Failed Volumes <th "
+                + nodeHeaderStr("versionString")
+                +"> Version\n");
 
             JspHelper.sortNodeList(live, sorterField, sorterOrder);
             for (DatanodeDescriptor aLive : live) {

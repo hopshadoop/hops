@@ -6136,6 +6136,7 @@ public class FSNamesystem
           .put("nonDfsUsedSpace", node.getNonDfsUsed())
           .put("capacity", node.getCapacity())
           .put("numBlocks", node.numBlocks())
+          .put("version", node.getSoftwareVersion())
           .put("used", node.getDfsUsed())
           .put("remaining", node.getRemaining())
           .put("blockScheduled", node.getBlocksScheduled())
@@ -6302,6 +6303,22 @@ public class FSNamesystem
       LOG.warn("Get corrupt file blocks returned error: " + e.getMessage());
     }
     return JSON.toString(list);
+  }
+
+  @Override  //NameNodeMXBean
+  public int getDistinctVersionCount() {
+    return blockManager.getDatanodeManager().getDatanodesSoftwareVersions()
+      .size();
+  }
+
+  @Override  //NameNodeMXBean
+  public Map<String, Integer> getDistinctVersions() {
+    return blockManager.getDatanodeManager().getDatanodesSoftwareVersions();
+  }
+
+  @Override  //NameNodeMXBean
+  public String getSoftwareVersion() {
+    return VersionInfo.getVersion();
   }
 
   /**

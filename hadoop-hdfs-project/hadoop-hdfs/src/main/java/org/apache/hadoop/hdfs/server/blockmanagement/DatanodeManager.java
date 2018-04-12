@@ -190,6 +190,13 @@ public class DatanodeManager {
   
   private final StorageMap storageMap = new StorageMap();
   
+   /**
+   * The number of datanodes for each software version. This list should change
+   * during rolling upgrades.
+   * Software version -> Number of datanodes with this version
+   */
+  private HashMap<String, Integer> datanodesSoftwareVersions = new HashMap<String, Integer>(4, 0.75f);
+  
   DatanodeManager(final BlockManager blockManager, final Namesystem namesystem,
       final Configuration conf) throws IOException {
     this.namesystem = namesystem;
@@ -470,6 +477,7 @@ public class DatanodeManager {
 
     }
     networktopology.remove(nodeInfo);
+    decrementVersionCount(nodeInfo.getSoftwareVersion());
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("removed datanode " + nodeInfo);
@@ -537,8 +545,8 @@ public class DatanodeManager {
       host2DatanodeMap.remove(datanodeMap.put(node.getDatanodeUuid(), node));
     }
 
+    networktopology.add(node); // may throw InvalidTopologyException
     host2DatanodeMap.add(node);
-    networktopology.add(node);
     checkIfClusterIsNowMultiRack(node);
 
     if (LOG.isDebugEnabled()) {
@@ -559,6 +567,59 @@ public class DatanodeManager {
       LOG.debug(
           getClass().getSimpleName() + ".wipeDatanode(" + node + "): storage " +
               key + " is removed from datanodeMap.");
+    }
+  }
+
+  private void incrementVersionCount(String version) {
+    if (version == null) {
+      return;
+    }
+    synchronized (datanodeMap) {
+      Integer count = this.datanodesSoftwareVersions.get(version);
+      count = count == null ? 1 : count + 1;
+      this.datanodesSoftwareVersions.put(version, count);
+    }
+  }
+
+  private void decrementVersionCount(String version) {
+    if (version == null) {
+      return;
+    }
+    synchronized (datanodeMap) {
+      Integer count = this.datanodesSoftwareVersions.get(version);
+      if (count != null) {
+        if (count > 1) {
+          this.datanodesSoftwareVersions.put(version, count - 1);
+        } else {
+          this.datanodesSoftwareVersions.remove(version);
+        }
+      }
+    }
+  }
+
+  private boolean shouldCountVersion(DatanodeDescriptor node) {
+    return node.getSoftwareVersion() != null && node.isAlive && !isDatanodeDead(node);
+  }
+
+  private void countSoftwareVersions() {
+    synchronized (datanodeMap) {
+      HashMap<String, Integer> versionCount = new HashMap<String, Integer>();
+      for (DatanodeDescriptor dn : datanodeMap.values()) {
+        // Check isAlive too because right after removeDatanode(),
+        // isDatanodeDead() is still true 
+        if (shouldCountVersion(dn)) {
+          Integer num = versionCount.get(dn.getSoftwareVersion());
+          num = num == null ? 1 : num + 1;
+          versionCount.put(dn.getSoftwareVersion(), num);
+        }
+      }
+      this.datanodesSoftwareVersions = versionCount;
+    }
+  }
+
+  public HashMap<String, Integer> getDatanodesSoftwareVersions() {
+    synchronized (datanodeMap) {
+      return new HashMap<String, Integer>(this.datanodesSoftwareVersions);
     }
   }
 
@@ -749,7 +810,12 @@ public class DatanodeManager {
       }
       // update cluster map
       getNetworkTopology().remove(nodeS);
+      if (shouldCountVersion(nodeS)) {
+        decrementVersionCount(nodeS.getSoftwareVersion());
+      }
       nodeS.updateRegInfo(nodeReg);
+      
+      nodeS.setSoftwareVersion(nodeReg.getSoftwareVersion());
       nodeS.setDisallowed(false); // Node is in the include list
       
       // resolve network location
@@ -763,6 +829,7 @@ public class DatanodeManager {
 
       // also treat the registration message as a heartbeat
       heartbeatManager.register(nodeS);
+      incrementVersionCount(nodeS.getSoftwareVersion());
       checkDecommissioning(nodeS);
       return;
     }
@@ -772,12 +839,13 @@ public class DatanodeManager {
         nodeReg, NetworkTopology.DEFAULT_RACK);
 
     // resolve network location
-        if (this.rejectUnresolvedTopologyDN) {
+    if (this.rejectUnresolvedTopologyDN) {
       nodeDescr.setNetworkLocation(resolveNetworkLocation(nodeDescr));
     } else {
       nodeDescr.setNetworkLocation(
           resolveNetworkLocationWithFallBackToDefaultLocation(nodeDescr));
     }
+    nodeDescr.setSoftwareVersion(nodeReg.getSoftwareVersion());
     addDatanode(nodeDescr);
     checkDecommissioning(nodeDescr);
     
@@ -785,6 +853,7 @@ public class DatanodeManager {
     // no need to update its timestamp
     // because its is done when the descriptor is created
     heartbeatManager.addDatanode(nodeDescr);
+    incrementVersionCount(nodeReg.getSoftwareVersion());
   }
 
   /**
@@ -804,6 +873,7 @@ public class DatanodeManager {
     }
     refreshHostsReader(conf);
     refreshDatanodes();
+    countSoftwareVersions();
   }
 
   /**

@@ -350,6 +350,7 @@ class ClusterJspHelper {
       nn.httpAddress = httpAddress;
       getLiveNodeCount(getProperty(props, "LiveNodes").getValueAsText(), nn);
       getDeadNodeCount(getProperty(props, "DeadNodes").getValueAsText(), nn);
+      nn.softwareVersion = getProperty(props, "SoftwareVersion").getTextValue();
       return nn;
     }
     
@@ -613,6 +614,7 @@ class ClusterJspHelper {
             nn.deadDecomCount + ")",
             nn.httpAddress + "/dfsnodelist.jsp?whatNodes=DEAD",
             "Dead Datanode (Decommissioned)");
+        toXmlItemBlock(doc, "Software Version", nn.softwareVersion);
         doc.endTag(); // node
       }
       doc.endTag(); // namenodes
@@ -641,6 +643,7 @@ class ClusterJspHelper {
     int deadDatanodeCount = 0;
     int deadDecomCount = 0;
     String httpAddress = null;
+    String softwareVersion = "";
   }
 
   /**
