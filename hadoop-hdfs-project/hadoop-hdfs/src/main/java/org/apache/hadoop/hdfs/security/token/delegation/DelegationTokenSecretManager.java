@@ -82,11 +82,6 @@ public class DelegationTokenSecretManager
   public DelegationTokenIdentifier createIdentifier() {
     return new DelegationTokenIdentifier();
   }
-  
-  @Override //SecretManager
-  public void checkAvailableForRead() throws StandbyException {
-    //FIXME:
-  }
 
   /**
    * Returns expiry time of a token given its identifier.
