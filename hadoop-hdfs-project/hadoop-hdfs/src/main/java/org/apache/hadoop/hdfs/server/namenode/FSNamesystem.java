@@ -4931,8 +4931,16 @@ public class FSNamesystem
     @Override
     public void run() {
       try {
-        while (fsRunning && (safeMode != null && !safeMode.canLeave())) {
-          safeMode.checkMode();
+        while (fsRunning) {
+          checkSafeMode();
+           if (safeMode == null) { // Not in safe mode.
+            break;
+          }
+          if (safeMode.canLeave()) {
+            // Leave safe mode.
+            safeMode.leave();
+            break;
+          }
           try {
             Thread.sleep(recheckInterval);
           } catch (InterruptedException ie) {
@@ -4940,13 +4948,6 @@ public class FSNamesystem
         }
         if (!fsRunning) {
           LOG.info("NameNode is being shutdown, exit SafeModeMonitor thread");
-        } else {
-          try {
-            // leave safe mode and stop the monitor
-            leaveSafeMode();
-          } catch (IOException ex) {
-            LOG.error(ex);
-          }
         }
         smmthread = null;
       } catch (IOException ex) {
