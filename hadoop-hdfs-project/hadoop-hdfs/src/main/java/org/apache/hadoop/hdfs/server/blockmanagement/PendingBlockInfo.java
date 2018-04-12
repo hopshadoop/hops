@@ -16,6 +16,9 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.metadata.common.FinderType;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * An object that contains information about a block that is being replicated.
@@ -41,7 +44,6 @@ public class PendingBlockInfo {
     public Annotation getAnnotated() {
       switch (this) {
         case ByBlockIdAndINodeId:
-          return Annotation.PrimaryKey;
         case ByINodeId:
           return Annotation.PrunedIndexScan;
         case ByINodeIds:
@@ -58,16 +60,38 @@ public class PendingBlockInfo {
   private long blockId;
   private int inodeId;
   private long timeStamp;
-  private int numReplicasInProgress;
+  private final List<String> targets;
 
   public PendingBlockInfo(long blockId, int inodeId, long timestamp,
-      int numReplicas) {
+      DatanodeDescriptor[] targets) {
     this.blockId = blockId;
     this.inodeId = inodeId;
     this.timeStamp = timestamp;
-    this.numReplicasInProgress = numReplicas;
+    this.targets = new ArrayList<String>();
+    if(targets!=null){
+      for (DatanodeDescriptor dn : targets) {
+          this.targets.add(dn.getDatanodeUuid());
+      }
+    }
   }
 
+  public PendingBlockInfo(long blockId, int inodeId, long timestamp,
+      List<String> targets) {
+    this.blockId = blockId;
+    this.inodeId = inodeId;
+    this.timeStamp = timestamp;
+    this.targets = targets;
+  }
+  
+  public PendingBlockInfo(long blockId, int inodeId, long timestamp,
+      String target) {
+    this.blockId = blockId;
+    this.inodeId = inodeId;
+    this.timeStamp = timestamp;
+    this.targets = new ArrayList<>();
+    this.targets.add(target);
+  }
+  
   public long getTimeStamp() {
     return timeStamp;
   }
@@ -76,17 +100,20 @@ public class PendingBlockInfo {
     timeStamp = timestamp;
   }
 
-  void incrementReplicas(int increment) {
-    numReplicasInProgress += increment;
+  void incrementReplicas(DatanodeDescriptor... newTargets) {
+      if (newTargets != null) {
+        for (DatanodeDescriptor dn : newTargets) {
+          targets.add(dn.getDatanodeUuid());
+        }
+      }
   }
 
-  void decrementReplicas() {
-    numReplicasInProgress--;
-    assert (numReplicasInProgress >= 0);
+  boolean decrementReplicas(DatanodeDescriptor dn) {
+    return targets.remove(dn.getDatanodeUuid());
   }
 
   public int getNumReplicas() {
-    return numReplicasInProgress;
+    return targets.size();
   }
 
   /**
@@ -110,6 +137,10 @@ public class PendingBlockInfo {
 
   public void setInodeId(int inodeId) {
     this.inodeId = inodeId;
+  }
+
+  public List<String> getTargets() {
+    return targets;
   }
 
   @Override

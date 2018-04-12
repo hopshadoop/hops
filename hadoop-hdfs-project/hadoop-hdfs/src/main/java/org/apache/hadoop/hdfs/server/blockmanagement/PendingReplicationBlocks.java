@@ -31,6 +31,7 @@ import org.apache.commons.logging.Log;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Time;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -69,16 +70,18 @@ class PendingReplicationBlocks {
 
   /**
    * Add a block to the list of pending Replications
+   * @param block The corresponding block
+   * @param targets The DataNodes where replicas of the block should be placed
    */
-  void increment(BlockInfo block, int numReplicas)
+  void increment(BlockInfo block, DatanodeDescriptor[] targets)
       throws StorageException, TransactionContextException {
     PendingBlockInfo found = getPendingBlock(block);
     if (found == null) {
       addPendingBlockInfo(
           new PendingBlockInfo(block.getBlockId(), block.getInodeId(), now(),
-              numReplicas));
+              targets));
     } else {
-      found.incrementReplicas(numReplicas);
+      found.incrementReplicas(targets);
       found.setTimeStamp(now());
       updatePendingBlockInfo(found);
     }
@@ -89,19 +92,16 @@ class PendingReplicationBlocks {
    * Decrement the number of pending replication requests
    * for this block.
    */
-  void decrement(BlockInfo block)
+  void decrement(BlockInfo block, DatanodeDescriptor dn)
       throws StorageException, TransactionContextException {
     PendingBlockInfo found = getPendingBlock(block);
     if (found != null && !isTimedout(found)) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Removing pending replication for " + block);
       }
-      found.decrementReplicas();
-      if (found.getNumReplicas() <= 0) {
-        removePendingBlockInfo(found);
-      } else {
-        updatePendingBlockInfo(found);
-      }
+      if (found.decrementReplicas(dn)) {
+        removePendingBlockInfo(found, dn);
+      } 
     }
   }
 
@@ -251,6 +251,13 @@ class PendingReplicationBlocks {
     EntityManager.update(pbi);
   }
 
+  private void removePendingBlockInfo(PendingBlockInfo pbi, DatanodeDescriptor dn)
+      throws StorageException, TransactionContextException {
+    PendingBlockInfo toRemove = new PendingBlockInfo(pbi.getBlockId(), pbi.getInodeId(), pbi.getTimeStamp(), dn.
+        getDatanodeUuid());
+    EntityManager.remove(toRemove);
+  }
+  
   private void removePendingBlockInfo(PendingBlockInfo pbi)
       throws StorageException, TransactionContextException {
     EntityManager.remove(pbi);

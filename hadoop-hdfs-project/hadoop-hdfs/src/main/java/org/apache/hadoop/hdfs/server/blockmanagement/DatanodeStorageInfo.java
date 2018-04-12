@@ -95,6 +95,15 @@ public class DatanodeStorageInfo {
     return datanodes;
   }
 
+  static DatanodeDescriptor[] toDatanodeDescriptors(
+      DatanodeStorageInfo[] storages) {
+    DatanodeDescriptor[] datanodes = new DatanodeDescriptor[storages.length];
+    for (int i = 0; i < storages.length; ++i) {
+      datanodes[i] = storages[i].getDatanodeDescriptor();
+    }
+    return datanodes;
+  }
+
   private final DatanodeDescriptor dn;
   private final String storageID;
   private StorageType storageType;

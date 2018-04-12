@@ -1049,6 +1049,10 @@ public class DFSTestUtil {
     return createDatanodeStorageInfos(racks.length, racks, hostnames);
   }
 
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(int n) throws IOException {
+    return createDatanodeStorageInfos(n, null, null);
+  }
+  
   public static DatanodeStorageInfo[] createDatanodeStorageInfos(
       int n, String[] racks, String[] hostnames) throws IOException {
     return createDatanodeStorageInfos(n, racks, hostnames, null);

@@ -107,7 +107,7 @@ public class PendingBlockContext
   @Override
   PendingBlockInfo cloneEntity(PendingBlockInfo pendingBlockInfo, int inodeId) {
     return new PendingBlockInfo(pendingBlockInfo.getBlockId(), inodeId,
-        pendingBlockInfo.getTimeStamp(), pendingBlockInfo.getNumReplicas());
+        pendingBlockInfo.getTimeStamp(), pendingBlockInfo.getTargets());
   }
 
   @Override
@@ -135,7 +135,7 @@ public class PendingBlockContext
       hit(pFinder, result, "bid", blockId, "inodeid", inodeId);
     } else {
       aboutToAccessStorage(pFinder, params);
-      result = dataAccess.findByPKey(blockId, inodeId);
+      result = dataAccess.findByBlockAndInodeIds(blockId, inodeId);
       gotFromDB(new BlockPK(blockId, inodeId), result);
       miss(pFinder, result, "bid", blockId, "inodeid", inodeId);
     }
