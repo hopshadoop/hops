@@ -50,6 +50,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.hadoop.hdfs.util.ChunkedArrayList;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
 
 /**
@@ -1117,7 +1118,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     private List<Block> toDeleteList;
 
     public BlocksMapUpdateInfo(List<Block> toDeleteList) {
-      this.toDeleteList = toDeleteList == null ? new ArrayList<Block>()
+      this.toDeleteList = toDeleteList == null ? new ChunkedArrayList<Block>()
           : toDeleteList;
     }
 
