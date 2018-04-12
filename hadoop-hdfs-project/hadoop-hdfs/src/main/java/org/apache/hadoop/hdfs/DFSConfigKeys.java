@@ -415,8 +415,10 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "0.0.0.0:" + DFS_NAMENODE_HTTP_PORT_DEFAULT;
   public static final String DFS_NAMENODE_RPC_ADDRESS_KEY =
       "dfs.namenode.rpc-address";
+  public static final String  DFS_NAMENODE_RPC_BIND_HOST_KEY = "dfs.namenode.rpc-bind-host";
   public static final String DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY =
       "dfs.namenode.servicerpc-address";
+  public static final String  DFS_NAMENODE_SERVICE_RPC_BIND_HOST_KEY = "dfs.namenode.servicerpc-bind-host";
   public static final String DFS_NAMENODE_MAX_OBJECTS_KEY =
       "dfs.namenode.max.objects";
   public static final long DFS_NAMENODE_MAX_OBJECTS_DEFAULT = 0;
