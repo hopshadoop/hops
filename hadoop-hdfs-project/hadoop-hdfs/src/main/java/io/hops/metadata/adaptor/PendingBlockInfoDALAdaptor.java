@@ -50,9 +50,9 @@ public class PendingBlockInfoDALAdaptor extends
   }
 
   @Override
-  public org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo findByPKey(
+  public org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo findByBlockAndInodeIds(
       long blockId, int inodeId) throws StorageException {
-    return convertDALtoHDFS(dataAccces.findByPKey(blockId, inodeId));
+    return convertDALtoHDFS(dataAccces.findByBlockAndInodeIds(blockId, inodeId));
   }
 
   @Override
@@ -82,7 +82,7 @@ public class PendingBlockInfoDALAdaptor extends
     if (hdfsClass != null) {
       return new PendingBlockInfo(hdfsClass.getBlockId(),
           hdfsClass.getInodeId(), hdfsClass.getTimeStamp(),
-          hdfsClass.getNumReplicas());
+          hdfsClass.getTargets());
     } else {
       return null;
     }
@@ -94,7 +94,7 @@ public class PendingBlockInfoDALAdaptor extends
     if (dalClass != null) {
       return new org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo(
           dalClass.getBlockId(), dalClass.getInodeId(), dalClass.getTimeStamp(),
-          dalClass.getNumReplicas());
+          dalClass.getTargets());
     } else {
       return null;
     }
