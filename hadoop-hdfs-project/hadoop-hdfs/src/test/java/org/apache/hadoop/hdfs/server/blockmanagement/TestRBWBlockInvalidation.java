@@ -184,8 +184,8 @@ public class TestRBWBlockInvalidation {
     // in the context of the test, whereas a random one is more accurate
     // to what is seen in real clusters (nodes have random amounts of free
     // space)
-    conf.setClass("dfs.block.replicator.classname", TestDNFencing.RandomDeleterPolicy.class,
-        BlockPlacementPolicy.class);
+    conf.setClass(DFSConfigKeys.DFS_BLOCK_REPLICATOR_CLASSNAME_KEY,
+        TestDNFencing.RandomDeleterPolicy.class, BlockPlacementPolicy.class); 
 
     // Speed up the test a bit with faster heartbeats.
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
