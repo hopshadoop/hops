@@ -42,17 +42,23 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
 
     MiniDFSCluster cluster;
     FileSystem dfs1, dfs2;
+    private static String classpathDir;
 
     public TestDFSSSLServer(CERT_ERR error_mode) {
         super.error_mode = error_mode;
     }
 
+    @BeforeClass
+    public static void beforeClass() throws Exception {
+        classpathDir = KeyStoreTestUtil.getClasspathDir(TestDFSSSLServer.class);
+    }
+    
     @Before
     public void setUp() throws Exception {
         conf = new HdfsConfiguration();
-        filesToPurge = prepareCryptoMaterial(conf, KeyStoreTestUtil.getClasspathDir(TestDFSSSLServer.class));
-        setCryptoConfig(conf);
-
+        filesToPurge = prepareCryptoMaterial(conf, classpathDir);
+        setCryptoConfig(conf, classpathDir);
+        
         String testDataPath = System
                 .getProperty(MiniDFSCluster.PROP_TEST_BUILD_DATA, "build/test/data");
         File testDataCluster1 = new File(testDataPath, "dfs_cluster");

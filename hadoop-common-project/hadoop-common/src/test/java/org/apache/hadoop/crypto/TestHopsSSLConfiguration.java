@@ -457,7 +457,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     @Test
     public void testClientCacheWithNewCertificate() throws Exception {
         super.filesToPurge = prepareCryptoMaterial(conf, BASEDIR);
-        setCryptoConfig(conf);
+        setCryptoConfig(conf, classPathDir.getAbsolutePath());
         
         ClientCache clientCache = new ClientCache();
         Client client = clientCache.getClient(conf, NetUtils.getDefaultSocketFactory(conf), RpcWritable.Buffer.class);
@@ -466,7 +466,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
         Configuration newConf = new Configuration();
         passwd = "another_password";
         super.filesToPurge = prepareCryptoMaterial(newConf, BASEDIR);
-        setCryptoConfig(newConf);
+        setCryptoConfig(newConf, classPathDir.getAbsolutePath());
         
         Client anotherClient = clientCache.getClient(newConf, NetUtils.getDefaultSocketFactory(newConf),
             RpcWritable.Buffer.class);
