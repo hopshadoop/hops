@@ -44,6 +44,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -63,19 +64,24 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
 
     private MiniYARNCluster cluster;
     private ApplicationClientProtocol acClient, acClient1;
+    private static String classpathDir;
 
     public TestYarnSSLServer(CERT_ERR error_mode) {
         super.error_mode = error_mode;
     }
 
+    @BeforeClass
+    public static void beforeClass() throws Exception {
+        classpathDir = KeyStoreTestUtil.getClasspathDir(TestYarnSSLServer.class);
+    }
+    
     @Before
     public void setUp() throws Exception {
         LOG.debug("Error mode: " + error_mode.name());
 
         conf = new YarnConfiguration();
-        filesToPurge = prepareCryptoMaterial(conf, KeyStoreTestUtil
-            .getClasspathDir(TestYarnSSLServer.class));
-        setCryptoConfig(conf);
+        filesToPurge = prepareCryptoMaterial(conf, classpathDir);
+        setCryptoConfig(conf, classpathDir);
 
         conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
         conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
