@@ -68,7 +68,6 @@ import org.bouncycastle.x509.extension.AuthorityKeyIdentifierStructure;
 import org.bouncycastle.x509.extension.SubjectKeyIdentifierStructure;
 
 public class KeyStoreTestUtil {
-
   public static String getClasspathDir(Class klass) throws Exception {
     String file = klass.getName();
     file = file.replace('.', '/') + ".class";

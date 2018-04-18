@@ -98,7 +98,7 @@ public class HopsSSLTestUtils {
         return material;
     }
     
-    protected void setCryptoConfig(Configuration conf, String classpathDir) throws Exception {
+    protected void setCryptoConfig(Configuration conf, String classPathDir) throws Exception {
         conf.set(CommonConfigurationKeysPublic.HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_KEY,
                 "org.apache.hadoop.net.HopsSSLSocketFactory");
         conf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
@@ -109,7 +109,7 @@ public class HopsSSLTestUtils {
 
         Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(serverKeyStore.toString(),
                 passwd, passwd, serverTrustStore.toString(), passwd, "");
-        Path sslServerPath = Paths.get(classpathDir, HopsSSLTestUtils.class.getSimpleName() + ".ssl-server.xml");
+        Path sslServerPath = Paths.get(classPathDir, HopsSSLTestUtils.class.getSimpleName() + ".ssl-server.xml");
         filesToPurge.add(sslServerPath);
         File sslServer = new File(sslServerPath.toUri());
         KeyStoreTestUtil.saveConfig(sslServer, sslServerConf);
