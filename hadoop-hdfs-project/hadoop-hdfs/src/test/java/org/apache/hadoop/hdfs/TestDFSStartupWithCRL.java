@@ -48,8 +48,10 @@ import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 
 public class TestDFSStartupWithCRL {
-  private static final String BASE_DIR = System.getProperty("test.build.dir", Paths.get("target", "test-dir",
-      TestDFSStartupWithCRL.class.getSimpleName()).toString());
+  private static final String BASE_DIR = Paths.get(
+      System.getProperty("test.build.dir", Paths.get("target", "test-dir").toString()),
+      TestDFSStartupWithCRL.class.getSimpleName())
+      .toString();
   private static final File BASE_DIR_FILE = new File(BASE_DIR);
   
   private final String keyAlgorithm = "RSA";

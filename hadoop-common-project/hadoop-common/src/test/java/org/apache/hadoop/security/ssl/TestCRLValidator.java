@@ -65,8 +65,11 @@ import java.util.concurrent.TimeUnit;
 
 public class TestCRLValidator {
   private final static Logger LOG = LogManager.getLogger(TestCRLValidator.class);
-  private static final String BASE_DIR = System.getProperty("test.build.dir", Paths.get("target","test-dir",
-      TestCRLValidator.class.getSimpleName()).toString());
+  private static final String BASE_DIR = Paths.get(
+      System.getProperty("test.build.dir", Paths.get("target", "test-dir").toString()),
+      TestCRLValidator.class.getSimpleName())
+      .toString();
+  
   private static final File BASE_DIR_FILE = new File(BASE_DIR);
   private Configuration conf;
   

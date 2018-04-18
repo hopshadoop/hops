@@ -40,8 +40,10 @@ import static org.junit.Assert.*;
 public class TestRevocationListFetcher {
   private static final Logger LOG = LogManager.getLogger(TestRevocationListFetcher.class);
   
-  private final String BASE_DIR = System.getProperty("test.build.dir", Paths.get("target","test-dir",
-      TestRevocationListFetcher.class.getSimpleName()).toString());
+  private static final String BASE_DIR = Paths.get(
+      System.getProperty("test.build.dir", Paths.get("target", "test-dir").toString()),
+      TestRevocationListFetcher.class.getSimpleName())
+      .toString();
   private final File outputFile = Paths.get(BASE_DIR, "crl.pem").toFile();
   private final File baseDirFile = new File(BASE_DIR);
   
