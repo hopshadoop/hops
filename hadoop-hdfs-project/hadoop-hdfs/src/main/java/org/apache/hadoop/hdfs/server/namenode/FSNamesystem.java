@@ -6452,8 +6452,12 @@ public class FSNamesystem
           }
           sb.append(trackingId);
         }
-        auditLog.info(sb);
+        logAuditMessage(sb.toString());
       }
+    }
+    
+    public void logAuditMessage(String message) {
+      auditLog.info(message);
     }
   }
 
