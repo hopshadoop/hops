@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.common;
 
+import io.hops.metadata.StorageMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -49,6 +50,12 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
 
 import static org.mockito.Mockito.doAnswer;
@@ -445,4 +452,61 @@ public class TestJspHelper {
           ugi.getAuthenticationMethod());
     }
   }
+  
+  @Test
+  public void testSortNodeByFields() throws Exception {
+    DatanodeID dnId1 = new DatanodeID("127.0.0.1", "localhost1", "datanode1",
+        1234, 2345, 3456);
+    DatanodeID dnId2 = new DatanodeID("127.0.0.2", "localhost2", "datanode2",
+        1235, 2346, 3457);
+    
+    // Setup DatanodeDescriptors with one storage each.
+    StorageMap storageMap = mock(StorageMap.class);
+    DatanodeDescriptor dnDesc1 = new DatanodeDescriptor(storageMap, dnId1, "rack1");
+    DatanodeDescriptor dnDesc2 = new DatanodeDescriptor(storageMap, dnId2, "rack2");
+
+    // Update the DatanodeDescriptors with their attached storages.
+    BlockManagerTestUtil.updateStorage(dnDesc1, new DatanodeStorage("dnStorage1"));
+    BlockManagerTestUtil.updateStorage(dnDesc2, new DatanodeStorage("dnStorage2"));
+
+    DatanodeStorage dns1 = new DatanodeStorage("dnStorage1");
+    DatanodeStorage dns2 = new DatanodeStorage("dnStorage2");
+    
+    StorageReport[] report1 = new StorageReport[] {
+        new StorageReport(dns1, false, 1024, 100, 924, 100)
+    };
+    StorageReport[] report2 = new StorageReport[] {
+        new StorageReport(dns2, false, 2500, 200, 1848, 200)
+    };
+    dnDesc1.updateHeartbeat(report1, 10, 2);
+    dnDesc2.updateHeartbeat(report2, 20, 1);
+
+    ArrayList<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
+    live.add(dnDesc1);
+    live.add(dnDesc2);
+
+    // Test sorting by failed volumes
+    JspHelper.sortNodeList(live, "volfails", "ASC");
+    Assert.assertEquals(dnDesc2, live.get(0));
+    Assert.assertEquals(dnDesc1, live.get(1));
+    JspHelper.sortNodeList(live, "volfails", "DSC");
+    Assert.assertEquals(dnDesc1, live.get(0));
+    Assert.assertEquals(dnDesc2, live.get(1));
+
+    // Test sorting by Blockpool used
+    JspHelper.sortNodeList(live, "bpused", "ASC");
+    Assert.assertEquals(dnDesc1, live.get(0));
+    Assert.assertEquals(dnDesc2, live.get(1));
+    JspHelper.sortNodeList(live, "bpused", "DSC");
+    Assert.assertEquals(dnDesc2, live.get(0));
+    Assert.assertEquals(dnDesc1, live.get(1));
+
+    // Test sorting by Percentage Blockpool used
+    JspHelper.sortNodeList(live, "pcbpused", "ASC");
+    Assert.assertEquals(dnDesc2, live.get(0));
+    Assert.assertEquals(dnDesc1, live.get(1));
+    JspHelper.sortNodeList(live, "pcbpused", "DSC");
+    Assert.assertEquals(dnDesc1, live.get(0));
+    Assert.assertEquals(dnDesc2, live.get(1));
+}
 }
