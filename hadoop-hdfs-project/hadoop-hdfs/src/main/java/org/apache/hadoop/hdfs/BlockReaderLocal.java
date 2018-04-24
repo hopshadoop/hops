@@ -25,8 +25,11 @@ import java.nio.ByteBuffer;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdfs.client.ClientMmap;
+import org.apache.hadoop.hdfs.client.ClientMmapManager;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.datanode.BlockMetadataHeader;
 import org.apache.hadoop.hdfs.util.DirectBufferPool;
 import org.apache.hadoop.io.IOUtils;
@@ -87,6 +90,8 @@ class BlockReaderLocal implements BlockReader {
   private final ExtendedBlock block;
   
   private final FileInputStreamCache fisCache;
+  private ClientMmap clientMmap;
+  private boolean mmapDisabled;
   
   private static int getSlowReadBufferNumChunks(int bufSize,
       int bytesPerChecksum) {
@@ -113,6 +118,8 @@ class BlockReaderLocal implements BlockReader {
     this.datanodeID = datanodeID;
     this.block = block;
     this.fisCache = fisCache;
+    this.clientMmap = null;
+    this.mmapDisabled = false;
     
     // read and handle the common header here. For now just a version
     checksumIn.getChannel().position(0);
@@ -487,6 +494,10 @@ class BlockReaderLocal implements BlockReader {
 
   @Override
   public synchronized void close() throws IOException {
+    if (clientMmap != null) {
+      clientMmap.unref();
+      clientMmap = null;
+    }
     if (fisCache != null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("putting FileInputStream for " + filename +
@@ -533,5 +544,31 @@ class BlockReaderLocal implements BlockReader {
   @Override
   public boolean isShortCircuit() {
     return true;
+  }
+  
+  @Override
+  public ClientMmap getClientMmap(LocatedBlock curBlock,
+      ClientMmapManager mmapManager) {
+    if (clientMmap == null) {
+      if (mmapDisabled) {
+        return null;
+      }
+      try {
+        clientMmap = mmapManager.fetch(datanodeID, block, dataIn);
+        if (clientMmap == null) {
+          mmapDisabled = true;
+          return null;
+        }
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted while setting up mmap for " + filename, e);
+        Thread.currentThread().interrupt();
+        return null;
+      } catch (IOException e) {
+        LOG.error("unable to set up mmap for " + filename, e);
+        mmapDisabled = true;
+        return null;
+      }
+    }
+    return clientMmap;
   }
 }
