@@ -415,4 +415,14 @@
     <Filed name="done"/>
     <Bug pattern="JLM_JSR166_UTILCONCURRENT_MONITORENTER"/>
   </Match>
+  <Match>
+      <Class name="org.apache.hadoop.hdfs.client.ClientMmapManager" />
+      <Method name="create" />
+      <Bug pattern="UL_UNRELEASED_LOCK_EXCEPTION_PATH" />
+    </Match>
+    <Match>
+      <Class name="org.apache.hadoop.hdfs.client.ClientMmapManager" />
+      <Method name="create" />
+      <Bug pattern="UL_UNRELEASED_LOCK" />
+    </Match>
 </FindBugsFilter>
