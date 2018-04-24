@@ -47,9 +47,13 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Random;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.RemoteIterator;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -184,8 +188,7 @@ public class TestDistributedFileSystem {
       final long millis = Time.now();
 
       {
-        DistributedFileSystem dfs =
-            (DistributedFileSystem) cluster.getFileSystem();
+        final DistributedFileSystem dfs = cluster.getFileSystem();
         dfs.dfs.getLeaseRenewer().setGraceSleepPeriod(grace);
         assertFalse(dfs.dfs.getLeaseRenewer().isRunning());
 
@@ -285,8 +288,7 @@ public class TestDistributedFileSystem {
       }
 
       {
-        DistributedFileSystem dfs =
-            (DistributedFileSystem) cluster.getFileSystem();
+        final DistributedFileSystem dfs = cluster.getFileSystem();
         assertFalse(dfs.dfs.getLeaseRenewer().isRunning());
 
         //open and check the file
@@ -776,6 +778,28 @@ public class TestDistributedFileSystem {
       if (cluster != null) {
         cluster.shutdown();
       }
+    }
+  }
+  
+  @Test(timeout=60000)
+  public void testListFiles() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
+    
+    try {
+      DistributedFileSystem fs = cluster.getFileSystem();
+  
+      final Path relative = new Path("relative");
+      fs.create(new Path(relative, "foo")).close();
+  
+      final List<LocatedFileStatus> retVal = new ArrayList<LocatedFileStatus>();
+      final RemoteIterator<LocatedFileStatus> iter = fs.listFiles(relative, true);
+      while (iter.hasNext()) {
+        retVal.add(iter.next());
+      }
+      System.out.println("retVal = " + retVal);
+    } finally {
+      cluster.shutdown();
     }
   }
 }
