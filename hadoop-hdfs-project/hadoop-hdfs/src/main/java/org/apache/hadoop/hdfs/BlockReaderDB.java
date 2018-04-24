@@ -5,6 +5,9 @@ import org.apache.commons.logging.LogFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import org.apache.hadoop.hdfs.client.ClientMmap;
+import org.apache.hadoop.hdfs.client.ClientMmapManager;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
 /**
  * Created by salman on 3/29/16.
@@ -132,5 +135,11 @@ public class BlockReaderDB implements  BlockReader{
   @Override
   public boolean isShortCircuit() {
     return false;
+  }
+  
+  @Override
+  public ClientMmap getClientMmap(LocatedBlock curBlock,
+      ClientMmapManager mmapManager) {
+    return null;
   }
 }
