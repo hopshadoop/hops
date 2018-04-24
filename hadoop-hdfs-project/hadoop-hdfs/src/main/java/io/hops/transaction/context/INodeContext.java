@@ -33,6 +33,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -373,20 +374,25 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
   private List<INode> findBatch(INode.Finder inodeFinder, String[] names,
                                 int[] parentIds, int[] partitionIds) throws StorageException {
     INode rootINode = null;
+    boolean addCachedRootInode = false;
     if (canReadCachedRootINode(names[0], parentIds[0])) {
       rootINode = RootINodeCache.getRootINode();
-      LOG.debug("Reading root inode from the cache "+rootINode);
       if (rootINode != null) {
-        names = Arrays.copyOfRange(names, 1, names.length);
-        parentIds = Arrays.copyOfRange(parentIds, 1, parentIds.length);
-        partitionIds = Arrays.copyOfRange(partitionIds, 1, partitionIds.length);
+        if(names[0] == INodeDirectory.ROOT_NAME && parentIds[0] == INodeDirectory.ROOT_PARENT_ID){
+          LOG.debug("Reading root inode from the cache "+rootINode);
+          //remove root from the batch operation. Cached root inode will be added later to the results
+          names = Arrays.copyOfRange(names, 1, names.length);
+          parentIds = Arrays.copyOfRange(parentIds, 1, parentIds.length);
+          partitionIds = Arrays.copyOfRange(partitionIds, 1, partitionIds.length);
+          addCachedRootInode=true;
+        }
       }
     }
 
     List<INode> batch = dataAccess.getINodesPkBatched(names, parentIds, partitionIds);
     miss(inodeFinder, batch, "names", Arrays.toString(names), "parent_ids",
             Arrays.toString(parentIds), "partition_ids", Arrays.toString(partitionIds));
-    if (rootINode != null) {
+    if (rootINode != null && addCachedRootInode) {
       batch.add(0, rootINode);
     }
     return syncInodeInstances(batch);
