@@ -700,7 +700,7 @@ class BPOfferService implements Runnable {
         //
         long waitTime = 1000;
         synchronized (pendingIncrementalBRperStorage) {
-          if (waitTime > 0 && sendImmediateIBR) {
+          if (waitTime > 0 && !sendImmediateIBR) {
             try {
               pendingIncrementalBRperStorage.wait(waitTime);
             } catch (InterruptedException ie) {
