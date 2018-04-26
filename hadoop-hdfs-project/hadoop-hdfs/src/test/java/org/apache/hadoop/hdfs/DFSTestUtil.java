@@ -180,7 +180,7 @@ public class DFSTestUtil {
   }
   
   /**
-   * when formating a namenode - we must provide clusterid.
+   * when formatting a namenode - we must provide clusterid.
    *
    * @param conf
    * @throws IOException
@@ -950,6 +950,7 @@ public class DFSTestUtil {
     return new DatanodeID(ipAddr, "localhost", "",
         DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
   }
 
@@ -958,7 +959,7 @@ public class DFSTestUtil {
   }
 
   public static DatanodeID getLocalDatanodeID(int port) {
-    return new DatanodeID("127.0.0.1", "localhost", "", port, port, port);
+    return new DatanodeID("127.0.0.1", "localhost", "", port, port, port, port);
   }
 
   public static DatanodeDescriptor getLocalDatanodeDescriptor() throws IOException {
@@ -989,6 +990,7 @@ public class DFSTestUtil {
   public static DatanodeInfo getDatanodeInfo(String ipAddr, String host, int port) {
     return new DatanodeInfo(new DatanodeID(ipAddr, host, "", port,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT));
   }
 
@@ -997,6 +999,7 @@ public class DFSTestUtil {
     return new DatanodeInfo(ipAddr, hostname, "",
         DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT, 1, 2, 3, 4, 5, 6, "local",
         adminState);
   }
@@ -1036,6 +1039,7 @@ public class DFSTestUtil {
     DatanodeID dnId = new DatanodeID(ipAddr, hostname,
         UUID.randomUUID().toString(), port,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
     return new DatanodeDescriptor(storageMap, dnId, rackLocation);
   }

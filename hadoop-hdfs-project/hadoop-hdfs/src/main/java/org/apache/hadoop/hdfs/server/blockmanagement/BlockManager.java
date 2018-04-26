@@ -913,6 +913,7 @@ public class BlockManager {
               namesystem.getBlockPoolId(),
               DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
               DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+              DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
               DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
       DatanodeInfo phantomDatanode = new DatanodeInfo(phantomDatanodID);
       machines[0] = phantomDatanode;

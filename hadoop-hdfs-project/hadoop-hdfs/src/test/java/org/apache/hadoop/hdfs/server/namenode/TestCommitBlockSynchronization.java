@@ -288,7 +288,7 @@ public class TestCommitBlockSynchronization {
     Block block = new Block(blockId, length, genStamp);
     FSNamesystem namesystemSpy = makeNameSystemSpy(block, file);
     DatanodeID[] newTargets = new DatanodeID[]{
-        new DatanodeID("0.0.0.0", "nonexistantHost", "1", 0, 0, 0)};
+        new DatanodeID("0.0.0.0", "nonexistantHost", "1", 0, 0, 0, 0)};
 
     ExtendedBlock lastBlock = new ExtendedBlock();
     namesystemSpy.commitBlockSynchronization(

@@ -84,7 +84,6 @@ import org.apache.hadoop.hdfs.server.namenode.StreamFile;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
@@ -96,7 +95,6 @@ import org.apache.hadoop.io.ReadaheadPool;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
@@ -110,7 +108,6 @@ import org.apache.hadoop.security.ssl.RevocationListFetcherService;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Daemon;
-import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.DiskChecker;
@@ -131,11 +128,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.net.UnknownHostException;
-import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.security.PrivilegedExceptionAction;
 import java.util.AbstractList;
@@ -264,6 +259,7 @@ public class DataNode extends Configured
   private volatile boolean heartbeatsDisabledForTests = false;
   private DataStorage storage = null;
   private HttpServer infoServer = null;
+  private int infoSecurePort;
   DataNodeMetrics metrics;
   private InetSocketAddress streamingAddr;
   
@@ -407,6 +403,7 @@ public class DataNode extends Configured
       if (LOG.isDebugEnabled()) {
         LOG.debug("Datanode listening for SSL on " + secInfoSocAddr);
       }
+      infoSecurePort = secInfoSocAddr.getPort();
     }
     this.infoServer.addInternalServlet(null, "/streamFile/*", StreamFile.class);
     this.infoServer.addInternalServlet(null, "/getFileChecksum/*",
@@ -868,7 +865,7 @@ public class DataNode extends Configured
 
     DatanodeID dnId =
         new DatanodeID(streamingAddr.getAddress().getHostAddress(), hostName,
-            storage.getDatanodeUuid(), getXferPort(), getInfoPort(), getIpcPort());
+            storage.getDatanodeUuid(), getXferPort(), getInfoPort(), infoSecurePort, getIpcPort());
 
     return new DatanodeRegistration(dnId, storageInfo, new ExportedBlockKeys(),
         VersionInfo.getVersion());
@@ -2558,6 +2555,13 @@ public class DataNode extends Configured
    */
   public int getInfoPort() {
     return infoServer.getPort();
+  }
+  
+  /**
+   * @return the datanode's https port
+   */
+  public int getInfoSecurePort() {
+    return infoSecurePort;
   }
 
   /**

@@ -248,7 +248,8 @@ public class PBHelper {
   // DatanodeId
   public static DatanodeID convert(DatanodeIDProto dn) {
     return new DatanodeID(dn.getIpAddr(), dn.getHostName(), dn.getDatanodeUuid(),
-        dn.getXferPort(), dn.getInfoPort(), dn.getIpcPort());
+        dn.getXferPort(), dn.getInfoPort(), dn.hasInfoSecurePort() ? dn
+            .getInfoSecurePort() : 0, dn.getIpcPort());
   }
 
   public static DatanodeIDProto convert(DatanodeID dn) {

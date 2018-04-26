@@ -352,6 +352,7 @@ public class JsonUtil {
     m.put("storageID", datanodeinfo.getDatanodeUuid());
     m.put("xferPort", datanodeinfo.getXferPort());
     m.put("infoPort", datanodeinfo.getInfoPort());
+    m.put("infoSecurePort", datanodeinfo.getInfoSecurePort());
     m.put("ipcPort", datanodeinfo.getIpcPort());
 
     m.put("capacity", datanodeinfo.getCapacity());
@@ -377,6 +378,7 @@ public class JsonUtil {
         (String) m.get("hostName"), (String) m.get("storageID"),
         (int) (long) (Long) m.get("xferPort"),
         (int) (long) (Long) m.get("infoPort"),
+        (int)(long)(Long)m.get("infoSecurePort"),
         (int) (long) (Long) m.get("ipcPort"),
 
         (Long) m.get("capacity"), (Long) m.get("dfsUsed"),

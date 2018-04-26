@@ -44,6 +44,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
   private String peerHostName; // hostname from the actual connection
   private int xferPort;      // data streaming port
   private int infoPort;      // info server port
+  private int infoSecurePort; // info server port
   private int ipcPort;       // IPC server port
 
   /**
@@ -59,6 +60,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
         from.getDatanodeUuid(),
         from.getXferPort(),
         from.getInfoPort(),
+        from.getInfoSecurePort(),
         from.getIpcPort());
     this.peerHostName = from.getPeerHostName();
   }
@@ -80,12 +82,13 @@ public class DatanodeID implements Comparable<DatanodeID> {
    *     ipc server port
    */
   public DatanodeID(String ipAddr, String hostName, String datanodeUuid,
-      int xferPort, int infoPort, int ipcPort) {
+      int xferPort, int infoPort, int infoSecurePort, int ipcPort) {
     this.ipAddr = ipAddr;
     this.hostName = hostName;
     this.datanodeUuid = checkDatanodeUuid(datanodeUuid);
     this.xferPort = xferPort;
     this.infoPort = infoPort;
+    this.infoSecurePort = infoSecurePort;
     this.ipcPort = ipcPort;
   }
   
@@ -148,6 +151,13 @@ public class DatanodeID implements Comparable<DatanodeID> {
    */
   public String getInfoAddr() {
     return ipAddr + ":" + infoPort;
+  }
+
+  /**
+   * @return IP:infoPort string
+   */
+  public String getInfoSecureAddr() {
+    return ipAddr + ":" + infoSecurePort;
   }
 
   /**
@@ -217,6 +227,13 @@ public class DatanodeID implements Comparable<DatanodeID> {
   }
 
   /**
+   * @return infoSecurePort (the port at which the HTTPS server bound to)
+   */
+  public int getInfoSecurePort() {
+    return infoSecurePort;
+  }
+
+  /**
    * @return ipcPort (the port at which the IPC server bound to)
    */
   public int getIpcPort() {
@@ -258,13 +275,14 @@ public class DatanodeID implements Comparable<DatanodeID> {
     peerHostName = nodeReg.getPeerHostName();
     xferPort = nodeReg.getXferPort();
     infoPort = nodeReg.getInfoPort();
+    infoSecurePort = nodeReg.getInfoSecurePort();
     ipcPort = nodeReg.getIpcPort();
   }
 
   /**
    * Compare based on data transfer address.
    *
-   * @param that
+   * @param that datanode to compare with
    * @return as specified by Comparable
    */
   @Override

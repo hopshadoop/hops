@@ -165,6 +165,7 @@ public class TestDatanodeRegistration {
     final String DN_HOSTNAME = "localhost";
     final int DN_XFER_PORT = 12345;
     final int DN_INFO_PORT = 12346;
+    final int DN_INFO_SECURE_PORT = 12347;
     final int DN_IPC_PORT = 12348;
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = null;
@@ -181,7 +182,7 @@ public class TestDatanodeRegistration {
       // register a datanode
       DatanodeID dnId =
           new DatanodeID(DN_IP_ADDR, DN_HOSTNAME, "fake-storage-id",
-              DN_XFER_PORT, DN_INFO_PORT, DN_IPC_PORT);
+              DN_XFER_PORT, DN_INFO_PORT, DN_INFO_SECURE_PORT, DN_IPC_PORT);
       long nnCTime = StorageInfo.getStorageInfoFromDB().getCTime();
       StorageInfo mockStorageInfo = mock(StorageInfo.class);
       doReturn(nnCTime).when(mockStorageInfo).getCTime();
@@ -197,7 +198,7 @@ public class TestDatanodeRegistration {
 
       // register the same datanode again with a different storage ID
       dnId = new DatanodeID(DN_IP_ADDR, DN_HOSTNAME, "changed-fake-storage-id",
-          DN_XFER_PORT, DN_INFO_PORT, DN_IPC_PORT);
+          DN_XFER_PORT, DN_INFO_PORT, DN_INFO_SECURE_PORT, DN_IPC_PORT);
       dnReg = new DatanodeRegistration(dnId, mockStorageInfo, null,
           VersionInfo.getVersion());
       rpcServer.registerDatanode(dnReg);

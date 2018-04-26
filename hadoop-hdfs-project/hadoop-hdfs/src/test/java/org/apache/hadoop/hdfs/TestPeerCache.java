@@ -150,7 +150,7 @@ public class TestPeerCache {
     PeerCache cache = new PeerCache(3, 100000);
     DatanodeID dnId = new DatanodeID("192.168.0.1",
           "fakehostname", "fake_storage_id",
-          100, 101, 102);
+          100, 101, 102, 103);
     FakePeer peer = new FakePeer(dnId, false);
     cache.put(dnId, peer);
     assertTrue(!peer.isClosed());
@@ -170,7 +170,7 @@ public class TestPeerCache {
     for (int i = 0; i < CAPACITY; ++i) {
       dnIds[i] = new DatanodeID("192.168.0.1",
           "fakehostname_" + i, "fake_storage_id",
-          100, 101, 102);
+          100, 101, 102, 103);
       peers[i] = new FakePeer(dnIds[i], false);
     }
     for (int i = 0; i < CAPACITY; ++i) {
@@ -201,7 +201,7 @@ public class TestPeerCache {
     for (int i = 0; i < dnIds.length; ++i) {
       dnIds[i] = new DatanodeID("192.168.0.1",
           "fakehostname_" + i, "fake_storage_id_" + i,
-          100, 101, 102);
+          100, 101, 102, 103);
       peers[i] = new FakePeer(dnIds[i], false);
     }
     for (int i = 0; i < CAPACITY; ++i) {
@@ -232,7 +232,7 @@ public class TestPeerCache {
     PeerCache cache = new PeerCache(CAPACITY, 100000);
     DatanodeID dnId = new DatanodeID("192.168.0.1",
           "fakehostname", "fake_storage_id",
-          100, 101, 102);
+          100, 101, 102, 103);
     HashMultiset<FakePeer> peers = HashMultiset.create(CAPACITY);
     for (int i = 0; i < CAPACITY; ++i) {
       FakePeer peer = new FakePeer(dnId, false);
@@ -257,7 +257,7 @@ public class TestPeerCache {
     PeerCache cache = new PeerCache(CAPACITY, 100000);
     DatanodeID dnId = new DatanodeID("192.168.0.1",
           "fakehostname", "fake_storage_id",
-          100, 101, 102);
+          100, 101, 102, 103);
     HashMultiset<FakePeer> peers = HashMultiset.create(CAPACITY);
     for (int i = 0; i < CAPACITY; ++i) {
       FakePeer peer = new FakePeer(dnId, i == CAPACITY - 1);
