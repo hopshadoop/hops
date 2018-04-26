@@ -30,29 +30,22 @@
   NameNode nn = NameNodeHttpServer.getNameNodeFromContext(application);
   FSNamesystem fsn = nn.getNamesystem();
   String namenodeRole = nn.getRole().toString();
-  String namenodeLabel = nn.getRpcServer() != null ?
-    nn.getNameNodeAddressHostPortString() : null;
+  String namenodeLabel = NamenodeJspHelper.getNameNodeLabel(nn);
 %>
 
 <!DOCTYPE html>
 <html>
 <head>
 <link rel="stylesheet" type="text/css" href="/static/hadoop.css">
-<% if (namenodeLabel != null) { %>
 <title>Hadoop <%=namenodeRole%>&nbsp;<%=namenodeLabel%></title>
-<% } else { %>
-<title>Hadoop <%=namenodeRole%></title>
-<% } %>
 </head>    
 <body>
-  <% if (namenodeLabel != null) { %>
 <h1><%=namenodeRole%> '<%=namenodeLabel%>'</h1>
-<% } else { %>
-<h1><%=namenodeRole%></h1>
-<% } %>
 <%= NamenodeJspHelper.getVersionTable(fsn,nn) %>
 <br />
+<% if (fsn != null) { %> 
 <b><a href="/nn_browsedfscontent.jsp">Browse the filesystem</a></b><br>
+<% } %>
 <b><a href="/logs/"><%=namenodeRole%> Logs</a></b>
 
 <hr>
