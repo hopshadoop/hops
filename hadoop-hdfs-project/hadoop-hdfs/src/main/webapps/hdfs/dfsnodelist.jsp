@@ -30,7 +30,7 @@ final NamenodeJspHelper.NodeListJsp nodelistjsp = new NamenodeJspHelper.NodeList
 NameNode nn = NameNodeHttpServer.getNameNodeFromContext(application);
 String namenodeRole = nn.getRole().toString();
 FSNamesystem fsn = nn.getNamesystem();
-String namenodeLabel = nn.getNameNodeAddressHostPortString();
+String namenodeLabel = NamenodeJspHelper.getNameNodeLabel(nn);
 %>
 
 <!DOCTYPE html>
@@ -43,7 +43,9 @@ String namenodeLabel = nn.getNameNodeAddressHostPortString();
 <h1><%=namenodeRole%> '<%=namenodeLabel%>'</h1>
 <%= NamenodeJspHelper.getVersionTable(fsn,nn) %>
 <br />
+<% if (fsn != null) { %> 
 <b><a href="/nn_browsedfscontent.jsp">Browse the filesystem</a></b><br>
+<% } %>
 <b><a href="/logs/"><%=namenodeRole%> Logs</a></b><br>
 <b><a href=/dfshealth.jsp> Go back to DFS home</a></b>
 <hr>
