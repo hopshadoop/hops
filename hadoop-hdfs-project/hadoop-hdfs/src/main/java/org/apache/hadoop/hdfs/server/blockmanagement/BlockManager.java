@@ -137,11 +137,6 @@ public class BlockManager {
   static final Log LOG = LogFactory.getLog(BlockManager.class);
   public static final Log blockLog = NameNode.blockStateChangeLog;
 
-  /**
-   * Default load factor of map
-   */
-  public static final float DEFAULT_MAP_LOAD_FACTOR = 0.75f;
-
   private final Namesystem namesystem;
 
   private final DatanodeManager datanodeManager;
