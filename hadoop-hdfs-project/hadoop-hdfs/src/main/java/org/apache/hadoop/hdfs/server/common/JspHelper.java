@@ -129,6 +129,26 @@ public class JspHelper {
     }
   }
 
+  /**
+   * A helper class that generates the correct URL for different schema.
+   *
+   */
+  public static final class Url {
+    public static String authority(String scheme, DatanodeID d) {
+      if (scheme.equals("http")) {
+        return d.getInfoAddr();
+      } else if (scheme.equals("https")) {
+        return d.getInfoSecureAddr();
+      } else {
+        throw new IllegalArgumentException("Unknown scheme:" + scheme);
+      }
+    }
+
+    public static String url(String scheme, DatanodeID d) {
+      return scheme + "://" + authority(scheme, d);
+    }
+  }
+
   public static DatanodeInfo bestNode(LocatedBlocks blks, Configuration conf)
       throws IOException {
     HashMap<DatanodeInfo, NodeRecord> map =
