@@ -701,7 +701,7 @@ class NamenodeJspHelper {
         String suffix, boolean alive, int nnHttpPort, String nnaddr)
         throws IOException {
       // from nn_browsedfscontent.jsp:
-      String url = HttpConfig2.getSchemePrefix() + d.getHostName() + ":" +
+      String url = "///" + d.getHostName() + ":" +
           d.getInfoPort() + "/browseDirectory.jsp?namenodeInfoPort=" +
           nnHttpPort + "&dir=" + URLEncoder.encode("/", "UTF-8") +
           JspHelper.getUrlParam(JspHelper.NAMENODE_ADDRESS, nnaddr);

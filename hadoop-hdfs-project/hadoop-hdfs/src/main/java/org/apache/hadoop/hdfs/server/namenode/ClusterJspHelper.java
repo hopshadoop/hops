@@ -848,7 +848,7 @@ class ClusterJspHelper {
     doc.startTag("item");
     doc.attribute("label", label);
     doc.attribute("value", value);
-    doc.attribute("link", HttpConfig2.getSchemePrefix() + url);
+    doc.attribute("link", "///" + url);
     doc.endTag(); // item
   }
 
