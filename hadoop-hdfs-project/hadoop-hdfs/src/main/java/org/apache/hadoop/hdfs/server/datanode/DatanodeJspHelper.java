@@ -220,7 +220,7 @@ public class DatanodeJspHelper {
         JspHelper.addTableFooter(out);
       }
     }
-    out.print("<br><a href=\"" + HttpConfig2.getSchemePrefix() +
+    out.print("<br><a href=\"///" +
         canonicalize(nnAddr) + ":" + namenodeInfoPort +
         "/dfshealth.jsp\">Go back to DFS home</a>");
     dfs.close();
@@ -298,10 +298,7 @@ public class DatanodeJspHelper {
             .getLocatedBlocks();
     // Add the various links for looking at the file contents
     // URL for downloading the full file
-    String downloadUrl =
-        HttpConfig2.getSchemePrefix() + req.getServerName() + ":" +
-            req.getServerPort() + "/streamFile" +
-            ServletUtil.encodePath(filename) +
+    String downloadUrl = "/streamFile" + ServletUtil.encodePath(filename) +
             JspHelper.getUrlParam(JspHelper.NAMENODE_ADDRESS, nnAddr, true) +
             JspHelper.getDelegationTokenUrlParam(tokenString);
     out.print("<a name=\"viewOptions\"></a>");
@@ -318,8 +315,7 @@ public class DatanodeJspHelper {
       return;
     }
     String fqdn = canonicalize(chosenNode.getIpAddr());
-    String tailUrl =
-        HttpConfig2.getSchemePrefix() + fqdn + ":" + chosenNode.getInfoPort() +
+    String tailUrl = "///" + fqdn + ":" + chosenNode.getInfoPort() +
             "/tail.jsp?filename=" + URLEncoder.encode(filename, "UTF-8") +
             "&namenodeInfoPort=" + namenodeInfoPort + "&chunkSizeToView=" +
             chunkSizeToView +
@@ -372,8 +368,7 @@ public class DatanodeJspHelper {
         String datanodeAddr = loc.getXferAddr();
         datanodePort = loc.getXferPort();
         fqdn = canonicalize(loc.getIpAddr());
-        String blockUrl =
-            HttpConfig2.getSchemePrefix() + fqdn + ":" + loc.getInfoPort() +
+        String blockUrl = "///" + fqdn + ":" + loc.getInfoPort() +
                 "/browseBlock.jsp?blockId=" + blockidstring + "&blockSize=" +
                 blockSize + "&filename=" +
                 URLEncoder.encode(filename, "UTF-8") + "&datanodePort=" +
@@ -383,8 +378,7 @@ public class DatanodeJspHelper {
                 JspHelper.getDelegationTokenUrlParam(tokenString) +
                 JspHelper.getUrlParam(JspHelper.NAMENODE_ADDRESS, nnAddr);
     
-        String blockInfoUrl =
-            HttpConfig2.getSchemePrefix() + nnCanonicalName + ":" +
+        String blockInfoUrl = "///" + nnCanonicalName + ":" +
                 namenodeInfoPort + "/block_info_xml.jsp?blockId=" +
                 blockidstring;
         out.print(
@@ -397,7 +391,7 @@ public class DatanodeJspHelper {
     out.println("</table>");
     out.print("<hr>");
     out.print(
-        "<br><a href=\"" + HttpConfig2.getSchemePrefix() + nnCanonicalName +
+        "<br><a href=\"///" + nnCanonicalName +
             ":" + namenodeInfoPort +
             "/dfshealth.jsp\">Go back to DFS home</a>");
     dfs.close();
@@ -501,10 +495,7 @@ public class DatanodeJspHelper {
     String parent = new File(filename).getParent();
     JspHelper.printGotoForm(out, namenodeInfoPort, tokenString, parent, nnAddr);
     out.print("<hr>");
-    out.print(
-        "<a href=\"" + HttpConfig2.getSchemePrefix() + req.getServerName() +
-            ":" + req.getServerPort() + "/browseDirectory.jsp?dir=" +
-            URLEncoder.encode(parent, "UTF-8") + "&namenodeInfoPort=" +
+    out.print("<a href=\"/browseDirectory.jsp?dir=" + URLEncoder.encode(parent, "UTF-8") + "&namenodeInfoPort=" +
             namenodeInfoPort +
             JspHelper.getDelegationTokenUrlParam(tokenString) +
             JspHelper.getUrlParam(JspHelper.NAMENODE_ADDRESS, nnAddr) +
@@ -552,7 +543,7 @@ public class DatanodeJspHelper {
     }
     String nextUrl = null;
     if (nextBlockIdStr != null) {
-      nextUrl = HttpConfig2.getSchemePrefix() + canonicalize(nextHost) + ":" +
+      nextUrl = "///" + canonicalize(nextHost) + ":" +
           nextPort + "/browseBlock.jsp?blockId=" + nextBlockIdStr +
           "&blockSize=" + nextBlockSize + "&startOffset=" + nextStartOffset +
           "&genstamp=" + nextGenStamp + "&filename=" +
@@ -608,7 +599,7 @@ public class DatanodeJspHelper {
 
     String prevUrl = null;
     if (prevBlockIdStr != null) {
-      prevUrl = HttpConfig2.getSchemePrefix() + canonicalize(prevHost) + ":" +
+      prevUrl = "///" + canonicalize(prevHost) + ":" +
           prevPort + "/browseBlock.jsp?blockId=" + prevBlockIdStr +
           "&blockSize=" + prevBlockSize + "&startOffset=" + prevStartOffset +
           "&filename=" + URLEncoder.encode(filename, "UTF-8") +
