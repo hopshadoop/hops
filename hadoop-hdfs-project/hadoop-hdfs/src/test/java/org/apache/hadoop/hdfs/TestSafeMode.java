@@ -522,7 +522,7 @@ public class TestSafeMode {
       } catch (SafeModeException e) {
         // as expected 
       } catch (RemoteException re) {
-        if (!re.getClassName().equals(SafeModeException.class.getName())) {
+        if (!re.getMessage().contains("SafeModeException")){
           assertTrue("Should have got safemode exception", false);
         }
       }
