@@ -402,7 +402,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
       blockCount += blks.size();
       replIndex += blks.size();
       
-      if (count(priority) <= remainingblksToProcess && priority == LEVEL - 1) {
+      if (priority == LEVEL - 1 && count(priority) <= replIndex) {
         // reset all priorities replication index to 0 because there is no
         // recently added blocks in any list.
         for (int i = 0; i < LEVEL; i++) {
