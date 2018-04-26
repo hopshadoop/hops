@@ -38,12 +38,16 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
+import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.MiniDFSNNTopology;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.ipc.ClientId;
@@ -51,7 +55,9 @@ import org.apache.hadoop.ipc.RPC.RpcKind;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
 import org.apache.hadoop.ipc.RpcConstants;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.LightWeightCache;
 import org.junit.After;
 import org.junit.Assert;
@@ -79,13 +85,14 @@ public class TestNamenodeRetryCache {
       "TestNamenodeRetryCache", null, FsPermission.getDefault());
   private static DistributedFileSystem filesystem;
   private static int callId = 100;
-  private static Configuration conf = new HdfsConfiguration();
+  private static Configuration conf;
   private static final int BlockSize = 512;
   private static final int expirityTime = 30000;
   
   /** Start a cluster */
   @Before
   public void setup() throws Exception {
+    conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BlockSize);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY, true);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
@@ -302,6 +309,43 @@ public class TestNamenodeRetryCache {
     }
   }
   
+  /**
+   * Make sure a retry call does not hang because of the exception thrown in the
+   * first call.
+   */
+  @Test(timeout = 60000)
+  public void testUpdatePipelineWithFailOver() throws Exception {
+    cluster.shutdown();
+    namesystem = null;
+    filesystem = null;
+    cluster = new MiniDFSCluster.Builder(conf).nnTopology(
+        MiniDFSNNTopology.simpleHOPSTopology(2)).numDataNodes(1).build();
+    FSNamesystem ns0 = cluster.getNamesystem(0);
+    ExtendedBlock oldBlock = new ExtendedBlock();
+    ExtendedBlock newBlock = new ExtendedBlock();
+    DatanodeID[] newNodes = new DatanodeID[2];
+    String[] newStorages = new String[2];
+    
+    cluster.shutdownNameNode(0);
+    cluster.shutdownNameNode(1);
+    
+    newCall();
+    try {
+      ns0.updatePipeline("testClient", oldBlock, newBlock, newNodes, newStorages);
+      Assert.fail("Expect StandbyException from the updatePipeline call");
+    } catch (IOException e) {
+      // expected, since in the beginning both nn are in standby state
+      GenericTestUtils.assertExceptionContains(
+          "does not exist or is not under Construction", e);
+    }
+    
+    cluster.restartNameNode(0);
+    try {
+      ns0.updatePipeline("testClient", oldBlock, newBlock, newNodes, newStorages);
+    } catch (IOException e) {
+      // ignore call should not hang.
+    }
+  }
   
   @Test
   public void testRetryCacheConfig() {
