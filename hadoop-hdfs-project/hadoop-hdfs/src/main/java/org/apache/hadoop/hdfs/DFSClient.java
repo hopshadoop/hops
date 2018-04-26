@@ -177,6 +177,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 import org.apache.hadoop.hdfs.client.ClientMmapManager;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
+import org.apache.hadoop.ipc.RetriableException;
 
 /**
  * *****************************************************
@@ -3104,6 +3105,12 @@ public class DFSClient implements java.io.Closeable {
           } catch (InterruptedException ex) {
           }
           continue;
+        } else if(getWrappedRetriableException(e) != null) {
+          try {
+            Thread.sleep(waitTime);
+            waitTime *= 2;
+          } catch (InterruptedException ex) {
+          }
         } else {
           break;
         }
@@ -3113,6 +3120,16 @@ public class DFSClient implements java.io.Closeable {
     throw exception; // Did not return so RPC failed
   }
 
+  private static RetriableException getWrappedRetriableException(Exception e) {
+    if (!(e instanceof RemoteException)) {
+      return null;
+    }
+    Exception unwrapped = ((RemoteException)e).unwrapRemoteException(
+        RetriableException.class);
+    return unwrapped instanceof RetriableException ? 
+        (RetriableException) unwrapped : null;
+  }
+  
   /**
    * Ping the name node to see if there is a connection
    * -- A connection won't exist if it gives an IOException of type

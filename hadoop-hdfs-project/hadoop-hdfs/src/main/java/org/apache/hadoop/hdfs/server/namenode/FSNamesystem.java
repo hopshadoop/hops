@@ -260,6 +260,7 @@ import org.apache.hadoop.hdfs.server.namenode.startupprogress.Status;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Step;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StepType;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
+import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.ipc.RetryCacheDistributed;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
 import org.apache.hadoop.ipc.RetryCacheDistributed.CacheEntryWithPayload;
@@ -857,6 +858,21 @@ public class FSNamesystem
     }
   }
 
+  /**
+   * @throws RetriableException
+   *           If 1) The NameNode is in SafeMode, 2) HA is enabled, and 3)
+   *           NameNode is in active state
+   * @throws SafeModeException
+   *           Otherwise if NameNode is in SafeMode.
+   */
+  private void checkNameNodeSafeMode(String errorMsg)
+      throws RetriableException, SafeModeException, IOException {
+    if (isInSafeMode()) {
+      SafeModeException se = new SafeModeException(errorMsg, safeMode);
+      throw new RetriableException(se);
+    }
+  }
+  
   NamespaceInfo getNamespaceInfo() throws IOException {
     return unprotectedGetNamespaceInfo();
   }
@@ -975,9 +991,7 @@ public class FSNamesystem
       IOException {
     HdfsFileStatus resultingStat;
     FSPermissionChecker pc = getPermissionChecker();
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot set permission for " + src, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot set permission for " + src);
     checkOwner(pc, src);
     dir.setPermission(src, permission);
     resultingStat = getAuditFileInfo(src, false);
@@ -1032,9 +1046,7 @@ public class FSNamesystem
       IOException {
     HdfsFileStatus resultingStat;
     FSPermissionChecker pc = getPermissionChecker();
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot set permission for " + src, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot set permission for " + src);
     checkOwner(pc, src);
     dir.setPermission(src, permission);
     resultingStat = getAuditFileInfo(src, false);
@@ -1091,9 +1103,7 @@ public class FSNamesystem
       IOException {
     HdfsFileStatus resultingStat;
     FSPermissionChecker pc = getPermissionChecker();
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot set owner for " + src, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot set owner for " + src);
     checkOwner(pc, src);
     if (!pc.isSuperUser()) {
       if (username != null && !pc.getUser().equals(username)) {
@@ -1154,9 +1164,7 @@ public class FSNamesystem
     HdfsFileStatus resultingStat;
     FSPermissionChecker pc = getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src);
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot set owner for " + src, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot set owner for " + src);
     src = FSDirectory.resolvePath(src, pathComponents, dir);
     checkOwner(pc, src);
     if (!pc.isSuperUser()) {
@@ -1322,8 +1330,9 @@ public class FSNamesystem
       for (LocatedBlock b : ret.getLocatedBlocks()) {
         // if safe mode & no block locations yet then throw SafeModeException
         if ((b.getLocations() == null) || (b.getLocations().length == 0)) {
-          throw new SafeModeException("No block locations for " + src,
-              safeMode);
+          SafeModeException se = new SafeModeException(
+              "Zero blocklocations for " + src, safeMode);
+          throw new RetriableException(se);
         }
       }
     }
@@ -1469,9 +1478,7 @@ public class FSNamesystem
 
     HdfsFileStatus resultingStat;
     FSPermissionChecker pc = getPermissionChecker();
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot concat " + target, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot concat " + target);
     concatInternal(pc, target, srcs);
     resultingStat = getAuditFileInfo(target, false);
     logAuditEvent(true, "concat", Arrays.toString(srcs), target, resultingStat);
@@ -1713,9 +1720,7 @@ public class FSNamesystem
       NameNode.stateChangeLog.debug("DIR* NameSystem.createSymlink: target=" +
           target + " link=" + link);
     }
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot create symlink " + link, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot create symlink " + link);
     if (FSDirectory.isReservedName(target)) {
       throw new InvalidPathException("Invalid target name: " + target);
     }
@@ -1787,10 +1792,7 @@ public class FSNamesystem
     blockManager.verifyReplication(src, replication, null);
     final boolean isFile;
     FSPermissionChecker pc = getPermissionChecker();
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot set replication for " + src,
-          safeMode);
-    }
+    checkNameNodeSafeMode("Cannot set replication for " + src);
     if (isPermissionEnabled) {
       checkPathAccess(pc, src, FsAction.WRITE);
     }
@@ -1849,10 +1851,7 @@ public class FSNamesystem
   private void setMetaEnabledInt(final String src, final boolean metaEnabled)
       throws IOException {
     FSPermissionChecker pc = getPermissionChecker();
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot set metaEnabled for " + src,
-          safeMode);
-    }
+    checkNameNodeSafeMode("Cannot set metaEnabled for " + src);
     if (isPermissionEnabled) {
       checkPathAccess(pc, src, FsAction.WRITE);
     }
@@ -1924,9 +1923,7 @@ public class FSNamesystem
           @Override
           public Object performTask() throws IOException {           
             FSPermissionChecker pc = getPermissionChecker();
-            if (isInSafeMode()) {
-              throw new SafeModeException("Cannot set metaEnabled for " + filename, safeMode);
-            }
+            checkNameNodeSafeMode("Cannot set metaEnabled for " + filename);
             if (isPermissionEnabled) {
               checkPathAccess(pc, filename, FsAction.WRITE);
             }
@@ -2309,8 +2306,7 @@ public class FSNamesystem
           public Object performTask() throws IOException {
             FSPermissionChecker pc = getPermissionChecker();
             if (isInSafeMode()) {
-              throw new SafeModeException("Cannot recover the lease of " + src,
-                  safeMode);
+              checkNameNodeSafeMode("Cannot recover the lease of " + src);
             }
             if (!DFSUtil.isValidName(src)) {
               throw new IOException("Invalid file name: " + src);
@@ -2730,9 +2726,7 @@ public class FSNamesystem
 
     checkBlock(previous);
     onRetryBlock[0] = null;
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot add block to " + src, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot add block to " + src);
 
     // have we exceeded the configured limit of fs objects.
     checkFsObjectLimit();
@@ -2856,10 +2850,7 @@ public class FSNamesystem
             final long preferredBlockSize;
             final List<DatanodeStorageInfo> chosen;
             //check safe mode
-            if (isInSafeMode()) {
-              throw new SafeModeException(
-                  "Cannot add datanode; src=" + src + ", blk=" + blk, safeMode);
-            }
+            checkNameNodeSafeMode("Cannot add datanode; src=" + src + ", blk=" + blk);
 
             //check lease
             final INodeFileUnderConstruction file = checkLease(src,
@@ -2919,10 +2910,7 @@ public class FSNamesystem
               NameNode.stateChangeLog.debug(
                   "BLOCK* NameSystem.abandonBlock: " + b + "of file " + src);
             }
-            if (isInSafeMode()) {
-              throw new SafeModeException(
-                  "Cannot abandon block " + b + " for fle" + src, safeMode);
-            }
+            checkNameNodeSafeMode("Cannot abandon block " + b + " for fle" + src);
             INodeFileUnderConstruction file = checkLease(src, holder, false);
             boolean removed = dir.removeBlock(src, file, ExtendedBlock.getLocalBlock(b));
             if (!removed) {
@@ -3050,9 +3038,7 @@ public class FSNamesystem
       NameNode.stateChangeLog.debug("DIR* NameSystem.completeFile: " +
           src + " for " + holder);
     }
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot complete file " + src, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot complete file " + src);
 
     if (data != null) {
       if (last != null) {
@@ -3336,9 +3322,7 @@ public class FSNamesystem
       IOException {
     BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
     FSPermissionChecker pc = getPermissionChecker();
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot delete " + src, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot delete " + src);
     if (!recursive && dir.isNonEmptyDirectory(src)) {
       throw new IOException(src + " is non empty");
     }
@@ -3545,9 +3529,7 @@ public class FSNamesystem
   private boolean mkdirsInternal(FSPermissionChecker pc, String src,
       PermissionStatus permissions, boolean createParent)
       throws IOException {
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot create directory " + src, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot create directory " + src);
     if (isPermissionEnabled) {
       checkTraverse(pc, src);
     }
@@ -3613,9 +3595,7 @@ public class FSNamesystem
       public Object performTask() throws IOException {
         NameNode.stateChangeLog
             .info("BLOCK* fsync: " + src + " for " + clientName);
-        if (isInSafeMode()) {
-          throw new SafeModeException("Cannot fsync file " + src, safeMode);
-        }
+        checkNameNodeSafeMode("Cannot fsync file " + src);
         INodeFileUnderConstruction pendingFile = checkLease(src, clientName);
         if (lastBlockLength > 0) {
           pendingFile.updateLengthOfLastBlock(lastBlockLength);
@@ -3859,10 +3839,8 @@ public class FSNamesystem
         // If a DN tries to commit to the standby, the recovery will
         // fail, and the next retry will succeed on the new NN.
 
-        if (isInSafeMode()) {
-          throw new SafeModeException(
-              "Cannot commitBlockSynchronization while in safe mode", safeMode);
-        }
+        checkNameNodeSafeMode(
+          "Cannot commitBlockSynchronization while in safe mode");
         LOG.info("commitBlockSynchronization(lastBlock=" + lastBlock +
             ", newGenerationStamp=" + newGenerationStamp + ", newLength=" +
             newLength + ", newTargets=" + Arrays.asList(newTargets) +
@@ -4024,10 +4002,7 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
-        if (isInSafeMode()) {
-          throw new SafeModeException("Cannot renew lease for " + holder,
-              safeMode);
-        }
+        checkNameNodeSafeMode("Cannot renew lease for " + holder);
         leaseManager.renewLease(holder);
         return null;
       }
@@ -4362,7 +4337,7 @@ public class FSNamesystem
    * replicas, and calculates the ratio of safe blocks to the total number
    * of blocks in the system, which is the size of blocks in
    * {@link FSNamesystem#blockManager}. When the ratio reaches the
-   * {@link #threshold} it starts the {@link SafeModeMonitor} daemon in order
+   * {@link #threshold} it starts the SafeModeMonitor daemon in order
    * to monitor whether the safe mode {@link #extension} is passed.
    * Then it leaves safe mode and destroys itself.
    * <p/>
@@ -4370,10 +4345,9 @@ public class FSNamesystem
    * not tracked because the name node is not intended to leave safe mode
    * automatically in the case.
    *
-   * @see ClientProtocol#setSafeMode
-   * @see SafeModeMonitor
+   * @see ClientProtocol#setSafeMode(HdfsConstants.SafeModeAction, boolean)
    */
-  class SafeModeInfo {
+  public class SafeModeInfo {
 
     // configuration fields
     /**
@@ -5469,19 +5443,14 @@ public class FSNamesystem
   }
 
   private long nextBlockId() throws IOException{
-    if (isInSafeMode()) {
-      throw new SafeModeException(
-          "Cannot get next block ID", safeMode);
-    }
+    checkNameNodeSafeMode("Cannot get next block ID");
     return IDsGeneratorFactory.getInstance().getUniqueBlockID();
   }
   
   private INodeFileUnderConstruction checkUCBlock(ExtendedBlock block,
       String clientName) throws IOException {
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot get a new generation stamp and an " +
-          "access token for block " + block, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot get a new generation stamp and an "
+        + "access token for block " + block);
 
     // check stored block state
     BlockInfo storedBlock =
@@ -5636,9 +5605,7 @@ public class FSNamesystem
         }
         boolean success = false;
         try {
-          if (isInSafeMode()) {
-            throw new SafeModeException("Pipeline not updated", safeMode);
-          }
+          checkNameNodeSafeMode("Pipeline not updated");
           assert newBlock.getBlockId() == oldBlock.getBlockId() :
               newBlock + " and " + oldBlock + " has different block identifier";
 
@@ -5876,10 +5843,7 @@ public class FSNamesystem
           @Override
           public Object performTask() throws IOException {
             Token<DelegationTokenIdentifier> token;
-            if (isInSafeMode()) {
-              throw new SafeModeException("Cannot issue delegation token",
-                  safeMode);
-            }
+            checkNameNodeSafeMode("Cannot issue delegation token");
             if (!isAllowedDelegationTokenOp()) {
               throw new IOException(
                   "Delegation Token can be issued only with kerberos or web authentication");
@@ -5927,10 +5891,7 @@ public class FSNamesystem
           @Override
           public Object performTask() throws IOException {
             long expiryTime;
-            if (isInSafeMode()) {
-              throw new SafeModeException("Cannot renew delegation token",
-                  safeMode);
-            }
+            checkNameNodeSafeMode("Cannot renew delegation token");
             if (!isAllowedDelegationTokenOp()) {
               throw new IOException(
                   "Delegation Token can be renewed only with kerberos or web authentication");
@@ -5965,10 +5926,7 @@ public class FSNamesystem
 
           @Override
           public Object performTask() throws IOException {
-            if (isInSafeMode()) {
-              throw new SafeModeException("Cannot cancel delegation token",
-                  safeMode);
-            }
+            checkNameNodeSafeMode("Cannot cancel delegation token");
             String canceller = getRemoteUser().getUserName();
             DelegationTokenIdentifier id =
                 dtSecretManager.cancelToken(token, canceller);
@@ -6683,9 +6641,7 @@ public class FSNamesystem
   void multiTransactionalSetQuota(final String path1, final long nsQuota,
       final long dsQuota) throws IOException {
     checkSuperuserPrivilege();
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot set quota on " + path1, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot set quota on " + path1);
     if (!isLeader()) {
       throw new RuntimeException("Asked non leading node to setQuota");
     }
@@ -6851,7 +6807,7 @@ public class FSNamesystem
     
     try {
     if (isInSafeMode()) {
-      throw new SafeModeException("Cannot rename " + src, safeMode);
+      checkNameNodeSafeMode("Cannot rename " + src);
     }
     
     if (dst.equals(src)) {
@@ -7075,9 +7031,7 @@ public class FSNamesystem
               "DIR* NameSystem.renameTo: with options - " + src + " to " + dst);
         }
 
-        if (isInSafeMode()) {
-          throw new SafeModeException("Cannot rename " + src, safeMode);
-        }
+        checkNameNodeSafeMode("Cannot rename " + src);
         if (!DFSUtil.isValidName(dst)) {
           throw new InvalidPathException("Invalid name: " + dst);
         }
@@ -7165,9 +7119,7 @@ public class FSNamesystem
               " to " + dst);
     }
 
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot rename " + src, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot rename " + src);
     if (!DFSUtil.isValidName(dst)) {
       throw new InvalidPathException("Invalid name: " + dst);
     }
@@ -7344,9 +7296,7 @@ public class FSNamesystem
                   + " to " + dst);
             }
 
-            if (isInSafeMode()) {
-              throw new SafeModeException("Cannot rename " + src, safeMode);
-            }
+            checkNameNodeSafeMode("Cannot rename " + src);
             if (!DFSUtil.isValidName(dst)) {
               throw new IOException("Invalid name: " + dst);
             }
@@ -7405,9 +7355,7 @@ public class FSNamesystem
       final boolean recursive) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
     final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
-    if (isInSafeMode()) {
-      throw new SafeModeException("Cannot delete " + path, safeMode);
-    }
+    checkNameNodeSafeMode("Cannot delete " + path);
 
     if (!recursive) {
       // It is safe to do this as it will only delete a single file or an empty directory
