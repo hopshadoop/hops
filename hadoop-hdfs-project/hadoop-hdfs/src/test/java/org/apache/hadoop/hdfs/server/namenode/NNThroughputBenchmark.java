@@ -882,6 +882,7 @@ public class NNThroughputBenchmark implements Tool {
               DNS.getDefaultHost("default", "default"),
               DataNode.generateUuid(), getNodePort(dnIdx),
               DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+              DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
               DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT),
           new DataStorage(nsInfo), new ExportedBlockKeys(),
           VersionInfo.getVersion());
@@ -1382,7 +1383,7 @@ public class NNThroughputBenchmark implements Tool {
   /**
    * Main method of the benchmark.
    *
-   * @param args
+   * @param aArgs
    *     command line parameters
    */
   @Override // Tool

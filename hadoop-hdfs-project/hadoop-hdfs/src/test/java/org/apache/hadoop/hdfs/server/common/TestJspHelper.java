@@ -466,9 +466,9 @@ public class TestJspHelper {
   @Test
   public void testSortNodeByFields() throws Exception {
     DatanodeID dnId1 = new DatanodeID("127.0.0.1", "localhost1", "datanode1",
-        1234, 2345, 3456);
+        1234, 2345, 3456, 4567);
     DatanodeID dnId2 = new DatanodeID("127.0.0.2", "localhost2", "datanode2",
-        1235, 2346, 3457);
+        1235, 2346, 3457, 4568);
     
     // Setup DatanodeDescriptors with one storage each.
     StorageMap storageMap = mock(StorageMap.class);
