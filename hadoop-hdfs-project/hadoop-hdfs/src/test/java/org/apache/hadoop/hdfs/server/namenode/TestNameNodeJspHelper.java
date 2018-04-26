@@ -105,6 +105,11 @@ public class TestNameNodeJspHelper {
     Assert.assertTrue(containsMatch(contents, SAFEMODE.getDescription()));
   }
 
+  @Test
+  public void testGetRollingUpgradeText() {
+    Assert.assertEquals("", NamenodeJspHelper.getRollingUpgradeText(null));
+  }
+  
   /**
    * Checks if the list contains any string that partially matches the regex.
    * 

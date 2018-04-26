@@ -705,6 +705,7 @@ public class DistributedFileSystem extends FileSystem {
   @Override
   protected RemoteIterator<LocatedFileStatus> listLocatedStatus(final Path p,
       final PathFilter filter) throws IOException {
+    final Path absF = fixRelativePart(p);
     return new RemoteIterator<LocatedFileStatus>() {
       private DirectoryListing thisListing;
       private int i;
@@ -712,7 +713,7 @@ public class DistributedFileSystem extends FileSystem {
       private LocatedFileStatus curStat = null;
 
       { // initializer
-        src = getPathName(p);
+        src = getPathName(absF);
         // fetch the first batch of entries in the directory
         thisListing = dfs.listPaths(src, HdfsFileStatus.EMPTY_NAME, true);
         statistics.incrementReadOps(1);
@@ -725,7 +726,7 @@ public class DistributedFileSystem extends FileSystem {
       public boolean hasNext() throws IOException {
         while (curStat == null && hasNextNoFilter()) {
           LocatedFileStatus next = makeQualifiedLocated(
-              (HdfsLocatedFileStatus) thisListing.getPartialListing()[i++], p);
+              (HdfsLocatedFileStatus) thisListing.getPartialListing()[i++], absF);
           if (filter.accept(next.getPath())) {
             curStat = next;
           }
