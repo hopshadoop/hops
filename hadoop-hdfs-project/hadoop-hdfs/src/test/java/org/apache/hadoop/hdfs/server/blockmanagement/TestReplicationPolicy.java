@@ -973,6 +973,19 @@ public class TestReplicationPolicy {
     // QUEUE_HIGHEST_PRIORITY, 1 block from QUEUE_VERY_UNDER_REPLICATED.
     chosenBlocks = underReplicatedBlocks.chooseUnderReplicatedBlocks(7);
     assertTheChosenBlocks(chosenBlocks, 6, 1, 0, 0, 0);
+
+    //choose all the remaining blocks except one to reach the end of the lists 
+    chosenBlocks = underReplicatedBlocks.chooseUnderReplicatedBlocks(18);
+    assertTheChosenBlocks(chosenBlocks, 0, 4, 5, 5, 4);
+    
+    //choose the last block in the lists, should set the system to restart picking the blocks
+    //from the start at next try
+    chosenBlocks = underReplicatedBlocks.chooseUnderReplicatedBlocks(1);
+    assertTheChosenBlocks(chosenBlocks, 0, 0, 0, 0, 1);
+    
+    //should start picking the blocks from start
+    chosenBlocks = underReplicatedBlocks.chooseUnderReplicatedBlocks(1);
+    assertTheChosenBlocks(chosenBlocks, 1, 0, 0, 0, 0);
   }
 
   /**
