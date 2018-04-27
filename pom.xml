@@ -618,6 +618,28 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
+      <id>os.linux</id>
+      <activation>
+        <os>
+          <family>!Mac</family>
+        </os>
+      </activation>
+      <properties>
+        <lib_ext>so</lib_ext>
+      </properties>
+    </profile>
+    <profile>
+      <id>os.mac</id>
+      <activation>
+        <os>
+          <family>Mac</family>
+        </os>
+      </activation>
+      <properties>
+        <lib_ext>dylib</lib_ext>
+      </properties>
+    </profile>
+    <profile>
       <id>ndb</id>
       <activation>
         <activeByDefault>false</activeByDefault>
@@ -645,14 +667,14 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <groupId>io.hops.gpu</groupId>
           <artifactId>libhopsnvml</artifactId>
           <version>${project.version}</version>
-          <type>so</type>
+          <type>${lib_ext}</type>
           <scope>test</scope>
         </dependency>
         <dependency>
           <groupId>io.hops.streaming</groupId>
           <artifactId>libhopsyarn</artifactId>
           <version>${project.version}</version>
-          <type>so</type>
+          <type>${lib_ext}</type>
           <scope>test</scope>
         </dependency>
       </dependencies>
@@ -691,7 +713,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <groupId>io.hops.streaming</groupId>
                       <artifactId>libhopsyarn</artifactId>
                       <version>${project.version}</version>
-                      <type>so</type>
+                      <type>${lib_ext}</type>
                       <overWrite>true</overWrite>
                       <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
                     </artifactItem>
@@ -699,7 +721,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <groupId>io.hops.gpu</groupId>
                       <artifactId>libhopsnvml</artifactId>
                       <version>${project.version}</version>
-                      <type>so</type>
+                      <type>${lib_ext}</type>
                       <overWrite>true</overWrite>
                       <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
                     </artifactItem>
