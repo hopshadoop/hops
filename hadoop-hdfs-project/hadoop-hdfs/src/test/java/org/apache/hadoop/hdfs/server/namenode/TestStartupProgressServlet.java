@@ -73,6 +73,7 @@ public class TestStartupProgressServlet {
       .put("phases", Arrays.<Object>asList(
         ImmutableMap.<String, Object>builder()
           .put("name", "SafeMode")
+          .put("desc", "Safe mode")
           .put("status", "PENDING")
           .put("percentComplete", 0.0f)
           .put("steps", Collections.emptyList())
@@ -94,11 +95,13 @@ public class TestStartupProgressServlet {
       .put("phases", Arrays.<Object>asList(
         ImmutableMap.<String, Object>builder()
           .put("name", "SafeMode")
+          .put("desc", "Safe mode")
           .put("status", "COMPLETE")
           .put("percentComplete", 1.0f)
           .put("steps", Collections.<Object>singletonList(
             ImmutableMap.<String, Object>builder()
               .put("name", "AwaitingReportedBlocks")
+              .put("desc", "awaiting reported blocks")
               .put("count", 400L)
               .put("total", 400L)
               .put("percentComplete", 1.0f)
