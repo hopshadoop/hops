@@ -90,6 +90,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.fs.CanSetDropBehind;
 
 import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.SUCCESS;
@@ -145,7 +146,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   private long bytesCurBlock = 0; // bytes writen in current block
   private int packetSize = 0; // write packet size, not including the header.
   private int chunksPerPacket = 0;
-  private volatile IOException lastException = null;
+  private final AtomicReference<IOException> lastException = new AtomicReference<IOException>();
   private long artificialSlowdown = 0;
   private long lastFlushOffset = 0; // offset when flush was invoked
   //persist blocks on namenode
@@ -894,8 +895,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
         if (++pipelineRecoveryCount > 5) {
           DFSClient.LOG.warn("Error recovering pipeline for writing " +
               block + ". Already retried 5 times for the same packet.");
-          lastException = new IOException("Failing write. Tried pipeline " +
-              "recovery 5 times without success.");
+          lastException.set(new IOException("Failing write. Tried pipeline " +
+              "recovery 5 times without success."));
           streamerClosed = true;
           return false;
         }
@@ -1090,8 +1091,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
             }
           }
           if (nodes.length <= 1) {
-            lastException = new IOException(
-                    "All datanodes " + pipelineMsg + " are bad. Aborting...");
+            lastException.set(new IOException(
+                    "All datanodes " + pipelineMsg + " are bad. Aborting..."));
             streamerClosed = true;
             return false;
           }
@@ -1112,7 +1113,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           setPipeline(newnodes, newStorageTypes, newStorageIDs);
 
           hasError = false;
-          lastException = null;
+          lastException.set(null);
           errorIndex = -1;
         }
 
@@ -1152,7 +1153,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       boolean success;
       do {
         hasError = false;
-        lastException = null;
+        lastException.set(null);
         errorIndex = -1;
 
         block = lb.getBlock();
@@ -1192,7 +1193,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       ExtendedBlock oldBlock = block;
       do {
         hasError = false;
-        lastException = null;
+        lastException.set(null);
         errorIndex = -1;
         success = false;
 
@@ -1477,9 +1478,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     }
 
     private void setLastException(IOException e) {
-      if (lastException == null) {
-        lastException = e;
-      }
+      lastException.compareAndSet(null, e);
     }
   }
 
@@ -1810,24 +1809,27 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
   private void waitAndQueueCurrentPacket() throws IOException {
     synchronized (dataQueue) {
-      // If queue is full, then wait till we have enough space
-      while (!closed && dataQueue.size() + ackQueue.size() > MAX_PACKETS) {
-        try {
-          dataQueue.wait();
-        } catch (InterruptedException e) {
-          // If we get interrupted while waiting to queue data, we still need to get rid
-          // of the current packet. This is because we have an invariant that if
-          // currentPacket gets full, it will get queued before the next writeChunk.
-          //
-          // Rather than wait around for space in the queue, we should instead try to
-          // return to the caller as soon as possible, even though we slightly overrun
-          // the MAX_PACKETS iength.
-          Thread.currentThread().interrupt();
-          break;
+      try {
+        // If queue is full, then wait till we have enough space
+        while (!closed && dataQueue.size() + ackQueue.size() > MAX_PACKETS) {
+          try {
+            dataQueue.wait();
+          } catch (InterruptedException e) {
+            // If we get interrupted while waiting to queue data, we still need to get rid
+            // of the current packet. This is because we have an invariant that if
+            // currentPacket gets full, it will get queued before the next writeChunk.
+            //
+            // Rather than wait around for space in the queue, we should instead try to
+            // return to the caller as soon as possible, even though we slightly overrun
+            // the MAX_PACKETS iength.
+            Thread.currentThread().interrupt();
+            break;
+          }
         }
+        checkClosed();
+        queueCurrentPacket();
+      } catch (ClosedChannelException e) {
       }
-      checkClosed();
-      queueCurrentPacket();
     }
   }
 
@@ -2079,7 +2081,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       DFSClient.LOG.warn("Error while syncing", e);
       synchronized (this) {
         if (!closed) {
-          lastException = new IOException("IOException flush:" + e);
+          lastException.set(new IOException("IOException flush:" + e));
           closeThreads(true);
         }
       }
@@ -2140,22 +2142,25 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       if (DFSClient.LOG.isDebugEnabled()) {
         DFSClient.LOG.debug("Waiting for ack for: " + seqno);
       }
-      synchronized (dataQueue) {
-        while (!closed) {
-          checkClosed();
-          if (lastAckedSeqno >= seqno) {
-            break;
-          }
-          try {
-            dataQueue
-                    .wait(1000); // when we receive an ack, we notify on dataQueue
-          } catch (InterruptedException ie) {
-            throw new InterruptedIOException(
-                    "Interrupted while waiting for data to be acknowledged by pipeline");
+      try {
+        synchronized (dataQueue) {
+          while (!closed) {
+            checkClosed();
+            if (lastAckedSeqno >= seqno) {
+              break;
+            }
+            try {
+              dataQueue.wait(1000); // when we receive an ack, we notify on
+              // dataQueue
+            } catch (InterruptedException ie) {
+              throw new InterruptedIOException(
+                  "Interrupted while waiting for data to be acknowledged by pipeline");
+            }
           }
         }
+        checkClosed();
+      } catch (ClosedChannelException e) {
       }
-      checkClosed();
     }
   }
 
@@ -2201,7 +2206,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   @Override
   public synchronized void close() throws IOException {
     if (closed) {
-      IOException e = lastException;
+      IOException e = lastException.getAndSet(null);
       if (e == null) {
         return;
       } else {
@@ -2212,6 +2217,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     try {
       closeInternal();
       // get last block before destroying the streamer
+    } catch (ClosedChannelException e) {
     } catch (RemoteException e ) {
       IOException outOfDBExtents =
               e.unwrapRemoteException(OutOfDBExtentsException.class);
@@ -2401,7 +2407,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   @Override
   protected void checkClosed() throws IOException {
     if (closed) {
-      IOException e = lastException;
+      IOException e = lastException.get();
       throw e != null ? e : new ClosedChannelException();
     }
   }
