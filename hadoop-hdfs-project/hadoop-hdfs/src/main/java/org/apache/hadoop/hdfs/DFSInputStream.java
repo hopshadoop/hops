@@ -414,7 +414,7 @@ public class DFSInputStream extends FSInputStream
     //check offset
     if (offset < 0 || offset >= getFileLength()) {
       throw new IOException(
-          "offset < 0 || offset > getFileLength(), offset=" + offset +
+          "offset < 0 || offset >= getFileLength(), offset=" + offset +
               ", updatePosition=" + updatePosition + ", locatedBlocks=" +
               locatedBlocks);
     } else if (offset >= locatedBlocks.getFileLength()) {
