@@ -5340,7 +5340,8 @@ public class FSNamesystem
   /**
    * Get the total number of objects in the system.
    */
-  long getMaxObjects() {
+  @Override // FSNamesystemMBean
+  public long getMaxObjects() {
     return maxFsObjects;
   }
 
@@ -5463,12 +5464,18 @@ public class FSNamesystem
   @Override // FSNamesystemMBean
   public int getNumDecomDeadDataNodes() {
     final List<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
-    getBlockManager().getDatanodeManager().fetchDatanodes(dead, null, true);
+    getBlockManager().getDatanodeManager().fetchDatanodes(null, dead, true);
     int deadDecommissioned = 0;
     for (DatanodeDescriptor node : dead) {
       deadDecommissioned += node.isDecommissioned() ? 1 : 0;
     }
     return deadDecommissioned;
+  }
+
+  @Override // FSNamesystemMBean
+  public int getNumDecommissioningDataNodes() {
+    return getBlockManager().getDatanodeManager().getDecommissioningNodes()
+        .size();
   }
 
   @Override // FSNamesystemMBean
@@ -6154,6 +6161,7 @@ public class FSNamesystem
     for (DatanodeDescriptor node : live) {
       Map<String, Object> innerInfo = ImmutableMap.<String, Object>builder()
           .put("infoAddr", node.getInfoAddr())
+          .put("infoSecureAddr", node.getInfoSecureAddr())
           .put("xferaddr", node.getXferAddr())
           .put("lastContact", getLastContact(node))
           .put("usedSpace", getDfsUsed(node))
@@ -6186,9 +6194,11 @@ public class FSNamesystem
     final List<DatanodeDescriptor> dead = new ArrayList<>();
     blockManager.getDatanodeManager().fetchDatanodes(null, dead, true);
     for (DatanodeDescriptor node : dead) {
-      final Map<String, Object> innerInfo = new HashMap<>();
-      innerInfo.put("lastContact", getLastContact(node));
-      innerInfo.put("decommissioned", node.isDecommissioned());
+      Map<String, Object> innerInfo = ImmutableMap.<String, Object>builder()
+          .put("lastContact", getLastContact(node))
+          .put("decommissioned", node.isDecommissioned())
+          .put("xferaddr", node.getXferAddr())
+          .build();
       info.put(node.getHostName(), innerInfo);
     }
     return JSON.toString(info);
@@ -6205,13 +6215,16 @@ public class FSNamesystem
     final List<DatanodeDescriptor> decomNodeList =
         blockManager.getDatanodeManager().getDecommissioningNodes();
     for (DatanodeDescriptor node : decomNodeList) {
-      final Map<String, Object> innerInfo = new HashMap<>();
-      innerInfo.put("underReplicatedBlocks",
-          node.decommissioningStatus.getUnderReplicatedBlocks());
-      innerInfo.put("decommissionOnlyReplicas",
-          node.decommissioningStatus.getDecommissionOnlyReplicas());
-      innerInfo.put("underReplicateInOpenFiles",
-          node.decommissioningStatus.getUnderReplicatedInOpenFiles());
+      Map<String, Object> innerInfo = ImmutableMap
+          .<String, Object> builder()
+          .put("xferaddr", node.getXferAddr())
+          .put("underReplicatedBlocks",
+              node.decommissioningStatus.getUnderReplicatedBlocks())
+          .put("decommissionOnlyReplicas",
+              node.decommissioningStatus.getDecommissionOnlyReplicas())
+          .put("underReplicateInOpenFiles",
+              node.decommissioningStatus.getUnderReplicatedInOpenFiles())
+          .build();
       info.put(node.getHostName(), innerInfo);
     }
     return JSON.toString(info);
