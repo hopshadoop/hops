@@ -451,6 +451,11 @@ public class FSNamesystem
   private static int DB_ON_DISK_LARGE_FILE_MAX_SIZE;
   private static int DB_IN_MEMORY_FILE_MAX_SIZE;
   private final long BIGGEST_DELETABLE_DIR;
+  
+  /**
+   * Whether the namenode is in the middle of starting the active service
+   */
+  private volatile boolean startingActiveService = false;
 
   private final AclConfigFlag aclConfigFlag;
 
@@ -799,32 +804,43 @@ public class FSNamesystem
    * @throws IOException
    */
   void startActiveServices() throws IOException {
+    startingActiveService = true;
     LOG.info("Starting services required for active state");
-    LOG.info("Catching up to latest edits from old active before " +
-        "taking over writer role in edits logs");
-    blockManager.getDatanodeManager().markAllDatanodesStale();
+    LOG.info("Catching up to latest edits from old active before " + "taking over writer role in edits logs");
+    try {
+      blockManager.getDatanodeManager().markAllDatanodesStale();
 
-    if (isClusterInSafeMode()) {
-      if (!isInSafeMode() ||
-          (isInSafeMode() && safeMode.isPopulatingReplicationQueues())) {
-        LOG.info("Reprocessing replication and invalidation queues");
-        blockManager.processMisReplicatedBlocks();
+      if (isClusterInSafeMode()) {
+        if (!isInSafeMode() || (isInSafeMode() && safeMode.isPopulatingReplicationQueues())) {
+          LOG.info("Reprocessing replication and invalidation queues");
+          blockManager.processMisReplicatedBlocks();
+        }
       }
+
+      leaseManager.startMonitor();
+      startSecretManagerIfNecessary();
+
+      //ResourceMonitor required only at ActiveNN. See HDFS-2914
+      this.nnrmthread = new Daemon(new NameNodeResourceMonitor());
+      nnrmthread.start();
+
+      this.retryCacheCleanerThread = new Daemon(new RetryCacheCleaner());
+      retryCacheCleanerThread.start();
+
+      if (erasureCodingEnabled) {
+        erasureCodingManager.activate();
+      }
+    } finally {
+      startingActiveService = false;
     }
-
-    leaseManager.startMonitor();
-    startSecretManagerIfNecessary();
-
-    //ResourceMonitor required only at ActiveNN. See HDFS-2914
-    this.nnrmthread = new Daemon(new NameNodeResourceMonitor());
-    nnrmthread.start();
-
-    this.retryCacheCleanerThread = new Daemon(new RetryCacheCleaner());
-    retryCacheCleanerThread.start();
-    
-    if (erasureCodingEnabled) {
-      erasureCodingManager.activate();
-    }
+  }
+  
+  /**
+   * @return Whether the namenode is transitioning to active state and is in the
+   *         middle of the {@link #startActiveServices()}
+   */
+  public boolean inTransitionToActive() {
+    return startingActiveService;
   }
 
   private boolean shouldUseDelegationTokens() {
@@ -6317,11 +6333,17 @@ public class FSNamesystem
    *     Token identifier.
    * @param password
    *     Password in the token.
-   * @throws InvalidToken
    */
   public synchronized void verifyToken(DelegationTokenIdentifier identifier,
-      byte[] password) throws InvalidToken {
-    getDelegationTokenSecretManager().verifyToken(identifier, password);
+      byte[] password) throws InvalidToken, RetriableException {
+    try {
+      getDelegationTokenSecretManager().verifyToken(identifier, password);
+    } catch (InvalidToken it) {
+      if (inTransitionToActive()) {
+        throw new RetriableException(it);
+      }
+      throw it;
+    }
   }
 
   @Override

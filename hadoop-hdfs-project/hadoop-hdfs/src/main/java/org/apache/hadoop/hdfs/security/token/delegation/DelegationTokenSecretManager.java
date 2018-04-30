@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.InetSocketAddress;
 import java.util.Iterator;
+import org.apache.hadoop.ipc.RetriableException;
 
 //FIXME: needs to be presisted
 
@@ -92,6 +93,23 @@ public class DelegationTokenSecretManager
   @Override //SecretManager
   public DelegationTokenIdentifier createIdentifier() {
     return new DelegationTokenIdentifier();
+  }
+
+  @Override
+  public byte[] retriableRetrievePassword(DelegationTokenIdentifier identifier)
+      throws InvalidToken, StandbyException, RetriableException, IOException {
+    try {
+      return super.retrievePassword(identifier);
+    } catch (InvalidToken it) {
+      if (namesystem.inTransitionToActive()) {
+        // if the namesystem is currently in the middle of transition to 
+        // active state, let client retry since the corresponding editlog may 
+        // have not been applied yet
+        throw new RetriableException(it);
+      } else {
+        throw it;
+      }
+    }
   }
 
   /**
