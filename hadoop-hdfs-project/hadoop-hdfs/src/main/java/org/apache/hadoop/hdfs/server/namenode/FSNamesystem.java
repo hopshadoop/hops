@@ -4654,7 +4654,7 @@ public class FSNamesystem
         return false;
       }
       return (threshold != 0 && blockSafe() < blockThreshold) ||
-          (getNumLiveDataNodes() < datanodeThreshold) ||
+          (datanodeThreshold != 0 && getNumLiveDataNodes() < datanodeThreshold) ||
           (!nameNodeHasResourcesAvailable());
     }
 
