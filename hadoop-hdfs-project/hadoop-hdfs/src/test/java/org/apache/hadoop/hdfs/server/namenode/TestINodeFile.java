@@ -44,6 +44,7 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.DirectoryListingStartAfterNotFoundException;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -61,6 +62,7 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
@@ -1054,7 +1056,9 @@ public class TestINodeFile {
       dirNodeFromNode = fsdir.getInode(dirNode.getId());
       assertEquals(dirNode, dirNodeFromNode);
     } finally {
-      cluster.shutdown();
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
   
@@ -1084,9 +1088,57 @@ public class TestINodeFile {
       assertTrue(parentId == status.getFileId());
       
     } finally {
-      cluster.shutdown();
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
+  
+  @Test
+  public void testFilesInGetListingOps() throws Exception {
+    final Configuration conf = new Configuration();
+    MiniDFSCluster cluster = null;
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      final DistributedFileSystem hdfs = cluster.getFileSystem();
+      final FSDirectory fsdir = cluster.getNamesystem().getFSDirectory();
+
+      hdfs.mkdirs(new Path("/tmp"));
+      DFSTestUtil.createFile(hdfs, new Path("/tmp/f1"), 0, (short) 1, 0);
+      DFSTestUtil.createFile(hdfs, new Path("/tmp/f2"), 0, (short) 1, 0);
+      DFSTestUtil.createFile(hdfs, new Path("/tmp/f3"), 0, (short) 1, 0);
+
+      DirectoryListing dl = cluster.getNameNodeRpc().getListing("/tmp",
+          HdfsFileStatus.EMPTY_NAME, false);
+      assertTrue(dl.getPartialListing().length == 3);
+
+      String f2 = new String("f2");
+      dl = cluster.getNameNodeRpc().getListing("/tmp", f2.getBytes(), false);
+      assertTrue(dl.getPartialListing().length == 1);
+
+      INode f2INode = getINode("/tmp/f2", fsdir, cluster);
+      String f2InodePath = "/.reserved/.inodes/" + f2INode.getId();
+      dl = cluster.getNameNodeRpc().getListing("/tmp", f2InodePath.getBytes(),
+          false);
+      assertTrue(dl.getPartialListing().length == 1);
+
+      // Test the deleted startAfter file
+      hdfs.delete(new Path("/tmp/f2"), false);
+      try {
+        dl = cluster.getNameNodeRpc().getListing("/tmp",
+            f2InodePath.getBytes(), false);
+        fail("Didn't get exception for the deleted startAfter token.");
+      } catch (IOException e) {
+        assertTrue(e instanceof DirectoryListingStartAfterNotFoundException);
+      }
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+}
   
   public INode getINode(final String src, final FSDirectory fsdir, final MiniDFSCluster cluster) throws IOException {
     HopsTransactionalRequestHandler getInodeHandler = new HopsTransactionalRequestHandler(

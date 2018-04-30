@@ -189,6 +189,7 @@ import java.util.concurrent.TimeUnit;
 import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
+import org.apache.hadoop.fs.DirectoryListingStartAfterNotFoundException;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
@@ -4042,11 +4043,30 @@ public class FSNamesystem
    * @throws IOException
    *     if other I/O error occurred
    */
-  DirectoryListing getListing(final String src1, final byte[] startAfter,
+  DirectoryListing getListing(final String src1, byte[] startAfter1,
       final boolean needLocation)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    String startAfterString = new String(startAfter1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    
+    // Get file name when startAfter is an INodePath
+    if (FSDirectory.isReservedName(startAfterString)) {
+      byte[][] startAfterComponents = FSDirectory
+          .getPathComponentsForReservedPath(startAfterString);
+      try {
+        String tmp = FSDirectory.resolvePath(src, startAfterComponents, dir);
+        byte[][] regularPath = INode.getPathComponents(tmp);
+        startAfter1 = regularPath[regularPath.length - 1];
+      } catch (IOException e) {
+        // Possibly the inode is deleted
+        throw new DirectoryListingStartAfterNotFoundException(
+            "Can't find startAfter " + startAfterString);
+      }
+    }
+
+    final byte[] startAfter = startAfter1;
+
     HopsTransactionalRequestHandler getListingHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.GET_LISTING,
             src) {
