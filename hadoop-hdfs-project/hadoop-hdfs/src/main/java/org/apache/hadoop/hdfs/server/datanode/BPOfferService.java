@@ -728,7 +728,11 @@ class BPOfferService implements Runnable {
     if(futur == null || futur.isDone()){
       if(futur!=null){
         //check that previous run did not end with an exception
-        futur.get();
+	try{
+	  futur.get();
+	}finally{
+	    futur=null;
+	}
       }
       futur = brDispatcher.submit(brTask);
     }
