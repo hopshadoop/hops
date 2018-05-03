@@ -705,21 +705,25 @@ class BPOfferService implements Runnable {
       }
     } // while (shouldRun())
   } // offerService
-  
-  private final Object BRLock = new Object();
-  private boolean brIsRunning = false;
+
   private BRTask brTask = new BRTask();
-  private void startBRThread(){
-    synchronized (BRLock) {
-      if (!brIsRunning) {
-        brIsRunning = true;
-        brDispatcher.submit(brTask);
+  private Future futur = null;
+  private void startBRThread() throws InterruptedException, ExecutionException{
+    if(futur == null || futur.isDone()){
+      if(futur!=null){
+        //check that previous run did not end with an exception
+	try{
+	  futur.get();
+	}finally{
+	    futur=null;
+	}
       }
+      futur = brDispatcher.submit(brTask);
     }
   }
 
   private class BRTask implements Callable{
-    /**
+  /**
      * Computes a result, or throws an exception if unable to do so.
      *
      * @return computed result
@@ -727,7 +731,7 @@ class BPOfferService implements Runnable {
      */
     @Override
     public Object call() throws Exception {
-      DatanodeCommand cmd = blockReport();
+      DatanodeCommand cmd = blockReport();      
       if (cmd != null) {
         blkReportHander.processCommand(new DatanodeCommand[]{cmd});
       }
@@ -735,9 +739,6 @@ class BPOfferService implements Runnable {
       // If it has already been started, this is a no-op.
       if (dn.blockScanner != null) {
         dn.blockScanner.addBlockPool(getBlockPoolId());
-      }
-      synchronized (BRLock) {
-        brIsRunning = false;
       }
       return null;
     }
