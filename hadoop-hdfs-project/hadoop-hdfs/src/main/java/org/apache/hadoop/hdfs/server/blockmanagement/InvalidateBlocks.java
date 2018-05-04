@@ -25,6 +25,7 @@ import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.util.Slicer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -165,7 +166,7 @@ class InvalidateBlocks {
   /**
    * Invalidate work for the datanode.
    */
-  List<Block> invalidateWork(DatanodeDescriptor dn) throws IOException {
+  List<Block> invalidateWork(final DatanodeDescriptor dn) throws IOException {
     final List<InvalidatedBlock> invBlocks = new ArrayList<InvalidatedBlock>();
 
     for(DatanodeStorageInfo storage : dn.getStorageInfos()) {
@@ -185,8 +186,20 @@ class InvalidateBlocks {
       toInvalidate.add(new Block(invBlock.getBlockId(), invBlock.getNumBytes(), invBlock.getGenerationStamp()));
       toInvblks.add(invBlock);
     }
-    removeInvBlocks(toInvblks);
-    dn.addBlocksToBeInvalidated(toInvalidate);
+
+    int batchSize = 10000;
+    try {
+      Slicer.slice(invBlocks.size(), batchSize, new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex) throws Exception {
+          removeInvBlocks(toInvblks.subList(startIndex, endIndex));
+          dn.addBlocksToBeInvalidated(toInvalidate.subList(startIndex, endIndex));
+        }
+      });
+    } catch (Exception e) {
+      LOG.warn("Failed to remove batch of " + batchSize + " blocks from BlocksToInvalidate.", e);
+    }
+
     return toInvalidate;
   }
   
