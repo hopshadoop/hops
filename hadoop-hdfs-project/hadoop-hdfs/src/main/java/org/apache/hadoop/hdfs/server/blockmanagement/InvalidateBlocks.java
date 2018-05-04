@@ -150,8 +150,10 @@ class InvalidateBlocks {
     HashSet<String> storageIds = new HashSet<>();
     if (invBlocks != null) {
       for (InvalidatedBlock ib : invBlocks) {
-        storageIds
-            .add(datanodeManager.getDatanode(ib.getStorageId()).getStorageID());
+        DatanodeDescriptor dataNode = datanodeManager.getDatanode(ib.getStorageId());
+        if (dataNode != null) {
+          storageIds.add(dataNode.getStorageID());
+        }
       }
     }
     return new ArrayList<>(storageIds);
