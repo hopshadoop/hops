@@ -6105,7 +6105,7 @@ public class FSNamesystem
     return "Safe mode is ON. " + this.getSafeModeTip();
   }
 
-  @Override // NameNodeMXBean
+//  @Override // NameNodeMXBean
   public boolean isUpgradeFinalized() {
     throw new UnsupportedOperationException("HOP: Upgrade is not supported");
   }
@@ -6262,7 +6262,7 @@ public class FSNamesystem
     return blockPoolId;
   }
 
-  @Override  // NameNodeMXBean
+//  @Override  // NameNodeMXBean
   public String getNameDirStatuses() {
     throw new UnsupportedOperationException(
         "HOP: there are no name dirs any more");

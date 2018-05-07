@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.hadoop.util.ExitUtil;
 
 /**
  * tool to get data from NameNode or DataNode using MBeans currently the
@@ -295,7 +296,7 @@ public class JMXGet {
       // invalid arguments
       err("Invalid args");
       printUsage(opts);
-      System.exit(-1);
+      ExitUtil.terminate(-1);
     }
 
     JMXGet jm = new JMXGet();
@@ -317,7 +318,7 @@ public class JMXGet {
 
     if (commandLine.hasOption("help")) {
       printUsage(opts);
-      System.exit(0);
+      ExitUtil.terminate(0);
     }
 
     // rest of args
@@ -343,6 +344,6 @@ public class JMXGet {
       res = -1;
     }
 
-    System.exit(res);
+    ExitUtil.terminate(res);
   }
 }

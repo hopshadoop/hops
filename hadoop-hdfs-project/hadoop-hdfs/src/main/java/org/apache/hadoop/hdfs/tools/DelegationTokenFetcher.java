@@ -55,6 +55,7 @@ import java.net.URLConnection;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
 import java.util.Date;
+import org.apache.hadoop.util.ExitUtil;
 
 /**
  * Fetch a DelegationToken from the current Namenode and store it in the
@@ -86,7 +87,7 @@ public class DelegationTokenFetcher {
     err.println("  --print             Print the delegation token");
     err.println();
     GenericOptionsParser.printGenericCommandUsage(err);
-    System.exit(1);
+    ExitUtil.terminate(1);
   }
 
   private static Collection<Token<?>> readTokens(Path file, Configuration conf)

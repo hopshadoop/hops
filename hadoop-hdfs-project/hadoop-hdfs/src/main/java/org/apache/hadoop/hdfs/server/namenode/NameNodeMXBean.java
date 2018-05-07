@@ -77,7 +77,7 @@ public interface NameNodeMXBean {
    *
    * @return true, if upgrade is finalized
    */
-  public boolean isUpgradeFinalized();
+//  public boolean isUpgradeFinalized();
   
   /**
    * Gets total used space by data nodes for non DFS purposes such as storing
@@ -181,7 +181,7 @@ public interface NameNodeMXBean {
    *
    * @return the name dir status information, as a JSON string.
    */
-  public String getNameDirStatuses();
+//  public String getNameDirStatuses();
   
   /**
    * Get Max, Median, Min and Standard Deviation of DataNodes usage.
