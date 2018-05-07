@@ -76,15 +76,44 @@ public class TestSubtreeLockACL extends TestCase{
   public void teardown(){
     cluster.shutdown();
   }
-  
+
+
+
+  //This test automatically tests destination ancestor since the implementation treats an existing parent as ancestor.
   @Test
-  public void testSubtreeMoveBlockedByAccessAcl() throws IOException, InterruptedException {
+  public void testRenameBlockedByDestinationParentAccessAcl() throws IOException, InterruptedException {
+    try {
+      setup();
+
+      setReadOnlyUserAccessAcl(user2.getShortUserName(), subtree2);
+
+      FileSystem user2fs = user2.doAs(new PrivilegedExceptionAction<FileSystem>() {
+        @Override
+        public FileSystem run() throws Exception {
+          return FileSystem.get(conf);
+        }
+      });
+
+      try {
+        user2fs.rename(level1folder1, new Path(subtree2, "newname"));
+        fail("Owner permission should block rename");
+      } catch (AccessControlException expected) {
+        assertTrue("Wrong inode triggered access control exception.", expected.getMessage().contains("inode=\"/subtrees/subtree2\""));
+        //Operation should fail.
+      }
+    } finally {
+      teardown();
+    }
+  }
+
+  @Test
+  public void testSubtreeMoveBlockedSourceParentAccessAcl() throws IOException, InterruptedException {
    
     try {
       setup();
       
-      //Deny access via access acl to subtree1
-      setDenyUserAccessAcl(user2.getShortUserName(), subtree1);
+      //Make src readonly via access acl
+      setReadOnlyUserAccessAcl(user2.getShortUserName(), subtree1);
      
       //Try to move subtree1 under subtree2. Should fail because of access acl.
       FileSystem user2fs = user2.doAs(new PrivilegedExceptionAction<FileSystem>() {
@@ -95,7 +124,7 @@ public class TestSubtreeLockACL extends TestCase{
       });
   
       try {
-        user2fs.rename(subtree1, new Path(subtree2, "newname"));
+        user2fs.rename(level1folder1, new Path(subtree2, "newname"));
         fail("Acl should block move");
       } catch (AccessControlException expected){
         assertTrue("Wrong inode triggered access control exception.", expected.getMessage().contains("inode=\"/subtrees/subtree1\""));
@@ -113,9 +142,8 @@ public class TestSubtreeLockACL extends TestCase{
       setup();
       
       //Deny access via default acl down subtree1
-      setDenyUserDefaultAcl(user2.getShortUserName(), subtree1);
+      setReadOnlyUserDefaultAcl(user2.getShortUserName(), subtree1);
       
-      //Try to move subtree1 under subtree2. Should fail because of access acl.
       FileSystem user2fs = user2.doAs(new PrivilegedExceptionAction<FileSystem>() {
         @Override
         public FileSystem run() throws Exception {
@@ -124,7 +152,8 @@ public class TestSubtreeLockACL extends TestCase{
       });
   
       try {
-        user2fs.rename(level1folder1, new Path(subtree2, "newname"));
+        //Try to move level2folder1 under subtree2. Should fail because of inherited acl in level1folder1.
+        user2fs.rename(level2folder1, new Path(subtree2, "newname"));
         fail("Acl should block move");
       } catch (AccessControlException expected){
         assertTrue("Wrong inode triggered access control exception.", expected.getMessage().contains("inode=\"/subtrees/subtree1/level1folder1\""));
@@ -285,17 +314,61 @@ public class TestSubtreeLockACL extends TestCase{
     superFs.setPermission(subtree2, defaultPerm);
     superFs.setOwner(subtree2, user1.getShortUserName(), sharedGroup);
   }
-  
+
+  private List<AclEntry> createUserEntry(String username, boolean isDefaultScope, FsAction permission) {
+    ArrayList<AclEntry> newEntry = new ArrayList<>();
+    newEntry.add(new AclEntry.Builder()
+            .setScope(isDefaultScope? AclEntryScope.DEFAULT : AclEntryScope.ACCESS)
+            .setType(AclEntryType.USER)
+            .setName(username)
+            .setPermission(permission).build());
+    return newEntry;
+  }
+
+  private void setReadOnlyUserAccessAcl(String username, Path path) throws IOException {
+    FileSystem fileSystem = cluster.getFileSystem();
+
+    List<AclEntry> readOnlyUserAcl = createUserEntry(username, false, FsAction.READ_EXECUTE);
+
+    fileSystem.modifyAclEntries(path, readOnlyUserAcl);
+
+    AclStatus aclStatus = fileSystem.getAclStatus(path);
+    boolean found = false;
+    for (AclEntry aclEntry : aclStatus.getEntries()) {
+      if (aclEntry.getScope().equals(AclEntryScope.ACCESS) && aclEntry.getType().equals(AclEntryType.USER) &&
+              aclEntry.getName().equals(username) && aclEntry.getPermission().equals(FsAction.READ_EXECUTE)) {
+        found = true;
+        break;
+      }
+    }
+    assertTrue("Did not manage to update acl for path " + path.toString(), found);
+  }
+
+  private void setReadOnlyUserDefaultAcl(String username, Path path) throws IOException {
+    FileSystem fileSystem = cluster.getFileSystem();
+
+    List<AclEntry> userEntry = createUserEntry(username, true, FsAction.READ_EXECUTE);
+
+    fileSystem.modifyAclEntries(path, userEntry);
+
+    AclStatus aclStatus = fileSystem.getAclStatus(path);
+    boolean found = false;
+    for (AclEntry aclEntry : aclStatus.getEntries()) {
+      if (aclEntry.getScope().equals(AclEntryScope.DEFAULT) && aclEntry.getType().equals(AclEntryType.USER) &&
+              aclEntry.getName().equals(username) && aclEntry.getPermission().equals(FsAction.READ_EXECUTE)) {
+        found = true;
+        break;
+      }
+    }
+    assertTrue("Did not manage to update acl for path " + path.toString(), found);
+
+  }
+
   private void setDenyUserAccessAcl(String username, Path path) throws IOException {
     FileSystem fileSystem = cluster.getFileSystem();
     
-    List<AclEntry> denyUserAcl = new ArrayList<>();
-    denyUserAcl.add(new AclEntry.Builder()
-        .setScope(AclEntryScope.ACCESS)
-        .setType(AclEntryType.USER)
-        .setName(username)
-        .setPermission(FsAction.NONE).build());
-    
+    List<AclEntry> denyUserAcl = createUserEntry(username, false, FsAction.NONE);
+
     fileSystem.modifyAclEntries(path, denyUserAcl);
   
     AclStatus aclStatus = fileSystem.getAclStatus(path);
@@ -313,13 +386,8 @@ public class TestSubtreeLockACL extends TestCase{
   private void setDenyUserDefaultAcl(String username, Path path) throws IOException {
     FileSystem fileSystem = cluster.getFileSystem();
    
-    List<AclEntry> denyUserDefaultAcl = new ArrayList<>();
-    denyUserDefaultAcl.add(new AclEntry.Builder()
-        .setScope(AclEntryScope.DEFAULT)
-        .setType(AclEntryType.USER)
-        .setName(username)
-        .setPermission(FsAction.NONE).build());
-    
+    List<AclEntry> denyUserDefaultAcl = createUserEntry(username, true, FsAction.NONE);
+
     fileSystem.modifyAclEntries(path, denyUserDefaultAcl);
   
     AclStatus aclStatus = fileSystem.getAclStatus(path);

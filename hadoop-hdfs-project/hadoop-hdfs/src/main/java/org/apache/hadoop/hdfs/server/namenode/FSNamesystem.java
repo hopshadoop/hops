@@ -7085,6 +7085,7 @@ public class FSNamesystem
         if (erasureCodingEnabled) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, dst));
         }
+        locks.add(lf.getAcesLock());
       }
 
       @Override
@@ -7196,7 +7197,7 @@ public class FSNamesystem
 
 
     PathInformation srcInfo = getPathExistingINodesFromDB(src,
-        false, null, FsAction.WRITE, FsAction.WRITE, null);
+        false, null, FsAction.WRITE, null, null);
     INode[] srcInodes = srcInfo.getPathInodes();
     INode srcInode = srcInodes[srcInodes.length - 1];
     if(srcInode == null){
@@ -7207,7 +7208,7 @@ public class FSNamesystem
     }
 
     PathInformation dstInfo = getPathExistingINodesFromDB(dst,
-        false, null, FsAction.WRITE, null, null);
+        false, FsAction.WRITE, null, null, null);
     String actualDst = dst;
     if(dstInfo.isDir()){
       actualDst += Path.SEPARATOR + new Path(src).getName();
@@ -7650,7 +7651,6 @@ public class FSNamesystem
                 add(lf.getSubTreeOpsLock(LockType.READ_COMMITTED,
                 getSubTreeLockPathPrefix(path))); // it is
         locks.add(lf.getAcesLock());
-
       }
 
       @Override
