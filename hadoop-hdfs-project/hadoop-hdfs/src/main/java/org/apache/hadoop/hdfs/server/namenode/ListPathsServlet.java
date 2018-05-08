@@ -44,8 +44,7 @@ import java.util.regex.Pattern;
 
 /**
  * Obtain meta-information about a filesystem.
- *
- * @see HftpFileSystem
+ *  @see org.apache.hadoop.hdfs.web.HftpFileSystem
  */
 @InterfaceAudience.Private
 public class ListPathsServlet extends DfsServlet {
