@@ -383,6 +383,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.client.socketcache.expiryMsec";
   public static final long DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_DEFAULT =
       2 * 60 * 1000;
+  public static final String  DFS_CLIENT_WRITE_EXCLUDE_NODES_CACHE_EXPIRY_INTERVAL = "dfs.client.write.exclude.nodes.cache.expiry.interval.millis";
+  public static final long    DFS_CLIENT_WRITE_EXCLUDE_NODES_CACHE_EXPIRY_INTERVAL_DEFAULT = 10 * 60 * 1000; // 10 minutes, in ms
   public static final String DFS_DATANODE_BALANCE_BANDWIDTHPERSEC_KEY =
       "dfs.datanode.balance.bandwidthPerSec";
   public static final long DFS_DATANODE_BALANCE_BANDWIDTHPERSEC_DEFAULT =
