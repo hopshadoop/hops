@@ -264,12 +264,13 @@ class HeartbeatManager implements DatanodeStatistics {
     while (!allAlive) {
       // locate the first dead node.
       DatanodeID dead = null;
-      
+
       // locate the first failed storage that isn't on a dead node.
       DatanodeStorageInfo failedStorage = null;
 
       // check the number of stale nodes
       int numOfStaleNodes = 0;
+      int numOfStaleStorages = 0;
       synchronized (this) {
         for (DatanodeDescriptor d : datanodes) {
           if (dead == null && dm.isDatanodeDead(d)) {
@@ -279,10 +280,13 @@ class HeartbeatManager implements DatanodeStatistics {
           if (d.isStale(dm.getStaleInterval())) {
             numOfStaleNodes++;
           }
-          
-                    DatanodeStorageInfo[] storageInfos = d.getStorageInfos();
+
+          DatanodeStorageInfo[] storageInfos = d.getStorageInfos();
           for(DatanodeStorageInfo storageInfo : storageInfos) {
-            
+            if (storageInfo.areBlockContentsStale()){
+                numOfStaleStorages++;
+            }
+
             if (failedStorage == null &&
                 storageInfo.areBlocksOnFailedStorage() &&
                 d != dead) {
@@ -294,6 +298,7 @@ class HeartbeatManager implements DatanodeStatistics {
         
         // Set the number of stale nodes in the DatanodeManager
         dm.setNumStaleNodes(numOfStaleNodes);
+        dm.setNumStaleStorages(numOfStaleStorages);
       }
 
       allAlive = dead == null && failedStorage == null;;
