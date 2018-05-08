@@ -2654,8 +2654,8 @@ public class FSNamesystem
             final INodeFileUnderConstruction pendingFile =
                 (INodeFileUnderConstruction) inodes[inodes.length - 1];
 
-            if (onRetryBlock[0] != null) {
-              // This is a retry. Just return the last block.
+            if (onRetryBlock[0] != null && onRetryBlock[0].getLocations().length > 0) {
+              // This is a retry. Just return the last block if having locations.
               return onRetryBlock[0];
             }
 
@@ -2687,16 +2687,25 @@ public class FSNamesystem
             // Allocate a new block, add it to the INode and the BlocksMap.
             Block newBlock;
             long offset;
-            LocatedBlock[] onRetryBlock2 = new LocatedBlock[1];
+            onRetryBlock = new LocatedBlock[1];
             INodesInPath iNodesInPath2 =
-                analyzeFileState(src, fileId, clientName, previous, onRetryBlock2);
+                analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
             INode[] inodes2 = iNodesInPath2.getINodes();
             final INodeFileUnderConstruction pendingFile2 =
                 (INodeFileUnderConstruction) inodes2[inodes2.length - 1];
 
-            if (onRetryBlock2[0] != null) {
-              // This is a retry. Just return the last block.
-              return onRetryBlock2[0];
+            if (onRetryBlock[0] != null) {
+              if (onRetryBlock[0].getLocations().length > 0) {
+                // This is a retry. Just return the last block if having locations.
+                return onRetryBlock[0];
+              } else {
+                // add new chosen targets to already allocated block and return
+                BlockInfo lastBlockInFile = pendingFile.getLastBlock();
+                ((BlockInfoUnderConstruction) lastBlockInFile)
+                    .setExpectedLocations(targets);
+                offset = pendingFile.computeFileSize();
+                return makeLocatedBlock(lastBlockInFile, targets, offset);
+              }
             }
 
             // commit the last block and complete it if it has minimum replicas
