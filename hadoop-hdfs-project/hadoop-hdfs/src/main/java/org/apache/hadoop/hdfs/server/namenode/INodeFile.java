@@ -318,6 +318,11 @@ public class INodeFile extends INode implements BlockCollection {
   public final long computeFileSizeNotIncludingLastUcBlock() throws StorageException, TransactionContextException {
     return computeFileSize(false);
   }
+  
+  public long computeFileSize()
+      throws StorageException, TransactionContextException {
+    return computeFileSize(true, getBlocks());
+  }  
 
   /**
    * Compute file size.
