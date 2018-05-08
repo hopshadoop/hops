@@ -32,6 +32,7 @@ import org.junit.Test;
 import org.mortbay.util.ajax.JSON;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -113,5 +114,28 @@ public class TestJsonUtil {
     Assert.assertEquals(jsonString,
         JsonUtil.toJsonString(aclStatusBuilder.build()));
 
+  }
+  
+  @Test
+  public void testToDatanodeInfoWithoutSecurePort() {
+    Map<String, Object> response = new HashMap<String, Object>();
+    
+    response.put("ipAddr", "127.0.0.1");
+    response.put("hostName", "localhost");
+    response.put("storageID", "fake-id");
+    response.put("xferPort", 1337l);
+    response.put("infoPort", 1338l);
+    // deliberately don't include an entry for "infoSecurePort"
+    response.put("ipcPort", 1339l);
+    response.put("capacity", 1024l);
+    response.put("dfsUsed", 512l);
+    response.put("remaining", 512l);
+    response.put("blockPoolUsed", 512l);
+    response.put("lastUpdate", 0l);
+    response.put("xceiverCount", 4096l);
+    response.put("networkLocation", "foo.bar.baz");
+    response.put("adminState", "NORMAL");
+    
+    JsonUtil.toDatanodeInfo(response);
   }
 }
