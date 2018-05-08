@@ -379,7 +379,7 @@ public class FSNamesystem
 
   private static final Step STEP_AWAITING_REPORTED_BLOCKS =
     new Step(StepType.AWAITING_REPORTED_BLOCKS);
-  
+
   // Tracks whether the default audit logger is the only configured audit
   // logger; this allows isAuditEnabled() to return false in case the
   // underlying logger is disabled, and avoid some unnecessary work.
@@ -395,7 +395,7 @@ public class FSNamesystem
 
   // whether setStoragePolicy is allowed.
   private final boolean isStoragePolicyEnabled;
-  
+
   // Block pool ID used by this namenode
   //HOP made it final and now its value is read from the config file. all
   // namenodes should have same block pool id
@@ -409,7 +409,7 @@ public class FSNamesystem
   private Daemon nnrmthread = null; // NamenodeResourceMonitor thread
 
   private Daemon retryCacheCleanerThread = null;
-  
+
   private volatile boolean hasResourcesAvailable = true; //HOP. yes we have huge namespace
   private volatile boolean fsRunning = true;
 
@@ -433,7 +433,7 @@ public class FSNamesystem
 
   private final long minBlockSize;         // minimum block size
   private final long maxBlocksPerFile;     // maximum # of blocks per file
-  
+
   // precision of access times.
   private final long accessTimePrecision;
 
@@ -452,7 +452,7 @@ public class FSNamesystem
   private static int DB_ON_DISK_LARGE_FILE_MAX_SIZE;
   private static int DB_IN_MEMORY_FILE_MAX_SIZE;
   private final long BIGGEST_DELETABLE_DIR;
-  
+
   /**
    * Whether the namenode is in the middle of starting the active service
    */
@@ -566,7 +566,7 @@ public class FSNamesystem
       this.isStoragePolicyEnabled =
           conf.getBoolean(DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY,
                           DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_DEFAULT);
-      
+
       this.fsOwner = UserGroupInformation.getCurrentUser();
       this.fsOwnerShortUserName = fsOwner.getShortUserName();
       this.superGroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
@@ -658,7 +658,7 @@ public class FSNamesystem
   public RetryCacheDistributed getRetryCache() {
     return retryCache;
   }
-  
+
   /** Whether or not retry cache is enabled */
   boolean hasRetryCache() {
     return retryCache != null;
@@ -835,7 +835,7 @@ public class FSNamesystem
       startingActiveService = false;
     }
   }
-  
+
   /**
    * @return Whether the namenode is transitioning to active state and is in the
    *         middle of the {@link #startActiveServices()}
@@ -864,12 +864,12 @@ public class FSNamesystem
       ((NameNodeResourceMonitor) nnrmthread.getRunnable()).stopMonitor();
       nnrmthread.interrupt();
     }
-    
+
     if(retryCacheCleanerThread !=null){
       ((RetryCacheCleaner)retryCacheCleanerThread.getRunnable()).stopMonitor();
       retryCacheCleanerThread.interrupt();
     }
-    
+
     if (erasureCodingManager != null) {
       erasureCodingManager.close();
     }
@@ -889,7 +889,7 @@ public class FSNamesystem
       throw new RetriableException(se);
     }
   }
-  
+
   NamespaceInfo getNamespaceInfo() throws IOException {
     return unprotectedGetNamespaceInfo();
   }
@@ -1425,7 +1425,7 @@ public class FSNamesystem
    * @throws IOException
    */
   void concat(final String target, final String[] srcs) throws IOException {
-    
+
     final String[] paths = new String[srcs.length + 1];
     System.arraycopy(srcs, 0, paths, 0, srcs.length);
     paths[srcs.length] = target;
@@ -1923,7 +1923,7 @@ public class FSNamesystem
       throw new IOException("Failed to set storage policy since "
           + DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY + " is set to false.");
     }
-    
+
     final BlockStoragePolicy policy =  blockManager.getStoragePolicy(policyName);
     if (policy == null) {
       throw new HadoopIllegalArgumentException("Cannot find a block policy with the name " + policyName);
@@ -1938,7 +1938,7 @@ public class FSNamesystem
           }
 
           @Override
-          public Object performTask() throws IOException {           
+          public Object performTask() throws IOException {
             FSPermissionChecker pc = getPermissionChecker();
             checkNameNodeSafeMode("Cannot set metaEnabled for " + filename);
             if (isPermissionEnabled) {
@@ -1958,12 +1958,12 @@ public class FSNamesystem
   BlockStoragePolicy getDefaultStoragePolicy() throws IOException {
     return blockManager.getDefaultStoragePolicy();
   }
- 
-  
+
+
   BlockStoragePolicy getStoragePolicy(byte storagePolicyID) throws IOException {
     return blockManager.getStoragePolicy(storagePolicyID);
   }
-  
+
   /**
    * @return All the existing block storage policies
    */
@@ -2098,13 +2098,13 @@ public class FSNamesystem
     if (!DFSUtil.isValidName(src)) {
       throw new InvalidPathException(src);
     }
-    
+
     if (blockSize < minBlockSize) {
       throw new IOException("Specified block size is less than configured" + " minimum value ("
           + DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY
           + "): " + blockSize + " < " + minBlockSize);
     }
-    
+
     boolean create = flag.contains(CreateFlag.CREATE);
     boolean overwrite = flag.contains(CreateFlag.OVERWRITE);
 
@@ -2130,7 +2130,7 @@ public class FSNamesystem
       boolean create, boolean overwrite, boolean createParent, short replication,
       long blockSize) throws
       IOException {
-    
+
     // Verify that the destination does not exist as a directory already.
     boolean pathExists = dir.exists(src);
     if (pathExists && dir.isDir(src)) {
@@ -2229,7 +2229,7 @@ public class FSNamesystem
           + src + " on client " + clientMachine);
       }
       final INodeFile myFile = INodeFile.valueOf(inode, src);
-      
+
       final BlockInfo lastBlock = myFile.getLastBlock();
       // Check that the block has at least minimum replication.
       if (lastBlock != null && lastBlock.isComplete() && !getBlockManager().isSufficientlyReplicated(lastBlock)) {
@@ -2467,7 +2467,7 @@ public class FSNamesystem
 
   private Configuration copyConfiguration(Configuration conf){
     Configuration newConf = new HdfsConfiguration();
-  
+
     for (Map.Entry<String, String> entry : conf) {
       newConf.set(entry.getKey(), entry.getValue());
     }
@@ -2574,7 +2574,7 @@ public class FSNamesystem
   private LocatedBlock appendFileInt(String src, String holder,
       String clientMachine) throws
       IOException {
-    
+
     if (!supportAppends) {
       throw new UnsupportedOperationException(
           "Append is not enabled on this NameNode. Use the " +
@@ -2823,7 +2823,7 @@ public class FSNamesystem
 
     // Check if the penultimate block is minimally replicated
     if (!checkFileProgress(pendingFile, false)) {
-      throw new NotReplicatedYetException("Not replicated yet: " + src + 
+      throw new NotReplicatedYetException("Not replicated yet: " + src +
               " block " + pendingFile.getPenultimateBlock());
     }
     return inodesInPath;
@@ -2955,14 +2955,14 @@ public class FSNamesystem
       TransactionContextException, FileNotFoundException {
     return checkLease(src, INodeDirectory.ROOT_PARENT_ID, holder, true);
   }
-  
+
   private INodeFileUnderConstruction checkLease(String src, String holder,
       boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
       UnresolvedLinkException, StorageException,
       TransactionContextException, FileNotFoundException {
     return checkLease(src, INodeDirectory.ROOT_PARENT_ID, holder, updateLastTwoBlocksInFile);
   }
-  
+
   private INodeFileUnderConstruction checkLease(String src, int fileId, String holder,
       boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
       UnresolvedLinkException, StorageException,
@@ -3176,7 +3176,7 @@ public class FSNamesystem
   private Block createNewBlock(INodeFile pendingFile)
       throws IOException {
     Block b = new Block(nextBlockId()
-        , 0, 0); 
+        , 0, 0);
     // Increment the generation stamp for every new block.
     b.setGenerationStampNoPersistance(pendingFile.nextGenerationStamp());
     return b;
@@ -4049,7 +4049,7 @@ public class FSNamesystem
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     String startAfterString = new String(startAfter1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
-    
+
     // Get file name when startAfter is an INodePath
     if (FSDirectory.isReservedName(startAfterString)) {
       byte[][] startAfterComponents = FSDirectory
@@ -4725,7 +4725,7 @@ public class FSNamesystem
      */
     private void incrementSafeBlockCount(Block blk) throws IOException {
       addSafeBlock(blk.getBlockId());
-      
+
       // Report startup progress only if we haven't completed startup yet.
         StartupProgress prog = NameNode.getStartupProgress();
         if (prog.getStatus(Phase.SAFEMODE) != Status.COMPLETE) {
@@ -4791,7 +4791,7 @@ public class FSNamesystem
       if(!isOn()){
         return "Safe mode is OFF.";
       }
-    
+
       //Manual OR low-resource safemode. (Admin intervention required)
       String leaveMsg = "It was turned on manually. ";
       if (areResourcesLow()) {
@@ -4805,7 +4805,7 @@ public class FSNamesystem
           + "Use \"hdfs dfsadmin -safemode leave\" to turn safe mode off.";
       }
 
-      
+
       //Automatic safemode. System will come out of safemode automatically.
       leaveMsg = "Safe mode will be turned off automatically";
       int numLive = getNumLiveDataNodes();
@@ -5198,7 +5198,7 @@ public class FSNamesystem
     LOG.info("Number of blocks under construction: " + numUCBlocks);
     return getBlocksTotal() - numUCBlocks;
   }
-  
+
   /**
    * Enter safe mode. If resourcesLow is false, then we assume it is manual
    *
@@ -5308,7 +5308,7 @@ public class FSNamesystem
     checkPermission(pc, path, doCheckOwner, ancestorAccess,
         parentAccess, access, subAccess, true);
   }
-  
+
   /**
    * Check whether current user have permissions to access the path. For more
    * details of the parameters, see
@@ -5435,7 +5435,6 @@ public class FSNamesystem
     }
   }
 
-
   @Override // FSNamesystemMBean
   @Metric({"LiveDataNodes",
       "Number of datanodes marked as live"})
@@ -5485,11 +5484,20 @@ public class FSNamesystem
     return getBlockManager().getDatanodeManager().getNumStaleNodes();
   }
 
+  /**
+   * Storages are marked as "content stale" after NN restart or fails over and
+   * before NN receives the first Heartbeat followed by the first Blockreport.
+   */
+  @Override // FSNamesystemMBean
+  public int getNumStaleStorages() {
+      return getBlockManager().getDatanodeManager().getNumStaleStorages();
+  }
+
   private long nextBlockId() throws IOException{
     checkNameNodeSafeMode("Cannot get next block ID");
     return IDsGeneratorFactory.getInstance().getUniqueBlockID();
   }
-  
+
   private INodeFileUnderConstruction checkUCBlock(ExtendedBlock block,
       String clientName) throws IOException {
     checkNameNodeSafeMode("Cannot get a new generation stamp and an "
@@ -5686,7 +5694,7 @@ public class FSNamesystem
 
     final BlockInfoUnderConstruction blockInfo =
         (BlockInfoUnderConstruction) pendingFile.getLastBlock();
-    
+
     // check new GS & length: this is not expected
     if (newBlock.getGenerationStamp() <= blockInfo.getGenerationStamp() ||
         newBlock.getNumBytes() < blockInfo.getNumBytes()) {
@@ -5696,15 +5704,15 @@ public class FSNamesystem
       LOG.warn(msg);
       throw new IOException(msg);
     }
-    
-  
+
+
     //Make sure the hashes are corrected to avoid leaving stale replicas behind
     for (DatanodeStorageInfo oldLocation :
         blockInfo.getStorages(blockManager.getDatanodeManager())){
       HashBuckets.getInstance().undoHash(oldLocation.getSid(),
           HdfsServerConstants.ReplicaState.FINALIZED, oldBlock.getLocalBlock());
     }
-    
+
     // Update old block with the new generation stamp and new length
     blockInfo.setNumBytes(newBlock.getNumBytes());
     blockInfo.setGenerationStamp(newBlock.getGenerationStamp());
@@ -6312,7 +6320,7 @@ public class FSNamesystem
     return VersionInfo.getDate() + " by " + VersionInfo.getUser() +
         " from " + VersionInfo.getBranch();
   }
-  
+
   /**
    * @return the block manager.
    */
@@ -6324,7 +6332,7 @@ public class FSNamesystem
   public FSDirectory getFSDirectory() {
     return dir;
   }
-  
+
   @Override  // NameNodeMXBean
   public String getCorruptFiles() {
     List<String> list = new ArrayList<String>();
@@ -6419,7 +6427,7 @@ public class FSNamesystem
   private static class DefaultAuditLogger extends HdfsAuditLogger {
 
     private boolean logTokenTrackingId;
-    
+
     @Override
     public void initialize(Configuration conf) {
       logTokenTrackingId = conf.getBoolean(
@@ -6468,7 +6476,7 @@ public class FSNamesystem
         logAuditMessage(sb.toString());
       }
     }
-    
+
     public void logAuditMessage(String message) {
       auditLog.info(message);
     }
@@ -6705,7 +6713,7 @@ public class FSNamesystem
     boolean removeSTOLock = false;
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
     final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
-    try {      
+    try {
       PathInformation pathInfo = getPathExistingINodesFromDB(path,
           false, null, null, null, null);
       INode lastComp = pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1];
@@ -6808,10 +6816,10 @@ public class FSNamesystem
           subtreeRoot.getLocalName(),subtreeRoot.getPartitionId());
       subtreeRootIdentifier.setDepth(((short) (INodeDirectory.ROOT_DIR_DEPTH + pathInfo.getPathComponents().length-1 )));
 
-      
+
     //Calcualte subtree root default ACLs to be inherited in the tree.
     List<AclEntry> nearestDefaultsForSubtree = calculateNearestDefaultAclForSubtree(pathInfo);
-  
+
     final AbstractFileTree.CountingFileTree fileTree =
             new AbstractFileTree.CountingFileTree(this, subtreeRootIdentifier, FsAction.READ_EXECUTE, nearestDefaultsForSubtree);
     fileTree.buildUp();
@@ -6857,14 +6865,14 @@ public class FSNamesystem
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
     final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
-    
+
     boolean success = false;
-    
+
     try {
     if (isInSafeMode()) {
       checkNameNodeSafeMode("Cannot rename " + src);
     }
-    
+
     if (dst.equals(src)) {
       throw new FileAlreadyExistsException(
           "The source " + src + " and destination " + dst + " are the same");
@@ -7395,7 +7403,7 @@ public class FSNamesystem
       NameNode.stateChangeLog
           .debug("DIR* NameSystem.multiTransactionalDelete: " + path);
     }
-   
+
     try {
       ret = multiTransactionalDeleteInternal(path, recursive);
       logAuditEvent(ret, "delete", path);
@@ -7456,7 +7464,7 @@ public class FSNamesystem
           subtreeRoot = lockSubtreeAndCheckPathPermission(path, false, null,
               FsAction.WRITE, null, null,
               SubTreeOperation.StoOperationType.DELETE_STO);
-  
+
           List<AclEntry> nearestDefaultsForSubtree = calculateNearestDefaultAclForSubtree(pathInfo);
           AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(this, subtreeRoot, FsAction.ALL,
               nearestDefaultsForSubtree);
@@ -7883,7 +7891,7 @@ public class FSNamesystem
     }
     return blocks;
   }
- 
+
   /**
    * Add and encoding status for a file without checking the retry cache.
    *
@@ -8243,7 +8251,7 @@ public class FSNamesystem
             INodeResolveType.PATH, src));
         locks.add(lf.getAcesLock());
       }
-    
+
       @Override
       public Object performTask() throws IOException {
         FSPermissionChecker pc = getPermissionChecker();
@@ -8262,7 +8270,7 @@ public class FSNamesystem
       throw new SafeModeException("Cannot remove acl entries " + src, safeMode);
     }
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL_ENTRIES) {
-    
+
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
@@ -8288,7 +8296,7 @@ public class FSNamesystem
       throw new SafeModeException("Cannot remove default acl " + src, safeMode);
     }
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_DEFAULT_ACL) {
-    
+
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
@@ -8314,7 +8322,7 @@ public class FSNamesystem
       throw new SafeModeException("Cannot remove acl " + src, safeMode);
     }
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL) {
-    
+
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
@@ -8347,7 +8355,7 @@ public class FSNamesystem
             INodeResolveType.PATH, src));
         locks.add(lf.getAcesLock());
       }
-    
+
       @Override
       public Object performTask() throws IOException {
         FSPermissionChecker pc = getPermissionChecker();
@@ -8358,13 +8366,13 @@ public class FSNamesystem
         return null;
       }
     }.handle();
-    
+
   }
 
   AclStatus getAclStatus(final String src) throws IOException {
     aclConfigFlag.checkForApiCall();
     return (AclStatus) new HopsTransactionalRequestHandler(HDFSOperationType.GET_ACL_STATUS) {
-    
+
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
@@ -8372,7 +8380,7 @@ public class FSNamesystem
             INodeResolveType.PATH, src));
         locks.add(lf.getAcesLock());
       }
-      
+
       @Override
       public Object performTask() throws IOException {
         FSPermissionChecker pc = getPermissionChecker();
@@ -8497,7 +8505,7 @@ public class FSNamesystem
             INodeDirectory.INodesInPath dstInodesInPath = dir.getRootDir().getExistingPathINodes(pathComponents,
                 pathComponents.length, false);
             final INode[] pathInodes = dstInodesInPath.getINodes();
-            
+
             INodeAttributes quotaDirAttributes = null;
             INode leafInode = pathInodes[pathInodes.length - 1];
             if(leafInode != null){  // complete path resolved
@@ -8738,7 +8746,7 @@ public class FSNamesystem
     return luSummary;
 
   }
-  
+
   private CacheEntry retryCacheWaitForCompletionTransactional() throws IOException {
     HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType.CONCAT) {
       @Override
@@ -8771,7 +8779,7 @@ public class FSNamesystem
     };
     return (CacheEntry) rh.handle(this);
   }
-  
+
   class RetryCacheCleaner implements Runnable {
 
     boolean shouldCacheCleanerRun = true;
@@ -8837,7 +8845,7 @@ public class FSNamesystem
       shouldCacheCleanerRun = false;
     }
   }
-  
+
   private List<AclEntry> calculateNearestDefaultAclForSubtree(final PathInformation pathInfo) throws IOException {
     for (int i = pathInfo.pathInodeAcls.length-1; i > -1 ; i--){
       List<AclEntry> aclEntries = pathInfo.pathInodeAcls[i];
@@ -8851,7 +8859,7 @@ public class FSNamesystem
           onlyDefaults.add(aclEntry);
         }
       }
-      
+
       if (!onlyDefaults.isEmpty()){
         return onlyDefaults;
       }

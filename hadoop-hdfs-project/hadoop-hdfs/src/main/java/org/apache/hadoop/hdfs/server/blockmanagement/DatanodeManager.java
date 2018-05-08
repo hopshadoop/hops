@@ -177,7 +177,10 @@ public class DatanodeManager {
    * The number of stale DataNodes
    */
   private volatile int numStaleNodes;
-  
+
+  /** The number of stale storages */
+  private volatile int numStaleStorages;
+
   /**
    * Whether or not this cluster has ever consisted of more than 1 rack,
    * according to the NetworkTopology.
@@ -185,9 +188,9 @@ public class DatanodeManager {
   private boolean hasClusterEverBeenMultiRack = false;
 
   private final boolean checkIpHostnameInRegistration;
-  
+
   private final StorageMap storageMap = new StorageMap();
-  
+
    /**
    * The number of datanodes for each software version. This list should change
    * during rolling upgrades.
@@ -243,7 +246,7 @@ public class DatanodeManager {
       }
       dnsToSwitchMapping.resolve(locations);
     };
-    
+
     final long heartbeatIntervalSeconds =
         conf.getLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY,
             DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_DEFAULT);
@@ -284,7 +287,7 @@ public class DatanodeManager {
             " = '" + ratioUseStaleDataNodesForWrite + "' is invalid. " +
             "It should be a positive non-zero float value, not greater than 1.0f.");
   }
-  
+
   private static long getStaleIntervalFromConf(Configuration conf,
       long heartbeatExpireInterval) {
     long staleInterval =
@@ -657,7 +660,7 @@ public class DatanodeManager {
     if (!hostFileManager.hasIncludes()) {
       return;
     }
-    
+
     for (Iterator<DatanodeDescriptor> it = nodeList.iterator();
          it.hasNext(); ) {
       DatanodeDescriptor node = it.next();
@@ -763,7 +766,7 @@ public class DatanodeManager {
     nodeReg.setExportedKeys(blockManager.getBlockKeys());
 
     // Checks if the node is not on the hosts list.  If it is not, then
-    // it will be disallowed from registering. 
+    // it will be disallowed from registering.
     if (!hostFileManager.isIncluded(nodeReg)) {
       throw new DisallowedDatanodeException(nodeReg);
     }
@@ -778,7 +781,7 @@ public class DatanodeManager {
 
     if (nodeN != null && nodeN != nodeS) {
       NameNode.LOG.info("BLOCK* registerDatanode: " + nodeN);
-      // nodeN previously served a different data storage, 
+      // nodeN previously served a different data storage,
       // which is not served by anybody anymore.
       removeDatanode(nodeN);
       // physically remove node from datanodeMap
@@ -788,7 +791,7 @@ public class DatanodeManager {
 
     if (nodeS != null) {
       if (nodeN == nodeS) {
-        // The same datanode has been just restarted to serve the same data 
+        // The same datanode has been just restarted to serve the same data
         // storage. We do not need to remove old data blocks, the delta will
         // be calculated on the next block report from the datanode
         if (NameNode.stateChangeLog.isDebugEnabled()) {
@@ -797,13 +800,13 @@ public class DatanodeManager {
         }
       } else {
         // nodeS is found
-        /* The registering datanode is a replacement node for the existing 
+        /* The registering datanode is a replacement node for the existing
           data storage, which from now on will be served by a new node.
-          If this message repeats, both nodes might have same storageID 
+          If this message repeats, both nodes might have same storageID
           by (insanely rare) random chance. User needs to restart one of the
           nodes with its data cleared (or user can just remove the StorageID
           value in "VERSION" file under the data directory of the datanode,
-          but this is might not work if VERSION file format has changed 
+          but this is might not work if VERSION file format has changed
        */
         NameNode.stateChangeLog.info("BLOCK* registerDatanode: " + nodeS
             + " is replaced by " + nodeReg + " with the same storageID "
@@ -815,10 +818,10 @@ public class DatanodeManager {
         decrementVersionCount(nodeS.getSoftwareVersion());
       }
       nodeS.updateRegInfo(nodeReg);
-      
+
       nodeS.setSoftwareVersion(nodeReg.getSoftwareVersion());
       nodeS.setDisallowed(false); // Node is in the include list
-      
+
       // resolve network location
       if (this.rejectUnresolvedTopologyDN) {
         nodeS.setNetworkLocation(resolveNetworkLocation(nodeS));
@@ -849,7 +852,7 @@ public class DatanodeManager {
     nodeDescr.setSoftwareVersion(nodeReg.getSoftwareVersion());
     addDatanode(nodeDescr);
     checkDecommissioning(nodeDescr);
-    
+
     // also treat the registration message as a heartbeat
     // no need to update its timestamp
     // because its is done when the descriptor is created
@@ -864,9 +867,9 @@ public class DatanodeManager {
    */
   public void refreshNodes(final Configuration conf) throws IOException {
     // refreshNodes starts/stops decommission/recommission process
-    // it should only be handled by the leader node. 
+    // it should only be handled by the leader node.
     // because it depends upon threads like replication_deamon which is only active
-    // on the leader node. 
+    // on the leader node.
 
     if (!this.namesystem.isLeader()) {
       throw new UnsupportedOperationException(
@@ -973,7 +976,7 @@ public class DatanodeManager {
         heartbeatManager.getLiveDatanodeCount() *
             ratioUseStaleDataNodesForWrite);
   }
-  
+
   /**
    * @return The time interval used to mark DataNodes as stale.
    */
@@ -1001,11 +1004,24 @@ public class DatanodeManager {
   }
 
   /**
-   * Fetch live and dead datanodes.
+   * Get the number of content stale storages.
    */
-  public void fetchDatanodes(final List<DatanodeDescriptor> live,
-      final List<DatanodeDescriptor> dead,
-      final boolean removeDecommissionNode) {
+  public int getNumStaleStorages() {
+    return numStaleStorages;
+  }
+
+  /**
+   * Set the number of content stale storages.
+   *
+   * @param numStaleStorages The number of content stale storages.
+   */
+  void setNumStaleStorages(int numStaleStorages) {
+    this.numStaleStorages = numStaleStorages;
+  }
+
+  /** Fetch live and dead datanodes. */
+  public void fetchDatanodes(final List<DatanodeDescriptor> live, 
+      final List<DatanodeDescriptor> dead, final boolean removeDecommissionNode) {
     if (live == null && dead == null) {
       throw new HadoopIllegalArgumentException(
           "Both live and dead lists are null");
@@ -1140,7 +1156,7 @@ public class DatanodeManager {
         foundNodes.add(dn);
       }
     }
-    
+
     if (listDeadNodes) {
       final EntrySet includedNodes = hostFileManager.getIncludes();
       final EntrySet excludedNodes = hostFileManager.getExcludes();
@@ -1286,7 +1302,7 @@ public class DatanodeManager {
               new BlockCommand(DatanodeProtocol.DNA_INVALIDATE, blockPoolId,
                   blks));
         }
-        
+
         blockManager.addKeyUpdateCommand(cmds, nodeinfo);
 
         // check for balancer bandwidth update
@@ -1509,7 +1525,7 @@ public class DatanodeManager {
   public DatanodeDescriptor getDatanodeByXferAddr(String host, int xferPort) {
     return host2DatanodeMap.getDatanodeByXferAddr(host, xferPort);
   }
-  
+
   // only for testing
   @VisibleForTesting
   void addDnToStorageMapInDB(DatanodeDescriptor nodeDescr) throws IOException {
@@ -1526,7 +1542,7 @@ public class DatanodeManager {
     if(datanodeMap.isEmpty()){
         return null;
     }else{
-        
+
       return (DatanodeDescriptor) datanodeMap.values().toArray()[rand.nextInt(datanodeMap.size())];
     }
   }
@@ -1542,7 +1558,7 @@ public class DatanodeManager {
   public DatanodeStorageInfo getStorage(int sid) {
     return this.storageMap.getStorage(sid);
   }
-  
+
   public int getSid(String StorageId){
     return this.storageMap.getSId(StorageId);
   }

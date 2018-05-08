@@ -145,14 +145,20 @@ public interface FSNamesystemMBean {
    * @return number of decommissioned dead data nodes
    */
   public int getNumDecomDeadDataNodes();
-  
+
   /**
    * Number of data nodes that are in the decommissioning state
    */
   public int getNumDecommissioningDataNodes();
-  
+
   /**
    * Return the maximum number of inodes in the file system
    */
   public long getMaxObjects();
+
+  /**
+   * Number of content stale storages.
+   * @return number of content stale storages
+   */
+  public int getNumStaleStorages();
 }

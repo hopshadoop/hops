@@ -77,7 +77,7 @@ class BPServiceActor implements Runnable {
   private final DNConf dnConf;
 
   private DatanodeRegistration bpRegistration;
-  
+
   private final Object waitForHeartBeats = new Object();
 
   BPServiceActor(InetSocketAddress nnAddr, BPOfferService bpos) {
@@ -200,6 +200,18 @@ class BPServiceActor implements Runnable {
 
     // Second phase of the handshake with the NN.
     register();
+  }
+
+  // This is useful to make sure NN gets Heartbeat before Blockreport
+  // upon NN restart while DN keeps retrying Otherwise,
+  // 1. NN restarts.
+  // 2. Heartbeat RPC will retry and succeed. NN asks DN to reregister.
+  // 3. After reregistration completes, DN will send Blockreport first.
+  // 4. Given NN receives Blockreport after Heartbeat, it won't mark
+  //    DatanodeStorageInfo#blockContentsStale to false until the next
+  //    Blockreport.
+  void scheduleHeartbeat() {
+    lastHeartbeat = 0;
   }
 
   void reportBadBlocks(ExtendedBlock block, String storageUuid,
@@ -391,7 +403,7 @@ class BPServiceActor implements Runnable {
       }
     } // while (shouldRun())
   } // offerService
-        
+
     /**
    * Register one bp with the corresponding NameNode
    * <p/>
@@ -529,6 +541,7 @@ class BPServiceActor implements Runnable {
       retrieveNamespaceInfo();
       // and re-register
       register();
+      scheduleHeartbeat();
     }
   }
 

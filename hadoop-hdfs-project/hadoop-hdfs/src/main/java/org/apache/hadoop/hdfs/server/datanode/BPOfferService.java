@@ -167,11 +167,11 @@ class BPOfferService implements Runnable {
 
     dnConf = dn.getDnConf();
 
-    
+
     maxNumIncrementalReportThreads = dnConf.iBRDispatherTPSize;
     incrementalBRExecutor = Executors.newFixedThreadPool(maxNumIncrementalReportThreads);
     brDispatcher = Executors.newSingleThreadExecutor();
-    
+
   }
 
   void refreshNNList(ArrayList<InetSocketAddress> addrs) throws IOException {
@@ -312,7 +312,7 @@ class BPOfferService implements Runnable {
             BlockStatus.CREATING, null);
     notifyNamenodeBlockImmediatelyInt(bInfo, storageUuid, false);
   }
- 
+
   public void notifyNamenodeAppendingBlock(ExtendedBlock block, String storageUuid) {
     checkBlock(block);
     ReceivedDeletedBlockInfo bInfo =
@@ -328,7 +328,7 @@ class BPOfferService implements Runnable {
             BlockStatus.RECOVERING_APPEND, null);
     notifyNamenodeBlockImmediatelyInt(bInfo, storageUuid, true);
   }
-  
+
   public void notifyNamenodeUpdateRecoveredBlock(ExtendedBlock block, String storageUuid) {
     checkBlock(block);
     ReceivedDeletedBlockInfo bInfo =
@@ -336,7 +336,7 @@ class BPOfferService implements Runnable {
             BlockStatus.UPDATE_RECOVERED, null);
     notifyNamenodeBlockImmediatelyInt(bInfo, storageUuid, true);
   }
- 
+
 
   //This must be called only by blockPoolManager
   void start() {
@@ -747,7 +747,7 @@ class BPOfferService implements Runnable {
      */
     @Override
     public Object call() throws Exception {
-      DatanodeCommand cmd = blockReport();      
+      DatanodeCommand cmd = blockReport();
       if (cmd != null) {
         blkReportHander.processCommand(new DatanodeCommand[]{cmd});
       }
@@ -759,7 +759,7 @@ class BPOfferService implements Runnable {
       return null;
     }
   }
-  
+
   private final Object incrementalBRLock = new Object();
   private int incrementalBRCounter = 0;
   private final IncrementalBRTask incrementalBRTask = new IncrementalBRTask();
@@ -1248,7 +1248,7 @@ public class IncrementalBRTask implements Callable{
     }
     return null;
   }
-   
+
   private synchronized void forwardRRIndex() {
       if (nnList != null && !nnList.isEmpty()) {
         // watch out for black listed NN
