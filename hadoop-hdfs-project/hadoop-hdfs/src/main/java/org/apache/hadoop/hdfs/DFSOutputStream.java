@@ -18,6 +18,12 @@
 package org.apache.hadoop.hdfs;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
+import com.google.common.collect.ImmutableSet;
 import io.hops.erasure_coding.Codec;
 import io.hops.exception.OutOfDBExtentsException;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
@@ -89,6 +95,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.fs.CanSetDropBehind;
@@ -365,8 +372,23 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     private volatile StorageType[] storageTypes = null;
     private volatile String[] storageIDs = null;
 
-    private ArrayList<DatanodeInfo> excludedNodes =
-        new ArrayList<>();
+    private LoadingCache<DatanodeInfo, DatanodeInfo> excludedNodes = CacheBuilder.newBuilder()
+        .expireAfterWrite(
+            dfsClient.getConf().excludedNodesCacheExpiry,
+            TimeUnit.MILLISECONDS)
+        .removalListener(new RemovalListener<DatanodeInfo, DatanodeInfo>() {
+          @Override
+          public void onRemoval(
+              RemovalNotification<DatanodeInfo, DatanodeInfo> notification) {
+            DFSClient.LOG.info("Removing node " + notification.getKey() + " from the excluded nodes list");
+          }
+        })
+        .build(new CacheLoader<DatanodeInfo, DatanodeInfo>() {
+          @Override
+          public DatanodeInfo load(DatanodeInfo key) throws Exception {
+            return key;
+          }
+        });
     private String[] favoredNodes;
     volatile boolean hasError = false;
     volatile int errorIndex = -1;
@@ -1223,10 +1245,12 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
         }
 
         if (erasureCodingSourceStream || erasureCodingParityStream) {
-          excluded = new DatanodeInfo[excludedNodes.size() + usedNodes.size() +
-                  stripeNodes.size() + parityStripeNodes.size()];
+          ImmutableSet<DatanodeInfo> excludedSet = excludedNodes.getAllPresent(excludedNodes.asMap().keySet()).keySet();
+              
+          excluded = new DatanodeInfo[excludedSet.size() + usedNodes.
+              size() + stripeNodes.size() + parityStripeNodes.size()];
           int i = 0;
-          for (DatanodeInfo node : excludedNodes) {
+          for (DatanodeInfo node : excludedSet) {
             excluded[i] = node;
             LOG.info("Excluding node " + node);
             i++;
@@ -1257,8 +1281,9 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           }
           currentBlockIndex++;
         } else {
-          excluded =
-                  excludedNodes.toArray(new DatanodeInfo[excludedNodes.size()]);
+          excluded = excludedNodes.getAllPresent(excludedNodes.asMap().keySet())
+              .keySet()
+              .toArray(new DatanodeInfo[0]);
         }
         block = oldBlock;
         lb = locateFollowingBlock(startTime,
@@ -1279,7 +1304,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           dfsClient.abandonBlock(block, src, dfsClient.clientName);
           block = null;
           DFSClient.LOG.info("Excluding datanode " + nodes[errorIndex]);
-          excludedNodes.add(nodes[errorIndex]);
+          excludedNodes.put(nodes[errorIndex], nodes[errorIndex]);
         }
       } while (!success && --count >= 0);
 
