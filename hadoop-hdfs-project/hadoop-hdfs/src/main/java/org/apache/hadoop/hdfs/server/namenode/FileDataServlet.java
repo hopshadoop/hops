@@ -39,8 +39,7 @@ import java.security.PrivilegedExceptionAction;
 
 /**
  * Redirect queries about the hosted filesystem to an appropriate datanode.
- *
- * @see HftpFileSystem
+ * @see org.apache.hadoop.hdfs.web.HftpFileSystem
  */
 @InterfaceAudience.Private
 public class FileDataServlet extends DfsServlet {

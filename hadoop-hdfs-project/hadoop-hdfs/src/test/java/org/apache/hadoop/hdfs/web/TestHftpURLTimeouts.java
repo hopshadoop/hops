@@ -33,7 +33,6 @@ import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.hdfs.web.URLUtils;
 import org.junit.BeforeClass;
 import org.junit.Test;
 

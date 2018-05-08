@@ -18,8 +18,6 @@
 package org.apache.hadoop.hdfs.web;
 
 import org.apache.hadoop.hdfs.server.namenode.StreamFile;
-import org.apache.hadoop.hdfs.web.ByteRangeInputStream;
-import org.apache.hadoop.hdfs.web.HftpFileSystem;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
