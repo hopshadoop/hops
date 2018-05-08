@@ -203,6 +203,11 @@ public class DirectoryScanner implements Runnable {
 
     private final FsVolumeSpi volume;
     
+    /**
+     * Get the file's length in async block scan
+     */
+    private final long blockFileLength;
+    
     private final static Pattern CONDENSED_PATH_REGEX =
         Pattern.compile("(?<!^)(\\\\|/){2,}");
     
@@ -243,6 +248,7 @@ public class DirectoryScanner implements Runnable {
         getCondensedPath(vol.getBasePath());
       this.blockSuffix = blockFile == null ? null :
         getSuffix(blockFile, condensedVolPath);
+      this.blockFileLength = (blockFile != null) ? blockFile.length() : 0;
       if (metaFile == null) {
         this.metaSuffix = null;
       } else if (blockFile == null) {
@@ -259,6 +265,10 @@ public class DirectoryScanner implements Runnable {
         new File(volume.getBasePath(), blockSuffix);
     }
 
+    long getBlockFileLength() {
+      return blockFileLength;
+    }
+    
     File getMetaFile() {
       if (metaSuffix == null) {
         return null;
@@ -483,7 +493,7 @@ public class DirectoryScanner implements Runnable {
             // Block metadata file exits and block file is missing
             addDifference(diffRecord, statsRecord, info);
           } else if (info.getGenStamp() != memBlock.getGenerationStamp() ||
-              info.getBlockFile().length() != memBlock.getNumBytes()) {
+              info.getBlockFileLength() != memBlock.getNumBytes()) {
             // Block metadata file is missing or has wrong generation stamp,
             // or block file length is different than expected
             statsRecord.mismatchBlocks++;
