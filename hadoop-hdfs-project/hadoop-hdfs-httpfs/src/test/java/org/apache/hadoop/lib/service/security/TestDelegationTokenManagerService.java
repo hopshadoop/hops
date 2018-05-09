@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.lib.service.security;
 
-import junit.framework.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.http.server.HttpFSServerWebApp;
 import org.apache.hadoop.lib.server.Server;
@@ -35,6 +34,7 @@ import org.junit.Test;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import org.junit.Assert;
 
 public class TestDelegationTokenManagerService extends HTestCase {
 

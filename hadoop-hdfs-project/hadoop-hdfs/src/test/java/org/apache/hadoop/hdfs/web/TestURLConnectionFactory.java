@@ -22,12 +22,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
 
-import junit.framework.Assert;
-
 import org.apache.hadoop.security.authentication.client.ConnectionConfigurator;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
+import org.junit.Assert;
 
 public final class TestURLConnectionFactory {
 

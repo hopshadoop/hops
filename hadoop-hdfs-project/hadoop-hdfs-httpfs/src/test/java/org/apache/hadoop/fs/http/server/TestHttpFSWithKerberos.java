@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.fs.http.server;
 
-import junit.framework.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.DelegationTokenRenewer;
@@ -56,6 +55,7 @@ import java.net.URI;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.Callable;
+import org.junit.Assert;
 
 public class TestHttpFSWithKerberos extends HFSTestCase {
 
