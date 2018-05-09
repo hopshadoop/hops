@@ -154,7 +154,8 @@ public class HsftpFileSystem extends HftpFileSystem {
     query = addDelegationTokenParam(query);
     final URL url = new URL(getUnderlyingProtocol(), nnUri.getHost(),
         nnUri.getPort(), path + '?' + query);
-    HttpsURLConnection conn = (HttpsURLConnection) URLUtils.openConnection(url);
+    HttpsURLConnection conn;
+    conn = (HttpsURLConnection)connectionFactory.openConnection(url);
     // bypass hostname verification
     conn.setHostnameVerifier(new DummyHostnameVerifier());
     conn.setRequestMethod("GET");

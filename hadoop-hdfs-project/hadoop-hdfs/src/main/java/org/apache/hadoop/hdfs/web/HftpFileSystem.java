@@ -88,6 +88,8 @@ public class HftpFileSystem extends FileSystem
     HttpURLConnection.setFollowRedirects(true);
   }
 
+  URLConnectionFactory connectionFactory = URLConnectionFactory.DEFAULT_CONNECTION_FACTORY;
+  
   public static final Text TOKEN_KIND = new Text("HFTP delegation");
 
   protected UserGroupInformation ugi;
@@ -344,8 +346,8 @@ public class HftpFileSystem extends FileSystem
       throws IOException {
     query = addDelegationTokenParam(query);
     final URL url = getNamenodeURL(path, query);
-    final HttpURLConnection connection =
-        (HttpURLConnection) URLUtils.openConnection(url);
+    final HttpURLConnection connection;
+    connection = (HttpURLConnection)connectionFactory.openConnection(url);
     connection.setRequestMethod("GET");
     connection.connect();
     return connection;
@@ -365,12 +367,14 @@ public class HftpFileSystem extends FileSystem
   }
 
   static class RangeHeaderUrlOpener extends ByteRangeInputStream.URLOpener {
+    URLConnectionFactory connectionFactory = URLConnectionFactory.DEFAULT_CONNECTION_FACTORY;
+    
     RangeHeaderUrlOpener(final URL url) {
       super(url);
     }
 
     protected HttpURLConnection openConnection() throws IOException {
-      return (HttpURLConnection) URLUtils.openConnection(url);
+      return (HttpURLConnection) connectionFactory.openConnection(url);
     }
 
     /**

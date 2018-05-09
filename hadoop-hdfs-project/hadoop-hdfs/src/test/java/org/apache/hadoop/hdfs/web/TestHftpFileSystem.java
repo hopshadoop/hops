@@ -45,6 +45,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.Random;
 
 import static org.junit.Assert.assertEquals;
@@ -344,6 +345,16 @@ public class TestHftpFileSystem {
 
     assertEquals(uri, fs.getUri());
     assertEquals("127.0.0.1:789", fs.getCanonicalServiceName());
+  }
+
+  @Test
+  public void testTimeout() throws IOException {
+    Configuration conf = new Configuration();
+    URI uri = URI.create("hftp://localhost");
+    HftpFileSystem fs = (HftpFileSystem) FileSystem.get(uri, conf);
+    URLConnection conn = fs.connectionFactory.openConnection(new URL("http://localhost"));
+    assertEquals(URLConnectionFactory.DEFAULT_SOCKET_TIMEOUT, conn.getConnectTimeout());
+    assertEquals(URLConnectionFactory.DEFAULT_SOCKET_TIMEOUT, conn.getReadTimeout());
   }
 
   ///
