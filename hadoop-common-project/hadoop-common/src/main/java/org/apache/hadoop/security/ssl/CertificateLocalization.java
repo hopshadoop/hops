@@ -18,7 +18,6 @@
 package org.apache.hadoop.security.ssl;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
@@ -26,11 +25,11 @@ public interface CertificateLocalization {
 
   void materializeCertificates(String username, String userFolder,
       ByteBuffer keyStore, String keyStorePassword,
-      ByteBuffer trustStore, String trustStorePassword) throws IOException;
+      ByteBuffer trustStore, String trustStorePassword) throws InterruptedException;
   
   void materializeCertificates(String username, String applicationId, String userFolder,
       ByteBuffer keyStore, String keyStorePassword,
-      ByteBuffer trustStore, String trustStorePassword) throws IOException;
+      ByteBuffer trustStore, String trustStorePassword) throws InterruptedException;
   
   void removeMaterial(String username)
     throws InterruptedException, ExecutionException;
@@ -39,10 +38,10 @@ public interface CertificateLocalization {
       throws InterruptedException, ExecutionException;
   
   CryptoMaterial getMaterialLocation(String username)
-      throws FileNotFoundException, InterruptedException, ExecutionException;
+      throws FileNotFoundException, InterruptedException;
   
   CryptoMaterial getMaterialLocation(String username, String applicationId)
-      throws FileNotFoundException, InterruptedException, ExecutionException;
+      throws FileNotFoundException, InterruptedException;
   
   String getSuperKeystoreLocation();
   

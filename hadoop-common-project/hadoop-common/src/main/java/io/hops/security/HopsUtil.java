@@ -83,6 +83,8 @@ public class HopsUtil {
   /**
    * Extracts the CommonName (CN) from an X.509 subject
    *
+   * NOTE: Used by Hopsworks
+   *
    * @param subject X.509 subject
    * @return CommonName or null if it cannot be parsed
    */
@@ -96,6 +98,8 @@ public class HopsUtil {
   
   /**
    * Extracts the Organization (O) from an X.509 subject
+   *
+   * NOTE: Used by Hopsworks
    *
    * @param subject X.509 subject
    * @return Organization or null if it cannot be parsed

@@ -37,12 +37,12 @@ import javax.management.MBeanOperationInfo;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
@@ -94,8 +94,6 @@ public class TestCertificateLocalizationService {
   public void tearDown() throws Exception {
     if (null != certLocSrv) {
       certLocSrv.serviceStop();
-      File fd = certLocSrv.getMaterializeDirectory().toFile();
-      assertFalse(fd.exists());
     }
   }
 
@@ -104,26 +102,21 @@ public class TestCertificateLocalizationService {
       throws Exception {
     
     String certLoc = certLocSrv.getMaterializeDirectory().toString();
-    String expectedKPath, expectedTPath;
+    Path expectedKPath, expectedTPath;
     if (service == CertificateLocalizationService.ServiceType.NM) {
-      expectedKPath = Paths.get(certLoc, userFolder, username + "__kstore" +
-          ".jks").toString();
-      expectedTPath = Paths.get(certLoc, userFolder, username + "__tstore" +
-          ".jks").toString();
+      expectedKPath = Paths.get(certLoc, userFolder, username + "__kstore.jks");
+      expectedTPath = Paths.get(certLoc, userFolder, username + "__tstore.jks");
     } else {
-      expectedKPath = Paths.get(certLoc, username, username + "__kstore.jks").toString();
-      expectedTPath = Paths.get(certLoc, username, username + "__tstore.jks").toString();
+      expectedKPath = Paths.get(certLoc, username, username + "__kstore.jks");
+      expectedTPath = Paths.get(certLoc, username, username + "__tstore.jks");
     }
 
-    File kfd = new File(expectedKPath);
-    File tfd = new File(expectedTPath);
-    
     if (exist) {
       CryptoMaterial material = certLocSrv.getMaterialLocation(username);
       assertEquals(expectedKPath, material.getKeyStoreLocation());
       assertEquals(expectedTPath, material.getTrustStoreLocation());
-      assertTrue(kfd.exists());
-      assertTrue(tfd.exists());
+      assertTrue(expectedKPath.toFile().exists());
+      assertTrue(expectedTPath.toFile().exists());
       assertEquals(kstorePass, material.getKeyStorePass());
       assertEquals(tstorePass, material.getTrustStorePass());
     } else {
@@ -133,14 +126,16 @@ public class TestCertificateLocalizationService {
       } catch (FileNotFoundException ex) {
         LOG.info("Exception here is normal");
         assertNull(material);
-        assertFalse(kfd.exists());
-        assertFalse(tfd.exists());
+        TimeUnit.MILLISECONDS.sleep(500);
+        assertFalse(expectedKPath.toFile().exists());
+        assertFalse(expectedTPath.toFile().exists());
       }
     }
   }
 
   private void materializeCertificateUtil(CertificateLocalizationService certLocSrv, String username,
-      String userFolder, ByteBuffer bfk, String keyStorePass, ByteBuffer bft, String trustStorePass) throws IOException {
+      String userFolder, ByteBuffer bfk, String keyStorePass, ByteBuffer bft, String trustStorePass)
+      throws InterruptedException {
 
     if (service == CertificateLocalizationService.ServiceType.NM) {
       certLocSrv.materializeCertificates(username, userFolder, bfk, keyStorePass, bft, trustStorePass);
@@ -183,6 +178,17 @@ public class TestCertificateLocalizationService {
     // Deletion is asynchronous so we have to wait
     TimeUnit.MILLISECONDS.sleep(10);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePass, trustStorePass, false);
+  }
+  
+  @Test
+  public void testMaterializationRemoval() throws Exception {
+    ByteBuffer store = ByteBuffer.wrap("some_bytes".getBytes());
+    String username = "Dolores";
+    String userFolder = "userFolder";
+    String password = "password";
+    materializeCertificateUtil(certLocSrv, username, userFolder, store, password, store, password);
+    certLocSrv.removeMaterial(username);
+    verifyMaterialExistOrNot(certLocSrv, username, userFolder, password, password, false);
   }
 
   @Test
@@ -256,6 +262,71 @@ public class TestCertificateLocalizationService {
   public void testMaterialNotFound() throws Exception {
     rule.expect(FileNotFoundException.class);
     certLocSrv.getMaterialLocation("username");
+  }
+  
+  @Test
+  public void testDelayedMaterializationAndForceRemoval() throws Exception {
+    if (certLocSrv != null) {
+      certLocSrv.serviceStop();
+      certLocSrv = null;
+    }
+    DelayedCertificateLocalizationService delayedCertLoc = new DelayedCertificateLocalizationService(service, 1000);
+    try {
+      delayedCertLoc.serviceInit(conf);
+      delayedCertLoc.serviceStart();
+    
+      String username = "username";
+      String userFolder = "userFolder";
+      String password = "password";
+      ByteBuffer byteBuffer = ByteBuffer.wrap("some_bytes".getBytes());
+      materializeCertificateUtil(delayedCertLoc, username, userFolder, byteBuffer, password, byteBuffer, password);
+      delayedCertLoc.forceRemoveMaterial(username);
+      verifyMaterialExistOrNot(delayedCertLoc, username, userFolder, password, password, false);
+    
+      TimeUnit.MILLISECONDS.sleep(1000);
+      assertNotNull(delayedCertLoc.getHasBeenMaterialized());
+      assertFalse(delayedCertLoc.getHasBeenMaterialized());
+    } finally {
+      delayedCertLoc.serviceStop();
+    }
+  }
+  
+  private class DelayedCertificateLocalizationService extends CertificateLocalizationService {
+  
+    private final long sleepInMS;
+    private Boolean hasBeenMaterialized = null;
+    
+    public DelayedCertificateLocalizationService(ServiceType service, long sleepInMS) {
+      super(service);
+      this.sleepInMS = sleepInMS;
+    }
+    
+    public Boolean getHasBeenMaterialized() {
+      return hasBeenMaterialized;
+    }
+    
+    @Override
+    protected Thread createLocalizationEventsHandler() {
+      return new Thread() {
+  
+        @Override
+        public void run() {
+          while (!Thread.currentThread().isInterrupted()) {
+            try {
+              LocalizationEvent event = dequeue();
+              TimeUnit.MILLISECONDS.sleep(sleepInMS);
+              if (event instanceof MaterializeEvent) {
+                hasBeenMaterialized = materializeInternal((MaterializeEvent) event);
+              } else if (event instanceof RemoveEvent) {
+                removeInternal((RemoveEvent) event);
+              }
+            } catch (InterruptedException ex) {
+              Thread.currentThread().interrupt();
+            }
+          }
+        }
+      };
+    }
   }
   
   @Test

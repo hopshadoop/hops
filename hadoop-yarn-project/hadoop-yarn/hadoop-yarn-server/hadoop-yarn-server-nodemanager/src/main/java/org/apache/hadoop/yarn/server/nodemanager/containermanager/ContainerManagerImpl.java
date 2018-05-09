@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -884,8 +884,13 @@ public class ContainerManagerImpl extends CompositeService implements
     // AMLauncher
     if (keyStorePass != null && !keyStorePass.isEmpty()
         && trustStorePass != null && !trustStorePass.isEmpty()) {
-      context.getCertificateLocalizationService().materializeCertificates(user, appId.toString(), userFolder,
-          keyStore, keyStorePass, trustStore, trustStorePass);
+      try {
+        context.getCertificateLocalizationService().materializeCertificates(user, appId.toString(), userFolder,
+            keyStore, keyStorePass, trustStore, trustStorePass);
+      } catch (InterruptedException ex) {
+        LOG.error(ex, ex);
+        throw new IOException(ex);
+      }
     }
   }
   
@@ -1084,9 +1089,9 @@ public class ContainerManagerImpl extends CompositeService implements
         String applicationId = containerId.getApplicationAttemptId().getApplicationId().toString();
         CryptoMaterial cryptoMaterial = context
             .getCertificateLocalizationService().getMaterialLocation(applicationUser, applicationId);
-        String keyStoreLocation = cryptoMaterial.getKeyStoreLocation();
-        String trustStoreLocation = cryptoMaterial.getTrustStoreLocation();
-        String passwdLocation = cryptoMaterial.getPasswdLocation();
+        Path keyStoreLocation = cryptoMaterial.getKeyStoreLocation();
+        Path trustStoreLocation = cryptoMaterial.getTrustStoreLocation();
+        Path passwdLocation = cryptoMaterial.getPasswdLocation();
         
         if (keyStoreLocation == null || trustStoreLocation == null || passwdLocation == null) {
           throw new YarnException("One of the crypto materials for container " + containerId.toString() + " has not " +
@@ -1094,12 +1099,12 @@ public class ContainerManagerImpl extends CompositeService implements
         }
         
         Map<File, String> resources = new HashMap<>(3);
-        resources.put(new File(keyStoreLocation), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
-        resources.put(new File(trustStoreLocation), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
-        resources.put(new File(passwdLocation), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+        resources.put(keyStoreLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+        resources.put(trustStoreLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+        resources.put(passwdLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
         
         addAsLocalResource(resources, containerId, containerLaunchContext);
-      } catch (InterruptedException | ExecutionException ex) {
+      } catch (InterruptedException ex) {
         throw new YarnException(ex);
       }
     }

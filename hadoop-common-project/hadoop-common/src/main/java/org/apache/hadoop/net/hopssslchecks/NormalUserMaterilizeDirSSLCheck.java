@@ -75,7 +75,7 @@ public class NormalUserMaterilizeDirSSLCheck extends AbstractHopsSSLCheck {
           try {
             CryptoMaterial material = certificateLocalization.getMaterialLocation(username);
             password = material.getKeyStorePass();
-          } catch (InterruptedException | ExecutionException ex) {
+          } catch (InterruptedException ex) {
             throw new IOException(ex);
           }
         } else {
