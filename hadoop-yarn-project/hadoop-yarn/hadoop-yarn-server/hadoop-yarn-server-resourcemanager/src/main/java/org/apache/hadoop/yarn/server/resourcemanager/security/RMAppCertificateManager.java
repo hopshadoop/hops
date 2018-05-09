@@ -308,7 +308,7 @@ public class RMAppCertificateManager extends AbstractService
         if (certificateLocalizationService != null) {
           certificateLocalizationService.removeMaterial(applicationUser, appId.toString());
         }
-      } catch (InterruptedException | ExecutionException ex) {
+      } catch (InterruptedException ex) {
         LOG.warn("Could not remove material for user " + applicationUser + " and application " + appId, ex);
       }
     }

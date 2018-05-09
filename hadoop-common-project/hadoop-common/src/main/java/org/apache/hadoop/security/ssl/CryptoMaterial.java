@@ -18,26 +18,37 @@
 package org.apache.hadoop.security.ssl;
 
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class CryptoMaterial {
-  private final String certFolder;
-  private final String keyStoreLocation;
+  public enum STATE {
+    NEW,
+    ONGOING,
+    FINISHED
+  }
+  
+  private final Path certFolder;
+  private final Path keyStoreLocation;
   private final int keyStoreSize;
-  private final String trustStoreLocation;
-  private final String passwdLocation;
+  private final Path trustStoreLocation;
+  private final Path passwdLocation;
   private final int trustStoreSize;
   private final ByteBuffer keyStoreMem;
   private final String keyStorePass;
   private final ByteBuffer trustStoreMem;
   private final String trustStorePass;
+  private final AtomicBoolean tombstone;
+  
+  private STATE state;
   
   // Number of applications using the same crypto material
   // The same user might have multiple applications running
   // at the same time
   private int requestedApplications;
   
-  public CryptoMaterial(String certFolder, String keyStoreLocation, String trustStoreLocation,
-      String passwdLocation, ByteBuffer kStore, String kStorePass,
+  public CryptoMaterial(Path certFolder, Path keyStoreLocation, Path trustStoreLocation,
+      Path passwdLocation, ByteBuffer kStore, String kStorePass,
       ByteBuffer tstore, String tstorePass) {
     this.certFolder = certFolder;
     this.keyStoreLocation = keyStoreLocation;
@@ -52,11 +63,14 @@ public class CryptoMaterial {
     this.trustStorePass = tstorePass;
     
     requestedApplications = 1;
+    
+    state = STATE.NEW;
+    tombstone = new AtomicBoolean(false);
   }
 
-  public String getCertFolder() { return certFolder; }
+  public Path getCertFolder() { return certFolder; }
   
-  public String getKeyStoreLocation() {
+  public Path getKeyStoreLocation() {
     return keyStoreLocation;
   }
   
@@ -64,11 +78,11 @@ public class CryptoMaterial {
     return keyStoreSize;
   }
   
-  public String getTrustStoreLocation() {
+  public Path getTrustStoreLocation() {
     return trustStoreLocation;
   }
   
-  public String getPasswdLocation() {
+  public Path getPasswdLocation() {
     return passwdLocation;
   }
   
@@ -106,5 +120,25 @@ public class CryptoMaterial {
   
   public boolean isSafeToRemove() {
     return requestedApplications == 0;
+  }
+  
+  public synchronized void changeState(STATE state) {
+    this.state = state;
+  }
+  
+  public synchronized STATE getState() {
+    return state;
+  }
+  
+  public boolean hasBeenCanceled() {
+    return tombstone.get();
+  }
+  
+  public synchronized boolean tryToCancel() {
+    if (state.equals(STATE.NEW)) {
+      tombstone.set(true);
+      return true;
+    }
+    return false;
   }
 }

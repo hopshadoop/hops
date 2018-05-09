@@ -64,7 +64,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.*;
@@ -273,15 +272,9 @@ public class LinuxContainerExecutor extends ContainerExecutor {
      // If SSL is enabled, populate the environment with the location of the certificates
     if (getConf().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      String certFolder = null;
       CertificateLocalization certificateLocalization = CertificateLocalizationCtx.getInstance()
           .getCertificateLocalization();
-
-      try {
-        certFolder = certificateLocalization.getMaterialLocation(user, appId).getCertFolder();
-      } catch (ExecutionException e) {
-        throw new InterruptedException("Execution of CertificateMaterializer interrupted");
-      }
+      String certFolder = certificateLocalization.getMaterialLocation(user, appId).getCertFolder().toString();
 
       environment = new HashMap<>();
       environment.put(HopsSSLSocketFactory.CRYPTO_MATERIAL_ENV_VAR, certFolder);
