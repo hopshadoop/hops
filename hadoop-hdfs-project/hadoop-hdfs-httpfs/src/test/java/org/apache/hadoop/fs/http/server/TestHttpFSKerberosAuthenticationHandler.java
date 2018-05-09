@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.http.server;
 
-import junit.framework.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem;
 import org.apache.hadoop.fs.http.client.HttpFSKerberosAuthenticator;
@@ -46,6 +45,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import org.junit.Assert;
 
 public class TestHttpFSKerberosAuthenticationHandler extends HFSTestCase {
 

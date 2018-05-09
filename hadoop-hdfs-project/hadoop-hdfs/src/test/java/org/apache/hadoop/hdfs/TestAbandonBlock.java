@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -34,6 +32,7 @@ import org.junit.Test;
 import static junit.framework.Assert.assertFalse;
 import java.io.IOException;
 import org.apache.hadoop.hdfs.server.namenode.TestSubtreeLock;
+import org.junit.Assert;
 
 import static org.junit.Assert.fail;
 
