@@ -63,6 +63,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Map;
 import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
+import org.mockito.internal.util.reflection.Whitebox;
 
 public class TestDelegationTokenForProxyUser {
   private static MiniDFSCluster cluster;
@@ -161,8 +162,6 @@ public class TestDelegationTokenForProxyUser {
   @Test(timeout=20000)
   public void testWebHdfsDoAs() throws Exception {
     WebHdfsTestUtil.LOG.info("START: testWebHdfsDoAs()");
-    ((Log4JLogger) NamenodeWebHdfsMethods.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) ExceptionHandler.LOG).getLogger().setLevel(Level.ALL);
     WebHdfsTestUtil.LOG
         .info("ugi.getShortUserName()=" + ugi.getShortUserName());
     final UserGroupInformation proxyUgi = UserGroupInformation
@@ -174,51 +173,17 @@ public class TestDelegationTokenForProxyUser {
     final Path root = new Path("/");
     cluster.getFileSystem().setPermission(root, new FsPermission((short) 0777));
 
-    {
-      //test GETHOMEDIRECTORY with doAs
-      final URL url = WebHdfsTestUtil
-          .toUrl(webhdfs, GetOpParam.Op.GETHOMEDIRECTORY, root,
-              new DoAsParam(PROXY_USER));
-      final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-      final Map<?, ?> m =
-          WebHdfsTestUtil.connectAndGetJson(conn, HttpServletResponse.SC_OK);
-      conn.disconnect();
-
-      final Object responsePath = m.get(Path.class.getSimpleName());
-      WebHdfsTestUtil.LOG.info("responsePath=" + responsePath);
-      Assert.assertEquals("/user/" + PROXY_USER, responsePath);
-    }
+    Whitebox.setInternalState(webhdfs, "ugi", proxyUgi);
 
     {
-      //test GETHOMEDIRECTORY with DOas
-      final URL url = WebHdfsTestUtil
-          .toUrl(webhdfs, GetOpParam.Op.GETHOMEDIRECTORY, root,
-              new DoAsParam(PROXY_USER) {
-                @Override
-                public String getName() {
-                  return "DOas";
-                }
-              });
-      final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-      final Map<?, ?> m =
-          WebHdfsTestUtil.connectAndGetJson(conn, HttpServletResponse.SC_OK);
-      conn.disconnect();
-
-      final Object responsePath = m.get(Path.class.getSimpleName());
+      Path responsePath = webhdfs.getHomeDirectory();
       WebHdfsTestUtil.LOG.info("responsePath=" + responsePath);
-      Assert.assertEquals("/user/" + PROXY_USER, responsePath);
+      Assert.assertEquals(webhdfs.getUri() + "/user/" + PROXY_USER, responsePath.toString());
     }
 
     final Path f = new Path("/testWebHdfsDoAs/a.txt");
     {
-      //test create file with doAs
-      final PutOpParam.Op op = PutOpParam.Op.CREATE;
-      final URL url =
-          WebHdfsTestUtil.toUrl(webhdfs, op, f, new DoAsParam(PROXY_USER));
-      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-      conn = WebHdfsTestUtil.twoStepWrite(webhdfs, op, conn);
-      final FSDataOutputStream out =
-          WebHdfsTestUtil.write(webhdfs, op, conn, 4096);
+      FSDataOutputStream out = webhdfs.create(f);
       out.write("Hello, webhdfs user!".getBytes());
       out.close();
 
@@ -228,14 +193,7 @@ public class TestDelegationTokenForProxyUser {
     }
 
     {
-      //test append file with doAs
-      final PostOpParam.Op op = PostOpParam.Op.APPEND;
-      final URL url =
-          WebHdfsTestUtil.toUrl(webhdfs, op, f, new DoAsParam(PROXY_USER));
-      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-      conn = WebHdfsTestUtil.twoStepWrite(webhdfs, op, conn);
-      final FSDataOutputStream out =
-          WebHdfsTestUtil.write(webhdfs, op, conn, 4096);
+      final FSDataOutputStream out = webhdfs.append(f);
       out.write("\nHello again!".getBytes());
       out.close();
 
