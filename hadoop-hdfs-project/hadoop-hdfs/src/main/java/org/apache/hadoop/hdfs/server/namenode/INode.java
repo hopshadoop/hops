@@ -476,16 +476,27 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    */
   public final ContentSummary computeContentSummary()
       throws StorageException, TransactionContextException {
-    long[] a = computeContentSummary(new long[]{0, 0, 0, 0});
-    return new ContentSummary(a[0], a[1], a[2], getNsQuota(), a[3],
-        getDsQuota());
+    return computeAndConvertContentSummary(
+        new ContentSummaryComputationContext());
+  }
+  
+  /**
+   * Compute {@link ContentSummary}.
+   */
+  public final ContentSummary computeAndConvertContentSummary(
+      ContentSummaryComputationContext summary) throws StorageException, TransactionContextException {
+    Content.Counts counts = computeContentSummary(summary).getCounts();
+    return new ContentSummary(counts.get(Content.LENGTH),
+        counts.get(Content.FILE) + counts.get(Content.SYMLINK),
+        counts.get(Content.DIRECTORY), getNsQuota(),
+        counts.get(Content.DISKSPACE), getDsQuota());
   }
 
   /**
-   * @return an array of three longs.
-   * 0: length, 1: file count, 2: directory count 3: disk space
+   * @param summary the context object holding counts for the subtree.
+   * @return The same objects as summary.
    */
-  abstract long[] computeContentSummary(long[] summary)
+  abstract ContentSummaryComputationContext computeContentSummary(ContentSummaryComputationContext summary)
       throws StorageException, TransactionContextException;
   
   /**

@@ -121,7 +121,9 @@ public class FSDirectory implements Closeable {
   private final int maxComponentLength;
   private final int maxDirItems;
   private final int lsLimit;  // max list limit
-
+  private final int contentCountLimit; // max content summary counts per run
+  private long yieldCount = 0; // keep track of lock yield count.
+  
   private boolean quotaEnabled;
 
 
@@ -146,6 +148,10 @@ public class FSDirectory implements Closeable {
         DFSConfigKeys.DFS_LIST_LIMIT_DEFAULT);
     this.lsLimit = configuredLimit > 0 ? configuredLimit :
         DFSConfigKeys.DFS_LIST_LIMIT_DEFAULT;
+    
+    this.contentCountLimit = conf.getInt(
+        DFSConfigKeys.DFS_CONTENT_SUMMARY_LIMIT_KEY,
+        DFSConfigKeys.DFS_CONTENT_SUMMARY_LIMIT_DEFAULT);
     
     // filesystem limits
     this.maxComponentLength =
@@ -1100,7 +1106,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
     INodeDirectory dirInode = (INodeDirectory) targetNode;
     List<INode> contents = dirInode.getChildrenList();
-    int startChild = dirInode.nextChild(startAfter);
+    int startChild = dirInode.nextChild(contents, startAfter);
     int totalNumChildren = contents.size();
     int numOfListing = Math.min(totalNumChildren - startChild, this.lsLimit);
     HdfsFileStatus listing[] = new HdfsFileStatus[numOfListing];
@@ -1824,8 +1830,19 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     if (targetNode == null) {
       throw new FileNotFoundException("File does not exist: " + srcs);
     } else {
-      return targetNode.computeContentSummary();
+      // Make it relinquish locks everytime contentCountLimit entries are
+      // processed. 0 means disabled. I.e. blocking for the entire duration.
+      ContentSummaryComputationContext cscc = new ContentSummaryComputationContext(this, getFSNamesystem(),
+          contentCountLimit);
+      ContentSummary cs = targetNode.computeAndConvertContentSummary(cscc);
+      yieldCount += cscc.getYieldCount();
+      return cs;
     }
+  }
+  
+  @VisibleForTesting
+  public long getYieldCount() {
+    return yieldCount;
   }
 
   /**
