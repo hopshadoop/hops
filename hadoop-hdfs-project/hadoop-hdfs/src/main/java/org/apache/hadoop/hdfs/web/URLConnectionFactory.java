@@ -27,7 +27,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.hdfs.web.resources.HttpOpParam;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -77,11 +76,12 @@ public class URLConnectionFactory {
    * @throws IOException
    */
   public URLConnection openConnection(URL url) throws IOException {
-    URLConnection connection = url.openConnection();
-    if (connection instanceof HttpURLConnection) {
-      connConfigurator.configure((HttpURLConnection) connection);
+    try {
+      return openConnection(url, false);
+    } catch (AuthenticationException e) {
+      // Unreachable
+      return null;
     }
-    return connection;
   }
 
   /**
@@ -89,12 +89,13 @@ public class URLConnectionFactory {
    *
    * @param url URL to open
    * @return URLConnection
+   * @param isSpnego whether the url should be authenticated via SPNEGO
    * @throws IOException
    * @throws AuthenticationException
    */
-  public URLConnection openConnection(HttpOpParam.Op op, URL url)
+  public URLConnection openConnection(URL url, boolean isSpnego)
       throws IOException, AuthenticationException {
-    if (op.getRequireAuth()) {
+    if (isSpnego) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("open AuthenticatedURL connection" + url);
       }
@@ -106,7 +107,11 @@ public class URLConnectionFactory {
       if (LOG.isDebugEnabled()) {
         LOG.debug("open URL connection");
       }
-      return openConnection(url);
+      URLConnection connection = url.openConnection();
+      if (connection instanceof HttpURLConnection) {
+        connConfigurator.configure((HttpURLConnection) connection);
+      }
+      return connection;
     }
   }
 
