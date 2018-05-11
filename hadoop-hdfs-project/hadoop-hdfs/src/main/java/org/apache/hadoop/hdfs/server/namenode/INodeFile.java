@@ -301,14 +301,19 @@ public class INodeFile extends INode implements BlockCollection {
 
 
   @Override
-  long[] computeContentSummary(long[] summary)
+  public final ContentSummaryComputationContext  computeContentSummary(ContentSummaryComputationContext summary)
       throws StorageException, TransactionContextException {
-    summary[0] += computeFileSize(true);
-    summary[1]++;
-    summary[3] += diskspaceConsumed();
+    computeContentSummary4Current(summary.getCounts());
     return summary;
   }
 
+  private void computeContentSummary4Current(final Content.Counts counts) throws StorageException,
+      TransactionContextException {
+    counts.add(Content.LENGTH, computeFileSize());
+    counts.add(Content.FILE, 1);
+    counts.add(Content.DISKSPACE, diskspaceConsumed());
+  }
+  
   /**
    * Compute file size of the current file size
    * but not including the last block if it is under construction.

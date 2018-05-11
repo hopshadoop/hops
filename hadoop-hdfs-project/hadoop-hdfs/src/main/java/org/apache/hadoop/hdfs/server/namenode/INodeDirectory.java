@@ -328,12 +328,12 @@ public class INodeDirectory extends INode {
    *     a child's name
    * @return the index of the next child
    */
-  int nextChild(byte[] name)
+  int nextChild(List<INode> children, byte[] name)
       throws StorageException, TransactionContextException {
     if (name.length == 0) { // empty name
       return 0;
     }
-    int nextPos = Collections.binarySearch(getChildrenList(), name) + 1;
+    int nextPos = Collections.binarySearch(children, name) + 1;
     if (nextPos >= 0) {
       return nextPos;
     }
@@ -443,35 +443,44 @@ public class INodeDirectory extends INode {
   }
 
   @Override
-  long[] computeContentSummary(long[] summary)
+  ContentSummaryComputationContext computeContentSummary(ContentSummaryComputationContext summary)
       throws StorageException, TransactionContextException {
-    // Walk through the children of this node, using a new summary array
-    // for the (sub)tree rooted at this node
-    assert 4 == summary.length;
-    long[] subtreeSummary = new long[]{0, 0, 0, 0};
-    List<INode> children = getChildren();
-    if (children != null) {
-      for (INode child : children) {
-        child.computeContentSummary(subtreeSummary);
+    List<INode> childrenList = getChildrenList();
+    // Explicit traversing is done to enable repositioning after relinquishing
+    // and reacquiring locks.
+    for (int i = 0;  i < childrenList.size(); i++) {
+      INode child = childrenList.get(i);
+      byte[] childName = child.getLocalNameBytes();
+      
+      long lastYieldCount = summary.getYieldCount();
+      child.computeContentSummary(summary);
+      
+      // Check whether the computation was paused in the subtree.
+      // The counts may be off, but traversing the rest of children
+      // should be made safe.
+      if (lastYieldCount == summary.getYieldCount()) {
+        continue;
       }
-    }
-    if (this instanceof INodeDirectoryWithQuota) {
-      // Warn if the cached and computed diskspace values differ
-      INodeDirectoryWithQuota node = (INodeDirectoryWithQuota) this;
-      long space = node.diskspaceConsumed();
-      if (-1 != node.getDsQuota() && space != subtreeSummary[3]) {
-        NameNode.LOG.warn(
-            "Inconsistent diskspace for directory " + getLocalName() +
-                ". Cached: " + space + " Computed: " + subtreeSummary[3]);
+      
+      // The locks were released and reacquired. Check parent first.
+      if (getParent() == null) {
+        // Stop further counting and return whatever we have so far.
+        break;
       }
+      
+      // Obtain the children list again since it may have been modified.
+      childrenList = getChildrenList();
+      // Reposition in case the children list is changed. Decrement by 1
+      // since it will be incremented when loops.
+      i = nextChild(childrenList, childName) - 1;
     }
+    
+    // Increment the directory count for this directory.
+    summary.getCounts().add(Content.DIRECTORY, 1);
 
-    // update the passed summary array with the values for this node's subtree
-    for (int i = 0; i < summary.length; i++) {
-      summary[i] += subtreeSummary[i];
-    }
+    // Relinquish and reacquire locks if necessary.
+    summary.yield();
 
-    summary[2]++;
     return summary;
   }
 

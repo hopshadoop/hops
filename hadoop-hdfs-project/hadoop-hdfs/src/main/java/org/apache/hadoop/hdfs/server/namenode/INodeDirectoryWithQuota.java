@@ -112,6 +112,28 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
   }
 
   @Override
+  public ContentSummaryComputationContext computeContentSummary(
+      final ContentSummaryComputationContext summary) throws StorageException, TransactionContextException {
+    final long original = summary.getCounts().get(Content.DISKSPACE);
+    long oldYieldCount = summary.getYieldCount();
+    super.computeContentSummary(summary);
+    // Check only when the content has not changed in the middle.
+    if (oldYieldCount == summary.getYieldCount()) {
+      checkDiskspace(summary.getCounts().get(Content.DISKSPACE) - original);
+    }
+    return summary;
+  }
+  
+  private void checkDiskspace(final long computed) throws StorageException, TransactionContextException {
+    long diskspace = diskspaceConsumed();
+    if (-1 != getDsQuota() && diskspace != computed) {
+      NameNode.LOG.error("BUG: Inconsistent diskspace for directory "
+          + getFullPathName() + ". Cached = " + diskspace
+          + " != Computed = " + computed);
+    }
+  }
+  
+  @Override
   DirCounts spaceConsumedInTree(DirCounts counts)
       throws StorageException, TransactionContextException {
     counts.nsCount += getINodeAttributes().getNsCount();

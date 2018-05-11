@@ -400,7 +400,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
 
   private List<INode> syncInodeInstances(List<INode> newInodes) {
     List<INode> finalList = new ArrayList<>(newInodes.size());
-
+    
     for (INode inode : newInodes) {
       if (isRemoved(inode.getId())) {
         continue;
@@ -418,7 +418,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
         inodesNameParentIndex.put(key, inode);
       }
     }
-    //Collections.sort(finalList, INode.Order.ByName);
+    Collections.sort(finalList, INode.Order.ByName);
     return finalList;
   }
 
