@@ -87,7 +87,7 @@ public class HftpFileSystem extends FileSystem
     HttpURLConnection.setFollowRedirects(true);
   }
 
-  URLConnectionFactory connectionFactory = URLConnectionFactory.DEFAULT_CONNECTION_FACTORY;
+  URLConnectionFactory connectionFactory;
   
   public static final Text TOKEN_KIND = new Text("HFTP delegation");
 
@@ -99,7 +99,7 @@ public class HftpFileSystem extends FileSystem
   public static final String HFTP_TIMEZONE = "UTC";
   public static final String HFTP_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZ";
 
-  private TokenAspect<HftpFileSystem> tokenAspect = new TokenAspect<HftpFileSystem>(this, TOKEN_KIND);
+  protected TokenAspect<HftpFileSystem> tokenAspect;
   private Token<?> delegationToken;
   private Token<?> renewToken;
 
@@ -173,6 +173,16 @@ public class HftpFileSystem extends FileSystem
     return SCHEME;
   }
 
+  /**
+   * Initialize connectionFactory and tokenAspect. This function is intended to
+   * be overridden by HsFtpFileSystem.
+   */
+  protected void initConnectionFactoryAndTokenAspect(Configuration conf)
+      throws IOException {
+    tokenAspect = new TokenAspect<HftpFileSystem>(this, TOKEN_KIND);
+    connectionFactory = URLConnectionFactory.DEFAULT_CONNECTION_FACTORY;
+  }
+
   @Override
   public void initialize(final URI name, final Configuration conf)
       throws IOException {
@@ -187,6 +197,7 @@ public class HftpFileSystem extends FileSystem
       throw new IllegalArgumentException(e);
     }
 
+    initConnectionFactoryAndTokenAspect(conf);
     if (UserGroupInformation.isSecurityEnabled()) {
       tokenAspect.initDelegationToken(ugi);
     }
@@ -214,7 +225,7 @@ public class HftpFileSystem extends FileSystem
      *
      * For other operations, however, the client has to send a
      * HDFS_DELEGATION_KIND token over the wire so that it can talk to Hadoop
-     * 0.20.3 clusters. Later releases fix this problem. See HDFS-5440 for more
+     * 0.20.203 clusters. Later releases fix this problem. See HDFS-5440 for more
      * details.
      */
     renewToken = token;
@@ -231,13 +242,12 @@ public class HftpFileSystem extends FileSystem
       return ugi.doAs(new PrivilegedExceptionAction<Token<?>>() {
         @Override
         public Token<?> run() throws IOException {
-          final String nnHttpUrl = nnUri.toString();
           Credentials c;
           try {
             c = DelegationTokenFetcher.getDTfromRemote(connectionFactory, nnUri, renewer);
           } catch (IOException e) {
             if (e.getCause() instanceof ConnectException) {
-              LOG.warn("Couldn't connect to " + nnHttpUrl +
+              LOG.warn("Couldn't connect to " + nnUri +
                   ", assuming security is disabled");
               return null;
             }

@@ -794,6 +794,10 @@ public class NameNode implements NameNodeStatusMXBean {
   public InetSocketAddress getHttpAddress() {
     return httpServer.getHttpAddress();
   }
+  
+  public InetSocketAddress getHttpsAddress() {
+    return httpServer.getHttpsAddress();
+  }
 
   /**
    * Verify that configured directories exist, then Interactively confirm that
