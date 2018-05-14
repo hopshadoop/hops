@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 
 /**
  * Represents a block that is currently being constructed.<br>
@@ -154,6 +155,31 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   }
 
   /**
+   * Process the recorded replicas. When about to commit or finish the
+   * pipeline recovery sort out bad replicas.
+   * @param genStamp  The final generation stamp for the block.
+   */
+  public void setGenerationStampAndVerifyReplicas(long genStamp, DatanodeManager datanodeMgr) throws StorageException, TransactionContextException {
+    List<ReplicaUnderConstruction> replicas = getExpectedReplicas();
+    if (replicas == null)
+      return;
+
+    // Remove the replicas with wrong gen stamp.
+    // The replica list is unchanged.
+    for (ReplicaUnderConstruction r : replicas) {
+      if (genStamp != r.getGenerationStamp()) {
+        DatanodeDescriptor dn = datanodeMgr.getDatanodeBySid(r.getStorageId());
+        dn.removeReplica(this);
+        NameNode.blockStateChangeLog.info("BLOCK* Removing stale replica "
+            + "from location: " + r);
+      }
+    }
+
+    // Set the generation stamp for the block.
+    setGenerationStamp(genStamp);
+  }
+
+  /**
    * Commit block's length and generation stamp as reported by the client. Set
    * block state to {@link BlockUCState#COMMITTED}.
    *
@@ -264,6 +290,12 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   protected void addExpectedReplica(
       DatanodeStorageInfo storage, ReplicaState rState)
       throws StorageException, TransactionContextException {
+    addExpectedReplica(storage, rState, GenerationStamp.GRANDFATHER_GENERATION_STAMP);
+  }
+  
+  protected void addExpectedReplica(
+      DatanodeStorageInfo storage, ReplicaState rState, long genStamp)
+      throws StorageException, TransactionContextException {
 
     int sid = storage.getSid();
 
@@ -275,14 +307,14 @@ public class BlockInfoUnderConstruction extends BlockInfo {
 
         if(r.getStorageId() == sid && r.getState().equals(rState)) {
           // Nothing changed: just return the replica
-          return;
         } else {
           // Update the sid and state, then return
           r.setStorageId(sid);
           r.setState(rState);
-          save();
-          return;
         }
+        r.setGenerationStamp(genStamp);
+        update(r);
+        return;
       }
     }
 

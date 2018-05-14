@@ -34,19 +34,16 @@ import io.hops.metadata.hdfs.dal.MisReplicatedRangeQueueDataAccess;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.HashBucket;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.metadata.security.token.block.NameNodeBlockTokenSecretManager;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
-import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
 import io.hops.util.Slicer;
-import org.apache.commons.configuration.SystemConfiguration;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -63,11 +60,11 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.UnregisteredNodeException;
-import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
+import org.apache.hadoop.hdfs.server.blockmanagement.CorruptReplicasMap.Reason;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.namenode.FSClusterStats;
@@ -119,13 +116,6 @@ import static io.hops.transaction.lock.LockFactory.BLK;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -1348,7 +1338,7 @@ public class BlockManager {
         }
 
 
-        BlockToMarkCorrupt b = new BlockToMarkCorrupt(storedBlock, blk.getGenerationStamp(), reason);
+        BlockToMarkCorrupt b = new BlockToMarkCorrupt(storedBlock, blk.getGenerationStamp(), reason, Reason.CORRUPTION_REPORTED);
         markBlockAsCorrupt(b, storage, node);
 
         return null;
@@ -1386,7 +1376,7 @@ public class BlockManager {
     }
 
     // Add this replica to corruptReplicas Map
-    corruptReplicas.addToCorruptReplicasMap(b.corrupted, storageInfo, b.reason);
+    corruptReplicas.addToCorruptReplicasMap(b.corrupted, storageInfo, b.reason, b.reasonCode);
 
     NumberReplicas numberOfReplicas = countNodes(b.stored);
     boolean hasEnoughLiveReplicas = numberOfReplicas.liveReplicas() >= bc
@@ -2008,22 +1998,25 @@ public class BlockManager {
      * The reason to mark corrupt.
      */
     final String reason;
+    /** The reason code to be stored */
+    final Reason reasonCode;
 
-    BlockToMarkCorrupt(BlockInfo corrupted, BlockInfo stored, String reason) {
+    BlockToMarkCorrupt(BlockInfo corrupted, BlockInfo stored, String reason, Reason reasonCode) {
       Preconditions.checkNotNull(corrupted, "corrupted is null");
       Preconditions.checkNotNull(stored, "stored is null");
 
       this.corrupted = corrupted;
       this.stored = stored;
       this.reason = reason;
+      this.reasonCode = reasonCode;
     }
 
-    BlockToMarkCorrupt(BlockInfo stored, String reason) {
-      this(stored, stored, reason);
+    BlockToMarkCorrupt(BlockInfo stored, String reason, Reason reasonCode) {
+      this(stored, stored, reason, reasonCode);
     }
 
-    BlockToMarkCorrupt(BlockInfo stored, long gs, String reason) {
-      this(new BlockInfo(stored), stored, reason);
+    BlockToMarkCorrupt(BlockInfo stored, long gs, String reason, Reason reasonCode) {
+      this(new BlockInfo(stored), stored, reason, reasonCode);
       //the corrupted block in datanode has a different generation stamp
       corrupted.setGenerationStampNoPersistance(gs);
     }
@@ -2611,9 +2604,11 @@ public class BlockManager {
       return storedBlock;
     }
 
-    //add replica if appropriate
+    // Add replica if appropriate. If the replica was previously corrupt
+    // but now okay, it might need to be updated.
     if (reportedState == ReplicaState.FINALIZED
-      && !storedBlock.isReplicatedOnStorage(storage)){
+        && (!storedBlock.isReplicatedOnStorage(storage) || corruptReplicas.isReplicaCorrupt(storedBlock, storage.
+        getDatanodeDescriptor()))) {
       toAdd.add(storedBlock);
     }
     return storedBlock;
@@ -2722,12 +2717,12 @@ public class BlockManager {
               return new BlockToMarkCorrupt(storedBlock, reportedGS,
                   "block is " + ucState + " and reported genstamp " +
                       reportedGS + " does not match genstamp in block map " +
-                      storedBlock.getGenerationStamp());
+                      storedBlock.getGenerationStamp(), Reason.GENSTAMP_MISMATCH);
             } else if (storedBlock.getNumBytes() != reported.getNumBytes()) {
               return new BlockToMarkCorrupt(storedBlock,
                   "block is " + ucState + " and reported length " +
                       reported.getNumBytes() + " does not match " +
-                      "length in block map " + storedBlock.getNumBytes());
+                      "length in block map " + storedBlock.getNumBytes(), Reason.SIZE_MISMATCH);
             } else {
               return null; // not corrupt
             }
@@ -2745,7 +2740,7 @@ public class BlockManager {
               "reported " + reportedState + " replica with genstamp " +
                   reportedGS +
                   " does not match COMPLETE block's genstamp in block map " +
-                  storedBlock.getGenerationStamp());
+                  storedBlock.getGenerationStamp(), Reason.GENSTAMP_MISMATCH);
         } else { // COMPLETE block, same genstamp
           if (reportedState == ReplicaState.RBW) {
             // If it's a RBW report for a COMPLETE block, it may just be that
@@ -2758,7 +2753,7 @@ public class BlockManager {
             return null;
           } else {
             return new BlockToMarkCorrupt(storedBlock,
-                "reported replica has invalid state " + reportedState);
+                "reported replica has invalid state " + reportedState, Reason.INVALID_STATE);
           }
         }
       case RUR:       // should not be reported
@@ -2770,7 +2765,7 @@ public class BlockManager {
                 .getNumBytes();
         // log here at WARN level since this is really a broken HDFS invariant
         LOG.warn(msg);
-        return new BlockToMarkCorrupt(storedBlock, msg);
+        return new BlockToMarkCorrupt(storedBlock, msg, Reason.INVALID_STATE);
     }
   }
 
@@ -2797,7 +2792,7 @@ public class BlockManager {
 
   private void addStoredBlockUnderConstruction(BlockInfoUnderConstruction block,
      DatanodeStorageInfo storage, ReplicaState reportedState) throws IOException {
-    block.addExpectedReplica(storage, reportedState);
+    block.addExpectedReplica(storage, reportedState, block.getGenerationStamp());
     if (reportedState == ReplicaState.FINALIZED && !block.isReplicatedOnStorage(storage)) {
       addStoredBlock(block, storage, null, true);
     }
@@ -2892,6 +2887,11 @@ public class BlockManager {
         logAddStoredBlock(storedBlock, storage);
       }
     } else {
+      // if the same block is added again and the replica was corrupt
+      // previously because of a wrong gen stamp, remove it from the
+      // corrupt block list.
+      corruptReplicas.removeFromCorruptReplicasMap(block, storage.getDatanodeDescriptor(),
+          Reason.GENSTAMP_MISMATCH);
       curReplicaDelta = 0;
       blockLog.warn("BLOCK* addStoredBlock: " +
           "Redundant addStoredBlock request received for " + storedBlock +
@@ -3038,7 +3038,7 @@ public class BlockManager {
     DatanodeDescriptor[] nodesCopy = nodes.toArray(new DatanodeDescriptor[0]);
     for (DatanodeDescriptor node : nodesCopy) {
       try {
-        removedFromBlocksMap = invalidateBlock(new BlockToMarkCorrupt(blk, null), node);
+        removedFromBlocksMap = invalidateBlock(new BlockToMarkCorrupt(blk, null, Reason.ANY), node);
       } catch (IOException e) {
         blockLog.info("invalidateCorruptReplicas error in deleting bad block " +
                 blk + " on " + node, e);
@@ -4763,7 +4763,7 @@ public class BlockManager {
 
       @Override
       public Object performTask() throws IOException {
-        block.addExpectedReplica(storage, reportedState);
+        block.addExpectedReplica(storage, reportedState, block.getGenerationStamp());
         //and fall through to next clause
         //add replica if appropriate
         if (reportedState == ReplicaState.FINALIZED) {
