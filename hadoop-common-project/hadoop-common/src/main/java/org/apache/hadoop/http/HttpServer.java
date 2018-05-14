@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.http;
 
+import com.google.common.base.Preconditions;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -635,6 +636,19 @@ public class HttpServer implements FilterContainer {
    */
   public int getPort() {
     return webServer.getConnectors()[0].getLocalPort();
+  }
+
+  /**
+   * Get the port that corresponds to a particular connector. In the case of
+   * HDFS, the second connector corresponds to the HTTPS connector.
+   *
+   * @return the corresponding port for the connector, or -1 if there's no such
+   *         connector.
+   */
+  public int getConnectorPort(int index) {
+    Preconditions.checkArgument(index >= 0);
+    return index < webServer.getConnectors().length ?
+        webServer.getConnectors()[index].getLocalPort() : -1;
   }
 
   /**

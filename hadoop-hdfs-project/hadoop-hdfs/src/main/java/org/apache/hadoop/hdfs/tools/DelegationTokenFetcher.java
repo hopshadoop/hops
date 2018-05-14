@@ -55,6 +55,7 @@ import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
 import java.util.Date;
+import org.apache.hadoop.hdfs.web.HsftpFileSystem;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ExitUtil;
@@ -222,6 +223,8 @@ public class DelegationTokenFetcher {
           .append(renewer);
     }
 
+    boolean isHttps = nnUri.getScheme().equals("https");
+    
     HttpURLConnection conn = null;
     DataInputStream dis = null;
     InetSocketAddress serviceAddr = NetUtils.createSocketAddr(nnUri
@@ -234,7 +237,7 @@ public class DelegationTokenFetcher {
       dis = new DataInputStream(in);
       ts.readFields(dis);
       for (Token<?> token : ts.getAllTokens()) {
-        token.setKind(HftpFileSystem.TOKEN_KIND);
+        token.setKind(isHttps ? HsftpFileSystem.TOKEN_KIND : HftpFileSystem.TOKEN_KIND);
         SecurityUtil2.setTokenService(token, serviceAddr);
       }
       return ts;
