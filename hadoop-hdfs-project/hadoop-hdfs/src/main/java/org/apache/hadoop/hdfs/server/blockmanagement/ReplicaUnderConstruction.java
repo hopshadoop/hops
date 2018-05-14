@@ -25,6 +25,7 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 
 import java.util.Comparator;
+import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 
 /**
  * ReplicaUnderConstruction contains information about replicas while they are
@@ -72,16 +73,18 @@ public class ReplicaUnderConstruction extends Replica {
 
   HdfsServerConstants.ReplicaState state;
   private boolean chosenAsPrimary;
+  private long generationStamp;
 
   public ReplicaUnderConstruction(ReplicaState state, int storageId,
       long blockId, int inodeId, int bucketId) {
-    this(state, storageId, blockId, inodeId, bucketId, false);
+    this(state, storageId, blockId, inodeId, bucketId, false, GenerationStamp.GRANDFATHER_GENERATION_STAMP);
   }
   public ReplicaUnderConstruction(ReplicaState state, int storageId,
-      long blockId, int inodeId, int bucketId, boolean chosenAsPrimary) {
+      long blockId, int inodeId, int bucketId, boolean chosenAsPrimary, long generationStamp) {
     super(storageId, blockId, inodeId, bucketId);
     this.state = state;
     this.chosenAsPrimary = chosenAsPrimary;
+    this.generationStamp = generationStamp;
   }
 
   public DatanodeStorageInfo getExpectedStorageLocation(DatanodeManager
@@ -109,5 +112,13 @@ public class ReplicaUnderConstruction extends Replica {
    */
   void setChosenAsPrimary(boolean chosenAsPrimary) throws TransactionContextException, StorageException {
     this.chosenAsPrimary = chosenAsPrimary;
+  }
+
+  public long getGenerationStamp() {
+    return generationStamp;
+  }
+
+  public void setGenerationStamp(long generationStamp) {
+    this.generationStamp = generationStamp;
   }
 }

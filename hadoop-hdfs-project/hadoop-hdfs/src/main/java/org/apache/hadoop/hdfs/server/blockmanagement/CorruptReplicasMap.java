@@ -37,9 +37,13 @@ import org.apache.hadoop.ipc.Server;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -54,6 +58,16 @@ import java.util.TreeSet;
 @InterfaceAudience.Private
 public class CorruptReplicasMap {
   
+  /** The corruption reason code */
+  public static enum Reason {
+    NONE,                // not specified.
+    ANY,                 // wildcard reason
+    GENSTAMP_MISMATCH,   // mismatch in generation stamps
+    SIZE_MISMATCH,       // mismatch in sizes
+    INVALID_STATE,       // invalid state
+    CORRUPTION_REPORTED  // client or datanode reported the corruption
+  }
+
   private final DatanodeManager datanodeMgr;
   private static final Log LOG =
       LogFactory.getLog(CorruptReplicasMap.class);
@@ -74,8 +88,20 @@ public class CorruptReplicasMap {
    */
   public void addToCorruptReplicasMap(BlockInfo blk, DatanodeStorageInfo
       storage, String reason) throws StorageException, TransactionContextException {
-    Collection<DatanodeDescriptor> nodes = getNodes(blk);
-
+    addToCorruptReplicasMap(blk, storage, reason, Reason.NONE);
+  }
+  
+  /**
+   * Mark the block belonging to datanode as corrupt.
+   *
+   * @param blk Block to be added to CorruptReplicasMap
+   * @param dn DatanodeDescriptor which holds the corrupt replica
+   * @param reason a textual reason (for logging purposes)
+   * @param reasonCode the enum representation of the reason
+   */
+  public void addToCorruptReplicasMap(BlockInfo blk, DatanodeStorageInfo storage,
+      String reason, Reason reasonCode) throws StorageException, TransactionContextException {
+    Map <DatanodeDescriptor, Reason> nodes = getNodesMap(blk);
     String reasonText;
     if (reason != null) {
       reasonText = " because " + reason;
@@ -89,10 +115,7 @@ public class CorruptReplicasMap {
       return;
     }
     
-    if (!nodes.contains(storage.getDatanodeDescriptor())) {
-      addCorruptReplicaToDB(new CorruptReplica(storage.getSid(),
-          blk.getBlockId(), blk.getInodeId()));
-
+    if (!nodes.keySet().contains(storage.getDatanodeDescriptor())) {
       NameNode.blockStateChangeLog
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
               blk.getBlockName() + " added as corrupt on " + storage +
@@ -104,6 +127,9 @@ public class CorruptReplicasMap {
               " to add as corrupt on " + storage +
               " by " + Server.getRemoteIp() + reasonText);
     }
+    // Add the node or update the reason.
+    addCorruptReplicaToDB(new CorruptReplica(storage.getSid(),
+          blk.getBlockId(), blk.getInodeId(), reasonCode.name()));
   }
 
   /**
@@ -131,28 +157,38 @@ public class CorruptReplicasMap {
    */
   boolean removeFromCorruptReplicasMap(BlockInfo blk, DatanodeDescriptor
       datanode) throws IOException {
-    // Get the list of storages where the replica is stored
+    return removeFromCorruptReplicasMap(blk, datanode, Reason.ANY);
+  }
+  
+  boolean removeFromCorruptReplicasMap(BlockInfo blk, DatanodeDescriptor datanode,
+      Reason reason) throws StorageException, TransactionContextException {
     Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
-    if (corruptReplicas == null || corruptReplicas.size() == 0) {
+    Map <DatanodeDescriptor, Reason> datanodes = getNodesMap(corruptReplicas);
+    if (datanodes==null)
+      return false;
+    
+    // if reasons can be compared but don't match, return false.
+    Reason storedReason = datanodes.get(datanode);
+    if (reason != Reason.ANY && storedReason != null &&
+        reason != storedReason) {
       return false;
     }
 
-    HashSet<Integer> replicaSids = new HashSet<Integer>();
-    for(CorruptReplica c : corruptReplicas) {
-      replicaSids.add(c.getStorageId());
-    }
-
-    boolean result = false;
-    // Get the list of storages on this datanode
-    for(DatanodeStorageInfo storage : datanode.getStorageInfos()) {
-      if(replicaSids.contains(storage.getSid())) {
-        result = true;
-        removeCorruptReplicaFromDB(new CorruptReplica(storage.getSid(), blk
-            .getBlockId(), blk.getInodeId()));
+    if (datanodes.containsKey(datanode)) { // remove the replicas
+      Set<Integer> sids = new HashSet<>();
+      for(DatanodeStorageInfo storage: datanode.getStorageInfos()){
+        sids.add(storage.getSid());
       }
+      for(CorruptReplica c : corruptReplicas){
+        if(sids.contains(c.getStorageId())){
+          removeCorruptReplicaFromDB(new CorruptReplica(c.getStorageId(), blk
+            .getBlockId(), blk.getInodeId(), c.getReason()));
+        }
+      }
+      return true;
     }
-
-    return result;
+    return false;
+  
   }
 
 
@@ -183,6 +219,41 @@ public class CorruptReplicasMap {
     return dnds;
   }
 
+    /**
+   * Get Nodes which have corrupt replicas of Block
+   *
+   * @param blk
+   *     Block for which nodes are requested
+   * @return collection of nodes. Null if does not exists
+   */
+  Map<DatanodeDescriptor, Reason> getNodesMap(BlockInfo blk) throws StorageException, TransactionContextException {
+    // HOPS datanodeMgr is null in some tests
+    if (datanodeMgr == null) {
+      return new TreeMap<>();
+    }
+
+    Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
+    return getNodesMap(corruptReplicas);
+  }
+  
+  Map<DatanodeDescriptor, Reason> getNodesMap(Collection<CorruptReplica> corruptReplicas) throws StorageException, TransactionContextException {
+    // HOPS datanodeMgr is null in some tests
+    if (datanodeMgr == null) {
+      return new TreeMap<>();
+    }
+
+    Map<DatanodeDescriptor, Reason> dnds = new TreeMap<>();
+    if (corruptReplicas != null) {
+      for (CorruptReplica cr : corruptReplicas) {
+        DatanodeDescriptor dn = datanodeMgr.getDatanodeBySid(cr.getStorageId());
+        if (dn != null) {
+          dnds.put(dn, Reason.valueOf(cr.getReason()));
+        }
+      }
+    }
+    return dnds;
+  }
+  
   /**
    * Check if replica belonging to Datanode is corrupt
    *

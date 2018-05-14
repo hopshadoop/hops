@@ -5724,7 +5724,7 @@ public class FSNamesystem
 
     // Update old block with the new generation stamp and new length
     blockInfo.setNumBytes(newBlock.getNumBytes());
-    blockInfo.setGenerationStamp(newBlock.getGenerationStamp());
+    blockInfo.setGenerationStampAndVerifyReplicas(newBlock.getGenerationStamp(), blockManager.getDatanodeManager());
     pendingFile.recomputeFileSize();
 
     // find the DatanodeStorageInfo objects
