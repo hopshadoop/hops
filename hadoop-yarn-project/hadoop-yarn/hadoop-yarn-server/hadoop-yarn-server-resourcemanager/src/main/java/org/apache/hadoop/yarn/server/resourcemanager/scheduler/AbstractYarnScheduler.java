@@ -809,7 +809,11 @@ public abstract class AbstractYarnScheduler
       if (maxNodeVCores != -1) {
         maxVcores = Math.min(maxVcores, maxNodeVCores);
       }
-      maximumAllocation = Resources.createResource(maxMemory, maxVcores);
+      int maxGPUs = newMaxAlloc.getGPUs();
+      if (maxNodeGPUs != -1) {
+        maxGPUs = Math.min(maxGPUs, maxNodeGPUs);
+      }
+      maximumAllocation = Resources.createResource(maxMemory, maxVcores, maxGPUs);
     } finally {
       maxAllocWriteLock.unlock();
     }

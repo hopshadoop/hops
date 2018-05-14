@@ -2479,6 +2479,9 @@ public class TestCapacityScheduler {
     assertEquals("max allocation in CS",
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
         cs.getMaximumResourceCapability().getMemorySize());
+    assertEquals("max gpu allocation in CS",
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_GPUS,
+            cs.getMaximumResourceCapability().getGPUs());
     assertEquals("max allocation for A1",
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
         conf.getMaximumAllocationPerQueue(A1).getMemorySize());
