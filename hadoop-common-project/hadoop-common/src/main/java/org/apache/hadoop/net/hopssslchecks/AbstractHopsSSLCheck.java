@@ -42,7 +42,7 @@ public abstract class AbstractHopsSSLCheck implements HopsSSLCheck, Comparable<H
   
   public abstract HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperUsers,
       Configuration configuration, CertificateLocalization certificateLocalization)
-      throws IOException, SSLMaterialAlreadyConfiguredException;
+      throws IOException;
   
   @Override
   public Integer getPriority() {
@@ -99,6 +99,9 @@ public abstract class AbstractHopsSSLCheck implements HopsSSLCheck, Comparable<H
     String keystorePassword = sslConf.get(
         FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
             FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
+    String keyPassword = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY));
     String truststoreLocation = sslConf.get(
         FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
             FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
@@ -113,7 +116,8 @@ public abstract class AbstractHopsSSLCheck implements HopsSSLCheck, Comparable<H
           "Check your configuration.");
     }
   
-    return new HopsSSLCryptoMaterial(keystoreLocation, keystorePassword, truststoreLocation, truststorePassword);
+    return new HopsSSLCryptoMaterial(keystoreLocation, keystorePassword, keyPassword, truststoreLocation,
+        truststorePassword);
   }
   
   private boolean isCryptoMaterialSet(Configuration conf, String username) {

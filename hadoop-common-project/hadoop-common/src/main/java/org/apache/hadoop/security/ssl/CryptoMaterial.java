@@ -30,14 +30,14 @@ public class CryptoMaterial {
   
   private final Path certFolder;
   private final Path keyStoreLocation;
-  private final int keyStoreSize;
+  private int keyStoreSize;
   private final Path trustStoreLocation;
   private final Path passwdLocation;
   private final int trustStoreSize;
-  private final ByteBuffer keyStoreMem;
-  private final String keyStorePass;
-  private final ByteBuffer trustStoreMem;
-  private final String trustStorePass;
+  private ByteBuffer keyStoreMem;
+  private String keyStorePass;
+  private ByteBuffer trustStoreMem;
+  private String trustStorePass;
   private final AtomicBoolean tombstone;
   
   private STATE state;
@@ -74,7 +74,7 @@ public class CryptoMaterial {
     return keyStoreLocation;
   }
   
-  public int getKeyStoreSize() {
+  public synchronized int getKeyStoreSize() {
     return keyStoreSize;
   }
   
@@ -90,20 +90,36 @@ public class CryptoMaterial {
     return trustStoreSize;
   }
   
-  public ByteBuffer getKeyStoreMem() {
+  public synchronized ByteBuffer getKeyStoreMem() {
     return keyStoreMem.asReadOnlyBuffer();
   }
   
-  public String getKeyStorePass() {
+  public synchronized void updateKeyStoreMem(ByteBuffer keyStoreMem) {
+    this.keyStoreMem = keyStoreMem;
+  }
+  
+  public synchronized String getKeyStorePass() {
     return keyStorePass;
   }
   
-  public ByteBuffer getTrustStoreMem() {
+  public synchronized void updateKeyStorePass(String keyStorePass) {
+    this.keyStorePass = keyStorePass;
+  }
+  
+  public synchronized ByteBuffer getTrustStoreMem() {
     return trustStoreMem.asReadOnlyBuffer();
   }
   
-  public String getTrustStorePass() {
+  public synchronized void updateTrustStoreMem(ByteBuffer trustStoreMem) {
+    this.trustStoreMem = trustStoreMem;
+  }
+  
+  public synchronized String getTrustStorePass() {
     return trustStorePass;
+  }
+  
+  public synchronized void updateTrustStorePass(String trustStorePass) {
+    this.trustStorePass = trustStorePass;
   }
   
   public int getRequestedApplications() {

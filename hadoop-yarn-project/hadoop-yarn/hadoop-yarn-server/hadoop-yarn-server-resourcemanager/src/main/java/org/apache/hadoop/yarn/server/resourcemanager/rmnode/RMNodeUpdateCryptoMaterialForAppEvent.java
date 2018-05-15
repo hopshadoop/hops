@@ -15,25 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
+package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.NodeId;
 
-public class RMAppCertificateGeneratedEvent extends RMAppEvent {
+public class RMNodeUpdateCryptoMaterialForAppEvent extends RMNodeEvent {
+  private final ApplicationId appId;
   private final byte[] keyStore;
   private final char[] keyStorePassword;
   private final byte[] trustStore;
   private final char[] trustStorePassword;
-  private final long expirationEpoch;
+  private final int version;
   
-  public RMAppCertificateGeneratedEvent(ApplicationId appId, byte[] keyStore, char[] keyStorePassword,
-      byte[] trustStore, char[] trustStorePassword, long expirationEpoch, RMAppEventType type) {
-    super(appId, type);
+  public RMNodeUpdateCryptoMaterialForAppEvent(NodeId nodeId, ApplicationId appId,
+      byte[] keyStore, char[] keyStorePassword,
+      byte[] trustStore, char[] trustStorePassword, int version) {
+    super(nodeId, RMNodeEventType.UPDATE_CRYPTO_MATERIAL);
+    this.appId = appId;
     this.keyStore = keyStore;
     this.keyStorePassword = keyStorePassword;
     this.trustStore = trustStore;
     this.trustStorePassword = trustStorePassword;
-    this.expirationEpoch = expirationEpoch;
+    this.version = version;
+  }
+  
+  public ApplicationId getAppId() {
+    return appId;
   }
   
   public byte[] getKeyStore() {
@@ -52,7 +60,7 @@ public class RMAppCertificateGeneratedEvent extends RMAppEvent {
     return trustStorePassword;
   }
   
-  public long getExpirationEpoch() {
-    return expirationEpoch;
+  public int getVersion() {
+    return version;
   }
 }

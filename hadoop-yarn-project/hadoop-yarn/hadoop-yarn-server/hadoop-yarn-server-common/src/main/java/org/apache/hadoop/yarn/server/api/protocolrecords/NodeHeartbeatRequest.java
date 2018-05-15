@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.server.api.protocolrecords;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
@@ -59,4 +60,9 @@ public abstract class NodeHeartbeatRequest {
 
   public abstract void setLogAggregationReportsForApps(
       List<LogAggregationReport> logAggregationReportsForApps);
+  
+  public abstract Set<ApplicationId> getUpdatedApplicationsWithNewCryptoMaterial();
+  
+  public abstract void setUpdatedApplicationsWithNewCryptoMaterial(
+      Set<ApplicationId> updatedApplicationsWithNewCryptoMaterial);
 }

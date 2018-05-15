@@ -1325,6 +1325,13 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
     rmStore.updateApplicationAttemptState(attemptState);
   }
 
+  private static final EnumSet<RMAppAttemptState> STATES_THAT_SHOULD_REVOKE_CERTS = EnumSet.of(
+      RMAppAttemptState.NEW,
+      RMAppAttemptState.SUBMITTED,
+      RMAppAttemptState.SCHEDULED,
+      RMAppAttemptState.ALLOCATED_SAVING,
+      RMAppAttemptState.ALLOCATED);
+  
   private static class FinalSavingTransition extends BaseTransition {
 
     Object transitionToDo;
@@ -1338,6 +1345,9 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
 
     @Override
     public void transition(RMAppAttemptImpl appAttempt, RMAppAttemptEvent event) {
+      if (STATES_THAT_SHOULD_REVOKE_CERTS.contains(appAttempt.getState())) {
+        appAttempt.sendCertificateRevocationEvent();
+      }
       // For cases Killed/Failed, targetedFinalState is the same as the state to
       // be stored
       appAttempt.rememberTargetTransitionsAndStoreState(event, transitionToDo,
@@ -1703,14 +1713,20 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
             AMLauncherEventType.CLEANUP, appAttempt));
       } else {
         // Tell RMAppCertificateManager to revoke the certificate and remove it from local cache
-        ApplicationId applicationId = appAttempt.applicationAttemptId.getApplicationId();
-        String user = appAttempt.rmContext.getRMApps().get(applicationId).getUser();
-        appAttempt.eventHandler.handle(new RMAppCertificateManagerEvent(
-            applicationId, user, RMAppCertificateManagerEventType.REVOKE_CERTIFICATE));
+        appAttempt.sendCertificateRevocationEvent();
       }
     }
   }
 
+  private void sendCertificateRevocationEvent() {
+    ApplicationId applicationId = applicationAttemptId.getApplicationId();
+    RMApp application = rmContext.getRMApps().get(applicationId);
+    String user = application.getUser();
+    Integer cryptoMaterialVersion = application.getCryptoMaterialVersion();
+    eventHandler.handle(new RMAppCertificateManagerEvent(
+        applicationId, user, cryptoMaterialVersion, RMAppCertificateManagerEventType.REVOKE_CERTIFICATE));
+  }
+  
   private static class ExpiredTransition extends FinalTransition {
 
     public ExpiredTransition() {

@@ -27,10 +27,13 @@ import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.net.NetworkTopology;
@@ -42,6 +45,7 @@ import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
@@ -61,6 +65,7 @@ import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
+import org.apache.hadoop.yarn.server.resourcemanager.Application;
 import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
@@ -277,9 +282,9 @@ public class TestAMRMClientOnRMRestart {
         NMContainerStatus.newInstance(containerId, 0, ContainerState.RUNNING,
             Resource.newInstance(1024, 1), "recover container", 0,
             Priority.newInstance(0), 0);
-    nm1.registerNode(Collections.singletonList(containerReport),
-        Collections.singletonList(
-            containerId.getApplicationAttemptId().getApplicationId()));
+    Map<ApplicationId, Integer> runningApps = new HashMap<>(1);
+    runningApps.put(containerId.getApplicationAttemptId().getApplicationId(), 0);
+    nm1.registerNode(Collections.singletonList(containerReport), runningApps);
     nm1.nodeHeartbeat(true);
     dispatcher.await();
 

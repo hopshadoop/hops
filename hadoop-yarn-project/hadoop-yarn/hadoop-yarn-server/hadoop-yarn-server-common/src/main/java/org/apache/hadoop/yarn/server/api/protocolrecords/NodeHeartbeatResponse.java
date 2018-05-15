@@ -86,4 +86,8 @@ public interface NodeHeartbeatResponse {
   boolean getNextheartbeat();
   
   public void setNextheartbeat(boolean nextHeartbeat);
+  
+  Map<ApplicationId, UpdatedCryptoForApp> getUpdatedCryptoForApps();
+  
+  void setUpdatedCryptoForApps(Map<ApplicationId, UpdatedCryptoForApp> updatedCryptoForApps);
 }

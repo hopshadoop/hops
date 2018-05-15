@@ -38,11 +38,9 @@ public interface HopsSSLCheck {
    *                               otherwise null
    * @return HopsSSLCryptoMaterial if able to pass the tests and find proper material, null otherwise.
    * @throws IOException
-   * @throws SSLMaterialAlreadyConfiguredException When the configuration already contains correct values for TLS
-   * configuration properties
    */
   HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperUsers, Configuration configuration,
       CertificateLocalization certificateLocalization)
-      throws IOException, SSLMaterialAlreadyConfiguredException;
+      throws IOException;
   Integer getPriority();
 }

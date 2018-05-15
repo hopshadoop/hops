@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManager;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.LocalConfigurationProvider;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -87,6 +88,7 @@ public class RMContextImpl implements RMContext {
   
   private byte[] seed;
   private String userFolderHashAlgo = YarnConfiguration.DEFAULT_USER_FOLDER_ALGO;
+  private RMAppCertificateManager rmAppCertificateManager;
   
   /**
    * Default constructor. To be used in conjunction with setter methods for
@@ -568,5 +570,14 @@ public class RMContextImpl implements RMContext {
   public void setUserFolderHashAlgo(String userFolderHashAlgo) {
     this.userFolderHashAlgo = userFolderHashAlgo;
   }
-
+  
+  @Override
+  public RMAppCertificateManager getRMAppCertificateManager() {
+    return rmAppCertificateManager;
+  }
+  
+  @Override
+  public void setRMAppCertificateManager(RMAppCertificateManager rmAppCertificateManager) {
+    this.rmAppCertificateManager = rmAppCertificateManager;
+  }
 }

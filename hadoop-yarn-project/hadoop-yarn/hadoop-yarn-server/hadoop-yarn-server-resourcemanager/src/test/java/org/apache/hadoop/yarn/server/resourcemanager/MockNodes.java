@@ -21,7 +21,9 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -35,7 +37,7 @@ import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
-import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
 
@@ -113,6 +115,7 @@ public class MockNodes {
     private Set<String> labels;
     private ResourceUtilization containersUtilization;
     private ResourceUtilization nodeUtilization;
+    private Map<ApplicationId, UpdatedCryptoForApp> appCryptoMaterialToUpdate = new ConcurrentHashMap<>();
 
     public MockRMNodeImpl(NodeId nodeId, String nodeAddr, String httpAddress,
         Resource perNode, String rackName, String healthReport,
@@ -268,6 +271,11 @@ public class MockNodes {
 
     @Override
     public void setUntrackedTimeStamp(long timeStamp) {
+    }
+  
+    @Override
+    public Map<ApplicationId, UpdatedCryptoForApp> getAppCryptoMaterialToUpdate() {
+      return appCryptoMaterialToUpdate;
     }
   };
 

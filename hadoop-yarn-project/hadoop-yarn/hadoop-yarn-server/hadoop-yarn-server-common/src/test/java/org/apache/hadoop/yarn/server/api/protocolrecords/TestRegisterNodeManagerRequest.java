@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.server.api.protocolrecords;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -34,6 +36,11 @@ import org.junit.Test;
 public class TestRegisterNodeManagerRequest {
   @Test
   public void testRegisterNodeManagerRequest() {
+    ApplicationId appId1 = ApplicationId.newInstance(1234L, 1);
+    ApplicationId appId2 = ApplicationId.newInstance(1234L, 2);
+    Map<ApplicationId, Integer> runningApplications = new HashMap<>(2);
+    runningApplications.put(appId1, 0);
+    runningApplications.put(appId2, 2);
     RegisterNodeManagerRequest request =
         RegisterNodeManagerRequest.newInstance(
           NodeId.newInstance("host", 1234), 1234, Resource.newInstance(0, 0),
@@ -42,9 +49,7 @@ public class TestRegisterNodeManagerRequest {
               ApplicationAttemptId.newInstance(
                 ApplicationId.newInstance(1234L, 1), 1), 1), 0,
             ContainerState.RUNNING, Resource.newInstance(1024, 1), "good", -1,
-            Priority.newInstance(0), 1234)), Arrays.asList(
-            ApplicationId.newInstance(1234L, 1),
-            ApplicationId.newInstance(1234L, 2)));
+            Priority.newInstance(0), 1234)), runningApplications);
 
     // serialze to proto, and get request from proto
     RegisterNodeManagerRequest request1 =
@@ -62,6 +67,10 @@ public class TestRegisterNodeManagerRequest {
         .getRunningApplications().get(0));
     Assert.assertEquals(request1.getRunningApplications().get(1), request
         .getRunningApplications().get(1));
+    Assert.assertEquals(request1.getRunningApplications().get(appId1), request
+        .getRunningApplications().get(appId1));
+    Assert.assertEquals(request1.getRunningApplications().get(appId2), request
+        .getRunningApplications().get(appId2));
   }
   
   @Test

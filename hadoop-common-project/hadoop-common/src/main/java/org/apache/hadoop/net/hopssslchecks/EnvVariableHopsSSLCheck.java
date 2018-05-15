@@ -56,8 +56,8 @@ public class EnvVariableHopsSSLCheck extends AbstractHopsSSLCheck {
       }
       
       String password = HopsUtil.readCryptoMaterialPassword(passwordFd);
-      return new HopsSSLCryptoMaterial(keystoreFd.getAbsolutePath(), password, trustStoreFd.getAbsolutePath(),
-          password);
+      return new HopsSSLCryptoMaterial(keystoreFd.getAbsolutePath(), password, password, trustStoreFd.getAbsolutePath(),
+          password, passwordFd.getAbsolutePath(), true);
     }
     
     return null;

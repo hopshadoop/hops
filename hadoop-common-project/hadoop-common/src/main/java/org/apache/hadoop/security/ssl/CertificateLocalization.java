@@ -18,6 +18,7 @@
 package org.apache.hadoop.security.ssl;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
@@ -43,9 +44,14 @@ public interface CertificateLocalization {
   CryptoMaterial getMaterialLocation(String username, String applicationId)
       throws FileNotFoundException, InterruptedException;
   
+  void updateCryptoMaterial(String username, String applicationId, ByteBuffer keyStore, String keyStorePassword,
+      ByteBuffer trustStore, String trustStorePassword) throws IOException, InterruptedException;
+  
   String getSuperKeystoreLocation();
   
   String getSuperKeystorePass();
+  
+  String getSuperKeyPassword();
   
   String getSuperTruststoreLocation();
   

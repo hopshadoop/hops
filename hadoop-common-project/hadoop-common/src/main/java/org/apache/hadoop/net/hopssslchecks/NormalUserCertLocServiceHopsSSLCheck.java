@@ -55,8 +55,11 @@ public class NormalUserCertLocServiceHopsSSLCheck extends AbstractHopsSSLCheck {
           return new HopsSSLCryptoMaterial(
               material.getKeyStoreLocation().toString(),
               material.getKeyStorePass(),
+              material.getKeyStorePass(),
               material.getTrustStoreLocation().toString(),
-              material.getTrustStorePass());
+              material.getTrustStorePass(),
+              material.getPasswdLocation().toString(),
+              true);
         } catch (InterruptedException ex) {
           throw new IOException(ex);
         }

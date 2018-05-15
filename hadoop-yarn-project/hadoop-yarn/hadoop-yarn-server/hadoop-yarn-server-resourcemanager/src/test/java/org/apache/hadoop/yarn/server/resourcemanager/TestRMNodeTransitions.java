@@ -18,6 +18,8 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
@@ -26,7 +28,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -45,6 +49,7 @@ import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.event.InlineDispatcher;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
@@ -61,6 +66,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeReconnectEvent
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeResourceUpdateEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStartedEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStatusEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeUpdateCryptoMaterialForAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
@@ -909,6 +915,26 @@ public class TestRMNodeTransitions {
         nodesListManagerEvent.getType());
   }
 
+  @Test
+  public void testCryptoMaterialUpdateOnRunningNode() {
+    RMNodeImpl node = getRunningNode();
+    ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
+    byte[] keyStore = "keyStore".getBytes();
+    char[] keyStorePassword = "keyStorePassword".toCharArray();
+    byte[] trustStore = "trustStore".getBytes();
+    char[] trustStorePassword = "trustStorePassword".toCharArray();
+    RMNodeUpdateCryptoMaterialForAppEvent updateEvent = new RMNodeUpdateCryptoMaterialForAppEvent(
+        node.getNodeID(), appId, keyStore, keyStorePassword, trustStore, trustStorePassword, 0);
+    node.handle(updateEvent);
+    assertEquals(1, node.getAppCryptoMaterialToUpdate().size());
+    UpdatedCryptoForApp cryptoToUpdate = node.getAppCryptoMaterialToUpdate().get(appId);
+    assertNotNull(cryptoToUpdate);
+    assertTrue(ByteBuffer.wrap(keyStore).equals(cryptoToUpdate.getKeyStore()));
+    assertTrue(Arrays.equals(keyStorePassword, cryptoToUpdate.getKeyStorePassword()));
+    assertTrue(ByteBuffer.wrap(trustStore).equals(cryptoToUpdate.getTrustStore()));
+    assertTrue(Arrays.equals(trustStorePassword, cryptoToUpdate.getTrustStorePassword()));
+  }
+  
   @Test
   public void testDecommissioningOnRunningNode(){
     getDecommissioningNode();

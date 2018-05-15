@@ -22,11 +22,15 @@ import static org.apache.hadoop.service.Service.STATE.STARTED;
 
 import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,11 +38,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -59,6 +69,8 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.service.ServiceStateChangeListener;
+import org.apache.hadoop.util.BackOff;
+import org.apache.hadoop.util.ExponentialBackOff;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
@@ -110,6 +122,7 @@ import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedAppsEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedContainersEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrDecreaseContainersResourceEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrSignalContainersEvent;
+import org.apache.hadoop.yarn.server.nodemanager.CMgrUpdateCryptoMaterialEvent;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerManagerEvent;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
@@ -200,6 +213,9 @@ public class ContainerManagerImpl extends CompositeService implements
   protected boolean amrmProxyEnabled = false;
 
   private long waitForContainersOnShutdownMillis;
+  
+  private final ExecutorService cryptoMaterialUpdaterThreadPool;
+  private final Map<ContainerId, Future> cryptoMaterialUpdaters = new HashMap<>();
 
   public ContainerManagerImpl(Context context, ContainerExecutor exec,
       DeletionService deletionContext, NodeStatusUpdater nodeStatusUpdater,
@@ -247,6 +263,12 @@ public class ContainerManagerImpl extends CompositeService implements
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     this.readLock = lock.readLock();
     this.writeLock = lock.writeLock();
+  
+    this.cryptoMaterialUpdaterThreadPool = Executors.newFixedThreadPool(3,
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat("Container crypto material updater thread #%d")
+            .build());
   }
 
   @Override
@@ -319,14 +341,16 @@ public class ContainerManagerImpl extends CompositeService implements
     Credentials creds = new Credentials();
     creds.readTokenStorageStream(
         new DataInputStream(p.getCredentials().newInput()));
-
+    int cryptoMaterialVersion = -1;
+    
     if (getConfig() != null && getConfig().getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
       materializeCertificates(appId, p.getUser(), p.getUserFolder(),
           ProtoUtils.convertFromProtoFormat(p.getKeyStore()), p.getKeyStorePassword(),
           ProtoUtils.convertFromProtoFormat(p.getTrustStore()), p.getTrustStorePassword());
+      cryptoMaterialVersion = p.getCryptoVersion();
     }
-
+    
     List<ApplicationACLMapProto> aclProtoList = p.getAclsList();
     Map<ApplicationAccessType, String> acls =
         new HashMap<ApplicationAccessType, String>(aclProtoList.size());
@@ -342,8 +366,15 @@ public class ContainerManagerImpl extends CompositeService implements
     }
 
     LOG.info("Recovering application " + appId);
-    ApplicationImpl app = new ApplicationImpl(dispatcher, p.getUser(), appId,
-        creds, context, p.getUserFolder());
+    ApplicationImpl app = null;
+    if (cryptoMaterialVersion == -1) {
+      // Basically if RPC TLS is disabled
+      app = new ApplicationImpl(dispatcher, p.getUser(), appId,
+          creds, context, p.getUserFolder());
+    } else {
+      app = new ApplicationImpl(dispatcher, p.getUser(), appId, creds, context, p.getUserFolder(),
+          cryptoMaterialVersion);
+    }
     context.getApplications().put(appId, app);
     app.handle(new ApplicationInitEvent(appId, acls, logAggregationContext));
   }
@@ -561,6 +592,9 @@ public class ContainerManagerImpl extends CompositeService implements
     }
     if (server != null) {
       server.stop();
+    }
+    if (cryptoMaterialUpdaterThreadPool != null) {
+      cryptoMaterialUpdaterThreadPool.shutdownNow();
     }
     super.serviceStop();
   }
@@ -898,7 +932,7 @@ public class ContainerManagerImpl extends CompositeService implements
       String user, String userFolder, Credentials credentials,
       Map<ApplicationAccessType, String> appAcls,
       LogAggregationContext logAggregationContext, ByteBuffer keyStore, String keyStorePass,
-      ByteBuffer trustStore, String trustStorePass) {
+      ByteBuffer trustStore, String trustStorePass, int cryptoVersion) {
 
     ContainerManagerApplicationProto.Builder builder =
         ContainerManagerApplicationProto.newBuilder();
@@ -915,6 +949,8 @@ public class ContainerManagerImpl extends CompositeService implements
       builder.setTrustStorePassword(trustStorePass);
     }
 
+    builder.setCryptoVersion(cryptoVersion);
+    
     if (logAggregationContext != null) {
       builder.setLogAggregationContext((
           (LogAggregationContextPBImpl)logAggregationContext).getProto());
@@ -989,8 +1025,16 @@ public class ContainerManagerImpl extends CompositeService implements
       }
     }
     
+    int cryptoMaterialVersion = -1;
     // Inject crypto material when RPC TLS is enabled as LocalResources
-    injectCryptoMaterialAsLocalResources(user, containerId, launchContext);
+    if (getConfig() != null && getConfig().getBoolean(
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      injectCryptoMaterialAsLocalResources(user, containerId, launchContext);
+      // Crypto version of this material might be greater than 0, but from the NM's perspective it's
+      // the first time it receives it
+      cryptoMaterialVersion = 0;
+    }
     
     // Sanity check for local resources
     for (Map.Entry<String, LocalResource> rsrc : launchContext
@@ -1023,7 +1067,7 @@ public class ContainerManagerImpl extends CompositeService implements
       if (!serviceStopped) {
         // Create the application
         Application application =
-            new ApplicationImpl(dispatcher, user, applicationID, credentials, context, userFolder);
+            new ApplicationImpl(dispatcher, user, applicationID, credentials, context, userFolder, cryptoMaterialVersion);
         if (null == context.getApplications().putIfAbsent(applicationID,
           application)) {
           LOG.info("Creating a new application reference for app " + applicationID);
@@ -1031,9 +1075,10 @@ public class ContainerManagerImpl extends CompositeService implements
               containerTokenIdentifier.getLogAggregationContext();
           Map<ApplicationAccessType, String> appAcls =
               container.getLaunchContext().getApplicationACLs();
+          
           context.getNMStateStore().storeApplication(applicationID,
               buildAppProto(applicationID, user, userFolder, credentials, appAcls,
-                  logAggregationContext,keyStore, keyStorePass, trustStore, trustStorePass));
+                  logAggregationContext, keyStore, keyStorePass, trustStore, trustStorePass, cryptoMaterialVersion));
           dispatcher.getEventHandler().handle(
             new ApplicationInitEvent(applicationID, appAcls,
               logAggregationContext));
@@ -1082,31 +1127,27 @@ public class ContainerManagerImpl extends CompositeService implements
   private void injectCryptoMaterialAsLocalResources(String applicationUser, ContainerId containerId,
       ContainerLaunchContext containerLaunchContext)
       throws YarnException, IOException {
-    if (getConfig() != null && getConfig().getBoolean(
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      try {
-        String applicationId = containerId.getApplicationAttemptId().getApplicationId().toString();
-        CryptoMaterial cryptoMaterial = context
-            .getCertificateLocalizationService().getMaterialLocation(applicationUser, applicationId);
-        Path keyStoreLocation = cryptoMaterial.getKeyStoreLocation();
-        Path trustStoreLocation = cryptoMaterial.getTrustStoreLocation();
-        Path passwdLocation = cryptoMaterial.getPasswdLocation();
-        
-        if (keyStoreLocation == null || trustStoreLocation == null || passwdLocation == null) {
-          throw new YarnException("One of the crypto materials for container " + containerId.toString() + " has not " +
-              "been localized correctly and is null");
-        }
-        
-        Map<File, String> resources = new HashMap<>(3);
-        resources.put(keyStoreLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
-        resources.put(trustStoreLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
-        resources.put(passwdLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
-        
-        addAsLocalResource(resources, containerId, containerLaunchContext);
-      } catch (InterruptedException ex) {
-        throw new YarnException(ex);
+    try {
+      String applicationId = containerId.getApplicationAttemptId().getApplicationId().toString();
+      CryptoMaterial cryptoMaterial = context
+          .getCertificateLocalizationService().getMaterialLocation(applicationUser, applicationId);
+      Path keyStoreLocation = cryptoMaterial.getKeyStoreLocation();
+      Path trustStoreLocation = cryptoMaterial.getTrustStoreLocation();
+      Path passwdLocation = cryptoMaterial.getPasswdLocation();
+      
+      if (keyStoreLocation == null || trustStoreLocation == null || passwdLocation == null) {
+        throw new YarnException("One of the crypto materials for container " + containerId.toString() + " has not " +
+            "been localized correctly and is null");
       }
+      
+      Map<File, String> resources = new HashMap<>(3);
+      resources.put(keyStoreLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+      resources.put(trustStoreLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+      resources.put(passwdLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+      
+      addAsLocalResource(resources, containerId, containerLaunchContext);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
     }
   }
   
@@ -1422,7 +1463,164 @@ public class ContainerManagerImpl extends CompositeService implements
       throw RPCUtil.getRemoteException(msg);
     }
   }
+  
+  private Future removeCryptoUpdaterTask(ContainerId cid) {
+    Future task = null;
+    synchronized (cryptoMaterialUpdaters) {
+      task = cryptoMaterialUpdaters.remove(cid);
+    }
+    return task;
+  }
+  
+  private void scheduleCryptoUpdaterForContainer(CMgrUpdateCryptoMaterialEvent event) {
+    LOG.info("Scheduling crypto updater for container " + event.getContainerId());
+    Future previousTask = removeCryptoUpdaterTask(event.getContainerId());
+    if (previousTask != null) {
+      previousTask.cancel(true);
+    }
+    ContainerImpl container = (ContainerImpl) context.getContainers().get(event.getContainerId());
+    if (container != null) {
+      ContainerCryptoMaterialUpdater updater = new ContainerCryptoMaterialUpdater(container, event.getKeyStore(),
+          event.getKeyStorePassword(), event.getTrustStore(), event.getTrustStorePassword(), event.getVersion());
+      scheduleUpdaterInternal(updater, container.getContainerId());
+    }
+  }
+  
+  private void scheduleUpdaterInternal(ContainerCryptoMaterialUpdater updater, ContainerId cid) {
+    // Make sure we put the task to the Map before the worker tries to remove itself from the Map
+    synchronized (cryptoMaterialUpdaters) {
+      Future task = cryptoMaterialUpdaterThreadPool.submit(updater);
+      cryptoMaterialUpdaters.put(cid, task);
+    }
+  }
+  
+  private class ContainerCryptoMaterialUpdater implements Runnable {
+    private final ContainerImpl container;
+    private final ByteBuffer keyStore;
+    private final char[] keyStorePassword;
+    private final ByteBuffer trustStore;
+    private final char[] trustStorePassword;
+    private final int cryptoVersion;
+    private final BackOff backoff;
+    private long backoffTime;
+    
+    private ContainerCryptoMaterialUpdater(ContainerImpl container, ByteBuffer keyStore, char[] keyStorePassword,
+        ByteBuffer trustStore, char[] trustStorePassword, int cryptoVersion) {
+      this.container = container;
+      this.keyStore = keyStore;
+      this.keyStorePassword = keyStorePassword;
+      this.trustStore = trustStore;
+      this.trustStorePassword = trustStorePassword;
+      this.cryptoVersion = cryptoVersion;
+      this.backoff = createBackOffPolicy();
+      this.backoffTime = 0L;
+    }
 
+    private BackOff createBackOffPolicy() {
+      return new ExponentialBackOff.Builder()
+          .setInitialIntervalMillis(200)
+          .setMaximumIntervalMillis(5000)
+          .setMultiplier(1.4)
+          .setMaximumRetries(6)
+          .build();
+    }
+    
+    @Override
+    public void run() {
+      try {
+        TimeUnit.MILLISECONDS.sleep(backoffTime);
+        if (!container.getContainerState().equals(
+            org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerState.RUNNING)) {
+          LOG.info("Crypto updater for container " + container.getContainerId() + " run but the container is not in " +
+              "RUNNING state, instead state is: " + container.getContainerState());
+          removeCryptoUpdaterTask(container.getContainerId());
+          return;
+        }
+        container.identifyCryptoMaterialLocation();
+        File keyStorePath = container.getKeyStoreLocalizedPath();
+        File trustStorePath = container.getTrustStoreLocalizedPath();
+        File passwordFilePath = container.getPasswordFileLocalizedPath();
+        if (keyStorePath == null || trustStorePath == null || passwordFilePath == null) {
+          throw new IOException("Could not identify localized cryptographic material location for container " +
+              container.getContainerId());
+        }
+        writeByteBufferToFile(keyStorePath, keyStore);
+        writeByteBufferToFile(trustStorePath, trustStore);
+        // Assume key store password is the same for the trust store and for the key itself
+        writeStringToFile(passwordFilePath, String.valueOf(keyStorePassword));
+        removeCryptoUpdaterTask(container.getContainerId());
+        updateStateStore();
+        LOG.debug("Updated crypto material for container: " + container.getContainerId());
+      } catch (IOException ex) {
+        LOG.error(ex, ex);
+        // Re-schedule here with backoff
+        removeCryptoUpdaterTask(container.getContainerId());
+        backoffTime = backoff.getBackOffInMillis();
+        if (backoffTime != -1) {
+          LOG.warn("Re-scheduling updating crypto material for container " + container.getContainerId() + " after "
+              + backoffTime + "ms");
+          scheduleUpdaterInternal(this, container.getContainerId());
+        } else {
+          LOG.error("Reached maximum number of retries for container " + container.getContainerId() + ", giving up",
+              ex);
+        }
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+      }
+    }
+    
+    private void writeByteBufferToFile(File target, ByteBuffer data) throws IOException {
+      Set<PosixFilePermission> permissions = null;
+      Path targetPath = target.toPath();
+      if (!target.canWrite()) {
+        permissions = addOwnerWritePermission(targetPath);
+      }
+      FileChannel fileChannel = new FileOutputStream(target, false).getChannel();
+      fileChannel.write(data);
+      fileChannel.close();
+      if (permissions != null) {
+        removeOwnerWritePermission(targetPath, permissions);
+      }
+    }
+  
+    private void writeStringToFile(File target, String data) throws IOException {
+      Set<PosixFilePermission> permissions = null;
+      Path targetPath = target.toPath();
+      if (!target.canWrite()) {
+        permissions = addOwnerWritePermission(targetPath);
+      }
+      FileUtils.writeStringToFile(target, data);
+      if (permissions != null) {
+        removeOwnerWritePermission(targetPath, permissions);
+      }
+    }
+    
+    private Set<PosixFilePermission> addOwnerWritePermission(Path target) throws IOException {
+      Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(target);
+      if (permissions.add(PosixFilePermission.OWNER_WRITE)) {
+        Files.setPosixFilePermissions(target, permissions);
+      }
+      return permissions;
+    }
+    
+    private void removeOwnerWritePermission(Path target, Set<PosixFilePermission> permissions) throws IOException {
+      if (permissions.remove(PosixFilePermission.OWNER_WRITE)) {
+        Files.setPosixFilePermissions(target, permissions);
+      }
+    }
+    
+    private void updateStateStore() throws IOException {
+      ApplicationId applicationId = container.getContainerId().getApplicationAttemptId().getApplicationId();
+      Application app = context.getApplications().get(applicationId);
+      app.setCryptoMaterialVersion(cryptoVersion);
+      context.getNMStateStore().storeApplication(applicationId,
+          buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
+              container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier()
+                  .getLogAggregationContext(),
+              keyStore, String.valueOf(keyStorePassword), trustStore, String.valueOf(trustStorePassword), cryptoVersion));
+    }
+  }
+  
   class ContainerEventDispatcher implements EventHandler<ContainerEvent> {
     @Override
     public void handle(ContainerEvent event) {
@@ -1550,6 +1748,9 @@ public class ContainerManagerImpl extends CompositeService implements
         internalSignalToContainer(request, "ResourceManager");
       }
       break;
+    case UPDATE_CRYPTO_MATERIAL:
+      scheduleCryptoUpdaterForContainer((CMgrUpdateCryptoMaterialEvent) event);
+      break;
     default:
         throw new YarnRuntimeException(
             "Got an unknown ContainerManagerEvent type: " + event.getType());
@@ -1575,6 +1776,11 @@ public class ContainerManagerImpl extends CompositeService implements
     return this.context;
   }
 
+  @VisibleForTesting
+  public Map<ContainerId, Future> getCryptoMaterialUpdaters() {
+    return cryptoMaterialUpdaters;
+  }
+  
   public Map<String, ByteBuffer> getAuxServiceMetaData() {
     return this.auxiliaryServices.getMetaData();
   }

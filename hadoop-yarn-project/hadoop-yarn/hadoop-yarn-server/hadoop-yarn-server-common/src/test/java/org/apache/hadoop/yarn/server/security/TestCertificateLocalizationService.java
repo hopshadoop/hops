@@ -37,6 +37,7 @@ import javax.management.MBeanOperationInfo;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -178,6 +179,86 @@ public class TestCertificateLocalizationService {
     // Deletion is asynchronous so we have to wait
     TimeUnit.MILLISECONDS.sleep(10);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePass, trustStorePass, false);
+  }
+  
+  @Test
+  public void testUpdateMaterialNotification() throws Exception {
+    if (certLocSrv != null) {
+      certLocSrv.stop();
+      certLocSrv = null;
+    }
+    
+    DelayedCertificateLocalizationService delayedCertLoc = new DelayedCertificateLocalizationService(service, 1000);
+    try {
+      delayedCertLoc.init(conf);
+      delayedCertLoc.start();
+      
+      ByteBuffer keyStore = ByteBuffer.wrap("keyStore0".getBytes());
+      ByteBuffer trustStore = ByteBuffer.wrap("trustStore0".getBytes());
+      String keyStorePassword = "kpassword0";
+      String trustStorePassword = "tpassword0";
+      String username = "Dolores";
+      String userFolder = "userFolder";
+  
+      ByteBuffer newKeyStore = ByteBuffer.wrap("keyStore1".getBytes());
+      ByteBuffer newTrustStore = ByteBuffer.wrap("trustStore1".getBytes());
+      String newKeyStorePassword = "kpassword1";
+      String newTrustStorePassword = "tpassword1";
+      materializeCertificateUtil(delayedCertLoc, username, userFolder, keyStore, keyStorePassword, trustStore, trustStorePassword);
+      delayedCertLoc.updateCryptoMaterial(username, null, newKeyStore, newKeyStorePassword, newTrustStore, newTrustStorePassword);
+      CryptoMaterial material = delayedCertLoc.getMaterialLocation(username);
+      
+      // Make some basic checks here. Extended checks are in testUpdateMaterial
+      assertNotEquals(keyStore, material.getKeyStoreMem());
+      assertNotEquals(keyStorePassword, material.getKeyStorePass());
+      assertEquals(newKeyStore, material.getKeyStoreMem());
+      assertEquals(newKeyStorePassword, material.getKeyStorePass());
+    } finally {
+      delayedCertLoc.stop();
+    }
+  }
+  
+  @Test
+  public void testUpdateMaterial() throws Exception {
+    ByteBuffer keyStore = ByteBuffer.wrap("keyStore0".getBytes());
+    ByteBuffer trustStore = ByteBuffer.wrap("trustStore0".getBytes());
+    String keyStorePassword = "kpassword0";
+    String trustStorePassword = "tpassword0";
+    String username = "Dolores";
+    String userFolder = "userFolder";
+    
+    materializeCertificateUtil(certLocSrv, username, userFolder, keyStore, keyStorePassword,
+        trustStore, trustStorePassword);
+    verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePassword, trustStorePassword, true);
+    
+    CryptoMaterial oldMaterial = certLocSrv.getMaterialLocation(username);
+    
+    ByteBuffer newKeyStore = ByteBuffer.wrap("keyStore1".getBytes());
+    ByteBuffer newTrustStore = ByteBuffer.wrap("trustStore1".getBytes());
+    String newKeyStorePassword = "kpassword1";
+    String newTrustStorePassword = "tpassword1";
+    certLocSrv.updateCryptoMaterial(username, null, newKeyStore, newKeyStorePassword,
+        newTrustStore, newTrustStorePassword);
+    
+    CryptoMaterial newMaterial = certLocSrv.getMaterialLocation(username);
+    assertEquals(newKeyStore, newMaterial.getKeyStoreMem());
+    assertEquals(newTrustStore, newMaterial.getTrustStoreMem());
+    assertEquals(newKeyStorePassword, newMaterial.getKeyStorePass());
+    assertEquals(newTrustStorePassword, newMaterial.getTrustStorePass());
+    assertEquals(oldMaterial.getCertFolder(), newMaterial.getCertFolder());
+    assertEquals(oldMaterial.getKeyStoreLocation().toString(), newMaterial.getKeyStoreLocation().toString());
+    assertEquals(oldMaterial.getTrustStoreLocation().toString(), newMaterial.getTrustStoreLocation().toString());
+    assertEquals(oldMaterial.getPasswdLocation().toString(), newMaterial.getPasswdLocation().toString());
+    assertEquals(oldMaterial.getRequestedApplications(), newMaterial.getRequestedApplications());
+    assertEquals(CryptoMaterial.STATE.FINISHED, newMaterial.getState());
+    
+    assertFalse(keyStore.equals(newMaterial.getKeyStoreMem()));
+    assertFalse(trustStore.equals(newMaterial.getTrustStoreMem()));
+    assertNotEquals(keyStorePassword, newMaterial.getKeyStorePass());
+    assertNotEquals(trustStorePassword, newMaterial.getTrustStorePass());
+    
+    certLocSrv.removeMaterial(username);
+    verifyMaterialExistOrNot(certLocSrv, username, userFolder, newKeyStorePassword, newTrustStorePassword, false);
   }
   
   @Test

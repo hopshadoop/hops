@@ -23,6 +23,7 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -79,12 +80,19 @@ public class ApplicationImpl implements Application {
   private static final Log LOG = LogFactory.getLog(ApplicationImpl.class);
 
   private LogAggregationContext logAggregationContext;
-
+  
   Map<ContainerId, Container> containers =
       new ConcurrentHashMap<>();
-
+  
+  private AtomicInteger cryptoMaterialVersion;
+  
   public ApplicationImpl(Dispatcher dispatcher, String user, ApplicationId appId,
       Credentials credentials, Context context, String userFolder) {
+    this(dispatcher, user, appId, credentials, context, userFolder, 0);
+  }
+  
+  public ApplicationImpl(Dispatcher dispatcher, String user, ApplicationId appId,
+      Credentials credentials, Context context, String userFolder, int cryptoMaterialVersion) {
     this.dispatcher = dispatcher;
     this.user = user;
     this.userFolder = userFolder;
@@ -92,6 +100,7 @@ public class ApplicationImpl implements Application {
     this.credentials = credentials;
     this.aclsManager = context.getApplicationACLsManager();
     this.context = context;
+    this.cryptoMaterialVersion = new AtomicInteger(cryptoMaterialVersion);
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     readLock = lock.readLock();
     writeLock = lock.writeLock();
@@ -133,6 +142,16 @@ public class ApplicationImpl implements Application {
     }
   }
 
+  @Override
+  public int getCryptoMaterialVersion() {
+    return cryptoMaterialVersion.get();
+  }
+  
+  @Override
+  public void setCryptoMaterialVersion(int cryptoMaterialVersion) {
+    this.cryptoMaterialVersion.set(cryptoMaterialVersion);
+  }
+  
   private static final ContainerDoneTransition CONTAINER_DONE_TRANSITION =
       new ContainerDoneTransition();
 

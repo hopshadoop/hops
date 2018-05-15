@@ -50,8 +50,9 @@ public class LocalResourceHopsSSLCheck extends AbstractHopsSSLCheck {
       }
       File passwordFile = new File(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
       String password = HopsUtil.readCryptoMaterialPassword(passwordFile);
-      return new HopsSSLCryptoMaterial(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME, password,
-          HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME, password);
+      return new HopsSSLCryptoMaterial(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME, password, password,
+          HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME, password, HopsSSLSocketFactory
+          .LOCALIZED_PASSWD_FILE_NAME, true);
     }
     return null;
   }

@@ -273,6 +273,7 @@ public class RMNodeImplNotDist extends RMNodeImpl {
     ApplicationId appId = ((RMNodeCleanAppEvent) event).getAppId();
     rmNode.finishedApplications.add(appId);
     rmNode.runningApplications.remove(appId);
+    rmNode.getAppCryptoMaterialToUpdate().remove(appId);
   }
 
   protected void cleanUpContainerTransitionInternal(RMNodeImpl rmNode,

@@ -20,31 +20,37 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.ipc.RpcSSLEngineAbstr;
 import org.apache.hadoop.net.hopssslchecks.EnvVariableHopsSSLCheck;
 import org.apache.hadoop.net.hopssslchecks.HopsSSLCheck;
 import org.apache.hadoop.net.hopssslchecks.HopsSSLCryptoMaterial;
 import org.apache.hadoop.net.hopssslchecks.LocalResourceHopsSSLCheck;
 import org.apache.hadoop.net.hopssslchecks.NormalUserCertLocServiceHopsSSLCheck;
 import org.apache.hadoop.net.hopssslchecks.NormalUserMaterilizeDirSSLCheck;
-import org.apache.hadoop.net.hopssslchecks.SSLMaterialAlreadyConfiguredException;
 import org.apache.hadoop.net.hopssslchecks.SuperUserHopsSSLCheck;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
+import org.apache.hadoop.security.ssl.ReloadingX509KeyManager;
+import org.apache.hadoop.security.ssl.ReloadingX509TrustManager;
+import org.apache.hadoop.security.ssl.SSLFactory;
 
 import javax.net.SocketFactory;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
 public class HopsSSLSocketFactory extends SocketFactory implements Configurable {
   
@@ -83,6 +89,10 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   private final static HopsSSLCheck NORMAL_USER_CERTIFICATE_LOCALIZATION = new NormalUserCertLocServiceHopsSSLCheck();
   private final static HopsSSLCheck SUPER_USER = new SuperUserHopsSSLCheck();
   private final static Set<HopsSSLCheck> HOPS_SSL_CHECKS = new TreeSet<>();
+  
+  private HopsSSLCryptoMaterial configuredCryptoMaterial = null;
+  private ReloadingX509KeyManager reloadingKeyManager = null;
+  private ReloadingX509TrustManager reloadingTrustManager = null;
   
   /**
    * Configuration checks will run according to their priority
@@ -158,6 +168,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   }
   
   private Configuration conf;
+  private Configuration sslClientConf;
   private String keyStoreFilePath;
   
   public HopsSSLSocketFactory() {
@@ -166,6 +177,9 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
+    sslClientConf = new Configuration(false);
+    String sslConfResource = conf.get(SSLFactory.SSL_CLIENT_CONF_KEY, "ssl-client.xml");
+    sslClientConf.addResource(sslConfResource);
   }
   
   public void configureCryptoMaterial(CertificateLocalization certificateLocalization, Set<String> proxySuperusers)
@@ -174,43 +188,29 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     UserGroupInformation currentUser = null;
     try {
       currentUser = UserGroupInformation.getCurrentUser();
-      HopsSSLCryptoMaterial sslCryptoMaterial = null;
-      boolean configured = false;
       for (HopsSSLCheck checks : HOPS_SSL_CHECKS) {
-        try {
-          // Checks return null if they were not able to discover proper crypto material
-          sslCryptoMaterial = checks.check(currentUser, proxySuperusers, conf, certificateLocalization);
-          if (sslCryptoMaterial != null) {
-            configured = true;
-            break;
-          }
-          // And throw SSLMaterialAlreadyConfiguredException if the configuration is already configured
-        } catch (SSLMaterialAlreadyConfiguredException ex) {
-          configured = true;
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(ex.getMessage());
-          }
+        // Checks return null if they were not able to discover proper crypto material
+        configuredCryptoMaterial = checks.check(currentUser, proxySuperusers, conf, certificateLocalization);
+        if (configuredCryptoMaterial != null) {
           break;
         }
       }
       
-      if (!configured) {
+      if (configuredCryptoMaterial == null) {
         String message = "> HopsSSLSocketFactory could not determine cryptographic material for user <" + currentUser.getUserName() +
             ">. Check your configuration!";
         SSLCertificateException ex = new SSLCertificateException(message);
         LOG.error(message, ex);
         throw ex;
       }
-      
-      // sslCryptoMaterial will be null when the factory is already configured
-      if (sslCryptoMaterial != null) {
-        setTlsConfiguration(
-            sslCryptoMaterial.getKeyStoreLocation(),
-            sslCryptoMaterial.getKeyStorePassword(),
-            sslCryptoMaterial.getTrustStoreLocation(),
-            sslCryptoMaterial.getTrustStorePassword(),
-            conf);
-      }
+  
+      setTlsConfiguration(
+          configuredCryptoMaterial.getKeyStoreLocation(),
+          configuredCryptoMaterial.getKeyStorePassword(),
+          configuredCryptoMaterial.getKeyPassword(),
+          configuredCryptoMaterial.getTrustStoreLocation(),
+          configuredCryptoMaterial.getTrustStorePassword(),
+          conf);
       
       // *ClientCache* caches client instances based on their socket factory.
       // In order to distinguish two client with the same socket factory but
@@ -248,14 +248,19 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   
   private static void setTlsConfiguration(String kstorePath, String tstorePath,
       Configuration conf) {
-    setTlsConfiguration(kstorePath, PASSPHRASE, tstorePath, PASSPHRASE, conf);
+    setTlsConfiguration(kstorePath, PASSPHRASE, PASSPHRASE, tstorePath, PASSPHRASE, conf);
   }
   
   public static void setTlsConfiguration(String kstorePath, String
       kstorePass, String tstorePath, String tstorePass, Configuration conf) {
+    setTlsConfiguration(kstorePath, kstorePass, kstorePass, tstorePath, tstorePass, conf);
+  }
+  
+  public static void setTlsConfiguration(String kstorePath, String kstorePass, String keyPassword, String tstorePath,
+      String tstorePass, Configuration conf) {
     conf.set(CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(), kstorePath);
     conf.set(CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue(), kstorePass);
-    conf.set(CryptoKeys.KEY_PASSWORD_KEY.getValue(), kstorePass);
+    conf.set(CryptoKeys.KEY_PASSWORD_KEY.getValue(), keyPassword);
     conf.set(CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue(), tstorePath);
     conf.set(CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue(), tstorePass);
     conf.set(CommonConfigurationKeys.HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_KEY, SOCKET_FACTORY_NAME);
@@ -266,6 +271,16 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     return conf;
   }
   
+  public void stopReloadingKeyManagers() {
+    if (reloadingKeyManager != null) {
+      reloadingKeyManager.stop();
+    }
+    
+    if (reloadingTrustManager != null) {
+      reloadingTrustManager.destroy();
+    }
+  }
+  
   public Socket createSocket() throws IOException, UnknownHostException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Creating SSL client socket");
@@ -273,9 +288,61 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     if (conf.getBoolean(FORCE_CONFIGURE, false)) {
       setConf(conf);
     }
-    SSLContext sslCtx = RpcSSLEngineAbstr.initializeSSLContext(conf);
+    SSLContext sslCtx = initializeSSLContext();
     SSLSocketFactory socketFactory = sslCtx.getSocketFactory();
     return socketFactory.createSocket();
+  }
+  
+  private SSLContext initializeSSLContext() throws IOException {
+    try {
+      String enabledProtocol = conf.get(HopsSSLSocketFactory.CryptoKeys.SOCKET_ENABLED_PROTOCOL.getValue(),
+          HopsSSLSocketFactory.CryptoKeys.SOCKET_ENABLED_PROTOCOL.getDefaultValue());
+      SSLContext sslCtx = SSLContext.getInstance(enabledProtocol);
+      
+      long keyStoreReloadInterval = FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_INTERVAL;
+      String timeUnitStr = FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_TIMEUNIT;
+      long trustStoreReloadInterval = FileBasedKeyStoresFactory.DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL;
+      if (sslClientConf != null) {
+        keyStoreReloadInterval = sslClientConf.getLong(FileBasedKeyStoresFactory.resolvePropertyName(
+            SSLFactory.Mode.CLIENT, FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY),
+            FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_INTERVAL);
+        timeUnitStr = sslClientConf.get(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.CLIENT,
+            FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_TIMEUNIT_TPL_KEY),
+            FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_TIMEUNIT);
+        trustStoreReloadInterval = sslClientConf.getLong(FileBasedKeyStoresFactory.resolvePropertyName(
+            SSLFactory.Mode.CLIENT, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY),
+            FileBasedKeyStoresFactory.DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL);
+      }
+      TimeUnit timeUnit = TimeUnit.valueOf(timeUnitStr);
+      sslCtx.init(createKeyManagers(keyStoreReloadInterval, timeUnit), createTrustManagers(trustStoreReloadInterval),
+          null);
+      return sslCtx;
+    } catch (GeneralSecurityException ex) {
+      String keyStore = conf.get(CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue());
+      LOG.error("Could not initialize SSLContext with keystore " + keyStore, ex);
+      throw new IOException("Error initializing SSLContext", ex);
+    }
+  }
+  
+  private KeyManager[] createKeyManagers(long reloadInterval, TimeUnit timeUnit)
+      throws GeneralSecurityException, IOException {
+    reloadingKeyManager = new ReloadingX509KeyManager("JKS", configuredCryptoMaterial.getKeyStoreLocation(),
+        configuredCryptoMaterial.getKeyStorePassword(),
+        configuredCryptoMaterial.getPasswordFileLocation(),
+        configuredCryptoMaterial.getKeyStorePassword(), reloadInterval, timeUnit);
+    if (configuredCryptoMaterial.needsReloading()) {
+      reloadingKeyManager.init();
+    }
+    return new KeyManager[]{reloadingKeyManager};
+  }
+  
+  private TrustManager[] createTrustManagers(long reloadInterval) throws GeneralSecurityException, IOException {
+    reloadingTrustManager = new ReloadingX509TrustManager("JKS", configuredCryptoMaterial.getTrustStoreLocation(),
+        configuredCryptoMaterial.getTrustStorePassword(), configuredCryptoMaterial.getPasswordFileLocation(), reloadInterval);
+    if (configuredCryptoMaterial.needsReloading()) {
+      reloadingTrustManager.init();
+    }
+    return new TrustManager[]{reloadingTrustManager};
   }
   
   @Override

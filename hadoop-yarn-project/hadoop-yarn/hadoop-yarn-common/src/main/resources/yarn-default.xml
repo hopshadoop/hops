@@ -2878,4 +2878,17 @@
     <name>hops.hopsworks.revoke.endpoint</name>
     <value>hopsworks-ca/ca/agentservice/revoke</value>
   </property>
+
+  <property>
+    <description>Amount of time to subtract from the application certificate expiration date to start the renewal
+      process</description>
+    <name>yarn.resourcemanager.certificate.expiration-safety-period</name>
+    <value>2d</value>
+  </property>
+
+  <property>
+    <description>Interval for the Certificate Revocation Monitor thread</description>
+    <name>yarn.resourcemanager.certificate.revocation-monitor-interval</name>
+    <value>10h</value>
+  </property>
 </configuration>

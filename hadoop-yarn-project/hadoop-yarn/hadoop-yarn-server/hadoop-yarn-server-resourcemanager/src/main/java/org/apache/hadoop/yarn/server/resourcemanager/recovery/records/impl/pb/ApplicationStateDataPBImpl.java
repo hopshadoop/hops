@@ -22,7 +22,6 @@ import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationSubmissionContextPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationStateDataProto;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationStateDataProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.RMAppStateProto;
@@ -31,8 +30,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.TextFormat;
-
-import java.nio.ByteBuffer;
 
 public class ApplicationStateDataPBImpl extends ApplicationStateData {
   ApplicationStateDataProto proto = 
@@ -343,6 +340,57 @@ public class ApplicationStateDataPBImpl extends ApplicationStateData {
       return;
     }
     builder.setTrustStorePassword(String.valueOf(trustStorePassword));
+  }
+  
+  @Override
+  public Integer getCryptoMaterialVersion() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getCryptoMaterialVersion();
+  }
+  
+  @Override
+  public void setCryptoMaterialVersion(Integer cryptoMaterialVersion) {
+    maybeInitBuilder();
+    builder.setCryptoMaterialVersion(cryptoMaterialVersion);
+  }
+  
+  @Override
+  public long getCertificateExpiration() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getCertificateExpiration();
+  }
+  
+  @Override
+  public void setCertificateExpiration(long certificateExpiration) {
+    maybeInitBuilder();
+    builder.setCertificateExpiration(certificateExpiration);
+  }
+  
+  @Override
+  public boolean isDuringMaterialRotation() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getIsDuringMaterialRotation();
+  }
+  
+  @Override
+  public void setIsDuringMaterialRotation(boolean isDuringMaterialRotation) {
+    maybeInitBuilder();
+    builder.setIsDuringMaterialRotation(isDuringMaterialRotation);
+  }
+  
+  @Override
+  public long getMaterialRotationStartTime() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasMaterialRotationStart()) {
+      return -1L;
+    }
+    return p.getMaterialRotationStart();
+  }
+  
+  @Override
+  public void setMaterialRotationStartTime(long materialRotationStartTime) {
+    maybeInitBuilder();
+    builder.setMaterialRotationStart(materialRotationStartTime);
   }
   
   private static String RM_APP_PREFIX = "RMAPP_";

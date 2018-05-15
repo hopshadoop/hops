@@ -38,6 +38,7 @@ public enum RMNodeEventType {
 
   // Source: Application
   CLEANUP_APP,
+  UPDATE_CRYPTO_MATERIAL,
 
   // Source: Container
   CONTAINER_ALLOCATED,

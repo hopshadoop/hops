@@ -367,7 +367,7 @@ public class TestApplicationCleanup {
     
     // nm1 register to rm2, and do a heartbeat
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
-    nm1.registerNode(Arrays.asList(app0.getApplicationId()));
+    nm1.registerNode(createRunningAppsForRequest(0, app0.getApplicationId()));
     rm2.waitForState(app0.getApplicationId(), RMAppState.FAILED);
     
     // wait for application cleanup message received
@@ -418,9 +418,9 @@ public class TestApplicationCleanup {
         ContainerId.newContainerId(am0.getApplicationAttemptId(), 1), 0,
         ContainerState.COMPLETE, Resource.newInstance(1024, 1), "", 0,
         Priority.newInstance(0), 1234)),
-        Arrays.asList(app0.getApplicationId()));
+        createRunningAppsForRequest(0, app0.getApplicationId()));
     nm2.setResourceTrackerService(rm2.getResourceTrackerService());
-    nm2.registerNode(Arrays.asList(app0.getApplicationId()));
+    nm2.registerNode(createRunningAppsForRequest(0, app0.getApplicationId()));
 
     // assert app state has been saved.
     rm2.waitForState(app0.getApplicationId(), RMAppState.FAILED);
@@ -470,7 +470,7 @@ public class TestApplicationCleanup {
 
     // nm1 register to rm2, and do a heartbeat
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
-    nm1.registerNode(Arrays.asList(app0.getApplicationId()));
+    nm1.registerNode(createRunningAppsForRequest(0, app0.getApplicationId()));
     rm2.waitForState(app0.getApplicationId(), RMAppState.ACCEPTED);
 
     // Add unknown container for application unknown to scheduler
@@ -496,6 +496,7 @@ public class TestApplicationCleanup {
         new MockNM("127.0.0.1:1234", 15120, rm1.getResourceTrackerService());
     nm1.registerNode();
 
+    rm1.getRMContext().getStateStore().loadState();
     // create app and launch the AM
     RMApp app0 = rm1.submitApp(200);
     MockAM am0 = launchAM(app0, rm1, nm1);
@@ -506,7 +507,7 @@ public class TestApplicationCleanup {
     waitForAppCleanupMessageRecved(nm1, app0.getApplicationId());
 
     // reconnect NM with application still active
-    nm1.registerNode(Arrays.asList(app0.getApplicationId()));
+    nm1.registerNode(createRunningAppsForRequest(0, app0.getApplicationId()));
     waitForAppCleanupMessageRecved(nm1, app0.getApplicationId());
 
     rm1.stop();
@@ -566,8 +567,7 @@ public class TestApplicationCleanup {
     // 5. Re-register NM by sending completed container status
     List<NMContainerStatus> nMContainerStatusForApp =
         createNMContainerStatusForApp(am0);
-    nm1.registerNode(nMContainerStatusForApp,
-        Arrays.asList(app0.getApplicationId()));
+    nm1.registerNode(nMContainerStatusForApp, createRunningAppsForRequest(0, app0.getApplicationId()));
 
     waitForClusterMemory(nm1, rs, amMemory);
 
@@ -630,6 +630,14 @@ public class TestApplicationCleanup {
     return containerReport;
   }
 
+  private Map<ApplicationId, Integer> createRunningAppsForRequest(Integer cryptoVersion, ApplicationId... appIds) {
+    Map<ApplicationId, Integer> runningApps = new HashMap<>();
+    for (ApplicationId appId : appIds) {
+      runningApps.put(appId, cryptoVersion);
+    }
+    return runningApps;
+  }
+  
   public static void main(String[] args) throws Exception {
     TestApplicationCleanup t = new TestApplicationCleanup();
     t.testAppCleanup();

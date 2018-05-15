@@ -31,12 +31,16 @@ import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
+import java.util.List;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.KeyManagersReloaderThreadPool;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
@@ -70,6 +74,7 @@ public class TestTimelineClient {
   public void setup() {
     FileUtil.fullyDelete(testDir);
     testDir.mkdirs();
+    KeyManagersReloaderThreadPool.getInstance(true).clearListOfTasks();
     YarnConfiguration conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED, true);
     conf.setFloat(YarnConfiguration.TIMELINE_SERVICE_VERSION, 1.0f);
@@ -455,36 +460,19 @@ public class TestTimelineClient {
     KeyStoreTestUtil.setupSSLConfig(testDir.getAbsolutePath(),
         sslConfDir, conf, false);
     client = createTimelineClient(conf);
-
-    ThreadGroup threadGroup = Thread.currentThread().getThreadGroup();
-
-    while (threadGroup.getParent() != null) {
-      threadGroup = threadGroup.getParent();
+  
+    List<ScheduledFuture> reloaders = KeyManagersReloaderThreadPool.getInstance(true).getListOfTasks();
+    for (ScheduledFuture reloader : reloaders) {
+      Assert.assertFalse("Reloader threads are not alive", reloader.isCancelled());
     }
-
-    Thread[] threads = new Thread[threadGroup.activeCount()];
-
-    threadGroup.enumerate(threads);
-    Thread reloaderThread = null;
-    for (Thread thread : threads) {
-      if ((thread.getName() != null)
-          && (thread.getName().contains("Truststore reloader thread"))) {
-        reloaderThread = thread;
-      }
-    }
-    Assert.assertTrue("Reloader is not alive", reloaderThread.isAlive());
 
     client.close();
-
-    boolean reloaderStillAlive = true;
-    for (int i = 0; i < 10; i++) {
-      reloaderStillAlive = reloaderThread.isAlive();
-      if (!reloaderStillAlive) {
-        break;
-      }
-      Thread.sleep(1000);
+  
+    TimeUnit.MILLISECONDS.sleep(500);
+    reloaders = KeyManagersReloaderThreadPool.getInstance(true).getListOfTasks();
+    for (ScheduledFuture reloader : reloaders) {
+      Assert.assertTrue("Reloader threads are still active", reloader.isCancelled());
     }
-    Assert.assertFalse("Reloader is still alive", reloaderStillAlive);
   }
 
   private static class TestTimlineDelegationTokenSecretManager extends

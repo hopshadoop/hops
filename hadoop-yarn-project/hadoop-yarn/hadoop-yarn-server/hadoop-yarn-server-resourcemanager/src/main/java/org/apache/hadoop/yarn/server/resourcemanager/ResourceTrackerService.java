@@ -21,8 +21,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
@@ -32,7 +35,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.Node;
@@ -62,6 +67,7 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequ
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerResponse;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
@@ -398,10 +404,13 @@ public class ResourceTrackerService extends AbstractService implements
               resolve(host), capability, nodeManagerVersion);
     }
     RMNode oldNode = this.rmContext.getRMNodes().putIfAbsent(nodeId, rmNode);
+    Map<ApplicationId, Integer> runningsAppsWithCryptoVersion = request.getRunningApplications();
+    List<ApplicationId> runningApplications = new ArrayList<>(runningsAppsWithCryptoVersion.size());
+    runningApplications.addAll(runningsAppsWithCryptoVersion.keySet());
     if (oldNode == null) {
       this.rmContext.getDispatcher().getEventHandler().handle(
-              new RMNodeStartedEvent(nodeId, request.getNMContainerStatuses(),
-                  request.getRunningApplications()));
+              new RMNodeStartedEvent(nodeId, request.getNMContainerStatuses(), runningApplications));
+      pushCryptoUpdatedEventsForRunningApps(runningsAppsWithCryptoVersion, rmNode);
     } else {
       LOG.info("Reconnect from the node at: " + host);
       this.nmLivelinessMonitor.unregister(nodeId);
@@ -416,8 +425,8 @@ public class ResourceTrackerService extends AbstractService implements
           .getDispatcher()
           .getEventHandler()
           .handle(
-              new RMNodeReconnectEvent(nodeId, rmNode, request
-                  .getRunningApplications(), request.getNMContainerStatuses()));
+              new RMNodeReconnectEvent(nodeId, rmNode, runningApplications, request.getNMContainerStatuses()));
+      pushCryptoUpdatedEventsForRunningApps(runningsAppsWithCryptoVersion, oldNode);
     }
     // On every node manager register we will be clearing NMToken keys if
     // present for any running application.
@@ -474,6 +483,34 @@ public class ResourceTrackerService extends AbstractService implements
     return response;
   }
 
+  private void pushCryptoUpdatedEventsForRunningApps(Map<ApplicationId, Integer> runningApps, RMNode rmNode) {
+    if (!getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, CommonConfigurationKeys
+        .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      return;
+    }
+    for (Map.Entry<ApplicationId, Integer> entry : runningApps.entrySet()) {
+      ApplicationId appId = entry.getKey();
+      RMApp rmApp = rmContext.getRMApps().get(appId);
+      if (rmApp != null) {
+        Integer nmCryptoMaterialVersion = entry.getValue();
+        if (rmApp.getCryptoMaterialVersion() > nmCryptoMaterialVersion) {
+          ByteBuffer keyStore = ByteBuffer.wrap(rmApp.getKeyStore());
+          char[] keyStorePassword = rmApp.getKeyStorePassword();
+          ByteBuffer trustStore = ByteBuffer.wrap(rmApp.getTrustStore());
+          char[] trustStorePassword = rmApp.getTrustStorePassword();
+          int cryptoVersion = rmApp.getCryptoMaterialVersion();
+          UpdatedCryptoForApp updatedCrypto = recordFactory.newRecordInstance(UpdatedCryptoForApp.class);
+          updatedCrypto.setKeyStore(keyStore);
+          updatedCrypto.setKeyStorePassword(keyStorePassword);
+          updatedCrypto.setTrustStore(trustStore);
+          updatedCrypto.setTrustStorePassword(trustStorePassword);
+          updatedCrypto.setVersion(cryptoVersion);
+          rmNode.getAppCryptoMaterialToUpdate().putIfAbsent(appId, updatedCrypto);
+        }
+      }
+    }
+  }
+  
   @SuppressWarnings("unchecked")
   @Override
   public NodeHeartbeatResponse nodeHeartbeat(NodeHeartbeatRequest request)
@@ -515,6 +552,18 @@ public class ResourceTrackerService extends AbstractService implements
 
     // Send ping
     this.nmLivelinessMonitor.receivedPing(nodeId);
+    
+    if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      Set<ApplicationId> updatedApps = request.getUpdatedApplicationsWithNewCryptoMaterial();
+      if (updatedApps != null) {
+        for (ApplicationId appId : updatedApps) {
+          rmNode.getAppCryptoMaterialToUpdate().remove(appId);
+          RMApp rmApp = rmContext.getRMApps().get(appId);
+          rmApp.rmNodeHasUpdatedCryptoMaterial(rmNode.getNodeID());
+        }
+      }
+    }
 
     // 3. Check if it's a 'fresh' heartbeat i.e. not duplicate heartbeat
     NodeHeartbeatResponse lastNodeHeartbeatResponse = rmNode.getLastNodeHeartBeatResponse();
@@ -547,7 +596,11 @@ public class ResourceTrackerService extends AbstractService implements
         nodeHeartBeatResponse);
 
     populateKeys(request, nodeHeartBeatResponse);
-
+    if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      setAppsToUpdateWithNewCryptoMaterial(nodeHeartBeatResponse, rmNode);
+    }
+    
     ConcurrentMap<ApplicationId, ByteBuffer> systemCredentials =
         rmContext.getSystemCredentialsForApps();
     if (!systemCredentials.isEmpty()) {
@@ -592,6 +645,17 @@ public class ResourceTrackerService extends AbstractService implements
     return nodeHeartBeatResponse;
   }
 
+  @InterfaceAudience.Private
+  @VisibleForTesting
+  protected void setAppsToUpdateWithNewCryptoMaterial(NodeHeartbeatResponse response, RMNode rmNode) {
+    Set<Map.Entry<ApplicationId, UpdatedCryptoForApp>> appsToUpdate = rmNode.getAppCryptoMaterialToUpdate().entrySet();
+    Map<ApplicationId, UpdatedCryptoForApp> payload = new HashMap<>(appsToUpdate.size());
+    for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : appsToUpdate) {
+      payload.put(entry.getKey(), entry.getValue());
+    }
+    response.setUpdatedCryptoForApps(payload);
+  }
+  
   /**
    * Check if node in decommissioning state.
    * @param nodeId

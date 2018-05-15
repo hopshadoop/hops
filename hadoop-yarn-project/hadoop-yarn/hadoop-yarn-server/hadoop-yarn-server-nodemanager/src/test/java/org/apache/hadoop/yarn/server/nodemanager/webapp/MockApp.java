@@ -40,6 +40,7 @@ public class MockApp implements Application {
   Map<ContainerId, Container> containers = new HashMap<ContainerId, Container>();
   ApplicationState appState;
   Application app;
+  int cryptoMaterialVersion;
 
   public MockApp(int uniqId) {
     this("mockUser", 1234, uniqId, "mockUserFolder");
@@ -55,6 +56,7 @@ public class MockApp implements Application {
     this.appId = BuilderUtils.newApplicationId(recordFactory, clusterTimeStamp,
         uniqId);
     appState = ApplicationState.NEW;
+    this.cryptoMaterialVersion = 0;
   }
 
   public void setState(ApplicationState state) {
@@ -81,6 +83,16 @@ public class MockApp implements Application {
     return appState;
   }
 
+  @Override
+  public int getCryptoMaterialVersion() {
+    return cryptoMaterialVersion;
+  }
+  
+  @Override
+  public void setCryptoMaterialVersion(int cryptoMaterialVersion) {
+    this.cryptoMaterialVersion = cryptoMaterialVersion;
+  }
+  
   public void handle(ApplicationEvent event) {}
 
 }

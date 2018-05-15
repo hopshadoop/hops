@@ -42,6 +42,7 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
+import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SignalContainerRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.MasterKeyProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.NodeActionProto;
@@ -49,6 +50,7 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.NodeHeartbeatR
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.NodeHeartbeatResponseProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.SystemCredentialsForAppsProto;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
@@ -70,6 +72,7 @@ public class NodeHeartbeatResponsePBImpl extends
   private MasterKey nmTokenMasterKey = null;
   private List<Container> containersToDecrease = null;
   private List<SignalContainerRequest> containersToSignal = null;
+  private Map<ApplicationId, UpdatedCryptoForApp> updatedCryptoForApps = null;
 
   public NodeHeartbeatResponsePBImpl() {
     builder = NodeHeartbeatResponseProto.newBuilder();
@@ -114,6 +117,11 @@ public class NodeHeartbeatResponsePBImpl extends
     if (this.containersToSignal != null) {
       addContainersToSignalToProto();
     }
+    
+    if (this.updatedCryptoForApps != null) {
+      addUpdatedCryptoForAppsToProto();
+    }
+    
     if (this.resource != null) {
       builder.setResource(convertToProtoFormat(this.resource));
     }
@@ -130,6 +138,27 @@ public class NodeHeartbeatResponsePBImpl extends
     }
   }
 
+  private void addUpdatedCryptoForAppsToProto() {
+    maybeInitBuilder();
+    builder.clearUpdatedCryptoForApps();
+    if (updatedCryptoForApps == null) {
+      return;
+    }
+    
+    for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : updatedCryptoForApps.entrySet()) {
+      builder.addUpdatedCryptoForApps(YarnServerCommonServiceProtos.UpdatedCryptoForAppsProto.newBuilder()
+        .setAppId(convertToProtoFormat(entry.getKey()))
+        .setUpdatedCryptoForApp(
+            YarnServerCommonServiceProtos.UpdatedCryptoForAppProto.newBuilder()
+            .setKeyStore(ProtoUtils.convertToProtoFormat(entry.getValue().getKeyStore().duplicate()))
+            .setKeyStorePassword(String.valueOf(entry.getValue().getKeyStorePassword()))
+            .setTrustStore(ProtoUtils.convertToProtoFormat(entry.getValue().getTrustStore().duplicate()))
+            .setTrustStorePassword(String.valueOf(entry.getValue().getTrustStorePassword()))
+            .setVersion(entry.getValue().getVersion())
+        ));
+    }
+  }
+  
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -530,6 +559,43 @@ public class NodeHeartbeatResponsePBImpl extends
     }
   }
 
+  @Override
+  public Map<ApplicationId, UpdatedCryptoForApp> getUpdatedCryptoForApps() {
+    if (this.updatedCryptoForApps != null) {
+      return this.updatedCryptoForApps;
+    }
+    initUpdatedCryptoForApps();
+    return updatedCryptoForApps;
+  }
+  
+  @Override
+  public void setUpdatedCryptoForApps(Map<ApplicationId, UpdatedCryptoForApp> updatedCryptoForApps) {
+    if (updatedCryptoForApps == null) {
+      return;
+    }
+    initUpdatedCryptoForApps();
+    this.updatedCryptoForApps.clear();
+    this.updatedCryptoForApps.putAll(updatedCryptoForApps);
+  }
+  
+  private void initUpdatedCryptoForApps() {
+    if (this.updatedCryptoForApps != null) {
+      return;
+    }
+    NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
+    List<YarnServerCommonServiceProtos.UpdatedCryptoForAppsProto> list = p.getUpdatedCryptoForAppsList();
+    this.updatedCryptoForApps = new HashMap<>();
+    for (YarnServerCommonServiceProtos.UpdatedCryptoForAppsProto ucp : list) {
+      ApplicationId appId = convertFromProtoFormat(ucp.getAppId());
+      UpdatedCryptoForApp updatedCryptoForApp = convertFromProtoFormat(ucp.getUpdatedCryptoForApp());
+      this.updatedCryptoForApps.put(appId, updatedCryptoForApp);
+    }
+  }
+  
+  private UpdatedCryptoForAppPBImpl convertFromProtoFormat(YarnServerCommonServiceProtos.UpdatedCryptoForAppProto p) {
+    return new UpdatedCryptoForAppPBImpl(p);
+  }
+  
   @Override
   public void setSystemCredentialsForApps(
       Map<ApplicationId, ByteBuffer> systemCredentials) {

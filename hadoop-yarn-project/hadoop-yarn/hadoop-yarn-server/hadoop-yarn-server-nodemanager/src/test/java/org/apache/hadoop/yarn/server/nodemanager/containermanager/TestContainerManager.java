@@ -20,21 +20,28 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.util.Shell;
@@ -78,6 +85,7 @@ import org.apache.hadoop.yarn.server.api.ResourceManagerConstants;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedAppsEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrDecreaseContainersResourceEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrSignalContainersEvent;
+import org.apache.hadoop.yarn.server.nodemanager.CMgrUpdateCryptoMaterialEvent;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor.Signal;
 import org.apache.hadoop.yarn.server.nodemanager.DefaultContainerExecutor;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
@@ -91,7 +99,6 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.Reso
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerSignalContext;
 import org.apache.hadoop.yarn.server.nodemanager.security.NMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -99,6 +106,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -184,7 +194,190 @@ public class TestContainerManager extends BaseContainerManagerTest {
     }
     Assert.assertTrue(throwsException);
   }
-
+  
+  private LocalResource createLocalResource(File file) {
+    return createLocalResource(file, LocalResourceVisibility.PRIVATE, LocalResourceType.FILE);
+  }
+  
+  private LocalResource createLocalResource(File file, LocalResourceVisibility visibility, LocalResourceType type) {
+    URL url = URL.fromPath(localFS.makeQualified(new Path(file.getAbsolutePath())));
+    LocalResource lr = recordFactory.newRecordInstance(LocalResource.class);
+    lr.setResource(url);
+    lr.setSize(file.length());
+    lr.setVisibility(visibility);
+    lr.setType(type);
+    lr.setTimestamp(file.lastModified());
+    return lr;
+  }
+  
+  @Test
+  public void testContainerUpdateCryptoMaterial() throws Exception {
+    containerManager.start();
+    // Create script to run
+    File scriptFile = Shell.appendScriptExtension(tmpDir, "script");
+    FileWriter fw = new FileWriter(scriptFile, false);
+    
+    if (Shell.WINDOWS) {
+      fw.write("@ping -n 20 127.0.0.1 >nul");
+    } else {
+      fw.write("\numask 0");
+      fw.write("\nexec sleep 15");
+    }
+    fw.close();
+    
+    // Create dummy crypto material resources
+    ByteBuffer keyStore = ByteBuffer.wrap("keyStore".getBytes());
+    ByteBuffer trustStore = ByteBuffer.wrap("trustStore".getBytes());
+    char[] password = "password".toCharArray();
+  
+    ContainerId cid0 = createContainerId(0);
+    ContainerLaunchContext ctx0 = createContainerLaunchContext(scriptFile, cid0, keyStore, trustStore, password);
+    StartContainerRequest scr0 = StartContainerRequest.newInstance(ctx0,
+        createContainerToken(cid0, DUMMY_RM_IDENTIFIER, context.getNodeId(), user,
+            context.getContainerTokenSecretManager(), userFolder));
+  
+    ContainerId cid1 = createContainerId(1);
+    ContainerLaunchContext ctx1 = createContainerLaunchContext(scriptFile, cid1, keyStore, trustStore, password);
+    StartContainerRequest scr1 = StartContainerRequest.newInstance(ctx1,
+        createContainerToken(cid1, DUMMY_RM_IDENTIFIER, context.getNodeId(), user,
+            context.getContainerTokenSecretManager(), userFolder));
+    
+    List<StartContainerRequest> scrList = new ArrayList<>(2);
+    scrList.add(scr0);
+    scrList.add(scr1);
+    StartContainersRequest allRequests = StartContainersRequest.newInstance(scrList);
+    containerManager.startContainers(allRequests);
+    
+    BaseContainerManagerTest.waitForContainerState(containerManager, cid0, ContainerState.RUNNING);
+    BaseContainerManagerTest.waitForContainerState(containerManager, cid1, ContainerState.RUNNING);
+    
+    ContainerImpl container0 = (ContainerImpl) containerManager.getContext().getContainers().get(cid0);
+    waitForContainerToRunningState(container0);
+  
+    ContainerImpl container1 = (ContainerImpl) containerManager.getContext().getContainers().get(cid1);
+    waitForContainerToRunningState(container1);
+    
+    File[] cryptoMaterial0 = getContainerCryptoMaterialFiles(container0);
+    File[] cryptoMaterial1 = getContainerCryptoMaterialFiles(container1);
+    
+    ByteBuffer newKeyStore = ByteBuffer.wrap("newKeyStore".getBytes());
+    ByteBuffer newTrustStore = ByteBuffer.wrap("newTrustStore".getBytes());
+    char[] newPassword = "newPassword".toCharArray();
+    CMgrUpdateCryptoMaterialEvent updateEvent0 = new CMgrUpdateCryptoMaterialEvent(cid0, newKeyStore, newPassword,
+        newTrustStore, newPassword, 1);
+    CMgrUpdateCryptoMaterialEvent updateEvent1 = new CMgrUpdateCryptoMaterialEvent(cid1, newKeyStore, newPassword,
+        newTrustStore, newPassword, 1);
+    containerManager.handle(updateEvent0);
+    containerManager.handle(updateEvent1);
+    
+    Thread.sleep(200);
+    Map<ContainerId, Future> cryptoMaterialUpdaters = containerManager.getCryptoMaterialUpdaters();
+    waitForCryptoMaterialUpdatersToFinish(cid0, cryptoMaterialUpdaters);
+    waitForCryptoMaterialUpdatersToFinish(cid1, cryptoMaterialUpdaters);
+  
+    // Check content of crypto material is updated
+    LOG.info("Asserting crypto material for container0");
+    assertUpdatedCryptoMaterial(cryptoMaterial0, keyStore, newKeyStore, trustStore, newTrustStore,
+        String.valueOf(password), String.valueOf(newPassword));
+    LOG.info("Asserting crypto material for container1");
+    assertUpdatedCryptoMaterial(cryptoMaterial1, keyStore, newKeyStore, trustStore, newTrustStore,
+        String.valueOf(password), String.valueOf(newPassword));
+    
+    BaseContainerManagerTest.waitForContainerState(containerManager, cid0, ContainerState.COMPLETE, 30);
+    BaseContainerManagerTest.waitForContainerState(containerManager, cid1, ContainerState.COMPLETE, 30);
+  }
+  
+  private void waitForCryptoMaterialUpdatersToFinish(ContainerId cid, Map<ContainerId, Future> cryptoMaterialUpdaters)
+    throws InterruptedException {
+    int numOfRetries = 0;
+    while (cryptoMaterialUpdaters.containsKey(cid) && numOfRetries < 10) {
+      Thread.sleep(1000);
+      numOfRetries++;
+    }
+  }
+  
+  private ContainerLaunchContext createContainerLaunchContext(File script, ContainerId cid,
+      ByteBuffer keyStore, ByteBuffer trustStore, char[] password)
+      throws IOException {
+    File cryptoDir = new File(tmpDir, "crypto_" + cid.toString());
+    cryptoDir.mkdirs();
+    File keyStoreFile = new File(cryptoDir, "k_store.jks");
+    File trustStoreFile = new File(cryptoDir, "t_store.jks");
+    File passwordFile = new File(cryptoDir, "passwd");
+    writeByteBufferToFile(keyStoreFile, keyStore);
+    writeByteBufferToFile(trustStoreFile, trustStore);
+    FileUtils.writeStringToFile(passwordFile, String.valueOf(password));
+  
+    Map<String, LocalResource> lrs = new HashMap<>(4);
+    lrs.put(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME, createLocalResource(keyStoreFile));
+    lrs.put(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME, createLocalResource(trustStoreFile));
+    lrs.put(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME, createLocalResource(passwordFile));
+    lrs.put("script", createLocalResource(script, LocalResourceVisibility.APPLICATION, LocalResourceType.FILE));
+    
+    ContainerLaunchContext ctx = recordFactory.newRecordInstance(ContainerLaunchContext.class);
+    ctx.setLocalResources(lrs);
+    List<String> commands = Arrays.asList(Shell.getRunScriptCommand(script));
+    ctx.setCommands(commands);
+    return ctx;
+  }
+  
+  private void writeByteBufferToFile(File target, ByteBuffer data) throws IOException {
+    FileChannel fileChannel = new FileOutputStream(target, false).getChannel();
+    fileChannel.write(data);
+    fileChannel.close();
+  }
+  
+  private void waitForContainerToRunningState(ContainerImpl container) throws InterruptedException {
+    int numOfRetries = 0;
+    while (!container.getContainerState().equals(
+        org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerState.RUNNING)
+        && numOfRetries < 5) {
+      Thread.sleep(300);
+      numOfRetries++;
+    }
+    assertEquals(org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerState.RUNNING,
+        container.getContainerState());
+  }
+  
+  private File[] getContainerCryptoMaterialFiles(ContainerImpl container) {
+    container.identifyCryptoMaterialLocation();
+    File[] cryptoMaterial = new File[3];
+    cryptoMaterial[0] = container.getKeyStoreLocalizedPath();
+    cryptoMaterial[1] = container.getTrustStoreLocalizedPath();
+    cryptoMaterial[2] = container.getPasswordFileLocalizedPath();
+    
+    for (int i = 0; i < cryptoMaterial.length; i++) {
+      assertTrue(cryptoMaterial[i].exists());
+    }
+    return cryptoMaterial;
+  }
+  
+  private void assertUpdatedCryptoMaterial(File[] cryptoMaterialFiles, ByteBuffer oldKeyStore, ByteBuffer newKeyStore,
+      ByteBuffer oldTrustStore, ByteBuffer newTrustStore, String oldPassword, String newPassword)
+      throws
+      IOException {
+    ByteBuffer newKeyStoreBB = readFileToByteBuffer(cryptoMaterialFiles[0]);
+    assertFalse(oldKeyStore.equals(newKeyStoreBB));
+    assertTrue(newKeyStore.equals(newKeyStoreBB));
+    
+    ByteBuffer newTrustStoreBB = readFileToByteBuffer(cryptoMaterialFiles[1]);
+    assertFalse(oldTrustStore.equals(newTrustStoreBB));
+    assertTrue(newTrustStore.equals(newTrustStoreBB));
+    
+    String newPasswordU = FileUtils.readFileToString(cryptoMaterialFiles[2]);
+    assertNotEquals(oldPassword, newPasswordU);
+    assertEquals(newPassword, newPasswordU);
+  }
+  
+  private ByteBuffer readFileToByteBuffer(File source) throws IOException {
+    ByteBuffer buffer = ByteBuffer.allocate(128);
+    FileChannel fileChannel = new FileInputStream(source).getChannel();
+    fileChannel.read(buffer);
+    fileChannel.close();
+    buffer.flip();
+    return buffer;
+  }
+  
   @Test
   public void testContainerSetup() throws Exception {
 

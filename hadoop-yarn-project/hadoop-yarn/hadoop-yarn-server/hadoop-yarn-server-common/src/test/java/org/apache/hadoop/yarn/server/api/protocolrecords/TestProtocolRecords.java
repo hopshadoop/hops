@@ -83,11 +83,13 @@ public class TestProtocolRecords {
           ContainerState.RUNNING, Resource.newInstance(1024, 1, 2), "diagnostics",
           0, Priority.newInstance(10), 1234);
     List<NMContainerStatus> reports = Arrays.asList(containerReport);
+    Map<ApplicationId, Integer> runningApplications = new HashMap<>(1);
+    runningApplications.put(appId, 0);
     RegisterNodeManagerRequest request =
         RegisterNodeManagerRequest.newInstance(
           NodeId.newInstance("1.1.1.1", 1000), 8080,
             Resource.newInstance(1024, 1, 2), "NM-version-id", reports,
-            Arrays.asList(appId));
+            runningApplications);
     RegisterNodeManagerRequest requestProto =
         new RegisterNodeManagerRequestPBImpl(
           ((RegisterNodeManagerRequestPBImpl) request).getProto());
@@ -100,7 +102,7 @@ public class TestProtocolRecords {
     Assert.assertEquals(Resource.newInstance(1024, 1, 2),
       requestProto.getResource());
     Assert.assertEquals(1, requestProto.getRunningApplications().size());
-    Assert.assertEquals(appId, requestProto.getRunningApplications().get(0)); 
+    Assert.assertNotNull(requestProto.getRunningApplications().get(appId));
   }
 
   @Test

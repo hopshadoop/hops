@@ -77,7 +77,7 @@ public class FSDownload implements Callable<Path> {
       (short) 0755);
   static final FsPermission PUBLIC_FILE_PERMS = new FsPermission((short) 0555);
   static final FsPermission PRIVATE_FILE_PERMS = new FsPermission(
-      (short) 0500);
+      (short) 0520);
   static final FsPermission PUBLIC_DIR_PERMS = new FsPermission((short) 0755);
   static final FsPermission PRIVATE_DIR_PERMS = new FsPermission((short) 0700);
 
