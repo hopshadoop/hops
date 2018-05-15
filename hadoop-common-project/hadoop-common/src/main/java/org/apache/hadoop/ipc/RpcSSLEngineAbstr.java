@@ -17,9 +17,6 @@ package org.apache.hadoop.ipc;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.net.HopsSSLSocketFactory;
-import org.apache.hadoop.security.ssl.SSLFactory;
 
 import javax.net.ssl.*;
 import java.io.*;
@@ -27,8 +24,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
-import java.security.*;
-import java.security.cert.CertificateException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -216,84 +211,7 @@ public abstract class RpcSSLEngineAbstr implements RpcSSLEngine {
 
     public abstract int read(ReadableByteChannel channel, ByteBuffer buffer, Server.Connection connection)
         throws IOException;
-
-    public static SSLContext initializeSSLContext(Configuration conf) throws IOException {
-        SSLContext sslCtx = null;
-        try {
-            String enabledProtocol = conf.get(HopsSSLSocketFactory.CryptoKeys
-                .SOCKET_ENABLED_PROTOCOL.getValue(),
-                HopsSSLSocketFactory.CryptoKeys.SOCKET_ENABLED_PROTOCOL
-                    .getDefaultValue());
-            sslCtx = SSLContext.getInstance(enabledProtocol);
-
-            String keyStoreFilePath = conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(),
-                    HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getDefaultValue());
-            String keyStorePassword = conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue(),
-                    HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getDefaultValue());
-            String keyPassword = conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue(),
-                    HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getDefaultValue());
-            String trustStoreFilePath = conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue(),
-                    HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getDefaultValue());
-            String trustStorePassword = conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue(),
-                    HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getDefaultValue());
-
-            sslCtx.init(createKeyManager(keyStoreFilePath, keyStorePassword, keyPassword),
-                    createTrustManager(trustStoreFilePath, trustStorePassword),
-                    new SecureRandom());
-        } catch (NoSuchAlgorithmException | KeyManagementException ex) {
-            handleException(ex);
-        }
-
-        return sslCtx;
-    }
-
-    // Helper method to initialize key managers needed by SSLContext
-    private static KeyManager[] createKeyManager(String filePath, String keyStorePasswd, String keyPasswd)
-        throws IOException {
-
-        KeyManager[] keyManagers = null;
-        try {
-            KeyStore keyStore = KeyStore.getInstance("JKS");
-            keyStore.load(new FileInputStream(filePath), keyStorePasswd.toCharArray());
-
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(keyStore, keyPasswd.toCharArray());
-
-            keyManagers = kmf.getKeyManagers();
-        } catch (KeyStoreException | NoSuchAlgorithmException
-                | CertificateException | UnrecoverableKeyException ex) {
-            handleException(ex);
-        }
-
-        return keyManagers;
-    }
-
-    // Helper method to initialize trust manager needed by SSLContext
-    private static TrustManager[] createTrustManager(String filePath, String keyStorePasswd)
-            throws IOException {
-        TrustManager[] trustManagers = null;
-
-        try {
-            KeyStore trustStore = KeyStore.getInstance("JKS");
-            trustStore.load(new FileInputStream(filePath), keyStorePasswd.toCharArray());
-
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
-            tmf.init(trustStore);
-
-            trustManagers = tmf.getTrustManagers();
-        } catch (KeyStoreException | NoSuchAlgorithmException
-                | CertificateException ex) {
-            handleException(ex);
-        }
-
-        return trustManagers;
-    }
-
-    private static void handleException(Throwable ex) throws IOException {
-        String errorPrefix = "Error while initializing cryptographic material ";
-        LOG.error(errorPrefix + ex, ex);
-        throw new IOException(errorPrefix, ex);
-    }
+    
 
     protected ByteBuffer enlargeApplicationBuffer(ByteBuffer buffer) {
         return enlargeBuffer(buffer, sslEngine.getSession().getApplicationBufferSize());

@@ -285,7 +285,7 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
       String user) throws YarnException, IOException {
     ApplicationId applicationId = submissionContext.getApplicationId();
 
-    RMAppImpl application =
+    RMApp application =
         createAndPopulateNewRMApp(submissionContext, submitTime, user, false);
     Credentials credentials = null;
     try {
@@ -322,7 +322,7 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
     ApplicationId appId = appContext.getApplicationId();
 
     // create and recover app.
-    RMAppImpl application =
+    RMApp application =
         createAndPopulateNewRMApp(appContext, appState.getSubmitTime(),
             appState.getUser(), true);
 
@@ -357,7 +357,7 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
     application.handle(new RMAppRecoverEvent(appId, rmState));
   }
 
-  private RMAppImpl createAndPopulateNewRMApp(
+  private RMApp createAndPopulateNewRMApp(
       ApplicationSubmissionContext submissionContext, long submitTime,
       String user, boolean isRecovery) throws YarnException, IOException {
     // Do queue mapping
@@ -401,11 +401,7 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
     submissionContext.setPriority(appPriority);
 
     // Create RMApp
-    RMAppImpl application = new RMAppImpl(applicationId, rmContext, this.conf,
-        submissionContext.getApplicationName(), user,
-        submissionContext.getQueue(), submissionContext, this.scheduler,
-        this.masterService, submitTime, submissionContext.getApplicationType(),
-        submissionContext.getApplicationTags(), amReq);
+    RMApp application = createRMApp(applicationId, user, submissionContext, submitTime, amReq);
 
     // Concurrent app submissions with same applicationId will fail here
     // Concurrent app submissions with different applicationIds will not
@@ -427,6 +423,13 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
     return application;
   }
 
+  protected RMApp createRMApp(ApplicationId applicationId, String user, ApplicationSubmissionContext submissionContext,
+      long submitTime, ResourceRequest amReq) throws IOException {
+    return new RMAppImpl(applicationId, rmContext, this.conf, submissionContext.getApplicationName(), user,
+        submissionContext.getQueue(), submissionContext, this.scheduler, this.masterService, submitTime,
+        submissionContext.getApplicationType(), submissionContext.getApplicationTags(), amReq);
+  }
+  
   private ResourceRequest validateAndCreateResourceRequest(
       ApplicationSubmissionContext submissionContext, boolean isRecovery)
       throws InvalidResourceRequestException {

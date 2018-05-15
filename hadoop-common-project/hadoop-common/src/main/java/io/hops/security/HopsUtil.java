@@ -67,6 +67,7 @@ public class HopsUtil {
   // Assuming that subject attributes do not contain comma
   private static final Pattern CN_PATTERN = Pattern.compile(".*CN=([^,]+).*");
   private static final Pattern O_PATTERN = Pattern.compile(".*O=([^,]+).*");
+  private static final Pattern OU_PATTERN = Pattern.compile(".*OU=([^,]+).*");
   
   /**
    * Read password for cryptographic material from a file. The file could be
@@ -113,6 +114,14 @@ public class HopsUtil {
    */
   public static String extractOFromSubject(String subject) {
     Matcher matcher = O_PATTERN.matcher(subject);
+    if (matcher.matches()) {
+      return matcher.group(1);
+    }
+    return null;
+  }
+  
+  public static String extractOUFromSubject(String subject) {
+    Matcher matcher = OU_PATTERN.matcher(subject);
     if (matcher.matches()) {
       return matcher.group(1);
     }

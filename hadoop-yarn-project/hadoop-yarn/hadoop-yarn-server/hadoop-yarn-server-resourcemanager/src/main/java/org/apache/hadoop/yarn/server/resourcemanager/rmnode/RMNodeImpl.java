@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -40,6 +42,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.CryptoMaterial;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -59,6 +62,7 @@ import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.ClusterMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEvent;
@@ -163,6 +167,10 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   
   private final Map<ContainerId, Container> nmReportedIncreasedContainers =
       new HashMap<>();
+  
+  // Map of renewed application certificates that should be propagated to NM
+  private final Map<ApplicationId, UpdatedCryptoForApp> appCryptoMaterialToUpdate =
+      new ConcurrentHashMap<>();
 
   protected NodeHeartbeatResponse latestNodeHeartBeatResponse = recordFactory
       .newRecordInstance(NodeHeartbeatResponse.class);
@@ -223,6 +231,8 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       .addTransition(NodeState.RUNNING, NodeState.SHUTDOWN,
           RMNodeEventType.SHUTDOWN,
           new DeactivateNodeTransition(NodeState.SHUTDOWN))
+      .addTransition(NodeState.RUNNING, NodeState.RUNNING,
+          RMNodeEventType.UPDATE_CRYPTO_MATERIAL, new UpdateCryptoMaterialForAppTransition())
 
       //Transitions from REBOOTED state
       .addTransition(NodeState.REBOOTED, NodeState.REBOOTED,
@@ -777,6 +787,24 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     }
   }
   
+  public static class UpdateCryptoMaterialForAppTransition implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
+  
+    @Override
+    public void transition(RMNodeImpl rmNode, RMNodeEvent rmNodeEvent) {
+      RMNodeUpdateCryptoMaterialForAppEvent updateEvent = (RMNodeUpdateCryptoMaterialForAppEvent) rmNodeEvent;
+      LOG.info("Node " + rmNode.toString() + " received UPDATE_CRYPTO_MATERIAL event for app " + updateEvent.getAppId());
+      UpdatedCryptoForApp updatedCrypto = recordFactory.newRecordInstance(UpdatedCryptoForApp.class);
+      ByteBuffer keyStore = ByteBuffer.wrap(updateEvent.getKeyStore());
+      ByteBuffer trustStore = ByteBuffer.wrap(updateEvent.getTrustStore());
+      updatedCrypto.setKeyStore(keyStore);
+      updatedCrypto.setKeyStorePassword(updateEvent.getKeyStorePassword());
+      updatedCrypto.setTrustStore(trustStore);
+      updatedCrypto.setTrustStorePassword(updateEvent.getTrustStorePassword());
+      updatedCrypto.setVersion(updateEvent.getVersion());
+      rmNode.appCryptoMaterialToUpdate.put(updateEvent.getAppId(), updatedCrypto);
+    }
+  }
+  
   public static class CleanUpAppTransition
           implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
@@ -1073,4 +1101,9 @@ public static class RecommissionNodeTransition
   public boolean getNextHeartbeat(){
     return nextHeartBeat;
   }
- }
+  
+  @Override
+  public Map<ApplicationId, UpdatedCryptoForApp> getAppCryptoMaterialToUpdate() {
+    return appCryptoMaterialToUpdate;
+  }
+}

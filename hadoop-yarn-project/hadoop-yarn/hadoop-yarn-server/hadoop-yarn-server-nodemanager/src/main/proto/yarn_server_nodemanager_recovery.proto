@@ -35,6 +35,7 @@ message ContainerManagerApplicationProto {
   optional string key_store_password = 8;
   optional bytes trust_store = 9;
   optional string trust_store_password = 10;
+  optional int32 crypto_version = 11;
 }
 
 message DeletionServiceDeleteTaskProto {

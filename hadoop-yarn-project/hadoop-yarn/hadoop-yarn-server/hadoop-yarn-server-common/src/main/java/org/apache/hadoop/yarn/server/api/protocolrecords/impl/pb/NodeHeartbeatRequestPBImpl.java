@@ -24,8 +24,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeLabel;
+import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.NodeLabelPBImpl;
+import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeLabelProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.MasterKeyProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.NodeStatusProto;
@@ -51,6 +54,7 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   private MasterKey lastKnownNMTokenMasterKey = null;
   private Set<NodeLabel> labels = null;
   private List<LogAggregationReport> logAggregationReportsForApps = null;
+  private Set<ApplicationId> updatedApplicationsWithNewCryptoMaterial = null;
 
   public NodeHeartbeatRequestPBImpl() {
     builder = NodeHeartbeatRequestProto.newBuilder();
@@ -106,6 +110,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     if (this.logAggregationReportsForApps != null) {
       addLogAggregationStatusForAppsToProto();
     }
+    if (this.updatedApplicationsWithNewCryptoMaterial != null) {
+      addUpdatedApplicationsWithNewCryptoMaterialToProto();
+    }
   }
 
   private void addLogAggregationStatusForAppsToProto() {
@@ -142,6 +149,20 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     builder.addAllLogAggregationReportsForApps(it);
   }
 
+  private void addUpdatedApplicationsWithNewCryptoMaterialToProto() {
+    maybeInitBuilder();
+    builder.clearUpdatedApplicationsWithNewCryptoMaterial();
+    if (updatedApplicationsWithNewCryptoMaterial == null) {
+      return;
+    }
+    for (ApplicationId appId : updatedApplicationsWithNewCryptoMaterial) {
+      builder.addUpdatedApplicationsWithNewCryptoMaterial(
+          YarnProtos.ApplicationIdProto.newBuilder()
+          .setClusterTimestamp(appId.getClusterTimestamp())
+          .setId(appId.getId()));
+    }
+  }
+  
   private LogAggregationReportProto convertToProtoFormat(
       LogAggregationReport value) {
     return ((LogAggregationReportPBImpl) value).getProto();
@@ -273,6 +294,37 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     }
   }
 
+  private void initUpdatedApplicationWithNewCryptoMaterial() {
+    if (this.updatedApplicationsWithNewCryptoMaterial != null) {
+      return;
+    }
+    NodeHeartbeatRequestProtoOrBuilder p = viaProto ? proto : builder;
+    List<YarnProtos.ApplicationIdProto> list = p.getUpdatedApplicationsWithNewCryptoMaterialList();
+    this.updatedApplicationsWithNewCryptoMaterial = new HashSet<>();
+    for (YarnProtos.ApplicationIdProto aip : list) {
+      this.updatedApplicationsWithNewCryptoMaterial.add(convertFromProtoFormat(aip));
+    }
+  }
+  
+  @Override
+  public Set<ApplicationId> getUpdatedApplicationsWithNewCryptoMaterial() {
+    initUpdatedApplicationWithNewCryptoMaterial();
+    return this.updatedApplicationsWithNewCryptoMaterial;
+  }
+  
+  public void setUpdatedApplicationsWithNewCryptoMaterial(Set<ApplicationId> updatedApplicationsWithNewCryptoMaterial) {
+    if (updatedApplicationsWithNewCryptoMaterial == null) {
+      return;
+    }
+    maybeInitBuilder();
+    builder.clearUpdatedApplicationsWithNewCryptoMaterial();
+    this.updatedApplicationsWithNewCryptoMaterial = updatedApplicationsWithNewCryptoMaterial;
+  }
+  
+  private ApplicationIdPBImpl convertFromProtoFormat(YarnProtos.ApplicationIdProto p) {
+    return new ApplicationIdPBImpl(p);
+  }
+  
   private NodeLabelPBImpl convertFromProtoFormat(NodeLabelProto p) {
     return new NodeLabelPBImpl(p);
   }

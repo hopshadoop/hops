@@ -15,44 +15,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
+package org.apache.hadoop.yarn.server.nodemanager;
 
-import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 
-public class RMAppCertificateGeneratedEvent extends RMAppEvent {
-  private final byte[] keyStore;
+import java.nio.ByteBuffer;
+
+public class CMgrUpdateCryptoMaterialEvent extends ContainerManagerEvent {
+  private final ContainerId containerId;
+  private final ByteBuffer keyStore;
   private final char[] keyStorePassword;
-  private final byte[] trustStore;
+  private final ByteBuffer trustStore;
   private final char[] trustStorePassword;
-  private final long expirationEpoch;
+  private final int version;
   
-  public RMAppCertificateGeneratedEvent(ApplicationId appId, byte[] keyStore, char[] keyStorePassword,
-      byte[] trustStore, char[] trustStorePassword, long expirationEpoch, RMAppEventType type) {
-    super(appId, type);
+  public CMgrUpdateCryptoMaterialEvent(ContainerId containerId, ByteBuffer keyStore, char[] keyStorePassword,
+      ByteBuffer trustStore, char[] trustStorePassword, int version) {
+    super(ContainerManagerEventType.UPDATE_CRYPTO_MATERIAL);
+    this.containerId = containerId;
     this.keyStore = keyStore;
     this.keyStorePassword = keyStorePassword;
     this.trustStore = trustStore;
     this.trustStorePassword = trustStorePassword;
-    this.expirationEpoch = expirationEpoch;
+    this.version = version;
   }
   
-  public byte[] getKeyStore() {
-    return keyStore;
+  public ContainerId getContainerId() {
+    return containerId;
+  }
+  
+  public ByteBuffer getKeyStore() {
+    return keyStore.asReadOnlyBuffer();
   }
   
   public char[] getKeyStorePassword() {
     return keyStorePassword;
   }
   
-  public byte[] getTrustStore() {
-    return trustStore;
+  public ByteBuffer getTrustStore() {
+    return trustStore.asReadOnlyBuffer();
   }
   
   public char[] getTrustStorePassword() {
     return trustStorePassword;
   }
   
-  public long getExpirationEpoch() {
-    return expirationEpoch;
+  public int getVersion() {
+    return version;
   }
 }

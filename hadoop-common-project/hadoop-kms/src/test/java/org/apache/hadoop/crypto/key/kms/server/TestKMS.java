@@ -38,6 +38,7 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
+import org.apache.hadoop.security.ssl.KeyManagersReloaderThreadPool;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
@@ -80,12 +81,11 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 public class TestKMS {
   private static final Logger LOG = LoggerFactory.getLogger(TestKMS.class);
-
-  private static final String SSL_RELOADER_THREAD_NAME =
-      "Truststore reloader thread";
 
   @Rule
   public final Timeout testTimeout = new Timeout(180000);
@@ -96,6 +96,7 @@ public class TestKMS {
     Configuration conf = new Configuration();
     UserGroupInformation.setConfiguration(conf);
     GenericTestUtils.setLogLevel(LOG, Level.INFO);
+    KeyManagersReloaderThreadPool.getInstance(true).clearListOfTasks();
   }
 
   public static File getTestDir() throws Exception {
@@ -257,6 +258,8 @@ public class TestKMS {
 
   @BeforeClass
   public static void setUpMiniKdc() throws Exception {
+    // Create thread pool for testing
+    KeyManagersReloaderThreadPool.getInstance(true);
     File kdcDir = getTestDir();
     Properties kdcConf = MiniKdc.createConf();
     kdc = new MiniKdc(kdcConf, kdcDir);
@@ -342,28 +345,16 @@ public class TestKMS {
 
         if (ssl) {
           KeyProvider testKp = createProvider(uri, conf);
-          ThreadGroup threadGroup = Thread.currentThread().getThreadGroup();
-          while (threadGroup.getParent() != null) {
-            threadGroup = threadGroup.getParent();
+          List<ScheduledFuture> tasks = KeyManagersReloaderThreadPool.getInstance(true).getListOfTasks();
+          for (ScheduledFuture task : tasks) {
+            Assert.assertFalse("Reloader tasks are not alive", task.isCancelled());
           }
-          Thread[] threads = new Thread[threadGroup.activeCount()];
-          threadGroup.enumerate(threads);
-          Thread reloaderThread = null;
-          for (Thread thread : threads) {
-            if ((thread.getName() != null)
-                && (thread.getName().contains(SSL_RELOADER_THREAD_NAME))) {
-              reloaderThread = thread;
-            }
-          }
-          Assert.assertTrue("Reloader is not alive", reloaderThread.isAlive());
           testKp.close();
-          boolean reloaderStillAlive = true;
-          for (int i = 0; i < 10; i++) {
-            reloaderStillAlive = reloaderThread.isAlive();
-            if (!reloaderStillAlive) break;
-            Thread.sleep(1000);
+          TimeUnit.MILLISECONDS.sleep(500);
+          tasks = KeyManagersReloaderThreadPool.getInstance(true).getListOfTasks();
+          for (ScheduledFuture task : tasks) {
+            Assert.assertTrue("Reloader tasks are still alive", task.isCancelled());
           }
-          Assert.assertFalse("Reloader is still alive", reloaderStillAlive);
         }
 
         if (kerberos) {
@@ -1938,9 +1929,9 @@ public class TestKMS {
       GenericTestUtils.waitFor(new Supplier<Boolean>() {
         @Override
         public Boolean get() {
-          final Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
-          for (Thread t : threadSet) {
-            if (t.getName().contains(SSL_RELOADER_THREAD_NAME)) {
+          List<ScheduledFuture> tasks = KeyManagersReloaderThreadPool.getInstance(true).getListOfTasks();
+          for (ScheduledFuture task : tasks) {
+            if (!task.isCancelled()) {
               return false;
             }
           }

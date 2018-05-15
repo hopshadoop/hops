@@ -57,6 +57,7 @@ import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.LocalResourcePBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceProto;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.ContainerManagerApplicationProto;
@@ -214,6 +215,58 @@ public class TestNMLeveldbStateStoreService {
     assertEquals(appProto1, state.getApplications().get(0));
   }
 
+  @Test
+  public void testCryptoMaterialUpdateForApplication() throws IOException {
+    RecoveredApplicationsState appState = stateStore.loadApplicationsState();
+    assertTrue(appState.getApplications().isEmpty());
+    
+    ByteBuffer keyStore = ByteBuffer.wrap("keyStore".getBytes());
+    ByteBuffer trustStore = ByteBuffer.wrap("trustStore".getBytes());
+    String password = "password";
+    long now = System.currentTimeMillis();
+    ApplicationId appId = ApplicationId.newInstance(now, 1);
+    ContainerManagerApplicationProto.Builder builder =
+        ContainerManagerApplicationProto.newBuilder();
+    builder.setId(((ApplicationIdPBImpl) appId).getProto());
+    builder.setUser("userA");
+    builder.setKeyStore(ProtoUtils.convertToProtoFormat(keyStore));
+    builder.setKeyStorePassword(password);
+    builder.setTrustStore(ProtoUtils.convertToProtoFormat(trustStore));
+    builder.setTrustStorePassword(password);
+    ContainerManagerApplicationProto appProto = builder.build();
+    stateStore.storeApplication(appId, appProto);
+    appState = stateStore.loadApplicationsState();
+    assertEquals(1, appState.getApplications().size());
+    
+    ByteBuffer newKeyStore = ByteBuffer.wrap("newKeyStore".getBytes());
+    ByteBuffer newTrustStore = ByteBuffer.wrap("newTrustStore".getBytes());
+    String newPassword = "newPassword";
+    builder = ContainerManagerApplicationProto.newBuilder();
+    builder.setId(((ApplicationIdPBImpl) appId).getProto());
+    builder.setUser("userA");
+    builder.setKeyStore(ProtoUtils.convertToProtoFormat(newKeyStore));
+    builder.setKeyStorePassword(newPassword);
+    builder.setTrustStore(ProtoUtils.convertToProtoFormat(newTrustStore));
+    builder.setTrustStorePassword(newPassword);
+    appProto = builder.build();
+    stateStore.storeApplication(appId, appProto);
+    
+    appState = stateStore.loadApplicationsState();
+    assertEquals(1, appState.getApplications().size());
+    ContainerManagerApplicationProto recoveredAppProto = appState.getApplications().get(0);
+    ByteBuffer recoveredKeyStore = ProtoUtils.convertFromProtoFormat(recoveredAppProto.getKeyStore());
+    assertTrue(recoveredKeyStore.equals(newKeyStore));
+    
+    String recoveredKeyStorePass = recoveredAppProto.getKeyStorePassword();
+    assertEquals(newPassword, recoveredKeyStorePass);
+    
+    ByteBuffer recoveredTrustStore = ProtoUtils.convertFromProtoFormat(recoveredAppProto.getTrustStore());
+    assertTrue(newTrustStore.equals(recoveredTrustStore));
+    
+    String recoveredTrustStorePass = recoveredAppProto.getTrustStorePassword();
+    assertEquals(newPassword, recoveredTrustStorePass);
+  }
+  
   @Test
   public void testContainerStorage() throws IOException {
     // test empty when no state

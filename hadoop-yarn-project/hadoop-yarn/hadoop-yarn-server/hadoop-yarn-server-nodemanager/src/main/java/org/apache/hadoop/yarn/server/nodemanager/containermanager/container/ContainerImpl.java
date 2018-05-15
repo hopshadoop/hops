@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.container;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
@@ -37,6 +38,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -129,6 +131,10 @@ public class ContainerImpl implements Container {
   // whether container was marked as killed after recovery
   private boolean recoveredAsKilled = false;
   private Context context;
+  
+  private File keyStoreLocalizedPath = null;
+  private File trustStoreLocalizedPath = null;
+  private File passwordFileLocalizedPath = null;
 
   public ContainerImpl(Configuration conf, Dispatcher dispatcher,
       ContainerLaunchContext launchContext, Credentials creds,
@@ -574,7 +580,41 @@ public class ContainerImpl implements Container {
     dispatcher.getEventHandler().handle(
         new ContainerLocalizationCleanupEvent(this, rsrc));
   }
-
+  
+  public synchronized File getKeyStoreLocalizedPath() {
+    return keyStoreLocalizedPath;
+  }
+  
+  public synchronized File getTrustStoreLocalizedPath() {
+    return trustStoreLocalizedPath;
+  }
+  
+  public synchronized File getPasswordFileLocalizedPath() {
+    return passwordFileLocalizedPath;
+  }
+  
+  public synchronized void identifyCryptoMaterialLocation() {
+    if (keyStoreLocalizedPath == null || trustStoreLocalizedPath == null || passwordFileLocalizedPath == null) {
+      for (Map.Entry<Path, List<String>> localizedResource : localizedResources.entrySet()) {
+        if (keyStoreLocalizedPath == null &&
+            localizedResource.getValue().contains(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME)) {
+          keyStoreLocalizedPath = new File(localizedResource.getKey().toString());
+        }
+        if (trustStoreLocalizedPath == null &&
+            localizedResource.getValue().contains(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME)) {
+          trustStoreLocalizedPath = new File(localizedResource.getKey().toString());
+        }
+        if (passwordFileLocalizedPath == null  &&
+            localizedResource.getValue().contains(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME)) {
+          passwordFileLocalizedPath = new File(localizedResource.getKey().toString());
+        }
+        if (keyStoreLocalizedPath != null && trustStoreLocalizedPath != null && passwordFileLocalizedPath != null) {
+          break;
+        }
+      }
+    }
+  }
+  
   static class ContainerTransition implements
       SingleArcTransition<ContainerImpl, ContainerEvent> {
 
@@ -808,7 +848,7 @@ public class ContainerImpl implements Container {
       }
     }
   }
-
+  
   /**
    * Transition from RUNNING or KILLING state to EXITED_WITH_SUCCESS state
    * upon EXITED_WITH_SUCCESS message.

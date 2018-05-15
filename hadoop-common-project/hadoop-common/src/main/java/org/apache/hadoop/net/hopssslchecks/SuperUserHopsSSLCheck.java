@@ -20,6 +20,7 @@ package org.apache.hadoop.net.hopssslchecks;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
@@ -41,12 +42,22 @@ public class SuperUserHopsSSLCheck extends AbstractHopsSSLCheck {
   
   @Override
   public HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperUsers, Configuration configuration,
-      CertificateLocalization certificateLocalization) throws IOException, SSLMaterialAlreadyConfiguredException {
+      CertificateLocalization certificateLocalization) throws IOException {
   
     String username = ugi.getUserName();
     if (proxySuperUsers.contains(username)) {
       String hostname = NetUtils.getLocalHostname();
-      isConfigurationNeededForSuperUser(username, hostname, configuration);
+      try {
+        isConfigurationNeededForSuperUser(username, hostname, configuration);
+      } catch (SSLMaterialAlreadyConfiguredException ex) {
+        // Already configured, return
+        return new HopsSSLCryptoMaterial(
+            configuration.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()),
+            configuration.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()),
+            configuration.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()),
+            configuration.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()),
+            configuration.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+      }
     
       if (LOG.isDebugEnabled()) {
         LOG.debug("Found crypto material with the hostname");
@@ -56,6 +67,7 @@ public class SuperUserHopsSSLCheck extends AbstractHopsSSLCheck {
         return new HopsSSLCryptoMaterial(
             certificateLocalization.getSuperKeystoreLocation(),
             certificateLocalization.getSuperKeystorePass(),
+            certificateLocalization.getSuperKeyPassword(),
             certificateLocalization.getSuperTruststoreLocation(),
             certificateLocalization.getSuperTruststorePass());
       }

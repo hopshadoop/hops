@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.file.Paths;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.Arrays;
 import java.util.Collection;
@@ -100,6 +101,9 @@ public class TestContainer {
   final NodeManagerMetrics metrics = NodeManagerMetrics.create();
   final Configuration conf = new YarnConfiguration();
   final String FAKE_LOCALIZATION_ERROR = "Fake localization error";
+  private static final String BASE_DIR = Paths.get(System.getProperty("test.build.dir",
+      Paths.get("target", "test-dir").toString()),
+      TestContainer.class.getSimpleName()).toString();
   
   /**
    * Verify correct container request events sent to localizer.

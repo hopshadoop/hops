@@ -71,10 +71,12 @@ public class NormalUserMaterilizeDirSSLCheck extends AbstractHopsSSLCheck {
         // CertificateLocalizationService of RM would have a reference too. If that is
         // the case prefer the later than reading files.
         String password;
+        String passwordFileLocation;
         if (certificateLocalization != null) {
           try {
             CryptoMaterial material = certificateLocalization.getMaterialLocation(username);
             password = material.getKeyStorePass();
+            passwordFileLocation = material.getPasswdLocation().toString();
           } catch (InterruptedException ex) {
             throw new IOException(ex);
           }
@@ -82,13 +84,15 @@ public class NormalUserMaterilizeDirSSLCheck extends AbstractHopsSSLCheck {
           File passwdFile = Paths.get(hopsworksMaterializeDir, username + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX)
               .toFile();
           password = HopsUtil.readCryptoMaterialPassword(passwdFile);
+          passwordFileLocation = passwdFile.toString();
         }
   
         return new HopsSSLCryptoMaterial(
             Paths.get(hopsworksMaterializeDir, username + HopsSSLSocketFactory.KEYSTORE_SUFFIX).toString(),
             password,
+            password,
             Paths.get(hopsworksMaterializeDir, username + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX).toString(),
-            password);
+            password, passwordFileLocation, true);
       }
     }
     

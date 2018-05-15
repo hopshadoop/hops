@@ -20,7 +20,9 @@ package org.apache.hadoop.yarn.sls.nodemanager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -36,6 +38,7 @@ import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceUtilization;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode
@@ -65,6 +68,7 @@ public class NodeInfo {
     private List<ContainerId> toCleanUpContainers;
     private List<ApplicationId> toCleanUpApplications;
     private List<ApplicationId> runningApplications;
+    private Map<ApplicationId, UpdatedCryptoForApp> appCryptoMaterialToUpdate;
 
     public FakeRMNodeImpl(NodeId nodeId, String nodeAddr, String httpAddress,
         Resource perNode, String rackName, String healthReport,
@@ -81,6 +85,7 @@ public class NodeInfo {
       toCleanUpApplications = new ArrayList<ApplicationId>();
       toCleanUpContainers = new ArrayList<ContainerId>();
       runningApplications = new ArrayList<ApplicationId>();
+      appCryptoMaterialToUpdate = new ConcurrentHashMap<>();
     }
 
     public NodeId getNodeID() {
@@ -207,6 +212,11 @@ public class NodeInfo {
 
     @Override
     public void setUntrackedTimeStamp(long timeStamp) {
+    }
+    
+    @Override
+    public Map<ApplicationId, UpdatedCryptoForApp> getAppCryptoMaterialToUpdate() {
+      return appCryptoMaterialToUpdate;
     }
   }
 

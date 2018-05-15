@@ -36,5 +36,8 @@ public interface Application extends EventHandler<ApplicationEvent> {
   ApplicationId getAppId();
 
   ApplicationState getApplicationState();
-
+  
+  int getCryptoMaterialVersion();
+  
+  void setCryptoMaterialVersion(int cryptoMaterialVersion);
 }

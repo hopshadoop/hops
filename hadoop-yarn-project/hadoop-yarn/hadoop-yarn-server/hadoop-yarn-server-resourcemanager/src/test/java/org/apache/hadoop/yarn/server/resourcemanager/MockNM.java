@@ -22,8 +22,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -130,13 +132,13 @@ public class MockNM {
   }
   
   public RegisterNodeManagerResponse registerNode(
-      List<ApplicationId> runningApplications) throws Exception {
+      Map<ApplicationId, Integer> runningApplications) throws Exception {
     return registerNode(null, runningApplications);
   }
 
   public RegisterNodeManagerResponse registerNode(
       List<NMContainerStatus> containerReports,
-      List<ApplicationId> runningApplications) throws Exception {
+      Map<ApplicationId, Integer> runningApplications) throws Exception {
     RegisterNodeManagerRequest req = Records.newRecord(
         RegisterNodeManagerRequest.class);
     req.setNodeId(nodeId);
@@ -202,9 +204,14 @@ public class MockNM {
     return nodeHeartbeat(updatedStats, Collections.<Container>emptyList(),
         isHealthy, resId);
   }
-
+  
   public NodeHeartbeatResponse nodeHeartbeat(List<ContainerStatus> updatedStats,
-      List<Container> increasedConts, boolean isHealthy, int resId)
+      List<Container> increasedConts, boolean isHealthy, int resId) throws Exception {
+    return nodeHeartbeat(updatedStats, increasedConts, isHealthy, resId, new HashSet<ApplicationId>());
+  }
+  
+  public NodeHeartbeatResponse nodeHeartbeat(List<ContainerStatus> updatedStats,
+      List<Container> increasedConts, boolean isHealthy, int resId, Set<ApplicationId> updatedCryptoApps)
           throws Exception {
     NodeHeartbeatRequest req = Records.newRecord(NodeHeartbeatRequest.class);
     NodeStatus status = Records.newRecord(NodeStatus.class);
@@ -231,6 +238,9 @@ public class MockNM {
     req.setNodeStatus(status);
     req.setLastKnownContainerTokenMasterKey(this.currentContainerTokenMasterKey);
     req.setLastKnownNMTokenMasterKey(this.currentNMTokenMasterKey);
+    if (updatedCryptoApps != null) {
+      req.setUpdatedApplicationsWithNewCryptoMaterial(updatedCryptoApps);
+    }
     NodeHeartbeatResponse heartbeatResponse =
         resourceTracker.nodeHeartbeat(req);
     
@@ -270,5 +280,9 @@ public class MockNM {
 
   public String getVersion() {
     return version;
+  }
+  
+  public int getNextResponseId() {
+    return ++responseId;
   }
 }

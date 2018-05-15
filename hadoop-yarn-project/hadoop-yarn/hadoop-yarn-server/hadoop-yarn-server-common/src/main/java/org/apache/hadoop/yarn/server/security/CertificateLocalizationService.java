@@ -65,10 +65,10 @@ public class CertificateLocalizationService extends AbstractService
   private final String SYSTEM_TMP = System.getProperty("java.io.tmpdir",
       "/tmp");
   private final String LOCALIZATION_DIR_NAME = "certLoc";
-  private String LOCALIZATION_DIR;
   private Path materializeDir;
   private String superKeystoreLocation;
   private String superKeystorePass;
+  private String superKeyPassword;
   private String superTrustStoreLocation;
   private String superTruststorePass;
 
@@ -115,15 +115,9 @@ public class CertificateLocalizationService extends AbstractService
   
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    LOCALIZATION_DIR = service.toString() +  "_" + LOCALIZATION_DIR_NAME;
-
     parseSuperuserMaterial(conf);
-    super.serviceInit(conf);
-  }
-  
-  @Override
-  protected void serviceStart() throws Exception {
-    materializeDir = Paths.get(SYSTEM_TMP, LOCALIZATION_DIR);
+    String localizationDir = service.toString() +  "_" + LOCALIZATION_DIR_NAME;
+    materializeDir = Paths.get(SYSTEM_TMP, localizationDir);
     File fileMaterializeDir = materializeDir.toFile();
     if (!fileMaterializeDir.exists()) {
       fileMaterializeDir.mkdir();
@@ -140,9 +134,14 @@ public class CertificateLocalizationService extends AbstractService
       }
       Files.setPosixFilePermissions(materializeDir, materializeDirPerm);
     }
-
-    LOG.debug("Initialized at dir: " + materializeDir.toString());
   
+    LOG.debug("Initialized at dir: " + materializeDir.toString());
+    
+    super.serviceInit(conf);
+  }
+  
+  @Override
+  protected void serviceStart() throws Exception {
     localizationEventsHandler = createLocalizationEventsHandler();
     localizationEventsHandler.setDaemon(true);
     localizationEventsHandler.setName("CertificateLocalizationEvents handler");
@@ -164,6 +163,9 @@ public class CertificateLocalizationService extends AbstractService
     superKeystorePass = sslConf.get(
         FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
             FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
+    superKeyPassword = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY));
     superTrustStoreLocation = sslConf.get(
         FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
             FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
@@ -184,6 +186,13 @@ public class CertificateLocalizationService extends AbstractService
   @Override
   public String getSuperKeystorePass() {
     return superKeystorePass;
+  }
+  
+  // This method is accessible only from RM or NM. In any other case
+  // CertificateLocalizationService is null
+  @Override
+  public String getSuperKeyPassword() {
+    return superKeyPassword;
   }
   
   // This method is accessible only from RM or NM. In any other case
@@ -271,6 +280,19 @@ public class CertificateLocalizationService extends AbstractService
     }
   }
   
+  private void writeToLocalFS(ByteBuffer keyStore, File keyStoreLocation, ByteBuffer trustStore, File
+      trustStoreLocation, String password, File passwordFileLocation) throws IOException {
+    FileChannel keyStoreChannel = new FileOutputStream(keyStoreLocation, false).getChannel();
+    keyStoreChannel.write(keyStore);
+    keyStoreChannel.close();
+  
+    FileChannel trustStoreChannel = new FileOutputStream(trustStoreLocation, false).getChannel();
+    trustStoreChannel.write(trustStore);
+    trustStoreChannel.close();
+  
+    FileUtils.writeStringToFile(passwordFileLocation, password);
+  }
+  
   @InterfaceAudience.Private
   @VisibleForTesting
   protected boolean materializeInternal(MaterializeEvent event) {
@@ -290,18 +312,9 @@ public class CertificateLocalizationService extends AbstractService
     }
     
     try {
-      FileChannel keyStoreChannel = new FileOutputStream(event.cryptoMaterial.getKeyStoreLocation().toFile(), false)
-          .getChannel();
-      keyStoreChannel.write(event.cryptoMaterial.getKeyStoreMem());
-      keyStoreChannel.close();
-  
-      FileChannel trustStoreChannel = new FileOutputStream(event.cryptoMaterial.getTrustStoreLocation().toFile(), false)
-          .getChannel();
-      trustStoreChannel.write(event.cryptoMaterial.getTrustStoreMem());
-      trustStoreChannel.close();
-  
-      FileUtils.writeStringToFile(event.cryptoMaterial.getPasswdLocation().toFile(),
-          event.cryptoMaterial.getKeyStorePass());
+      writeToLocalFS(event.cryptoMaterial.getKeyStoreMem(), event.cryptoMaterial.getKeyStoreLocation().toFile(),
+          event.cryptoMaterial.getTrustStoreMem(), event.cryptoMaterial.getTrustStoreLocation().toFile(),
+          event.cryptoMaterial.getKeyStorePass(), event.cryptoMaterial.getPasswdLocation().toFile());
   
       if (service == ServiceType.NM) {
         Set<PosixFilePermission> materialPermissions =
@@ -409,6 +422,52 @@ public class CertificateLocalizationService extends AbstractService
       }
       
       return material;
+    }
+  }
+  
+  @Override
+  public void updateCryptoMaterial(String username, String applicationId, ByteBuffer keyStore,
+      String keyStorePassword, ByteBuffer trustStore, String trustStorePassword)
+      throws IOException, InterruptedException {
+    StorageKey key = new StorageKey(username, applicationId);
+    CryptoMaterial material = materialLocation.get(key);
+    if (material == null) {
+      LOG.warn("Requested to update crypto material for " + key + " but material is missing");
+      return;
+    }
+    
+    synchronized (material) {
+      while (!material.getState().equals(CryptoMaterial.STATE.FINISHED)) {
+        material.wait();
+      }
+      material.changeState(CryptoMaterial.STATE.ONGOING);
+    }
+    
+    try {
+      // Lock to ensure no remove event is being processed
+      lock.lock();
+      material = materialLocation.get(key);
+      if (material == null) {
+        // Oops material has been removed
+        return;
+      }
+      
+      writeToLocalFS(keyStore.asReadOnlyBuffer(), material.getKeyStoreLocation().toFile(),
+          trustStore.asReadOnlyBuffer(), material.getTrustStoreLocation().toFile(),
+          keyStorePassword, material.getPasswdLocation().toFile());
+      
+      material.updateKeyStoreMem(keyStore);
+      material.updateKeyStorePass(keyStorePassword);
+      material.updateTrustStoreMem(trustStore);
+      material.updateTrustStorePass(trustStorePassword);
+    } finally {
+      if (material != null) {
+        synchronized (material) {
+          material.changeState(CryptoMaterial.STATE.FINISHED);
+          material.notifyAll();
+        }
+      }
+      lock.unlock();
     }
   }
   

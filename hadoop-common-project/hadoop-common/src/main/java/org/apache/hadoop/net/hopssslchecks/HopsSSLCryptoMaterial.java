@@ -23,15 +23,26 @@ package org.apache.hadoop.net.hopssslchecks;
 public class HopsSSLCryptoMaterial {
   private final String keyStoreLocation;
   private final String keyStorePassword;
+  private final String keyPassword;
   private final String trustStoreLocation;
   private final String trustStorePassword;
+  private final String passwordFileLocation;
+  private final boolean needsReloading;
   
-  public HopsSSLCryptoMaterial(String keyStoreLocation, String keyStorePassword, String trustStoreLocation,
-      String trustStorePassword) {
+  public HopsSSLCryptoMaterial(String keyStoreLocation, String keyStorePassword, String keyPassword,
+      String trustStoreLocation, String trustStorePassword) {
+    this(keyStoreLocation, keyStorePassword, keyPassword, trustStoreLocation, trustStorePassword, null, false);
+  }
+  
+  public HopsSSLCryptoMaterial(String keyStoreLocation, String keyStorePassword, String keyPassword,
+      String trustStoreLocation, String trustStorePassword, String passwordFileLocation, boolean needsReloading) {
     this.keyStoreLocation = keyStoreLocation;
     this.keyStorePassword = keyStorePassword;
+    this.keyPassword = keyPassword;
     this.trustStoreLocation = trustStoreLocation;
     this.trustStorePassword = trustStorePassword;
+    this.passwordFileLocation = passwordFileLocation;
+    this.needsReloading = needsReloading;
   }
   
   public String getKeyStoreLocation() {
@@ -42,11 +53,23 @@ public class HopsSSLCryptoMaterial {
     return keyStorePassword;
   }
   
+  public String getKeyPassword() {
+    return keyPassword;
+  }
+  
   public String getTrustStoreLocation() {
     return trustStoreLocation;
   }
   
   public String getTrustStorePassword() {
     return trustStorePassword;
+  }
+  
+  public String getPasswordFileLocation() {
+    return passwordFileLocation;
+  }
+  
+  public boolean needsReloading() {
+    return needsReloading;
   }
 }

@@ -1366,6 +1366,10 @@ public class Client implements AutoCloseable {
     }
     
     clientExcecutorFactory.unrefAndCleanup();
+    
+    if (socketFactory instanceof HopsSSLSocketFactory) {
+      ((HopsSSLSocketFactory) socketFactory).stopReloadingKeyManagers();
+    }
   }
 
   /** 

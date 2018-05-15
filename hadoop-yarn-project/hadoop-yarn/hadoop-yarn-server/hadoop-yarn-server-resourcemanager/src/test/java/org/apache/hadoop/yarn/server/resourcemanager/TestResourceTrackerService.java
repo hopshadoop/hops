@@ -18,15 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.PendingEventDataAccess;
-import io.hops.metadata.yarn.dal.RMNodeDataAccess;
-import io.hops.metadata.yarn.dal.ResourceDataAccess;
-import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
-import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
-import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.util.DBUtility;
 import io.hops.util.DBUtilityTests;
 import io.hops.util.RMStorageFactory;
@@ -39,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -49,6 +43,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -74,6 +69,7 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
@@ -84,10 +80,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsMana
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplDist;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
@@ -297,7 +293,83 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertEquals(NodeAction.SHUTDOWN, nodeHeartbeat2.getNodeAction());
     Assert.assertEquals(NodeAction.SHUTDOWN, nodeHeartbeat3.getNodeAction());
   }
-
+  
+  /**
+   * Submit one application, wait for the certificate renewal to kick off and check the Heartbeat response
+   *
+   * @throws Exception
+   */
+  @Test(timeout = 75000)
+  public void testNodeHeartbeatWithUpdatedCryptoMaterialForApp() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "30s");
+    conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
+    rm = new MockRM(conf);
+    rm.start();
+    
+    MockNM nm1 = rm.registerNode("localhost:1234", 5 * 1024);
+    NodeHeartbeatResponse response = nm1.nodeHeartbeat(true);
+    rm.waitForState(nm1.getNodeId(), NodeState.RUNNING);
+    
+    // There is no app running so list with updated crypto should be empty
+    Assert.assertNotNull(response.getUpdatedCryptoForApps());
+    Assert.assertTrue(response.getUpdatedCryptoForApps().isEmpty());
+    
+    RMApp app = rm.submitApp(2 * 1024);
+    MockAM am = MockRM.launchAndRegisterAM(app, rm, nm1);
+    ApplicationAttemptId appAttemptId = app.getCurrentAppAttempt().getAppAttemptId();
+    nm1.nodeHeartbeat(appAttemptId, 2, ContainerState.RUNNING);
+    rm.waitForState(appAttemptId, RMAppAttemptState.RUNNING);
+    
+    response = nm1.nodeHeartbeat(true);
+    // App certificate rotation should not have kicked in yet
+    Assert.assertNotNull(response.getUpdatedCryptoForApps());
+    Assert.assertTrue(response.getUpdatedCryptoForApps().isEmpty());
+    
+    // App certificate validity period for testing is 50 seconds.
+    // Set the delay for the renewer to 50 - 30 = 20 seconds
+    // Sleep here for 25 seconds to make sure the renewal has kicked in
+    TimeUnit.SECONDS.sleep(25);
+    response = nm1.nodeHeartbeat(true);
+    Assert.assertNotNull(response.getUpdatedCryptoForApps());
+    Assert.assertEquals(1, response.getUpdatedCryptoForApps().size());
+    Assert.assertTrue(response.getUpdatedCryptoForApps().containsKey(app.getApplicationId()));
+    UpdatedCryptoForApp updatedCryptoForApp = response.getUpdatedCryptoForApps().get(app.getApplicationId());
+    
+    Assert.assertTrue(updatedCryptoForApp.getKeyStore().equals(ByteBuffer.wrap(app.getKeyStore())));
+    Assert.assertTrue(updatedCryptoForApp.getTrustStore().equals(ByteBuffer.wrap(app.getTrustStore())));
+    Assert.assertArrayEquals(app.getKeyStorePassword(), updatedCryptoForApp.getKeyStorePassword());
+    Assert.assertArrayEquals(app.getTrustStorePassword(), updatedCryptoForApp.getTrustStorePassword());
+    
+    // Wait for the certificate renewer to run again
+    TimeUnit.SECONDS.sleep(25);
+    response = nm1.nodeHeartbeat(true);
+    Assert.assertNotNull(response.getUpdatedCryptoForApps());
+    Assert.assertEquals(1, response.getUpdatedCryptoForApps().size());
+    Assert.assertTrue(response.getUpdatedCryptoForApps().containsKey(app.getApplicationId()));
+    UpdatedCryptoForApp newUpdatedCryptoForApp = response.getUpdatedCryptoForApps().get(app.getApplicationId());
+  
+    Assert.assertTrue(newUpdatedCryptoForApp.getKeyStore().equals(ByteBuffer.wrap(app.getKeyStore())));
+    Assert.assertTrue(newUpdatedCryptoForApp.getTrustStore().equals(ByteBuffer.wrap(app.getTrustStore())));
+    Assert.assertArrayEquals(app.getKeyStorePassword(), newUpdatedCryptoForApp.getKeyStorePassword());
+    Assert.assertArrayEquals(app.getTrustStorePassword(), newUpdatedCryptoForApp.getTrustStorePassword());
+    
+    Assert.assertFalse(newUpdatedCryptoForApp.getKeyStore().equals(updatedCryptoForApp.getKeyStore()));
+    
+    // Kill application
+    rm.killApp(app.getApplicationId());
+    rm.waitForState(app.getApplicationId(), RMAppState.KILLED);
+    
+    response = nm1.nodeHeartbeat(true);
+    // There should be no updated crypto material in this response
+    Assert.assertNotNull(response.getUpdatedCryptoForApps());
+    Assert.assertTrue(response.getUpdatedCryptoForApps().isEmpty());
+    RMNode rmNode = rm.getRMContext().getRMNodes().get(nm1.getNodeId());
+    Assert.assertTrue(rmNode.getAppCryptoMaterialToUpdate().isEmpty());
+    
+    rm.stop();
+  }
+  
   /**
    * Graceful decommission node with running application.
    */
@@ -1291,8 +1363,8 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertEquals(5120 + 10240, metrics.getAvailableMB());
 
     // reconnect of node with changed capability and running applications
-    List<ApplicationId> runningApps = new ArrayList<ApplicationId>();
-    runningApps.add(ApplicationId.newInstance(1, 0));
+    Map<ApplicationId, Integer> runningApps = new HashMap<>(1);
+    runningApps.put(ApplicationId.newInstance(1, 0), 0);
     nm1 = rm.registerNode("host2:5678", 15360, 2, runningApps);
     rm.drainEvents();
     response = nm1.nodeHeartbeat(true);

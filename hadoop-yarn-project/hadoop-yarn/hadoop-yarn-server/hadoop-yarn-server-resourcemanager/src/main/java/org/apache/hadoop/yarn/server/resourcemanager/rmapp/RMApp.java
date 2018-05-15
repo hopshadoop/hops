@@ -265,4 +265,14 @@ public interface RMApp extends EventHandler<RMAppEvent> {
   byte[] getTrustStore();
   
   char[] getTrustStorePassword();
+  
+  Integer getCryptoMaterialVersion();
+  
+  long getCertificateExpiration();
+  
+  long getMaterialRotationStartTime();
+  
+  void rmNodeHasUpdatedCryptoMaterial(NodeId nodeId);
+  
+  boolean isAppRotatingCryptoMaterial();
 }

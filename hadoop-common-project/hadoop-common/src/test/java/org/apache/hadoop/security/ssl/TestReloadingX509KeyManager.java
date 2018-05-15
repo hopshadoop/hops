@@ -22,6 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -33,6 +34,8 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
+import java.util.List;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -40,6 +43,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class TestReloadingX509KeyManager {
   private static final String BASE_DIR = GenericTestUtils
@@ -58,6 +62,11 @@ public class TestReloadingX509KeyManager {
   public static void setUp() throws IOException {
     FileUtils.deleteDirectory(baseDirFile);
     baseDirFile.mkdirs();
+  }
+  
+  @Before
+  public void beforeTest() {
+    KeyManagersReloaderThreadPool.getInstance(true).clearListOfTasks();
   }
   
   @AfterClass
@@ -201,6 +210,12 @@ public class TestReloadingX509KeyManager {
       assertNotNull("Certificate chain should not be null for alias cert", certChain);
       assertEquals("DN for cert should be CN=cert", cert.getSubjectDN().getName(),
           certChain[0].getSubjectDN().getName());
+      List<ScheduledFuture> reloadTasks =  KeyManagersReloaderThreadPool.getInstance(true).getListOfTasks();
+      // Reloading thread should have been cancelled after unsuccessful reload
+      for (ScheduledFuture task : reloadTasks) {
+        assertTrue(task.isCancelled());
+      }
+      assertEquals(KeyManagersReloaderThreadPool.MAX_NUMBER_OF_RETRIES + 1, keyManager.getNumberOfFailures());
     } finally {
       keyManager.stop();
     }

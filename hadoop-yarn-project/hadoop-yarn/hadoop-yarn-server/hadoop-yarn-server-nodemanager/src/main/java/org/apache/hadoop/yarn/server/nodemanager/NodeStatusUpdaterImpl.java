@@ -38,6 +38,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.Credentials;
@@ -71,12 +72,14 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 import org.apache.hadoop.yarn.server.nodemanager.NodeManager.NMContext;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.ContainerManagerImpl;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Application;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationState;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitor;
@@ -84,7 +87,6 @@ import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
 import org.apache.hadoop.yarn.server.nodemanager.nodelabels.NodeLabelsProvider;
 import org.apache.hadoop.yarn.server.nodemanager.util.NodeManagerHardwareUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
-import org.apache.hadoop.yarn.server.nodemanager.util.NodeManagerHardwareUtils;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -144,6 +146,8 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
 
   private NMNodeLabelsHandler nodeLabelsHandler;
   private final NodeLabelsProvider nodeLabelsProvider;
+  
+  private Set<ApplicationId> applicationsWithUpdatedCryptoMaterial;
 
   public NodeStatusUpdaterImpl(Context context, Dispatcher dispatcher,
       NodeHealthCheckerService healthChecker, NodeManagerMetrics metrics) {
@@ -164,6 +168,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         new HashMap<ContainerId, ContainerStatus>();
     this.logAggregationReportForAppsTempList =
         new ArrayList<LogAggregationReport>();
+    this.applicationsWithUpdatedCryptoMaterial = new HashSet<>();
   }
 
   @Override
@@ -557,9 +562,12 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     return containerStatuses;
   }
   
-  private List<ApplicationId> getRunningApplications() {
-    List<ApplicationId> runningApplications = new ArrayList<ApplicationId>();
-    runningApplications.addAll(this.context.getApplications().keySet());
+  private Map<ApplicationId, Integer> getRunningApplications() {
+    Map<ApplicationId, Application> runningApps = this.context.getApplications();
+    Map<ApplicationId, Integer> runningApplications = new HashMap<>(runningApps.size());
+    for (Map.Entry<ApplicationId, Application> entry : runningApps.entrySet()) {
+      runningApplications.put(entry.getKey(), entry.getValue().getCryptoMaterialVersion());
+    }
     return runningApplications;
   }
 
@@ -773,7 +781,11 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
                 request.setLogAggregationReportsForApps(logAggregationReports);
               }
             }
-
+            
+            Set<ApplicationId> setForRequest = applicationsWithUpdatedCryptoMaterial;
+            applicationsWithUpdatedCryptoMaterial = new HashSet<>();
+            request.setUpdatedApplicationsWithNewCryptoMaterial(setForRequest);
+            
             response = resourceTracker.nodeHeartbeat(request);
             //get next heartbeat interval from response
             nextHeartBeatInterval = response.getNextHeartBeatInterval();
@@ -863,6 +875,39 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Node's resource is updated to " +
                     newResource.toString());
+              }
+            }
+            
+            if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, CommonConfigurationKeys
+                .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+              Map<ApplicationId, UpdatedCryptoForApp> cryptoMaterialToUpdate = response.getUpdatedCryptoForApps();
+              if (cryptoMaterialToUpdate != null) {
+                for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : cryptoMaterialToUpdate.entrySet()) {
+                  Application application = context.getApplications().get(entry.getKey());
+                  
+                  if (application != null) {
+                    UpdatedCryptoForApp crypto = entry.getValue();
+                    if (crypto.getVersion() > application.getCryptoMaterialVersion()) {
+                      context.getCertificateLocalizationService()
+                          .updateCryptoMaterial(application.getUser(), application.getAppId().toString(),
+                              crypto.getKeyStore(), String.valueOf(crypto.getKeyStorePassword()),
+                              crypto.getTrustStore(), String.valueOf(crypto.getTrustStorePassword()));
+  
+                      Set<ContainerId> containers = application.getContainers().keySet();
+                      for (ContainerId cid : containers) {
+                        CMgrUpdateCryptoMaterialEvent event =
+                            new CMgrUpdateCryptoMaterialEvent(cid, crypto.getKeyStore(),
+                                crypto.getKeyStorePassword(), crypto.getTrustStore(), crypto.getTrustStorePassword(),
+                                crypto.getVersion());
+                        dispatcher.getEventHandler().handle(event);
+                      }
+                    }
+                    applicationsWithUpdatedCryptoMaterial.add(entry.getKey());
+                  } else {
+                    LOG.warn("Received UpdatedCryptoMaterial request for missing application " + entry.getKey());
+                    applicationsWithUpdatedCryptoMaterial.add(entry.getKey());
+                  }
+                }
               }
             }
           } catch (ConnectException e) {
