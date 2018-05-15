@@ -69,6 +69,7 @@ import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
 import java.util.List;
+import javax.management.ObjectName;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_DEFAULT_NAME_KEY;
@@ -232,6 +233,7 @@ public class NameNode implements NameNodeStatusMXBean {
    */
   private BRTrackingService brTrackingService;
 
+  private ObjectName nameNodeStatusBeanName;
 
   /**
    * Format a new filesystem. Destroys any filesystem that may already exist
@@ -583,7 +585,7 @@ public class NameNode implements NameNodeStatusMXBean {
    * Register NameNodeStatusMXBean
    */
   private void registerNNSMXBean() {
-    MBeans.register("NameNode", "NameNodeStatus", this);
+    nameNodeStatusBeanName = MBeans.register("NameNode", "NameNodeStatus", this);
   }
 
   @Override // NameNodeStatusMXBean
@@ -730,27 +732,31 @@ public class NameNode implements NameNodeStatusMXBean {
   /**
    * Stop all NameNode threads and wait for all to finish.
    */
-    public void stop() {
-        synchronized (this) {
-            if (stopRequested) {
-                return;
-            }
-            stopRequested = true;
-        }
-        try {
-            exitActiveServices();
-        } catch (ServiceFailedException e) {
-            LOG.warn("Encountered exception while exiting state ", e);
-        } finally {
-            stopCommonServices();
-            if (metrics != null) {
-                metrics.shutdown();
-            }
-            if (namesystem != null) {
-                namesystem.shutdown();
-            }
-        }
+  public void stop() {
+    synchronized (this) {
+      if (stopRequested) {
+        return;
+      }
+      stopRequested = true;
     }
+    try {
+      exitActiveServices();
+    } catch (ServiceFailedException e) {
+      LOG.warn("Encountered exception while exiting state ", e);
+    } finally {
+      stopCommonServices();
+      if (metrics != null) {
+        metrics.shutdown();
+      }
+      if (namesystem != null) {
+        namesystem.shutdown();
+      }
+      if (nameNodeStatusBeanName != null) {
+        MBeans.unregister(nameNodeStatusBeanName);
+        nameNodeStatusBeanName = null;
+      }
+    }
+  }
   
 
   synchronized boolean isStopRequested() {

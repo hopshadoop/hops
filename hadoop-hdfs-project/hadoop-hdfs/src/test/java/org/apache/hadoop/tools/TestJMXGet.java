@@ -36,7 +36,11 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintStream;
+import java.lang.management.ManagementFactory;
 import java.util.Random;
+import java.util.Set;
+import javax.management.MBeanServerConnection;
+import javax.management.ObjectName;
 
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -105,9 +109,8 @@ public class TestJMXGet {
     writeFile(cluster.getFileSystem(), new Path("/test1"), 2);
 
     JMXGet jmx = new JMXGet();
-    //jmx.setService("*"); // list all hadoop services
-    //jmx.init();
-    //jmx = new JMXGet();
+    String serviceName = "NameNode";
+    jmx.setService(serviceName);
     jmx.init(); // default lists namenode mbeans only
     Thread.sleep(25000);
     assertTrue("error printAllValues", checkPrintAllValues(jmx));
@@ -123,6 +126,10 @@ public class TestJMXGet {
 //        Integer.parseInt(jmx.getValue("NumOpenConnections")));
 
     cluster.shutdown();
+    MBeanServerConnection mbsc = ManagementFactory.getPlatformMBeanServer();
+    ObjectName query = new ObjectName("Hadoop:service=" + serviceName + ",*");
+    Set<ObjectName> names = mbsc.queryNames(query, null);
+    assertTrue("No beans should be registered for " + serviceName, names.isEmpty());
   }
 
   private static boolean checkPrintAllValues(JMXGet jmx) throws Exception {
@@ -157,14 +164,17 @@ public class TestJMXGet {
     writeFile(cluster.getFileSystem(), new Path("/test"), 2);
 
     JMXGet jmx = new JMXGet();
-    //jmx.setService("*"); // list all hadoop services
-    //jmx.init();
-    //jmx = new JMXGet();
+    String serviceName = "DataNode";
+    jmx.setService(serviceName);
     jmx.setService("DataNode");
     jmx.init();
     Thread.sleep(15000);
     assertEquals(fileSize, Integer.parseInt(jmx.getValue("BytesWritten")));
 
     cluster.shutdown();
+    MBeanServerConnection mbsc = ManagementFactory.getPlatformMBeanServer();
+    ObjectName query = new ObjectName("Hadoop:service=" + serviceName + ",*");
+    Set<ObjectName> names = mbsc.queryNames(query, null);
+    assertTrue("No beans should be registered for " + serviceName, names.isEmpty());
   }
 }

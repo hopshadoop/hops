@@ -144,6 +144,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.management.ObjectName;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
@@ -290,6 +291,7 @@ public class DataNode extends Configured
   private boolean connectToDnViaHostname;
   ReadaheadPool readaheadPool;
   private final boolean getHdfsBlockLocationsEnabled;
+  private ObjectName dataNodeInfoBeanName;
 
   private Thread checkDiskErrorThread = null;
   protected final int checkDiskErrorInterval = 5*1000;
@@ -1044,7 +1046,7 @@ public class DataNode extends Configured
   }
   
   private void registerMXBean() {
-    MBeans.register("DataNode", "DataNodeInfo", this);
+    dataNodeInfoBeanName = MBeans.register("DataNode", "DataNodeInfo", this);
   }
   
   @VisibleForTesting
@@ -1380,6 +1382,11 @@ public class DataNode extends Configured
     }
     if (metrics != null) {
       metrics.shutdown();
+    }
+    
+    if (dataNodeInfoBeanName != null) {
+      MBeans.unregister(dataNodeInfoBeanName);
+      dataNodeInfoBeanName = null;
     }
     
     if (revocationListFetcherService != null) {
