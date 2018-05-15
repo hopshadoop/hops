@@ -5418,7 +5418,8 @@ public class FSNamesystem
   }
 
   private ObjectName mbeanName;
-
+  private ObjectName mxbeanName;
+  
   /**
    * Register the FSNamesystem MBean using the name
    * "hadoop:service=NameNode,name=FSNamesystemState"
@@ -5441,7 +5442,12 @@ public class FSNamesystem
   void shutdown() {
     if (mbeanName != null) {
       MBeans.unregister(mbeanName);
+      mbeanName = null;
     }
+    if (mxbeanName != null) {
+      MBeans.unregister(mxbeanName);
+      mxbeanName = null;
+     }
   }
 
   @Override // FSNamesystemMBean
@@ -6080,7 +6086,7 @@ public class FSNamesystem
    * Register NameNodeMXBean
    */
   private void registerMXBean() {
-    MBeans.register("NameNode", "NameNodeInfo", this);
+    mxbeanName = MBeans.register("NameNode", "NameNodeInfo", this);
   }
 
   /**
