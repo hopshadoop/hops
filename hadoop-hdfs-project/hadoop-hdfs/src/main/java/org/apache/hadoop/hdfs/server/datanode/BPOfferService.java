@@ -91,7 +91,7 @@ class BPOfferService implements Runnable {
    * The registration information for this block pool. This is assigned after
    * the second phase of the handshake.
    */
-  DatanodeRegistration bpRegistration;
+  volatile DatanodeRegistration bpRegistration;
   private final DataNode dn;
   /**
    * A reference to the BPServiceActor associated with the currently ACTIVE NN.
@@ -395,7 +395,7 @@ class BPOfferService implements Runnable {
    * calls this function to verify that the NN it connected to is consistent
    * with other NNs serving the block-pool.
    */
-  void registrationSucceeded(BPServiceActor bpServiceActor,
+  synchronized void registrationSucceeded(BPServiceActor bpServiceActor,
       DatanodeRegistration reg) throws IOException {
     if (bpRegistration != null) {
       checkNSEquality(bpRegistration.getStorageInfo().getNamespaceID(),
@@ -549,11 +549,28 @@ class BPOfferService implements Runnable {
     }
   }
 
-  synchronized boolean processCommandFromActor(DatanodeCommand cmd,
+  boolean processCommandFromActor(DatanodeCommand cmd,
       BPServiceActor actor) throws IOException {
 
     assert bpServices.contains(actor);
-    return processCommandFromActive(cmd, actor);
+    
+    if (cmd == null) {
+      return true;
+    }
+
+    /*
+     * Datanode Registration can be done asynchronously here. No need to hold
+     * the lock. for more info refer HDFS-5014
+     */
+    if (DatanodeProtocol.DNA_REGISTER == cmd.getAction()) {
+      LOG.info("DatanodeCommand action : DNA_REGISTER from " + actor.nnAddr);
+      actor.reRegister();
+      return true;
+    }
+    
+    synchronized (this) {
+      return processCommandFromActive(cmd, actor);
+    }
   }
 
   /**
@@ -563,9 +580,6 @@ class BPOfferService implements Runnable {
    */
   private boolean processCommandFromActive(DatanodeCommand cmd,
       BPServiceActor actor) throws IOException {
-    if (cmd == null) {
-      return true;
-    }
     final BlockCommand bcmd =
         cmd instanceof BlockCommand ? (BlockCommand) cmd : null;
 
@@ -599,11 +613,6 @@ class BPOfferService implements Runnable {
         // See HDFS-2987.
         throw new UnsupportedOperationException(
             "Received unimplemented DNA_SHUTDOWN");
-      case DatanodeProtocol.DNA_REGISTER:
-        // namenode requested a registration - at start or if NN lost contact
-        LOG.info("DatanodeCommand action: DNA_REGISTER");
-        actor.reRegister();
-        break;
       case DatanodeProtocol.DNA_FINALIZE:
         String bp = ((FinalizeCommand) cmd).getBlockPoolId();
         assert getBlockPoolId().equals(bp) :
