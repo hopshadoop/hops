@@ -2485,4 +2485,14 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   public void setDropBehind(Boolean dropBehind) throws IOException {
     this.cachingStrategy.setDropBehind(dropBehind);
   }
+  
+  @VisibleForTesting
+  ExtendedBlock getBlock() {
+    return streamer.getBlock();
+  }
+
+  @VisibleForTesting
+  long getFileId() {
+    return fileId;
+  }
 }

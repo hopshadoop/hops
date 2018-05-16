@@ -720,7 +720,8 @@ public class DFSClient implements java.io.Closeable {
     return dfsClientConf.hdfsTimeout;
   }
   
-  String getClientName() {
+  @VisibleForTesting
+  public String getClientName() {
     return clientName;
   }
 
@@ -2702,6 +2703,11 @@ public class DFSClient implements java.io.Closeable {
     };
     return (Boolean) doClientActionWithRetry(handler, "setSafeMode");
   }
+  
+  @VisibleForTesting
+  ExtendedBlock getPreviousBlock(String file) {
+    return filesBeingWritten.get(file).getBlock();
+  }
 
   /**
    * Refresh the hosts and exclude files.  (Rereads them.)
@@ -3035,8 +3041,7 @@ public class DFSClient implements java.io.Closeable {
   }
 
   private static AtomicLong fnID = new AtomicLong(); // for debugging purpose
-
-
+  
   /**
    * A client request encapsulated in @link{ClientActionHandler} will run on
    * a namenode specified by the nameNodeFetcher. If the client failed to
