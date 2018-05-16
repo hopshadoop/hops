@@ -38,7 +38,7 @@ public class TestWebHDFSAcl extends FSAclBaseTest {
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
-    fs = WebHdfsTestUtil.getWebHdfsFileSystem(conf);//, WebHdfsFileSystem.SCHEME);
+    fs = WebHdfsTestUtil.getWebHdfsFileSystem(conf, WebHdfsFileSystem.SCHEME);
     assertTrue(fs instanceof WebHdfsFileSystem);
   }
 

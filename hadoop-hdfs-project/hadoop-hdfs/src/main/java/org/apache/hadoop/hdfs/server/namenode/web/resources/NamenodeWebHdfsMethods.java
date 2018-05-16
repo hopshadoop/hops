@@ -115,6 +115,8 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
+import org.apache.hadoop.io.Text;
 
 /**
  * Web-hdfs NameNode implementation.
@@ -233,7 +235,8 @@ public class NamenodeWebHdfsMethods {
             renewer != null ? renewer : ugi.getShortUserName());
     final Token<? extends TokenIdentifier> t =
         c.getAllTokens().iterator().next();
-    t.setKind(WebHdfsFileSystem.TOKEN_KIND);
+    Text kind = request.getScheme().equals("http") ? WebHdfsFileSystem.TOKEN_KIND : SWebHdfsFileSystem.TOKEN_KIND;
+    t.setKind(kind);
     SecurityUtil.setTokenService(t, namenode.getHttpAddress());
     return t;
   }

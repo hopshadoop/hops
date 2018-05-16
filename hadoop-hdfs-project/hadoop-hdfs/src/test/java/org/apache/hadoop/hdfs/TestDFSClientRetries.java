@@ -81,6 +81,7 @@ import org.apache.hadoop.fs.CreateFlag;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.io.EnumSetWritable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -865,7 +866,7 @@ public class TestDFSClientRetries {
 
       final DistributedFileSystem dfs = cluster.getFileSystem();
       final FileSystem fs =
-          isWebHDFS ? WebHdfsTestUtil.getWebHdfsFileSystem(conf) : dfs;
+          isWebHDFS ? WebHdfsTestUtil.getWebHdfsFileSystem(conf, WebHdfsFileSystem.SCHEME) : dfs;
       final URI uri = dfs.getUri();
       assertTrue(HdfsUtils.isHealthy(uri));
 
@@ -1072,7 +1073,7 @@ public class TestDFSClientRetries {
     final UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
         username, new String[]{"supergroup"});
 
-    return isWebHDFS? WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, conf)
+    return isWebHDFS? WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, conf, WebHdfsFileSystem.SCHEME)
         : DFSTestUtil.getFileSystemAs(ugi, conf);
   }
 

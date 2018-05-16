@@ -70,6 +70,8 @@ import java.util.*;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
 import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
+import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
+import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 
 @InterfaceAudience.Private
 public class DFSUtil {
@@ -387,6 +389,26 @@ public class DFSUtil {
     return blkLocations;
   }
 
+  /**
+   * Resolve an HDFS URL into real INetSocketAddress. It works like a DNS resolver
+   * when the URL points to an non-HA cluster. When the URL points to an HA
+   * cluster, the resolver further resolves the logical name (i.e., the authority
+   * in the URL) into real namenode addresses.
+   */
+  public static InetSocketAddress resolveWebHdfsUri(URI uri, Configuration conf)
+      throws IOException {
+    int defaultPort;
+    String scheme = uri.getScheme();
+    if (WebHdfsFileSystem.SCHEME.equals(scheme)) {
+      defaultPort = DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT;
+    } else if (SWebHdfsFileSystem.SCHEME.equals(scheme)) {
+      defaultPort = DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT;
+    } else {
+      throw new IllegalArgumentException("Unsupported scheme: " + scheme);
+    }
+    return NetUtils.createSocketAddr(uri.getAuthority(), defaultPort);
+  }
+  
   /**
    * Substitute a default host in the case that an address has been configured
    * with a wildcard. This is used, for example, when determining the HTTP
