@@ -34,7 +34,13 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.security.PrivilegedExceptionAction;
 import java.util.Random;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Test WebHDFS
@@ -100,7 +106,7 @@ public class TestWebHDFS {
     try {
       cluster.waitActive();
 
-      final FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(conf);
+      final FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(conf, WebHdfsFileSystem.SCHEME);
       final Path dir = new Path("/test/largeFile");
       Assert.assertTrue(fs.mkdirs(dir));
 

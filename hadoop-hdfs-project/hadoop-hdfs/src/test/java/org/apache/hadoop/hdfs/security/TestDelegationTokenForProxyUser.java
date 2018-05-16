@@ -168,7 +168,7 @@ public class TestDelegationTokenForProxyUser {
         .createProxyUserForTesting(PROXY_USER, ugi, GROUP_NAMES);
     
     final WebHdfsFileSystem webhdfs =
-        WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, config);
+        WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, config, WebHdfsFileSystem.SCHEME);
     
     final Path root = new Path("/");
     cluster.getFileSystem().setPermission(root, new FsPermission((short) 0777));

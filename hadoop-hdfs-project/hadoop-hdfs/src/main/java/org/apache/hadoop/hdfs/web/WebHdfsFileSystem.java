@@ -121,8 +121,7 @@ public class WebHdfsFileSystem extends FileSystem
   
   /** Delegation token kind */
   public static final Text TOKEN_KIND = new Text("WEBHDFS delegation");
-  protected TokenAspect<WebHdfsFileSystem> tokenAspect = new TokenAspect<WebHdfsFileSystem>(
-      this, TOKEN_KIND);
+  protected TokenAspect<WebHdfsFileSystem> tokenAspect; 
 
   private UserGroupInformation ugi;
   private InetSocketAddress nnAddr;
@@ -139,7 +138,31 @@ public class WebHdfsFileSystem extends FileSystem
    */
   @Override
   public String getScheme() {
-    return "webhdfs";
+    return SCHEME;
+  }
+  
+  /**
+   * return the underlying transport protocol (http / https).
+   */
+  protected String getTransportScheme() {
+    return "http";
+  }
+
+  /**
+   * Initialize tokenAspect. This function is intended to
+   * be overridden by SWebHdfsFileSystem.
+   */
+  protected synchronized void initializeTokenAspect() {
+    tokenAspect = new TokenAspect<WebHdfsFileSystem>(this, TOKEN_KIND);
+  }
+
+  /**
+   * Initialize connectionFactory. This function is intended to
+   * be overridden by SWebHdfsFileSystem.
+   */
+  protected void initializeConnectionFactory(Configuration conf)
+      throws IOException {
+    connectionFactory = URLConnectionFactory.DEFAULT_CONNECTION_FACTORY;
   }
 
   @Override
@@ -147,13 +170,16 @@ public class WebHdfsFileSystem extends FileSystem
       ) throws IOException {
     super.initialize(uri, conf);
     setConf(conf);
+    initializeTokenAspect();
+    initializeConnectionFactory(conf);
+
     ugi = UserGroupInformation.getCurrentUser();
     try {
       this.uri = new URI(uri.getScheme(), uri.getAuthority(), null, null, null);
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException(e);
     }
-    this.nnAddr = NetUtils.createSocketAddr(uri.getAuthority(), getDefaultPort());
+    this.nnAddr = DFSUtil.resolveWebHdfsUri(this.uri, conf);
     this.retryPolicy =
         RetryUtils.getDefaultRetryPolicy(
             conf, 
@@ -308,7 +334,7 @@ public class WebHdfsFileSystem extends FileSystem
    * @throws IOException on error constructing the URL
    */
   private URL getNamenodeURL(String path, String query) throws IOException {
-    final URL url = new URL("http", nnAddr.getHostName(),
+    final URL url = new URL(getTransportScheme(), nnAddr.getHostName(),
           nnAddr.getPort(), path + '?' + query);
     if (LOG.isTraceEnabled()) {
       LOG.trace("url=" + url);
@@ -808,7 +834,9 @@ public class WebHdfsFileSystem extends FileSystem
   @Override
   public void close() throws IOException {
     super.close();
-    tokenAspect.removeRenewAction();
+    synchronized (this) {
+      tokenAspect.removeRenewAction();
+    }
   }
 
   class OffsetUrlOpener extends ByteRangeInputStream.URLOpener {

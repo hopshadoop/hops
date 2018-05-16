@@ -77,7 +77,7 @@ public class TestWebHdfsTimeouts {
     serverSocket = new ServerSocket(0, CONNECTION_BACKLOG);
     nnHttpAddress = new InetSocketAddress("localhost", serverSocket.getLocalPort());
     conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "localhost:" + serverSocket.getLocalPort());
-    fs = WebHdfsTestUtil.getWebHdfsFileSystem(conf);
+    fs = WebHdfsTestUtil.getWebHdfsFileSystem(conf, WebHdfsFileSystem.SCHEME);
     fs.connectionFactory = connectionFactory;
     clients = new ArrayList<SocketChannel>();
     serverThread = null;
