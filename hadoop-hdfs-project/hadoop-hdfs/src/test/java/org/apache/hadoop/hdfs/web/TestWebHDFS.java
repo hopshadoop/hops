@@ -40,6 +40,7 @@ import java.util.Random;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -223,5 +224,17 @@ public class TestWebHDFS {
     ((Log4JLogger) NamenodeWebHdfsMethods.LOG).getLogger().setLevel(Level.ALL);
     final Configuration conf = WebHdfsTestUtil.createConf();
     TestDFSClientRetries.namenodeRestartTest(conf, true);
+  }
+  
+  /**
+   * WebHdfs should be enabled by default after HDFS-5532
+   * 
+   * @throws Exception
+   */
+  @Test
+  public void testWebHdfsEnabledByDefault() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+    Assert.assertTrue(conf.getBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY,
+        false));
   }
 }
