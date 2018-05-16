@@ -2951,7 +2951,8 @@ public class FSNamesystem
                       " is removed from pendingCreates");
             }
             dir.persistBlocks(src, file);
-
+            file.recomputeFileSize();
+            
             return true;
           }
         };
@@ -3748,6 +3749,18 @@ public class FSNamesystem
         // setup the last block locations from the blockManager if not known
         if (uc.getNumExpectedLocations() == 0) {
           uc.setExpectedLocations(blockManager.getStorages(lastBlock));
+        }
+
+        if (uc.getNumExpectedLocations() == 0 && uc.getNumBytes() == 0) {
+          // There is no datanode reported to this block.
+          // may be client have crashed before writing data to pipeline.
+          // This blocks doesn't need any recovery.
+          // We can remove this block and close the file.
+          pendingFile.removeLastBlock(lastBlock);
+          finalizeINodeFileUnderConstruction(src, pendingFile);
+          NameNode.stateChangeLog.warn("BLOCK* internalReleaseLease: "
+              + "Removed empty last block and closed file.");
+          return true;
         }
         // start recovery of the last block for this file
         long blockRecoveryId = pendingFile.nextGenerationStamp();
