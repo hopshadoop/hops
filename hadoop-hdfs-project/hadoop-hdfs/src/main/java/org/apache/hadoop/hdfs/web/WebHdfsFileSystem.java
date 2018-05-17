@@ -56,7 +56,6 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.web.TokenAspect.DTSelecorByKind;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.hdfs.web.resources.AccessTimeParam;
 import org.apache.hadoop.hdfs.web.resources.AclPermissionParam;
@@ -99,7 +98,6 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Progressable;
 import org.mortbay.util.ajax.JSON;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -117,7 +115,7 @@ public class WebHdfsFileSystem extends FileSystem
   public static final String PATH_PREFIX = "/" + SCHEME + "/v" + VERSION;
 
   /** Default connection factory may be overriden in tests to use smaller timeout values */
-  URLConnectionFactory connectionFactory = URLConnectionFactory.DEFAULT_CONNECTION_FACTORY;
+  protected URLConnectionFactory connectionFactory;
   
   /** Delegation token kind */
   public static final Text TOKEN_KIND = new Text("WEBHDFS delegation");
@@ -156,24 +154,16 @@ public class WebHdfsFileSystem extends FileSystem
     tokenAspect = new TokenAspect<WebHdfsFileSystem>(this, TOKEN_KIND);
   }
 
-  /**
-   * Initialize connectionFactory. This function is intended to
-   * be overridden by SWebHdfsFileSystem.
-   */
-  protected void initializeConnectionFactory(Configuration conf)
-      throws IOException {
-    connectionFactory = URLConnectionFactory.DEFAULT_CONNECTION_FACTORY;
-  }
-
   @Override
   public synchronized void initialize(URI uri, Configuration conf
       ) throws IOException {
     super.initialize(uri, conf);
     setConf(conf);
+    connectionFactory = URLConnectionFactory
+        .newDefaultURLConnectionFactory(conf);
     /** set user pattern based on configuration file */
     UserParam.setUserPattern(conf.get(DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY, DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
     initializeTokenAspect();
-    initializeConnectionFactory(conf);
 
     ugi = UserGroupInformation.getCurrentUser();
     try {

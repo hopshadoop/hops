@@ -177,10 +177,9 @@ public class HftpFileSystem extends FileSystem
    * Initialize connectionFactory and tokenAspect. This function is intended to
    * be overridden by HsFtpFileSystem.
    */
-  protected void initConnectionFactoryAndTokenAspect(Configuration conf)
+  protected void initTokenAspect(Configuration conf)
       throws IOException {
     tokenAspect = new TokenAspect<HftpFileSystem>(this, TOKEN_KIND);
-    connectionFactory = URLConnectionFactory.DEFAULT_CONNECTION_FACTORY;
   }
 
   @Override
@@ -188,6 +187,8 @@ public class HftpFileSystem extends FileSystem
       throws IOException {
     super.initialize(name, conf);
     setConf(conf);
+    this.connectionFactory = URLConnectionFactory
+        .newDefaultURLConnectionFactory(conf);
     this.ugi = UserGroupInformation.getCurrentUser();
     this.nnUri = getNamenodeUri(name);
     try {
@@ -197,7 +198,7 @@ public class HftpFileSystem extends FileSystem
       throw new IllegalArgumentException(e);
     }
 
-    initConnectionFactoryAndTokenAspect(conf);
+    initTokenAspect(conf);
     if (UserGroupInformation.isSecurityEnabled()) {
       tokenAspect.initDelegationToken(ugi);
     }
@@ -345,7 +346,7 @@ public class HftpFileSystem extends FileSystem
   }
 
   static class RangeHeaderUrlOpener extends ByteRangeInputStream.URLOpener {
-    URLConnectionFactory connectionFactory = URLConnectionFactory.DEFAULT_CONNECTION_FACTORY;
+    URLConnectionFactory connectionFactory = URLConnectionFactory.DEFAULT_SYSTEM_CONNECTION_FACTORY;
     
     RangeHeaderUrlOpener(final URL url) {
       super(url);
