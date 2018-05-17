@@ -89,7 +89,6 @@ import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.hdfs.web.resources.Param;
-import org.apache.hadoop.http.HttpServer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.ReadaheadPool;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -147,8 +146,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.management.ObjectName;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
@@ -176,6 +173,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_USER_NAME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HTTPS_ENABLE_KEY;
 import org.apache.hadoop.hdfs.net.DomainPeerServer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
+import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.net.unix.DomainSocket;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
@@ -259,7 +257,8 @@ public class DataNode extends Configured
   private DNConf dnConf;
   private volatile boolean heartbeatsDisabledForTests = false;
   private DataStorage storage = null;
-  private HttpServer infoServer = null;
+  private HttpServer3 infoServer = null;
+  private int infoPort;
   private int infoSecurePort;
   DataNodeMetrics metrics;
   private InetSocketAddress streamingAddr;
@@ -386,27 +385,33 @@ public class DataNode extends Configured
     InetSocketAddress infoSocAddr = DataNode.getInfoAddr(conf);
     String infoHost = infoSocAddr.getHostName();
     int tmpInfoPort = infoSocAddr.getPort();
-    this.infoServer = (secureResources == null) ?
-        new HttpServer("datanode", infoHost, tmpInfoPort, tmpInfoPort == 0,
-            conf, new AccessControlList(conf.get(DFS_ADMIN, " "))) :
-        new HttpServer("datanode", infoHost, tmpInfoPort, tmpInfoPort == 0,
-            conf, new AccessControlList(conf.get(DFS_ADMIN, " ")),
-            secureResources.getListener());
+    HttpServer3.Builder builder = new HttpServer3.Builder().setName("datanode")
+        .addEndpoint(URI.create("http://" + NetUtils.getHostPortString(infoSocAddr)))
+         .setFindPort(tmpInfoPort == 0).setConf(conf)
+         .setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")));
     LOG.info("Opened info server at " + infoHost + ":" + tmpInfoPort);
     if (conf.getBoolean(DFS_HTTPS_ENABLE_KEY, false)) {
-      boolean needClientAuth = conf.getBoolean(DFS_CLIENT_HTTPS_NEED_AUTH_KEY,
-          DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT);
       InetSocketAddress secInfoSocAddr = NetUtils.createSocketAddr(
           conf.get(DFS_DATANODE_HTTPS_ADDRESS_KEY, infoHost + ":" + 0));
-      Configuration sslConf = new HdfsConfiguration(false);
-      sslConf.addResource(
-          conf.get(DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY, "ssl-server.xml"));
-      this.infoServer.addSslListener(secInfoSocAddr, sslConf, needClientAuth);
+      builder.addEndpoint(URI.create("https://"
+          + NetUtils.getHostPortString(secInfoSocAddr)));
+      Configuration sslConf = new Configuration(false);
+      sslConf.setBoolean(DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY, conf
+          .getBoolean(DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY,
+              DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT));
+      sslConf.addResource(conf.get(
+          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
+          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT));
+      DFSUtil.loadSslConfToHttpServerBuilder(builder, sslConf);
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("Datanode listening for SSL on " + secInfoSocAddr);
       }
       infoSecurePort = secInfoSocAddr.getPort();
     }
+    
+    this.infoServer = (secureResources == null) ? builder.build() :
+      builder.setConnector(secureResources.getListener()).build();
     this.infoServer.addInternalServlet(null, "/streamFile/*", StreamFile.class);
     this.infoServer.addInternalServlet(null, "/getFileChecksum/*",
         FileChecksumServlets.GetServlet.class);
@@ -423,6 +428,7 @@ public class DataNode extends Configured
           WebHdfsFileSystem.PATH_PREFIX + "/*");
     }
     this.infoServer.start();
+    this.infoPort = infoServer.getConnectorAddress(0).getPort();
   }
   
   private void startPlugins(Configuration conf) {
@@ -2561,7 +2567,7 @@ public class DataNode extends Configured
    * @return the datanode's http port
    */
   public int getInfoPort() {
-    return infoServer.getPort();
+    return infoPort;
   }
   
   /**
