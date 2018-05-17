@@ -3107,6 +3107,12 @@ public class FSNamesystem
       }
       throw lee;
     }
+    // Check the state of the penultimate block. It should be completed
+    // before attempting to complete the last one.
+    if (!checkFileProgress(pendingFile, false)) {
+      return false;
+    }
+
     // commit the last block and complete it if it has minimum replicas
     commitOrCompleteLastBlock(pendingFile, last);
 
@@ -3229,7 +3235,7 @@ public class FSNamesystem
             .tryToCompleteBlock((MutableBlockCollection) v, b.getBlockIndex());
         b = v.getPenultimateBlock();
         if (!b.isComplete()) {
-          LOG.info("BLOCK* checkFileProgress: " + b +
+          LOG.warn("BLOCK* checkFileProgress: " + b +
               " has not reached minimal replication " +
               blockManager.minReplication);
           return false;
