@@ -76,8 +76,8 @@ public class ReplicaUnderConstruction extends Replica {
   private long generationStamp;
 
   public ReplicaUnderConstruction(ReplicaState state, int storageId,
-      long blockId, int inodeId, int bucketId) {
-    this(state, storageId, blockId, inodeId, bucketId, false, GenerationStamp.GRANDFATHER_GENERATION_STAMP);
+      long blockId, int inodeId, int bucketId, long genStamp) {
+    this(state, storageId, blockId, inodeId, bucketId, false, genStamp);
   }
   public ReplicaUnderConstruction(ReplicaState state, int storageId,
       long blockId, int inodeId, int bucketId, boolean chosenAsPrimary, long generationStamp) {

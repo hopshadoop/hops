@@ -102,7 +102,8 @@ public class ReplicaUnderConstructionContext
         replicaUnderConstruction.getState(),
         replicaUnderConstruction.getStorageId(),
         replicaUnderConstruction.getBlockId(), inodeId,
-        replicaUnderConstruction.getBucketId());
+        replicaUnderConstruction.getBucketId(),
+        replicaUnderConstruction.getGenerationStamp());
   }
 
   private List<ReplicaUnderConstruction> findByBlockId(

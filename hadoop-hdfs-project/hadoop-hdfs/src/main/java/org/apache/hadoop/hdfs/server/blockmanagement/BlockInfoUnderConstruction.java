@@ -111,7 +111,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     }
     
     for (DatanodeStorageInfo storage : targets) {
-      addExpectedReplica(storage, ReplicaState.RBW);
+      addExpectedReplica(storage, ReplicaState.RBW, this.getGenerationStamp());
     }
   }
 
@@ -160,6 +160,8 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    * @param genStamp  The final generation stamp for the block.
    */
   public void setGenerationStampAndVerifyReplicas(long genStamp, DatanodeManager datanodeMgr) throws StorageException, TransactionContextException {
+    // Set the generation stamp for the block.
+    setGenerationStamp(genStamp);
     List<ReplicaUnderConstruction> replicas = getExpectedReplicas();
     if (replicas == null)
       return;
@@ -171,12 +173,10 @@ public class BlockInfoUnderConstruction extends BlockInfo {
         DatanodeDescriptor dn = datanodeMgr.getDatanodeBySid(r.getStorageId());
         dn.removeReplica(this);
         NameNode.blockStateChangeLog.info("BLOCK* Removing stale replica "
-            + "from location: " + r);
+            + "from location: " + r.getStorageId() + " for block " + r.getBlockId());
       }
     }
 
-    // Set the generation stamp for the block.
-    setGenerationStamp(genStamp);
   }
 
   /**
@@ -188,7 +188,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    * @throws IOException
    *     if block ids are inconsistent.
    */
-  void commitBlock(Block block) throws IOException {
+  void commitBlock(Block block, DatanodeManager datanodeMgr) throws IOException {
     if (getBlockId() != block.getBlockId()) {
       throw new IOException(
           "Trying to commit inconsistent block: id = " + block.getBlockId() +
@@ -196,6 +196,8 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     }
     blockUCState = BlockUCState.COMMITTED;
     this.set(getBlockId(), block.getNumBytes(), block.getGenerationStamp());
+    // Sort out invalid replicas.
+    setGenerationStampAndVerifyReplicas(block.getGenerationStamp(), datanodeMgr);
   }
 
   /**
@@ -288,12 +290,12 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   }
 
   protected void addExpectedReplica(
-      DatanodeStorageInfo storage, ReplicaState rState)
+      DatanodeStorageInfo storage, ReplicaState rState, long genStamp)
       throws StorageException, TransactionContextException {
-    addExpectedReplica(storage, rState, GenerationStamp.GRANDFATHER_GENERATION_STAMP);
+    addReplicaIfNotPresent(storage, rState, genStamp);
   }
   
-  protected void addExpectedReplica(
+  protected void addReplicaIfNotPresent(
       DatanodeStorageInfo storage, ReplicaState rState, long genStamp)
       throws StorageException, TransactionContextException {
 
@@ -321,7 +323,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     // Replica did not exist on this DN yet
     ReplicaUnderConstruction replica =
         new ReplicaUnderConstruction(rState, sid, getBlockId(), getInodeId(),
-            HashBuckets.getInstance().getBucketForBlock(this));
+            HashBuckets.getInstance().getBucketForBlock(this), genStamp);
     update(replica);
   }
 

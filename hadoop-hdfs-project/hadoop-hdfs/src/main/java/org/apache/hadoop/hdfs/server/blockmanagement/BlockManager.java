@@ -117,6 +117,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Keeps information related to the blocks stored in the Hadoop cluster.
@@ -622,14 +623,14 @@ public class BlockManager {
    *     of replicas reported from data-nodes.
    */
   private static boolean commitBlock(final BlockInfoUnderConstruction block,
-      final Block commitBlock) throws IOException, StorageException {
+      final Block commitBlock, DatanodeManager datanodeMgr) throws IOException, StorageException {
     if (block.getBlockUCState() == BlockUCState.COMMITTED) {
       return false;
     }
     assert block.getNumBytes() <= commitBlock.getNumBytes() :
         "commitBlock length is less than the stored one " +
             commitBlock.getNumBytes() + " vs. " + block.getNumBytes();
-    block.commitBlock(commitBlock);
+    block.commitBlock(commitBlock, datanodeMgr);
     return true;
   }
 
@@ -660,7 +661,7 @@ public class BlockManager {
       return false; // already completed (e.g. by syncBlock)
     }
     
-    final boolean b = commitBlock((BlockInfoUnderConstruction) lastBlock, commitBlock);
+    final boolean b = commitBlock((BlockInfoUnderConstruction) lastBlock, commitBlock, getDatanodeManager());
     LOG.debug("commitOrCompleteLastBlock for block " + lastBlock.getBlockId());
 
     int numReplicas = countNodes(lastBlock).liveReplicas();
@@ -740,7 +741,7 @@ public class BlockManager {
   public BlockInfo forceCompleteBlock(final MutableBlockCollection bc,
       final BlockInfoUnderConstruction block)
       throws IOException, StorageException {
-    block.commitBlock(block);
+    block.commitBlock(block, getDatanodeManager());
     return completeBlock(bc, block, true);
   }
 
@@ -1970,13 +1971,15 @@ public class BlockManager {
    * Besides the block in question, it provides the ReplicaState
    * reported by the datanode in the block report.
    */
-  private static class StatefulBlockInfo {
+  static class StatefulBlockInfo {
     final BlockInfoUnderConstruction storedBlock;
+    final Block reportedBlock;
     final ReplicaState reportedState;
 
     StatefulBlockInfo(BlockInfoUnderConstruction storedBlock,
-        ReplicaState reportedState) {
+        Block reportedBlock, ReplicaState reportedState) {
       this.storedBlock = storedBlock;
+      this.reportedBlock = reportedBlock;
       this.reportedState = reportedState;
     }
   }
@@ -2180,7 +2183,7 @@ public class BlockManager {
       if (firstBlockReport) {
         addStoredBlockUnderConstructionImmediateTx(b.storedBlock, storage, b.reportedState);
       } else {
-        addStoredBlockUnderConstructionTx(b.storedBlock, storage, b.reportedState);
+        addStoredBlockUnderConstructionTx(b, storage);
       }
     }
   
@@ -2599,7 +2602,7 @@ public class BlockManager {
     }
 
     if (isBlockUnderConstruction(storedBlock, ucState, reportedState)) {
-      toUC.add(new StatefulBlockInfo((BlockInfoUnderConstruction) storedBlock,
+      toUC.add(new StatefulBlockInfo((BlockInfoUnderConstruction) storedBlock, block,
           reportedState));
       return storedBlock;
     }
@@ -2676,7 +2679,7 @@ public class BlockManager {
 
 
     if (isBlockUnderConstruction(storedBlock, ucState, reportedState)) {
-      toUC.add(new StatefulBlockInfo((BlockInfoUnderConstruction) storedBlock,
+      toUC.add(new StatefulBlockInfo((BlockInfoUnderConstruction) storedBlock, block,
           reportedState));
       safeBlocks.remove(block.getBlockId());
       return storedBlock;
@@ -2790,10 +2793,11 @@ public class BlockManager {
     }
   }
 
-  private void addStoredBlockUnderConstruction(BlockInfoUnderConstruction block,
-     DatanodeStorageInfo storage, ReplicaState reportedState) throws IOException {
-    block.addExpectedReplica(storage, reportedState, block.getGenerationStamp());
-    if (reportedState == ReplicaState.FINALIZED && !block.isReplicatedOnStorage(storage)) {
+  private void addStoredBlockUnderConstruction(StatefulBlockInfo ucBlock,
+      DatanodeStorageInfo storage) throws IOException {
+    BlockInfoUnderConstruction block = ucBlock.storedBlock;
+    block.addReplicaIfNotPresent(storage, ucBlock.reportedState, ucBlock.reportedBlock.getGenerationStamp());
+    if (ucBlock.reportedState == ReplicaState.FINALIZED && !block.isReplicatedOnStorage(storage)) {
       addStoredBlock(block, storage, null, true);
     }
   }
@@ -3650,7 +3654,7 @@ public class BlockManager {
             1 : "The block should be only in one of the lists.";
 
     for (StatefulBlockInfo b : toUC) {
-      addStoredBlockUnderConstruction(b.storedBlock, storage, b.reportedState);
+      addStoredBlockUnderConstruction(b, storage);
     }
     long numBlocksLogged = 0;
     for (BlockInfo b : toAdd) {
@@ -4654,9 +4658,8 @@ public class BlockManager {
     }.handle();
   }
 
-  private void addStoredBlockUnderConstructionTx(
-      final BlockInfoUnderConstruction block, final DatanodeStorageInfo storage,
-      final ReplicaState reportedState) throws IOException {
+  private void addStoredBlockUnderConstructionTx( final StatefulBlockInfo ucBlock,
+      final DatanodeStorageInfo storage) throws IOException {
 
     new HopsTransactionalRequestHandler(
         HDFSOperationType.AFTER_PROCESS_REPORT_ADD_UC_BLK) {
@@ -4664,7 +4667,7 @@ public class BlockManager {
 
       @Override
       public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(ucBlock.reportedBlock);
       }
 
       @Override
@@ -4672,7 +4675,7 @@ public class BlockManager {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
             lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
-            .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
+            .add(lf.getIndividualBlockLock(ucBlock.reportedBlock.getBlockId(), inodeIdentifier))
             .add(lf.getBlockRelated(BLK.RE, BLK.UC, BLK.ER, BLK.CR, BLK.PE,
                 BLK.UR));
         if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
@@ -4684,7 +4687,7 @@ public class BlockManager {
 
       @Override
       public Object performTask() throws IOException {
-        addStoredBlockUnderConstruction(block, storage, reportedState);
+        addStoredBlockUnderConstruction(ucBlock, storage);
         return null;
       }
     }.handle();
@@ -4763,7 +4766,7 @@ public class BlockManager {
 
       @Override
       public Object performTask() throws IOException {
-        block.addExpectedReplica(storage, reportedState, block.getGenerationStamp());
+        block.addReplicaIfNotPresent(storage, reportedState, block.getGenerationStamp());
         //and fall through to next clause
         //add replica if appropriate
         if (reportedState == ReplicaState.FINALIZED) {
