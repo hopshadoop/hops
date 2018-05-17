@@ -24,13 +24,11 @@ import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.UnresolvedLinkException;
-import org.apache.hadoop.hdfs.SocketCache.SocketAndStreams;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.hdfs.protocol.datatransfer.InvalidEncryptionKeyException;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
@@ -40,6 +38,7 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StandardSocketFactory;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 
 import javax.net.SocketFactory;
@@ -602,8 +601,8 @@ public class DFSInputStream extends FSInputStream
           // The encryption key used is invalid.
           refetchEncryptionKey--;
           dfsClient.clearDataEncryptionKey();
-        } else if (ex instanceof InvalidBlockTokenException &&
-            refetchToken > 0) {
+        } else if ((ex instanceof InvalidBlockTokenException || ex instanceof InvalidToken)
+            && refetchToken > 0) {
           DFSClient.LOG.info("Will fetch a new access token and retry, " +
               "access token was invalid when connecting to " + targetAddr +
               " : " + ex);
@@ -1003,8 +1002,8 @@ public class DFSInputStream extends FSInputStream
           // The encryption key used is invalid.
           refetchEncryptionKey--;
           dfsClient.clearDataEncryptionKey();
-        } else if (e instanceof InvalidBlockTokenException &&
-            refetchToken > 0) {
+        } else if ((e instanceof InvalidBlockTokenException || e instanceof InvalidToken)
+            && refetchToken > 0) {
           DFSClient.LOG.info("Will get a new access token and retry, " +
               "access token was invalid when connecting to " + targetAddr +
               " : " + e);
