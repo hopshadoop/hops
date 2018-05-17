@@ -240,8 +240,6 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_ENABLED_DEFAU
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERSIST_BLOCKS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT;
@@ -366,7 +364,6 @@ public class FSNamesystem
   static int BLOCK_DELETION_INCREMENT = 1000;
 
   private final boolean isPermissionEnabled;
-  private final boolean persistBlocks;
   private final UserGroupInformation fsOwner;
   private final String fsOwnerShortUserName;
   private final String superGroup;
@@ -587,9 +584,6 @@ public class FSNamesystem
       LOG.info("fsOwner             = " + fsOwner);
       LOG.info("superGroup          = " + superGroup);
       LOG.info("isPermissionEnabled = " + isPermissionEnabled);
-
-      this.persistBlocks =
-          conf.getBoolean(DFS_PERSIST_BLOCKS_KEY, DFS_PERSIST_BLOCKS_DEFAULT);
 
       // Get the checksum type from config
       String checksumTypeStr =

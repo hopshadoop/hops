@@ -71,7 +71,6 @@ public class TestPersistBlocks {
     // Turn off persistent IPC, so that the DFSClient can survive NN restart
     conf.setInt(
         CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
-    conf.setBoolean(DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY, true);
     MiniDFSCluster cluster = null;
 
     long len = 0;
@@ -129,7 +128,6 @@ public class TestPersistBlocks {
     // Turn off persistent IPC, so that the DFSClient can survive NN restart
     conf.setInt(
         CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
-    conf.setBoolean(DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY, true);
     MiniDFSCluster cluster = null;
 
     long len = 0;
@@ -193,7 +191,6 @@ public class TestPersistBlocks {
     // Turn off persistent IPC, so that the DFSClient can survive NN restart
     conf.setInt(
         CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
-    conf.setBoolean(DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY, true);
     MiniDFSCluster cluster = null;
 
     FSDataOutputStream stream;
@@ -244,7 +241,6 @@ public class TestPersistBlocks {
     // Turn off persistent IPC, so that the DFSClient can survive NN restart
     conf.setInt(
         CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
-    conf.setBoolean(DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY, true);
     MiniDFSCluster cluster = null;
 
     FSDataOutputStream stream;
