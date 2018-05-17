@@ -40,6 +40,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
+import org.apache.hadoop.hdfs.web.resources.UserParam;
 
 /**
  * Encapsulates the HTTP server started by the NameNode.
@@ -82,7 +83,11 @@ public class NameNodeHttpServer {
                       DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY));
         }
         if (WebHdfsFileSystem.isEnabled(conf, LOG)) {
-          //add SPNEGO authentication filter for webhdfs
+          // set user pattern based on configuration file
+          UserParam.setUserPattern(conf.get(DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
+              DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
+
+          // add SPNEGO authentication filter for webhdfs
           final String name = "SPNEGO";
           final String classname = AuthFilter.class.getName();
           final String pathSpec = WebHdfsFileSystem.PATH_PREFIX + "/*";
