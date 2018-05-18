@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.hops.merge.HttpConfig2;
 import org.apache.commons.daemon.Daemon;
 import org.apache.commons.daemon.DaemonContext;
 import org.apache.hadoop.conf.Configuration;
@@ -25,16 +24,10 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.SSLFactory;
 import org.mortbay.jetty.Connector;
-import org.mortbay.jetty.security.SslSocketConnector;
-
-import javax.net.ssl.SSLServerSocketFactory;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.channels.ServerSocketChannel;
-import java.security.GeneralSecurityException;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.http.HttpConfig;
 
@@ -98,6 +91,7 @@ public class SecureDataNodeStarter implements Daemon {
   public static SecureResources getSecureResources(Configuration conf)
       throws Exception {
     HttpConfig.Policy policy = DFSUtil.getHttpPolicy(conf);
+    boolean isSecure = UserGroupInformation.isSecurityEnabled();
 
     // Obtain secure port for data streaming to datanode
     InetSocketAddress streamingAddr = DataNode.getStreamingAddr(conf);
@@ -118,6 +112,11 @@ public class SecureDataNodeStarter implements Daemon {
               ss.getLocalPort());
     }
 
+    if (ss.getLocalPort() > 1023 && isSecure) {
+      throw new RuntimeException(
+        "Cannot start secure datanode with unprivileged RPC ports");
+    }
+    
     System.err.println("Opened streaming server at " + streamingAddr);
 
     // Bind a port for the web server. The code intends to bind HTTP server to
@@ -138,9 +137,9 @@ public class SecureDataNodeStarter implements Daemon {
       System.err.println("Successfully obtained privileged resources (streaming port = "
           + ss + " ) (http listener port = " + listener.getConnection() +")");
 
-      if ((ss.getLocalPort() > 1023 || listener.getPort() > 1023) &&
-          UserGroupInformation.isSecurityEnabled()) {
-        throw new RuntimeException("Cannot start secure datanode with unprivileged ports");
+      if (listener.getPort() > 1023 && isSecure) {
+        throw new RuntimeException(
+            "Cannot start secure datanode with unprivileged HTTP ports");
       }
       System.err.println("Opened info server at " + infoSocAddr);
     }
