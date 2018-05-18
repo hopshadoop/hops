@@ -4008,6 +4008,7 @@ public class BlockManager {
   boolean isReplicationInProgress(final DatanodeDescriptor srcNode)
       throws IOException {
     final boolean[] status = new boolean[]{false};
+    final boolean[] firstReplicationLog = new boolean[]{true};
     final int[] underReplicatedBlocks = new int[]{0};
     final int[] decommissionOnlyReplicas = new int[]{0};
     final int[] underReplicatedInOpenFiles = new int[]{0};
@@ -4051,7 +4052,14 @@ public class BlockManager {
                   //Log info about one block for this node which needs replication
                   if (!status[0]) {
                     status[0] = true;
-                    logBlockReplicationInfo(block, srcNode, num);
+                    if (firstReplicationLog[0]) {
+                      logBlockReplicationInfo(block, srcNode, num);
+                    }
+                    // Allowing decommission as long as default replication is met
+                    if (curReplicas >= defaultReplication) {
+                      status[0] = false;
+                      firstReplicationLog[0] = false;
+                    }
                   }
                   underReplicatedBlocks[0]++;
                   if ((curReplicas == 0) &&
