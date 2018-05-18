@@ -47,6 +47,8 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Random;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
@@ -109,6 +111,12 @@ public class TestNameNodeMetrics {
   
   @After
   public void tearDown() throws Exception {
+    MetricsSource source = DefaultMetricsSystem.instance().getSource("UgiMetrics");
+    if (source != null) {
+      // Run only once since the UGI metrics is cleaned up during teardown
+      MetricsRecordBuilder rb = getMetrics(source);
+      assertQuantileGauges("GetGroups1s", rb);
+    }
     cluster.shutdown();
   }
   
