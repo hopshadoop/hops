@@ -570,11 +570,11 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   private void stopCommonServices() {
-    if (namesystem != null) {
-      namesystem.close();
-    }
     if (rpcServer != null) {
       rpcServer.stop();
+    }
+    if (namesystem != null) {
+      namesystem.close();
     }
     if (leaderElection != null && leaderElection.isRunning()) {
       leaderElection.stopElectionThread();
