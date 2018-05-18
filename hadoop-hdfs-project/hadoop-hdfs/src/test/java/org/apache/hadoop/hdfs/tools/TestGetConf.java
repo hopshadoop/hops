@@ -32,10 +32,15 @@ import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.StringTokenizer;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
 import static org.junit.Assert.assertEquals;
@@ -51,6 +56,8 @@ public class TestGetConf {
     NNRPCADDRESSES
   }
 
+  FileSystem localFileSys; 
+  
   /*
    * Convert the list returned from DFSUtil functions to an array of
    * addresses represented as "host:port"
@@ -268,5 +275,72 @@ public class TestGetConf {
         assertTrue(runTool(conf, args, true).contains("value"));
       }
     }
+  }
+  
+  @Test
+  public void TestGetConfExcludeCommand() throws Exception{
+  	HdfsConfiguration conf = new HdfsConfiguration();
+    // Set up the hosts/exclude files.
+    localFileSys = FileSystem.getLocal(conf);
+    Path workingDir = localFileSys.getWorkingDirectory();
+    Path dir = new Path(workingDir, System.getProperty("test.build.data", "target/test/data") + "/Getconf/");
+    Path hostsFile = new Path(dir, "hosts");
+    Path excludeFile = new Path(dir, "exclude");
+    
+    // Setup conf
+    conf.set(DFSConfigKeys.DFS_HOSTS, hostsFile.toUri().getPath());
+    conf.set(DFSConfigKeys.DFS_HOSTS_EXCLUDE, excludeFile.toUri().getPath());
+    writeConfigFile(hostsFile, null);
+    writeConfigFile(excludeFile, null);    
+    String[] args = {"-excludeFile"};
+    String ret = runTool(conf, args, true);
+    assertEquals(excludeFile.toUri().getPath(),ret.trim());
+    cleanupFile(localFileSys, excludeFile.getParent());
+  }
+  
+  @Test
+  public void TestGetConfIncludeCommand() throws Exception{
+  	HdfsConfiguration conf = new HdfsConfiguration();
+    // Set up the hosts/exclude files.
+    localFileSys = FileSystem.getLocal(conf);
+    Path workingDir = localFileSys.getWorkingDirectory();
+    Path dir = new Path(workingDir, System.getProperty("test.build.data", "target/test/data") + "/Getconf/");
+    Path hostsFile = new Path(dir, "hosts");
+    Path excludeFile = new Path(dir, "exclude");
+    
+    // Setup conf
+    conf.set(DFSConfigKeys.DFS_HOSTS, hostsFile.toUri().getPath());
+    conf.set(DFSConfigKeys.DFS_HOSTS_EXCLUDE, excludeFile.toUri().getPath());
+    writeConfigFile(hostsFile, null);
+    writeConfigFile(excludeFile, null);    
+    String[] args = {"-includeFile"};
+    String ret = runTool(conf, args, true);
+    assertEquals(hostsFile.toUri().getPath(),ret.trim());
+    cleanupFile(localFileSys, excludeFile.getParent());
+  }
+  
+  private void writeConfigFile(Path name, ArrayList<String> nodes) 
+      throws IOException {
+      // delete if it already exists
+      if (localFileSys.exists(name)) {
+        localFileSys.delete(name, true);
+      }
+
+      FSDataOutputStream stm = localFileSys.create(name);
+      
+      if (nodes != null) {
+        for (Iterator<String> it = nodes.iterator(); it.hasNext();) {
+          String node = it.next();
+          stm.writeBytes(node);
+          stm.writeBytes("\n");
+        }
+      }
+      stm.close();
+    }
+  
+  private void cleanupFile(FileSystem fileSys, Path name) throws IOException {
+    assertTrue(fileSys.exists(name));
+    fileSys.delete(name, true);
+    assertTrue(!fileSys.exists(name));
   }
 }

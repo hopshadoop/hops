@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 
 /**
  * Tool for getting configuration information from a configuration file.
@@ -77,9 +78,9 @@ public class GetConf extends Configured implements Tool {
       map = new HashMap<>();
       map.put(NAMENODE.getName().toLowerCase(), new NameNodesCommandHandler());
       map.put(INCLUDE_FILE.getName().toLowerCase(),
-          new CommandHandler("DFSConfigKeys.DFS_HOSTS"));
+          new CommandHandler(DFSConfigKeys.DFS_HOSTS));
       map.put(EXCLUDE_FILE.getName().toLowerCase(),
-          new CommandHandler("DFSConfigKeys.DFS_HOSTS_EXCLUDE"));
+          new CommandHandler(DFSConfigKeys.DFS_HOSTS_EXCLUDE));
       map.put(NNRPCADDRESSES.getName().toLowerCase(),
           new NNRpcAddressesCommandHandler());
       map.put(CONFKEY.getName().toLowerCase(),
