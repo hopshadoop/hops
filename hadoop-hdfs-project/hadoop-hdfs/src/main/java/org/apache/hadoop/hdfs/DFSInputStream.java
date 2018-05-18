@@ -243,7 +243,7 @@ public class DFSInputStream extends FSInputStream
    */
   synchronized void openInfo() throws IOException, UnresolvedLinkException {
     lastBlockBeingWrittenLength = fetchLocatedBlocksAndGetLastBlockLength();
-    int retriesForLastBlockLength = 3;
+    int retriesForLastBlockLength = dfsClient.getConf().retryTimesForGetLastBlockLength;
     while (retriesForLastBlockLength > 0) {
       // Getting last block length as -1 is a special case. When cluster
       // restarts, DNs may not report immediately. At this time partial block
@@ -253,7 +253,7 @@ public class DFSInputStream extends FSInputStream
         DFSClient.LOG.warn("Last block locations not available. " +
             "Datanodes might not have reported blocks completely." +
             " Will retry for " + retriesForLastBlockLength + " times");
-        waitFor(4000);
+        waitFor(dfsClient.getConf().retryIntervalForGetLastBlockLength);
         lastBlockBeingWrittenLength = fetchLocatedBlocksAndGetLastBlockLength();
       } else {
         break;
