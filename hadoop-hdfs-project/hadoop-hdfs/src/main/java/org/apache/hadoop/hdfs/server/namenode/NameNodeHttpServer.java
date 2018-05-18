@@ -98,51 +98,16 @@ public class NameNodeHttpServer {
     HttpConfig.Policy policy = DFSUtil.getHttpPolicy(conf);
     final String infoHost = bindAddress.getHostName();
     
-    HttpServer3.Builder builder = new HttpServer3.Builder()
-        .setName("hdfs")
-        .setConf(conf)
-        .setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")))
-        .setSecurityEnabled(UserGroupInformation.isSecurityEnabled())
-        .setUsernameConfKey(
-            DFSConfigKeys.DFS_NAMENODE_INTERNAL_SPNEGO_USER_NAME_KEY)
-        .setKeytabConfKey(
-            DFSUtil.getSpnegoKeytabKey(conf,
-                DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY));
+    final InetSocketAddress httpAddr = bindAddress;
+    final String httpsAddrString = conf.get(
+        DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
+        DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT);
+    InetSocketAddress httpsAddr = NetUtils.createSocketAddr(httpsAddrString);
 
-    if (policy.isHttpEnabled()) {
-      int port = bindAddress.getPort();
-      if (port == 0) {
-        builder.setFindPort(true);
-      }
-      builder.addEndpoint(URI.create("http://" + infoHost + ":" + port));
-    }
-
-    if (policy.isHttpsEnabled()) {
-      final String httpsAddrString = conf.get(
-          DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
-          DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT);
-      InetSocketAddress addr = NetUtils.createSocketAddr(httpsAddrString);
-
-      Configuration sslConf = new Configuration(false);
-      
-      sslConf.addResource(conf.get(
-          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
-          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT));
-      
-      sslConf.addResource(conf.get(
-          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
-          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT));
-      sslConf.setBoolean(DFS_CLIENT_HTTPS_NEED_AUTH_KEY, conf.getBoolean(
-          DFS_CLIENT_HTTPS_NEED_AUTH_KEY, DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT));
-      DFSUtil.loadSslConfToHttpServerBuilder(builder, sslConf);
-      
-      if (addr.getPort() == 0) {
-        builder.setFindPort(true);
-      }
-
-      builder.addEndpoint(URI.create("https://"
-          + NetUtils.getHostPortString(addr)));
-    }
+    HttpServer3.Builder builder = DFSUtil.httpServerTemplateForNNAndJN(conf,
+        httpAddr, httpsAddr, "hdfs",
+        DFSConfigKeys.DFS_NAMENODE_INTERNAL_SPNEGO_USER_NAME_KEY,
+        DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY);
 
     httpServer = builder.build();
     
