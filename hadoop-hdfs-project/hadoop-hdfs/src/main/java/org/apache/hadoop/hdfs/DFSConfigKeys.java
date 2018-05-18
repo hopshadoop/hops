@@ -831,6 +831,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.namenode.name.cache.threshold";
   public static final int DFS_NAMENODE_NAME_CACHE_THRESHOLD_DEFAULT = 10;
 
+  public static final String DFS_NAMESERVICES = "dfs.nameservices";
+  public static final String DFS_NAMESERVICE_ID = "dfs.nameservice.id";
   public static final String DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY =
       "dfs.namenode.resource.check.interval";
   public static final int DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT = 5000;
@@ -859,6 +861,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String  DFS_STORAGE_POLICY_ENABLED_KEY = "dfs.storage.policy.enabled";
   public static final boolean DFS_STORAGE_POLICY_ENABLED_DEFAULT = true;
 
+  // HA related configuration
+  public static final String DFS_HA_NAMENODES_KEY_PREFIX = "dfs.ha.namenodes";
+  
   // Security-related configs
   public static final String DFS_ENCRYPT_DATA_TRANSFER_KEY =
       "dfs.encrypt.data.transfer";

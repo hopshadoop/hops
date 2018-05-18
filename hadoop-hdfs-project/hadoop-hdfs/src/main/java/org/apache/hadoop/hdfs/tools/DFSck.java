@@ -36,10 +36,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLEncoder;
 import java.security.PrivilegedExceptionAction;
+import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
@@ -217,14 +219,14 @@ public class DFSck extends Configured implements Tool {
   }
   
   /**
-   * Derive the namenode http address from the current file system,
+   * Derive the leader namenode http address from the current file system,
    * either default or as set by "-fs" in the generic options.
    *
    * @return Returns http address or null if failure.
    * @throws IOException
    *     if we can't determine the active NN address
    */
-  private String getCurrentNamenodeAddress() throws IOException {
+  private URI getCurrentNamenodeAddress() throws IOException {
     //String nnAddress = null;
     Configuration conf = getConf();
 
@@ -242,19 +244,21 @@ public class DFSck extends Configured implements Tool {
       return null;
     }
     
-    return DFSUtil.getInfoServer(fs, false);
+    return DFSUtil.getInfoServer(HAUtil.getAddressOfActive(fs), conf,
+        DFSUtil.getHttpClientScheme(conf));
   }
 
   private int doWork(final String[] args) throws IOException {
-    final StringBuilder url = new StringBuilder(HttpConfig2.getSchemePrefix());
+    final StringBuilder url = new StringBuilder();
     
-    String namenodeAddress = getCurrentNamenodeAddress();
+    URI namenodeAddress = getCurrentNamenodeAddress();
     if (namenodeAddress == null) {
       //Error message already output in {@link #getCurrentNamenodeAddress()}
       System.err.println("DFSck exiting.");
       return 0;
     }
-    url.append(namenodeAddress);
+    
+    url.append(namenodeAddress.toString());
     System.err.println("Connecting to namenode via " + url.toString());
     
     url.append("/fsck?ugi=").append(ugi.getShortUserName());
