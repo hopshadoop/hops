@@ -164,7 +164,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   private Progressable progress;
   private final short blockReplication; // replication factor of file
   private boolean shouldSyncBlock = false; // force blocks to disk upon close
-  private CachingStrategy cachingStrategy;
+  private AtomicReference<CachingStrategy> cachingStrategy;
   private boolean failPacket = false;
   private boolean singleBlock = false;
 
@@ -1395,7 +1395,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
                   .writeBlock(block, nodeStorageTypes[0], accessToken,
               dfsClient.clientName, nodes, nodeStorageTypes, null,
               bcs, nodes.length, block.getNumBytes(), bytesSent, newGS,
-              checksum, cachingStrategy);
+              checksum, cachingStrategy.get());
 
           // receive ack for connect
           BlockOpResponseProto resp = BlockOpResponseProto
@@ -1592,8 +1592,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     this.blockSize = stat.getBlockSize();
     this.blockReplication = stat.getReplication();
     this.progress = progress;
-    this.cachingStrategy =
-        dfsClient.getDefaultWriteCachingStrategy().duplicate();
+    this.cachingStrategy = new AtomicReference<CachingStrategy>(
+        dfsClient.getDefaultWriteCachingStrategy());
     this.saveSmallFilesInDB = saveSmallFilesInDB;
     if (saveSmallFilesInDB) {
       isThisFileStoredInDB = true; // treat the current file as small file
@@ -2482,7 +2482,14 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   
   @Override
   public void setDropBehind(Boolean dropBehind) throws IOException {
-    this.cachingStrategy.setDropBehind(dropBehind);
+    CachingStrategy prevStrategy, nextStrategy;
+    // CachingStrategy is immutable.  So build a new CachingStrategy with the
+    // modifications we want, and compare-and-swap it in.
+    do {
+      prevStrategy = this.cachingStrategy.get();
+      nextStrategy = new CachingStrategy.Builder(prevStrategy).
+                        setDropBehind(dropBehind).build();
+    } while (!this.cachingStrategy.compareAndSet(prevStrategy, nextStrategy));
   }
   
   @VisibleForTesting

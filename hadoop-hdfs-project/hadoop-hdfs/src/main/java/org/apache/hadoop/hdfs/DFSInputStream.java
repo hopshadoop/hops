@@ -234,7 +234,7 @@ public class DFSInputStream extends FSInputStream
         dfsClient.getConf().shortCircuitStreamsCacheExpiryMs);
     this.emulateHdfsClient = emulateHdfsClient;
     this.cachingStrategy =
-        dfsClient.getDefaultReadCachingStrategy().duplicate();
+        dfsClient.getDefaultReadCachingStrategy();
     openInfo();
   }
 
@@ -587,7 +587,7 @@ public class DFSInputStream extends FSInputStream
         blockReader =
             getBlockReader(targetAddr, chosenNode, src, targetBlock, accessToken,
                 offsetIntoBlock, blk.getNumBytes() - offsetIntoBlock,
-                buffersize, verifyChecksum, dfsClient.clientName);
+                buffersize, verifyChecksum, dfsClient.clientName, cachingStrategy);
         if (connectFailedOnce) {
           DFSClient.LOG.info("Successfully connected to " + targetAddr +
               " for " + blk);
@@ -949,7 +949,11 @@ public class DFSInputStream extends FSInputStream
       // cached block locations may have been updated by chooseDataNode()
       // or fetchBlockAt(). Always get the latest list of locations at the 
       // start of the loop.
-      block = getBlockAt(block.getStartOffset(), false);
+      CachingStrategy curCachingStrategy;
+      synchronized (this) {
+        block = getBlockAt(block.getStartOffset(), false);
+        curCachingStrategy = cachingStrategy;
+      }
       DNAddrPair retval = chooseDataNode(block);
       DatanodeInfo chosenNode = retval.info;
       InetSocketAddress targetAddr = retval.addr;
@@ -961,7 +965,7 @@ public class DFSInputStream extends FSInputStream
         int len = (int) (end - start + 1);
         reader = getBlockReader(targetAddr, chosenNode, src, block,
             blockToken, start, len, buffersize, verifyChecksum,
-            dfsClient.clientName);
+            dfsClient.clientName, curCachingStrategy);
         int nread = reader.readAll(buf, offset, len);
         if (nread != len) {
           throw new IOException("truncated return from reader.read(): " +
@@ -1088,12 +1092,13 @@ public class DFSInputStream extends FSInputStream
    *     Whether to verify checksum
    * @param clientName
    *     Client name
+   * @param CachingStrategy  caching strategy to use
    * @return New BlockReader instance
    */
   protected BlockReader getBlockReader(InetSocketAddress dnAddr,
       DatanodeInfo chosenNode, String file, LocatedBlock locBlock,
       Token<BlockTokenIdentifier> blockToken, long startOffset, long len,
-      int bufferSize, boolean verifyChecksum, String clientName)
+      int bufferSize, boolean verifyChecksum, String clientName, CachingStrategy curCachingStrategy)
       throws IOException {
 
     if(locBlock.isPhantomBlock() && !emulateHdfsClient){
@@ -1117,7 +1122,7 @@ public class DFSInputStream extends FSInputStream
           setBlockMetadataHeader(BlockMetadataHeader.
               preadHeader(fis[1].getChannel())).
           setFileInputStreamCache(fileInputStreamCache).
-          setCachingStrategy(cachingStrategy).
+          setCachingStrategy(curCachingStrategy).
           build();
     }
 
@@ -1149,7 +1154,7 @@ public class DFSInputStream extends FSInputStream
         reader = BlockReaderFactory.newBlockReader(
             dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
             len, verifyChecksum, clientName, peer, chosenNode,
-            dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads, cachingStrategy);
+            dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads, curCachingStrategy);
         return reader;
       } catch (IOException ex) {
         DFSClient.LOG.debug("Error making BlockReader with DomainSocket. " + "Closing stale " + peer, ex);
@@ -1169,7 +1174,7 @@ public class DFSInputStream extends FSInputStream
         reader = BlockReaderFactory.newBlockReader(
             dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
             len, verifyChecksum, clientName, peer, chosenNode,
-            dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads, cachingStrategy);
+            dsFactory, peerCache, fileInputStreamCache, allowShortCircuitLocalReads, curCachingStrategy);
         return reader;
       } catch (IOException e) {
         DFSClient.LOG.warn("failed to connect to " + domSock, e);
@@ -1194,7 +1199,7 @@ public class DFSInputStream extends FSInputStream
         reader = BlockReaderFactory.newBlockReader(
             dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
             len, verifyChecksum, clientName, peer, chosenNode,
-            dsFactory, peerCache, fileInputStreamCache, false, cachingStrategy);
+            dsFactory, peerCache, fileInputStreamCache, false, curCachingStrategy);
         return reader;
       } catch (IOException ex) {
         DFSClient.LOG.debug("Error making BlockReader. Closing stale " + peer, ex);
@@ -1212,7 +1217,7 @@ public class DFSInputStream extends FSInputStream
     return BlockReaderFactory.newBlockReader(
         dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
         len, verifyChecksum, clientName, peer, chosenNode,
-        dsFactory, peerCache, fileInputStreamCache, false, cachingStrategy);
+        dsFactory, peerCache, fileInputStreamCache, false, curCachingStrategy);
   }
 
 
@@ -1500,14 +1505,18 @@ public class DFSInputStream extends FSInputStream
   @Override
   public synchronized void setReadahead(Long readahead)
       throws IOException {
-    this.cachingStrategy.setReadahead(readahead);
+    this.cachingStrategy =
+        new CachingStrategy.Builder(this.cachingStrategy).
+            setReadahead(readahead).build();
     closeCurrentBlockReader();
   }
 
   @Override
   public synchronized void setDropBehind(Boolean dropBehind)
       throws IOException {
-    this.cachingStrategy.setDropBehind(dropBehind);
+    this.cachingStrategy =
+        new CachingStrategy.Builder(this.cachingStrategy).
+            setDropBehind(dropBehind).build();
     closeCurrentBlockReader();
   }
   
