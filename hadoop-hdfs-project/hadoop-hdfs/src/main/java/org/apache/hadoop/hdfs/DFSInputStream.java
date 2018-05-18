@@ -1214,10 +1214,21 @@ public class DFSInputStream extends FSInputStream
     }
     // Try to create a new remote peer.
     Peer peer = newTcpPeer(dnAddr);
-    return BlockReaderFactory.newBlockReader(
-        dfsClient.getConf(), file, locBlock.getBlock(), blockToken, startOffset,
-        len, verifyChecksum, clientName, peer, chosenNode,
-        dsFactory, peerCache, fileInputStreamCache, false, curCachingStrategy);
+    try {
+      reader = BlockReaderFactory.newBlockReader(dfsClient.getConf(), file,
+          locBlock.getBlock(), blockToken, startOffset, len, verifyChecksum, clientName,
+          peer, chosenNode, dsFactory, peerCache, fileInputStreamCache, false,
+          curCachingStrategy);
+      return reader;
+    } catch (IOException ex) {
+      DFSClient.LOG.debug(
+          "Exception while getting block reader, closing stale " + peer, ex);
+      throw ex;
+    } finally {
+      if (reader == null) {
+        IOUtils.closeQuietly(peer);
+      }
+    }
   }
 
 
