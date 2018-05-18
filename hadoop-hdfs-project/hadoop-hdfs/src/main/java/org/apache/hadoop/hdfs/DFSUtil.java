@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdfs;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -35,7 +36,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -63,12 +63,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.SecureRandom;
 import java.util.*;
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
@@ -390,7 +388,68 @@ public class DFSUtil {
     }
     return blkLocations;
   }
+  
+  /**
+   * Returns collection of nameservice Ids from the configuration.
+   * @param conf configuration
+   * @return collection of nameservice Ids, or null if not specified
+   */
+  public static Collection<String> getNameServiceIds(Configuration conf) {
+    return conf.getTrimmedStringCollection(DFS_NAMESERVICES);
+  }
 
+  /**
+   * @return <code>coll</code> if it is non-null and non-empty. Otherwise,
+   * returns a list with a single null value.
+   */
+  private static Collection<String> emptyAsSingletonNull(Collection<String> coll) {
+    if (coll == null || coll.isEmpty()) {
+      return Collections.singletonList(null);
+    } else {
+      return coll;
+    }
+  }
+  
+  /**
+   * Namenode HighAvailability related configuration.
+   * Returns collection of namenode Ids from the configuration. One logical id
+   * for each namenode in the in the HA setup.
+   * 
+   * @param conf configuration
+   * @param nsId the nameservice ID to look at, or null for non-federated 
+   * @return collection of namenode Ids
+   */
+  public static Collection<String> getNameNodeIds(Configuration conf, String nsId) {
+    String key = addSuffix(DFS_HA_NAMENODES_KEY_PREFIX, nsId);
+    return conf.getTrimmedStringCollection(key);
+  }
+
+  /** Add non empty and non null suffix to a key */
+  private static String addSuffix(String key, String suffix) {
+    if (suffix == null || suffix.isEmpty()) {
+      return key;
+    }
+    assert !suffix.startsWith(".") :
+      "suffix '" + suffix + "' should not already have '.' prepended.";
+    return key + "." + suffix;
+  }
+  
+  /** Concatenate list of suffix strings '.' separated */
+  private static String concatSuffixes(String... suffixes) {
+    if (suffixes == null) {
+      return null;
+    }
+    return Joiner.on(".").skipNulls().join(suffixes);
+  }
+  
+  /**
+   * Return configuration key of format key.suffix1.suffix2...suffixN
+   */
+  public static String addKeySuffixes(String key, String... suffixes) {
+    String keySuffix = concatSuffixes(suffixes);
+    return addSuffix(key, keySuffix);
+  }
+  
   /**
    * Resolve an HDFS URL into real INetSocketAddress. It works like a DNS resolver
    * when the URL points to an non-HA cluster. When the URL points to an HA
@@ -427,6 +486,7 @@ public class DFSUtil {
    * @throws IOException
    *     if it is a wildcard address and security is enabled
    */
+  @VisibleForTesting
   public static String substituteForWildcardAddress(String configuredAddress,
       String defaultHost) throws IOException {
     InetSocketAddress sockAddr = NetUtils.createSocketAddr(configuredAddress);
@@ -442,6 +502,15 @@ public class DFSUtil {
     } else {
       return configuredAddress;
     }
+  }
+  
+  private static String getSuffixedConf(Configuration conf,
+      String key, String defaultVal, String[] suffixes) {
+    String ret = conf.get(DFSUtil.addKeySuffixes(key, suffixes));
+    if (ret != null) {
+      return ret;
+    }
+    return conf.get(key, defaultVal);
   }
 
   /**
@@ -506,7 +575,94 @@ public class DFSUtil {
     return new ClientDatanodeProtocolTranslatorPB(addr, ticket, conf, factory);
   }
 
-
+  /**
+   * Returns nameservice Id and namenode Id when the local host matches the
+   * configuration parameter {@code addressKey}.<nameservice Id>.<namenode Id>
+   * 
+   * @param conf Configuration
+   * @param addressKey configuration key corresponding to the address.
+   * @param knownNsId only look at configs for the given nameservice, if not-null
+   * @param knownNNId only look at configs for the given namenode, if not null
+   * @param matcher matching criteria for matching the address
+   * @return Array with nameservice Id and namenode Id on success. First element
+   *         in the array is nameservice Id and second element is namenode Id.
+   *         Null value indicates that the configuration does not have the the
+   *         Id.
+   * @throws HadoopIllegalArgumentException on error
+   */
+  static String[] getSuffixIDs(final Configuration conf, final String addressKey,
+      String knownNsId, String knownNNId,
+      final AddressMatcher matcher) {
+    String nameserviceId = null;
+    String namenodeId = null;
+    int found = 0;
+    
+    Collection<String> nsIds = getNameServiceIds(conf);
+    for (String nsId : emptyAsSingletonNull(nsIds)) {
+      if (knownNsId != null && !knownNsId.equals(nsId)) {
+        continue;
+      }
+      
+      Collection<String> nnIds = getNameNodeIds(conf, nsId);
+      for (String nnId : emptyAsSingletonNull(nnIds)) {
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(String.format("addressKey: %s nsId: %s nnId: %s",
+              addressKey, nsId, nnId));
+        }
+        if (knownNNId != null && !knownNNId.equals(nnId)) {
+          continue;
+        }
+        String key = addKeySuffixes(addressKey, nsId, nnId);
+        String addr = conf.get(key);
+        if (addr == null) {
+          continue;
+        }
+        InetSocketAddress s = null;
+        try {
+          s = NetUtils.createSocketAddr(addr);
+        } catch (Exception e) {
+          LOG.warn("Exception in creating socket address " + addr, e);
+          continue;
+        }
+        if (!s.isUnresolved() && matcher.match(s)) {
+          nameserviceId = nsId;
+          namenodeId = nnId;
+          found++;
+        }
+      }
+    }
+    if (found > 1) { // Only one address must match the local address
+      String msg = "Configuration has multiple addresses that match "
+          + "local node's address. Please configure the system with "
+          + DFS_NAMESERVICE_ID;
+      throw new HadoopIllegalArgumentException(msg);
+    }
+    return new String[] { nameserviceId, namenodeId };
+  }
+  
+  /**
+   * For given set of {@code keys} adds nameservice Id and or namenode Id
+   * and returns {nameserviceId, namenodeId} when address match is found.
+   * @see #getSuffixIDs(Configuration, String, AddressMatcher)
+   */
+  static String[] getSuffixIDs(final Configuration conf,
+      final InetSocketAddress address, final String... keys) {
+    AddressMatcher matcher = new AddressMatcher() {
+     @Override
+      public boolean match(InetSocketAddress s) {
+        return address.equals(s);
+      } 
+    };
+    
+    for (String key : keys) {
+      String[] ids = getSuffixIDs(conf, key, null, null, matcher);
+      if (ids != null && (ids [0] != null || ids[1] != null)) {
+        return ids;
+      }
+    }
+    return null;
+  }
+    
   private interface AddressMatcher {
     public boolean match(InetSocketAddress s);
   }
@@ -810,19 +966,70 @@ public class DFSUtil {
     return null;
   }
 
-  //FIXME: fix for https?
-  public static String getInfoServer(FileSystem fs, boolean httpsAddress)
-      throws IOException {
-    if (!(fs instanceof DistributedFileSystem)) {
-      throw new IllegalArgumentException("FileSystem " + fs + " is not a DFS.");
+  public static URI getInfoServer(InetSocketAddress namenodeAddr,
+      Configuration conf, String scheme) throws IOException {
+
+    String[] suffixes = null;
+    if (namenodeAddr != null) {
+      // if non-default namenode, try reverse look up 
+      // the nameServiceID if it is available
+      suffixes = getSuffixIDs(conf, namenodeAddr,
+          DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
+          DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY);
     }
-    // force client address resolution.
-    fs.exists(new Path("/"));
-    DistributedFileSystem dfs = (DistributedFileSystem) fs;
-    DFSClient dfsClient = dfs.getClient();
-    return dfsClient.getActiveNodes().getLeader().getHttpAddress();
+
+    String authority;
+    if ("http".equals(scheme)) {
+      authority = getSuffixedConf(conf, DFS_NAMENODE_HTTP_ADDRESS_KEY,
+          DFS_NAMENODE_HTTP_ADDRESS_DEFAULT, suffixes);
+    } else if ("https".equals(scheme)) {
+      authority = getSuffixedConf(conf, DFS_NAMENODE_HTTPS_ADDRESS_KEY,
+          DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT, suffixes);
+    } else {
+      throw new IllegalArgumentException("Invalid scheme:" + scheme);
+    }
+    if (namenodeAddr != null) {
+      authority = substituteForWildcardAddress(authority,
+          namenodeAddr.getHostName());
+    }
+    return URI.create(scheme + "://" + authority);
+
   }
 
+  /**
+   * Lookup the HTTP / HTTPS address of the namenode, and replace its hostname
+   * with defaultHost when it found out that the address is a wildcard / local
+   * address.
+   *
+   * @param defaultHost
+   *          The default host name of the namenode.
+   * @param conf
+   *          The configuration
+   * @param scheme
+   *          HTTP or HTTPS
+   * @throws IOException
+   */
+  public static URI getInfoServerWithDefaultHost(String defaultHost,
+      Configuration conf, final String scheme) throws IOException {
+    URI configuredAddr = getInfoServer(null, conf, scheme);
+    String authority = substituteForWildcardAddress(
+        configuredAddr.getAuthority(), defaultHost);
+    return URI.create(scheme + "://" + authority);
+  }
+
+  /**
+   * Determine whether HTTP or HTTPS should be used to connect to the remote
+   * server. Currently the client only connects to the server via HTTPS if the
+   * policy is set to HTTPS_ONLY.
+   *
+   * @return the scheme (HTTP / HTTPS)
+   */
+  public static String getHttpClientScheme(Configuration conf) {
+    HttpConfig.Policy policy = DFSUtil.getHttpPolicy(conf);
+    return policy == HttpConfig.Policy.HTTPS_ONLY ? "https" : "http";
+  }  
+  
+  
   public static List<URI> getNsServiceRpcUris(Configuration conf)
       throws URISyntaxException {
     return getNameNodesRPCAddressesAsURIs(conf,
