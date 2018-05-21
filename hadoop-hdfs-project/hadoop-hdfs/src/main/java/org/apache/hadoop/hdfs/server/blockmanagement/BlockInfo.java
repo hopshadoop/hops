@@ -60,7 +60,8 @@ public class BlockInfo extends Block {
     ByINodeId,
     ByINodeIds,
     ByMaxBlockIndexForINode,
-    ByBlockIdsAndINodeIds;
+    ByBlockIdsAndINodeIds,
+    ByINodeIdAndIndex;
     
     @Override
     public Class getType() {
@@ -77,6 +78,7 @@ public class BlockInfo extends Block {
         case ByMaxBlockIndexForINode:
           return Annotation.PrunedIndexScan;
         case ByINodeId:
+        case ByINodeIdAndIndex:
           return Annotation.PrunedIndexScan;
         case ByINodeIds:
           return Annotation.BatchedPrunedIndexScan;

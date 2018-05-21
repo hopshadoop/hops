@@ -726,7 +726,7 @@ public class BlockManager {
       final BlockInfo block, boolean force)
       throws IOException, StorageException {
     BlockInfo blk = bc.getBlock(block.getBlockIndex());
-    if(blk == block){
+    if (blk == block) {
       return completeBlock(bc, blk.getBlockIndex(), force);
     }
     return block;
@@ -4006,8 +4006,7 @@ public class BlockManager {
             Block block = (Block) getParams()[0];
             locks.add(
                 lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
-                .add(lf.getIndividualBlockLock(block.getBlockId(),
-                    inodeIdentifier)).add(
+                .add(lf.getBlockLock()).add(
                 lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR, BLK.PE));
           }
 

@@ -24,6 +24,10 @@ import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
+import io.hops.transaction.lock.BlockLock;
+import io.hops.transaction.lock.LastTwoBlocksLock;
+import io.hops.transaction.lock.Lock;
+import io.hops.transaction.lock.SqlBatchedBlocksLock;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
@@ -46,6 +50,8 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   private final List<BlockInfo> concatRemovedBlks = new ArrayList<>();
 
   private final BlockInfoDataAccess<BlockInfo> dataAccess;
+
+  private boolean foundByInode = false;
 
   public BlockInfoContext(BlockInfoDataAccess<BlockInfo> dataAccess) {
     this.dataAccess = dataAccess;
@@ -83,6 +89,11 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   @Override
   public void prepare(TransactionLocks tlm)
       throws TransactionContextException, StorageException {
+    if (foundByInode && !(tlm.getLock(Lock.Type.Block) instanceof BlockLock)
+        && !(tlm.getLock(Lock.Type.Block) instanceof LastTwoBlocksLock)
+        && !(tlm.getLock(Lock.Type.Block) instanceof SqlBatchedBlocksLock)) {
+      throw new TransactionContextException("You can't call find ByINodeId(s) when taking the lock only on one block");
+    }
     Collection<BlockInfo> removed = new ArrayList<>(getRemoved());
     removed.addAll(concatRemovedBlks);
     dataAccess.prepare(removed, getAdded(), getModified());
@@ -97,6 +108,8 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
         return findById(bFinder, params);
       case ByMaxBlockIndexForINode:
         return findMaxBlk(bFinder, params);
+      case ByINodeIdAndIndex:
+        return findByInodeIdAndIndex(bFinder, params);
     }
     throw new RuntimeException(UNSUPPORTED_FINDER);
   }
@@ -107,10 +120,12 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     BlockInfo.Finder bFinder = (BlockInfo.Finder) finder;
     switch (bFinder) {
       case ByINodeId:
+        foundByInode = true;
         return findByInodeId(bFinder, params);
       case ByBlockIdsAndINodeIds:
         return findBatch(bFinder, params);
       case ByINodeIds:
+        foundByInode = true;
         return findByInodeIds(bFinder, params);
     }
     throw new RuntimeException(UNSUPPORTED_FINDER);
@@ -193,6 +208,28 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     return syncBlockInfoInstances(result, true);
   }
 
+  private BlockInfo findByInodeIdAndIndex(BlockInfo.Finder bFinder,
+      final Object[] params)
+      throws TransactionContextException, StorageException {
+    List<BlockInfo> blocks = null;
+    BlockInfo result = null;
+    final Integer inodeId = (Integer) params[0];
+    final Integer index = (Integer) params[1];
+    if (inodeBlocks.containsKey(inodeId)) {
+      blocks = inodeBlocks.get(inodeId);
+      for(BlockInfo bi: blocks){
+        if(bi.getBlockIndex()==index){
+          result = bi;
+          break;
+        }
+      }
+      hit(bFinder, result, "inodeid", inodeId);
+    } else {
+      throw new TransactionContextException("this function can't be called without owning a lock on the block");
+    }
+    return result;
+  }
+  
   private BlockInfo findById(BlockInfo.Finder bFinder, final Object[] params)
       throws TransactionContextException, StorageException {
     BlockInfo result = null;
