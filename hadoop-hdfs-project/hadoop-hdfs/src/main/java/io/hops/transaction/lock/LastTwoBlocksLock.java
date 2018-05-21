@@ -21,7 +21,7 @@ import org.apache.hadoop.hdfs.server.namenode.INode;
 import java.io.IOException;
 import java.util.Collection;
 
-final class LastTwoBlocksLock extends IndividualBlockLock{
+public final class LastTwoBlocksLock extends IndividualBlockLock{
 
   private final String path;
   public LastTwoBlocksLock(String src){

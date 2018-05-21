@@ -19,7 +19,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
 import java.io.IOException;
 
-final class SqlBatchedBlocksLock extends BaseIndividualBlockLock {
+public final class SqlBatchedBlocksLock extends BaseIndividualBlockLock {
 
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {

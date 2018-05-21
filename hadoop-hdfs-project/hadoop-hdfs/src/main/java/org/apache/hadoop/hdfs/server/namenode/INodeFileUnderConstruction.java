@@ -275,18 +275,7 @@ public class INodeFileUnderConstruction extends INodeFile
   @Override
   public BlockInfo getBlock(int index)
       throws TransactionContextException, StorageException {
-    List<BlockInfo> blocks = getBlocksOrderedByIndex();
-    if(blocks == null){
-      return null;
-    }
-
-    for(BlockInfo blk : blocks){
-      if(blk.getBlockIndex() == index){
-        return blk;
-      }
-    }
-
-    return null;
+    return (BlockInfo) EntityManager.find(BlockInfo.Finder.ByINodeIdAndIndex, id, index);
   }
   
   @Override
