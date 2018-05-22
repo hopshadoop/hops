@@ -45,13 +45,34 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
+import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.lib.servlet.ServerWebApp;
 import org.junit.Assert;
 
 public class TestHttpFSKerberosAuthenticationHandler extends HFSTestCase {
 
   @Test
   @TestDir
-  public void testManagementOperations() throws Exception {
+  public void testManagementOperationsWebHdfsFileSystem() throws Exception {
+    testManagementOperations(WebHdfsFileSystem.TOKEN_KIND);
+  }
+
+  @Test
+  @TestDir
+  public void testManagementOperationsSWebHdfsFileSystem() throws Exception {
+    try {
+      System.setProperty(HttpFSServerWebApp.NAME +
+          ServerWebApp.SSL_ENABLED, "true");
+      testManagementOperations(SWebHdfsFileSystem.TOKEN_KIND);
+    } finally {
+      System.getProperties().remove(HttpFSServerWebApp.NAME +
+          ServerWebApp.SSL_ENABLED);
+    }
+  }
+
+  private void testManagementOperations(Text expectedTokenKind) throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
 
     Configuration httpfsConf = new Configuration(false);
@@ -67,8 +88,8 @@ public class TestHttpFSKerberosAuthenticationHandler extends HFSTestCase {
 
       testNonManagementOperation(handler);
       testManagementOperationErrors(handler);
-      testGetToken(handler, null);
-      testGetToken(handler, "foo");
+      testGetToken(handler, null, expectedTokenKind);
+      testGetToken(handler, "foo", expectedTokenKind);
       testCancelToken(handler);
       testRenewToken(handler);
 
@@ -112,8 +133,8 @@ public class TestHttpFSKerberosAuthenticationHandler extends HFSTestCase {
             Mockito.contains("requires SPNEGO"));
   }
 
-  private void testGetToken(AuthenticationHandler handler, String renewer)
-      throws Exception {
+  private void testGetToken(AuthenticationHandler handler, String renewer,
+      Text expectedTokenKind) throws Exception {
     DelegationTokenOperation op = DelegationTokenOperation.GETDELEGATIONTOKEN;
     HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
     HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
@@ -156,6 +177,7 @@ public class TestHttpFSKerberosAuthenticationHandler extends HFSTestCase {
         new Token<>();
     dt.decodeFromUrlString(tokenStr);
     HttpFSServerWebApp.get().get(DelegationTokenManager.class).verifyToken(dt);
+    Assert.assertEquals(expectedTokenKind, dt.getKind());
   }
 
   private void testCancelToken(AuthenticationHandler handler) throws Exception {
