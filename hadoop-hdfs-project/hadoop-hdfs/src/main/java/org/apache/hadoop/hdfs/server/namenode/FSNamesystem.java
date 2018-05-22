@@ -2711,7 +2711,7 @@ public class FSNamesystem
             saveAllocatedBlock(src, iNodesInPath2, newBlock, targets);
 
 
-            dir.persistBlocks(src, pendingFile2);
+            dir.persistNewBlock(src, pendingFile2);
             offset = pendingFile2.computeFileSize(true);
 
             Lease lease = leaseManager.getLease(clientName);
