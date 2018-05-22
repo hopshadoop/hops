@@ -108,7 +108,9 @@ public class LayoutVersion {
         + "enable rebuilding retry cache in case of HA failover"),
     ADD_DATANODE_AND_STORAGE_UUIDS(-45, "Replace StorageID with DatanodeUuid."
         + " Use distinct StorageUuid per storage directory."),
-    EXTENDED_ACL(-53, "Extended ACL");
+    EDITLOG_ADD_BLOCK(-46, "Add new editlog that only records allocation of "
+        + "the new block instead of the entire block list"),
+    EXTENDED_ACL(-47, "Extended ACL");
   
     final int lv;
     final int ancestorLV;
