@@ -29,15 +29,30 @@ import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.URL;
 import java.net.UnknownHostException;
+import org.mortbay.jetty.Connector;
+import org.mortbay.jetty.security.SslSocketConnector;
 
 public class TestJettyHelper implements MethodRule {
-
-  @Test
-  public void dummy() {
+  private boolean ssl;
+  private String keyStoreType;
+  private String keyStore;
+  private String keyStorePassword;
+  private Server server;
+  
+  public TestJettyHelper() {
+    this.ssl = false;
   }
 
-  private static ThreadLocal<Server> TEST_SERVLET_TL =
-      new InheritableThreadLocal<>();
+  public TestJettyHelper(String keyStoreType, String keyStore,
+      String keyStorePassword) {
+    ssl = true;
+    this.keyStoreType = keyStoreType;
+    this.keyStore = keyStore;
+    this.keyStorePassword = keyStorePassword;
+  }
+
+  private static ThreadLocal<TestJettyHelper> TEST_JETTY_TL =
+      new InheritableThreadLocal<TestJettyHelper>();
 
   @Override
   public Statement apply(final Statement statement,
@@ -45,16 +60,15 @@ public class TestJettyHelper implements MethodRule {
     return new Statement() {
       @Override
       public void evaluate() throws Throwable {
-        Server server = null;
         TestJetty testJetty = frameworkMethod.getAnnotation(TestJetty.class);
         if (testJetty != null) {
           server = createJettyServer();
         }
         try {
-          TEST_SERVLET_TL.set(server);
+          TEST_JETTY_TL.set(TestJettyHelper.this);
           statement.evaluate();
         } finally {
-          TEST_SERVLET_TL.remove();
+          TEST_JETTY_TL.remove();
           if (server != null && server.isRunning()) {
             try {
               server.stop();
@@ -77,8 +91,19 @@ public class TestJettyHelper implements MethodRule {
       int port = ss.getLocalPort();
       ss.close();
       Server server = new Server(0);
-      server.getConnectors()[0].setHost(host);
-      server.getConnectors()[0].setPort(port);
+      if (!ssl) {
+        server.getConnectors()[0].setHost(host);
+        server.getConnectors()[0].setPort(port);
+      } else {
+        SslSocketConnector c = new SslSocketConnector();
+        c.setHost(host);
+        c.setPort(port);
+        c.setNeedClientAuth(false);
+        c.setKeystore(keyStore);
+        c.setKeystoreType(keyStoreType);
+        c.setKeyPassword(keyStorePassword);
+        server.setConnectors(new Connector[]{c});
+      }
       return server;
     } catch (Exception ex) {
       throw new RuntimeException(
@@ -114,11 +139,11 @@ public class TestJettyHelper implements MethodRule {
    * @return a Jetty server ready to be configured and the started.
    */
   public static Server getJettyServer() {
-    Server server = TEST_SERVLET_TL.get();
-    if (server == null) {
+    TestJettyHelper helper = TEST_JETTY_TL.get();
+    if (helper == null || helper.server == null) {
       throw new IllegalStateException("This test does not use @TestJetty");
     }
-    return server;
+    return helper.server;
   }
 
   /**
@@ -128,13 +153,15 @@ public class TestJettyHelper implements MethodRule {
    * @return the base URL (SCHEMA://HOST:PORT) of the test Jetty server.
    */
   public static URL getJettyURL() {
-    Server server = TEST_SERVLET_TL.get();
-    if (server == null) {
+    TestJettyHelper helper = TEST_JETTY_TL.get();
+    if (helper == null || helper.server == null) {
       throw new IllegalStateException("This test does not use @TestJetty");
     }
     try {
-      return new URL("http://" + server.getConnectors()[0].getHost() + ":" +
-          server.getConnectors()[0].getPort());
+      String scheme = (helper.ssl) ? "https" : "http";
+      return new URL(scheme + "://" +
+          helper.server.getConnectors()[0].getHost() + ":" +
+          helper.server.getConnectors()[0].getPort());
     } catch (MalformedURLException ex) {
       throw new RuntimeException("It should never happen, " + ex.getMessage(),
           ex);

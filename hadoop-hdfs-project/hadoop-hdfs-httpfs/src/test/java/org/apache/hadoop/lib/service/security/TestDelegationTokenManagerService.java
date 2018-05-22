@@ -34,6 +34,9 @@ import org.junit.Test;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import org.apache.hadoop.lib.service.hadoop.FileSystemAccessService;
+import org.apache.hadoop.lib.service.instrumentation.InstrumentationService;
+import org.apache.hadoop.lib.service.scheduler.SchedulerService;
 import org.junit.Assert;
 
 public class TestDelegationTokenManagerService extends HTestCase {
@@ -43,9 +46,12 @@ public class TestDelegationTokenManagerService extends HTestCase {
   public void service() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",",
-        Arrays.asList(DelegationTokenManagerService.class.getName())));
-    Server server = new Server("server", dir, dir, dir, dir, conf);
+    conf.set("httpfs.services", StringUtils.join(",",
+      Arrays.asList(InstrumentationService.class.getName(),
+            SchedulerService.class.getName(),
+            FileSystemAccessService.class.getName(),
+          DelegationTokenManagerService.class.getName())));
+    Server server = new HttpFSServerWebApp(dir, dir, dir, dir, conf);
     server.init();
     DelegationTokenManager tm = server.get(DelegationTokenManager.class);
     Assert.assertNotNull(tm);
