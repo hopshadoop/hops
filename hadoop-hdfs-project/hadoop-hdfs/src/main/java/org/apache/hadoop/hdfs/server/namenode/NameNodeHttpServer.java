@@ -39,8 +39,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
-import org.apache.hadoop.hdfs.web.resources.UserParam;
+import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer3;
 
 /**
@@ -62,45 +64,14 @@ public class NameNodeHttpServer {
   protected static final String NAMENODE_ATTRIBUTE_KEY = "name.node";
   public static final String STARTUP_PROGRESS_ATTRIBUTE_KEY = "startup.progress";
   
-  public NameNodeHttpServer(Configuration conf, NameNode nn,
+  NameNodeHttpServer(Configuration conf, NameNode nn,
       InetSocketAddress bindAddress) {
     this.conf = conf;
     this.nn = nn;
     this.bindAddress = bindAddress;
   }
   
-  void start() throws IOException {
-    final String infoHost = bindAddress.getHostName();
-    int infoPort = bindAddress.getPort();
-    HttpServer3.Builder builder = new HttpServer3.Builder().setName("hdfs")
-        .addEndpoint(URI.create(infoHost).create(("http://" + NetUtils.getHostPortString(bindAddress))))
-        .setFindPort(infoPort == 0).setConf(conf).setACL(
-        new AccessControlList(conf.get(DFS_ADMIN, " ")))
-        .setSecurityEnabled(UserGroupInformation.isSecurityEnabled())
-        .setUsernameConfKey(
-            DFSConfigKeys.DFS_NAMENODE_INTERNAL_SPNEGO_USER_NAME_KEY)
-        .setKeytabConfKey(DFSUtil.getSpnegoKeytabKey(conf,
-            DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY));
-
-    boolean certSSL = conf.getBoolean(DFSConfigKeys.DFS_HTTPS_ENABLE_KEY, false);
-    if (certSSL) {
-      httpsAddress = NetUtils.createSocketAddr(conf.get(
-          DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
-          DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT));
-
-      builder.addEndpoint(URI.create("https://"
-          + NetUtils.getHostPortString(httpsAddress)));
-      Configuration sslConf = new Configuration(false);
-      sslConf.setBoolean(DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY, conf
-          .getBoolean(DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY,
-              DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT));
-      sslConf.addResource(conf.get(
-          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
-          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT));
-      DFSUtil.loadSslConfToHttpServerBuilder(builder, sslConf);
-    }
-
-    httpServer = builder.build();
+  private void initWebHdfs(Configuration conf) throws IOException {
     if (WebHdfsFileSystem.isEnabled(conf, HttpServer3.LOG)) {
       //add SPNEGO authentication filter for webhdfs
       final String name = "SPNEGO";
@@ -114,21 +85,94 @@ public class NameNodeHttpServer {
       // add webhdfs packages
       httpServer.addJerseyResourcePackage(
           NamenodeWebHdfsMethods.class.getPackage().getName()
-          + ";" + Param.class.getPackage().getName(), pathSpec);
+              + ";" + Param.class.getPackage().getName(), pathSpec);
     }
+  }
+
+  /**
+   * @see DFSUtil#getHttpPolicy(org.apache.hadoop.conf.Configuration)
+   * for information related to the different configuration options and
+   * Http Policy is decided.
+   */
+  void start() throws IOException {
+    HttpConfig.Policy policy = DFSUtil.getHttpPolicy(conf);
+    final String infoHost = bindAddress.getHostName();
+    
+    HttpServer3.Builder builder = new HttpServer3.Builder()
+        .setName("hdfs")
+        .setConf(conf)
+        .setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")))
+        .setSecurityEnabled(UserGroupInformation.isSecurityEnabled())
+        .setUsernameConfKey(
+            DFSConfigKeys.DFS_NAMENODE_INTERNAL_SPNEGO_USER_NAME_KEY)
+        .setKeytabConfKey(
+            DFSUtil.getSpnegoKeytabKey(conf,
+                DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY));
+
+    if (policy.isHttpEnabled()) {
+      int port = bindAddress.getPort();
+      if (port == 0) {
+        builder.setFindPort(true);
+      }
+      builder.addEndpoint(URI.create("http://" + infoHost + ":" + port));
+    }
+
+    if (policy.isHttpsEnabled()) {
+      final String httpsAddrString = conf.get(
+          DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
+          DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT);
+      InetSocketAddress addr = NetUtils.createSocketAddr(httpsAddrString);
+
+      Configuration sslConf = new Configuration(false);
+      
+      sslConf.addResource(conf.get(
+          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
+          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT));
+      
+      sslConf.addResource(conf.get(
+          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
+          DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT));
+      sslConf.setBoolean(DFS_CLIENT_HTTPS_NEED_AUTH_KEY, conf.getBoolean(
+          DFS_CLIENT_HTTPS_NEED_AUTH_KEY, DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT));
+      DFSUtil.loadSslConfToHttpServerBuilder(builder, sslConf);
+      
+      if (addr.getPort() == 0) {
+        builder.setFindPort(true);
+      }
+
+      builder.addEndpoint(URI.create("https://"
+          + NetUtils.getHostPortString(addr)));
+    }
+
+    httpServer = builder.build();
+    
+    if (policy.isHttpsEnabled()) {
+      // assume same ssl port for all datanodes
+      InetSocketAddress datanodeSslPort = NetUtils.createSocketAddr(conf.get(
+          DFSConfigKeys.DFS_DATANODE_HTTPS_ADDRESS_KEY, infoHost + ":"
+              + DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT));
+      httpServer.setAttribute(DFSConfigKeys.DFS_DATANODE_HTTPS_PORT_KEY,
+          datanodeSslPort.getPort());
+    }
+
+    initWebHdfs(conf);
 
     httpServer.setAttribute(NAMENODE_ATTRIBUTE_KEY, nn);
     httpServer.setAttribute(JspHelper.CURRENT_CONF, conf);
     setupServlets(httpServer, conf);
     httpServer.start();
-    httpAddress = httpServer.getConnectorAddress(0);
-    if (certSSL) {
-      httpsAddress = httpServer.getConnectorAddress(1);
-      // assume same ssl port for all datanodes
-      InetSocketAddress datanodeSslPort = NetUtils.createSocketAddr(conf.get(
-          DFSConfigKeys.DFS_DATANODE_HTTPS_ADDRESS_KEY, infoHost + ":" + 50475));
-      httpServer.setAttribute(DFSConfigKeys.DFS_DATANODE_HTTPS_PORT_KEY, datanodeSslPort
-          .getPort());
+    
+    int connIdx = 0;
+    if (policy.isHttpEnabled()) {
+      httpAddress = httpServer.getConnectorAddress(connIdx++);
+      conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY,
+          NetUtils.getHostPortString(httpAddress));
+    }
+
+    if (policy.isHttpsEnabled()) {
+      httpsAddress = httpServer.getConnectorAddress(connIdx);
+      conf.set(DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
+          NetUtils.getHostPortString(httpsAddress));
     }
   }
 
@@ -162,17 +206,17 @@ public class NameNodeHttpServer {
     return params;
   }
 
-  public void stop() throws Exception {
+  void stop() throws Exception {
     if (httpServer != null) {
       httpServer.stop();
     }
   }
 
-  public InetSocketAddress getHttpAddress() {
+  InetSocketAddress getHttpAddress() {
     return httpAddress;
   }
 
-  public InetSocketAddress getHttpsAddress() {
+  InetSocketAddress getHttpsAddress() {
     return httpsAddress;
   }
   
@@ -181,7 +225,7 @@ public class NameNodeHttpServer {
    * 
    * @param nameNodeAddress InetSocketAddress to set
    */
-  public void setNameNodeAddress(InetSocketAddress nameNodeAddress) {
+  void setNameNodeAddress(InetSocketAddress nameNodeAddress) {
     httpServer.setAttribute(NAMENODE_ADDRESS_ATTRIBUTE_KEY,
         NetUtils.getConnectAddress(nameNodeAddress));
   }
@@ -191,7 +235,7 @@ public class NameNodeHttpServer {
    * 
    * @param prog StartupProgress to set
    */
-  public void setStartupProgress(StartupProgress prog) {
+  void setStartupProgress(StartupProgress prog) {
     httpServer.setAttribute(STARTUP_PROGRESS_ATTRIBUTE_KEY, prog);
   }
 
@@ -223,7 +267,7 @@ public class NameNodeHttpServer {
     return (NameNode) context.getAttribute(NAMENODE_ATTRIBUTE_KEY);
   }
 
-  public static Configuration getConfFromContext(ServletContext context) {
+  static Configuration getConfFromContext(ServletContext context) {
     return (Configuration) context.getAttribute(JspHelper.CURRENT_CONF);
   }
 
@@ -239,7 +283,7 @@ public class NameNodeHttpServer {
    * @param context ServletContext to get
    * @return StartupProgress associated with context
    */
-  public static StartupProgress getStartupProgressFromContext(
+  static StartupProgress getStartupProgressFromContext(
       ServletContext context) {
     return (StartupProgress)context.getAttribute(STARTUP_PROGRESS_ATTRIBUTE_KEY);
   }

@@ -408,17 +408,11 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   /**
-   * @return the NameNode HTTP address set in the conf.
+   * @return the NameNode HTTP address
    */
   public static InetSocketAddress getHttpAddress(Configuration conf) {
     return NetUtils.createSocketAddr(conf.get(DFS_NAMENODE_HTTP_ADDRESS_KEY,
             DFS_NAMENODE_HTTP_ADDRESS_DEFAULT));
-  }
-
-  protected void setHttpServerAddress(Configuration conf) {
-    String hostPort = NetUtils.getHostPortString(getHttpAddress());
-    conf.set(DFS_NAMENODE_HTTP_ADDRESS_KEY, hostPort);
-    LOG.info("Web-server up at: " + hostPort);
   }
 
   protected void loadNamesystem(Configuration conf) throws IOException {
@@ -499,7 +493,6 @@ public class NameNode implements NameNodeStatusMXBean {
     StartupProgressMetrics.register(startupProgress);
     
     startHttpServer(conf);
-    validateConfigurationSettingsOrAbort(conf);
     loadNamesystem(conf);
 
     rpcServer = createRpcServer(conf);
@@ -515,46 +508,6 @@ public class NameNode implements NameNodeStatusMXBean {
   protected NameNodeRpcServer createRpcServer(Configuration conf)
       throws IOException {
     return new NameNodeRpcServer(conf, this);
-  }
-
-  /**
-   * Verifies that the final Configuration Settings look ok for the NameNode
-   * to properly start up Things to check for include: - HTTP Server Port does
-   * not equal the RPC Server Port
-   *
-   * @param conf
-   * @throws IOException
-   */
-  protected void validateConfigurationSettings(final Configuration conf)
-      throws IOException {
-    // check to make sure the web port and rpc port do not match
-    if (getHttpServerAddress(conf).getPort() ==
-        getRpcServerAddress(conf).getPort()) {
-      String errMsg =
-          "dfs.namenode.rpc-address " + "(" + getRpcServerAddress(conf) +
-              ") and " + "dfs.namenode.http-address (" +
-              getHttpServerAddress(conf) + ") " +
-              "configuration keys are bound to the same port, unable to start " +
-              "NameNode. Port: " + getRpcServerAddress(conf).getPort();
-      throw new IOException(errMsg);
-    }
-  }
-
-  /**
-   * Validate NameNode configuration.  Log a fatal error and abort if
-   * configuration is invalid.
-   *
-   * @param conf Configuration to validate
-   * @throws IOException thrown if conf is invalid
-   */
-  private void validateConfigurationSettingsOrAbort(Configuration conf)
-      throws IOException {
-    try {
-      validateConfigurationSettings(conf);
-    } catch (IOException e) {
-      LOG.fatal(e.toString());
-      throw e;
-    }
   }
 
   /**
@@ -677,7 +630,6 @@ public class NameNode implements NameNodeStatusMXBean {
     httpServer = new NameNodeHttpServer(conf, this, getHttpServerAddress(conf));
     httpServer.start();
     httpServer.setStartupProgress(startupProgress);
-    setHttpServerAddress(conf);
   }
 
   private void stopHttpServer() {
@@ -1281,11 +1233,11 @@ public class NameNode implements NameNodeStatusMXBean {
     }
 
     String httpAddress;
-    if (conf.getBoolean(DFSConfigKeys.DFS_HTTPS_ENABLE_KEY, DFS_HTTPS_ENABLE_DEFAULT)) {
-      httpAddress = httpServer.getHttpAddress().getAddress().getHostAddress() + ":" + conf.getInt(DFSConfigKeys
-          .DFS_NAMENODE_HTTPS_PORT_KEY, DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT);
-    } else {
+    if (DFSUtil.getHttpPolicy(conf).isHttpEnabled()) {
       httpAddress = httpServer.getHttpAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpAddress()
+          .getPort() ;
+    } else {
+      httpAddress = httpServer.getHttpsAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpsAddress()
           .getPort() ;
     }
     

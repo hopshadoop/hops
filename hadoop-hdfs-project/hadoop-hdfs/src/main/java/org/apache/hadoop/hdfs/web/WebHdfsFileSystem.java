@@ -383,36 +383,26 @@ public class WebHdfsFileSystem extends FileSystem
    */
   private Map<?, ?> run(final HttpOpParam.Op op, final Path fspath,
       final Param<?,?>... parameters) throws IOException {
-    return new Runner(op, fspath, parameters).run().json;
+    return new FsPathRunner(op, fspath, parameters).run().json;
   }
 
   /**
    * This class is for initialing a HTTP connection, connecting to server,
    * obtaining a response, and also handling retry on failures.
    */
-  class Runner {
-    private final HttpOpParam.Op op;
-    private final URL url;
+  abstract class AbstractRunner {
+    abstract protected URL getUrl() throws IOException;
+
+    protected final HttpOpParam.Op op;
     private final boolean redirected;
 
     private boolean checkRetry;
-    private HttpURLConnection conn = null;
+    protected HttpURLConnection conn = null;
     private Map<?, ?> json = null;
 
-    Runner(final HttpOpParam.Op op, final URL url, final boolean redirected) {
+    protected AbstractRunner(final HttpOpParam.Op op, boolean redirected) {
       this.op = op;
-      this.url = url;
       this.redirected = redirected;
-    }
-
-    Runner(final HttpOpParam.Op op, final Path fspath,
-        final Param<?,?>... parameters) throws IOException {
-      this(op, toUrl(op, fspath, parameters), false);
-    }
-
-    Runner(final HttpOpParam.Op op, final HttpURLConnection conn) {
-      this(op, null, false);
-      this.conn = conn;
     }
 
     private HttpURLConnection getHttpUrlConnection(final URL url)
@@ -454,6 +444,7 @@ public class WebHdfsFileSystem extends FileSystem
   
     private void init() throws IOException {
       checkRetry = !redirected;
+      URL url = getUrl();
       try {
         conn = getHttpUrlConnection(url);
       } catch(AuthenticationException ae) {
@@ -480,7 +471,23 @@ public class WebHdfsFileSystem extends FileSystem
       }
     }
 
-    Runner run() throws IOException {
+    AbstractRunner run() throws IOException {
+      /**
+       * Do the real work.
+       *
+       * There are three cases that the code inside the loop can throw an
+       * IOException:
+       *
+       * <ul>
+       * <li>The connection has failed (e.g., ConnectException,
+       * @see FailoverOnNetworkExceptionRetry for more details)</li>
+       * <li>The namenode enters the standby state (i.e., StandbyException).</li>
+       * <li>The server returns errors for the command (i.e., RemoteException)</li>
+       * </ul>
+       *
+       * The call to shouldRetry() will conduct the retry policy. The policy
+       * examines the exception and swallows it if it decides to rerun the work.
+       */
       for(int retry = 0; ; retry++) {
         try {
           init();
@@ -578,6 +585,35 @@ public class WebHdfsFileSystem extends FileSystem
           disconnect();
         }
       }
+    }
+  }
+
+  final class FsPathRunner extends AbstractRunner {
+    private final Path fspath;
+    private final Param<?, ?>[] parameters;
+
+    FsPathRunner(final HttpOpParam.Op op, final Path fspath, final Param<?,?>... parameters) {
+      super(op, false);
+      this.fspath = fspath;
+      this.parameters = parameters;
+    }
+
+    @Override
+    protected URL getUrl() throws IOException {
+      return toUrl(op, fspath, parameters);
+    }
+  }
+
+  final class URLRunner extends AbstractRunner {
+    private final URL url;
+    @Override
+    protected URL getUrl() {
+      return url;
+    }
+
+    protected URLRunner(final HttpOpParam.Op op, final URL url, boolean redirected) {
+      super(op, redirected);
+      this.url = url;
     }
   }
 
@@ -785,7 +821,7 @@ public class WebHdfsFileSystem extends FileSystem
     statistics.incrementWriteOps(1);
 
     final HttpOpParam.Op op = PutOpParam.Op.CREATE;
-    return new Runner(op, f,
+    return new FsPathRunner(op, f,
         new PermissionParam(applyUMask(permission)),
         new OverwriteParam(overwrite),
         new BufferSizeParam(bufferSize),
@@ -801,7 +837,7 @@ public class WebHdfsFileSystem extends FileSystem
     statistics.incrementWriteOps(1);
 
     final HttpOpParam.Op op = PostOpParam.Op.APPEND;
-    return new Runner(op, f, new BufferSizeParam(bufferSize))
+    return new FsPathRunner(op, f, new BufferSizeParam(bufferSize))
       .run()
       .write(bufferSize);
   }
@@ -842,7 +878,7 @@ public class WebHdfsFileSystem extends FileSystem
         final boolean resolved) throws IOException {
       final URL offsetUrl = offset == 0L? url
           : new URL(url + "&" + new OffsetParam(offset));
-      return new Runner(GetOpParam.Op.OPEN, offsetUrl, resolved).run().conn;
+      return new URLRunner(GetOpParam.Op.OPEN, offsetUrl, resolved).run().conn;
     }
   }
 

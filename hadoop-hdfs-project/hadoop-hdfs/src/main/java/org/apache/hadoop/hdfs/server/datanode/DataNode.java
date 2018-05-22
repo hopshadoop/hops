@@ -145,34 +145,10 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.management.ObjectName;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_ADDRESS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_INTERVAL_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_INTERFACE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_INTERFACE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_NAMESERVER_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_NAMESERVER_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_IPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_PLUGINS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_STARTUP_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_USER_NAME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HTTPS_ENABLE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import org.apache.hadoop.hdfs.net.DomainPeerServer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
+import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.net.unix.DomainSocket;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -361,7 +337,7 @@ public class DataNode extends Configured
    * explicitly configured in the given config, then it is determined
    * via the DNS class.
    *
-   * @param config
+   * @param config configuration
    * @return the hostname (NB: may not be a FQDN)
    * @throws UnknownHostException
    *     if the dfs.datanode.dns.interface
@@ -379,39 +355,54 @@ public class DataNode extends Configured
     return name;
   }
 
-  
+  /**
+   * @see DFSUtil#getHttpPolicy(org.apache.hadoop.conf.Configuration)
+   * for information related to the different configuration options and
+   * Http Policy is decided.
+   */
   private void startInfoServer(Configuration conf) throws IOException {
-    // create a servlet to serve full-file content
+    HttpServer3.Builder builder = new HttpServer3.Builder().setName("datanode")
+        .setConf(conf).setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")));
+
+    HttpConfig.Policy policy = DFSUtil.getHttpPolicy(conf);
     InetSocketAddress infoSocAddr = DataNode.getInfoAddr(conf);
     String infoHost = infoSocAddr.getHostName();
-    int tmpInfoPort = infoSocAddr.getPort();
-    HttpServer3.Builder builder = new HttpServer3.Builder().setName("datanode")
-        .addEndpoint(URI.create("http://" + NetUtils.getHostPortString(infoSocAddr)))
-         .setFindPort(tmpInfoPort == 0).setConf(conf)
-         .setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")));
-    LOG.info("Opened info server at " + infoHost + ":" + tmpInfoPort);
-    if (conf.getBoolean(DFS_HTTPS_ENABLE_KEY, false)) {
+    
+    if (policy.isHttpEnabled()) {
+      if (secureResources == null) {
+        int port = infoSocAddr.getPort();
+        builder.addEndpoint(URI.create("http://" + infoHost + ":" + port));
+        if (port == 0) {
+          builder.setFindPort(true);
+        }
+      } else {
+        // The http socket is created externally using JSVC, we add it in
+        // directly.
+        builder.setConnector(secureResources.getListener());
+      }
+    }
+
+    if (policy.isHttpsEnabled()) {
       InetSocketAddress secInfoSocAddr = NetUtils.createSocketAddr(
           conf.get(DFS_DATANODE_HTTPS_ADDRESS_KEY, infoHost + ":" + 0));
-      builder.addEndpoint(URI.create("https://"
-          + NetUtils.getHostPortString(secInfoSocAddr)));
+      
       Configuration sslConf = new Configuration(false);
-      sslConf.setBoolean(DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY, conf
-          .getBoolean(DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY,
-              DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT));
       sslConf.addResource(conf.get(
           DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
           DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT));
+      sslConf.setBoolean(DFS_CLIENT_HTTPS_NEED_AUTH_KEY, conf.getBoolean(
+          DFS_CLIENT_HTTPS_NEED_AUTH_KEY, DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT));
       DFSUtil.loadSslConfToHttpServerBuilder(builder, sslConf);
 
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Datanode listening for SSL on " + secInfoSocAddr);
+      int port = secInfoSocAddr.getPort();
+      if (port == 0) {
+        builder.setFindPort(true);
       }
-      infoSecurePort = secInfoSocAddr.getPort();
+      builder.addEndpoint(URI.create("https://" + infoHost + ":" + port));
     }
     
-    this.infoServer = (secureResources == null) ? builder.build() :
-      builder.setConnector(secureResources.getListener()).build();
+    this.infoServer = builder.build();
+    
     this.infoServer.addInternalServlet(null, "/streamFile/*", StreamFile.class);
     this.infoServer.addInternalServlet(null, "/getFileChecksum/*",
         FileChecksumServlets.GetServlet.class);
@@ -428,7 +419,15 @@ public class DataNode extends Configured
           WebHdfsFileSystem.PATH_PREFIX + "/*");
     }
     this.infoServer.start();
-    this.infoPort = infoServer.getConnectorAddress(0).getPort();
+    
+    int connIdx = 0;
+    if (policy.isHttpEnabled()) {
+      infoPort = infoServer.getConnectorAddress(connIdx++).getPort();
+    }
+
+    if (policy.isHttpsEnabled()) {
+      infoSecurePort = infoServer.getConnectorAddress(connIdx).getPort();
+    }
   }
   
   private void startPlugins(Configuration conf) {
