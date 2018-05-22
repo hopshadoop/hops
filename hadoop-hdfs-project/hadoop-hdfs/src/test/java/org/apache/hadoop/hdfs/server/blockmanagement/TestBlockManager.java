@@ -525,6 +525,7 @@ public class TestBlockManager {
             INodeFile file = new INodeFile(inode_id, new PermissionStatus(USER, GROUP,
                 new FsPermission((short) 0777)), null, (short) 3,
                 System.currentTimeMillis(), System.currentTimeMillis(), 1000l, (byte) 0);
+            file.setHasBlocksNoPersistance(true);
             file.setLocalNameNoPersistance("hop");
             file.setParentIdNoPersistance(INodeDirectory.ROOT_INODE_ID);
             file.setPartitionIdNoPersistance(INodeDirectory.ROOT_INODE_ID);
