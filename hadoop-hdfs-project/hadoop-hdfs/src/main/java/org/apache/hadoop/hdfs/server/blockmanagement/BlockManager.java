@@ -1587,9 +1587,10 @@ public class BlockManager {
       // block should belong to a file
       bc = blocksMap.getBlockCollection(blk);
       // abandoned block or block reopened for append
-      if (bc == null || bc instanceof MutableBlockCollection) {
-        neededReplications.remove(getBlockInfo(blk),
-            priority1); // remove from neededReplications
+      if (bc == null
+          || (bc instanceof MutableBlockCollection && getBlockInfo(blk).equals(bc.getLastBlock()))) {
+        // remove from neededReplications
+        neededReplications.remove(getBlockInfo(blk), priority1);
         neededReplications.decrementReplicationIndex(priority1);
         return scheduledWork;
       }
@@ -1662,7 +1663,7 @@ public class BlockManager {
         // block should belong to a file
         bc = blocksMap.getBlockCollection(block);
         // abandoned block or block reopened for append
-        if (bc == null || bc instanceof MutableBlockCollection) {
+        if (bc == null || (bc instanceof MutableBlockCollection && getBlockInfo(blk).equals(bc.getLastBlock()))) {
           neededReplications.remove(getBlockInfo(block),
               priority); // remove from neededReplications
           rw.targets = null;
@@ -4049,6 +4050,13 @@ public class BlockManager {
               if (isNeededReplication(block, curExpectedReplicas,
                   curReplicas)) {
                 if (curExpectedReplicas > curReplicas) {
+                  if (bc instanceof MutableBlockCollection) {
+                    if (block.equals(bc.getLastBlock()) && curReplicas > minReplication) {
+                      return null;
+                    }
+                    underReplicatedInOpenFiles[0]++;
+                  }
+
                   //Log info about one block for this node which needs replication
                   if (!status[0]) {
                     status[0] = true;
@@ -4065,9 +4073,6 @@ public class BlockManager {
                   if ((curReplicas == 0) &&
                       (num.decommissionedReplicas() > 0)) {
                     decommissionOnlyReplicas[0]++;
-                  }
-                  if (bc instanceof MutableBlockCollection) {
-                    underReplicatedInOpenFiles[0]++;
                   }
                 }
                 if (!neededReplications.contains(getBlockInfo(block)) &&
@@ -4555,7 +4560,7 @@ public class BlockManager {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
-            .add(lf.getIndividualBlockLock(b.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockLock(b.getBlockId(), inodeIdentifier))
             .add(lf.getVariableLock(Variable.Finder.ReplicationIndex, LockType.WRITE))
             .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.UR, BLK.UC));
       }

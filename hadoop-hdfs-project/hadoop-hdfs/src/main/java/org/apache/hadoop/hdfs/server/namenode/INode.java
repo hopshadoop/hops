@@ -1075,10 +1075,15 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   }
 
   public void setHasBlocks(boolean hasBlocks) throws TransactionContextException, StorageException {
-    header = HeaderFormat.combineHasBlocksNoPersistance(header, hasBlocks);
+    setHasBlocksNoPersistance(hasBlocks);
     save();
   }
 
+  @VisibleForTesting
+  public void setHasBlocksNoPersistance(boolean hasBlocks) throws TransactionContextException, StorageException {
+    header = HeaderFormat.combineHasBlocksNoPersistance(header, hasBlocks);
+  }
+  
   public boolean hasBlocks(){
    return HeaderFormat.hasBlocks(header);
   }
