@@ -715,10 +715,17 @@ public class MiniDFSCluster {
     List<String> nnRpcs = Lists.newArrayList();
     List<String> nnServiceRpcs = Lists.newArrayList();
     List<String> nnhttpAddresses = Lists.newArrayList();
+    List<String> nnhttpsAddresses = Lists.newArrayList();
     for (NameNodeInfo nameNodeInfo : nameNodes) {
       nnRpcs.add(nameNodeInfo.nameNode.getNameNodeAddressHostPortString());
-      nnhttpAddresses.add(
-          NetUtils.getHostPortString(nameNodeInfo.nameNode.getHttpAddress()));
+      if (nameNodeInfo.nameNode.getHttpAddress() != null) {
+        nnhttpAddresses.add(
+            NetUtils.getHostPortString(nameNodeInfo.nameNode.getHttpAddress()));
+      }
+      if (nameNodeInfo.nameNode.getHttpsAddress() != null) {
+        nnhttpsAddresses.add(
+            NetUtils.getHostPortString(nameNodeInfo.nameNode.getHttpsAddress()));
+      }
       nnServiceRpcs.add(NetUtils
           .getHostPortString(nameNodeInfo.nameNode.getServiceRpcAddress()));
     }
@@ -738,8 +745,14 @@ public class MiniDFSCluster {
           serviceRpcAddresses);
     }
     
-    conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY,
-        nnhttpAddresses.get(0));
+    if (!nnhttpAddresses.isEmpty()) {
+      conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY,
+          nnhttpAddresses.get(0));
+    }
+    if (!nnhttpsAddresses.isEmpty()) {
+      conf.set(DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
+          nnhttpsAddresses.get(0));
+    }
     conf.set(DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY, nnRpcs.get(0));
     conf.set(DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
         nnServiceRpcs.get(0));
@@ -783,10 +796,13 @@ public class MiniDFSCluster {
 
     // After the NN has started, set back the bound ports into
     // the conf
-    nameNodeConf.set(DFS_NAMENODE_RPC_ADDRESS_KEY,
-        nn.getNameNodeAddressHostPortString());
-    nameNodeConf.set(DFS_NAMENODE_HTTP_ADDRESS_KEY,
-        NetUtils.getHostPortString(nn.getHttpAddress()));
+    nameNodeConf.set(DFS_NAMENODE_RPC_ADDRESS_KEY, nn.getNameNodeAddressHostPortString());
+    if (nn.getHttpAddress() != null) {
+      nameNodeConf.set(DFS_NAMENODE_HTTP_ADDRESS_KEY, NetUtils.getHostPortString(nn.getHttpAddress()));
+    }
+    if (nn.getHttpsAddress() != null) {
+      nameNodeConf.set(DFS_NAMENODE_HTTPS_ADDRESS_KEY, NetUtils.getHostPortString(nn.getHttpsAddress()));
+    }
 
     nameNodes[nnIndex] = new NameNodeInfo(nn, nnConf.getNnId(), nameNodeConf);
   }
@@ -1079,10 +1095,8 @@ public class MiniDFSCluster {
 
       SecureResources secureResources = null;
       if (UserGroupInformation.isSecurityEnabled()) {
-        SSLFactory sslFactory = new SSLFactory(SSLFactory.Mode.SERVER, dnConf);
         try {
-          secureResources =
-              SecureDataNodeStarter.getSecureResources(sslFactory, dnConf);
+          secureResources = SecureDataNodeStarter.getSecureResources(dnConf);
         } catch (Exception ex) {
           ex.printStackTrace();
         }

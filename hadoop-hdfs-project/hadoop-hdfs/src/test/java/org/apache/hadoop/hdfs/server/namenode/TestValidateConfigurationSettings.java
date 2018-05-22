@@ -26,6 +26,7 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.BindException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.After;
@@ -49,7 +50,7 @@ public class TestValidateConfigurationSettings {
    * an exception
    * is thrown when trying to re-use the same port
    */
-  @Test
+  @Test(expected = BindException.class)
   public void testThatMatchingRPCandHttpPortsThrowException()   //HOP: fails in the master branch
       throws IOException {
 
@@ -58,14 +59,7 @@ public class TestValidateConfigurationSettings {
     FileSystem.setDefaultUri(conf, "hdfs://localhost:9000");
     conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "127.0.0.1:9000");
     DFSTestUtil.formatNameNode(conf);
-    try {
-      NameNode nameNode = new NameNode(conf);
-      fail("Should have throw the exception since the ports match");
-    } catch (IOException e) {
-      // verify we're getting the right IOException
-      assertTrue(e.toString().contains("dfs.namenode.rpc-address ("));
-      System.out.println("Got expected exception: " + e.toString());
-    }
+    new NameNode(conf);
   }
 
   /**

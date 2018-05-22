@@ -81,6 +81,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.fs.FileContext;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -1088,11 +1090,15 @@ public class TestFsck {
     PrintWriter out = new PrintWriter(result, true);
     InetAddress remoteAddress = InetAddress.getLocalHost();
     FSNamesystem fsName = mock(FSNamesystem.class);
+    BlockManager blockManager = mock(BlockManager.class);
+    DatanodeManager dnManager = mock(DatanodeManager.class);
+    
     when(namenode.getNamesystem()).thenReturn(fsName);
     when(fsName.getBlockLocations(anyString(), anyLong(), anyLong(),
         anyBoolean(), anyBoolean(), anyBoolean())).
         thenThrow(new FileNotFoundException()) ;
-
+    when(fsName.getBlockManager()).thenReturn(blockManager);
+    when(blockManager.getDatanodeManager()).thenReturn(dnManager);
     NamenodeFsck fsck = new NamenodeFsck(conf, namenode, nettop, pmap, out,
         NUM_REPLICAS, (short)1, remoteAddress);
 
