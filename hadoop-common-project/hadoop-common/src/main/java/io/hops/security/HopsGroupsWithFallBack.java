@@ -27,8 +27,9 @@ public class HopsGroupsWithFallBack extends
   public List<String> getGroups(final String user) throws IOException {
     List<String> groups = UsersGroups.getGroups(user);
 
-    if(groups != null)
+    if (groups != null && !groups.isEmpty()) {
       return groups;
+    }
 
     return super.getGroups(user);
   }

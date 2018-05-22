@@ -31,7 +31,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.security.JniBasedUnixGroupsMappingWithFallback;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.hamcrest.Matchers;
+import org.junit.After;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -45,6 +48,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -55,7 +59,12 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.fail;
 
 public class TestUsersGroups {
-
+  
+  @After
+  public void afterTest() {
+    UsersGroups.stop();
+  }
+  
   @Test
   public void testUsersGroupsCache(){
     UsersGroupsCache cache = new UsersGroupsCache(10);
@@ -123,7 +132,6 @@ public class TestUsersGroups {
     cachedGroups = cache.getGroups(currentUser.getName());
     assertNotNull(cachedGroups);
     assertTrue(cachedGroups.equals(Arrays.asList(groups.get(2).getName())));
-    UsersGroups.stop();
   }
 
   @Test
@@ -243,9 +251,31 @@ public class TestUsersGroups {
     UsersGroups.addUserToGroups("user", new String[]{"group1", "group2"});
     assertEquals(UsersGroups.getGroupID("group1"), 0);
     assertEquals(UsersGroups.getUserID("user"), 0);
-    UsersGroups.stop();
   }
-
+  
+  /**
+   * Test groups of a user that exists in the database but its groups not.
+   * In that case it should fall back to Unix groups
+   */
+  @Test
+  public void testGetUnixUserGroups() throws Exception {
+    Configuration conf = new Configuration();
+    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.setConfiguration(conf);
+    HdfsStorageFactory.formatStorage();
+  
+    UserGroupInformation ugi = UserGroupInformation.getLoginUser();
+    JniBasedUnixGroupsMappingWithFallback jniGroupsMapping = new JniBasedUnixGroupsMappingWithFallback();
+    // Directly get the groups the user belongs to
+    List<String> loginUserGroups = jniGroupsMapping.getGroups(ugi.getUserName());
+    assertFalse(loginUserGroups.isEmpty());
+    
+    UsersGroups.addUserToGroupsTx(ugi.getUserName(), new String[]{});
+    List<String> ugiGroups = ugi.getGroups();
+    assertFalse(ugiGroups.isEmpty());
+    assertThat(ugiGroups, Matchers.equalTo(loginUserGroups));
+  }
+  
   @Test
   public void testAddUsers() throws IOException {
     Configuration conf = new Configuration();
@@ -307,7 +337,6 @@ public class TestUsersGroups {
     
     assertThat(UsersGroups.getGroups("user"), Matchers.containsInAnyOrder
         ("group1", "group2", "group3"));
-    UsersGroups.stop();
   }
 
   @Test
