@@ -30,6 +30,7 @@ import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.security.UsersGroups;
+import io.hops.transaction.context.EntityContext;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.SubtreeLockHelper;
@@ -92,11 +93,17 @@ abstract class AbstractFileTree {
                       .getDataAccess(INodeDataAccess.class);
               List<ProjectedINode> children = Collections.EMPTY_LIST;
               if (INode.isTreeLevelRandomPartitioned(depth)) {
-                children = dataAccess.findInodesForSubtreeOperationsWithWriteLockFTIS(parent.getId());
+                children = dataAccess.findInodesFTISTx(parent.getId(),
+                        EntityContext.LockMode.READ_COMMITTED);
               } else {
                 //then the partitioning key is the parent id
-                children = dataAccess.findInodesForSubtreeOperationsWithWriteLockPPIS(parent.getId(), parent.getId());
+                children = dataAccess.findInodesPPISTx(parent.getId(), parent.getId(),
+                        EntityContext.LockMode.READ_COMMITTED);
               }
+
+              //locking with FTIS and PPIS is not a good idea. See JIRA HOPS-458
+              //using batch operations to lock the children
+              lockInodesUsingBatchOperation(children, dataAccess);
 
               Map<ProjectedINode, List<AclEntry>> acls = new HashMap<>();
               for (ProjectedINode child : children) {
@@ -141,6 +148,49 @@ abstract class AbstractFileTree {
         handler.handle(this);
       } catch (IOException e) {
         setExceptionIfNull(e);
+      }
+    }
+
+    int batchIndex = 0;
+    final int BATCHSIZE = 10000;
+
+    private class InodesBatch {
+      int[] partitionIDs = null;
+      String[] names = null;
+      int[] pids = null;
+    }
+
+    boolean getBatch(List<ProjectedINode> children, InodesBatch inodesBatch) {
+
+      if (batchIndex >= children.size()) {
+        return false;
+      }
+
+      int remaining = (children.size() - batchIndex);
+      if (remaining > BATCHSIZE) {
+        remaining = BATCHSIZE;
+      } else {
+        remaining = (children.size() - batchIndex);
+      }
+
+      inodesBatch.names = new String[remaining];
+      inodesBatch.pids = new int[remaining];
+      inodesBatch.partitionIDs = new int[remaining];
+
+      for (int i = 0; i < remaining; i++) {
+        ProjectedINode inode = children.get(batchIndex++);
+        inodesBatch.names[i] = inode.getName();
+        inodesBatch.pids[i] = inode.getParentId();
+        inodesBatch.partitionIDs[i] = inode.getPartitionId();
+      }
+      return true;
+    }
+
+    void lockInodesUsingBatchOperation(List<ProjectedINode> children, INodeDataAccess<INode> dataAccess) throws StorageException {
+      InodesBatch batch = new InodesBatch();
+      while (getBatch(children, batch)) {
+        dataAccess.lockInodesUsingPkBatchTx(batch.names, batch.pids, batch.partitionIDs,
+                EntityContext.LockMode.WRITE_LOCK);
       }
     }
   }

@@ -22,6 +22,7 @@ import io.hops.metadata.hdfs.entity.INode;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
+import io.hops.transaction.context.EntityContext;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -76,21 +77,28 @@ public class INodeDALAdaptor
   }
 
   @Override
-  public List<ProjectedINode> findInodesForSubtreeOperationsWithWriteLockPPIS(
-          int parentId, int partitionId) throws StorageException {
+  public List<ProjectedINode> findInodesPPISTx(
+          int parentId, int partitionId, EntityContext.LockMode lock) throws StorageException {
     List<ProjectedINode> list =
-            dataAccess.findInodesForSubtreeOperationsWithWriteLockPPIS(parentId, partitionId);
+            dataAccess.findInodesPPISTx(parentId, partitionId, lock);
     Collections.sort(list);
     return list;
   }
 
   @Override
-  public List<ProjectedINode> findInodesForSubtreeOperationsWithWriteLockFTIS(
-      int parentId) throws StorageException {
+  public List<ProjectedINode> findInodesFTISTx(
+      int parentId, EntityContext.LockMode lock) throws StorageException {
     List<ProjectedINode> list =
-        dataAccess.findInodesForSubtreeOperationsWithWriteLockFTIS(parentId);
+        dataAccess.findInodesFTISTx(parentId, lock);
     Collections.sort(list);
     return list;
+  }
+
+  public List<org.apache.hadoop.hdfs.server.namenode.INode> lockInodesUsingPkBatchTx(
+          String[] names, int[] parentIds, int[] partitionIds, EntityContext.LockMode lock)
+          throws StorageException {
+    return (List<org.apache.hadoop.hdfs.server.namenode.INode>) convertDALtoHDFS(
+            dataAccess.lockInodesUsingPkBatchTx(names, parentIds, partitionIds, lock));
   }
 
   @Override
