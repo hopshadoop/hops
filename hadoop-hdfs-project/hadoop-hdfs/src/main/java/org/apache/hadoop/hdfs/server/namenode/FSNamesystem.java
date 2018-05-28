@@ -6397,6 +6397,16 @@ public class FSNamesystem
     return VersionInfo.getVersion();
   }
 
+  @Override  //NameNodeMXBean
+  public int getNumNameNodes() {
+    return nameNode.getActiveNameNodes().size();
+  }
+  
+  @Override //NameNodeMXBean
+  public String getLeaderNameNode(){
+    return nameNode.getActiveNameNodes().getSortedActiveNodes().get(0).getHostname();
+  }
+  
   /**
    * Verifies that the given identifier and password are valid and match.
    *

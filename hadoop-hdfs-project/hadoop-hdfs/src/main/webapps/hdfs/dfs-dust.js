@@ -85,5 +85,17 @@
   }
 
   exports.load_json = load_json;
+  
+  function get_location(){
+    var location = window.location.href;
+    var double_slash_pos = location.lastIndexOf("//");
+    if(double_slash_pos<0){
+      return "";
+    }
+    var end_location = location.indexOf("/", double_slash_pos+2);
+    return location.slice(0, end_location);
+  }
+  
+  exports.get_location = get_location;
 
 }($, dust, window));

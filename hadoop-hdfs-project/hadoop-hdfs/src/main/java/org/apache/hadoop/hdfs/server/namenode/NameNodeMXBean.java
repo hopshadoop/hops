@@ -224,4 +224,8 @@ public interface NameNodeMXBean {
    * @return the number of live datanodes for each distinct versions
    */
   public Map<String, Integer> getDistinctVersions();
+  
+  public int getNumNameNodes();
+  
+  public String getLeaderNameNode();
 }
