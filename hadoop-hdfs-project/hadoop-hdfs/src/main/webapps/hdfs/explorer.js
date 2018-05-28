@@ -35,8 +35,8 @@
       }
 
       if (sticky) {
-	var exec = ((parms.perm % 10) & 1) == 1;
-	res[res.length - 1] = exec ? 't' : 'T';
+      	var otherExec = ((ctx.current().permission % 10) & 1) == 1;
+        res = res.substr(0, res.length - 1) + (otherExec ? 't' : 'T');
       }
 
       chunk.write(dir + res);
@@ -112,7 +112,7 @@
       $('#file-info-tail').hide();
       $('#file-info-title').text("File information - " + path);
 
-      var download_url = '/webhdfs/v1' + abs_path + '/?op=OPEN';
+      var download_url = get_location() + '/webhdfs/v1' + abs_path + '/?op=OPEN';
 
       $('#file-info-download').attr('href', download_url);
       $('#file-info-preview').click(function() {
@@ -135,7 +135,7 @@
   }
 
   function browse_directory(dir) {
-    var url = '/webhdfs/v1' + dir + '?op=LISTSTATUS';
+    var url = get_location() + '/webhdfs/v1' + dir + '?op=LISTSTATUS';
     $.get(url, function(data) {
       var d = get_response(data, "FileStatuses");
       if (d === null) {

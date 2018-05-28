@@ -76,6 +76,8 @@
       <tr><th>Compiled:</th><td>{CompileInfo}</td></tr>
       <tr><th>Cluster ID:</th><td>{ClusterId}</td></tr>
       <tr><th>Block Pool ID:</th><td>{BlockPoolId}</td></tr>
+      <tr><th>Number of NameNodes:</th><td>{NumNameNodes}</td></tr>
+      <tr><th>Leading NameNode:</th><td>{LeaderNameNode}</td></tr>
     </table>
     {/nn}
   </div>
@@ -124,7 +126,7 @@
   </div>
 </div>
 <hr/>
-<div class="panel panel-success">
+<!--<div class="panel panel-success">
   <div class="panel-heading">NameNode Journal Status</div>
   <div class="panel-body">
     <p><b>Current transaction ID:</b> {nn.JournalTransactionInfo.LastAppliedOrWrittenTxId}</p>
@@ -172,8 +174,8 @@
     {/fs.SnapshotStats}
   </div>
 </div>
-<hr/>
-{#startup}
+<hr/>-->
+<!--{#startup}
 <div class="panel panel-success">
   <div class="panel-heading">Startup Progress</div>
   <div class="panel-body">
@@ -204,7 +206,7 @@
     </table>
   </div>
 </div>
-{/startup}
+{/startup}-->
 <hr/>
 <div class="panel panel-success">
   <div class="panel-heading">Datanode Information</div>

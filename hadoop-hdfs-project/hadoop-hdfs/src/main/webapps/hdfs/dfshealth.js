@@ -46,11 +46,11 @@
   }
 
   var BEANS = [
-    {"name": "nn",      "url": "/jmx?qry=Hadoop:service=NameNode,name=NameNodeInfo"},
-    {"name": "nnstat",  "url": "/jmx?qry=Hadoop:service=NameNode,name=NameNodeStatus"},
-    {"name": "fs",      "url": "/jmx?qry=Hadoop:service=NameNode,name=FSNamesystemState"},
-    {"name": "mem",     "url": "/jmx?qry=java.lang:type=Memory"},
-    {"name": "startup", "url": "/startupProgress"}
+    {"name": "nn",      "url": get_location() + "/jmx?qry=Hadoop:service=NameNode,name=NameNodeInfo"},
+    {"name": "nnstat",  "url": get_location() + "/jmx?qry=Hadoop:service=NameNode,name=NameNodeStatus"},
+    {"name": "fs",      "url": get_location() + "/jmx?qry=Hadoop:service=NameNode,name=FSNamesystemState"},
+    {"name": "mem",     "url": get_location() + "/jmx?qry=java.lang:type=Memory"},
+    {"name": "startup", "url": get_location() + "/startupProgress"}
   ];
 
   // Workarounds for the fact that JMXJsonServlet returns non-standard JSON strings
@@ -87,16 +87,16 @@
       return r;
     }
 
-    d.nn.JournalTransactionInfo = JSON.parse(d.nn.JournalTransactionInfo);
-    d.nn.NameJournalStatus = JSON.parse(d.nn.NameJournalStatus);
-    d.nn.NameDirStatuses = JSON.parse(d.nn.NameDirStatuses);
+//    d.nn.JournalTransactionInfo = JSON.parse(d.nn.JournalTransactionInfo);
+//    d.nn.NameJournalStatus = JSON.parse(d.nn.NameJournalStatus);
+//    d.nn.NameDirStatuses = JSON.parse(d.nn.NameDirStatuses);
     d.nn.NodeUsage = JSON.parse(d.nn.NodeUsage);
     d.nn.LiveNodes = node_map_to_array(JSON.parse(d.nn.LiveNodes));
     d.nn.DeadNodes = node_map_to_array(JSON.parse(d.nn.DeadNodes));
     d.nn.DecomNodes = node_map_to_array(JSON.parse(d.nn.DecomNodes));
     d.nn.CorruptFiles = JSON.parse(d.nn.CorruptFiles);
 
-    d.fs.SnapshotStats = JSON.parse(d.fs.SnapshotStats);
+//    d.fs.SnapshotStats = JSON.parse(d.fs.SnapshotStats);
     d.startup = startup_progress_workaround(d.startup);
     return d;
   }
