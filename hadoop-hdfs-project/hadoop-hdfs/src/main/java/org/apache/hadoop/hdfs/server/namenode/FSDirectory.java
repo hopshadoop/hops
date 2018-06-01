@@ -1124,16 +1124,32 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     int startChild = dirInode.nextChild(contents, startAfter);
     int totalNumChildren = contents.size();
     int numOfListing = Math.min(totalNumChildren - startChild, this.lsLimit);
+    int locationBudget = this.lsLimit;
+      int listingCnt = 0;
     HdfsFileStatus listing[] = new HdfsFileStatus[numOfListing];
-    for (int i = 0; i < numOfListing; i++) {
+    for (int i = 0; i < numOfListing && locationBudget>0; i++) {
       INode cur = contents.get(startChild + i);
       byte curPolicy = isSuperUser && !cur.isSymlink() ? cur.getLocalStoragePolicyID()
           : BlockStoragePolicySuite.ID_UNSPECIFIED;
       listing[i] = createFileStatus(cur.getLocalNameBytes(), cur, needLocation, getStoragePolicyID(curPolicy,
           parentStoragePolicy));
+      listingCnt++;
+        if (needLocation) {
+            // Once we  hit lsLimit locations, stop.
+            // This helps to prevent excessively large response payloads.
+            // Approximate #locations with locatedBlockCount() * repl_factor
+            LocatedBlocks blks = 
+                ((HdfsLocatedFileStatus)listing[i]).getBlockLocations();
+            locationBudget -= (blks == null) ? 0 :
+               blks.locatedBlockCount() * listing[i].getReplication();
+        }
+      }
+      // truncate return array if necessary
+      if (listingCnt < numOfListing) {
+          listing = Arrays.copyOf(listing, listingCnt);
     }
     return new DirectoryListing(listing,
-        totalNumChildren - startChild - numOfListing);
+        totalNumChildren - startChild - listingCnt);
   }
 
   /**
