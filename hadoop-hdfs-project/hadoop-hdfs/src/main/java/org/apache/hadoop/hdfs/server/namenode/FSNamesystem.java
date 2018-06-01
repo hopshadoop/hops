@@ -189,6 +189,7 @@ import java.util.concurrent.TimeUnit;
 import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
+import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.DirectoryListingStartAfterNotFoundException;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
@@ -205,6 +206,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_KEY
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOGGERS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_ASYNC_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_ASYNC_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DEFAULT_AUDIT_LOGGER_NAME;
@@ -266,6 +269,9 @@ import org.apache.hadoop.ipc.RetryCacheDistributed.CacheEntryWithPayload;
 import org.apache.hadoop.util.StringUtils;
 import static org.apache.hadoop.util.Time.now;
 import org.apache.hadoop.util.Timer;
+import org.apache.log4j.Appender;
+import org.apache.log4j.AsyncAppender;
+import org.apache.log4j.Logger;
 
 /**
  * ************************************************
@@ -526,6 +532,11 @@ public class FSNamesystem
    */
   private FSNamesystem(Configuration conf, NameNode namenode, boolean ignoreRetryCache) throws IOException {
     try {
+      if (conf.getBoolean(DFS_NAMENODE_AUDIT_LOG_ASYNC_KEY,
+          DFS_NAMENODE_AUDIT_LOG_ASYNC_DEFAULT)) {
+        LOG.info("Enabling async auditlog");
+        enableAsyncAuditLog();
+      }
       this.conf = conf;
       this.nameNode = namenode;
       resourceRecheckInterval =
@@ -6519,6 +6530,27 @@ public class FSNamesystem
 
     public void logAuditMessage(String message) {
       auditLog.info(message);
+    }
+  }
+  
+  private static void enableAsyncAuditLog() {
+    if (!(auditLog instanceof Log4JLogger)) {
+      LOG.warn("Log4j is required to enable async auditlog");
+      return;
+    }
+    Logger logger = ((Log4JLogger)auditLog).getLogger();
+    @SuppressWarnings("unchecked")
+    List<Appender> appenders = Collections.list(logger.getAllAppenders());
+    // failsafe against trying to async it more than once
+    if (!appenders.isEmpty() && !(appenders.get(0) instanceof AsyncAppender)) {
+      AsyncAppender asyncAppender = new AsyncAppender();
+      // change logger to have an async appender containing all the
+      // previously configured appenders
+      for (Appender appender : appenders) {
+        logger.removeAppender(appender);
+        asyncAppender.addAppender(appender);
+      }
+      logger.addAppender(asyncAppender);        
     }
   }
 
