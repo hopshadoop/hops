@@ -128,8 +128,12 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.security.PrivilegedExceptionAction;
 import java.util.AbstractList;
@@ -1408,7 +1412,11 @@ public class DataNode extends Configured
   protected void checkDiskError(Exception e) throws IOException {
     
     LOG.warn("checkDiskError: exception: ", e);
-    
+     if (isNetworkRelatedException(e)) {
+      LOG.info("Not checking disk as checkDiskError was called on a network" +
+      		" related exception");	
+      return;
+    }
     if (e.getMessage() != null &&
         e.getMessage().startsWith("No space left on device")) {
       throw new DiskOutOfSpaceException("No space left on device");
@@ -1417,6 +1425,29 @@ public class DataNode extends Configured
     }
   }
   
+  /**
+   * Check if the provided exception looks like it's from a network error
+   *
+   * @param e the exception from a checkDiskError call
+   * @return true if this exception is network related, false otherwise
+   */
+  protected boolean isNetworkRelatedException(Exception e) {
+    if (e instanceof SocketException
+        || e instanceof SocketTimeoutException
+        || e instanceof ClosedChannelException
+        || e instanceof ClosedByInterruptException) {
+      return true;
+    }
+
+    String msg = e.getMessage();
+
+    return null != msg
+        && (msg.startsWith("An established connection was aborted")
+        || msg.startsWith("Broken pipe")
+        || msg.startsWith("Connection reset")
+        || msg.contains("java.nio.channels.SocketChannel"));
+  }
+
   /**
    * Check if there is a disk failure and if so, handle the error
    */
