@@ -118,7 +118,8 @@ public class TestBlockHasMultipleReplicasOnSameDN {
     LogFactory.getLog("foooo").debug("HERE (1)");
 
     for (int i = 0; i < cluster.getStoragesPerDatanode(); ++i) {
-      BlockReport bll = BlockReport.builder(1).addAllAsFinalized(blocks).build();
+      BlockReport bll = BlockReport.builder(conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
+        DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT)).addAllAsFinalized(blocks).build();
       FsVolumeSpi v = dn.getFSDataset().getVolumes().get(i);
       DatanodeStorage dns = new DatanodeStorage(v.getStorageID());
       reports[i] = new StorageBlockReport(dns, bll);

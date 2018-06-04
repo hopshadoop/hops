@@ -322,8 +322,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
 
     // Replica did not exist on this DN yet
     ReplicaUnderConstruction replica =
-        new ReplicaUnderConstruction(rState, sid, getBlockId(), getInodeId(),
-            HashBuckets.getInstance().getBucketForBlock(this), genStamp);
+        new ReplicaUnderConstruction(rState, sid, getBlockId(), getInodeId(), genStamp);
     update(replica);
   }
 
