@@ -71,7 +71,7 @@ public class TestFSOutputSummer {
     cleanupFile(name);
   }
   
-  /* create a file, write data with vairable amount of data */
+  /* create a file, write data with variable amount of data */
   private void writeFile3(Path name) throws Exception {
     FSDataOutputStream stm = fileSys.create(name, true,
         fileSys.getConf().getInt(IO_FILE_BUFFER_SIZE_KEY, 4096),
@@ -114,13 +114,20 @@ public class TestFSOutputSummer {
   }
   
   /**
-   * Test write opeation for output stream in DFS.
+   * Test write operation for output stream in DFS.
    */
   @Test
   public void testFSOutputSummer() throws Exception {
+    doTestFSOutputSummer("CRC32");
+    doTestFSOutputSummer("CRC32C");
+    doTestFSOutputSummer("NULL");
+  }
+  
+  private void doTestFSOutputSummer(String checksumType) throws Exception {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
     conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, BYTES_PER_CHECKSUM);
+    conf.set(DFSConfigKeys.DFS_CHECKSUM_TYPE_KEY, checksumType);
     MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(NUM_OF_DATANODES).build();
     fileSys = cluster.getFileSystem();
