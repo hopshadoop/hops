@@ -271,32 +271,6 @@ public class LeaseManager {
   }
 
   /**
-   * Finds the pathname for the specified pendingFile
-   */
-  public String findPath(INodeFileUnderConstruction pendingFile)
-      throws IOException {
-    assert pendingFile.isUnderConstruction();
-    Lease lease = getLease(pendingFile.getClientName());
-    if (lease != null) {
-      String src = null;
-
-      for (LeasePath lpath : lease.getPaths()) {
-        if (lpath.getPath().equals(pendingFile.getFullPathName())) {
-          src = lpath.getPath();
-          break;
-        }
-      }
-
-      if (src != null) {
-        return src;
-      }
-    }
-    throw new IOException(
-        "pendingFile (=" + pendingFile + ") not found." + "(lease=" + lease +
-            ")");
-  }
-
-  /**
    * Renew the lease(s) held by the given client
    */
   void renewLease(String holder)

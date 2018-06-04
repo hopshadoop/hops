@@ -3822,7 +3822,7 @@ public class FSNamesystem
           - commitBlock.getNumBytes();
       if (diff > 0) {
         // Adjust disk space consumption if required
-        String path = leaseManager.findPath(fileINode);
+        String path = fileINode.getFullPathName();
         dir.updateSpaceConsumed(path, 0,
             -diff * fileINode.getBlockReplication());
       }
@@ -4008,7 +4008,7 @@ public class FSNamesystem
       BlockInfo storedBlock)
       throws IOException {
 
-    String src = leaseManager.findPath(pendingFile);
+    String src = pendingFile.getFullPathName();
 
     // commit the last block and complete it if it has minimum replicas
     commitOrCompleteLastBlock(pendingFile, storedBlock);
@@ -4029,7 +4029,7 @@ public class FSNamesystem
   @VisibleForTesting
   String persistBlocks(INodeFileUnderConstruction pendingFile)
       throws IOException {
-    String src = leaseManager.findPath(pendingFile);
+    String src = pendingFile.getFullPathName();
     dir.persistBlocks(src, pendingFile);
     return src;
   }
