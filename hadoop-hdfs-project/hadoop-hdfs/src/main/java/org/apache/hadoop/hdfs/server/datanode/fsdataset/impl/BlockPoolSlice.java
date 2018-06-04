@@ -40,6 +40,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 
 /**
  * A block pool slice represents a portion of a block pool stored on a volume.
@@ -205,7 +206,7 @@ class BlockPoolSlice {
                 blockFile.getParentFile());
       } else {
         newReplica = new ReplicaWaitingToBeRecovered(blockId,
-            validateIntegrity(blockFile, genStamp), genStamp, volume,
+            validateIntegrityAndSetLength(blockFile, genStamp), genStamp, volume,
             blockFile.getParentFile());
       }
 
@@ -230,7 +231,7 @@ class BlockPoolSlice {
    *     generation stamp of the block
    * @return the number of valid bytes
    */
-  private long validateIntegrity(File blockFile, long genStamp) {
+  private long validateIntegrityAndSetLength(File blockFile, long genStamp) {
     DataInputStream checksumIn = null;
     InputStream blockIn = null;
     try {
@@ -274,11 +275,25 @@ class BlockPoolSlice {
       IOUtils.readFully(blockIn, buf, 0, lastChunkSize);
 
       checksum.update(buf, 0, lastChunkSize);
+      long validFileLength;
       if (checksum.compare(buf, lastChunkSize)) { // last chunk matches crc
-        return lastChunkStartPos + lastChunkSize;
+        validFileLength = lastChunkStartPos + lastChunkSize;
       } else { // last chunck is corrupt
-        return lastChunkStartPos;
+        validFileLength = lastChunkStartPos;
       }
+      
+      // truncate if extra bytes are present without CRC
+      if (blockFile.length() > validFileLength) {
+        RandomAccessFile blockRAF = new RandomAccessFile(blockFile, "rw");
+        try {
+          // truncate blockFile
+          blockRAF.setLength(validFileLength);
+        } finally {
+          blockRAF.close();
+        }
+      }
+
+      return validFileLength;
     } catch (IOException e) {
       FsDatasetImpl.LOG.warn(e);
       return 0;
