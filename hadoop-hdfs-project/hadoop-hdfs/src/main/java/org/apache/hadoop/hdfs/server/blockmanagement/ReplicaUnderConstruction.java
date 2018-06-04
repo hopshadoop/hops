@@ -76,12 +76,12 @@ public class ReplicaUnderConstruction extends Replica {
   private long generationStamp;
 
   public ReplicaUnderConstruction(ReplicaState state, int storageId,
-      long blockId, int inodeId, int bucketId, long genStamp) {
-    this(state, storageId, blockId, inodeId, bucketId, false, genStamp);
+      long blockId, int inodeId, long genStamp) {
+    this(state, storageId, blockId, inodeId, false, genStamp);
   }
   public ReplicaUnderConstruction(ReplicaState state, int storageId,
-      long blockId, int inodeId, int bucketId, boolean chosenAsPrimary, long generationStamp) {
-    super(storageId, blockId, inodeId, bucketId);
+      long blockId, int inodeId, boolean chosenAsPrimary, long generationStamp) {
+    super(storageId, blockId, inodeId);
     this.state = state;
     this.chosenAsPrimary = chosenAsPrimary;
     this.generationStamp = generationStamp;

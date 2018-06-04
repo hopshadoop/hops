@@ -237,17 +237,11 @@ public class TestBlockReport  {
   public void blockReportSplit_06() throws Exception {
     blockReport_06(true);
   }
-  // Currently this test is failing as expected 'cause the correct behavior is
-  // not yet implemented (9/15/09)
   @Test
-  @Ignore
   public void blockReportCombined_07() throws Exception {
     blockReport_07(false);
   }
-  // Currently this test is failing as expected 'cause the correct behavior is
-  // not yet implemented (9/15/09)
   @Test
-  @Ignore
   public void blockReportSplit_07() throws Exception {
     blockReport_07(true);
   }
