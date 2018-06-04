@@ -16,7 +16,10 @@
 package org.apache.hadoop.hdfs;
 
 import io.hops.exception.StorageException;
+import io.hops.transaction.lock.SubtreeQuiesceException;
+import io.hops.transaction.lock.SubtreeRetriableException;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc.RetriableException;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -73,19 +76,23 @@ public class ExceptionCheck {
             e.getMessage().contains("End of File Exception between local host is") )) {
       return true;
     }
+    return false;
+  }
 
+  public static boolean isRetriableException(Exception e) {
     if (e instanceof RemoteException) {
-      Exception unwrappedException = ((RemoteException) e)
-          .unwrapRemoteException(); //unwraps wrapped IOExceptions
+      Exception unwrappedException = ((RemoteException) e).unwrapRemoteException(); //unwraps wrapped IOExceptions
       if (unwrappedException instanceof RemoteException) { //unable to unwrap
         unwrappedException = (new RemoteRuntimeException((RemoteException) e))
-            .unwrapRemoteRuntimeException(); //unwraps wrapped RuntimeExceptions
+                .unwrapRemoteRuntimeException(); //unwraps wrapped RuntimeExceptions
       }
 
+
       if (unwrappedException != null &&
-          !(unwrappedException instanceof RemoteException)) {
-        if (unwrappedException instanceof StorageException ||
-            unwrappedException instanceof StorageException) {
+              !(unwrappedException instanceof RemoteException)) {
+        if (unwrappedException instanceof SubtreeRetriableException ||
+                unwrappedException instanceof StorageException ||
+                unwrappedException instanceof RetriableException) {
           return true;
         }
       }

@@ -25,6 +25,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
+import io.hops.transaction.lock.SubtreeRetriableException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -3090,50 +3091,38 @@ public class DFSClient implements java.io.Closeable {
     IOException exception = null;
     NamenodeSelector.NamenodeHandle handle = null;
     int waitTime = dfsClientConf.dfsClientInitialWaitOnRetry;
-    for (int i = 0; i <= MAX_RPC_RETRIES;
-         i++) { // min value of MAX_RPC_RETRIES is 0
+    for (int i = 0; i <= MAX_RPC_RETRIES; i++) { // min value of MAX_RPC_RETRIES is 0
       try {
+        if(i > 0){ //sleep before retry
+            Thread.sleep(waitTime);
+            waitTime *= 2;
+        }
         handle = nameNodeFetcher.getNextNameNode(blackListedNamenodes);
 
-        LOG.debug(thisFnID + ") " + callerID + " sending RPC to " +
-            handle.getNamenode() + " tries left (" + (MAX_RPC_RETRIES - i) +
-            ")");
+        LOG.trace(thisFnID + ") " + callerID + " sending RPC to " +
+                handle.getNamenode() + " tries left (" + (MAX_RPC_RETRIES - i) + ")");
         Object obj = handler.doAction(handle.getRPCHandle());
         //no exception
         return obj;
       } catch (IOException e) {
         exception = e;
-        if (ExceptionCheck.isLocalConnectException(e)) {
-          //black list the namenode
-          //so that it is not used again
-          if (handle != null) {
-            LOG.debug(thisFnID + ") " + callerID + " RPC failed. NN used was " +
-                handle.getNamenode() + ", retries left (" +
+        LOG.debug(thisFnID + ") " + callerID + " RPC failed. Retries left (" +
                 (MAX_RPC_RETRIES - (i)) + ")", e);
-            namenodeSelector.blackListNamenode(handle);
-            blackListedNamenodes.add(handle.getNamenode());
-          } else {
-            LOG.debug(thisFnID + ") " + callerID +
-                " RPC failed. NN was NULL, retries left (" +
-                (MAX_RPC_RETRIES - (i)) + ")", e);
-          }
-
-          try {
-            LOG.debug(thisFnID + ") RPC failed. Sleep " + waitTime);
-            Thread.sleep(waitTime);
-            waitTime *= 2;
-          } catch (InterruptedException ex) {
+        if (ExceptionCheck.isLocalConnectException(e)
+                || ExceptionCheck.isRetriableException(e)) {
+          if (ExceptionCheck.isLocalConnectException(e)) {
+            //black-list the namenode
+            //so that it is not used again
+            if (handle != null) {
+              namenodeSelector.blackListNamenode(handle);
+              blackListedNamenodes.add(handle.getNamenode());
+            }
           }
           continue;
-        } else if(getWrappedRetriableException(e) != null) {
-          try {
-            Thread.sleep(waitTime);
-            waitTime *= 2;
-          } catch (InterruptedException ex) {
-          }
         } else {
           break;
         }
+      } catch (InterruptedException e){
       }
     }
     LOG.warn(thisFnID + ") " + callerID + " RPC failed", exception);
@@ -3145,8 +3134,8 @@ public class DFSClient implements java.io.Closeable {
       return null;
     }
     Exception unwrapped = ((RemoteException)e).unwrapRemoteException(
-        RetriableException.class);
-    return unwrapped instanceof RetriableException ? 
+        RetriableException.class,SubtreeRetriableException.class);
+    return unwrapped instanceof RetriableException ?
         (RetriableException) unwrapped : null;
   }
   
@@ -3608,16 +3597,17 @@ public class DFSClient implements java.io.Closeable {
         return obj;
       } catch (Exception e) {
         exception = e;
-        if (ExceptionCheck.isLocalConnectException(e)) {
-          //black list the namenode
-          //so that it is not used again
-          if (handle != null) {
-            LOG.warn(thisFnID + ") " + callerID + " RPC faild. NN used was " +
-                handle.getNamenode() + ", Exception " + e);
-            namenodeSelector.blackListNamenode(handle);
-          } else {
-            LOG.warn(thisFnID + ") " + callerID +
-                " RPC faild. NN was NULL,  Exception " + e);
+        LOG.warn(thisFnID + ") " + callerID + " RPC faild. Exception " + e);
+        if (ExceptionCheck.isLocalConnectException(e)
+                || ExceptionCheck.isRetriableException(e)) {
+          if (ExceptionCheck.isLocalConnectException(e)) {
+            //black list the namenode
+            //so that it is not used again
+            if (handle != null) {
+              LOG.warn(thisFnID + ") " + callerID + " RPC faild. NN used was " +
+                      handle.getNamenode() + ", Exception " + e);
+              namenodeSelector.blackListNamenode(handle);
+            }
           }
           continue;
         } else {
@@ -3625,6 +3615,7 @@ public class DFSClient implements java.io.Closeable {
         }
       }
     }
+
     if (!success) {
       //print the fn call trace to figure out with RPC failed
       for (int j = 0; j < Thread.currentThread().getStackTrace().length; j++) {

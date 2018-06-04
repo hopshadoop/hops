@@ -22,10 +22,7 @@ import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.EntityManager;
-import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
-import org.apache.hadoop.hdfs.server.namenode.INodeFile;
+import org.apache.hadoop.hdfs.server.namenode.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,21 +39,13 @@ public abstract class BaseINodeLock extends Lock {
       allLockedInodesInTx;
   private final ResolvedINodesMap resolvedINodesMap;
   private boolean isPartitionKeyAlreaySet = false;
-
-  protected static TransactionLockTypes.INodeLockType DEFAULT_INODE_LOCK_TYPE =
-      TransactionLockTypes.INodeLockType.READ_COMMITTED;
+  private boolean enableHierarchicalLocking = false;
 
   protected static boolean setPartitionKeyEnabled = false;
 
   protected static boolean setRandomParitionKeyEnabled = false;
 
   protected static Random rand = new Random(System.currentTimeMillis());
-
-
-  public static void setDefaultLockType(
-      TransactionLockTypes.INodeLockType defaultLockType) {
-    DEFAULT_INODE_LOCK_TYPE = defaultLockType;
-  }
 
   static void enableSetPartitionKey(boolean enable) {
     setPartitionKeyEnabled = enable;
@@ -343,5 +332,18 @@ public abstract class BaseINodeLock extends Lock {
       pathInodes.addFirst(curr);
     }
     return pathInodes;
+  }
+
+  public BaseINodeLock enableHierarchicalLocking(boolean val){
+    this.enableHierarchicalLocking = val;
+    return this;
+  }
+
+  public TransactionLockTypes.INodeLockType getDefaultInodeLockType(){
+    if(enableHierarchicalLocking){
+      return TransactionLockTypes.INodeLockType.READ;
+    }else{
+      return TransactionLockTypes.INodeLockType.READ_COMMITTED;
+    }
   }
 }

@@ -28,6 +28,7 @@ import java.util.Arrays;
 
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -452,8 +453,9 @@ public class TestFSPermissionChecker {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(cluster.getNameNode(), TransactionLockTypes.INodeLockType.WRITE,
-            TransactionLockTypes.INodeResolveType.PATH, src.toString()));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE, TransactionLockTypes.INodeResolveType.PATH, src.toString())
+                .setNameNodeID(cluster.getNameNode().getId()).setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il);
         locks.add(lf.getAcesLock());
       }
       
@@ -472,8 +474,9 @@ public class TestFSPermissionChecker {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(cluster.getNameNode(), TransactionLockTypes.INodeLockType.READ,
-            TransactionLockTypes.INodeResolveType.PATH, path));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.READ, TransactionLockTypes.INodeResolveType.PATH, path)
+                .setNameNodeID(cluster.getNameNode().getId()).setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il);
         locks.add(lf.getAcesLock());
       }
       
@@ -494,8 +497,9 @@ public class TestFSPermissionChecker {
         @Override
         public void acquireLock(TransactionLocks locks) throws IOException {
           LockFactory lf = LockFactory.getInstance();
-          locks.add(lf.getINodeLock(cluster.getNameNode(), TransactionLockTypes.INodeLockType.READ,
-              TransactionLockTypes.INodeResolveType.PATH, path));
+          INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.READ, TransactionLockTypes.INodeResolveType.PATH, path)
+                  .setNameNodeID(cluster.getNameNode().getId()).setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+          locks.add(il);
           locks.add(lf.getAcesLock());
         }
         

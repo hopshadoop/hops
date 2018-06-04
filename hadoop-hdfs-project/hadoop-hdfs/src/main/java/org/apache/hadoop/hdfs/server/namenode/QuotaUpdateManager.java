@@ -43,8 +43,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Daemon that is asynchronously updating the quota counts of directories.
@@ -237,10 +235,10 @@ public class QuotaUpdateManager {
         INodeDirectory dir = (INodeDirectory) EntityManager
             .find(INode.Finder.ByINodeIdFTIS, updates.get(0).getInodeId());
         if (dir != null && SubtreeLockHelper
-            .isSubtreeLocked(dir.isSubtreeLocked(), dir.getSubtreeLockOwner(),
+            .isSTOLocked(dir.isSTOLocked(), dir.getSTOLockOwner(),
                 namesystem.getNameNode().getActiveNameNodes()
-                    .getActiveNodes()) && dir.getSubtreeLockOwner() != namesystem.getNamenodeId()) {
-          LOG.warn("XXXXXXXXXXXXXXX ignoring updates as the subtree lock is set");
+                    .getActiveNodes()) && dir.getSTOLockOwner() != namesystem.getNamenodeId()) {
+          LOG.warn("Ignoring updates as the subtree lock is set");
           /*
            * We cannot process updates to keep move operations consistent. Otherwise the calculated size of the subtree
            * could differ from the view of the parent if outstanding quota updates are applied after being considered

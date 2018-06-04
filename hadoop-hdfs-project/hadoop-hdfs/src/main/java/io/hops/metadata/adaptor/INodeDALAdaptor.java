@@ -175,6 +175,11 @@ public class INodeDALAdaptor
   }
 
   @Override
+  public void deleteInode(String name) throws StorageException {
+    dataAccess.deleteInode(name);
+  }
+
+  @Override
   public void updateLogicalTime(Collection<MetadataLogEntry> logEntries)
       throws StorageException {
     dataAccess.updateLogicalTime(logEntries);
@@ -205,8 +210,8 @@ public class INodeDALAdaptor
       if(!inode.isSymlink()){
         hopINode.setStoragePolicy(inode.getLocalStoragePolicyID());
       }
-      hopINode.setSubtreeLocked(inode.isSubtreeLocked());
-      hopINode.setSubtreeLockOwner(inode.getSubtreeLockOwner());
+      hopINode.setSubtreeLocked(inode.isSTOLocked());
+      hopINode.setSubtreeLockOwner(inode.getSTOLockOwner());
       hopINode.setUserID(inode.getUserID());
 
       if (inode.isDirectory()) {

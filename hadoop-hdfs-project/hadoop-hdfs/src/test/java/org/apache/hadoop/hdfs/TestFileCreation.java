@@ -1595,11 +1595,11 @@ public class TestFileCreation {
 
             Lease lease = EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
             if (lease != null) {
-              FSNamesystem.LOG.debug("XXXXXXXXXXX Got the lock " + lockType +
+              FSNamesystem.LOG.debug("Got the lock " + lockType +
                   "Lease. Holder is: " + lease.getHolder() + " ID: " +
                   lease.getHolderID());
             } else {
-              FSNamesystem.LOG.debug("XXXXXXXXX LEASE is NULL");
+              FSNamesystem.LOG.debug("LEASE is NULL");
             }
             try {
               Thread.sleep(5000);

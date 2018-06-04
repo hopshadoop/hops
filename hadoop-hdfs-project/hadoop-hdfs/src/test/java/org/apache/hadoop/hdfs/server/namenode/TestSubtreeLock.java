@@ -16,6 +16,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.TestUtil;
+import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
@@ -24,7 +25,6 @@ import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
-import io.hops.transaction.handler.RequestHandler;
 import io.hops.transaction.lock.SubtreeLockedException;
 import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
@@ -34,12 +34,7 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.MiniDFSNNTopology;
-import org.apache.hadoop.hdfs.TestFileCreation;
+import org.apache.hadoop.hdfs.*;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.junit.Assert;
@@ -49,9 +44,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertTrue;
+
+import static org.apache.hadoop.hdfs.TestFileCreation.*;
 
 public class TestSubtreeLock extends TestCase {
 
@@ -74,11 +70,11 @@ public class TestSubtreeLock extends TestCase {
       dfs.mkdir(path2, FsPermission.getDefault());
 
       FSNamesystem namesystem = cluster.getNamesystem();
-      namesystem.lockSubtree(path1.toUri().getPath(), SubTreeOperation.StoOperationType.NA);
+      namesystem.lockSubtree(path1.toUri().getPath(), SubTreeOperation.Type.NA);
 
       boolean exception = false;
       try {
-        namesystem.lockSubtree(path1.toUri().getPath(), SubTreeOperation.StoOperationType.NA);
+        namesystem.lockSubtree(path1.toUri().getPath(), SubTreeOperation.Type.NA);
       } catch (SubtreeLockedException e) {
         exception = true;
       }
@@ -87,15 +83,16 @@ public class TestSubtreeLock extends TestCase {
 
       exception = false;
       try {
-        namesystem.lockSubtree(path2.toUri().getPath(), SubTreeOperation.StoOperationType.NA);
+        namesystem.lockSubtree(path2.toUri().getPath(), SubTreeOperation.Type.NA);
       } catch (SubtreeLockedException e) {
         exception = true;
       }
       assertTrue("Succeeded to acquire lock on previously locked subtree",
               exception);
 
-      namesystem.unlockSubtree(path1.toUri().getPath());
-      namesystem.lockSubtree(path2.toUri().getPath(), SubTreeOperation.StoOperationType.NA);
+      namesystem.unlockSubtree(path1.toUri().getPath()
+              , getSubTreeRootID(path1.toUri().getPath()));
+      namesystem.lockSubtree(path2.toUri().getPath(), SubTreeOperation.Type.NA);
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -116,17 +113,17 @@ public class TestSubtreeLock extends TestCase {
       dfs.mkdirs(new Path("/A/B/C/D/E"), FsPermission.getDefault());
 
       FSNamesystem namesystem = cluster.getNamesystem();
-      namesystem.lockSubtree("/A/B/C/D/E", SubTreeOperation.StoOperationType.NA);
+      namesystem.lockSubtree("/A/B/C/D/E", SubTreeOperation.Type.NA);
 
       boolean exception = false;
       try {
-        namesystem.lockSubtree("/A/B/C", SubTreeOperation.StoOperationType.NA);
+        namesystem.lockSubtree("/A/B/C", SubTreeOperation.Type.NA);
       } catch (SubtreeLockedException e) {
         exception = true;
       }
       assertTrue("Failed. Took a lock while sub tree was locked", exception);
 
-      namesystem.unlockSubtree("/A/B/C/D/E");
+      namesystem.unlockSubtree("/A/B/C/D/E", getSubTreeRootID("/A/B/C/D/E"));
 
       assertFalse("Not all subtree locsk are removed", subTreeLocksExists());
     } finally {
@@ -203,12 +200,12 @@ public class TestSubtreeLock extends TestCase {
       dfs.create(file0).close();
       final int bytes0 = 123;
       FSDataOutputStream stm = dfs.create(file1);
-      TestFileCreation.writeFile(stm, bytes0);
+      writeFile(stm, bytes0);
       stm.close();
       dfs.create(file2).close();
       final int bytes1 = 253;
       stm = dfs.create(file3);
-      TestFileCreation.writeFile(stm, bytes1);
+      writeFile(stm, bytes1);
       stm.close();
 
       AbstractFileTree.CountingFileTree fileTree = AbstractFileTree
@@ -251,12 +248,12 @@ public class TestSubtreeLock extends TestCase {
       FSNamesystem namesystem0 = cluster.getNamesystem(0);
       FSNamesystem namesystem1 = cluster.getNamesystem(1);
       namesystem0.lockSubtree(path1.toUri().getPath(),
-              SubTreeOperation.StoOperationType.NA);
+              SubTreeOperation.Type.NA);
 
       boolean exception = false;
       try {
         namesystem1.lockSubtree(path1.toUri().getPath(),
-                SubTreeOperation.StoOperationType.NA);
+                SubTreeOperation.Type.NA);
       } catch (SubtreeLockedException e) {
         exception = true;
       }
@@ -264,9 +261,14 @@ public class TestSubtreeLock extends TestCase {
               exception);
 
       cluster.shutdownNameNode(0);
-      Thread.sleep(4000);
+
+      long delay = conf.getLong(DFSConfigKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY, DFSConfigKeys
+              .DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT) * (conf.getInt(DFSConfigKeys
+              .DFS_LEADER_MISSED_HB_THRESHOLD_KEY, DFSConfigKeys
+              .DFS_LEADER_MISSED_HB_THRESHOLD_DEFAULT) + 1);
+      Thread.sleep(delay);
       namesystem1.lockSubtree(path1.toUri().getPath(),
-              SubTreeOperation.StoOperationType.NA);
+              SubTreeOperation.Type.NA);
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -280,10 +282,10 @@ public class TestSubtreeLock extends TestCase {
     Thread lockKeeper = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      final int RETRY_WAIT = conf.getInt(DFSConfigKeys.DFS_NAMENODE_TX_INITIAL_WAIT_TIME_BEFORE_RETRY_KEY,
-              DFSConfigKeys.DFS_NAMENODE_TX_INITIAL_WAIT_TIME_BEFORE_RETRY_DEFAULT);
-      final long RETRY_COUNT = conf.getInt(DFSConfigKeys.DFS_NAMENODE_TX_RETRY_COUNT_KEY,
-              DFSConfigKeys.DFS_NAMENODE_TX_RETRY_COUNT_DEFAULT);
+      final int RETRY_WAIT = conf.getInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY,
+              DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_DEFAULT);
+      final long RETRY_COUNT = conf.getInt(DFSConfigKeys.DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_KEY,
+              DFSConfigKeys.DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_DEFAULT);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -298,7 +300,8 @@ public class TestSubtreeLock extends TestCase {
           super.run();
           try {
             Thread.sleep((RETRY_COUNT - 1) * RETRY_WAIT);
-            namesystem.unlockSubtree(path1.toUri().getPath());
+            namesystem.unlockSubtree(path1.toUri().getPath(),
+                    getSubTreeRootID(path1.toUri().getPath()));
           } catch (Exception e) {
             e.printStackTrace();
           }
@@ -311,7 +314,7 @@ public class TestSubtreeLock extends TestCase {
       dfs.mkdir(path2, FsPermission.getDefault());
 
       namesystem.lockSubtree(path1.toUri().getPath(),
-              SubTreeOperation.StoOperationType.NA);
+              SubTreeOperation.Type.NA);
       lockKeeper.start();
 
       assertTrue(dfs.delete(path1, true));
@@ -372,16 +375,16 @@ public class TestSubtreeLock extends TestCase {
       DistributedFileSystem fs = cluster.getFileSystem();
       assertTrue(fs.mkdir(new Path("/foo"), FsPermission.getDefault()));
 
-      TestFileCreation.createFile(fs, new Path("/foo/bar"), 1).close();
+      createFile(fs, new Path("/foo/bar"), 1).close();
       assertTrue(fs.delete(new Path("/foo/bar"), false));
       assertFalse(fs.exists(new Path("/foo/bar")));
 
-      TestFileCreation.createFile(fs, new Path("/foo/bar"), 1).close();
+      createFile(fs, new Path("/foo/bar"), 1).close();
       assertTrue(fs.delete(new Path("/foo/bar"), true));
       assertFalse(fs.exists(new Path("/foo/bar")));
 
       assertTrue(fs.mkdir(new Path("/foo/bar"), FsPermission.getDefault()));
-      TestFileCreation.createFile(fs, new Path("/foo/bar/foo"), 1).close();
+      createFile(fs, new Path("/foo/bar/foo"), 1).close();
       assertTrue(fs.delete(new Path("/foo"), true));
       assertFalse(fs.exists(new Path("/foo/bar/foo")));
       assertFalse(fs.exists(new Path("/foo/bar/foo")));
@@ -412,15 +415,15 @@ public class TestSubtreeLock extends TestCase {
       assertTrue(fs.mkdir(new Path("/a/d"), FsPermission.getDefault()));
 
       for(int i = 0; i < 5; i++) {
-        TestFileCreation.createFile(fs, new Path("/a/b/a_b_file_"+i), 1).close();
+        createFile(fs, new Path("/a/b/a_b_file_"+i), 1).close();
       }
 
       for(int i = 0; i < 5; i++) {
-        TestFileCreation.createFile(fs, new Path("/a/b/a_b_file_"+i), 1).close();
+        createFile(fs, new Path("/a/b/a_b_file_"+i), 1).close();
       }
 
       for(int i = 0; i < 5; i++) {
-        TestFileCreation.createFile(fs, new Path("/a/c/a_c_file_"+i), 1).close();
+        createFile(fs, new Path("/a/c/a_c_file_"+i), 1).close();
       }
 
       for(int i = 0; i < 10;i ++){
@@ -432,7 +435,7 @@ public class TestSubtreeLock extends TestCase {
       }
 
       for(int i = 0; i < 3;i ++){
-        TestFileCreation.createFile(fs, new Path("/a/b/c/b/a_b_c_d_file_"+i), 1).close();
+        createFile(fs, new Path("/a/b/c/b/a_b_c_d_file_"+i), 1).close();
       }
       assertTrue(fs.delete(new Path("/a")));
       assertFalse(fs.exists(new Path("/a")));
@@ -455,7 +458,7 @@ public class TestSubtreeLock extends TestCase {
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
       assertTrue(fs.mkdir(new Path("/foo"), FsPermission.getDefault()));
-      TestFileCreation.createFile(fs, new Path("/foo/bar"), 1);
+      createFile(fs, new Path("/foo/bar"), 1);
       assertTrue(fs.delete(new Path("/foo/bar"), true));
       assertFalse(fs.exists(new Path("/foo/bar")));
       assertFalse("Not All subtree locks were removed after operation ", subTreeLocksExists());
@@ -476,7 +479,7 @@ public class TestSubtreeLock extends TestCase {
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
       assertTrue(fs.mkdir(new Path("/foo"), FsPermission.getDefault()));
-      TestFileCreation.createFile(fs, new Path("/foo/bar"), 1).close();
+      createFile(fs, new Path("/foo/bar"), 1).close();
 
       assertTrue(fs.delete(new Path("/foo"), true));
       assertFalse(fs.exists(new Path("/foo")));
@@ -498,9 +501,9 @@ public class TestSubtreeLock extends TestCase {
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
       assertTrue(fs.mkdir(new Path("/foo"), FsPermission.getDefault()));
-      TestFileCreation.createFile(fs, new Path("/foo/bar"), 1).close();
+      createFile(fs, new Path("/foo/bar"), 1).close();
       assertTrue(fs.mkdir(new Path("/foo1"), FsPermission.getDefault()));
-      TestFileCreation.createFile(fs, new Path("/foo1/bar1"), 1).close();
+      createFile(fs, new Path("/foo1/bar1"), 1).close();
       fs.rename(new Path("/foo1/bar1"), new Path("/foo/bar1"),
               Options.Rename.OVERWRITE);
       assertTrue(fs.exists(new Path("/foo/bar1")));
@@ -532,8 +535,8 @@ public class TestSubtreeLock extends TestCase {
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
 
-      TestFileCreation.createFile(fs, new Path("/foo/file1.txt"), 1).close();
-      TestFileCreation.createFile(fs, new Path("/bar/file1.txt"), 1).close();
+      createFile(fs, new Path("/foo/file1.txt"), 1).close();
+      createFile(fs, new Path("/bar/file1.txt"), 1).close();
 
       assertTrue("Rename Failed", fs.rename(new Path("/foo/file1.txt"), new Path("/bar/file2.txt")));
 
@@ -658,8 +661,8 @@ public class TestSubtreeLock extends TestCase {
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
 
-      TestFileCreation.createFile(fs, new Path("/foo/file1.txt"), 1).close();
-      TestFileCreation.createFile(fs, new Path("/bar/file1.txt"), 1).close();
+      createFile(fs, new Path("/foo/file1.txt"), 1).close();
+      createFile(fs, new Path("/bar/file1.txt"), 1).close();
 
       boolean isException = false;
       Exception exception = null;
@@ -695,42 +698,48 @@ public class TestSubtreeLock extends TestCase {
    * checks if all the sub tree locks are removed and no flags are set
    */
   public static boolean subTreeLocksExists() throws IOException {
+    if(countAllSubTreeLocks() > 0){
+      return true;
+    }
+    return false;
+  }
+  public static int countAllSubTreeLocks() throws IOException {
     LightWeightRequestHandler subTreeLockChecker =
             new LightWeightRequestHandler(HDFSOperationType.TEST_SUBTREE_LOCK) {
       @Override
       public Object performTask() throws StorageException, IOException {
+        int count = 0;
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
                 .getDataAccess(INodeDataAccess.class);
 
         OngoingSubTreeOpsDataAccess oda = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory.getDataAccess(OngoingSubTreeOpsDataAccess.class);
 
-        boolean subTreeLockExists = false;
         List<INode> inodes = ida.allINodes();
         List<SubTreeOperation> ops = (List<SubTreeOperation>) oda.allOps();
 
         if (ops != null && !ops.isEmpty()) {
-          subTreeLockExists = true;
           for (SubTreeOperation op : ops) {
-            LOG.error("On going sub tree operations table contains: \" " + op.getPath()
-                    + "\" NameNode id: " + op.getNameNodeId() + " OpType: " + op.getOpType());
+            count++;
+            LOG.debug("On going sub tree operations table contains: \" " + op.getPath()
+                    + "\" NameNode id: " + op.getNameNodeId() + " OpType: " + op.getOpType()+" " +
+                    "count "+count);
           }
         }
 
         if (inodes != null && !inodes.isEmpty()) {
           for (INode inode : inodes) {
-            if (inode.isSubtreeLocked()) {
-              subTreeLockExists = true;
+            if (inode.isSTOLocked()) {
               LOG.error("INode lock flag is set. Name " + inode.getLocalName()
                       + " id: " + inode.getId() + " pid: " + inode.getParentId()
-                      + " locked by " + inode.getSubtreeLockOwner());
+                      + " locked by " + inode.getSTOLockOwner());
             }
           }
         }
 
-        return subTreeLockExists;
+        return count;
       }
     };
-    return (Boolean) subTreeLockChecker.handle();
+    return (Integer) subTreeLockChecker.handle();
   }
 
   @Test
@@ -831,18 +840,18 @@ public class TestSubtreeLock extends TestCase {
 
       DistributedFileSystem dfs = cluster.getFileSystem();
       dfs.mkdirs(new Path("/foo"));
-      TestFileCreation.createFile(dfs, new Path("/foo/file1.txt"), 1).close();
+      createFile(dfs, new Path("/foo/file1.txt"), 1).close();
 
       boolean isException = false;
       Exception exception = null;
 
 
-      INodeIdentifier inode = cluster.getNamesystem().lockSubtree("/foo/file1.txt", SubTreeOperation.StoOperationType.NA);
+      INodeIdentifier inode = cluster.getNamesystem().lockSubtree("/foo/file1.txt", SubTreeOperation.Type.NA);
       if (inode != null) {
         fail("nothing should have been locked");
       }
 
-      inode = cluster.getNamesystem().lockSubtree("/", SubTreeOperation.StoOperationType.NA);
+      inode = cluster.getNamesystem().lockSubtree("/", SubTreeOperation.Type.NA);
       if (inode != null) {
         fail("root should not have been locked");
       }
@@ -958,5 +967,11 @@ public class TestSubtreeLock extends TestCase {
     } finally {
       cluster.shutdown();
     }
+  }
+
+  private int getSubTreeRootID(final String path) throws IOException {
+    LinkedList<INode> nodes = new LinkedList<>();
+    INodeUtil.resolvePathWithNoTransaction(path, false, nodes);
+    return nodes.getLast().getId();
   }
 }

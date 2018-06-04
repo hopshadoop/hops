@@ -24,6 +24,7 @@ import io.hops.transaction.handler.EncodingStatusOperationType;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -251,11 +252,11 @@ public class ErasureCodingManager extends Configured {
         @Override
         public void acquireLock(TransactionLocks locks) throws IOException {
           LockFactory lf = LockFactory.getInstance();
-          locks.add(lf.getINodeLock(namesystem.getNameNode(),
-              TransactionLockTypes.INodeLockType.WRITE,
-              TransactionLockTypes.INodeResolveType.PATH, path, parityPath))
-              .add(lf.getEncodingStatusLock(TransactionLockTypes.LockType.WRITE,
-                  path));
+          INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE,
+                  TransactionLockTypes.INodeResolveType.PATH, path, parityPath)
+                  .setNameNodeID(namesystem.getNameNode().getId())
+                  .setActiveNameNodes(namesystem.getNameNode().getActiveNameNodes().getActiveNodes());
+          locks.add(il).add(lf.getEncodingStatusLock(TransactionLockTypes.LockType.WRITE, path));
         }
 
         @Override
@@ -425,11 +426,10 @@ public class ErasureCodingManager extends Configured {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(namesystem.getNameNode(),
-            TransactionLockTypes.INodeLockType.WRITE,
-            TransactionLockTypes.INodeResolveType.PATH, path)).add(
-            lf.getEncodingStatusLock(TransactionLockTypes.LockType.WRITE,
-                path));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE,
+                TransactionLockTypes.INodeResolveType.PATH, path).setNameNodeID(namesystem.getNameNode().getId())
+                .setActiveNameNodes(namesystem.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getEncodingStatusLock(TransactionLockTypes.LockType.WRITE, path));
       }
 
       @Override
@@ -454,11 +454,10 @@ public class ErasureCodingManager extends Configured {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(namesystem.getNameNode(),
-            TransactionLockTypes.INodeLockType.WRITE,
-            TransactionLockTypes.INodeResolveType.PATH, path))
-            .add(lf.getEncodingStatusLock(
-                TransactionLockTypes.LockType.WRITE, path));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE,
+                TransactionLockTypes.INodeResolveType.PATH, path).setNameNodeID(namesystem.getNameNode().getId())
+                .setActiveNameNodes(namesystem.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getEncodingStatusLock(TransactionLockTypes.LockType.WRITE, path));
       }
 
       @Override

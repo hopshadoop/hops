@@ -25,6 +25,7 @@ import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -281,8 +282,9 @@ public class TestPendingReplication {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(cluster.getNameNode(), TransactionLockTypes.INodeLockType.READ,
-            TransactionLockTypes.INodeResolveType.PATH, file)).add(lf.getBlockLock());
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.READ, TransactionLockTypes.INodeResolveType.PATH, file)
+                .setNameNodeID(cluster.getNameNode().getId()).setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockLock());
       }
 
       @Override

@@ -35,6 +35,7 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.SubtreeLockHelper;
 import io.hops.transaction.lock.SubtreeLockedException;
+import io.hops.transaction.lock.SubtreeRetriableException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.permission.AclEntry;
@@ -59,6 +60,11 @@ abstract class AbstractFileTree {
   private final FSPermissionChecker fsPermissionChecker;
   private final INodeIdentifier subtreeRootId;
   private ConcurrentLinkedQueue<Future> activeCollectors = new ConcurrentLinkedQueue<>();
+
+  public INodeIdentifier getSubtreeRootId() {
+    return subtreeRootId;
+  }
+
   private final FsAction subAccess;
   private volatile IOException exception;
   private List<AclEntry> subtreeRootDefaultEntries;
@@ -127,7 +133,7 @@ abstract class AbstractFileTree {
               for (ProjectedINode child : children) {
                 List<ActiveNode> activeNamenodes = namesystem.getNameNode().
                     getActiveNameNodes().getActiveNodes();
-                if (SubtreeLockHelper.isSubtreeLocked(child.isSubtreeLocked(),
+                if (SubtreeLockHelper.isSTOLocked(child.isSubtreeLocked(),
                     child.getSubtreeLockOwner(), activeNamenodes)) {
                   exception = new SubtreeLockedException(child.getName(),
                       activeNamenodes);
@@ -250,9 +256,9 @@ abstract class AbstractFileTree {
           throw new RuntimeException(e.getCause());
         } else {
           // This should not happen as it is a Runnable
-          LOG.warn(
-              "FileTree.buildUp received an unexpected execution exception",
-              e);
+          String message = "FileTree.buildUp received an unexpected execution exception";
+          LOG.warn( message, e);
+          throw new SubtreeRetriableException(message);
         }
       }
     }
@@ -330,8 +336,7 @@ abstract class AbstractFileTree {
       String path) throws StorageException, UnresolvedPathException,
       TransactionContextException, AccessControlException {
     LinkedList<INode> nodes = new LinkedList<>();
-    boolean[] fullyResovled = new boolean[1];
-    INodeUtil.resolvePathWithNoTransaction(path, false, nodes, fullyResovled);
+    INodeUtil.resolvePathWithNoTransaction(path, false, nodes);
     INodeIdentifier rootId = new INodeIdentifier(
         nodes.getLast().getId(),
         nodes.getLast().getParentId(),
@@ -677,8 +682,7 @@ abstract class AbstractFileTree {
         throws StorageException, UnresolvedPathException,
         TransactionContextException, AccessControlException {
       LinkedList<INode> nodes = new LinkedList<>();
-      boolean[] fullyResovled = new boolean[1];
-      INodeUtil.resolvePathWithNoTransaction(path, false, nodes, fullyResovled);
+      INodeUtil.resolvePathWithNoTransaction(path, false, nodes );
       INodeIdentifier rootId = new INodeIdentifier(
           nodes.getLast().getId(),
           nodes.getLast().getParentId(),
@@ -736,8 +740,8 @@ abstract class AbstractFileTree {
         from.isSymlink(),
         from instanceof INodeDirectoryWithQuota,
         from.isUnderConstruction(),
-        from.isSubtreeLocked(),
-        from.getSubtreeLockOwner(),
+        from.isSTOLocked(),
+        from.getSTOLockOwner(),
         size,
         from.getLogicalTime(),
         from.getLocalStoragePolicyID(),

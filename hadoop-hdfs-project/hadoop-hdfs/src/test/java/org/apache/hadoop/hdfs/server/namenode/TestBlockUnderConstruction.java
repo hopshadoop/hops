@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.exception.StorageException;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
@@ -99,8 +100,10 @@ public class TestBlockUnderConstruction {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(cluster.getNameNode(), INodeLockType.READ,
-                INodeResolveType.PATH, file)).add(lf.getBlockLock());
+            INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, file)
+                    .setNameNodeID(cluster.getNameNode().getId())
+                    .setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+            locks.add(il).add(lf.getBlockLock());
           }
 
           @Override

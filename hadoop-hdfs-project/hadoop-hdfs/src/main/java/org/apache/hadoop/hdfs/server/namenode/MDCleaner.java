@@ -91,7 +91,7 @@ public class MDCleaner {
         Collection<SubTreeOperation> ops = getPaths(descriptor.getId());
         LOG.debug("Cleaning STO Lock for NN: " + descriptor +" No of stale locks: "+ops.size());
         for(SubTreeOperation op : ops){
-          namesystem.unlockSubtree(op.getPath());
+          namesystem.unlockSubtree(op.getPath(), -1);
         }
       }
     }

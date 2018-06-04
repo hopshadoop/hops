@@ -1207,13 +1207,17 @@ public class IncrementalBRTask implements Callable{
 
       } catch (Exception e) {
         exception = e;
-        if (ExceptionCheck.isLocalConnectException(e)) {
+        if (ExceptionCheck.isLocalConnectException(e) ||
+                ExceptionCheck.isRetriableException(e)) { //retry
           //black list the namenode
           //so that it is not used again
           LOG.debug("RPC faild. NN used was " + actor.getNNSocketAddress() +
               ", retries left (" + (MAX_RPC_RETRIES - (i)) + ")  Exception " +
               e);
-          blackListNN.add(actor.getNNSocketAddress());
+
+          if( ExceptionCheck.isLocalConnectException(e)) {
+            blackListNN.add(actor.getNNSocketAddress());
+          }
           continue;
         } else {
           break;

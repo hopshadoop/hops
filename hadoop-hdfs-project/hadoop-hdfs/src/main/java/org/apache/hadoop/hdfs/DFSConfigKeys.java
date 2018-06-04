@@ -47,11 +47,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT =
       "ndb-config.properties";
 
-  public static final String DFS_STORAGE_ANCESTOR_LOCK_TYPE =
-      "dfs.storage.ancestor.lock.type";
-  public static final String DFS_STORAGE_ANCESTOR_LOCK_TYPE_DEFAULT =
-      "READ_COMMITTED"; // "READ"  | "READ_COMMITTED"
-
   public static final String DFS_NAMENODE_QUOTA_ENABLED_KEY =
       "dfs.namenode.quota.enabled";
   public static final boolean DFS_NAMENODE_QUOTA_ENABLED_DEFAULT = true;
@@ -232,6 +227,10 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
           "dfs.subtree.clean.failed.ops.locks.delay";
   public static final long DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_DEFAULT =
           10*1000*60; //Reclaim locks after 10 mins
+
+  public static final String DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY =
+          "dfs.namenode.subtree.hierarchical.locking";
+  public static final boolean DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY_DEFAULT = true;
 
   public static final String ERASURE_CODING_CODECS_KEY =
       "dfs.erasure_coding.codecs.json";

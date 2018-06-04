@@ -22,8 +22,8 @@ import java.util.Collection;
 
 public final class SubtreeLockHelper {
 
-  public static boolean isSubtreeLocked(boolean subtreeLocked, long nameNodeId,
-      Collection<ActiveNode> activeNamenodes) {
+  public static boolean isSTOLocked(boolean subtreeLocked, long nameNodeId,
+                                    Collection<ActiveNode> activeNamenodes) {
     return subtreeLocked &&
         NameNode.isNameNodeAlive(activeNamenodes, nameNodeId);
   }

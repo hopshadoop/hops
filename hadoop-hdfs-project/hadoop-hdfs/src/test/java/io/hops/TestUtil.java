@@ -17,6 +17,7 @@ package io.hops;
 
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -44,9 +45,9 @@ public class TestUtil {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(nameNode,
-            TransactionLockTypes.INodeLockType.READ_COMMITTED,
-            TransactionLockTypes.INodeResolveType.PATH, filePath));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED, TransactionLockTypes.INodeResolveType.PATH, filePath)
+                .setNameNodeID(nameNode.getId()).setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il);
       }
 
       @Override

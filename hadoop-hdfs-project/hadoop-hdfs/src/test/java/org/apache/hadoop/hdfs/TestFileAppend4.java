@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import io.hops.exception.StorageException;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -395,10 +396,9 @@ public class TestFileAppend4 {
         @Override
         public void acquireLock(TransactionLocks locks) throws IOException {
           LockFactory lf = LockFactory.getInstance();
-          locks.add(lf.getINodeLock(cluster.getNameNode(),
-              TransactionLockTypes.INodeLockType.WRITE,
-              TransactionLockTypes.INodeResolveType.PATH, filename))
-              .add(lf.getBlockLock());
+          INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE, TransactionLockTypes.INodeResolveType.PATH, filename)
+                  .setNameNodeID(cluster.getNameNode().getId()).setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+          locks.add(il).add(lf.getBlockLock());
         }
 
         @Override

@@ -20,12 +20,9 @@ import io.hops.common.INodeResolver;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.ActiveNode;
-import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.resolvingcache.Cache;
 import io.hops.resolvingcache.OptimalMemcache;
 import io.hops.resolvingcache.PathMemcache;
-import io.hops.security.Users;
-import io.hops.transaction.EntityManager;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -34,50 +31,56 @@ import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
-class INodeLock extends BaseINodeLock {
+public class INodeLock extends BaseINodeLock {
   
   private final TransactionLockTypes.INodeLockType lockType;
   private final TransactionLockTypes.INodeResolveType resolveType;
-  private final boolean resolveLink;
+  private boolean resolveLink;
   protected final String[] paths;
-  private final Collection<ActiveNode> activeNamenodes;
-  private final boolean ignoreLocalSubtreeLocks;
-  private final long namenodeId;
-  protected final boolean skipReadingQuotaAttr;
+  private Collection<Integer> ignoredSTOInodes;
+  protected boolean skipReadingQuotaAttr;
+  protected long namenodeId;
+  protected Collection<ActiveNode> activeNamenodes;
 
   INodeLock(TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
-      boolean ignoreLocalSubtreeLocks, boolean skipReadingQuotaAttr, long namenodeId,
-      Collection<ActiveNode> activeNamenodes, String... paths) {
+      TransactionLockTypes.INodeResolveType resolveType, String... paths) {
     super();
     this.lockType = lockType;
     this.resolveType = resolveType;
-    this.resolveLink = resolveLink;
-    this.activeNamenodes = activeNamenodes;
-    this.ignoreLocalSubtreeLocks = ignoreLocalSubtreeLocks;
-    this.namenodeId = namenodeId;
+    this.resolveLink = false;
+    this.activeNamenodes = null;
+    this.ignoredSTOInodes = new ArrayList<Integer>();
+    this.namenodeId = -1;
     this.paths = paths;
-    this.skipReadingQuotaAttr = skipReadingQuotaAttr;
+    this.skipReadingQuotaAttr = false;
   }
 
-  INodeLock(boolean skipReadingQuotaAttr, TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
-      Collection<ActiveNode> activeNamenodes, String... paths) {
-    this(lockType, resolveType, resolveLink, false, skipReadingQuotaAttr, -1, activeNamenodes, paths);
+  public INodeLock setIgnoredSTOInodes(int inodeID) {
+    this.ignoredSTOInodes.add(inodeID);
+    return this;
   }
 
-  INodeLock(TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType,
-      Collection<ActiveNode> activeNamenodes, String... paths) {
-    this(lockType, resolveType, true, false, false, -1, activeNamenodes, paths);
+  public INodeLock setNameNodeID(long nnID) {
+    this.namenodeId = nnID;
+    return this;
   }
 
+  public INodeLock setActiveNameNodes(Collection<ActiveNode> activeNamenodes){
+    this.activeNamenodes = activeNamenodes;
+    return this;
+  }
+
+  public INodeLock skipReadingQuotaAttr(boolean val){
+    this.skipReadingQuotaAttr = val;
+    return this;
+  }
+
+  public INodeLock resolveSymLink(boolean resolveLink) {
+    this.resolveLink = resolveLink;
+    return this;
+  }
 
   private CacheResolver instance = null;
 
@@ -199,7 +202,7 @@ class INodeLock extends BaseINodeLock {
         throws TransactionContextException, StorageException,
         UnresolvedPathException {
       int rowsToReadWithDefaultLock = names.length;
-      if (!lockType.equals(DEFAULT_INODE_LOCK_TYPE)) {
+      if (!lockType.equals(getDefaultInodeLockType())) {
         if (lockType.equals(
             TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT)) {
           rowsToReadWithDefaultLock -= 2;
@@ -213,7 +216,7 @@ class INodeLock extends BaseINodeLock {
 
       List<INode> inodes = null;
       if (rowsToReadWithDefaultLock > 0) {
-        inodes = find(DEFAULT_INODE_LOCK_TYPE,
+        inodes = find(getDefaultInodeLockType(),
             Arrays.copyOf(names, rowsToReadWithDefaultLock),
             Arrays.copyOf(parentIds, rowsToReadWithDefaultLock),
             Arrays.copyOf(partitionIds, rowsToReadWithDefaultLock), true);
@@ -221,7 +224,7 @@ class INodeLock extends BaseINodeLock {
 
       if(inodes != null) {
         for (INode inode : inodes) {
-          addLockedINodes(inode, DEFAULT_INODE_LOCK_TYPE);
+          addLockedINodes(inode, getDefaultInodeLockType());
         }
       }
       
@@ -376,9 +379,14 @@ class INodeLock extends BaseINodeLock {
                     TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY)) {
       throw new IllegalArgumentException("Unknown type " + resolveType.name());
     }
-  
+
     for (String path : paths) {
-      List<INode> resolvedINodes = resolveUsingMemcache(path);
+      List<INode> resolvedINodes = null;
+      if (getDefaultInodeLockType() == TransactionLockTypes.INodeLockType.READ_COMMITTED) {
+        //Batching only works in READ_COMITTED mode. If locking is enabled then it can lead to deadlocks.
+        resolvedINodes = resolveUsingMemcache(path);
+      }
+
       if (resolvedINodes == null) {
         // path not found in the cache
         // set random partition key if enabled
@@ -388,15 +396,15 @@ class INodeLock extends BaseINodeLock {
         resolvedINodes = acquireINodeLockByPath(path);
         addPathINodesAndUpdateResolvingCache(path, resolvedINodes);
       }
-    
+
       if (resolvedINodes.size() > 0) {
         INode lastINode = resolvedINodes.get(resolvedINodes.size() - 1);
         if (resolveType ==
-            TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN) {
+                TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN) {
           List<INode> children = findImmediateChildren(lastINode);
           addChildINodes(path, children);
         } else if (resolveType ==
-            TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY) {
+                TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY) {
           List<INode> children = findChildrenRecursively(lastINode);
           addChildINodes(path, children);
         }
@@ -432,7 +440,7 @@ class INodeLock extends BaseINodeLock {
         TransactionLockTypes.impliesParentWriteLock(this.lockType)) {
       currentINode = acquireLockOnRoot(lockType);
     } else {
-      currentINode = acquireLockOnRoot(DEFAULT_INODE_LOCK_TYPE);
+      currentINode = acquireLockOnRoot(getDefaultInodeLockType());
     }
     resolvedINodes.add(currentINode);
 
@@ -471,7 +479,7 @@ class INodeLock extends BaseINodeLock {
         TransactionLockTypes.impliesParentWriteLock(this.lockType)) {
       lkType = TransactionLockTypes.INodeLockType.WRITE;
     } else {
-      lkType = DEFAULT_INODE_LOCK_TYPE;
+      lkType = getDefaultInodeLockType();
     }
     return lkType;
   }
@@ -485,13 +493,12 @@ class INodeLock extends BaseINodeLock {
   }
 
   private void checkSubtreeLock(INode iNode) throws SubtreeLockedException {
-    if (SubtreeLockHelper
-        .isSubtreeLocked(iNode.isSubtreeLocked(), iNode.getSubtreeLockOwner(),
-            activeNamenodes)) {
-      if (!ignoreLocalSubtreeLocks
-//         && namenodeId != iNode.getSubtreeLockOwner()
-         ) {
+    if (SubtreeLockHelper.isSTOLocked(iNode.isSTOLocked(),
+            iNode.getSTOLockOwner(), activeNamenodes)) {
+      if (!ignoredSTOInodes.contains(iNode.getId())) {
         throw new SubtreeLockedException(iNode.getLocalName(), activeNamenodes);
+      } else {
+        LOG.debug("Ignoring subtree lock for inode id: "+iNode.getId());
       }
     }
   }
