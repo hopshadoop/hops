@@ -797,7 +797,8 @@ public class TestMetadataLog extends TestCase {
       int folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
       assertTrue(checkLog(folderId, MetadataLogEntry.Operation.ADD));
       assertTrue(checkLog(inodeId, MetadataLogEntry.Operation.ADD));
-      
+
+
       dfs.setMetaEnabled(dataset, false);
       
       assertEquals(1, getMetadataLogEntries(inodeId).size());

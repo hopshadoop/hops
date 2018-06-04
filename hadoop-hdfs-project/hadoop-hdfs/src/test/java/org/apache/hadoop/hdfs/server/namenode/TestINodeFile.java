@@ -27,6 +27,7 @@ import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -288,10 +289,9 @@ public class TestINodeFile {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(cluster.getNameNode(),
-            TransactionLockTypes.INodeLockType.WRITE,
-            TransactionLockTypes.INodeResolveType.PATH, file.toString()))
-            .add(lf.getBlockLock());
+        INodeLock il = lf.getINodeLock( TransactionLockTypes.INodeLockType.WRITE, TransactionLockTypes.INodeResolveType.PATH, file.toString())
+                .setNameNodeID(cluster.getNameNode().getId()).setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockLock());
       }
 
       @Override
@@ -564,10 +564,11 @@ public class TestINodeFile {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(cluster.getNameNode(),
-            TransactionLockTypes.INodeLockType.WRITE,
-            TransactionLockTypes.INodeResolveType.PATH, "/"))
-            .add(lf.getBlockLock());
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE,
+                TransactionLockTypes.INodeResolveType.PATH, "/").setNameNodeID(cluster.getNameNode().getId())
+                .setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il)
+                .add(lf.getBlockLock());
       }
 
       @Override
@@ -916,10 +917,11 @@ public class TestINodeFile {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(getMockNamesystem().getNameNode(),
-                TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, true,
-                prevPath, dirPath));
+            INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                    TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN,
+                    prevPath, dirPath).setNameNodeID(getMockNamesystem().getNameNode().getId())
+                    .setActiveNameNodes(getMockNamesystem().getNameNode().getActiveNameNodes().getActiveNodes());
+            locks.add(il);
           }
 
           @Override
@@ -1218,8 +1220,9 @@ public class TestINodeFile {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(cluster.getNameNode(), TransactionLockTypes.INodeLockType.READ,
-            TransactionLockTypes.INodeResolveType.PATH, src));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.READ, TransactionLockTypes.INodeResolveType.PATH, src)
+                .setNameNodeID(cluster.getNameNode().getId()).setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il);
       }
 
       @Override

@@ -55,8 +55,8 @@ public class TestFailedSTOLockCleaner extends TestCase {
       dfs.mkdir(new Path("/A/B"), FsPermission.getDefault());
       dfs.mkdir(new Path("/A/C"), FsPermission.getDefault());
 
-      namesystem.lockSubtree("/A/C", SubTreeOperation.StoOperationType.NA);
-      namesystem.lockSubtree("/A/B", SubTreeOperation.StoOperationType.NA);
+      namesystem.lockSubtree("/A/C", SubTreeOperation.Type.NA);
+      namesystem.lockSubtree("/A/B", SubTreeOperation.Type.NA);
 
       assertEquals("On going subtree ops table", 2, countOnGoingSTOs());
       assertEquals("Locked Inodes", 2, countLockedINodes());

@@ -90,20 +90,18 @@ public class INodeUtil {
     return da.findInodeByNameParentIdAndPartitionIdPK(name, parentId, partitionId);
   }
 
-  public static void resolvePathWithNoTransaction(String path,
-      boolean resolveLink, LinkedList<INode> preTxResolvedINodes,
-      boolean[] isPathFullyResolved)
+  public static boolean resolvePathWithNoTransaction(String path,
+      boolean resolveLink, LinkedList<INode> preTxResolvedINodes)
       throws UnresolvedPathException, StorageException,
       TransactionContextException {
     preTxResolvedINodes.clear();
-    isPathFullyResolved[0] = false;
 
     byte[][] components = INode.getPathComponents(path);
     INode curNode = getRoot();
     preTxResolvedINodes.add(curNode);
 
     if (components.length == 1) {
-      return;
+      return false;
     }
 
     INodeResolver resolver =
@@ -114,7 +112,7 @@ public class INodeUtil {
         preTxResolvedINodes.add(curNode);
       }
     }
-    isPathFullyResolved[0] = preTxResolvedINodes.size() == components.length;
+    return  preTxResolvedINodes.size() == components.length;
   }
 
   public static void findPathINodesById(int inodeId, boolean inTree,

@@ -954,7 +954,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     }
   }
 
-  public boolean isSubtreeLocked() {
+  public boolean isSTOLocked() {
     return subtreeLocked;
   }
 
@@ -962,7 +962,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     this.subtreeLocked = subtreeLocked;
   }
 
-  public long getSubtreeLockOwner() {
+  public long getSTOLockOwner() {
     return subtreeLockOwner;
   }
 

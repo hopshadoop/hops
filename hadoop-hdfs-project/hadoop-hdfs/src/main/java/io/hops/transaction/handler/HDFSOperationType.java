@@ -338,6 +338,7 @@ public enum HDFSOperationType implements OperationType {
   SET_ACL,
   
   //retry cache
+  RETRY_CACHE,
   CLEAN_RETRY_CACHE,
 
   //Metadata GC

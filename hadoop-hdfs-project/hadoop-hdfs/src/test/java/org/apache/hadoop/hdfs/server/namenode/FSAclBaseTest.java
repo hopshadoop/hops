@@ -29,6 +29,7 @@ import java.util.List;
 
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -1066,19 +1067,23 @@ public abstract class FSAclBaseTest {
   private static void assertAclFeature(final Path pathToCheck,
       final boolean expectAclFeature) throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
-  
+
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(true, cluster.getNameNode(), TransactionLockTypes.INodeLockType.READ,
-            TransactionLockTypes.INodeResolveType.PATH, pathToCheck.toString()));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.READ,
+                TransactionLockTypes.INodeResolveType.PATH, pathToCheck.toString()).setNameNodeID(cluster.getNameNode().getId())
+                .setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(true);
+        locks.add(il);
         locks.add(lf.getAcesLock());
       }
+
       @Override
       public Object performTask() throws IOException {
         INode inode = cluster.getNamesystem().getINode(pathToCheck.toString());
         assertNotNull(inode);
-        
+
         List<AclEntry> aclEntries = AclStorage.readINodeAcl(inode);
         if (expectAclFeature){
           assertFalse(aclEntries.isEmpty());

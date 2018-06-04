@@ -25,6 +25,7 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -172,10 +173,10 @@ public class TestFsLimits {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(getMockNamesystem().getNameNode(),
-                TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN,
-                "/", "/" + name));
+            INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                    TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, "/", "/" + name)
+                    .setNameNodeID(getMockNamesystem().getNameNode().getId()).setActiveNameNodes(getMockNamesystem().getNameNode().getActiveNameNodes().getActiveNodes());
+            locks.add(il);
           }
 
           @Override

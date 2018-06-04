@@ -15,30 +15,16 @@
  */
 package io.hops.transaction.lock;
 
-import io.hops.exception.TransientStorageException;
+import io.hops.exception.StorageException;
 import io.hops.leader_election.node.ActiveNode;
 import org.apache.hadoop.ipc.RetriableException;
 
 import java.util.Collection;
 
-public class SubtreeLockedException extends SubtreeRetriableException /*client retires*/ {
+public class SubtreeQuiesceException extends SubtreeRetriableException /*client retires*/ {
 
-  public SubtreeLockedException(String inodeName,
-      Collection<ActiveNode> namenodes) {
-    super(createMessage(inodeName, namenodes));
-  }
-
-  public SubtreeLockedException(String message) {
+  public SubtreeQuiesceException(String message) {
     super(message);
   }
   
-  private static String createMessage(String inodeName,
-      Collection<ActiveNode> namenodes) {
-    StringBuilder builder = new StringBuilder();
-    builder.append("INode " + inodeName + " " + "Active NameNode were ");
-    for (ActiveNode namenode : namenodes) {
-      builder.append(namenode.toString() + ", ");
-    }
-    return builder.toString();
-  }  
 }

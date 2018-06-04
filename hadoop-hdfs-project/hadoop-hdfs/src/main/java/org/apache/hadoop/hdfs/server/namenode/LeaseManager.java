@@ -30,6 +30,7 @@ import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
@@ -478,16 +479,15 @@ public class LeaseManager {
           public void acquireLock(TransactionLocks locks) throws IOException {
             String holder = (String) getParams()[0];
             LockFactory lf = getInstance();
-            
-            locks.add(
-                lf.getINodeLock(fsnamesystem.getNameNode(), INodeLockType.WRITE,
+            INodeLock il = lf.getINodeLock(INodeLockType.WRITE,
                     INodeResolveType.PATH,
-                    leasePaths.toArray(new String[leasePaths.size()])))
-                .add(lf.getNameNodeLeaseLock(LockType.WRITE))
-                .add(lf.getLeaseLock(LockType.WRITE, holder))
-                .add(lf.getLeasePathLock(LockType.WRITE, leasePaths.size()))
-                .add(lf.getBlockLock()).add(
-                lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
+                    leasePaths.toArray(new String[leasePaths.size()])).setNameNodeID(fsnamesystem.getNameNode().getId())
+                    .setActiveNameNodes(fsnamesystem.getNameNode().getActiveNameNodes().getActiveNodes());
+
+            locks.add(il).add(lf.getNameNodeLeaseLock(LockType.WRITE))
+                    .add(lf.getLeaseLock(LockType.WRITE, holder))
+                    .add(lf.getLeasePathLock(LockType.WRITE, leasePaths.size()))
+                    .add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
           }
 
           @Override

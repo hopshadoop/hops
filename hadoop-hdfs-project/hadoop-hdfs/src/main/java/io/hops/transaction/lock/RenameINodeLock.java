@@ -41,54 +41,16 @@ final class RenameINodeLock extends INodeLock {
   };
   private final boolean legacyRename;
 
-  public RenameINodeLock(boolean skipReadingQuotaAttr,TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType,
-      boolean ignoreLocalSubtreeLocks, long namenodeId,
-      Collection<ActiveNode> activeNamenodes, String src, String dst,
+  public RenameINodeLock(TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType, String src, String dst,
       boolean legacyRename) {
-    super(lockType, resolveType, false, ignoreLocalSubtreeLocks, skipReadingQuotaAttr, namenodeId,
-        activeNamenodes, src, dst);
+    super(lockType, resolveType, src, dst);
     this.legacyRename = legacyRename;
   }
 
   public RenameINodeLock(TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType,
-      boolean ignoreLocalSubtreeLocks, long namenodeId,
-      Collection<ActiveNode> activeNamenodes, String src, String dst,
-      boolean legacyRename) {
-    super(lockType, resolveType, false, ignoreLocalSubtreeLocks, false, namenodeId,
-        activeNamenodes, src, dst);
-    this.legacyRename = legacyRename;
-  }
-
-  public RenameINodeLock(boolean skipReadingQuotaAttr, TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType,
-      Collection<ActiveNode> activeNamenodes, String src, String dst,
-      boolean legacyRename) {
-    super(skipReadingQuotaAttr, lockType, resolveType, false, activeNamenodes, src, dst);
-    this.legacyRename = legacyRename;
-  }
-
-  public RenameINodeLock(TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType,
-      Collection<ActiveNode> activeNamenodes, String src, String dst,
-      boolean legacyRename) {
-    super(false, lockType, resolveType, false, activeNamenodes, src, dst);
-    this.legacyRename = legacyRename;
-  }
-
-  public RenameINodeLock(TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType,
-      boolean ignoreLocalSubtreeLocks, long namenodeId,
-      List<ActiveNode> activeNamenodes, String src, String dst) {
-    this(lockType, resolveType, ignoreLocalSubtreeLocks, namenodeId,
-        activeNamenodes, src, dst, false);
-  }
-
-  public RenameINodeLock(TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType,
-      Collection<ActiveNode> activeNamenodes, String src, String dst) {
-    this(lockType, resolveType, activeNamenodes, src, dst, false);
+      TransactionLockTypes.INodeResolveType resolveType, String src, String dst) {
+    this(lockType, resolveType, src, dst, false);
   }
 
   @Override

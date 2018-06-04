@@ -22,6 +22,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.exception.StorageException;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -106,16 +107,14 @@ public class TestFSDirectory {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-
-        locks.add(lf.getINodeLock(cluster.getNameNode(),
-            TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-            TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, false, true, dir.toString()))
-            .add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
-            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
-            .add(lf.getBlockLock()).add(
-            lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR,
-                LockFactory.BLK.PE,
-                LockFactory.BLK.IV));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY,  dir.toString())
+                .setNameNodeID(cluster.getNameNode().getId())
+                .setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+                .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+                .add(lf.getBlockLock()).add(
+                lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR, LockFactory.BLK.PE, LockFactory.BLK.IV));
       }
 
       @Override
@@ -149,16 +148,15 @@ public class TestFSDirectory {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-
-        locks.add(lf.getINodeLock(cluster.getNameNode(),
-            TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-            TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, false, true, dir.toString()))
-            .add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
-            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
-            .add(lf.getBlockLock()).add(
-            lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR,
-                LockFactory.BLK.PE,
-                LockFactory.BLK.IV));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, dir.toString())
+                .setNameNodeID(cluster.getNameNode().getId())
+                .setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+                .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+                .add(lf.getBlockLock()).add(
+                lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC,
+                        LockFactory.BLK.UR, LockFactory.BLK.PE, LockFactory.BLK.IV));
       }
 
       @Override

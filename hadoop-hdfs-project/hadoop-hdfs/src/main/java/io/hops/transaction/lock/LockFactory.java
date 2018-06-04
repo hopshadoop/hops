@@ -168,81 +168,21 @@ public class LockFactory {
     return new IndividualINodeLock(lockType, inodeIdentifier);
   }
 
-  public Lock getINodeLock(boolean skipReadingQuotaAttr, NameNode nameNode,
-      TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
-      boolean ignoreLocalSubtreeLocks, String... paths) {
-    return new INodeLock(lockType, resolveType, resolveLink,
-        ignoreLocalSubtreeLocks, skipReadingQuotaAttr, nameNode.getId(),
-        nameNode.getActiveNameNodes().getActiveNodes(), paths);
+  public INodeLock getINodeLock(TransactionLockTypes.INodeLockType lockType,
+                                TransactionLockTypes.INodeResolveType resolveType, String... paths) {
+    return new INodeLock(lockType, resolveType, paths);
   }
 
-  public Lock getINodeLock(NameNode nameNode,
-      TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
-      boolean ignoreLocalSubtreeLocks, String... paths) {
-    return new INodeLock(lockType, resolveType, resolveLink,
-        ignoreLocalSubtreeLocks, false, nameNode.getId(),
-        nameNode.getActiveNameNodes().getActiveNodes(), paths);
+
+  public INodeLock getRenameINodeLock(TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType, String src, String dst) {
+    return new RenameINodeLock(lockType, resolveType, src, dst);
   }
 
-  public Lock getINodeLock(NameNode nameNode,
-      TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
-      String... paths) {
-    return new INodeLock(false, lockType, resolveType, resolveLink,
-        nameNode.getActiveNameNodes().getActiveNodes(), paths);
-  }
-
-  public Lock getINodeLock(NameNode nameNode,
-      TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType, String... paths) {
-    return new INodeLock(lockType, resolveType,
-        nameNode.getActiveNameNodes().getActiveNodes(), paths);
-  }
-  
-  public Lock getINodeLock(boolean skipReadingQuotaAttr, NameNode nameNode,
-      TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType, 
-      String... paths) {
-   return new INodeLock(lockType, resolveType, true,
-        false, skipReadingQuotaAttr, nameNode.getId(),
-        nameNode.getActiveNameNodes().getActiveNodes(), paths);
-  }
-  
-  public Lock getINodeLock(boolean skipReadingQuotaAttr, NameNode nameNode,
-      TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType,  boolean resolveLink,
-      String... paths) {
-   return new INodeLock(lockType, resolveType, resolveLink,
-        false, skipReadingQuotaAttr, nameNode.getId(),
-        nameNode.getActiveNameNodes().getActiveNodes(), paths);
-  }
-
-  public Lock getRenameINodeLock(NameNode nameNode,
-      TransactionLockTypes.INodeLockType lockType,
+  public INodeLock getLegacyRenameINodeLock(TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType,
-      boolean ignoreLocalSubtreeLocks, String src, String dst) {
-    return new RenameINodeLock(lockType, resolveType, ignoreLocalSubtreeLocks,
-        nameNode.getId(), nameNode.getActiveNameNodes().getActiveNodes(), src,
-        dst);
-  }
-
-  public Lock getRenameINodeLock(NameNode nameNode,
-      TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType, String src,
-      String dst) {
-    return new RenameINodeLock(lockType, resolveType,
-        nameNode.getActiveNameNodes().getActiveNodes(), src, dst);
-  }
-
-  public Lock getLegacyRenameINodeLock(boolean skipReadingQuotaAttr,NameNode nameNode,
-      TransactionLockTypes.INodeLockType lockType,
-      TransactionLockTypes.INodeResolveType resolveType,
-      boolean ignoreLocalSubtreeLocks, String src, String dst) {
-    return new RenameINodeLock(skipReadingQuotaAttr,lockType, resolveType, ignoreLocalSubtreeLocks,
-        nameNode.getId(), nameNode.getActiveNameNodes().getActiveNodes(), src,
-        dst, true);
+      String src, String dst) {
+    return new RenameINodeLock(lockType, resolveType, src, dst, true);
   }
 
   public Lock getLeaseLock(TransactionLockTypes.LockType lockType,
@@ -415,21 +355,5 @@ public class LockFactory {
     BaseINodeLock.enableSetRandomPartitionKey(conf.getBoolean(DFSConfigKeys
         .DFS_SET_RANDOM_PARTITION_KEY_ENABLED, DFSConfigKeys
         .DFS_SET_RANDOM_PARTITION_KEY_ENABLED_DEFAULT));
-    BaseINodeLock.setDefaultLockType(getPrecedingPathLockType(conf));
-  }
-  
-  private TransactionLockTypes.INodeLockType getPrecedingPathLockType(
-      Configuration conf) {
-    String val = conf.get(DFSConfigKeys.DFS_STORAGE_ANCESTOR_LOCK_TYPE,
-        DFSConfigKeys.DFS_STORAGE_ANCESTOR_LOCK_TYPE_DEFAULT);
-    if (val.compareToIgnoreCase("READ") == 0) {
-      return TransactionLockTypes.INodeLockType.READ;
-    } else if (val.compareToIgnoreCase("READ_COMMITTED") == 0) {
-      return TransactionLockTypes.INodeLockType.READ_COMMITTED;
-    } else {
-      throw new IllegalStateException(
-          "Critical Parameter is not defined. Set " +
-              DFSConfigKeys.DFS_STORAGE_ANCESTOR_LOCK_TYPE);
-    }
   }
 }

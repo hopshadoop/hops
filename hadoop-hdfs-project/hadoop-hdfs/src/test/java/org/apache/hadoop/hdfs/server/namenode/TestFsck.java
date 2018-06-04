@@ -22,6 +22,7 @@ import com.google.common.collect.Sets;
 import io.hops.exception.StorageException;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -779,9 +780,9 @@ public class TestFsck {
             @Override
             public void acquireLock(TransactionLocks locks) throws IOException {
               LockFactory lf = LockFactory.getInstance();
-              locks.add(lf.getINodeLock(clusterFinal.getNameNode(),
-                  TransactionLockTypes.INodeLockType.WRITE,
-                  TransactionLockTypes.INodeResolveType.PATH, fileName))
+              INodeLock il = lf.getINodeLock( TransactionLockTypes.INodeLockType.WRITE, TransactionLockTypes.INodeResolveType.PATH, fileName)
+                      .setNameNodeID(clusterFinal.getNameNode().getId()).setActiveNameNodes(clusterFinal.getNameNode().getActiveNameNodes().getActiveNodes());
+              locks.add(il)
                   .add(lf.getBlockLock());
             }
 

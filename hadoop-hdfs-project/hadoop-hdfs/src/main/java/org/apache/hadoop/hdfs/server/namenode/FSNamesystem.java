@@ -51,12 +51,10 @@ import io.hops.transaction.handler.EncodingStatusOperationType;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
-import io.hops.transaction.lock.LockFactory;
-import io.hops.transaction.lock.SubtreeLockedException;
+import io.hops.transaction.lock.*;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
-import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -132,6 +130,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
+import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Server;
@@ -178,11 +177,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
@@ -462,7 +457,13 @@ public class FSNamesystem
   private final AclConfigFlag aclConfigFlag;
 
   private final RetryCacheDistributed retryCache;
-  
+
+  //Add delay for file system operations. Used only for testing
+  private boolean isTestingSTO = false;
+  private ThreadLocal<Times> delays = new ThreadLocal<Times>();
+  long delayBeforeSTOFlag = 0; //This parameter can not be more than TxInactiveTimeout: 1.2 sec
+  long delayAfterBuildingTree=0;
+
   /**
    * Clear all loaded data
    */
@@ -511,7 +512,7 @@ public class FSNamesystem
     }
     return namesystem;
   }
-  
+
   FSNamesystem(Configuration conf, NameNode namenode) throws IOException {
     this(conf, namenode, false);
   }
@@ -656,7 +657,7 @@ public class FSNamesystem
       throw e;
     }
   }
-  
+
   @VisibleForTesting
   public RetryCacheDistributed getRetryCache() {
     return retryCache;
@@ -666,13 +667,13 @@ public class FSNamesystem
   boolean hasRetryCache() {
     return retryCache != null;
   }
-  
+
   void addCacheEntryWithPayload(byte[] clientId, int callId, Object payload) {
     if (retryCache != null) {
       retryCache.addCacheEntryWithPayload(clientId, callId, payload);
     }
   }
-  
+
   void addCacheEntry(byte[] clientId, int callId) {
     if (retryCache != null) {
       retryCache.addCacheEntry(clientId, callId);
@@ -987,23 +988,28 @@ public class FSNamesystem
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     boolean txFailed = true;
-    INodeIdentifier inode = null;
+    final INodeIdentifier inode = lockSubtreeAndCheckPathPermission(src, true,
+            null, null, null, null, SubTreeOperation.Type.SET_PERMISSION_STO);
+    final boolean isSTO = inode != null;
     try {
-      inode = lockSubtreeAndCheckPathPermission(src,
-          true, null, null, null, null, SubTreeOperation.StoOperationType.SET_PERMISSION_STO);
-      final boolean isSto = inode != null;
       new HopsTransactionalRequestHandler(HDFSOperationType.SUBTREE_SETPERMISSION, src) {
         @Override
         public void acquireLock(TransactionLocks locks) throws IOException {
           LockFactory lf = getInstance();
-          locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/, nameNode,
-              INodeLockType.WRITE, INodeResolveType.PATH,false, true, src)).add(lf.getBlockLock());
+          INodeLock il = lf.getINodeLock( INodeLockType.WRITE, INodeResolveType.PATH,  src)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                  .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+          if (isSTO) {
+            il.setIgnoredSTOInodes(inode.getInodeId());
+          }
+          locks.add(il).add(lf.getBlockLock());
         }
 
         @Override
         public Object performTask() throws IOException {
           try {
-            setPermissionSTOInt(src, permission, isSto);
+            setPermissionSTOInt(src, permission, isSTO);
           } catch (AccessControlException e) {
             logAuditEvent(false, "setPermission", src);
             throw e;
@@ -1015,7 +1021,7 @@ public class FSNamesystem
     } finally {
       if(txFailed){
         if(inode!=null){
-          unlockSubtree(src);
+          unlockSubtree(src, inode.getInodeId());
         }
       }
     }
@@ -1038,7 +1044,7 @@ public class FSNamesystem
       INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, false);
       INode[] nodes = inodesInPath.getINodes();
       INode inode = nodes[nodes.length - 1];
-      if (inode != null && inode.isSubtreeLocked()) {
+      if (inode != null && inode.isSTOLocked()) {
         inode.setSubtreeLocked(false);
         EntityManager.update(inode);
       }
@@ -1060,8 +1066,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, src)).add(lf.getBlockLock());
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockLock());
       }
 
       @Override
@@ -1097,26 +1105,34 @@ public class FSNamesystem
   void setOwnerSTO(final String src1, final String username, final String group)
       throws
       IOException {
+    //only for testing STO
+    saveTimes();
+
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     boolean txFailed = true;
-    INodeIdentifier inode = null;
+    final INodeIdentifier inode =  lockSubtreeAndCheckPathPermission(src, true,
+            null, null, null, null, SubTreeOperation.Type.SET_OWNER_STO);
+    final boolean isSTO = inode != null;
     try{
-    inode = lockSubtreeAndCheckPathPermission(src,
-            true, null, null, null, null, SubTreeOperation.StoOperationType.SET_OWNER_STO);
-    final boolean isSto = inode != null;
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_OWNER_SUBTREE, src) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/,nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, false, true, src)).add(lf.getBlockLock());
+        INodeLock il = lf.getINodeLock( INodeLockType.WRITE, INodeResolveType.PATH,  src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+        if (isSTO){
+          il.setIgnoredSTOInodes(inode.getInodeId());
+        }
+        locks.add(il).add(lf.getBlockLock());
       }
 
         @Override
         public Object performTask() throws IOException {
           try {
-            setOwnerSTOInt(src, username, group,isSto);
+            setOwnerSTOInt(src, username, group,isSTO);
           } catch (AccessControlException e) {
             logAuditEvent(false, "setOwner", src);
             throw e;
@@ -1128,7 +1144,7 @@ public class FSNamesystem
     }finally{
       if(txFailed){
         if(inode!=null){
-          unlockSubtree(src);
+          unlockSubtree(src,inode.getInodeId());
         }
       }
     }
@@ -1156,7 +1172,7 @@ public class FSNamesystem
       INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, false);
       INode[] nodes = inodesInPath.getINodes();
       INode inode = nodes[nodes.length - 1];
-      if (inode != null && inode.isSubtreeLocked()) {
+      if (inode != null && inode.isSTOLocked()) {
         inode.setSubtreeLocked(false);
         EntityManager.update(inode);
       }
@@ -1177,8 +1193,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, src)).add(lf.getBlockLock());
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockLock());
       }
 
       @Override
@@ -1248,8 +1266,11 @@ public class FSNamesystem
               @Override
               public void acquireLock(TransactionLocks locks) throws IOException {
                 LockFactory lf = getInstance();
-                locks.add(lf.getINodeLock(!dir.isQuotaEnabled(),nameNode, lockType,
-                        INodeResolveType.PATH, src)).add(lf.getBlockLock())
+                INodeLock il = lf.getINodeLock( lockType, INodeResolveType.PATH, src)
+                        .setNameNodeID(nameNode.getId())
+                        .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                        .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+                locks.add(il).add(lf.getBlockLock())
                         .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
                 locks.add(lf.getAcesLock());
               }
@@ -1300,8 +1321,10 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,
-                INodeResolveType.PATH, src)).add(lf.getBlockLock())
+            INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            locks.add(il).add(lf.getBlockLock())
                 .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
           }
 
@@ -1453,9 +1476,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(
-            lf.getINodeLock(nameNode, INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                INodeResolveType.PATH, paths)).add(lf.getBlockLock()).add(
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, paths)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockLock()).add(
             lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.PE, BLK.UC, BLK.IV))
             .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
         if (erasureCodingEnabled) {
@@ -1651,8 +1675,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, src)).add(lf.getBlockLock());
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockLock());
         locks.add(lf.getAcesLock());
       }
 
@@ -1706,10 +1732,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, false, link));
-        locks.add(lf.getAcesLock());
-        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH,  link)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getAcesLock())
+                .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
       }
 
       @Override
@@ -1784,7 +1811,7 @@ public class FSNamesystem
    * under-replicated data blocks or removal of the excessive block copies
    * if the blocks are over-replicated.
    *
-   * @param src
+   * @param src1
    *     file name
    * @param replication
    *     new replication
@@ -1802,12 +1829,12 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/,nameNode,
-                INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH,
-                src)).add(lf.getBlockLock()).add(
-                lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.UR,
-                    BLK.IV));
-            locks.add(lf.getAcesLock());
+            INodeLock il = lf.getINodeLock( INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+            locks.add(il).add(lf.getBlockLock())
+                    .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.UR, BLK.IV)).add(lf.getAcesLock());
           }
 
           @Override
@@ -1852,18 +1879,22 @@ public class FSNamesystem
 
   void setMetaEnabled(final String src, final boolean metaEnabled)
       throws IOException {
+    INodeIdentifier stoRootINode = null;
     try {
-      INodeIdentifier inode = lockSubtree(src, SubTreeOperation
-          .StoOperationType.META_ENABLE);
-      final AbstractFileTree.FileTree fileTree = buildTreeForLogging(inode,
+      stoRootINode = lockSubtree(src, SubTreeOperation.Type.META_ENABLE_STO);
+      final AbstractFileTree.FileTree fileTree = buildTreeForLogging(stoRootINode,
           metaEnabled);
       new HopsTransactionalRequestHandler(HDFSOperationType.SET_META_ENABLED,
           src) {
         @Override
         public void acquireLock(TransactionLocks locks) throws IOException {
+          int stoRootINodeId = (Integer) getParams()[0];
           LockFactory lf = getInstance();
-          locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-              INodeResolveType.PATH, true, true, src));
+          INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            il.setIgnoredSTOInodes(stoRootINodeId);
+          locks.add(il);
           locks.add(lf.getAcesLock());
         }
 
@@ -1880,9 +1911,11 @@ public class FSNamesystem
           }
           return null;
         }
-      }.handle(this);
+      }.setParams(stoRootINode.getInodeId()).handle(this);
     } finally {
-      unlockSubtree(src);
+      if(stoRootINode != null) {
+        unlockSubtree(src, stoRootINode.getInodeId());
+      }
     }
   }
 
@@ -1966,7 +1999,10 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE, INodeResolveType.PATH, filename));
+            INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, filename)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            locks.add(il);
           }
 
           @Override
@@ -2012,8 +2048,10 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.READ_COMMITTED,
-                INodeResolveType.PATH, filename));
+            INodeLock il =lf.getINodeLock(INodeLockType.READ_COMMITTED, INodeResolveType.PATH, filename)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            locks.add(il);
           }
 
           @Override
@@ -2051,7 +2089,7 @@ public class FSNamesystem
    * Create a new file entry in the namespace.
    * <p/>
    * For description of parameters and exceptions thrown see
-   * {@link ClientProtocol#create()}, except it returns valid file status upon
+   * {@link ClientProtocol#create(String, FsPermission, String, EnumSetWritable, boolean, short, long)} , except it returns valid file status upon
    * success
    *
    * For retryCache handling details see -
@@ -2069,17 +2107,16 @@ public class FSNamesystem
         @Override
         public void acquireLock(TransactionLocks locks) throws IOException {
           LockFactory lf = getInstance();
-          locks.add(
-              //if quota is disabled then do not read the INode Attributes table
-              lf.getINodeLock(!dir.isQuotaEnabled()/*
-                   * skip INode Attr Lock
-                   */, nameNode, INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                  INodeResolveType.PATH, false, src)).add(lf.getBlockLock())
-              .add(lf.getLeaseLock(LockType.WRITE, holder))
-              .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
-              lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE,
-                  BLK.IV))
-              .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+          INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                  .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+          locks.add(il)
+                  .add(lf.getBlockLock())
+                  .add(lf.getLeaseLock(LockType.WRITE, holder))
+                  .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
+                  lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE, BLK.IV))
+                  .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
 
         if (flag.contains(CreateFlag.OVERWRITE) && dir.isQuotaEnabled()) {
           locks.add(lf.getQuotaUpdateLock(src));
@@ -2152,7 +2189,7 @@ public class FSNamesystem
    * Create a new file or overwrite an existing file<br>
    *
    * Once the file is create the client then allocates a new block with the next
-   * call using {@link NameNode#addBlock()}.
+   * call using {@link ClientProtocol#addBlock(String, String, ExtendedBlock, DatanodeInfo[], long, String[])} ()}.
    * <p>
    * For description of parameters and exceptions thrown see
    * {@link ClientProtocol#create}
@@ -2233,7 +2270,7 @@ public class FSNamesystem
    * which can still be used for writing more data. The client uses the returned
    * block locations to form the data pipeline for this block.<br>
    * The method returns null if the last block is full. The client then
-   * allocates a new block with the next call using {@link NameNode#addBlock()}.
+   * allocates a new block with the next call using {@link ClientProtocol#addBlock(String, String, ExtendedBlock, DatanodeInfo[], long, String[])}}.
    * <p>
    *
    * For description of parameters and exceptions thrown see
@@ -2324,7 +2361,7 @@ public class FSNamesystem
    * Immediately revoke the lease of the current lease holder and start lease
    * recovery so that the file can be forced to be closed.
    *
-   * @param src
+   * @param src1
    *     the path of the file to start lease recovery
    * @param holder
    *     the lease holder's name
@@ -2343,12 +2380,14 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-                INodeResolveType.PATH, src))
-                .add(lf.getLeaseLock(LockType.WRITE, holder))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
-                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR))
-                .add(lf.getAcesLock());
+            INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            locks.add(il)
+                    .add(lf.getLeaseLock(LockType.WRITE, holder))
+                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
+                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR))
+                    .add(lf.getAcesLock());
           }
 
           @Override
@@ -2516,14 +2555,15 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(!dir.isQuotaEnabled(),nameNode,
-                INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH,
-                src)).add(lf.getBlockLock())
-                .add(lf.getLeaseLock(LockType.WRITE, holder))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
-                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
-                    BLK.IV, BLK.PE))
-                .add(lf.getLastBlockHashBucketsLock());
+            INodeLock il = lf.getINodeLock( INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+            locks.add(il).add(lf.getBlockLock())
+                    .add(lf.getLeaseLock(LockType.WRITE, holder))
+                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV, BLK.PE))
+                    .add(lf.getLastBlockHashBucketsLock());
             locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
             // Always needs to be read. Erasure coding might have been
             // enabled earlier and we don't want to end up in an inconsistent
@@ -2653,12 +2693,14 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-                INodeResolveType.PATH, src))
-                .add(lf.getLeaseLock(LockType.READ, clientName))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
-                .add(lf.getLastTwoBlocksLock(src))
-                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC));
+            INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            locks.add(il)
+                    .add(lf.getLeaseLock(LockType.READ, clientName))
+                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                    .add(lf.getLastTwoBlocksLock(src))
+                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC));
           }
 
           @Override
@@ -2894,9 +2936,10 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,
-                INodeResolveType.PATH, src))
-                .add(lf.getLeaseLock(LockType.READ, clientName));
+            INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            locks.add(il).add(lf.getLeaseLock(LockType.READ, clientName));
           }
 
           @Override
@@ -2951,12 +2994,13 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(nameNode,
-                INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH,
-                src)).add(lf.getLeaseLock(LockType.READ))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src))
-                .add(lf.getBlockLock())
-                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR));
+            INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            locks.add(il).add(lf.getLeaseLock(LockType.READ))
+                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src))
+                    .add(lf.getBlockLock())
+                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR));
           }
 
           @Override
@@ -2984,7 +3028,7 @@ public class FSNamesystem
             }
             dir.persistBlocks(src, file);
             file.recomputeFileSize();
-            
+
             return true;
           }
         };
@@ -3067,15 +3111,17 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip Inode Attr*/,nameNode, INodeLockType.WRITE,
-                INodeResolveType.PATH, src))
-                .add(lf.getLeaseLock(LockType.WRITE, holder))
-                .add(lf.getLeasePathLock(LockType.WRITE))
-                .add(lf.getBlockLock());
+            INodeLock il = lf.getINodeLock( INodeLockType.WRITE, INodeResolveType.PATH, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+            locks.add(il)
+                    .add(lf.getLeaseLock(LockType.WRITE, holder))
+                    .add(lf.getLeasePathLock(LockType.WRITE))
+                    .add(lf.getBlockLock());
 
             if (data == null) { // the data is stored on the datanodes.
-              locks.add(
-                  lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV));
+              locks.add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV));
             }
           }
 
@@ -3304,14 +3350,15 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/, nameNode,
-                INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, false, src))
-                .add(lf.getLeaseLock(LockType.WRITE))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
-                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE,
-                    BLK.IV))
-                .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+            INodeLock il = lf.getINodeLock( INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                    INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+            locks.add(il).add(lf.getLeaseLock(LockType.WRITE))
+                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
+                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE, BLK.IV))
+                    .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
             if (dir.isQuotaEnabled()) {
               locks.add(lf.getQuotaUpdateLock(true, src));
             }
@@ -3447,7 +3494,7 @@ public class FSNamesystem
   /**
    * Get the file info for a specific file.
    *
-   * @param src
+   * @param src1
    *     The string representation of the path to the file
    * @param resolveLink
    *     whether to throw UnresolvedLinkException
@@ -3469,8 +3516,11 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(true/*skip quota*/,nameNode, INodeLockType.READ,
-                INodeResolveType.PATH, resolveLink, src));
+            INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
+                    .resolveSymLink(resolveLink).setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(true);
+            locks.add(il);
             locks.add(lf.getAcesLock());
           }
 
@@ -3498,7 +3548,7 @@ public class FSNamesystem
     }
     return (HdfsFileStatus) getFileInfoHandler.handle(this);
   }
-  
+
   /**
    * Returns true if the file is closed
    */
@@ -3511,7 +3561,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,INodeResolveType.PATH, src));
+        INodeLock il = lf.getINodeLock(INodeLockType.READ,INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il);
       }
 
       @Override
@@ -3548,9 +3601,12 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(!dir.isQuotaEnabled(),nameNode,
-                INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH,
-                resolvedLink, src));
+            INodeLock il = lf.getINodeLock( INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
+                    .resolveSymLink(resolvedLink)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+            locks.add(il);
             locks.add(lf.getAcesLock());
           }
 
@@ -3649,9 +3705,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(
-            lf.getINodeLock(nameNode, INodeLockType.WRITE, INodeResolveType.PATH,
-                src)).add(lf.getLeaseLock(LockType.READ, clientName))
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getLeaseLock(LockType.READ, clientName))
             .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
             .add(lf.getBlockLock());
       }
@@ -3902,12 +3959,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
-            .add(lf.getLeaseLock(LockType.WRITE))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
-            .add(lf.getBlockLock(lastBlock.getBlockId(), inodeIdentifier))
-            .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
+        locks.add(lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
+                .add(lf.getLeaseLock(LockType.WRITE))
+                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                .add(lf.getBlockLock(lastBlock.getBlockId(), inodeIdentifier))
+                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
       }
 
       @Override
@@ -4089,9 +4145,9 @@ public class FSNamesystem
   /**
    * Get a partial listing of the indicated directory
    *
-   * @param src
+   * @param src1
    *     the directory name
-   * @param startAfter
+   * @param startAfter1
    *     the name to start after
    * @param needLocation
    *     if blockLocations need to be returned
@@ -4133,12 +4189,13 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(true/*skip INodeAttr*/, nameNode,
-                INodeLockType.READ,
-                INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src));
-            if(needLocation){
-              locks.add(lf.getBlockLock())
-                  .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
+            INodeLock il = lf.getINodeLock( INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(true);
+            locks.add(il);
+            if (needLocation) {
+              locks.add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
             }
             locks.add(lf.getAcesLock());
           }
@@ -5220,12 +5277,13 @@ public class FSNamesystem
         public void acquireLock(TransactionLocks locks) throws IOException {
           String holder = lease.getHolder();
           LockFactory lf = LockFactory.getInstance();
-          locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,
-              INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, leasePaths.toArray(new String[leasePaths.size()])))
-              .add(lf.getLeaseLock(LockType.READ, holder))
-              .add(lf.getLeasePathLock(LockType.READ)).add(lf.getBlockLock())
-              .add(
-                  lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
+          INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN,
+                  leasePaths.toArray(new String[leasePaths.size()]))
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+          locks.add(il).add(lf.getLeaseLock(LockType.READ, holder))
+                  .add(lf.getLeasePathLock(LockType.READ)).add(lf.getBlockLock())
+                  .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
         }
 
         @Override
@@ -5374,7 +5432,7 @@ public class FSNamesystem
   /**
    * Check whether current user have permissions to access the path. For more
    * details of the parameters, see
-   * {@link FSPermissionChecker#checkPermission()}.
+   * {@link FSPermissionChecker#checkPermission(String, INodeDirectory, boolean, FsAction, FsAction, FsAction, FsAction)}}.
    */
   private void checkPermission(FSPermissionChecker pc,
       String path, boolean doCheckOwner, FsAction ancestorAccess,
@@ -5472,7 +5530,7 @@ public class FSNamesystem
 
   private ObjectName mbeanName;
   private ObjectName mxbeanName;
-  
+
   /**
    * Register the FSNamesystem MBean using the name
    * "hadoop:service=NameNode,name=FSNamesystemState"
@@ -5646,8 +5704,7 @@ public class FSNamesystem
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
             locks.add(
-                lf.getIndividualINodeLock(INodeLockType.WRITE,
-                    inodeIdentifier, true))
+                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
                 .add(lf.getBlockLock(block.getBlockId(), inodeIdentifier));
           }
 
@@ -5706,14 +5763,13 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
-            .add(lf.getLeaseLock(LockType.READ))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
-            .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
-            .add(lf.getBlockRelated(BLK.UC))
-            .add(lf.getLastBlockHashBucketsLock())
-            .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+        locks.add( lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
+                .add(lf.getLeaseLock(LockType.READ))
+                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
+                .add(lf.getBlockRelated(BLK.UC))
+                .add(lf.getLastBlockHashBucketsLock())
+                .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
       }
 
       @Override
@@ -6439,12 +6495,12 @@ public class FSNamesystem
   public int getNumNameNodes() {
     return nameNode.getActiveNameNodes().size();
   }
-  
+
   @Override //NameNodeMXBean
   public String getLeaderNameNode(){
     return nameNode.getActiveNameNodes().getSortedActiveNodes().get(0).getHostname();
   }
-  
+
   /**
    * Verifies that the given identifier and password are valid and match.
    *
@@ -6559,7 +6615,7 @@ public class FSNamesystem
       auditLog.info(message);
     }
   }
-  
+
   private static void enableAsyncAuditLog() {
     if (!(auditLog instanceof Log4JLogger)) {
       LOG.warn("Log4j is required to enable async auditlog");
@@ -6577,7 +6633,7 @@ public class FSNamesystem
         logger.removeAppender(appender);
         asyncAppender.addAppender(appender);
       }
-      logger.addAppender(asyncAppender);        
+      logger.addAppender(asyncAppender);
     }
   }
 
@@ -6677,11 +6733,6 @@ public class FSNamesystem
 
   QuotaUpdateManager getQuotaUpdateManager() {
     return quotaUpdateManager;
-  }
-
-  public String getFilePathAncestorLockType() {
-    return conf.get(DFSConfigKeys.DFS_STORAGE_ANCESTOR_LOCK_TYPE,
-        DFSConfigKeys.DFS_STORAGE_ANCESTOR_LOCK_TYPE_DEFAULT);
   }
 
   /**
@@ -6792,7 +6843,7 @@ public class FSNamesystem
    * concurrent modification.
    *
    * Note: This does not support ".inodes" relative path.
-   * @param path
+   * @param path1
    *    the path of the directory where the quota should be set
    * @param nsQuota
    *    the namespace quota to be set
@@ -6808,7 +6859,7 @@ public class FSNamesystem
       throw new RuntimeException("Asked non leading node to setQuota");
     }
 
-    INodeIdentifier subtreeRoot;
+    INodeIdentifier subtreeRoot = null;
     boolean removeSTOLock = false;
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
     final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
@@ -6830,7 +6881,7 @@ public class FSNamesystem
         // path = "/"
         subtreeRoot = INodeDirectory.getRootIdentifier();
       }else{
-        subtreeRoot = lockSubtree(path, SubTreeOperation.StoOperationType.QUOTA_STO);
+        subtreeRoot = lockSubtree(path, SubTreeOperation.Type.QUOTA_STO);
         if(subtreeRoot == null){
           // in the mean while the dir has been deleted by someone
           throw new FileNotFoundException("Directory does not exist: " + path);
@@ -6861,9 +6912,12 @@ public class FSNamesystem
             @Override
             public void acquireLock(TransactionLocks locks) throws IOException {
               LockFactory lf = LockFactory.getInstance();
-              locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-                  INodeResolveType.PATH, true, true, path))
-                  .add(lf.getBlockLock());
+              INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, path)
+                      .setNameNodeID(nameNode.getId())
+                      .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                      .setIgnoredSTOInodes(fileTree.getSubtreeRootId().getInodeId())
+                      .setIgnoredSTOInodes(fileTree.getSubtreeRootId().getInodeId());
+              locks.add(il).add(lf.getBlockLock());
             }
 
             @Override
@@ -6876,7 +6930,7 @@ public class FSNamesystem
       setQuotaHandler.handle(this);
     } finally {
       if(removeSTOLock){
-        unlockSubtree(path);
+        unlockSubtree(path, subtreeRoot.getInodeId());
       }
     }
   }
@@ -6889,7 +6943,7 @@ public class FSNamesystem
    * level by level. The directory tree is locked during the operation to prevent
    * any concurrent modification.
    *
-   * @param path
+   * @param path1
    *    the path
    * @return
    *    the content summary for the given path
@@ -6941,14 +6995,17 @@ public class FSNamesystem
    * The subtree is locked during these operations in order to prevent any
    * concurrent modification.
    *
-   * @param src
+   * @param src1
    *    the source
-   * @param dst
+   * @param dst1
    *    the destination
    * @throws IOException
    */
   void multiTransactionalRename(final String src1, final String dst1,
       final Options.Rename... options) throws IOException {
+    //only for testing
+    saveTimes();
+
     CacheEntry cacheEntry = retryCacheWaitForCompletionTransactional();
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
@@ -7096,7 +7153,7 @@ public class FSNamesystem
       if (isUsingSubTreeLocks) {
         LOG.debug("Rename src: " + src + " dst: " + dst + " requires sub-tree locking mechanism");
         srcSubTreeRoot = lockSubtreeAndCheckPathPermission(src, false, null,
-            FsAction.WRITE, null, null, SubTreeOperation.StoOperationType.RENAME_STO);
+            FsAction.WRITE, null, null, SubTreeOperation.Type.RENAME_STO);
 
         if (srcSubTreeRoot != null) {
           AbstractFileTree.QuotaCountingFileTree srcFileTree;
@@ -7113,18 +7170,22 @@ public class FSNamesystem
           }
           srcCounts.nsCount = srcFileTree.getNamespaceCount();
           srcCounts.dsCount = srcFileTree.getDiskspaceCount();
+
+          delayAfterBbuildingTree("Built Tree for "+src1+" for rename. ");
         }
       } else {
         LOG.debug("Rename src: " + src + " dst: " + dst + " does not require sub-tree locking mechanism");
       }
 
-      renameTo(src, dst, srcCounts, dstCounts,
-          isUsingSubTreeLocks, subTreeLockDst, logEntries, options);
+      renameTo(src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0,
+              dst, srcCounts, dstCounts, isUsingSubTreeLocks,
+              subTreeLockDst, logEntries, options);
+
       renameTransactionCommitted = true;
     } finally {
       if (!renameTransactionCommitted) {
         if (srcSubTreeRoot != null) { //only unlock if locked
-          unlockSubtree(src);
+          unlockSubtree(src, srcSubTreeRoot.getInodeId());
         }
       }
     }
@@ -7150,12 +7211,11 @@ public class FSNamesystem
     return null;
   }
 
-  private void renameTo(final String src1, final String dst1, final INode.DirCounts srcCounts,
-      final INode.DirCounts dstCounts, final boolean isUsingSubTreeLocks, final String subTreeLockDst,
-      final Collection<MetadataLogEntry> logEntries,
-      final Options.Rename... options
-  )
-      throws IOException {
+  private void renameTo(final String src1, final int srcINodeID, final String dst1,
+                        final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
+                        final boolean isUsingSubTreeLocks, final String subTreeLockDst,
+                        final Collection<MetadataLogEntry> logEntries,
+                        final Options.Rename... options) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
@@ -7166,9 +7226,14 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getRenameINodeLock(nameNode,
-            INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-            INodeResolveType.PATH, true, src, dst))
+        INodeLock il = lf.getRenameINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                INodeResolveType.PATH, src, dst)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        if (isUsingSubTreeLocks) {
+          il.setIgnoredSTOInodes(srcINodeID);
+        }
+        locks.add(il)
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.IV,
                 BLK.PE, BLK.ER));
@@ -7248,7 +7313,7 @@ public class FSNamesystem
         INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, false);
         nodes = inodesInPath.getINodes();
         inode = nodes[nodes.length - 1];
-        if (inode != null && inode.isSubtreeLocked()) {
+        if (inode != null && inode.isSTOLocked()) {
           inode.setSubtreeLocked(false);
           EntityManager.update(inode);
         }
@@ -7259,6 +7324,9 @@ public class FSNamesystem
   @Deprecated
   boolean multiTransactionalRename(final String src, final String dst)
       throws IOException {
+    //only for testing
+    saveTimes();
+
     CacheEntry cacheEntry = retryCacheWaitForCompletionTransactional();
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return true; // Return previous response
@@ -7362,7 +7430,7 @@ public class FSNamesystem
       if (isUsingSubTreeLocks) {
         LOG.debug("Rename src: "+src+" dst: "+dst+" requires sub-tree locking mechanism");
         srcSubTreeRoot = lockSubtreeAndCheckPathPermission(src, false, null,
-            FsAction.WRITE, null, null, SubTreeOperation.StoOperationType.RENAME_STO);
+            FsAction.WRITE, null, null, SubTreeOperation.Type.RENAME_STO);
 
         if (srcSubTreeRoot != null) {
           AbstractFileTree.QuotaCountingFileTree srcFileTree;
@@ -7380,11 +7448,13 @@ public class FSNamesystem
           srcCounts.nsCount = srcFileTree.getNamespaceCount();
           srcCounts.dsCount = srcFileTree.getDiskspaceCount();
         }
+        delayAfterBbuildingTree("Built tree of "+src1+" for rename. ");
       } else {
         LOG.debug("Rename src: " + src + " dst: " + dst + " does not require sub-tree locking mechanism");
       }
 
-      boolean retValue = renameTo(src, dst, srcCounts, dstCounts, isUsingSubTreeLocks, subTreeLockDst, logEntries);
+      boolean retValue = renameTo(src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0,
+              dst, srcCounts, dstCounts, isUsingSubTreeLocks, subTreeLockDst, logEntries);
 
       // the rename Tx has committed. it has also remove the subTreeLocks
       renameTransactionCommitted = true;
@@ -7394,7 +7464,7 @@ public class FSNamesystem
     } finally {
       if (!renameTransactionCommitted) {
         if (srcSubTreeRoot != null) { //only unlock if locked
-          unlockSubtree(src);
+          unlockSubtree(src, srcSubTreeRoot.getInodeId());
         }
      }
     }
@@ -7415,13 +7485,14 @@ public class FSNamesystem
   /**
    * Change the indicated filename.
    *
-   * @deprecated Use {@link #renameTo(String, String, Options.Rename...)}
+   * @deprecated Use {@link #multiTransactionalRename(String, String, Rename...)}}
    * instead.
    */
   @Deprecated
-  boolean renameTo(final String src1, final String dst1, final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
-      final boolean isUsingSubTreeLocks, final String subTreeLockDst,
-      final Collection<MetadataLogEntry> logEntries)
+  boolean renameTo(final String src1, final int srcINodeID, final String dst1,
+                   final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
+                   final boolean isUsingSubTreeLocks, final String subTreeLockDst,
+                   final Collection<MetadataLogEntry> logEntries)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
@@ -7435,12 +7506,17 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getLegacyRenameINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/, nameNode,
-                INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                INodeResolveType.PATH, true, src, dst))
-                .add(lf.getBlockLock())
-                .add(lf.getBlockRelated(BLK.RE, BLK.UC, BLK.IV, BLK.CR, BLK.ER,
-                    BLK.PE, BLK.UR));
+            INodeLock il = lf.getLegacyRenameINodeLock(
+                    INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src, dst)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+            if(isUsingSubTreeLocks) {
+                    il.setIgnoredSTOInodes(srcINodeID);
+            }
+            locks.add(il)
+                    .add(lf.getBlockLock())
+                    .add(lf.getBlockRelated(BLK.RE, BLK.UC, BLK.IV, BLK.CR, BLK.ER, BLK.PE, BLK.UR));
             if(!isUsingSubTreeLocks){
               locks.add(lf.getLeaseLock(LockType.WRITE))
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
@@ -7499,6 +7575,9 @@ public class FSNamesystem
    */
   boolean multiTransactionalDelete(final String path, final boolean recursive)
       throws IOException {
+    //only for testing
+    saveTimes();
+
     boolean ret = false;
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog
@@ -7564,12 +7643,13 @@ public class FSNamesystem
         try {
           subtreeRoot = lockSubtreeAndCheckPathPermission(path, false, null,
               FsAction.WRITE, null, null,
-              SubTreeOperation.StoOperationType.DELETE_STO);
+              SubTreeOperation.Type.DELETE_STO);
 
           List<AclEntry> nearestDefaultsForSubtree = calculateNearestDefaultAclForSubtree(pathInfo);
           AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(this, subtreeRoot, FsAction.ALL,
               nearestDefaultsForSubtree);
           fileTree.buildUp();
+          delayAfterBbuildingTree("Built tree for "+path1+" for delete op");
 
           if (dir.isQuotaEnabled()) {
             Iterator<Integer> idIterator = fileTree.getAllINodesIds().iterator();
@@ -7585,14 +7665,14 @@ public class FSNamesystem
           }
 
           for (int i = fileTree.getHeight(); i > 0; i--) {
-            if (!deleteTreeLevel(path, fileTree, i)) {
+            if (!deleteTreeLevel(path, fileTree.getSubtreeRoot().getId(), fileTree, i)) {
               ret = false;
               return ret;
             }
           }
         } finally {
           if (subtreeRoot != null) {
-            unlockSubtree(path);
+            unlockSubtree(path, subtreeRoot.getInodeId());
           }
         }
         ret = true;
@@ -7603,27 +7683,27 @@ public class FSNamesystem
     }
   }
 
-  private boolean deleteTreeLevel(final String subtreeRootPath,
+  private boolean deleteTreeLevel(final String subtreeRootPath, final int subTreeRootID,
       final AbstractFileTree.FileTree fileTree, int level) throws TransactionContextException, IOException {
     ArrayList<Future> barrier = new ArrayList<>();
 
      for (final ProjectedINode dir : fileTree.getDirsByLevel(level)) {
        if (fileTree.countChildren(dir.getId()) <= BIGGEST_DELETABLE_DIR) {
          final String path = fileTree.createAbsolutePath(subtreeRootPath, dir);
-         Future f = multiTransactionDeleteInternal(path);
+         Future f = multiTransactionDeleteInternal(path, subTreeRootID);
          barrier.add(f);
        } else {
          //delete the content of the directory one by one.
          for (final ProjectedINode inode : fileTree.getChildren(dir.getId())) {
            if(!inode.isDirectory()) {
              final String path = fileTree.createAbsolutePath(subtreeRootPath, inode);
-             Future f = multiTransactionDeleteInternal(path);
+             Future f = multiTransactionDeleteInternal(path, subTreeRootID);
              barrier.add(f);
            }
          }
          // the dir is empty now. delete it.
          final String path = fileTree.createAbsolutePath(subtreeRootPath, dir);
-         Future f = multiTransactionDeleteInternal(path);
+         Future f = multiTransactionDeleteInternal(path, subTreeRootID);
          barrier.add(f);
        }
      }
@@ -7634,16 +7714,24 @@ public class FSNamesystem
         if (!((Boolean) f.get())) {
           result = false;
         }
-      } catch (Exception e) {
+      } catch (ExecutionException e) {
         result = false;
         LOG.error("Exception was thrown during partial delete", e);
+        Throwable throwable= e.getCause();
+        if ( throwable instanceof  IOException ){
+          throw (IOException)throwable; //pass the exception as is to the client
+        } else {
+          throw new IOException(e); //only io exception as passed to clients.
+        }
+      } catch (InterruptedException e) {
+        e.printStackTrace();
       }
     }
     return result;
   }
 
-  private Future multiTransactionDeleteInternal(final String path1) throws StorageException, TransactionContextException,
-      IOException {
+  private Future multiTransactionDeleteInternal(final String path1, final int subTreeRootId)
+          throws StorageException, TransactionContextException, IOException {
    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
    final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
    return  subtreeOperationsExecutor.submit(new Callable<Boolean>() {
@@ -7655,25 +7743,35 @@ public class FSNamesystem
                     public void acquireLock(TransactionLocks locks)
                             throws IOException {
                       LockFactory lf = LockFactory.getInstance();
-                      locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/, nameNode,
-                              INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                              INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, false, true, path))
+                      INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                              INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY,path)
+                               .setNameNodeID(nameNode.getId())
+                              .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                              .skipReadingQuotaAttr(!dir.isQuotaEnabled())
+                              .setIgnoredSTOInodes(subTreeRootId);
+                      locks.add(il)
                               .add(lf.getLeaseLock(LockType.WRITE))
                               .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                               .add(lf.getBlockLock()).add(
-                              lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE,
-                                      BLK.IV));
+                              lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE, BLK.IV));
                       if (dir.isQuotaEnabled()) {
                         locks.add(lf.getQuotaUpdateLock(true, path));
                       }
                       if (erasureCodingEnabled) {
-                        locks.add(lf.getEncodingStatusLock(true,LockType.WRITE, path));
+                        locks.add(lf.getEncodingStatusLock(true, LockType.WRITE, path));
                       }
                     }
 
                     @Override
                     public Object performTask() throws IOException {
-                      return deleteInternal(path,true,false);
+                      if(!deleteInternal(path,true,false)){
+                        //at this point the delete op is expected to succeed. Apart from DB errors
+                        // this can only fail if the quiesce phase in subtree operation failed to
+                        // quiesce the subtree. See TestSubtreeConflicts.testConcurrentSTOandInodeOps
+                        throw new SubtreeQuiesceException("Unable to Delete path: "+path1+". Possible subtree quiesce failure");
+
+                      }
+                      return true;
                     }
                   };
           return (Boolean) deleteHandler.handle(this);
@@ -7692,7 +7790,7 @@ public class FSNamesystem
    * @throws IOException
    */
   @VisibleForTesting
-  INodeIdentifier lockSubtree(final String path, SubTreeOperation.StoOperationType stoType) throws IOException {
+  INodeIdentifier lockSubtree(final String path, SubTreeOperation.Type stoType) throws IOException {
     return lockSubtreeAndCheckPathPermission(path, false, null, null, null,
         null, stoType);
   }
@@ -7723,7 +7821,7 @@ public class FSNamesystem
       final boolean doCheckOwner, final FsAction ancestorAccess,
       final FsAction parentAccess, final FsAction access,
       final FsAction subAccess,
-      final SubTreeOperation.StoOperationType stoType) throws IOException {
+      final SubTreeOperation.Type stoType) throws IOException {
 
     if(path.compareTo("/")==0){
       return null;
@@ -7743,11 +7841,13 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/, nameNode, INodeLockType
-            .WRITE,
-            INodeResolveType.PATH, false, path)).
-            //READ_COMMITTED because it is index scan and locking is bad idea
-            //INode lock is sufficient
+        INodeLock il = lf.getINodeLock( INodeLockType.WRITE, INodeResolveType.PATH, path);
+        il.setNameNodeID(nameNode.getId()).setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(!dir.isQuotaEnabled())
+                .enableHierarchicalLocking(conf.getBoolean(DFSConfigKeys.DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY,
+                DFSConfigKeys.DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY_DEFAULT));
+        locks.add(il).
+                //READ_COMMITTED because it is index scan and hierarchical locking for inodes is sufficient
                 add(lf.getSubTreeOpsLock(LockType.READ_COMMITTED,
                 getSubTreeLockPathPrefix(path))); // it is
         locks.add(lf.getAcesLock());
@@ -7764,6 +7864,7 @@ public class FSNamesystem
         INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(path, false);
         INode[] nodes = inodesInPath.getINodes();
         INode inode = nodes[nodes.length - 1];
+
         if (inode != null && inode.isDirectory() &&
             !inode.isRoot()) { // never lock the fs root
           checkSubTreeLocks(getSubTreeLockPathPrefix(path));
@@ -7781,6 +7882,9 @@ public class FSNamesystem
           INodeIdentifier iNodeIdentifier =  new INodeIdentifier(inode.getId(), inode.getParentId(),
               inode.getLocalName(), inode.getPartitionId());
           iNodeIdentifier.setDepth(inode.myDepth());
+
+          //Wait before commit. Only for testing
+          delayBeforeSTOFlag(stoType.toString());
           return  iNodeIdentifier;
         }else{
           if(LOG.isInfoEnabled()) {
@@ -7813,7 +7917,8 @@ public class FSNamesystem
    * check for sub tree locks in the descendant tree
    * @return number of active operations in the descendant tree
    */
-  private void checkSubTreeLocks(String path) throws TransactionContextException, StorageException{
+  private void checkSubTreeLocks(String path) throws TransactionContextException,
+          StorageException, SubtreeLockedException{
     List<SubTreeOperation> ops = (List<SubTreeOperation>)
         EntityManager.findList(SubTreeOperation.Finder.ByPathPrefix,
             path);  // THIS RETURNS ONLY ONE SUBTREE OP IN THE CHILD TREE. INCREASE THE LIMIT IN IMPL LAYER IF NEEDED
@@ -7827,7 +7932,6 @@ public class FSNamesystem
         throw new SubtreeLockedException("There is at least one ongoing " +
             "subtree operation on the descendants. Path: "+op.getPath()
             +" Operation "+op.getOpType()+" NameNodeId "+ op.getNameNodeId());
-
       }else{ // operation started by a dead namenode.
         //TODO: what if the activeNameNodeIds does not contain all new namenode ids
         //An operation belonging to new namenode might be considered dead
@@ -7845,13 +7949,19 @@ public class FSNamesystem
    * @throws IOException
    */
   @VisibleForTesting
-  void unlockSubtree(final String path) throws IOException {
+  void unlockSubtree(final String path, final int ignoreStoInodeId) throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.RESET_SUBTREE_LOCK) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/,nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, false, true, path));
+        INodeLock il = (INodeLock)lf.getINodeLock( INodeLockType.WRITE, INodeResolveType.PATH, path)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(!dir.isQuotaEnabled())
+                .setIgnoredSTOInodes(ignoreStoInodeId)
+                .enableHierarchicalLocking(conf.getBoolean(DFSConfigKeys.DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY,
+                        DFSConfigKeys.DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY_DEFAULT));
+        locks.add(il);
       }
 
       @Override
@@ -7859,7 +7969,7 @@ public class FSNamesystem
         INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(path, false);
         INode[] nodes = inodesInPath.getINodes();
         INode inode = nodes[nodes.length - 1];
-        if (inode != null && inode.isSubtreeLocked()) {
+        if (inode != null && inode.isSTOLocked()) {
           inode.setSubtreeLocked(false);
           EntityManager.update(inode);
         }
@@ -7895,9 +8005,10 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.READ_COMMITTED,
-                INodeResolveType.PATH, filePath)).add(
-                lf.getEncodingStatusLock(LockType.READ_COMMITTED, filePath));
+            INodeLock il = lf.getINodeLock(INodeLockType.READ_COMMITTED, INodeResolveType.PATH, filePath)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            locks.add(il).add(lf.getEncodingStatusLock(LockType.READ_COMMITTED, filePath));
           }
 
           @Override
@@ -8009,10 +8120,12 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, sourcePath));
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, sourcePath)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il);
         locks.add(lf.getEncodingStatusLock(LockType.WRITE, sourcePath))
-            .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+                .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
       }
 
       @Override
@@ -8104,8 +8217,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, path))
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, path)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il)
             .add(lf.getEncodingStatusLock(LockType.WRITE, path));
       }
 
@@ -8129,8 +8244,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, filePath))
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, filePath)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il)
             .add(lf.getEncodingStatusLock(LockType.WRITE, filePath));
       }
 
@@ -8222,9 +8339,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, sourceFile))
-            .add(lf.getEncodingStatusLock(LockType.WRITE, sourceFile));
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, sourceFile)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getEncodingStatusLock(LockType.WRITE, sourceFile));
       }
 
       @Override
@@ -8271,8 +8389,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, src));
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il);
       }
 
       @Override
@@ -8306,9 +8426,10 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getINodeLock(nameNode, INodeLockType.READ, INodeResolveType.PATH,
-                src)).add(lf.getBlockChecksumLock(src, blockIndex));
+        INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockChecksumLock(src, blockIndex));
       }
 
       @Override
@@ -8347,8 +8468,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(false, nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, src));
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(false);
+        locks.add(il);
         locks.add(lf.getAcesLock());
       }
 
@@ -8374,8 +8498,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, src));
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(true);
+        locks.add(il);
         locks.add(lf.getAcesLock());
       }
       @Override
@@ -8400,8 +8527,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, src));
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(true);
+        locks.add(il);
         locks.add(lf.getAcesLock());
       }
       @Override
@@ -8426,8 +8556,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, src));
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(true);
+        locks.add(il);
         locks.add(lf.getAcesLock());
       }
       @Override
@@ -8451,8 +8584,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, src));
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(true);
+        locks.add(il);
         locks.add(lf.getAcesLock());
       }
 
@@ -8476,8 +8612,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.READ,
-            INodeResolveType.PATH, src));
+        INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(true);
+        locks.add(il);
         locks.add(lf.getAcesLock());
       }
 
@@ -8542,9 +8681,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(nameNode,
-            TransactionLockTypes.INodeLockType.READ_COMMITTED,
-            TransactionLockTypes.INodeResolveType.PATH, sourcePath));
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED,
+                TransactionLockTypes.INodeResolveType.PATH, sourcePath)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il);
       }
 
       @Override
@@ -8585,9 +8726,12 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/,nameNode, INodeLockType.READ_COMMITTED,
-                INodeResolveType.PATH, false,
-                path)).add(lf.getBlockLock()); // blk lock only if file
+            INodeLock il = lf.getINodeLock(INodeLockType.READ_COMMITTED,
+                    INodeResolveType.PATH, path)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+            locks.add(il).add(lf.getBlockLock()); // blk lock only if file
             locks.add(lf.getAcesLock());
           }
 
@@ -8776,9 +8920,11 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(true/*skip quota*/, nameNode,
-                INodeLockType.READ,
-                INodeResolveType.PATH, true, src));
+            INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
+                    .setNameNodeID(nameNode.getId())
+                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                    .skipReadingQuotaAttr(true/*skip quota*/);
+            locks.add(il);
           }
 
           @Override
@@ -8817,8 +8963,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getINodeLock(!dir.isQuotaEnabled(), nameNode, INodeLockType
-            .READ_COMMITTED, INodeResolveType.PATH, false, path));
+        INodeLock il = lf.getINodeLock(INodeLockType.READ_COMMITTED, INodeResolveType.PATH, path)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+        locks.add(il);
       }
 
       @Override
@@ -8848,7 +8997,8 @@ public class FSNamesystem
   }
 
   private CacheEntry retryCacheWaitForCompletionTransactional() throws IOException {
-    HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType.CONCAT) {
+    HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType
+            .RETRY_CACHE) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
@@ -8864,7 +9014,8 @@ public class FSNamesystem
   }
 
   private CacheEntry retryCacheSetStateTransactional(final CacheEntry cacheEntry, final boolean ret) throws IOException {
-    HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType.CONCAT) {
+    HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType
+            .RETRY_CACHE) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
@@ -8901,7 +9052,8 @@ public class FSNamesystem
           final List<CacheEntry> toRemove = new ArrayList<>();
           int num = retryCache.getToRemove().drainTo(toRemove);
           if (num > 0) {
-            HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType.CONCAT) {
+            HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler
+                    (HDFSOperationType.CLEAN_RETRY_CACHE) {
               @Override
               public void acquireLock(TransactionLocks locks) throws IOException {
                 LockFactory lf = getInstance();
@@ -8965,6 +9117,80 @@ public class FSNamesystem
       }
     }
    return new ArrayList<>();
+  }
+
+  public void setDelayBeforeSTOFlag(long delay){
+    if(isTestingSTO)
+      this.delayBeforeSTOFlag = delay;
+  }
+
+  public void setDelayAfterBuildingTree(long delay){
+    if (isTestingSTO)
+      this.delayAfterBuildingTree = delay;
+  }
+
+
+  public void delayBeforeSTOFlag(String message) {
+    if (isTestingSTO) {
+      //Only for testing
+      Times time = delays.get();
+      if (time == null){
+        time = saveTimes();
+      }
+      try {
+        LOG.debug("Testing STO. "+message+" Sleeping for " + time.delayBeforeSTOFlag);
+        Thread.sleep(time.delayBeforeSTOFlag);
+        LOG.debug("Testing STO. "+message+" Waking up from sleep of " + time.delayBeforeSTOFlag);
+      } catch (InterruptedException e) {
+        LOG.warn(e);
+      }
+    }
+  }
+
+  public void delayAfterBbuildingTree(String message) {
+    //Only for testing
+    if (isTestingSTO) {
+      Times time = delays.get();
+      if (time == null){
+        time = saveTimes();
+      }
+      try {
+        LOG.debug("Testing STO. "+message+" Sleeping for " + time.delayAfterBuildingTree);
+        Thread.sleep(time.delayAfterBuildingTree);
+        LOG.debug("Testing STO. "+message+" Waking up from sleep of " + time.delayAfterBuildingTree);
+      } catch (InterruptedException e) {
+        LOG.warn(e);
+      }
+    }
+  }
+
+  private class Times {
+    long delayBeforeSTOFlag = 0; //This parameter can not be more than TxInactiveTimeout: 1.2 sec
+    long delayAfterBuildingTree = 0;
+
+    public Times(long delayBeforeSTOFlag, long delayAfterBuildingTree) {
+      this.delayBeforeSTOFlag = delayBeforeSTOFlag;
+      this.delayAfterBuildingTree = delayAfterBuildingTree;
+    }
+  }
+
+  public void setTestingSTO(boolean val) {
+    this.isTestingSTO = val ;
+  }
+
+  public boolean isTestingSTO() {
+    return isTestingSTO;
+  }
+
+  private Times saveTimes(){
+    if(isTestingSTO) {
+      delays.remove();
+      Times times = new Times(delayBeforeSTOFlag, delayAfterBuildingTree);
+      delays.set(times);
+      return times;
+    }else{
+      return null;
+    }
   }
 }
 

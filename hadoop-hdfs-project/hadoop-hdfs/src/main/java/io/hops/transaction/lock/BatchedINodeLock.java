@@ -47,7 +47,7 @@ public class BatchedINodeLock extends BaseINodeLock {
         inodeIds[i] = inodeIdentifier.getInodeId();
       }
 
-      List<INode> inodes = find(DEFAULT_INODE_LOCK_TYPE, names, parentIds, partitionIds, false);
+      List<INode> inodes = find(getDefaultInodeLockType(), names, parentIds,partitionIds, false);
       for (INode inode : inodes) {
         if (inode != null) {
           List<INode> pathInodes = readUpInodes(inode);
