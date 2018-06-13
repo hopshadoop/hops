@@ -108,7 +108,7 @@ public class LayoutVersion {
         + "enable rebuilding retry cache in case of HA failover"),
     ADD_DATANODE_AND_STORAGE_UUIDS(-45, "Replace StorageID with DatanodeUuid."
         + " Use distinct StorageUuid per storage directory."),
-    EXTENDED_ACL(-53, "Extended ACL");
+    EXTENDED_ACL(-46, "Extended ACL");
   
     final int lv;
     final int ancestorLV;
