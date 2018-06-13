@@ -88,16 +88,4 @@ final class IndividualINodeLock extends BaseINodeLock {
     return "Individual Inode Lock not set";
   }
 
-  private List<INode> readUpInodes(INode leaf)
-      throws StorageException, TransactionContextException {
-    LinkedList<INode> pathInodes = new LinkedList<>();
-    pathInodes.add(leaf);
-    INode curr = leaf;
-    while (curr.getParentId() != INodeDirectory.ROOT_PARENT_ID) {
-      curr = find(TransactionLockTypes.INodeLockType.READ_COMMITTED,
-          curr.getParentId());
-      pathInodes.addFirst(curr);
-    }
-    return pathInodes;
-  }
 }
