@@ -105,13 +105,18 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE =
       "dfs.namenode.misreplicated.batchsize";
   public static final int
-      DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE_DEFAULT = 500;
+      DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE_DEFAULT = 1000;
   
   public static final String DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_BATCHS =
       "dfs.namenode.misreplicated.noofbatches";
   public static final int
-      DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_BATCHS_DEFAULT = 10;
+      DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_BATCHS_DEFAULT = 100;
 
+  public static final String DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS =
+      "dfs.namenode.misreplicated.noofbatches";
+  public static final int
+      DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT = 10;
+  
   public static final String DFS_TRANSACTION_STATS_ENABLED =
       "dfs.transaction.stats.enabled";
   public static final boolean DFS_TRANSACTION_STATS_ENABLED_DEFAULT = false;

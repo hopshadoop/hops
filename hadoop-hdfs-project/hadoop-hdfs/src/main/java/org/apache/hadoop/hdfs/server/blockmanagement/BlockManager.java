@@ -304,7 +304,11 @@ public class BlockManager {
    * Number of batches to be processed by this namenode at one time
    */
   private final int processMisReplicatedNoOfBatchs;
-
+  /**
+   * Number of threads procession batches in parallel
+   */
+  private final int processMisReplicatedNoThreads;
+  
   public BlockManager(final Namesystem namesystem, final FSClusterStats stats,
       final Configuration conf) throws IOException {
     this.namesystem = namesystem;
@@ -396,6 +400,9 @@ public class BlockManager {
         DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_BATCHS,
         DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_BATCHS_DEFAULT);
 
+    this.processMisReplicatedNoThreads = conf.getInt(
+        DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS,
+        DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT);
     LOG.info("defaultReplication         = " + defaultReplication);
     LOG.info("maxReplication             = " + maxReplication);
     LOG.info("minReplication             = " + minReplication);
@@ -406,6 +413,7 @@ public class BlockManager {
     LOG.info("maxNumBlocksToLog          = " + maxNumBlocksToLog);
     LOG.info("misReplicatedBatchSize     = " + processMisReplicatedBatchSize);
     LOG.info("misReplicatedNoOfBatchs     = " + processMisReplicatedNoOfBatchs);   
+    LOG.info("misReplicatedNoOfThreads     = " + processMisReplicatedNoThreads);   
   }
 
   private NameNodeBlockTokenSecretManager createBlockTokenSecretManager(
@@ -3057,10 +3065,12 @@ public class BlockManager {
    * over or under replicated. Place it into the respective queue.
    */
   public void processMisReplicatedBlocks() throws IOException {
-    final long[] nrInvalid = {0}, nrOverReplicated = {0}, nrUnderReplicated =
-        {0}, nrPostponed = {0},
-        nrUnderConstruction = {0};
-
+    final AtomicLong nrInvalid = new AtomicLong(0);
+    final AtomicLong nrOverReplicated = new AtomicLong(0);
+    final AtomicLong nrUnderReplicated = new AtomicLong(0);
+    final AtomicLong nrPostponed = new AtomicLong(0);
+    final AtomicLong nrUnderConstruction = new AtomicLong(0);
+    
     //FIXME [M] we need to have a garbage collection to check for the invalid
     // blocks
     final HopsTransactionalRequestHandler processMisReplicatedBlocksHandler =
@@ -3092,20 +3102,20 @@ public class BlockManager {
                 }
                 switch (res) {
                   case UNDER_REPLICATED:
-                    nrUnderReplicated[0]++;
+                    nrUnderReplicated.incrementAndGet();
                     break;
                   case OVER_REPLICATED:
-                    nrOverReplicated[0]++;
+                    nrOverReplicated.incrementAndGet();
                     break;
                   case INVALID:
-                    nrInvalid[0]++;
+                    nrInvalid.incrementAndGet();
                     break;
                   case POSTPONE:
-                    nrPostponed[0]++;
+                    nrPostponed.incrementAndGet();
                     postponeBlock(block);
                     break;
                   case UNDER_CONSTRUCTION:
-                    nrUnderConstruction[0]++;
+                    nrUnderConstruction.incrementAndGet();
                     break;
                   case OK:
                     break;
@@ -3146,7 +3156,7 @@ public class BlockManager {
             " - " + filesToProcessEndIndex + "]");
 
         try {
-          Slicer.slice(allINodes.size(), processMisReplicatedBatchSize,
+          Slicer.slice(allINodes.size(), processMisReplicatedBatchSize, processMisReplicatedNoThreads, 
               new Slicer.OperationHandler() {
                 @Override
                 public void handle(int startIndex, int endIndex)
@@ -3167,11 +3177,11 @@ public class BlockManager {
       } while (haveMore);
     }
     LOG.info("Total number of blocks            = " + blocksMap.size());
-    LOG.info("Number of invalid blocks          = " + nrInvalid[0]);
-    LOG.info("Number of under-replicated blocks = " + nrUnderReplicated[0]);
-    LOG.info("Number of  over-replicated blocks = " + nrOverReplicated[0] +
-        ((nrPostponed[0] > 0) ? (" (" + nrPostponed[0] + " postponed)") : ""));
-    LOG.info("Number of blocks being written    = " + nrUnderConstruction[0]);
+    LOG.info("Number of invalid blocks          = " + nrInvalid.get());
+    LOG.info("Number of under-replicated blocks = " + nrUnderReplicated.get());
+    LOG.info("Number of  over-replicated blocks = " + nrOverReplicated.get() +
+        ((nrPostponed.get() > 0) ? (" (" + nrPostponed.get() + " postponed)") : ""));
+    LOG.info("Number of blocks being written    = " + nrUnderConstruction.get());
   }
 
   private void addToMisReplicatedRangeQueue(final long start, final long end)
