@@ -339,7 +339,7 @@ public class BlockInfo extends Block {
         (BlockInfoDataAccess) HdfsStorageFactory
             .getDataAccess(BlockInfoDataAccess.class);
 
-    return da.existsOnAnyStorage(getBlockId(), sids);
+    return da.existsOnAnyStorage(getInodeId(), getBlockId(), sids);
   }
   
   boolean isReplicatedOnStorage(DatanodeStorageInfo storage)

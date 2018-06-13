@@ -20,7 +20,6 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.resolvingcache.Cache;
-import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.server.namenode.INode;
@@ -32,9 +31,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 
 public abstract class BaseINodeLock extends Lock {
   private final Map<INode, TransactionLockTypes.INodeLockType>
@@ -326,5 +327,21 @@ public abstract class BaseINodeLock extends Lock {
     }else{
       return false;
     }
+  }
+  
+  protected List<INode> readUpInodes(INode leaf)
+      throws StorageException, TransactionContextException {
+    LinkedList<INode> pathInodes = new LinkedList<>();
+    pathInodes.add(leaf);
+    INode curr = leaf;
+    while (curr.getParentId() != INodeDirectory.ROOT_PARENT_ID) {
+      curr = find(TransactionLockTypes.INodeLockType.READ_COMMITTED,
+          curr.getParentId());
+      if(curr==null){
+        break;
+      }
+      pathInodes.addFirst(curr);
+    }
+    return pathInodes;
   }
 }
