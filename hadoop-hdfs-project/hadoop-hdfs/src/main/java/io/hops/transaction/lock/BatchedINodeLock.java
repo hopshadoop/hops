@@ -15,15 +15,12 @@
  */
 package io.hops.transaction.lock;
 
+import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
-import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 
 public class BatchedINodeLock extends BaseINodeLock {
@@ -50,7 +47,14 @@ public class BatchedINodeLock extends BaseINodeLock {
         inodeIds[i] = inodeIdentifier.getInodeId();
       }
 
-      List<INode> inodes = find(DEFAULT_INODE_LOCK_TYPE, names, parentIds,partitionIds, false);
+      List<INode> inodes = find(DEFAULT_INODE_LOCK_TYPE, names, parentIds, partitionIds, false);
+      for (INode inode : inodes) {
+        if (inode != null) {
+          List<INode> pathInodes = readUpInodes(inode);
+          addPathINodesAndUpdateResolvingCache(INodeUtil.constructPath(pathInodes),
+              pathInodes);
+        }
+      }
       addIndividualINodes(inodes);
     } else {
       throw new StorageException(

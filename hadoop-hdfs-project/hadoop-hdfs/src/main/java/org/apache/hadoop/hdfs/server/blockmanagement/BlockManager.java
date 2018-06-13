@@ -4675,7 +4675,7 @@ public class BlockManager {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
             .add(lf.getBlockLock(block.getBlockId(), inodeIdentifier)).add(
             lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.IV, BLK.UR));
         if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
@@ -4708,7 +4708,7 @@ public class BlockManager {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
             .add(lf.getIndividualBlockLock(ucBlock.reportedBlock.getBlockId(), inodeIdentifier))
             .add(lf.getBlockRelated(BLK.RE, BLK.UC, BLK.ER, BLK.CR, BLK.PE,
                 BLK.UR));
@@ -4787,7 +4787,7 @@ public class BlockManager {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
             .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
             .add(lf.getBlockRelated(BLK.RE, BLK.UC, BLK.CR, BLK.ER, BLK.PE,
                 BLK.UR));
@@ -4826,7 +4826,7 @@ public class BlockManager {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
             .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.PE, BLK.IV,
                 BLK.UR));

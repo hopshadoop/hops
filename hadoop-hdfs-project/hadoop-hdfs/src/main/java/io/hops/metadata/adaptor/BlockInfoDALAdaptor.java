@@ -108,9 +108,9 @@ public class BlockInfoDALAdaptor extends
   }
 
   @Override
-  public boolean existsOnAnyStorage(long blockId, List<Integer> sids) throws
+  public boolean existsOnAnyStorage(int inodeId, long blockId, List<Integer> sids) throws
       StorageException {
-    return dataAccess.existsOnAnyStorage(blockId, sids);
+    return dataAccess.existsOnAnyStorage(inodeId, blockId, sids);
   }
 
   @Override

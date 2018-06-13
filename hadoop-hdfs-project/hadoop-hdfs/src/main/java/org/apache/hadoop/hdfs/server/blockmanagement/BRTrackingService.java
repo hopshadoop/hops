@@ -99,6 +99,7 @@ public class BRTrackingService {
 
     LOG.debug("Currently processing at "+ongoingWork+" blks /"+(BR_LB_TIME_WINDOW_SIZE/(double)1000)+" sec");
     if ((ongoingWork + noOfBlks) > getBrLbMaxBlkPerTW(DB_VAR_UPDATE_THRESHOLD)) {
+      LOG.info("Work ("+noOfBlks+" blks) can not be assigned, ongoing work: " + ongoingWork);
       return false;
     } else {
       return true;
@@ -131,7 +132,6 @@ public class BRTrackingService {
         return an;
       }
     }
-    LOG.info("Work ("+noOfBlks+" blks) could not be assigned");
     throw new BRLoadBalancingException("Work ("+noOfBlks+" blks) could not be assigned. System is fully loaded now. At most "+getBrLbMaxBlkPerTW(
             DB_VAR_UPDATE_THRESHOLD )+" blocks can be processed per "+BR_LB_TIME_WINDOW_SIZE);
   }
