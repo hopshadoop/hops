@@ -72,7 +72,7 @@ public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
   }
 
   @Override
-  public void initializeHierarchy(Configuration conf) {
+  public void initializeHierarchy() {
 
   }
 }

@@ -212,7 +212,6 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     } catch (ContainerExecutionException e) {
       throw new IOException("Failed to initialize linux container runtime(s)!");
     }
-    resourcesHandler.initializeHierarchy(conf);
     resourcesHandler.init(this);
   }
 

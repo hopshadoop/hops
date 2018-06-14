@@ -52,5 +52,5 @@ public interface LCEResourcesHandler extends Configurable {
   
   void recoverDeviceControlSystem(ContainerId containerId);
 
-  void initializeHierarchy(Configuration conf);
+  void initializeHierarchy();
 }
