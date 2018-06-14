@@ -922,13 +922,10 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }
 
     final BlockManager bm = namesystem.getBlockManager();
-    boolean hasStaleStorages = false;
+    boolean hasStaleStorages = true;
     for(StorageBlockReport r : reports) {
       final BlockReport blocks = r.getReport();
-      boolean success = bm.processReport(nodeReg, r.getStorage(), blocks);
-      if (!success){
-        hasStaleStorages = true;
-      }
+      hasStaleStorages = bm.processReport(nodeReg, r.getStorage(), blocks);
       metrics.incrStorageBlockReportOps();
     }
 

@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -766,10 +767,10 @@ class BPOfferService implements Runnable {
      */
     @Override
     public Object call() throws Exception {
-      DatanodeCommand cmd = blockReport();
-      if (cmd != null) {
-        blkReportHander.processCommand(new DatanodeCommand[]{cmd});
-      }
+      List<DatanodeCommand> cmds = blockReport();
+      
+      blkReportHander.processCommand(cmds == null ? null : cmds.toArray(new DatanodeCommand[cmds.size()]));
+      
       // Now safe to start scanning the block pool.
       // If it has already been started, this is a no-op.
       if (dn.blockScanner != null) {
@@ -919,82 +920,108 @@ public class IncrementalBRTask implements Callable{
    *
    * @throws IOException
    */
-  DatanodeCommand blockReport() throws IOException {
+  
+  List<DatanodeCommand> blockReport() throws IOException {
     // send block report if timer has expired.
-    DatanodeCommand cmd = null;
-    long startTime = now();
-    if (startTime - lastBlockReport > dnConf.blockReportInterval) {
-
-      // Flush any block information that precedes the block report. Otherwise
-      // we have a chance that we will miss the delHint information
-      // or we will report an RBW replica after the BlockReport already reports
-      // a FINALIZED one.
-      reportReceivedDeletedBlocks();
-
-      // Send one block report per known storage.
-
-      // Create block report
-      long brCreateStartTime = now();
-      long totalBlockCount = 0;
-      Map<DatanodeStorage, BlockReport> perVolumeBlockLists =
-          dn.getFSDataset().getBlockReports(getBlockPoolId());
-
-      // Send block report
-      long brSendStartTime = now();
-      // Make an array of block reports
-      StorageBlockReport[] reports = new StorageBlockReport[perVolumeBlockLists.size()];
-      int i = 0;
-      for(Map.Entry<DatanodeStorage, BlockReport> kvPair : perVolumeBlockLists.entrySet()) {
-        DatanodeStorage dnStorage = kvPair.getKey();
-        BlockReport blockList = kvPair.getValue();
-        totalBlockCount += blockList.getNumBlocks();
-        reports[i++] =
-            new StorageBlockReport(dnStorage, blockList);
-      }
-
-      // Get a namenode to send the report(s) to
-      ActiveNode an = nextNNForBlkReport(totalBlockCount);
-      if (an != null) {
-        blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
-        if (blkReportHander == null || !blkReportHander.isInitialized()) {
-          return null; //no one is ready to handle the request, return now without changing the values of lastBlockReport. it will be retried in next cycle
-        }
-      } else {
-        LOG.warn("Unable to send block report");
-        return null;
-      }
-
-      cmd = blkReportHander.blockReport(bpRegistration, getBlockPoolId(), reports);
-
-      // Log the block report processing stats from Datanode perspective
-      long brSendCost = now() - brSendStartTime;
-      long brCreateCost = brSendStartTime - brCreateStartTime;
-      dn.getMetrics().addBlockReport(brSendCost);
-      LOG.info(
-          "BlockReport of " + totalBlockCount + " blocks took " +
-              brCreateCost + " msec to generate and " + brSendCost +
-              " msecs for RPC and NN processing");
-
-      // If we have sent the first block report, then wait a random
-      // time before we start the periodic block reports.
-      if (resetBlockReportTime) {
-        lastBlockReport = startTime -
-            DFSUtil.getRandom().nextInt((int) (dnConf.blockReportInterval));
-        resetBlockReportTime = false;
-      } else {
-        /* say the last block report was at 8:20:14. The current report
-         * should have started around 9:20:14 (default 1 hour interval).
-         * If current time is :
-         *   1) normal like 9:20:18, next report should be at 10:20:14
-         *   2) unexpected like 11:35:43, next report should be at 12:20:14
-         */
-        lastBlockReport +=
-            (now() - lastBlockReport) / dnConf.blockReportInterval *
-                dnConf.blockReportInterval;
-      }
-      LOG.info("sent block report, processed command:" + cmd);
+    final long startTime = now();
+    if (startTime - lastBlockReport <= dnConf.blockReportInterval) {
+      return null;
     }
-    return cmd;
+
+      
+
+    ArrayList<DatanodeCommand> cmds = new ArrayList<DatanodeCommand>();
+
+    // Flush any block information that precedes the block report. Otherwise
+    // we have a chance that we will miss the delHint information
+    // or we will report an RBW replica after the BlockReport already reports
+    // a FINALIZED one.
+    reportReceivedDeletedBlocks();
+    lastDeletedReport = startTime;
+
+    long brCreateStartTime = now();
+    Map<DatanodeStorage, BlockReport> perVolumeBlockLists =
+        dn.getFSDataset().getBlockReports(getBlockPoolId());
+
+    // Convert the reports to the format expected by the NN.
+    int i = 0;
+    int totalBlockCount = 0;
+    StorageBlockReport reports[] =
+        new StorageBlockReport[perVolumeBlockLists.size()];
+
+    for(Map.Entry<DatanodeStorage, BlockReport> kvPair : perVolumeBlockLists.entrySet()) {
+      BlockReport blockList = kvPair.getValue();
+      reports[i++] = new StorageBlockReport(kvPair.getKey(), blockList);
+      totalBlockCount += blockList.getNumberOfBlocks();
+    }
+    
+    // Get a namenode to send the report(s) to
+    ActiveNode an = nextNNForBlkReport(totalBlockCount);
+    if (an != null) {
+      blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
+      if (blkReportHander == null || !blkReportHander.isInitialized()) {
+        return null; //no one is ready to handle the request, return now without changing the values of lastBlockReport. it will be retried in next cycle
+      }
+    } else {
+      LOG.warn("Unable to send block report");
+      return null;
+    }
+
+    // Send the reports to the NN.
+    int numReportsSent;
+    long brSendStartTime = now();
+    if (totalBlockCount < dnConf.blockReportSplitThreshold) {
+      // Below split threshold, send all reports in a single message.
+      numReportsSent = 1;
+      DatanodeCommand cmd =
+          blkReportHander.blockReport(bpRegistration, getBlockPoolId(), reports);
+      if (cmd != null) {
+        cmds.add(cmd);
+      }
+    } else {
+      // Send one block report per message.
+      numReportsSent = i;
+      for (StorageBlockReport report : reports) {
+        StorageBlockReport singleReport[] = { report };
+        DatanodeCommand cmd = blkReportHander.blockReport(
+            bpRegistration, getBlockPoolId(), singleReport);
+        if (cmd != null) {
+          cmds.add(cmd);
+        }
+      }
+    }
+    // Log the block report processing stats from Datanode perspective
+    long brSendCost = now() - brSendStartTime;
+    long brCreateCost = brSendStartTime - brCreateStartTime;
+    dn.getMetrics().addBlockReport(brSendCost);
+    LOG.info("Sent " + numReportsSent + " blockreports " + totalBlockCount +
+        " blocks total. Took " + brCreateCost +
+        " msec to generate and " + brSendCost +
+        " msecs for RPC and NN processing. " +
+        " Got back commands " +
+            (cmds.size() == 0 ? "none" : Joiner.on("; ").join(cmds)));
+
+    scheduleNextBlockReport(startTime);
+    return cmds.size() == 0 ? null : cmds;
+  }
+
+  private void scheduleNextBlockReport(long previousReportStartTime) {
+    // If we have sent the first set of block reports, then wait a random
+    // time before we start the periodic block reports.
+    if (resetBlockReportTime) {
+      lastBlockReport = previousReportStartTime -
+          DFSUtil.getRandom().nextInt((int)(dnConf.blockReportInterval));
+      resetBlockReportTime = false;
+    } else {
+      /* say the last block report was at 8:20:14. The current report
+       * should have started around 9:20:14 (default 1 hour interval).
+       * If current time is :
+       *   1) normal like 9:20:18, next report should be at 10:20:14
+       *   2) unexpected like 11:35:43, next report should be at 12:20:14
+       */
+      lastBlockReport += (now() - lastBlockReport) /
+          dnConf.blockReportInterval * dnConf.blockReportInterval;
+    }
   }
 
   /**

@@ -41,7 +41,7 @@ public class BlockReport implements Iterable<ReportedBlock> {
     return hashes;
   }
   
-  public int getNumBlocks(){
+  public int getNumberOfBlocks(){
     return numBlocks;
   }
   

@@ -116,6 +116,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Keeps information related to the blocks stored in the Hadoop cluster.
@@ -2065,7 +2066,7 @@ public class BlockManager {
       blockLog.info("BLOCK* processReport: " +
           "discarded non-initial block report from " + nodeID +
           " because namenode still in startup phase");
-      return !storageInfo.areBlockContentsStale();
+      return !node.hasStaleStorages();
     }
   
     // Get the storageinfo object that we are updating in this processreport
@@ -2091,9 +2092,9 @@ public class BlockManager {
       metrics.addBlockReport((int) (endTime - startTime));
     }
     blockLog.info("BLOCK* processReport: from " + nodeID + " storage: " + storage + ", blocks: " +
-        newReport.getNumBlocks() + ", processing time: " +
+        newReport.getNumberOfBlocks() + ", processing time: " +
         (endTime - startTime) + " ms. " + reportStatistics);
-    return !storageInfo.areBlockContentsStale();
+    return !node.hasStaleStorages();
   }
 
   /**
@@ -2293,17 +2294,13 @@ public class BlockManager {
     if (newReport == null) {
       return null;
     }
-    // Get all replica's stored on this storage
-    final Map<Long,Integer> blkAndInodeIdMap = storage.getAllStorageReplicas();
-    // Get the id's of all blocks stored on this storage
-    final Set<Long> allMachineBlocks = new HashSet<Long>(blkAndInodeIdMap.keySet());
     // Get all invalidated replica's
     final Map<Long,Long> invalidatedReplicas = storage
         .getAllStorageInvalidatedReplicasWithGenStamp();
     
     ReportStatistics stats = new ReportStatistics();
     stats.numBuckets = newReport.getBuckets().length;
-    stats.numBlocks = newReport.getNumBlocks();
+    stats.numBlocks = newReport.getNumberOfBlocks();
   
     HashMatchingResult matchingResult;
     if (firstBlockReport){
@@ -2351,7 +2348,7 @@ public class BlockManager {
     if (namesystem.isInStartupSafeMode()) {
       aggregatedSafeBlocks.removeAll(toRemove);
       LOG.debug("AGGREGATED SAFE BLOCK #: " + aggregatedSafeBlocks.size() +
-          " REPORTED BLOCK #: " + newReport.getNumBlocks());
+          " REPORTED BLOCK #: " + newReport.getNumberOfBlocks());
       namesystem.adjustSafeModeBlocks(aggregatedSafeBlocks);
       stats.numConsideredSafeIfInSafemode = aggregatedSafeBlocks.size();
     }

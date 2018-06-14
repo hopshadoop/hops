@@ -169,10 +169,10 @@ public class TestSimulatedFSDataset {
   public void testGetBlockReport() throws IOException {
     SimulatedFSDataset fsdataset = getSimulatedFSDataset();
     BlockReport blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(0, blockReport.getNumBlocks());
+    assertEquals(0, blockReport.getNumberOfBlocks());
     addSomeBlocks(fsdataset);
     blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
     for (ReportedBlock b : blockReport) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getLength());
@@ -183,10 +183,10 @@ public class TestSimulatedFSDataset {
   public void testInjectionEmpty() throws IOException {
     SimulatedFSDataset fsdataset = getSimulatedFSDataset();
     BlockReport blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(0, blockReport.getNumBlocks());
+    assertEquals(0, blockReport.getNumberOfBlocks());
     int bytesAdded = addSomeBlocks(fsdataset);
     blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
     for (ReportedBlock b : blockReport) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getLength());
@@ -197,7 +197,7 @@ public class TestSimulatedFSDataset {
     SimulatedFSDataset sfsdataset = getSimulatedFSDataset();
     sfsdataset.injectBlocks(bpid, blockReport.blockIterable());
     blockReport = sfsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
     for (Block b : blockReport.blockIterable()) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getNumBytes());
@@ -213,10 +213,10 @@ public class TestSimulatedFSDataset {
   public void testInjectionNonEmpty() throws IOException {
     SimulatedFSDataset fsdataset = getSimulatedFSDataset();
     BlockReport blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(0, blockReport.getNumBlocks());
+    assertEquals(0, blockReport.getNumberOfBlocks());
     int bytesAdded = addSomeBlocks(fsdataset);
     blockReport = fsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
     for (ReportedBlock b : blockReport) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getLength());
@@ -230,12 +230,12 @@ public class TestSimulatedFSDataset {
     // the ones we are going to inject.
     bytesAdded += addSomeBlocks(sfsdataset, NUMBLOCKS + 1);
     sfsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
     sfsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS, blockReport.getNumBlocks());
+    assertEquals(NUMBLOCKS, blockReport.getNumberOfBlocks());
     sfsdataset.injectBlocks(bpid, blockReport.blockIterable());
     blockReport = sfsdataset.getBlockReport(bpid);
-    assertEquals(NUMBLOCKS * 2, blockReport.getNumBlocks());
+    assertEquals(NUMBLOCKS * 2, blockReport.getNumberOfBlocks());
     for (Block b : blockReport.blockIterable()) {
       assertNotNull(b);
       assertEquals(blockIdToLen(b.getBlockId()), b.getNumBytes());

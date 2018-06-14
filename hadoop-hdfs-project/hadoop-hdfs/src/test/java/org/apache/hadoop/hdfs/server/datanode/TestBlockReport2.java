@@ -1185,7 +1185,7 @@ public class TestBlockReport2 {
       String poolId = cluster.getNamesystem().getBlockPoolId();
       Map<DatanodeStorage, BlockReport> blockReports = dn.getFSDataset().getBlockReports(poolId);
       for (BlockReport reportedBlocks : blockReports.values()) {
-        count += reportedBlocks.getNumBlocks();
+        count += reportedBlocks.getNumberOfBlocks();
       }
     }
     return count;
