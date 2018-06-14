@@ -73,6 +73,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
   private String cgroupPrefix;
   private boolean cgroupMount;
   private String cgroupMountPath;
+  private String lceGroup;
   
   private boolean cpuWeightEnabled = true;
   private boolean strictResourceUsageMode = false;
@@ -156,11 +157,13 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
   void initConfig() throws IOException {
     
     this.cgroupPrefix = conf.get(YarnConfiguration.
-        NM_LINUX_CONTAINER_CGROUPS_HIERARCHY, "/hadoop-yarn");
+        NM_LINUX_CONTAINER_CGROUPS_HIERARCHY, "/hops-yarn");
     this.cgroupMount = conf.getBoolean(YarnConfiguration.
         NM_LINUX_CONTAINER_CGROUPS_MOUNT, false);
     this.cgroupMountPath = conf.get(YarnConfiguration.
-        NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH, null);
+        NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH, "/sys/fs/cgroup");
+    this.lceGroup = conf.get(YarnConfiguration.
+            NM_LINUX_CONTAINER_GROUP, "hadoop");
     
     this.deleteCgroupTimeout = conf.getLong(
         YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT,
@@ -203,15 +206,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
       getGPUAllocator().initialize(conf);
     }
     
-    // mount cgroups if requested
-    if (cgroupMount && cgroupMountPath != null) {
-      ArrayList<String> cgroupKVs = new ArrayList<String>();
-      cgroupKVs.add(CONTROLLER_CPU + "=" + cgroupMountPath + "/" +
-          CONTROLLER_CPU);
-        cgroupKVs.add(CONTROLLER_DEVICES + "=" + cgroupMountPath + "/" +
-            CONTROLLER_DEVICES);
-      lce.mountCgroups(cgroupKVs, cgroupPrefix);
-    }
+    initializeHierarchy();
     
     initializeControllerPaths();
 
@@ -578,6 +573,13 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
    */
   public void preExecute(ContainerId containerId, Resource containerResource)
       throws IOException {
+
+    File cpuHierarchy = new File(cgroupMountPath + "/cpu/" + cgroupPrefix);
+    File devicesHierarchy = new File(cgroupMountPath + "/devices/" + cgroupPrefix);
+    if(!cpuHierarchy.exists() || !devicesHierarchy.exists()) {
+      initializeHierarchy();
+    }
+
     setupLimits(containerId, containerResource);
   }
   
@@ -661,23 +663,23 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
   }
 
   @Override
-  public void initializeHierarchy(Configuration conf) {
-
+  public void initializeHierarchy() {
     if(executablePath != null) {
 
-      String cgroupPath = conf.get(YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH);
-      String hierarchyName = conf.get(YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_HIERARCHY);
-      String group = conf.get(YarnConfiguration.NM_LINUX_CONTAINER_GROUP);
+      LOG.info("Attempting to create cgroup hierarchy with configuration " +
+              "[" + YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH + "=" + cgroupMountPath + ", " +
+              YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_HIERARCHY + "=" + cgroupPrefix + ", " +
+              YarnConfiguration.NM_LINUX_CONTAINER_GROUP + "=" + lceGroup + "]");
 
       List<String> command = new ArrayList<>();
-      command.addAll(Arrays.asList(executablePath, "--create-hierarchy", cgroupPath, hierarchyName, group));
+      command.addAll(Arrays.asList(executablePath, "--create-hierarchy", cgroupMountPath, cgroupPrefix, lceGroup));
 
       String[] commandArray = command.toArray(new String[command.size()]);
       Shell.ShellCommandExecutor shExec = new Shell.ShellCommandExecutor(commandArray, null);
       try {
         shExec.execute();
       } catch (IOException e) {
-        e.printStackTrace();
+        LOG.error("Failed to execute command to create cgroup hierarchy", e);
       }
     }
   }

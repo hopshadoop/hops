@@ -693,7 +693,7 @@ public class TestLinuxContainerExecutor {
     }
 
     @Override
-    public void initializeHierarchy(Configuration conf) {
+    public void initializeHierarchy() {
 
     }
   }

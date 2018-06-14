@@ -2291,15 +2291,33 @@ int create_cgroup_hierarchy(const char* cgroup_path, const char* cgroup_hierarch
 
   // create hierarchy as 0750 and chown to Hadoop NM user
   const mode_t perms = S_IRWXU | S_IRGRP | S_IXGRP;
-  if (mkdirs(cpuHierarchyPath, perms) == 0) {
-      change_owner(cpuHierarchyPath, nm_uid, nm_gid);
-      chown_dir_contents(cpuHierarchyPath, nm_uid, nm_gid);
+  mkdirs(cpuHierarchyPath, perms);
+  change_owner(cpuHierarchyPath, nm_uid, nm_gid);
+  chown_dir_contents(cpuHierarchyPath, nm_uid, nm_gid);
+
+  DIR* cpuDir = opendir(cpuHierarchyPath);
+  if (cpuDir) {
+      closedir(cpuDir);
+  }
+  else if (ENOENT == errno) {
+      fprintf(LOGFILE, "Failed to create cgroup hierarchy %s - %s\n",
+                 cpuHierarchyPath, strerror(errno));
+      return -1;
   }
 
   // create hierarchy as 0750 and chown to Hadoop NM user
-  if (mkdirs(devicesHierarchyPath, perms) == 0) {
-      change_owner(devicesHierarchyPath, nm_uid, nm_gid);
-      chown_dir_contents(devicesHierarchyPath, nm_uid, nm_gid);
+  mkdirs(devicesHierarchyPath, perms);
+  change_owner(devicesHierarchyPath, nm_uid, nm_gid);
+  chown_dir_contents(devicesHierarchyPath, nm_uid, nm_gid);
+
+  DIR* devicesDir = opendir(devicesHierarchyPath);
+  if (devicesDir) {
+    closedir(devicesDir);
+  }
+  else if (ENOENT == errno) {
+    fprintf(LOGFILE, "Failed to create cgroup hierarchy %s - %s\n",
+               devicesHierarchyPath, strerror(errno));
+    return -1;
   }
 
   // Revert back to the calling user.
