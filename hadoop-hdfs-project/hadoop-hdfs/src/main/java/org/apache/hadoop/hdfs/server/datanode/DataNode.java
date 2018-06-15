@@ -369,13 +369,13 @@ public class DataNode extends Configured
         .setConf(conf).setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")));
 
     HttpConfig.Policy policy = DFSUtil.getHttpPolicy(conf);
-    InetSocketAddress infoSocAddr = DataNode.getInfoAddr(conf);
-    String infoHost = infoSocAddr.getHostName();
     
     if (policy.isHttpEnabled()) {
       if (secureResources == null) {
+        InetSocketAddress infoSocAddr = DataNode.getInfoAddr(conf);
         int port = infoSocAddr.getPort();
-        builder.addEndpoint(URI.create("http://" + infoHost + ":" + port));
+        builder.addEndpoint(URI.create("http://"
+            + NetUtils.getHostPortString(infoSocAddr)));
         if (port == 0) {
           builder.setFindPort(true);
         }
@@ -388,7 +388,7 @@ public class DataNode extends Configured
 
     if (policy.isHttpsEnabled()) {
       InetSocketAddress secInfoSocAddr = NetUtils.createSocketAddr(
-          conf.get(DFS_DATANODE_HTTPS_ADDRESS_KEY, infoHost + ":" + 0));
+          conf.get(DFS_DATANODE_HTTPS_ADDRESS_KEY, DFS_DATANODE_HTTPS_ADDRESS_DEFAULT));
       
       Configuration sslConf = DFSUtil.loadSslConfiguration(conf);
       DFSUtil.loadSslConfToHttpServerBuilder(builder, sslConf);
@@ -397,7 +397,8 @@ public class DataNode extends Configured
       if (port == 0) {
         builder.setFindPort(true);
       }
-      builder.addEndpoint(URI.create("https://" + infoHost + ":" + port));
+      builder.addEndpoint(URI.create("https://"
+          + NetUtils.getHostPortString(secInfoSocAddr)));
     }
     
     this.infoServer = builder.build();
