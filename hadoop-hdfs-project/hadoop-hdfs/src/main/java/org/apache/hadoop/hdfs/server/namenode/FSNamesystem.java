@@ -891,7 +891,23 @@ public class FSNamesystem
       throws RetriableException, SafeModeException, IOException {
     if (isInSafeMode()) {
       SafeModeException se = new SafeModeException(errorMsg, safeMode);
-      throw new RetriableException(se);
+      if (shouldRetrySafeMode(this.safeMode)) {
+        throw new RetriableException(se);
+      } else {
+        throw se;
+      }
+    }
+  }
+  
+  /**
+   * We already know that the safemode is on. We will throw a RetriableException
+   * if the safemode is not manual or caused by low resource.
+   */
+  private boolean shouldRetrySafeMode(SafeModeInfo safeMode) {
+    if (safeMode == null) {
+      return false;
+    } else {
+      return !safeMode.isManual() && !safeMode.areResourcesLow();
     }
   }
 

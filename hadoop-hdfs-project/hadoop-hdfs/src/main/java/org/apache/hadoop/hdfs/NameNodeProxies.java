@@ -23,6 +23,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_RETRY_MAX_ATTEMPTS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_RETRY_MAX_ATTEMPTS_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -193,11 +195,15 @@ public class NameNodeProxies {
       int maxFailoverAttempts = config.getInt(
           DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
           DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
+      int maxRetryAttempts = config.getInt(
+          DFS_CLIENT_RETRY_MAX_ATTEMPTS_KEY,
+          DFS_CLIENT_RETRY_MAX_ATTEMPTS_DEFAULT);
       InvocationHandler dummyHandler = new LossyRetryInvocationHandler<T>(
               numResponseToDrop, failoverProxyProvider,
               RetryPolicies.failoverOnNetworkException(
-                  RetryPolicies.TRY_ONCE_THEN_FAIL, 
-                  Math.max(numResponseToDrop + 1, maxFailoverAttempts), delay, 
+                  RetryPolicies.TRY_ONCE_THEN_FAIL, maxFailoverAttempts, 
+                  Math.max(numResponseToDrop + 1, maxRetryAttempts), 
+                  delay, 
                   maxCap));
       
       T proxy = (T) Proxy.newProxyInstance(

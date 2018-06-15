@@ -42,12 +42,14 @@ import org.apache.hadoop.hdfs.MiniDFSNNTopology;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem.SafeModeInfo;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.log4j.Level;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.internal.util.reflection.Whitebox;
 
 
 /**
@@ -104,6 +106,9 @@ public class TestHASafeMode {
     // let nn0 enter safemode
     NameNodeAdapter.enterSafeMode(nn0, false);
     NameNodeAdapter.enterSafeMode(nn1, false);
+    SafeModeInfo safeMode = (SafeModeInfo) Whitebox.getInternalState(
+        nn0.getNamesystem(), "safeMode");
+    Whitebox.setInternalState(safeMode, "extension", Integer.valueOf(30000));
     LOG.info("enter safemode");
     Thread testThread = new Thread() {
       @Override
@@ -152,7 +157,7 @@ public class TestHASafeMode {
   }
   
   /** Test NN crash and client crash/stuck immediately after block allocation */
-  @Test(timeout = 10000000)
+  @Test(timeout = 100000)
   public void testOpenFileWhenNNAndClientCrashAfterAddBlock() throws Exception {
     cluster.getConfiguration(0).set(
         DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, "1.0f");
