@@ -16700,7 +16700,7 @@
       <comparators>
         <comparator>
           <type>SubstringComparator</type>
-          <expected-output>setQuota: org.apache.hadoop.hdfs.server.namenode.SafeModeException: Cannot set quota on /test. Name node is in safe mode.</expected-output>
+          <expected-output>setQuota: Cannot set quota on /test. Name node is in safe mode.</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -16719,7 +16719,7 @@
       <comparators>
         <comparator>
           <type>SubstringComparator</type>
-          <expected-output>clrQuota: org.apache.hadoop.hdfs.server.namenode.SafeModeException: Cannot set quota on /test. Name node is in safe mode.</expected-output>
+          <expected-output>clrQuota: Cannot set quota on /test. Name node is in safe mode.</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -16739,7 +16739,7 @@
       <comparators>
         <comparator>
           <type>SubstringComparator</type>
-          <expected-output>setSpaceQuota: org.apache.hadoop.hdfs.server.namenode.SafeModeException: Cannot set quota on /test. Name node is in safe mode.</expected-output>
+          <expected-output>setSpaceQuota: Cannot set quota on /test. Name node is in safe mode.</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -16758,7 +16758,7 @@
       <comparators>
         <comparator>
           <type>SubstringComparator</type>
-         <expected-output>clrSpaceQuota: org.apache.hadoop.hdfs.server.namenode.SafeModeException: Cannot set quota on /test. Name node is in safe mode.</expected-output>
+         <expected-output>clrSpaceQuota: Cannot set quota on /test. Name node is in safe mode.</expected-output>
         </comparator>
       </comparators>
     </test>
