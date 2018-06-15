@@ -704,7 +704,9 @@ public class DatanodeManager {
   /**
    * Start decommissioning the specified datanode.
    */
-  private void startDecommission(DatanodeDescriptor node) throws IOException {
+  @InterfaceAudience.Private
+  @VisibleForTesting
+  public void startDecommission(DatanodeDescriptor node) throws IOException {
     if (!node.isDecommissionInProgress() && !node.isDecommissioned()) {
       for (DatanodeStorageInfo storage : node.getStorageInfos()) {
         LOG.info("Start Decommissioning " + node + " " + storage
