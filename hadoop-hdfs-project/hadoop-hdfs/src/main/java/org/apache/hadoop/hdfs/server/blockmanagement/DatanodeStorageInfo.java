@@ -306,6 +306,11 @@ public class DatanodeStorageInfo {
   }
   
   @Override
+  public int hashCode() {
+    return storageID.hashCode();
+  }
+  
+  @Override
   public String toString() {
     return getDatanodeDescriptor().toString() + "[" + storageType + "]" +
         storageID + ":" + state;
