@@ -21,10 +21,13 @@ import io.hops.leaderElection.LeaderElectionRole.Role;
 import io.hops.leaderElection.exception.LeaderElectionForceAbort;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
+import io.hops.metadata.election.entity.LeDescriptor;
+import io.hops.metadata.election.entity.LeDescriptor.FailedNodeLeDescriptor;
 import io.hops.metadata.election.entity.LeDescriptorFactory;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class LeaderElection extends Thread {
@@ -44,6 +47,7 @@ public class LeaderElection extends Thread {
   private long failedtx = 0;
   private boolean relinquishCurrentId = false;
   private final LeDescriptorFactory leFactory;
+  private List<FailedNodeLeDescriptor> deadNodes;
 
   public LeaderElection(final LeDescriptorFactory leFactory,
       final long time_period, final int max_missed_hb_threshold,
@@ -57,6 +61,7 @@ public class LeaderElection extends Thread {
     context.http_address = http_address;
     context.time_period_increment = time_period_increment;
     this.leFactory = leFactory;
+    this.deadNodes = new ArrayList<FailedNodeLeDescriptor>();
     initialize();
   }
 
@@ -288,6 +293,11 @@ public class LeaderElection extends Thread {
     assert newContext != null;
     context = newContext;
 
+    // save failed nodes if any
+    for (LeDescriptor descriptor : newContext.removedNodes){
+      deadNodes.add(new FailedNodeLeDescriptor(descriptor));
+    }
+
     //only for testing
     if (forceContantTP) {
       context.time_period = forcedTimePerid;
@@ -302,6 +312,12 @@ public class LeaderElection extends Thread {
         return;
       }
     }
+  }
+
+  public synchronized List<FailedNodeLeDescriptor> getDeadNodes(){
+    List<FailedNodeLeDescriptor> ret = deadNodes;
+    deadNodes = new ArrayList<FailedNodeLeDescriptor>();
+    return ret;
   }
   
   public void waitActive() throws InterruptedException {

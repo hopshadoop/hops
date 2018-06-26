@@ -181,6 +181,11 @@ public class INodeDALAdaptor
   }
 
   @Override
+  public int countSubtreeLockedInodes() throws StorageException {
+    return dataAccess.countSubtreeLockedInodes();
+  }
+
+  @Override
   public INode convertHDFStoDAL(
       org.apache.hadoop.hdfs.server.namenode.INode inode)
       throws StorageException {

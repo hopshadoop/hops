@@ -38,6 +38,7 @@ public class LEContext {
   protected SortedActiveNodeList memberShip;
   protected long time_period_increment;
   protected boolean nextTimeTakeStrongerLocks;
+  protected List<LeDescriptor> removedNodes; //nodes removed during this round
 
   private LEContext() {
   }
@@ -71,6 +72,8 @@ public class LEContext {
     
     //ToDo clone membership
     memberShip = context.memberShip;
+
+    removedNodes = context.removedNodes;
   }
 
   public static LEContext initialContext() {
@@ -88,6 +91,7 @@ public class LEContext {
     context.rpc_addresses = null;
     context.time_period_increment = 0;
     context.nextTimeTakeStrongerLocks = false;
+    context.removedNodes = new ArrayList<LeDescriptor>();
     return context;
   }
 }
