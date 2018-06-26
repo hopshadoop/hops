@@ -228,6 +228,11 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.namenode.subtree-executor-limit";
   public static final int DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT = 80;
 
+  public static final String DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY =
+          "dfs.subtree.clean.failed.ops.locks.delay";
+  public static final long DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_DEFAULT =
+          10*1000*60; //Reclaim locks after 10 mins
+
   public static final String ERASURE_CODING_CODECS_KEY =
       "dfs.erasure_coding.codecs.json";
   public static final String ERASURE_CODING_ENABLED_KEY =

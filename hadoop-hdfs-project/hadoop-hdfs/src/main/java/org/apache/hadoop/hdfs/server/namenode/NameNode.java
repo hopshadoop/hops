@@ -233,6 +233,12 @@ public class NameNode implements NameNodeStatusMXBean {
    */
   private BRTrackingService brTrackingService;
 
+  /**
+   * Metadata cleaner service. Cleans stale metadata left my dead NNs
+   */
+  private MDCleaner mdCleaner;
+  private long stoTableCleanDelay = 0;
+
   private ObjectName nameNodeStatusBeanName;
 
   /**
@@ -481,7 +487,9 @@ public class NameNode implements NameNodeStatusMXBean {
             DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT),
             conf.getLong(DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE,
                     DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE_DEFAULT));
-
+    this.mdCleaner = MDCleaner.getInstance();
+    this.stoTableCleanDelay = conf.getLong(DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY,
+            DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_DEFAULT);
 
     String fsOwnerShortUserName = UserGroupInformation.getCurrentUser()
         .getShortUserName();
@@ -523,6 +531,8 @@ public class NameNode implements NameNodeStatusMXBean {
    */
   private void startCommonServices(Configuration conf) throws IOException {
     startLeaderElectionService();
+
+    startMDCleanerService();
     
     namesystem.startCommonServices(conf);
     registerNNSMXBean();
@@ -579,6 +589,11 @@ public class NameNode implements NameNodeStatusMXBean {
     if (leaderElection != null && leaderElection.isRunning()) {
       leaderElection.stopElectionThread();
     }
+
+    if(mdCleaner != null){
+      mdCleaner.stopMDCleanerMonitor();
+    }
+
     if (plugins != null) {
       for (ServicePlugin p : plugins) {
         try {
@@ -1220,7 +1235,15 @@ public class NameNode implements NameNodeStatusMXBean {
   public SortedActiveNodeList getActiveNameNodes() {
     return leaderElection.getActiveNamenodes();
   }
-  
+
+  private void startMDCleanerService(){
+    mdCleaner.startMDCleanerMonitor(namesystem, leaderElection,stoTableCleanDelay);
+  }
+
+  private void stopMDCleanerService(){
+    mdCleaner.stopMDCleanerMonitor();
+  }
+
   private void startLeaderElectionService() throws IOException {
     // Initialize the leader election algorithm (only once rpc server is
     // created and httpserver is started)

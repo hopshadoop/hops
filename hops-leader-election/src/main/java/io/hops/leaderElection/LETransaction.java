@@ -63,6 +63,8 @@ public class LETransaction {
             leFactory = lef;
             super.preTransactionSetup();
             context = new LEContext(currentContext, lef);
+            context.removedNodes.clear(); //do not report dead nodes multiple times
+
             if (relinquishCurrentId) {
               context.id = LeaderElection.LEADER_INITIALIZATION_ID;
             }
@@ -290,6 +292,7 @@ public class LETransaction {
         LOG.debug("LE Status: id " + context.id + " removing dead node " +
             oldDesc.getId());
         removeLeaderRow(oldDesc);
+        context.removedNodes.add(oldDesc);
       }
     }
   }
