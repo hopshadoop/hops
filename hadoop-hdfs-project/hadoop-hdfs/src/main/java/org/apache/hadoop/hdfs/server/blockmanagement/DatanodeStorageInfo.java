@@ -330,22 +330,6 @@ public class DatanodeStorageInfo {
     return (Map<Long, Integer>) findBlocksHandler.handle();
   }
 
-  public Map<Long, Integer> getAllStorageReplicasInBuckets(
-          final List<Integer> mismatchedBuckets) throws IOException {
-    LightWeightRequestHandler findReplicasHandler = new
-        LightWeightRequestHandler
-            (HDFSOperationType.GET_ALL_STORAGE_BLOCKS_IN_BUCKETS) {
-      @Override
-      public Object performTask() throws IOException {
-        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-            .getDataAccess(ReplicaDataAccess.class);
-        return da.findBlockAndInodeIdsByStorageIdAndBucketIds(sid,
-            mismatchedBuckets);
-      }
-    };
-    return (Map<Long,Integer>) findReplicasHandler.handle();
-  }
-
   public Map<Long,Long> getAllStorageInvalidatedReplicasWithGenStamp() throws IOException {
     LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_STORAGE_BLOCKS_IDS) {

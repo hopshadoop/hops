@@ -290,8 +290,7 @@ public class BlockInfo extends Block {
     }
  
     Replica replica =
-        new Replica(storage.getSid(), getBlockId(), getInodeId(), HashBuckets
-            .getInstance().getBucketForBlock(this));
+        new Replica(storage.getSid(), getBlockId(), getInodeId());
     update(replica);
     return true;
   }
