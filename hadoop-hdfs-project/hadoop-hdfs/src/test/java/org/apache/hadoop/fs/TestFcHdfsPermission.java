@@ -34,7 +34,7 @@ import java.net.URISyntaxException;
 public class TestFcHdfsPermission extends FileContextPermissionBase {
 
   private static final FileContextTestHelper fileContextTestHelper =
-      new FileContextTestHelper("/tmp/TestFcHdfsPermission");
+      new FileContextTestHelper();
   private static FileContext fc;
   private static MiniDFSCluster cluster;
   private static Path defaultWorkingDirectory;
