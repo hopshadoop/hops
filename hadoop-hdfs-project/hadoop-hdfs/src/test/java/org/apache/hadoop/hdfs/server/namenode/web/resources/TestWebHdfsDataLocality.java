@@ -93,8 +93,7 @@ public class TestWebHdfsDataLocality {
 
           //The chosen datanode must be the same as the client address
           final DatanodeInfo chosen = NamenodeWebHdfsMethods
-              .chooseDatanode(namenode, f, PutOpParam.Op.CREATE, -1L, blocksize,
-                  conf);
+              .chooseDatanode(namenode, f, PutOpParam.Op.CREATE, -1L, blocksize);
           Assert.assertEquals(ipAddr, chosen.getIpAddr());
         }
       }
@@ -119,22 +118,19 @@ public class TestWebHdfsDataLocality {
 
       { //test GETFILECHECKSUM
         final DatanodeInfo chosen = NamenodeWebHdfsMethods
-            .chooseDatanode(namenode, f, GetOpParam.Op.GETFILECHECKSUM, -1L,
-                blocksize, conf);
+            .chooseDatanode(namenode, f, GetOpParam.Op.GETFILECHECKSUM, -1L, blocksize);
         Assert.assertEquals(expected, chosen);
       }
 
       { //test OPEN
         final DatanodeInfo chosen = NamenodeWebHdfsMethods
-            .chooseDatanode(namenode, f, GetOpParam.Op.OPEN, 0, blocksize,
-                conf);
+            .chooseDatanode(namenode, f, GetOpParam.Op.OPEN, 0, blocksize);
         Assert.assertEquals(expected, chosen);
       }
 
       { //test APPEND
         final DatanodeInfo chosen = NamenodeWebHdfsMethods
-            .chooseDatanode(namenode, f, PostOpParam.Op.APPEND, -1L, blocksize,
-                conf);
+            .chooseDatanode(namenode, f, PostOpParam.Op.APPEND, -1L, blocksize);
         Assert.assertEquals(expected, chosen);
       }
     } finally {
