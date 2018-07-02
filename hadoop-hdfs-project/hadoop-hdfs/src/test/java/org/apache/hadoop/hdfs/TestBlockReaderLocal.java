@@ -32,7 +32,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.client.ShortCircuitCache;
 import org.apache.hadoop.hdfs.client.ShortCircuitReplica;
-import org.apache.hadoop.hdfs.client.ShortCircuitReplica.Key;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
@@ -169,7 +168,7 @@ public class TestBlockReaderLocal {
       };
       dataIn = streams[0];
       metaIn = streams[1];
-      Key key = new Key(block.getBlockId(), block.getBlockPoolId());
+      ExtendedBlockId key = new ExtendedBlockId(block.getBlockId(), block.getBlockPoolId());
       ShortCircuitReplica replica = new ShortCircuitReplica(
           key, dataIn, metaIn, shortCircuitCache, Time.now());
       blockReaderLocal = new BlockReaderLocal.Builder(
