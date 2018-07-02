@@ -44,7 +44,7 @@ import static org.apache.hadoop.fs.FileContextTestHelper.isFile;
 
 public class TestFcHdfsSetUMask {
   private static FileContextTestHelper fileContextTestHelper =
-      new FileContextTestHelper("/tmp/TestFcHdfsSetUMask");
+      new FileContextTestHelper();
 
   private static MiniDFSCluster cluster;
   private static Path defaultWorkingDirectory;
