@@ -31,7 +31,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.client.ShortCircuitCache;
 import org.apache.hadoop.hdfs.client.ShortCircuitCache.ShortCircuitReplicaCreator;
 import org.apache.hadoop.hdfs.client.ShortCircuitReplica;
-import org.apache.hadoop.hdfs.client.ShortCircuitReplica.Key;
 import org.apache.hadoop.hdfs.client.ShortCircuitReplicaInfo;
 import org.apache.hadoop.hdfs.net.DomainPeer;
 import org.apache.hadoop.hdfs.net.Peer;
@@ -411,7 +410,7 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
       return null;
     }
     ShortCircuitCache cache = clientContext.getShortCircuitCache();
-    Key key = new Key(block.getBlockId(), block.getBlockPoolId());
+    ExtendedBlockId key = new ExtendedBlockId(block.getBlockId(), block.getBlockPoolId());
     ShortCircuitReplicaInfo info = cache.fetchOrCreate(key, this);
     InvalidToken exc = info.getInvalidTokenException();
     if (exc != null) {
@@ -514,7 +513,7 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
       sock.recvFileInputStreams(fis, buf, 0, buf.length);
       ShortCircuitReplica replica = null;
       try {
-        Key key = new Key(block.getBlockId(), block.getBlockPoolId());
+        ExtendedBlockId key = new ExtendedBlockId(block.getBlockId(), block.getBlockPoolId());
         replica = new ShortCircuitReplica(key, fis[0], fis[1],
             clientContext.getShortCircuitCache(), Time.monotonicNow());
       } catch (IOException e) {
