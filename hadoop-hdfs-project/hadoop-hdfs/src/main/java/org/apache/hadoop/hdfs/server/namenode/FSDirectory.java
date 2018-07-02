@@ -1935,8 +1935,9 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
           .setSpaceConsumed(counts.nsCount, counts.dsCount);
 
       // check if quota is violated for some reason.
-      if ((dir.getNsQuota() >= 0 && counts.nsCount > dir.getNsQuota()) ||
-          (dir.getDsQuota() >= 0 && counts.dsCount > dir.getDsQuota())) {
+      final Quota.Counts oldQuota = dir.getQuotaCounts();
+      if ((oldQuota.get(Quota.NAMESPACE) >= 0 && counts.nsCount > oldQuota.get(Quota.NAMESPACE)) ||
+          (oldQuota.get(Quota.DISKSPACE) >= 0 && counts.dsCount > oldQuota.get(Quota.DISKSPACE))) {
 
         // can only happen because of a software bug. the bug should be fixed.
         StringBuilder path = new StringBuilder(512);
@@ -1946,9 +1947,9 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         }
         
         NameNode.LOG.warn("Quota violation in image for " + path +
-            " (Namespace quota : " + dir.getNsQuota() +
+            " (Namespace quota : " + oldQuota.get(Quota.NAMESPACE) +
             " consumed : " + counts.nsCount + ")" +
-            " (Diskspace quota : " + dir.getDsQuota() +
+            " (Diskspace quota : " + oldQuota.get(Quota.DISKSPACE) +
             " consumed : " + counts.dsCount + ").");
       }
     }
@@ -2013,8 +2014,9 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       throw new IllegalArgumentException(
           "Cannot clear namespace quota on root.");
     } else { // a directory inode
-      long oldNsQuota = dirNode.getNsQuota();
-      long oldDsQuota = dirNode.getDsQuota();
+      final Quota.Counts oldQuota = dirNode.getQuotaCounts();
+      final long oldNsQuota = oldQuota.get(Quota.NAMESPACE);
+      final long oldDsQuota = oldQuota.get(Quota.DISKSPACE);
       if (nsQuota == HdfsConstants.QUOTA_DONT_SET) {
         nsQuota = oldNsQuota;
       }

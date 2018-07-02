@@ -24,16 +24,14 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.lock.TransactionLocks;
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.namenode.Quota;
 
 public class INodeAttributesContext
     extends BaseEntityContext<Integer, INodeAttributes> {
@@ -51,7 +49,9 @@ public class INodeAttributesContext
     if (iNodeAttributes.isInTree()) {
       super.update(iNodeAttributes);
       if(isLogDebugEnabled()){
-        log("updated-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getDsQuota(),"DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getNsQuota(), "NS", iNodeAttributes.getNsCount());
+        log("updated-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getQuotaCounts().get(
+            Quota.DISKSPACE), "DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getQuotaCounts().get(
+                Quota.NAMESPACE), "NS", iNodeAttributes.getNsCount());
       }
     } else {
       if(isLogDebugEnabled()) {
@@ -163,7 +163,9 @@ public class INodeAttributesContext
       miss(qfinder, result, "inodeids", inodePks);
       if(result!=null){
         for(INodeAttributes iNodeAttributes:result){
-          log("read-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getDsQuota(),"DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getNsQuota(), "NS", iNodeAttributes.getNsCount());
+          log("read-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getQuotaCounts().get(
+              Quota.DISKSPACE), "DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getQuotaCounts().get(
+                  Quota.NAMESPACE), "NS", iNodeAttributes.getNsCount());
         }
 
       }
@@ -216,8 +218,8 @@ public class INodeAttributesContext
   }
 
   private INodeAttributes clone(INodeAttributes src, int inodeId) {
-    return new INodeAttributes(inodeId, src.getNsQuota(), src.getNsCount(),
-        src.getDsQuota(), src.getDiskspace());
+    return new INodeAttributes(inodeId, src.getQuotaCounts().get(Quota.NAMESPACE), src.getNsCount(),
+        src.getQuotaCounts().get(Quota.DISKSPACE), src.getDiskspace());
   }
 
 }

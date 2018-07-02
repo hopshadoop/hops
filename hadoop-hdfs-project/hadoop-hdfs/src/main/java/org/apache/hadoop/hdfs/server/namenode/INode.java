@@ -486,10 +486,11 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   public final ContentSummary computeAndConvertContentSummary(
       ContentSummaryComputationContext summary) throws StorageException, TransactionContextException {
     Content.Counts counts = computeContentSummary(summary).getCounts();
+    final Quota.Counts q = getQuotaCounts();
     return new ContentSummary(counts.get(Content.LENGTH),
         counts.get(Content.FILE) + counts.get(Content.SYMLINK),
-        counts.get(Content.DIRECTORY), getNsQuota(),
-        counts.get(Content.DISKSPACE), getDsQuota());
+        counts.get(Content.DIRECTORY), q.get(Quota.NAMESPACE),
+        counts.get(Content.DISKSPACE), q.get(Quota.DISKSPACE));
   }
 
   /**
@@ -502,20 +503,15 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   /**
    * Get the quota set for this inode
    *
-   * @return the quota if it is set; -1 otherwise
+   *  @return the quota counts.  The count is -1 if it is not set.
    */
-  public long getNsQuota()
-      throws StorageException, TransactionContextException {
-    return -1;
-  }
-
-  public long getDsQuota()
-      throws StorageException, TransactionContextException {
-    return -1;
+  public Quota.Counts getQuotaCounts() throws StorageException, TransactionContextException{
+    return Quota.Counts.newInstance(-1, -1);
   }
   
   boolean isQuotaSet() throws StorageException, TransactionContextException {
-    return getNsQuota() >= 0 || getDsQuota() >= 0;
+    final Quota.Counts q = getQuotaCounts();
+    return q.get(Quota.NAMESPACE) >= 0 || q.get(Quota.DISKSPACE) >= 0;
   }
   
   /**

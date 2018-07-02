@@ -23,6 +23,7 @@ import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 
 import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.namenode.Quota;
 
 public class INodeAttributeDALAdaptor extends
     DalAdaptor<org.apache.hadoop.hdfs.server.namenode.INodeAttributes, INodeAttributes>
@@ -57,8 +58,8 @@ public class INodeAttributeDALAdaptor extends
       throws StorageException {
     if (attribute != null) {
       INodeAttributes hia =
-          new INodeAttributes(attribute.getInodeId(), attribute.getNsQuota(),
-              attribute.getNsCount(), attribute.getDsQuota(),
+          new INodeAttributes(attribute.getInodeId(), attribute.getQuotaCounts().get(Quota.NAMESPACE),
+              attribute.getNsCount(), attribute.getQuotaCounts().get(Quota.DISKSPACE),
               attribute.getDiskspace());
       return hia;
     } else {

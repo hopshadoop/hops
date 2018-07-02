@@ -42,7 +42,7 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
    * @param other
    *     The other inode from which all other properties are copied
    */
-  INodeDirectoryWithQuota(Long nsQuota, Long dsQuota, INodeDirectory other)
+  INodeDirectoryWithQuota(INodeDirectory other, Long nsQuota, Long dsQuota)
       throws IOException {
     super(other);
     INode.DirCounts counts = new INode.DirCounts();
@@ -52,6 +52,11 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
     setQuota(nsQuota, dsQuota);
   }
 
+  public INodeDirectoryWithQuota(INodeDirectory other,
+      Quota.Counts quota) throws IOException {
+    this(other, quota.get(Quota.NAMESPACE), quota.get(Quota.DISKSPACE));
+  }
+  
   INodeDirectoryWithQuota(Long nsQuota, Long dsQuota, Long nsCount,
       Long dsCount, INodeDirectory other)
       throws IOException {
@@ -73,28 +78,12 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
   }
   
   public INodeDirectoryWithQuota(INodeDirectoryWithQuota other) throws IOException{
-    this(other.getNsQuota(),other.getDsQuota(),other);
-  }
-  /**
-   * Get this directory's namespace quota
-   *
-   * @return this directory's namespace quota
-   */
-  @Override
-  public long getNsQuota()
-      throws StorageException, TransactionContextException {
-    return getINodeAttributes().getNsQuota();
+    this(other, other.getQuotaCounts());
   }
   
-  /**
-   * Get this directory's diskspace quota
-   *
-   * @return this directory's diskspace quota
-   */
   @Override
-  public long getDsQuota()
-      throws StorageException, TransactionContextException {
-    return getINodeAttributes().getDsQuota();
+  public Quota.Counts getQuotaCounts() throws StorageException, TransactionContextException {
+    return getINodeAttributes().getQuotaCounts();
   }
   
   /**
@@ -126,7 +115,7 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
   
   private void checkDiskspace(final long computed) throws StorageException, TransactionContextException {
     long diskspace = diskspaceConsumed();
-    if (-1 != getDsQuota() && diskspace != computed) {
+    if (-1 != getQuotaCounts().get(Quota.DISKSPACE) && diskspace != computed) {
       NameNode.LOG.error("BUG: Inconsistent diskspace for directory "
           + getFullPathName() + ". Cached = " + diskspace
           + " != Computed = " + computed);
@@ -204,14 +193,14 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
     Long newDiskspace = getINodeAttributes().getDiskspace() + dsDelta;
 
     if (nsDelta > 0 || dsDelta > 0) {
-      if (getINodeAttributes().getNsQuota() >= 0 &&
-          getINodeAttributes().getNsQuota() < newCount) {
-        throw new NSQuotaExceededException(getINodeAttributes().getNsQuota(),
+      if (getQuotaCounts().get(Quota.NAMESPACE) >= 0 &&
+          getQuotaCounts().get(Quota.NAMESPACE) < newCount) {
+        throw new NSQuotaExceededException(getQuotaCounts().get(Quota.NAMESPACE),
             newCount);
       }
-      if (getINodeAttributes().getDsQuota() >= 0 &&
-          getINodeAttributes().getDsQuota() < newDiskspace) {
-        throw new DSQuotaExceededException(getINodeAttributes().getDsQuota(),
+      if (getQuotaCounts().get(Quota.DISKSPACE) >= 0 &&
+          getQuotaCounts().get(Quota.DISKSPACE) < newDiskspace) {
+        throw new DSQuotaExceededException(getQuotaCounts().get(Quota.DISKSPACE),
             newDiskspace);
       }
     }

@@ -29,13 +29,11 @@ import io.hops.exception.*;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
-import io.hops.metadata.hdfs.dal.AceDataAccess;
 import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.RetryCacheEntryDataAccess;
 import io.hops.metadata.hdfs.dal.SafeBlocksDataAccess;
-import io.hops.metadata.hdfs.entity.Ace;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
@@ -6927,9 +6925,10 @@ public class FSNamesystem
 
     return new ContentSummary(fileTree.getFileSizeSummary(),
         fileTree.getFileCount(), fileTree.getDirectoryCount(),
-        subtreeAttr == null ? subtreeRoot.getNsQuota() : subtreeAttr.getNsQuota(),
+        subtreeAttr == null ? subtreeRoot.getQuotaCounts().get(Quota.NAMESPACE) : subtreeAttr.getQuotaCounts().get(
+            Quota.NAMESPACE),
         fileTree.getDiskspaceCount(), subtreeAttr == null ? subtreeRoot
-        .getDsQuota() : subtreeAttr.getDsQuota());
+            .getQuotaCounts().get(Quota.DISKSPACE) : subtreeAttr.getQuotaCounts().get(Quota.DISKSPACE));
 
   }
 
@@ -8829,8 +8828,8 @@ public class FSNamesystem
           INodeDirectoryWithQuota quotaDir = (INodeDirectoryWithQuota)
               subtreeRoot;
           return new LastUpdatedContentSummary(quotaDir.numItemsInTree(),
-              quotaDir.diskspaceConsumed(), quotaDir.getNsQuota(), quotaDir
-              .getDsQuota());
+              quotaDir.diskspaceConsumed(), quotaDir.getQuotaCounts().get(Quota.NAMESPACE), quotaDir
+              .getQuotaCounts().get(Quota.DISKSPACE));
         }
         return null;
       }
