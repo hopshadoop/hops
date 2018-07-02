@@ -18,7 +18,27 @@
 
 package org.apache.hadoop.hdfs.server.common;
 
-import com.google.common.base.Charsets;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.DEFAULT_HADOOP_HTTP_STATIC_USER;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_HTTP_STATIC_USER;
+
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.jsp.JspWriter;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -41,7 +61,6 @@ import org.apache.hadoop.hdfs.web.resources.DelegationParam;
 import org.apache.hadoop.hdfs.web.resources.DoAsParam;
 import org.apache.hadoop.hdfs.web.resources.UserParam;
 import org.apache.hadoop.http.HtmlQuoting;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
@@ -52,30 +71,12 @@ import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.VersionInfo;
 
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.jsp.JspWriter;
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.TreeSet;
-
-import static org.apache.hadoop.fs.CommonConfigurationKeys.DEFAULT_HADOOP_HTTP_STATIC_USER;
-import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_HTTP_STATIC_USER;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
+
+import com.google.common.base.Charsets;
 
 @InterfaceAudience.Private
 public class JspHelper {
@@ -179,60 +180,30 @@ public class JspHelper {
     }
     NodeRecord[] nodes = map.values().toArray(new NodeRecord[map.size()]);
     Arrays.sort(nodes, new NodeRecordComparator());
-    return bestNode(nodes, false, conf);
+    return bestNode(nodes, false);
   }
 
   public static DatanodeInfo bestNode(LocatedBlock blk, Configuration conf)
       throws IOException {
     DatanodeInfo[] nodes = blk.getLocations();
-    return bestNode(nodes, true, conf);
+    return bestNode(nodes, true);
   }
 
-  public static DatanodeInfo bestNode(DatanodeInfo[] nodes, boolean doRandom,
-      Configuration conf) throws IOException {
-    TreeSet<DatanodeInfo> deadNodes = new TreeSet<>();
-    DatanodeInfo chosenNode = null;
-    int failures = 0;
-    Socket s = null;
-    int index = -1;
+  public static DatanodeInfo bestNode(DatanodeInfo[] nodes, boolean doRandom) throws IOException {
     if (nodes == null || nodes.length == 0) {
       throw new IOException("No nodes contain this block");
     }
-    while (s == null) {
-      if (chosenNode == null) {
-        do {
-          if (doRandom) {
-            index = DFSUtil.getRandom().nextInt(nodes.length);
-          } else {
-            index++;
-          }
-          chosenNode = nodes[index];
-        } while (deadNodes.contains(chosenNode));
-      }
-      chosenNode = nodes[index];
-
-      //just ping to check whether the node is alive
-      InetSocketAddress targetAddr =
-          NetUtils.createSocketAddr(chosenNode.getInfoAddr());
-
-      try {
-        s = NetUtils.getDefaultSocketFactory(conf).createSocket();
-        s.connect(targetAddr, HdfsServerConstants.READ_TIMEOUT);
-        s.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
-      } catch (IOException e) {
-        deadNodes.add(chosenNode);
-        IOUtils.closeSocket(s);
-        s = null;
-        failures++;
-      }
-      if (failures == nodes.length) {
-        throw new IOException(
-            "Could not reach the block containing the data. Please try again");
-      }
-
+    int l = 0;
+    while (l < nodes.length && !nodes[l].isDecommissioned()) {
+      ++l;
     }
-    s.close();
-    return chosenNode;
+
+    if (l == 0) {
+      throw new IOException("No active nodes contain this block");
+    }
+    
+    int index = doRandom ? DFSUtil.getRandom().nextInt(l) : 0;
+    return nodes[index];
   }
 
   public static void streamBlockInAscii(InetSocketAddress addr, String poolId,
