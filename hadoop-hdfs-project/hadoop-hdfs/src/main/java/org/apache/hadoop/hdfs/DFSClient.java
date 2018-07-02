@@ -174,7 +174,10 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
-import org.apache.hadoop.hdfs.client.ClientMmapManager;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CONTEXT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CONTEXT_DEFAULT;
+import org.apache.hadoop.hdfs.net.Peer;
+import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.ipc.RetriableException;
 
@@ -192,7 +195,7 @@ import org.apache.hadoop.ipc.RetriableException;
  * ******************************************************
  */
 @InterfaceAudience.Private
-public class DFSClient implements java.io.Closeable {
+public class DFSClient implements java.io.Closeable, RemotePeerFactory {
   public static final Log LOG = LogFactory.getLog(DFSClient.class);
   public static final long SERVER_DEFAULTS_VALIDITY_PERIOD = 60 * 60 * 1000L;
       // 1 hour
@@ -216,50 +219,13 @@ public class DFSClient implements java.io.Closeable {
   final ReplaceDatanodeOnFailure dtpReplaceDatanodeOnFailure;
   final FileSystem.Statistics stats;
   private final String authority;
-  final PeerCache peerCache;
   private Random r = new Random();
   private SocketAddress[] localInterfaceAddrs;
   private DataEncryptionKey encryptionKey;
 
-  private boolean shouldUseLegacyBlockReaderLocal;
   private final CachingStrategy defaultReadCachingStrategy;
   private final CachingStrategy defaultWriteCachingStrategy;
-  private ClientMmapManager mmapManager;
-  
-  private static final ClientMmapManagerFactory MMAP_MANAGER_FACTORY =
-      new ClientMmapManagerFactory();
-
-  private static final class ClientMmapManagerFactory {
-    private ClientMmapManager mmapManager = null;
-    /**
-     * Tracks the number of users of mmapManager.
-     */
-    private int refcnt = 0;
-
-    synchronized ClientMmapManager get(Configuration conf) {
-      if (refcnt++ == 0) {
-        mmapManager = ClientMmapManager.fromConf(conf);
-      } else {
-        String mismatches = mmapManager.verifyConfigurationMatches(conf);
-        if (!mismatches.isEmpty()) {
-          LOG.warn("The ClientMmapManager settings you specified " +
-            "have been ignored because another thread created the " +
-            "ClientMmapManager first.  " + mismatches);
-        }
-      }
-      return mmapManager;
-    }
-    
-    synchronized void unref(ClientMmapManager mmapManager) {
-      if (this.mmapManager != mmapManager) {
-        throw new IllegalArgumentException();
-      }
-      if (--refcnt == 0) {
-        IOUtils.cleanup(LOG, mmapManager);
-        mmapManager = null;
-      }
-    }
-  }
+  private final ClientContext clientContext;
   
   /**
    * DFSClient configuration
@@ -315,6 +281,11 @@ public class DFSClient implements java.io.Closeable {
     final int delayBeforeClose;
     //only for testing
     final boolean hdfsClientEmulationForSF;
+    
+    final int shortCircuitMmapCacheSize;
+    final long shortCircuitMmapCacheExpiryMs;
+    final long shortCircuitMmapCacheRetryTimeout;
+    final long shortCircuitCacheStaleThresholdMs;
 
     public Conf(Configuration conf) {
       // The hdfsTimeout is currently the same as the ipc timeout
@@ -435,6 +406,18 @@ public class DFSClient implements java.io.Closeable {
       shortCircuitStreamsCacheExpiryMs = conf.getLong(
           DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_EXPIRY_MS_KEY,
           DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_EXPIRY_MS_DEFAULT);
+      shortCircuitMmapCacheSize = conf.getInt(
+          DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_SIZE,
+          DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_SIZE_DEFAULT);
+      shortCircuitMmapCacheExpiryMs = conf.getLong(
+          DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_TIMEOUT_MS,
+          DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_TIMEOUT_MS_DEFAULT);
+      shortCircuitMmapCacheRetryTimeout = conf.getLong(
+          DFSConfigKeys.DFS_CLIENT_MMAP_RETRY_TIMEOUT_MS,
+          DFSConfigKeys.DFS_CLIENT_MMAP_RETRY_TIMEOUT_MS_DEFAULT);
+      shortCircuitCacheStaleThresholdMs = conf.getLong(
+          DFSConfigKeys.DFS_CLIENT_SHORT_CIRCUIT_REPLICA_STALE_THRESHOLD_MS,
+          DFSConfigKeys.DFS_CLIENT_SHORT_CIRCUIT_REPLICA_STALE_THRESHOLD_MS_DEFAULT);
       dfsClientInitialWaitOnRetry =
           conf.getInt(DFSConfigKeys.DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_KEY,
               DFSConfigKeys.DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_DEFAULT);
@@ -509,7 +492,6 @@ public class DFSClient implements java.io.Closeable {
   private final Map<String, DFSOutputStream> filesBeingWritten =
       new HashMap<>();
 
-  private final DomainSocketFactory domainSocketFactory;
   
   /**
    * Same as this(NameNode.getAddress(conf), conf);
@@ -559,8 +541,6 @@ public class DFSClient implements java.io.Closeable {
       FileSystem.Statistics stats) throws IOException {
     // Copy only the required DFSClient configuration
     this.dfsClientConf = new Conf(conf);
-    this.shouldUseLegacyBlockReaderLocal =
-        this.dfsClientConf.useLegacyBlockReaderLocal;
     if (this.dfsClientConf.useLegacyBlockReaderLocal) {
       LOG.debug("Using legacy short-circuit local reads.");
     }
@@ -611,9 +591,6 @@ public class DFSClient implements java.io.Closeable {
       namenodeSelector = new NamenodeSelector(conf, nameNodeUri, this.ugi);
     }
 
-    // read directly from the block file if configured.
-    this.domainSocketFactory = new DomainSocketFactory(dfsClientConf);
-    
     String localInterfaces[] =
         conf.getTrimmedStrings(DFSConfigKeys.DFS_CLIENT_LOCAL_INTERFACES);
     localInterfaceAddrs = getLocalInterfaceAddrs(localInterfaces);
@@ -623,7 +600,6 @@ public class DFSClient implements java.io.Closeable {
           Joiner.on(',').join(localInterfaceAddrs) + "]");
     }
     
-    this.peerCache = PeerCache.getInstance(dfsClientConf.socketCacheCapacity, dfsClientConf.socketCacheExpiry);
     
      Boolean readDropBehind = (conf.get(DFS_CLIENT_CACHE_DROP_BEHIND_READS) == null) ?
         null : conf.getBoolean(DFS_CLIENT_CACHE_DROP_BEHIND_READS, false);
@@ -635,8 +611,9 @@ public class DFSClient implements java.io.Closeable {
         new CachingStrategy(readDropBehind, readahead);
     this.defaultWriteCachingStrategy =
         new CachingStrategy(writeDropBehind, readahead);
-    this.mmapManager = MMAP_MANAGER_FACTORY.get(conf);
-    
+    this.clientContext = ClientContext.get(
+        conf.get(DFS_CLIENT_CONTEXT, DFS_CLIENT_CONTEXT_DEFAULT),
+        dfsClientConf);
     this.MAX_RPC_RETRIES =
         conf.getInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY,
             DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_DEFAULT);
@@ -879,10 +856,6 @@ public class DFSClient implements java.io.Closeable {
    * Abort and release resources held.  Ignore all errors.
    */
   void abort() {
-    if (mmapManager != null) {
-      MMAP_MANAGER_FACTORY.unref(mmapManager);
-      mmapManager = null;
-    }
     clientRunning = false;
     closeAllFilesBeingWritten(true);
     try {
@@ -930,10 +903,6 @@ public class DFSClient implements java.io.Closeable {
    */
   @Override
   public synchronized void close() throws IOException {
-    if (mmapManager != null) {
-      MMAP_MANAGER_FACTORY.unref(mmapManager);
-      mmapManager = null;
-    }
     if (clientRunning) {
       closeAllFilesBeingWritten(false);
       clientRunning = false;
@@ -2954,18 +2923,6 @@ public class DFSClient implements java.io.Closeable {
         ugi + "]";
   }
 
-  public DomainSocketFactory getDomainSocketFactory() {
-    return domainSocketFactory;
-  }
-
-  public void disableLegacyBlockReaderLocal() {
-    shouldUseLegacyBlockReaderLocal = false;
-  }
-
-  public boolean useLegacyBlockReaderLocal() {
-    return shouldUseLegacyBlockReaderLocal;
-  }
-
   /**
    * Action Handler to encapsualte the client requests to the namenode.
    */
@@ -3682,8 +3639,29 @@ public class DFSClient implements java.io.Closeable {
     return defaultWriteCachingStrategy;
   }
   
-  @VisibleForTesting
-  public ClientMmapManager getMmapManager() {
-    return mmapManager;
+  public ClientContext getClientContext() {
+    return clientContext;
+  }
+
+  @Override // RemotePeerFactory
+  public Peer newConnectedPeer(InetSocketAddress addr) throws IOException {
+    Peer peer = null;
+    boolean success = false;
+    Socket sock = null;
+    try {
+      sock = socketFactory.createSocket();
+      NetUtils.connect(sock, addr,
+        getRandomLocalInterfaceAddr(),
+        dfsClientConf.socketTimeout);
+      peer = TcpPeerServer.peerFromSocketAndKey(sock, 
+          getDataEncryptionKey());
+      success = true;
+      return peer;
+    } finally {
+      if (!success) {
+        IOUtils.cleanup(LOG, peer);
+        IOUtils.closeSocket(sock);
+      }
+    }
   }
 }

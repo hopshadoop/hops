@@ -51,9 +51,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdfs.BlockReader;
+import org.apache.hadoop.hdfs.ClientContext;
 import org.apache.hadoop.hdfs.DFSClient;
+import org.apache.hadoop.hdfs.RemotePeerFactory;
+import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
+import org.apache.hadoop.io.IOUtils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -340,21 +344,43 @@ public class TestDataNodeVolumeFailure {
   private void accessBlock(DatanodeInfo datanode, LocatedBlock lblock)
       throws IOException {
     InetSocketAddress targetAddr = null;
-    Socket s = null;
     ExtendedBlock block = lblock.getBlock();
 
     targetAddr = NetUtils.createSocketAddr(datanode.getXferAddr());
 
-    s = NetUtils.getDefaultSocketFactory(conf).createSocket();
-    s.connect(targetAddr, HdfsServerConstants.READ_TIMEOUT);
-    s.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
-
-    String file = BlockReaderFactory
-        .getFileName(targetAddr, "test-blockpoolid", block.getBlockId());
-    BlockReader blockReader = BlockReaderFactory
-        .newBlockReader(new DFSClient.Conf(conf), file, block,
-            lblock.getBlockToken(), 0, -1, true, "TestDataNodeVolumeFailure",
-            TcpPeerServer.peerFromSocket(s), datanode, null, null, null, false, CachingStrategy.newDefaultStrategy());
+    BlockReader blockReader = new BlockReaderFactory(new DFSClient.Conf(conf)).
+      setInetSocketAddress(targetAddr).
+      setExtendedBlock(block).
+      setFileName(BlockReaderFactory.getFileName(targetAddr,
+                    "test-blockpoolid", block.getBlockId())).
+      setBlockToken(lblock.getBlockToken()).
+      setStartOffset(0).
+      setLength(-1).
+      setVerifyChecksum(true).
+      setClientName("TestDataNodeVolumeFailure").
+      setDatanodeInfo(datanode).
+      setCachingStrategy(CachingStrategy.newDefaultStrategy()).
+      setClientCacheContext(ClientContext.getFromConf(conf)).
+      setConfiguration(conf).
+      setRemotePeerFactory(new RemotePeerFactory() {
+        @Override
+        public Peer newConnectedPeer(InetSocketAddress addr)
+            throws IOException {
+          Peer peer = null;
+          Socket sock = NetUtils.getDefaultSocketFactory(conf).createSocket();
+          try {
+            sock.connect(addr, HdfsServerConstants.READ_TIMEOUT);
+            sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
+            peer = TcpPeerServer.peerFromSocket(sock);
+          } finally {
+            if (peer == null) {
+              IOUtils.closeSocket(sock);
+            }
+          }
+          return peer;
+        }
+      }).
+      build();
     blockReader.close();
   }
 

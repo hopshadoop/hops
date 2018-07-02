@@ -89,6 +89,7 @@ public class TestConnCache {
     // instances.  Also use a really long socket timeout so that nothing
     // gets closed before we get around to checking the cache size at the end.
     final String contextName = "testReadFromOneDNContext";
+    configuration.set(DFSConfigKeys.DFS_CLIENT_CONTEXT, contextName);
     configuration.setLong(DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY,
         100000000L);
     BlockReaderTestUtil util = new BlockReaderTestUtil(1, configuration);
@@ -97,6 +98,8 @@ public class TestConnCache {
     DFSClient client = new DFSClient(
         new InetSocketAddress("localhost",
             util.getCluster().getNameNodePort()), util.getConf());
+    ClientContext cacheContext =
+        ClientContext.get(contextName, client.getConf());
     DFSInputStream in = client.open(testFile.toString());
     LOG.info("opened " + testFile.toString());
     byte[] dataBuf = new byte[BLOCK_SIZE];
@@ -113,5 +116,7 @@ public class TestConnCache {
 
     in.close();
     client.close();
+    Assert.assertEquals(1,
+        ClientContext.getFromConf(configuration).getPeerCache().size());
   }
 }

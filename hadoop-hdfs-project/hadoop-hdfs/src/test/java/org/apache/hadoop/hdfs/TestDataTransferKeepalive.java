@@ -23,16 +23,13 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_REUSE_KEE
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_REUSE_KEEPALIVE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CONTEXT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.InputStream;
-import java.io.PrintWriter;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 
 import com.google.common.io.ByteStreams;
 import org.apache.hadoop.conf.Configuration;
@@ -41,10 +38,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster.DataNodeProperties;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
-import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -92,21 +86,22 @@ public class TestDataTransferKeepalive {
     // the datanode-side expiration time.
     final long CLIENT_EXPIRY_MS = 60000L;
     clientConf.setLong(DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_KEY, CLIENT_EXPIRY_MS);
-    PeerCache.setInstance(DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT, CLIENT_EXPIRY_MS);
+    clientConf.set(DFS_CLIENT_CONTEXT, "testDatanodeRespectsKeepAliveTimeout");
     DistributedFileSystem fs =
         (DistributedFileSystem)FileSystem.get(cluster.getURI(),
             clientConf);
-
+    PeerCache peerCache = ClientContext.getFromConf(clientConf).getPeerCache();
+    
     DFSTestUtil.createFile(fs, TEST_FILE, 1L, (short)1, 0L);
 
     // Clients that write aren't currently re-used.
-    assertEquals(0, fs.dfs.peerCache.size());
+    assertEquals(0, peerCache.size());
     assertXceiverCount(0);
 
     // Reads the file, so we should get a
     // cached socket, and should have an xceiver on the other side.
     DFSTestUtil.readFile(fs, TEST_FILE);
-    assertEquals(1, fs.dfs.peerCache.size());
+    assertEquals(1, peerCache.size());
     assertXceiverCount(1);
 
     // Sleep for a bit longer than the keepalive timeout
@@ -117,15 +112,13 @@ public class TestDataTransferKeepalive {
     // The socket is still in the cache, because we don't
     // notice that it's closed until we try to read
     // from it again.
-    assertEquals(1, fs.dfs.peerCache.size());
+    assertEquals(1, peerCache.size());
     
     // Take it out of the cache - reading should
     // give an EOF.
-    Peer peer = fs.dfs.peerCache.get(dn.getDatanodeId(), false);
+    Peer peer = peerCache.get(dn.getDatanodeId(), false);
     assertNotNull(peer);
     assertEquals(-1, peer.getInputStream().read());
-    PeerCache.setInstance(DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT,
-        DFS_DATANODE_SOCKET_REUSE_KEEPALIVE_DEFAULT);
   }
 
   /**
@@ -138,34 +131,33 @@ public class TestDataTransferKeepalive {
     // the datanode-side expiration time.
     final long CLIENT_EXPIRY_MS = 10L;
     clientConf.setLong(DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_KEY, CLIENT_EXPIRY_MS);
-    PeerCache.setInstance(DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT, CLIENT_EXPIRY_MS);
+    clientConf.set(DFS_CLIENT_CONTEXT, "testClientResponsesKeepAliveTimeout");
     DistributedFileSystem fs =
         (DistributedFileSystem)FileSystem.get(cluster.getURI(),
             clientConf);
-
+    PeerCache peerCache = ClientContext.getFromConf(clientConf).getPeerCache();
+    
     DFSTestUtil.createFile(fs, TEST_FILE, 1L, (short)1, 0L);
 
     // Clients that write aren't currently re-used.
-    assertEquals(0, fs.dfs.peerCache.size());
+    assertEquals(0, peerCache.size());
     assertXceiverCount(0);
 
     // Reads the file, so we should get a
     // cached socket, and should have an xceiver on the other side.
     DFSTestUtil.readFile(fs, TEST_FILE);
-    assertEquals(1, fs.dfs.peerCache.size());
+    assertEquals(1, peerCache.size());
     assertXceiverCount(1);
 
     // Sleep for a bit longer than the client keepalive timeout.
     Thread.sleep(CLIENT_EXPIRY_MS + 1);
     
     // Taking out a peer which is expired should give a null.
-    Peer peer = fs.dfs.peerCache.get(dn.getDatanodeId(), false);
+    Peer peer = peerCache.get(dn.getDatanodeId(), false);
     assertTrue(peer == null);
 
     // The socket cache is now empty.
-    assertEquals(0, fs.dfs.peerCache.size());
-    PeerCache.setInstance(DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT,
-        DFS_DATANODE_SOCKET_REUSE_KEEPALIVE_DEFAULT);
+    assertEquals(0, peerCache.size());
   }
   
   /**
@@ -180,7 +172,7 @@ public class TestDataTransferKeepalive {
     final long CLIENT_EXPIRY_MS = 600000L;
     Configuration clientConf = new Configuration(conf);
     clientConf.setLong(DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_KEY, CLIENT_EXPIRY_MS);
-    PeerCache.setInstance(DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT, CLIENT_EXPIRY_MS);
+    clientConf.set(DFS_CLIENT_CONTEXT, "testSlowReader");
     DistributedFileSystem fs =
         (DistributedFileSystem)FileSystem.get(cluster.getURI(),
             clientConf);
@@ -215,7 +207,12 @@ public class TestDataTransferKeepalive {
   @Test(timeout=30000)
   public void testManyClosedSocketsInCache() throws Exception {
     // Make a small file
-    DistributedFileSystem fs = cluster.getFileSystem();
+    Configuration clientConf = new Configuration(conf);
+    clientConf.set(DFS_CLIENT_CONTEXT, "testManyClosedSocketsInCache");
+    DistributedFileSystem fs =
+        (DistributedFileSystem)FileSystem.get(cluster.getURI(),
+            clientConf);
+    PeerCache peerCache = ClientContext.getFromConf(clientConf).getPeerCache();
     DFSTestUtil.createFile(fs, TEST_FILE, 1L, (short)1, 0L);
 
     // Insert a bunch of dead sockets in the cache, by opening
@@ -233,15 +230,14 @@ public class TestDataTransferKeepalive {
       IOUtils.cleanup(null, stms);
     }
     
-    DFSClient client = ((DistributedFileSystem)fs).dfs;
-    assertEquals(5, client.peerCache.size());
+    assertEquals(5, peerCache.size());
     
     // Let all the xceivers timeout
     Thread.sleep(1500);
     assertXceiverCount(0);
 
     // Client side still has the sockets cached
-    assertEquals(5, client.peerCache.size());
+    assertEquals(5, peerCache.size());
 
     // Reading should not throw an exception.
     DFSTestUtil.readFile(fs, TEST_FILE);
