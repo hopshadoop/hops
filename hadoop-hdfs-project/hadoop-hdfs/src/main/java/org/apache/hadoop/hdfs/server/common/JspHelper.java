@@ -72,11 +72,15 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.VersionInfo;
 
 import org.apache.hadoop.hdfs.DFSClient;
+import org.apache.hadoop.hdfs.RemotePeerFactory;
+import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 import com.google.common.base.Charsets;
+import org.apache.hadoop.hdfs.ClientContext;
+import org.apache.hadoop.io.IOUtils;
 
 @InterfaceAudience.Private
 public class JspHelper {
@@ -208,46 +212,70 @@ public class JspHelper {
 
   public static void streamBlockInAscii(InetSocketAddress addr, String poolId,
       long blockId, Token<BlockTokenIdentifier> blockToken, long genStamp,
-      long blockSize, long offsetIntoBlock, long chunkSizeToView, JspWriter out,
-      Configuration conf, DFSClient.Conf dfsConf, DataEncryptionKey encryptionKey) throws IOException {
+      long blockSize, long offsetIntoBlock, long chunkSizeToView, 
+      JspWriter out, final Configuration conf, DFSClient.Conf dfsConf,
+      final DataEncryptionKey encryptionKey) throws IOException {
     if (chunkSizeToView == 0) {
       return;
     }
-    Socket s = NetUtils.getDefaultSocketFactory(conf).createSocket();
-    s.connect(addr, HdfsServerConstants.READ_TIMEOUT);
-    s.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
-
     int amtToRead =
         (int) Math.min(chunkSizeToView, blockSize - offsetIntoBlock);
 
-    // Use the block name for file name.
-    String file = BlockReaderFactory.getFileName(addr, poolId, blockId);
-    BlockReader blockReader = BlockReaderFactory.newBlockReader(dfsConf, file,
-        new ExtendedBlock(poolId, blockId, 0, genStamp), blockToken,
-        offsetIntoBlock, amtToRead,  true,
-        "JspHelper", TcpPeerServer.peerFromSocketAndKey(s, encryptionKey),
-        new DatanodeID(addr.getAddress().getHostAddress(),
-            addr.getHostName(), poolId, addr.getPort(), 0, 0, 0), null, null, null, false, CachingStrategy.
-        newDefaultStrategy());
-
-    final byte[] buf = new byte[amtToRead];
-    int readOffset = 0;
-    int retries = 2;
-    while (amtToRead > 0) {
-      int numRead = amtToRead;
-      try {
-        blockReader.readFully(buf, readOffset, amtToRead);
-      } catch (IOException e) {
-        retries--;
-        if (retries == 0) {
-          throw new IOException("Could not read data from datanode");
+    BlockReader blockReader = new BlockReaderFactory(dfsConf).
+      setInetSocketAddress(addr).
+      setExtendedBlock(new ExtendedBlock(poolId, blockId, 0, genStamp)).
+      setFileName(BlockReaderFactory.getFileName(addr, poolId, blockId)).
+      setBlockToken(blockToken).
+      setStartOffset(offsetIntoBlock).
+      setLength(amtToRead).
+      setVerifyChecksum(true).
+      setClientName("JspHelper").
+      setClientCacheContext(ClientContext.getFromConf(conf)).
+      setDatanodeInfo(new DatanodeInfo(
+          new DatanodeID(addr.getAddress().getHostAddress(),
+              addr.getHostName(), poolId, addr.getPort(), 0, 0, 0))).
+      setCachingStrategy(CachingStrategy.newDefaultStrategy()).
+      setConfiguration(conf).
+      setRemotePeerFactory(new RemotePeerFactory() {
+        @Override
+        public Peer newConnectedPeer(InetSocketAddress addr)
+            throws IOException {
+          Peer peer = null;
+          Socket sock = NetUtils.getDefaultSocketFactory(conf).createSocket();
+          try {
+            sock.connect(addr, HdfsServerConstants.READ_TIMEOUT);
+            sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
+            peer = TcpPeerServer.peerFromSocketAndKey(sock, encryptionKey);
+          } finally {
+            if (peer == null) {
+              IOUtils.closeSocket(sock);
+            }
+          }
+          return peer;
         }
-        continue;
+      }).
+      build();
+    
+    final byte[] buf = new byte[amtToRead];
+    try {
+      int readOffset = 0;
+      int retries = 2;
+      while (amtToRead > 0) {
+        int numRead = amtToRead;
+        try {
+          blockReader.readFully(buf, readOffset, amtToRead);
+        } catch (IOException e) {
+          retries--;
+          if (retries == 0)
+            throw new IOException("Could not read data from datanode");
+          continue;
+        }
+        amtToRead -= numRead;
+        readOffset += numRead;
       }
-      amtToRead -= numRead;
-      readOffset += numRead;
+    } finally {
+      blockReader.close();  
     }
-    blockReader.close();
     out.print(HtmlQuoting.quoteHtmlChars(new String(buf, Charsets.UTF_8)));
   }
 

@@ -8,7 +8,6 @@ import java.nio.ByteBuffer;
 import java.util.EnumSet;
 import org.apache.hadoop.fs.ReadOption;
 import org.apache.hadoop.hdfs.client.ClientMmap;
-import org.apache.hadoop.hdfs.client.ClientMmapManager;
 
 /**
  * Created by salman on 3/29/16.
@@ -139,8 +138,7 @@ public class BlockReaderDB implements  BlockReader{
   }
   
   @Override
-  public ClientMmap getClientMmap(EnumSet<ReadOption> opts,
-      ClientMmapManager mmapManager) {
+  public ClientMmap getClientMmap(EnumSet<ReadOption> opts) {
     return null;
   }
 }

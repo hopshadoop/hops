@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.IOUtils;
@@ -54,7 +55,8 @@ public class BlockMetadataHeader {
   private short version;
   private DataChecksum checksum = null;
 
-  BlockMetadataHeader(short version, DataChecksum checksum) {
+  @VisibleForTesting
+  public BlockMetadataHeader(short version, DataChecksum checksum) {
     this.checksum = checksum;
     this.version = version;
   }
@@ -157,7 +159,8 @@ public class BlockMetadataHeader {
    * @return
    * @throws IOException
    */
-  private static void writeHeader(DataOutputStream out,
+  @VisibleForTesting
+  public static void writeHeader(DataOutputStream out,
       BlockMetadataHeader header) throws IOException {
     out.writeShort(header.getVersion());
     header.getChecksum().writeHeader(out);
