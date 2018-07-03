@@ -96,7 +96,7 @@ public class TestRBWBlockInvalidation {
    * datanode, namenode should ask to invalidate that corrupted block and
    * schedule replication for one more replica for that under replicated block.
    */
-  @Test(timeout = 60000)
+  @Test(timeout = 600000)
   public void testBlockInvalidationWhenRBWReplicaMissedInDN()
       throws IOException, InterruptedException {
     // This test cannot pass on Windows due to file locking enforcement.  It will
