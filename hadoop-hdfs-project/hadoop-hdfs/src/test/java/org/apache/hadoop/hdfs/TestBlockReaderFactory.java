@@ -47,13 +47,20 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_DOMAIN_SOCKET_DATA_TRAFFIC;
-
+import org.junit.Assume;
+import static org.hamcrest.CoreMatchers.equalTo;
+ 
 public class TestBlockReaderFactory {
   static final Log LOG = LogFactory.getLog(TestBlockReaderFactory.class);
 
   @Before
   public void init() {
     DomainSocket.disableBindPathValidation();
+  }
+
+  @Before
+  public void before() {
+    Assume.assumeThat(DomainSocket.getLoadingFailureReason(), equalTo(null));
   }
 
   @After
