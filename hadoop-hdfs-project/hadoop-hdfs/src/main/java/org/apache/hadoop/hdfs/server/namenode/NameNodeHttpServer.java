@@ -42,6 +42,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
+import org.apache.hadoop.hdfs.web.resources.UserParam;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer3;
 
@@ -73,19 +74,27 @@ public class NameNodeHttpServer {
   
   private void initWebHdfs(Configuration conf) throws IOException {
     if (WebHdfsFileSystem.isEnabled(conf, HttpServer3.LOG)) {
-      //add SPNEGO authentication filter for webhdfs
-      final String name = "SPNEGO";
-      final String classname = AuthFilter.class.getName();
+      UserParam.setUserPattern(conf.get(
+          DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
+          DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
+
+      // add authentication filter for webhdfs
+      final String className = conf.get(
+          DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_KEY,
+          DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_DEFAULT);
+      final String name = className;
+
       final String pathSpec = WebHdfsFileSystem.PATH_PREFIX + "/*";
       Map<String, String> params = getAuthFilterParams(conf);
-      HttpServer3.defineFilter(httpServer.getWebAppContext(), name, classname, params,
-          new String[]{pathSpec});
-      HttpServer3.LOG.info("Added filter '" + name + "' (class=" + classname + ")");
+      HttpServer3.defineFilter(httpServer.getWebAppContext(), name, className,
+          params, new String[] { pathSpec });
+      HttpServer3.LOG.info("Added filter '" + name + "' (class=" + className
+          + ")");
 
       // add webhdfs packages
-      httpServer.addJerseyResourcePackage(
-          NamenodeWebHdfsMethods.class.getPackage().getName()
-              + ";" + Param.class.getPackage().getName(), pathSpec);
+      httpServer.addJerseyResourcePackage(NamenodeWebHdfsMethods.class
+          .getPackage().getName() + ";" + Param.class.getPackage().getName(),
+          pathSpec);
     }
   }
 
