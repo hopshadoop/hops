@@ -259,8 +259,9 @@ public class UsersGroups {
         (UsersOperationsType.GET_USER_GROUPS) {
       @Override
       public Object performTask() throws StorageException, IOException {
+        Pair<User, List<Group>> result = null;
         boolean transactionActive = connector.isTransactionActive();
-
+        
         if (!transactionActive) {
           connector.beginTransaction();
         }
@@ -269,17 +270,15 @@ public class UsersGroups {
         User user = userId == null ? userDataAccess.getUser(userName) :
             userDataAccess.getUser(userId);
 
-        if (user == null) {
-          return null;
+        if (user != null) {
+          List<Group> groups = userGroupDataAccess.getGroupsForUser(user.getId());
+          result = new Pair<User, List<Group>>(user, groups);
         }
-
-        List<Group> groups = userGroupDataAccess.getGroupsForUser(user.getId());
-
         if (!transactionActive) {
           connector.commit();
         }
 
-        return new Pair<User, List<Group>>(user, groups);
+        return result;
       }
     };
 
