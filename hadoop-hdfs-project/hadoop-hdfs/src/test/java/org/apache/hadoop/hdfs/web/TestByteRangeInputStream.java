@@ -97,12 +97,13 @@ public class TestByteRangeInputStream {
   
   @Test
   public void testByteRange() throws IOException {
+    URLConnectionFactory factory = mock(URLConnectionFactory.class);
     HftpFileSystem.RangeHeaderUrlOpener ospy =
-        spy(new HftpFileSystem.RangeHeaderUrlOpener(new URL("http://test/")));
+        spy(new HftpFileSystem.RangeHeaderUrlOpener(factory, new URL("http://test/")));
     doReturn(new MockHttpURLConnection(ospy.getURL())).when(ospy)
         .openConnection();
     HftpFileSystem.RangeHeaderUrlOpener rspy =
-        spy(new HftpFileSystem.RangeHeaderUrlOpener((URL) null));
+        spy(new HftpFileSystem.RangeHeaderUrlOpener(factory, (URL) null));
     doReturn(new MockHttpURLConnection(rspy.getURL())).when(rspy)
         .openConnection();
     ByteRangeInputStream is =
@@ -172,12 +173,15 @@ public class TestByteRangeInputStream {
       assertEquals("Should fail because incorrect response code was sent",
           "HTTP_OK expected, received 206", e.getMessage());
     }
+    is.close();
   }
   
   @Test
   public void testPropagatedClose() throws IOException {
-    ByteRangeInputStream brs =
-        spy(new HftpFileSystem.RangeHeaderInputStream(new URL("http://test/")));
+    URLConnectionFactory factory = mock(URLConnectionFactory.class);
+
+    ByteRangeInputStream brs = spy(new HftpFileSystem.RangeHeaderInputStream(
+        factory, new URL("http://test/")));
     
     InputStream mockStream = mock(InputStream.class);
     doReturn(mockStream).when(brs).openInputStream();
