@@ -20,14 +20,12 @@ package org.apache.hadoop.hdfs.server.namenode;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
-import org.apache.hadoop.hdfs.web.HftpFileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ServletUtil;
 
@@ -67,15 +65,10 @@ public class FileDataServlet extends DfsServlet {
     } else {
       hostname = host.getIpAddr();
     }
-    int port = host.getInfoPort();
-    if ("https".equals(scheme)) {
-      final Integer portObject = (Integer) getServletContext().getAttribute(
-          DFSConfigKeys.DFS_DATANODE_HTTPS_PORT_KEY);
-      if (portObject != null) {
-        port = portObject;
-      }
-    }
-
+    
+    int port = "https".equals(scheme) ? host.getInfoSecurePort() : host
+        .getInfoPort();
+    
     String dtParam = "";
     if (dt != null) {
       dtParam = JspHelper.getDelegationTokenUrlParam(dt);
