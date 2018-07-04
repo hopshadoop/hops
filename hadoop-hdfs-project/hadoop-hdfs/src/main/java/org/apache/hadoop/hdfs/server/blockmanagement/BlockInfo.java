@@ -460,9 +460,9 @@ public class BlockInfo extends Block {
     HashSet<DatanodeStorageInfo> set = new HashSet<>();
     for (int i = numLocations - 1; i >= 0; i--) {
       DatanodeStorageInfo desc = datanodeMgr.getStorage(replicas.get(i).getStorageId());
-      if (desc != null) {
+      if (desc != null && desc.getState().equals(state)) {
         set.add(desc);
-      } else if(desc.getState().equals(state)){
+      } else {
         replicas.remove(i);
       }
     }

@@ -84,6 +84,7 @@ import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocat
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage.State;
 import org.apache.hadoop.hdfs.server.protocol.KeyUpdateCommand;
 import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
@@ -1279,7 +1280,7 @@ public class BlockManager {
     StringBuilder datanodes = new StringBuilder();
     BlockInfo block = getBlockInfo(b);
 
-    DatanodeStorageInfo[] storages = getBlockInfo(block).getStorages(datanodeManager);
+    DatanodeStorageInfo[] storages = getBlockInfo(block).getStorages(datanodeManager, DatanodeStorage.State.NORMAL);
     for(DatanodeStorageInfo storage : storages) {
       final DatanodeDescriptor node = storage.getDatanodeDescriptor();
       invalidateBlocks.add(block, storage, false);
@@ -1615,7 +1616,10 @@ public class BlockManager {
         return scheduledWork;
       }
 
-      assert liveReplicaNodes.size() == numReplicas.liveReplicas();
+      // liveReplicaNodes can include READ_ONLY_SHARED replicas which are 
+      // not included in the numReplicas.liveReplicas() count
+      assert liveReplicaNodes.size() >= numReplicas.liveReplicas();
+
       // do not schedule more if enough replicas is already pending
       numEffectiveReplicas = numReplicas.liveReplicas() +
           pendingReplications.getNumReplicas(getBlockInfo(blk));
@@ -1891,15 +1895,16 @@ public class BlockManager {
     Collection<DatanodeDescriptor> nodesCorrupt = corruptReplicas.getNodes(block);
     for(DatanodeStorageInfo storage : block.getStorages(datanodeManager)) {
       final DatanodeDescriptor node = storage.getDatanodeDescriptor();
+      int countableReplica = storage.getState() == State.NORMAL ? 1 : 0; 
       if ((nodesCorrupt != null) && (nodesCorrupt.contains(node))) {
-        corrupt++;
+        corrupt += countableReplica;
       } else if (node.isDecommissionInProgress() || node.isDecommissioned()) {
-        decommissioned++;
+        decommissioned+= countableReplica;
       } else if (excessReplicateMap.contains(storage, block)) {
-          excess++;
+          excess+= countableReplica;
       } else {
         nodesContainingLiveReplicas.add(storage);
-        live++;
+        live+= countableReplica;
       }
       if(!containingNodes.contains(node)) {
         containingNodes.add(node);
@@ -3316,7 +3321,7 @@ public class BlockManager {
     Collection<DatanodeStorageInfo> nonExcess = new ArrayList<>();
     Collection<DatanodeDescriptor> corruptNodes = corruptReplicas.getNodes(getBlockInfo(block));
 
-    for (DatanodeStorageInfo storage : blocksMap.storageList(block)){
+    for (DatanodeStorageInfo storage : blocksMap.storageList(block, State.NORMAL)){
       final DatanodeDescriptor cur = storage.getDatanodeDescriptor();
       if (storage.areBlockContentsStale()) {
         LOG.info("BLOCK* processOverReplicatedBlock: Postponing processing of over-replicated " +
@@ -3876,7 +3881,7 @@ public class BlockManager {
     int stale = 0;
     Collection<DatanodeDescriptor> nodesCorrupt = corruptReplicas.getNodes(getBlockInfo(b));
 
-    for(DatanodeStorageInfo storage: blocksMap.storageList(b)) {
+    for(DatanodeStorageInfo storage: blocksMap.storageList(b, State.NORMAL)) {
 
       final DatanodeDescriptor node = storage.getDatanodeDescriptor();
 
@@ -3917,7 +3922,7 @@ public class BlockManager {
     }
     // else proceed with fast case
     int live = 0;
-    List<DatanodeStorageInfo> storages = blocksMap.storageList(b, DatanodeStorage.State.NORMAL);
+    List<DatanodeStorageInfo> storages = blocksMap.storageList(b, State.NORMAL);
     Collection<DatanodeDescriptor> nodesCorrupt = corruptReplicas.getNodes(b);
     for(DatanodeStorageInfo storage : storages) {
       final DatanodeDescriptor node = storage.getDatanodeDescriptor();

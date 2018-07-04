@@ -18,6 +18,14 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.common.INodeUtil;
+import io.hops.exception.StorageException;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -54,7 +62,6 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
@@ -62,6 +69,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdfs.RemotePeerFactory;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
+import org.apache.hadoop.hdfs.server.blockmanagement.NumberReplicas;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 /**
@@ -374,11 +382,12 @@ public class NamenodeFsck {
       boolean isCorrupt = lBlk.isCorrupt();
       String blkName = block.toString();
       DatanodeInfo[] locs = lBlk.getLocations();
-      res.totalReplicas += locs.length;
+      int liveReplicas = getNumLiveReplicas(block);
+      res.totalReplicas += liveReplicas;
       short targetFileReplication = file.getReplication();
       res.numExpectedReplicas += targetFileReplication;
-      if (locs.length > targetFileReplication) {
-        res.excessiveReplicas += (locs.length - targetFileReplication);
+      if (liveReplicas > targetFileReplication) {
+        res.excessiveReplicas += (liveReplicas - targetFileReplication);
         res.numOverReplicatedBlocks += 1;
       }
       // Check if block is Corrupt
@@ -389,11 +398,11 @@ public class NamenodeFsck {
             "\n" + path + ": CORRUPT blockpool " + block.getBlockPoolId() +
                 " block " + block.getBlockName() + "\n");
       }
-      if (locs.length >= minReplication) {
+      if (liveReplicas >= minReplication) {
         res.numMinReplicatedBlocks++;
       }
-      if (locs.length < targetFileReplication && locs.length > 0) {
-        res.missingReplicas += (targetFileReplication - locs.length);
+      if (liveReplicas < targetFileReplication && liveReplicas > 0) {
+        res.missingReplicas += (targetFileReplication - liveReplicas);
         res.numUnderReplicatedBlocks += 1;
         underReplicatedPerFile++;
         if (!showFiles) {
@@ -402,7 +411,7 @@ public class NamenodeFsck {
         out.println(" Under replicated " + block +
             ". Target Replicas is " +
             targetFileReplication + " but found " +
-            locs.length + " replica(s).");
+            liveReplicas + " replica(s).");
       }
 
       // verify block placement policy
@@ -421,13 +430,13 @@ public class NamenodeFsck {
       }
 
       report.append(i + ". " + blkName + " len=" + block.getNumBytes());
-      if (locs.length == 0) {
+      if (liveReplicas == 0) {
         report.append(" MISSING!");
         res.addMissing(block.toString(), block.getNumBytes());
         missing++;
         missize += block.getNumBytes();
       } else {
-        report.append(" repl=" + locs.length);
+        report.append(" repl=" + liveReplicas);
         if (showLocations || showRacks) {
           StringBuilder sb = new StringBuilder("[");
           for (int j = 0; j < locs.length; j++) {
@@ -478,6 +487,39 @@ public class NamenodeFsck {
     }
   }
 
+  private int getNumLiveReplicas(final ExtendedBlock block) throws IOException{
+    return (int) new HopsTransactionalRequestHandler(
+        HDFSOperationType.PROCESS_TIMEDOUT_PENDING_BLOCK) {
+      INodeIdentifier inodeIdentifier;
+
+      @Override
+      public void setUp() throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlockID(block.getBlockId());
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(
+            lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier))
+            .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.ER, LockFactory.BLK.CR, LockFactory.BLK.PE, LockFactory.BLK.UR));
+        if (((FSNamesystem) namenode.getNamesystem()).isErasureCodingEnabled() &&
+            inodeIdentifier != null) {
+          locks.add(lf.getIndivdualEncodingStatusLock(TransactionLockTypes.LockType.WRITE,
+              inodeIdentifier.getInodeId()));
+        }
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        NumberReplicas numberReplicas = namenode.getNamesystem().getBlockManager().countNodes(block.getLocalBlock());
+        return numberReplicas.liveReplicas();
+        
+      }
+    }.handle();  
+  }
+  
   private void deleteCorruptedFile(String path) {
     try {
       namenode.getRpcServer().delete(path, true);
