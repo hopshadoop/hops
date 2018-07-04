@@ -654,7 +654,7 @@ public class BlockManager {
    *     if the block does not have at least a minimal number
    *     of replicas reported from data-nodes.
    */
-  public boolean commitOrCompleteLastBlock(MutableBlockCollection bc,
+  public boolean commitOrCompleteLastBlock(BlockCollection bc,
       Block commitBlock) throws IOException, StorageException {
 
     if (commitBlock == null) {
@@ -695,7 +695,7 @@ public class BlockManager {
    *     if the block does not have at least a minimal number
    *     of replicas reported from data-nodes.
    */
-  private BlockInfo completeBlock(final MutableBlockCollection bc,
+  private BlockInfo completeBlock(final BlockCollection bc,
       final int blkIndex, boolean force) throws IOException, StorageException {
     if (blkIndex < 0) {
       return null;
@@ -729,8 +729,8 @@ public class BlockManager {
 
     return completeBlock;
   }
-
-  private BlockInfo completeBlock(final MutableBlockCollection bc,
+  
+  private BlockInfo completeBlock(final BlockCollection bc,
       final BlockInfo block, boolean force)
       throws IOException, StorageException {
     BlockInfo blk = bc.getBlock(block.getBlockIndex());
@@ -745,7 +745,7 @@ public class BlockManager {
    * regardless of whether enough replicas are present. This is necessary
    * when tailing edit logs as a Standby.
    */
-  public BlockInfo forceCompleteBlock(final MutableBlockCollection bc,
+  public BlockInfo forceCompleteBlock(final BlockCollection bc,
       final BlockInfoUnderConstruction block)
       throws IOException, StorageException {
     block.commitBlock(block, getDatanodeManager());
@@ -767,8 +767,7 @@ public class BlockManager {
    *     file
    * @return the last block locations if the block is partial or null otherwise
    */
-  public LocatedBlock convertLastBlockToUnderConstruction(
-      MutableBlockCollection bc) throws IOException {
+  public LocatedBlock convertLastBlockToUnderConstruction(BlockCollection bc) throws IOException {
     BlockInfo oldBlock = bc.getLastBlock();
     if (oldBlock == null ||
         bc.getPreferredBlockSize() == oldBlock.getNumBytes()) {
@@ -1596,8 +1595,7 @@ public class BlockManager {
       // block should belong to a file
       bc = blocksMap.getBlockCollection(blk);
       // abandoned block or block reopened for append
-      if (bc == null
-          || (bc instanceof MutableBlockCollection && getBlockInfo(blk).equals(bc.getLastBlock()))) {
+      if (bc == null || (bc.isUnderConstruction() && getBlockInfo(blk).equals(bc.getLastBlock()))) {
         // remove from neededReplications
         neededReplications.remove(getBlockInfo(blk), priority1);
         neededReplications.decrementReplicationIndex(priority1);
@@ -2834,8 +2832,7 @@ public class BlockManager {
     int numCurrentReplica = countLiveNodes(storedBlock);
     if (storedBlock.getBlockUCState() == BlockUCState.COMMITTED &&
         numCurrentReplica >= minReplication) {
-      completeBlock((MutableBlockCollection) storedBlock.getBlockCollection(),
-          storedBlock, false);
+      completeBlock(storedBlock.getBlockCollection(), storedBlock, false);
     } else if (storedBlock.isComplete()) {
       // check whether safe replication is reached for the block
       // only complete blocks are counted towards that.
@@ -2913,7 +2910,7 @@ public class BlockManager {
     if (storedBlock.getBlockUCState() == BlockUCState.COMMITTED &&
         numLiveReplicas >= minReplication) {
       storedBlock =
-          completeBlock((MutableBlockCollection) bc, storedBlock, false);
+          completeBlock(bc, storedBlock, false);
     } else if (storedBlock.isComplete()) {
       // check whether safe replication is reached for the block
       // only complete blocks are counted towards that
@@ -2924,7 +2921,7 @@ public class BlockManager {
     }
 
     // if file is under construction, then done for now
-    if (bc instanceof MutableBlockCollection) {
+    if (bc.isUnderConstruction()) {
       return storedBlock;
     }
 
@@ -3947,8 +3944,7 @@ public class BlockManager {
         ", live replicas: " + curReplicas + ", corrupt replicas: " +
         num.corruptReplicas() + ", decommissioned replicas: " +
         num.decommissionedReplicas() + ", excess replicas: " +
-        num.excessReplicas() + ", Is Open File: " +
-        (bc instanceof MutableBlockCollection) +
+        num.excessReplicas() + ", Is Open File: " + bc.isUnderConstruction() +
         ", Datanodes having this block: " + nodeList + ", Current Datanode: " +
         srcNode + ", Is current datanode decommissioning: " +
         srcNode.isDecommissionInProgress());
@@ -4579,7 +4575,7 @@ public class BlockManager {
     }.handle(namesystem);
   }
 
-  public BlockInfo tryToCompleteBlock(final MutableBlockCollection bc,
+  public BlockInfo tryToCompleteBlock(final BlockCollection bc,
       final int blkIndex) throws IOException {
 
     if (blkIndex < 0) {

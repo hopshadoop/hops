@@ -16,7 +16,7 @@
 package io.hops.transaction.lock;
 
 import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.INodeFileUnderConstruction;
+import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
 
 import java.io.IOException;
@@ -54,8 +54,8 @@ public final class LeaseLock extends Lock {
       BaseINodeLock inodeLock = (BaseINodeLock) locks.getLock(Type.INode);
 
       for (INode f : inodeLock.getAllResolvedINodes()) {
-        if (f instanceof INodeFileUnderConstruction) {
-          hldrs.add(((INodeFileUnderConstruction) f).getClientName());
+        if ((f instanceof INodeFile) && f.isUnderConstruction()) {
+          hldrs.add(((INodeFile) f).getFileUnderConstructionFeature().getClientName());
         }
       }
     }

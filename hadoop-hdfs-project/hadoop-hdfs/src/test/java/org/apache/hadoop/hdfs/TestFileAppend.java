@@ -335,8 +335,7 @@ public class TestFileAppend {
       }
 
       //1st append does not add any data so that the last block remains full
-      //and the last block in INodeFileUnderConstruction is a BlockInfo
-      //but not BlockInfoUnderConstruction. 
+      //and the last block in INodeFile is a BlockInfo but not BlockInfoUnderConstruction.
       fs2.append(p);
       
       //2nd append should get AlreadyBeingCreatedException

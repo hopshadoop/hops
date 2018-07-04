@@ -20,7 +20,6 @@ import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
-import org.apache.hadoop.hdfs.server.namenode.INodeFileUnderConstruction;
 
 import java.io.IOException;
 import java.util.ArrayList;

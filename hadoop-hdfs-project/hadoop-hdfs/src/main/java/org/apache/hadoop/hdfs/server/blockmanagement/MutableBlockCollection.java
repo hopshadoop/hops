@@ -27,11 +27,6 @@ import java.io.IOException;
  * few characteristics of a collection of Block/BlockUnderConstruction.
  */
 public interface MutableBlockCollection extends BlockCollection {
-  /**
-   * Set the block at the given index.
-   */
-  public void setBlock(int index, BlockInfo blk)
-      throws TransactionContextException, StorageException;
 
   /**
    * Convert the last block of the collection to an under-construction block
@@ -39,12 +34,5 @@ public interface MutableBlockCollection extends BlockCollection {
    */
   public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
       DatanodeStorageInfo[] locations) throws IOException, StorageException;
-
-  /**
-   * Get block at the specified index
-   * @param index
-   * @return blockinfo
-   */
-  public BlockInfo getBlock(int index)
-      throws TransactionContextException, StorageException;
+  
 }

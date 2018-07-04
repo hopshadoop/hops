@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.hops.common.IDsGenerator;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -227,7 +228,7 @@ public class FSDirectory implements Closeable {
    * @throws QuotaExceededException
    * @throws UnresolvedLinkException
    */
-  INodeFileUnderConstruction addFile(String path, PermissionStatus permissions,
+  INodeFile addFile(String path, PermissionStatus permissions,
       short replication, long preferredBlockSize, String clientName,
       String clientMachine, DatanodeDescriptor clientNode)
       throws IOException {
@@ -245,9 +246,9 @@ public class FSDirectory implements Closeable {
     if (!mkdirs(parent.toString(), permissions, true, modTime)) {
       return null;
     }
-    INodeFileUnderConstruction newNode =
-        new INodeFileUnderConstruction(IDsGeneratorFactory.getInstance().getUniqueINodeID(), permissions, replication,
-            preferredBlockSize, modTime, clientName, clientMachine, clientNode, (byte) 0);
+    INodeFile newNode = new INodeFile(IDsGeneratorFactory.getInstance().getUniqueINodeID(), permissions,
+        BlockInfo.EMPTY_ARRAY, replication, modTime, modTime, preferredBlockSize, (byte) 0);
+    newNode.toUnderConstruction(clientName, clientMachine, clientNode);
 
     boolean added = false;
     added = addINode(path, newNode);
@@ -271,8 +272,8 @@ public class FSDirectory implements Closeable {
       throws QuotaExceededException, StorageException,
       TransactionContextException, IOException {
     final INode[] inodes = inodesInPath.getINodes();
-      final INodeFileUnderConstruction fileINode =
-          INodeFileUnderConstruction.valueOf(inodes[inodes.length-1], path);
+    final INodeFile fileINode = inodes[inodes.length - 1].asFile();
+    Preconditions.checkState(fileINode.isUnderConstruction());
 
     long diskspaceTobeConsumed = fileINode.getBlockDiskspace();
     //When appending to a small file stored in DB we should consider the file
@@ -304,8 +305,9 @@ public class FSDirectory implements Closeable {
   /**
    * Persist the block list for the inode.
    */
-  void persistBlocks(String path, INodeFileUnderConstruction file)
+  void persistBlocks(String path, INodeFile file)
       throws StorageException, TransactionContextException {
+    Preconditions.checkArgument(file.isUnderConstruction());
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug(
           "DIR* FSDirectory.persistBlocks: " + path + " with " +
@@ -318,6 +320,7 @@ public class FSDirectory implements Closeable {
    * Persist the new block (the last block of the given file).
    */
   void persistNewBlock(String path, INodeFile file) throws IOException {
+    Preconditions.checkArgument(file.isUnderConstruction());
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       String block ="";
       if(file.getLastBlock()!=null){
@@ -350,13 +353,15 @@ public class FSDirectory implements Closeable {
    * Remove a block from the file.
    * @return Whether the block exists in the corresponding file
    */
-  boolean removeBlock(String path, INodeFileUnderConstruction fileNode,
+  boolean removeBlock(String path, INodeFile fileNode,
       Block block) throws IOException, StorageException {
+    Preconditions.checkArgument(fileNode.isUnderConstruction());
     return unprotectedRemoveBlock(path, fileNode, block);
   }
   
-  boolean unprotectedRemoveBlock(String path, INodeFileUnderConstruction fileNode,
+  boolean unprotectedRemoveBlock(String path, INodeFile fileNode,
       Block block) throws IOException, StorageException {
+    Preconditions.checkArgument(fileNode.isUnderConstruction());
     // modify file-> block and blocksMap
     boolean removed = fileNode.removeLastBlock(block);
     if (!removed) {
