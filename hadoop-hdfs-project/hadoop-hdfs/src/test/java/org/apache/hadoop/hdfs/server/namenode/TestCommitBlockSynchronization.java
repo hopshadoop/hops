@@ -19,9 +19,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
-import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -39,12 +37,10 @@ import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.*;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
-import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.junit.After;
 import org.junit.Before;
@@ -70,8 +66,7 @@ public class TestCommitBlockSynchronization {
     cluster.shutdown();
   }
   
-  private FSNamesystem makeNameSystemSpy(Block block,
-                                         INodeFileUnderConstruction file)
+  private FSNamesystem makeNameSystemSpy(Block block, INodeFile file)
       throws IOException {
     Configuration conf = new Configuration();
     DatanodeStorageInfo[] targets = new DatanodeStorageInfo[0];
@@ -92,16 +87,16 @@ public class TestCommitBlockSynchronization {
     doReturn(mockBlockInfo).when(namesystemSpy).getStoredBlock(any(Block.class));
     
     doReturn("").when(namesystemSpy).closeFileCommitBlocks(
-        any(INodeFileUnderConstruction.class),
+        any(INodeFile.class),
         any(BlockInfo.class));
     doReturn("").when(namesystemSpy).persistBlocks(
-        any(INodeFileUnderConstruction.class));
+        any(INodeFile.class));
 
     return namesystemSpy;
   }
   
-  private BlockInfoUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] targets, final Block block, final INodeFileUnderConstruction file) throws
-      IOException {
+  private BlockInfoUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] targets,
+      final Block block, final INodeFile file) throws IOException {
     return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier = new INodeIdentifier(1);
@@ -136,10 +131,15 @@ public class TestCommitBlockSynchronization {
 
     }.handle();
   }
-   
+  
+  private INodeFile mockFileUnderConstruction() {
+    INodeFile file = mock(INodeFile.class);
+    return file;
+  }
+  
   @Test
   public void testCommitBlockSynchronization() throws IOException {
-    INodeFileUnderConstruction file = mock(INodeFileUnderConstruction.class);
+    INodeFile file = mockFileUnderConstruction();
     Block block = new Block(blockId, length, genStamp);
     FSNamesystem namesystemSpy = makeNameSystemSpy(block, file);
     DatanodeID[] newTargets = new DatanodeID[0];
@@ -169,8 +169,8 @@ public class TestCommitBlockSynchronization {
         lastBlock, genStamp, length, false, false, newTargets, null);
   }
 
-    private BlockInfoUnderConstruction setBlockCollectionAndGenerationStamp(final BlockInfo completedBlockInfo, final INodeFileUnderConstruction file) throws
-      IOException {
+    private BlockInfoUnderConstruction setBlockCollectionAndGenerationStamp(final BlockInfo completedBlockInfo,
+        final INodeFile file) throws IOException {
     return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier = new INodeIdentifier(1);
@@ -205,7 +205,7 @@ public class TestCommitBlockSynchronization {
     
   @Test
   public void testCommitBlockSynchronization2() throws IOException {
-    INodeFileUnderConstruction file = mock(INodeFileUnderConstruction.class);
+    INodeFile file = mockFileUnderConstruction();
     
     Block block = new Block(blockId, length, genStamp);
     FSNamesystem namesystemSpy = makeNameSystemSpy(block, file);
@@ -231,7 +231,7 @@ public class TestCommitBlockSynchronization {
 
   @Test
   public void testCommitBlockSynchronizationWithDelete() throws IOException {
-    INodeFileUnderConstruction file = mock(INodeFileUnderConstruction.class);
+    INodeFile file = mockFileUnderConstruction();
     Block block = new Block(blockId, length, genStamp);
     FSNamesystem namesystemSpy = makeNameSystemSpy(block, file);
     DatanodeDescriptor[] targets = new DatanodeDescriptor[0];
@@ -252,7 +252,7 @@ public class TestCommitBlockSynchronization {
 
   @Test
   public void testCommitBlockSynchronizationWithClose() throws IOException {
-    INodeFileUnderConstruction file = mock(INodeFileUnderConstruction.class);
+    INodeFile file = mockFileUnderConstruction();
     Block block = new Block(blockId, length, genStamp);
     FSNamesystem namesystemSpy = makeNameSystemSpy(block, file);
     DatanodeDescriptor[] targets = new DatanodeDescriptor[0];
@@ -284,7 +284,7 @@ public class TestCommitBlockSynchronization {
   @Test
   public void testCommitBlockSynchronizationWithCloseAndNonExistantTarget()
       throws IOException {
-    INodeFileUnderConstruction file = mock(INodeFileUnderConstruction.class);
+    INodeFile file = mockFileUnderConstruction();
     Block block = new Block(blockId, length, genStamp);
     FSNamesystem namesystemSpy = makeNameSystemSpy(block, file);
     DatanodeID[] newTargets = new DatanodeID[]{

@@ -78,6 +78,31 @@ public interface BlockCollection {
   public String getName() throws StorageException, TransactionContextException;
   
   /**
+   * Get block at the specified index
+   * @param index
+   * @return blockinfo
+   */
+  public BlockInfo getBlock(int index)
+      throws TransactionContextException, StorageException;
+  
+  /**
+   * Set the block at the given index.
+   */
+  public void setBlock(int index, BlockInfo blk) throws StorageException, TransactionContextException;
+  
+  /**
+   * Convert the last block of the collection to an under-construction block
+   * and set the locations.
+   */
+  public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
+      DatanodeStorageInfo[] locations) throws IOException;
+  
+  /**
+   * @return whether the block collection is under construction.
+   */
+  public boolean isUnderConstruction();
+  
+  /**
    * HOP:
    * Get the Id of associated INode
    */

@@ -119,7 +119,6 @@ import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
-import org.apache.hadoop.hdfs.server.namenode.INodeFileUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.INodeSymlink;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
 
@@ -282,7 +281,6 @@ public class HdfsStorageFactory {
         entityContexts.put(INodeFile.class, inodeContext);
         entityContexts.put(INodeDirectoryWithQuota.class, inodeContext);
         entityContexts.put(INodeSymlink.class, inodeContext);
-        entityContexts.put(INodeFileUnderConstruction.class, inodeContext);
 
         entityContexts.put(CorruptReplica.class, new CorruptReplicaContext(
             (CorruptReplicaDataAccess) getDataAccess(
