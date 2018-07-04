@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.primitives.Longs;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -30,10 +33,13 @@ import java.util.List;
 @InterfaceStability.Unstable
 public class HdfsBlocksMetadata {
   
+  /** The block pool that was queried */
+  private final String blockPoolId;
+
   /**
    * List of blocks
    */
-  private final ExtendedBlock[] blocks;
+  private final long[] blockIds;
   
   /**
    * List of volumes
@@ -50,7 +56,7 @@ public class HdfsBlocksMetadata {
   /**
    * Constructs HdfsBlocksMetadata.
    *
-   * @param blocks
+   * @param blockIds
    *     List of blocks described
    * @param volumeIds
    *     List of potential volume identifiers, specifying volumes where
@@ -58,9 +64,13 @@ public class HdfsBlocksMetadata {
    * @param volumeIndexes
    *     Indexes into the list of volume identifiers, one per block
    */
-  public HdfsBlocksMetadata(ExtendedBlock[] blocks, List<byte[]> volumeIds,
+   public HdfsBlocksMetadata(String blockPoolId,
+      long[] blockIds, List<byte[]> volumeIds, 
       List<Integer> volumeIndexes) {
-    this.blocks = blocks;
+     Preconditions.checkArgument(blockIds.length == volumeIndexes.size(),
+        "Argument lengths should match");
+    this.blockPoolId = blockPoolId;
+    this.blockIds = blockIds;
     this.volumeIds = volumeIds;
     this.volumeIndexes = volumeIndexes;
   }
@@ -70,8 +80,8 @@ public class HdfsBlocksMetadata {
    *
    * @return array of blocks
    */
-  public ExtendedBlock[] getBlocks() {
-    return blocks;
+  public long[] getBlockIds() {
+    return blockIds;
   }
   
   /**
@@ -90,5 +100,11 @@ public class HdfsBlocksMetadata {
    */
   public List<Integer> getVolumeIndexes() {
     return volumeIndexes;
+  }
+  
+  @Override
+  public String toString() {
+    return "Metadata for " + blockIds.length + " blocks in " +
+        blockPoolId + ": " + Joiner.on(",").join(Longs.asList(blockIds));
   }
 }

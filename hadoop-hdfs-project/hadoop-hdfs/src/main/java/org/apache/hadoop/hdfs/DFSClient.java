@@ -270,7 +270,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     final boolean connectToDnViaHostname;
     final boolean getHdfsBlocksMetadataEnabled;
     final int getFileBlockStorageLocationsNumThreads;
-    final int getFileBlockStorageLocationsTimeout;
+    final int getFileBlockStorageLocationsTimeoutMs;
     final int retryTimesForGetLastBlockLength;
     final int retryIntervalForGetLastBlockLength;
     
@@ -363,9 +363,9 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
       getFileBlockStorageLocationsNumThreads = conf.getInt(
           DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_NUM_THREADS,
           DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_NUM_THREADS_DEFAULT);
-      getFileBlockStorageLocationsTimeout = conf.getInt(
-          DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT,
-          DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_DEFAULT);
+      getFileBlockStorageLocationsTimeoutMs = conf.getInt(
+          DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS,
+          DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS_DEFAULT);
       retryTimesForGetLastBlockLength = conf.getInt(
           DFSConfigKeys.DFS_CLIENT_RETRY_TIMES_GET_LAST_BLOCK_LENGTH,
           DFSConfigKeys.DFS_CLIENT_RETRY_TIMES_GET_LAST_BLOCK_LENGTH_DEFAULT);
@@ -1419,16 +1419,20 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     }
 
     // Make RPCs to the datanodes to get volume locations for its replicas
-    List<HdfsBlocksMetadata> metadatas = BlockStorageLocationUtil
+    Map<DatanodeInfo, HdfsBlocksMetadata> metadatas = BlockStorageLocationUtil
         .queryDatanodesForHdfsBlocksMetadata(conf, datanodeBlocks,
             getConf().getFileBlockStorageLocationsNumThreads,
-            getConf().getFileBlockStorageLocationsTimeout,
+            getConf().getFileBlockStorageLocationsTimeoutMs,
             getConf().connectToDnViaHostname);
+    
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("metadata returned: " + Joiner.on("\n").withKeyValueSeparator("=").join(metadatas));
+    }
     
     // Regroup the returned VolumeId metadata to again be grouped by
     // LocatedBlock rather than by datanode
     Map<LocatedBlock, List<VolumeId>> blockVolumeIds = BlockStorageLocationUtil
-        .associateVolumeIdsWithBlocks(blocks, datanodeBlocks, metadatas);
+        .associateVolumeIdsWithBlocks(blocks, metadatas);
     
     // Combine original BlockLocations with new VolumeId information
     BlockStorageLocation[] volumeBlockLocations = BlockStorageLocationUtil
