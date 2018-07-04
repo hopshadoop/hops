@@ -24,6 +24,7 @@ import io.hops.metadata.common.CounterType;
 import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.LeaseDataAccess;
 import io.hops.transaction.lock.TransactionLocks;
+import java.util.Collection;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
 
 import java.util.HashMap;
@@ -70,10 +71,22 @@ public class LeaseContext extends BaseEntityContext<String, Lease> {
         return findByHolder(lFinder, params);
       case ByHolderId:
         return findByHolderId(lFinder, params);
+
     }
     throw new RuntimeException(UNSUPPORTED_FINDER);
   }
 
+  @Override
+  public Collection<Lease> findList(FinderType<Lease> finder, Object... params)
+      throws TransactionContextException, StorageException {
+    Lease.Finder lFinder = (Lease.Finder) finder;
+    switch (lFinder) {
+      case All:
+        return findAll(lFinder, params);
+    }
+    throw new RuntimeException(UNSUPPORTED_FINDER);
+  }
+  
   @Override
   public void remove(Lease lease) throws TransactionContextException {
     super.remove(lease);
@@ -137,4 +150,17 @@ public class LeaseContext extends BaseEntityContext<String, Lease> {
     return result;
   }
 
+  private Collection<Lease> findAll(Lease.Finder lFinder, Object[] params) throws StorageCallPreventedException,
+      StorageException {
+    Collection<Lease> result = null;
+    aboutToAccessStorage(lFinder, params);
+    result = dataAccess.findAll();
+    gotFromDB(result);
+    for (Lease lease : result) {
+      idToLease.put(lease.getHolderID(), lease);
+    }
+    miss(lFinder, result);
+
+    return result;
+  }
 }

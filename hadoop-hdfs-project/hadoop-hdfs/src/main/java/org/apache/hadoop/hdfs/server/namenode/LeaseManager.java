@@ -368,7 +368,12 @@ public class LeaseManager {
     Collection<LeasePath> leasePathSet =
         EntityManager.findList(LeasePath.Finder.ByPrefix, prefix);
     final Map<LeasePath, Lease> entries = new HashMap<>();
-    final int srclen = prefix.length();
+    int srclen = prefix.length();
+    
+    // prefix may ended with '/'
+    if (prefix.charAt(srclen - 1) == Path.SEPARATOR_CHAR) {
+      srclen -= 1;
+    }
 
     for (LeasePath lPath : leasePathSet) {
       if (!lPath.getPath().startsWith(prefix)) {
