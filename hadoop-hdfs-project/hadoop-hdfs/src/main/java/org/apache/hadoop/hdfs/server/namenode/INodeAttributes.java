@@ -98,17 +98,13 @@ public class INodeAttributes {
   public boolean isInTree() {
     return inTree;
   }
-  
-  public Long getNsQuota() {
-    return nsQuota;
-  }
 
   public Long getNsCount() {
     return nsCount;
   }
 
-  public Long getDsQuota() {
-    return dsQuota;
+  public Quota.Counts getQuotaCounts() {
+      return Quota.Counts.newInstance(nsQuota, dsQuota);
   }
 
   public Long getDiskspace() {

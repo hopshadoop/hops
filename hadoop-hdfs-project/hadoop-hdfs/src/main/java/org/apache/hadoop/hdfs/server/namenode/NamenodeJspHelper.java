@@ -22,8 +22,6 @@ import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
-import io.hops.merge.HttpConfig2;
-import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -59,7 +57,6 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -1040,7 +1037,7 @@ class NamenodeJspHelper {
           doc.endTag();
 
           doc.startTag("ds_quota");
-          doc.pcdata("" + inode.getDsQuota());
+          doc.pcdata("" + inode.getQuotaCounts().get(Quota.DISKSPACE));
           doc.endTag();
 
           doc.startTag("permission_status");

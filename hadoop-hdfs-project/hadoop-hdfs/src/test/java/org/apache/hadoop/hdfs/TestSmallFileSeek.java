@@ -27,6 +27,7 @@ import org.junit.Test;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Random;
 
 import static org.junit.Assert.assertEquals;
@@ -46,12 +47,14 @@ public class TestSmallFileSeek {
     byte[] buffer = new byte[ONEMB];
     Random rand = new Random(seed);
     rand.nextBytes(buffer);
+    System.out.println("writing " + Arrays.toString(buffer));
     stm.write(buffer);
     stm.close();
   }
   
   private void checkAndEraseData(byte[] actual, int from, byte[] expected,
       String message) {
+    System.out.println("read " + Arrays.toString(actual));
     for (int idx = 0; idx < actual.length; idx++) {
       assertEquals(message + " byte " + (from + idx) + " differs. expected " +
               expected[from + idx] + " actual " + actual[idx], actual[idx],

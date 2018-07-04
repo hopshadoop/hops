@@ -15,24 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.blockmanagement;
-
-import io.hops.exception.StorageException;
-import io.hops.exception.TransactionContextException;
+package org.apache.hadoop.hdfs;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 
-/**
- * This interface is used by the block manager to expose a
- * few characteristics of a collection of Block/BlockUnderConstruction.
- */
-public interface MutableBlockCollection extends BlockCollection {
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.net.Peer;
+import org.apache.hadoop.security.UserGroupInformation;
 
+public interface RemotePeerFactory {
   /**
-   * Convert the last block of the collection to an under-construction block
-   * and set the locations.
+   * @param addr          The address to connect to.
+   * 
+   * @return              A new Peer connected to the address.
+   *
+   * @throws IOException  If there was an error connecting or creating 
+   *                      the remote socket, encrypted stream, etc.
    */
-  public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
-      DatanodeStorageInfo[] locations) throws IOException, StorageException;
-  
+  Peer newConnectedPeer(InetSocketAddress addr) throws IOException;
 }

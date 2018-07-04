@@ -42,7 +42,6 @@ import java.nio.ByteBuffer;
 import java.util.EnumSet;
 import org.apache.hadoop.fs.ReadOption;
 import org.apache.hadoop.hdfs.client.ClientMmap;
-import org.apache.hadoop.hdfs.client.ClientMmapManager;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
@@ -496,8 +495,7 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
   }
   
   @Override
-  public ClientMmap getClientMmap(EnumSet<ReadOption> opts,
-      ClientMmapManager mmapManager) {
+  public ClientMmap getClientMmap(EnumSet<ReadOption> opts) {
     return null;
   }
 }
