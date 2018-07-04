@@ -27,7 +27,6 @@ import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.util.List;
@@ -90,7 +89,6 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.token.Token;
@@ -101,6 +99,7 @@ import org.mortbay.util.ajax.JSON;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.web.resources.FsActionParam;
 
 /** A FileSystem for HDFS over the web. */
@@ -119,12 +118,13 @@ public class WebHdfsFileSystem extends FileSystem
   
   /** Delegation token kind */
   public static final Text TOKEN_KIND = new Text("WEBHDFS delegation");
-  protected TokenAspect<WebHdfsFileSystem> tokenAspect; 
+  protected TokenAspect<? extends WebHdfsFileSystem> tokenAspect;
 
   private UserGroupInformation ugi;
   private InetSocketAddress nnAddr;
   private URI uri;
   private Token<?> delegationToken;
+  protected Text tokenServiceName;
   private RetryPolicy retryPolicy = null;
   private Path workingDir;
 
@@ -151,7 +151,8 @@ public class WebHdfsFileSystem extends FileSystem
    * be overridden by SWebHdfsFileSystem.
    */
   protected synchronized void initializeTokenAspect() {
-    tokenAspect = new TokenAspect<WebHdfsFileSystem>(this, TOKEN_KIND);
+    tokenAspect = new TokenAspect<WebHdfsFileSystem>(this, tokenServiceName,
+        TOKEN_KIND);
   }
 
   @Override
@@ -162,15 +163,18 @@ public class WebHdfsFileSystem extends FileSystem
     connectionFactory = URLConnectionFactory
         .newDefaultURLConnectionFactory(conf);
     /** set user pattern based on configuration file */
-    UserParam.setUserPattern(conf.get(DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY, DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
-    initializeTokenAspect();
+    UserParam.setUserPattern(conf.get(
+        DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
+        DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
 
     ugi = UserGroupInformation.getCurrentUser();
-    try {
-      this.uri = new URI(uri.getScheme(), uri.getAuthority(), null, null, null);
-    } catch (URISyntaxException e) {
-      throw new IllegalArgumentException(e);
-    }
+    this.uri = URI.create(uri.getScheme() + "://" + uri.getAuthority());
+
+    // In non-HA case, the code needs to call getCanonicalUri() in order to
+    // handle the case where no port is specified in the URI
+    this.tokenServiceName = new Text(this.uri.getAuthority());
+    initializeTokenAspect();
+    
     this.nnAddr = DFSUtil.resolveWebHdfsUri(this.uri, conf);
     this.retryPolicy =
         RetryUtils.getDefaultRetryPolicy(
@@ -952,12 +956,12 @@ public class WebHdfsFileSystem extends FileSystem
     final HttpOpParam.Op op = GetOpParam.Op.GETDELEGATIONTOKEN;
     final Map<?, ?> m = run(op, null, new RenewerParam(renewer));
     final Token<DelegationTokenIdentifier> token = JsonUtil.toDelegationToken(m);
-    SecurityUtil.setTokenService(token, nnAddr);
+    token.setService(tokenServiceName);
     return token;
   }
 
   @Override
-  public Token<?> getRenewToken() {
+  public synchronized Token<?> getRenewToken() {
     return delegationToken;
   }
 

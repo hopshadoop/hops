@@ -20,9 +20,7 @@ package org.apache.hadoop.hdfs.web;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import java.io.IOException;
 import org.apache.hadoop.io.Text;
 
 /**
@@ -60,8 +58,9 @@ public class HsftpFileSystem extends HftpFileSystem {
   }
 
   @Override
-  protected void initTokenAspect(Configuration conf) throws IOException {
-    tokenAspect = new TokenAspect<HftpFileSystem>(this, TOKEN_KIND);
+  protected void initTokenAspect() {
+    tokenAspect = new TokenAspect<HsftpFileSystem>(this, tokenServiceName,
+        TOKEN_KIND);
   }
 
   @Override
