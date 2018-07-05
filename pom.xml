@@ -56,16 +56,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
   <distributionManagement>
     <repository>
-      <id>sics-release-repository</id>
-      <name>SICS Repository</name>
-      <url>scpexe://kompics.i.sics.se/home/maven/repository</url>
+      <id>Hops</id>
+      <name>Hops Repo</name>
+      <url>https://bbc1.sics.se/archiva/repository/Hops/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
     </repository>
-    <snapshotRepository>
-      <id>sics-snapshot-repository</id>
-      <name>SICS Snapshot Repository</name>
-      <url>scpexe://kompics.i.sics.se/home/maven/snapshotrepository</url>
-    </snapshotRepository>
-    <downloadUrl>http://kompics.sics.se/maven</downloadUrl>
   </distributionManagement>
 
   <repositories>
@@ -79,9 +79,18 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </snapshots>
     </repository>
     <repository>
-      <id>sics-snapshot-repository</id>
-      <name>SICS Snapshot Repository</name>
-      <url>http://kompics.sics.se/maven/snapshotrepository</url>
+      <id>hops-release</id>
+      <name>Hops Release Repository</name>
+      <url>https://bbc1.sics.se/archiva/repository/Hops/</url>
+      <snapshots>
+        <enabled>false</enabled>
+        <updatePolicy>never</updatePolicy>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>hops-snapshot-repository</id>
+      <name>Hops Snapshot Repository</name>
+      <url>https://bbc1.sics.se/archiva/repository/Hops/</url>
       <releases>
         <enabled>true</enabled>
       </releases>
