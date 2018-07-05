@@ -19,8 +19,10 @@ package org.apache.hadoop.fs;
 
 //import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CACHEREPORT_INTERVAL_MSEC_KEY;
 //import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY;
-//import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY;
 //import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MMAP_ENABLED;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_SIZE;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -130,7 +132,7 @@ public class TestEnhancedByteBufferAccess {
           "TestRequestMmapAccess._PORT.sock").getAbsolutePath());
     conf.setBoolean(DFSConfigKeys.
         DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY, true);
-//    conf.setLong(DFS_HEARTBEAT_INTERVAL_KEY, 1);
+    conf.setLong(DFS_HEARTBEAT_INTERVAL_KEY, 1);
 //    conf.setLong(DFS_CACHEREPORT_INTERVAL_MSEC_KEY, 1000);
 //    conf.setLong(DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS, 1000);
     return conf;
@@ -584,10 +586,10 @@ public class TestEnhancedByteBufferAccess {
     }
   }
 
-  /**
-   * Test that we can zero-copy read cached data even without disabling
-   * checksums.
-   */
+//  /**
+//   * Test that we can zero-copy read cached data even without disabling
+//   * checksums.
+//   */
 //  @Test(timeout=120000)
 //  public void testZeroCopyReadOfCachedData() throws Exception {
 //    BlockReaderTestUtil.enableShortCircuitShmTracing();
@@ -697,5 +699,64 @@ public class TestEnhancedByteBufferAccess {
         return result.toBoolean();
       }
     }, 10, 60000);
+  }
+  
+  @Test
+  public void testClientMmapDisable() throws Exception {
+    HdfsConfiguration conf = initZeroCopyTest();
+    conf.setBoolean(DFS_CLIENT_MMAP_ENABLED, false);
+    MiniDFSCluster cluster = null;
+    final Path TEST_PATH = new Path("/a");
+    final int TEST_FILE_LENGTH = 16385;
+    final int RANDOM_SEED = 23453;
+    final String CONTEXT = "testClientMmapDisable";
+    FSDataInputStream fsIn = null;
+    DistributedFileSystem fs = null;
+    conf.set(DFSConfigKeys.DFS_CLIENT_CONTEXT, CONTEXT);
+
+    try {
+      // With DFS_CLIENT_MMAP_ENABLED set to false, we should not do memory
+      // mapped reads.
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      fs = cluster.getFileSystem();
+      DFSTestUtil.createFile(fs, TEST_PATH,
+          TEST_FILE_LENGTH, (short)1, RANDOM_SEED);
+      DFSTestUtil.waitReplication(fs, TEST_PATH, (short)1);
+      fsIn = fs.open(TEST_PATH);
+      try {
+        fsIn.read(null, 1, EnumSet.of(ReadOption.SKIP_CHECKSUMS));
+        Assert.fail("expected zero-copy read to fail when client mmaps " +
+            "were disabled.");
+      } catch (UnsupportedOperationException e) {
+      }
+    } finally {
+      if (fsIn != null) fsIn.close();
+      if (fs != null) fs.close();
+      if (cluster != null) cluster.shutdown();
+    }
+
+    fsIn = null;
+    fs = null;
+    cluster = null;
+    try {
+      // Now try again with DFS_CLIENT_MMAP_CACHE_SIZE == 0.  It should work.
+      conf.setBoolean(DFS_CLIENT_MMAP_ENABLED, true);
+      conf.setInt(DFS_CLIENT_MMAP_CACHE_SIZE, 0);
+      conf.set(DFSConfigKeys.DFS_CLIENT_CONTEXT, CONTEXT + ".1");
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      fs = cluster.getFileSystem();
+      DFSTestUtil.createFile(fs, TEST_PATH,
+          TEST_FILE_LENGTH, (short)1, RANDOM_SEED);
+      DFSTestUtil.waitReplication(fs, TEST_PATH, (short)1);
+      fsIn = fs.open(TEST_PATH);
+      ByteBuffer buf = fsIn.read(null, 1, EnumSet.of(ReadOption.SKIP_CHECKSUMS));
+      fsIn.releaseBuffer(buf);
+    } finally {
+      if (fsIn != null) fsIn.close();
+      if (fs != null) fs.close();
+      if (cluster != null) cluster.shutdown();
+    }
   }
 }
