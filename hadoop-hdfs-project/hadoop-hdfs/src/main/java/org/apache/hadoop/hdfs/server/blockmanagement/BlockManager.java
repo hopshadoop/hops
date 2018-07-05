@@ -4058,7 +4058,7 @@ public class BlockManager {
               if (isNeededReplication(block, curExpectedReplicas,
                   curReplicas)) {
                 if (curExpectedReplicas > curReplicas) {
-                  if (bc instanceof MutableBlockCollection) {
+                  if (bc.isUnderConstruction()) {
                     if (block.equals(bc.getLastBlock()) && curReplicas > minReplication) {
                       return null;
                     }
