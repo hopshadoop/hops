@@ -118,6 +118,7 @@ import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 import org.apache.hadoop.fs.FileContext;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
 import org.junit.Assert;
@@ -1385,4 +1386,17 @@ public class DFSTestUtil {
     buf.duplicate().get(arr);
     return arr;
   }
+
+  /**
+   * Round a long value up to a multiple of a factor.
+   *
+   * @param val    The value.
+   * @param factor The factor to round up to.  Must be > 1.
+   * @return       The rounded value.
+   */
+  public static long roundUpToMultiple(long val, int factor) {
+    assert (factor > 1);
+    long c = (val + factor - 1) / factor;
+    return c * factor;
+}
 }

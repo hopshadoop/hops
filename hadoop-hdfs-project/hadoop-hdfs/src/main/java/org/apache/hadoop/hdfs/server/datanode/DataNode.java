@@ -233,6 +233,7 @@ public class DataNode extends Configured
   AtomicInteger xmitsInProgress = new AtomicInteger();
   Daemon dataXceiverServer = null;
   Daemon localDataXceiverServer = null;
+  ShortCircuitRegistry shortCircuitRegistry = null;
   ThreadGroup threadGroup = null;
   private DNConf dnConf;
   private volatile boolean heartbeatsDisabledForTests = false;
@@ -587,6 +588,7 @@ public class DataNode extends Configured
             domainPeerServer.getBindPath());
       }
     }
+    this.shortCircuitRegistry = new ShortCircuitRegistry(conf);
   }
 
   static DomainPeerServer getDomainPeerServer(Configuration conf,
@@ -1394,7 +1396,7 @@ public class DataNode extends Configured
       MBeans.unregister(dataNodeInfoBeanName);
       dataNodeInfoBeanName = null;
     }
-    
+    if (shortCircuitRegistry != null) shortCircuitRegistry.shutdown();
     if (revocationListFetcherService != null) {
       try {
         revocationListFetcherService.serviceStop();
@@ -2154,6 +2156,7 @@ public class DataNode extends Configured
    *
    * @return the fsdataset that stores the blocks
    */
+  @VisibleForTesting
   public FsDatasetSpi<?> getFSDataset() {
     return data;
   }
@@ -2733,5 +2736,9 @@ public class DataNode extends Configured
   byte[] getSmallFileDataFromNN(ExtendedBlock block) throws IOException {
     BPOfferService bpos = getBPOSForBlock(block);
     return bpos.getSmallFileDataFromNN((int)block.getBlockId());
+  }
+  
+  public ShortCircuitRegistry getShortCircuitRegistry() {
+    return shortCircuitRegistry;
   }
 }

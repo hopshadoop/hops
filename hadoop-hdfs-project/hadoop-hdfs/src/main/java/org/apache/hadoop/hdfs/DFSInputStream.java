@@ -69,6 +69,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.IdentityHashStore;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.io.IOUtils;
 
 /****************************************************************
  * DFSInputStream provides bytes from a named file.  It handles 
@@ -1634,7 +1635,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
       success = true;
     } finally {
       if (!success) {
-        clientMmap.unref();
+        IOUtils.closeQuietly(clientMmap);
       }
     }
     return buffer;
@@ -1648,7 +1649,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
           "that was not created by this stream, " + buffer);
     }
     if (val instanceof ClientMmap) {
-      ((ClientMmap)val).unref();
+      IOUtils.closeQuietly((ClientMmap)val);
     } else if (val instanceof ByteBufferPool) {
       ((ByteBufferPool)val).putBuffer(buffer);
     }
