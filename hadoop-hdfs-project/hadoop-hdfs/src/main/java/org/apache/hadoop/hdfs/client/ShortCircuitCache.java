@@ -61,6 +61,7 @@ import org.apache.hadoop.util.Waitable;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.net.unix.DomainSocketWatcher;
 
 /**
  * The ShortCircuitCache tracks things which the client needs to access
@@ -375,7 +376,8 @@ public class ShortCircuitCache implements Closeable {
     this.mmapRetryTimeoutMs = mmapRetryTimeoutMs;
     this.staleThresholdMs = staleThresholdMs;
     DfsClientShmManager shmManager = null;
-    if (shmInterruptCheckMs > 0) {
+    if ((shmInterruptCheckMs > 0) &&
+        (DomainSocketWatcher.getLoadingFailureReason() == null)) {
       try {
         shmManager = new DfsClientShmManager(shmInterruptCheckMs);
       } catch (IOException e) {
