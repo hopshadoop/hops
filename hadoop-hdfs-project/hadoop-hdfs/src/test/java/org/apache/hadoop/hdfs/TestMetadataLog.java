@@ -775,4 +775,44 @@ public class TestMetadataLog extends TestCase {
     assertTrue(inodeLogEntries.get(2).getOperation() ==
         MetadataLogEntry.Operation.ADD);
   }
+  
+  @Test
+  public void testSettingAndUnsettingMetaEnabled() throws Exception{
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(2)
+        .build();
+    try {
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      Path projects = new Path("/projects");
+      Path project = new Path(projects, "project");
+      Path dataset = new Path(project, "dataset");
+      Path folder = new Path(dataset, "folder");
+      Path file = new Path(folder, "file");
+      dfs.mkdirs(folder, FsPermission.getDefault());
+      HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
+      out.close();
+      dfs.setMetaEnabled(dataset, true);
+      int inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
+      int folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
+      assertTrue(checkLog(folderId, MetadataLogEntry.Operation.ADD));
+      assertTrue(checkLog(inodeId, MetadataLogEntry.Operation.ADD));
+      
+      dfs.setMetaEnabled(dataset, false);
+      
+      assertEquals(1, getMetadataLogEntries(inodeId).size());
+      assertEquals(1, getMetadataLogEntries(folderId).size());
+  
+      dfs.setMetaEnabled(dataset, true);
+  
+      assertEquals(2, getMetadataLogEntries(inodeId).size());
+      assertEquals(2, getMetadataLogEntries(folderId).size());
+      
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
 }

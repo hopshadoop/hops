@@ -1855,10 +1855,10 @@ public class FSNamesystem
   void setMetaEnabled(final String src, final boolean metaEnabled)
       throws IOException {
     try {
-      INodeIdentifier inode = lockSubtree(src, SubTreeOperation.StoOperationType.META_ENABLE);
-      final AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(
-          FSNamesystem.this, inode);
-      fileTree.buildUp();
+      INodeIdentifier inode = lockSubtree(src, SubTreeOperation
+          .StoOperationType.META_ENABLE);
+      final AbstractFileTree.FileTree fileTree = buildTreeForLogging(inode,
+          metaEnabled);
       new HopsTransactionalRequestHandler(HDFSOperationType.SET_META_ENABLED,
           src) {
         @Override
@@ -1872,7 +1872,9 @@ public class FSNamesystem
         @Override
         public Object performTask() throws IOException {
           try {
-            logMetadataEvents(fileTree, MetadataLogEntry.Operation.ADD);
+            if(metaEnabled) {
+              logMetadataEvents(fileTree, MetadataLogEntry.Operation.ADD);
+            }
             setMetaEnabledInt(src, metaEnabled);
           } catch (AccessControlException e) {
             logAuditEvent(false, "setMetaEnabled", src);
@@ -1886,6 +1888,17 @@ public class FSNamesystem
     }
   }
 
+  private AbstractFileTree.FileTree buildTreeForLogging(INodeIdentifier
+      inode, boolean metaEnabled) throws IOException {
+    if(!metaEnabled)
+      return null;
+    
+    final AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(
+        FSNamesystem.this, inode);
+    fileTree.buildUp();
+    return fileTree;
+  }
+  
   private void setMetaEnabledInt(final String src, final boolean metaEnabled)
       throws IOException {
     FSPermissionChecker pc = getPermissionChecker();
