@@ -931,9 +931,12 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
       throws StorageException, TransactionContextException {
     EntityManager.remove(node);
     //if This inode is of type INodeDirectoryWithQuota then also delete the INode Attribute table
-    if (node instanceof INodeDirectoryWithQuota) {
-      ((INodeDirectoryWithQuota) node).removeAttributes();
+    if ((node instanceof INodeDirectory) && ((INodeDirectory) node).isWithQuota()) {
+      final DirectoryWithQuotaFeature q = ((INodeDirectory) node).getDirectoryWithQuotaFeature();
+      q.removeAttributes((INodeDirectory) node);
+      ((INodeDirectory) node).removeFeature(q);
     }
+    
     cleanParity(node);
   }
 
@@ -1208,5 +1211,53 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   @Override
   public LinkedElement getNext() {
     return next;
+  }
+  
+  /**
+   * INode feature such as {@link FileUnderConstructionFeature}
+   * and {@link DirectoryWithQuotaFeature}.
+   */
+  interface Feature<F extends Feature<F>> {
+    /** @return the next feature. */
+    public F getNextFeature();
+  
+    /** Set the next feature. */
+    public void setNextFeature(F next);
+  
+    /** Utility methods such as addFeature and removeFeature. */
+    static class Util {
+      /**
+       * Add a feature to the linked list.
+       * @return the new head.
+       */
+      static <F extends Feature<F>> F addFeature(F feature, F head) {
+        feature.setNextFeature(head);
+        return feature;
+      }
+  
+      /**
+       * Remove a feature from the linked list.
+       * @return the new head.
+       */
+      static <F extends Feature<F>> F removeFeature(F feature, F head) {
+        if (feature == head) {
+          final F newHead = head.getNextFeature();
+          head.setNextFeature(null);
+          return newHead;
+        } else if (head != null) {
+          F prev = head;
+          F curr = head.getNextFeature();
+          for (; curr != null && curr != feature;
+              prev = curr, curr = curr.getNextFeature())
+            ;
+          if (curr != null) {
+            prev.setNextFeature(curr.getNextFeature());
+            curr.setNextFeature(null);
+            return head;
+          }
+        }
+        throw new IllegalStateException("Feature " + feature + " not found.");
+      }
+    }
   }
 }

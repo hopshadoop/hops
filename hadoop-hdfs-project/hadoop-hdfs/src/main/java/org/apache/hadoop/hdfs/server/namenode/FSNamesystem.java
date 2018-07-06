@@ -8759,10 +8759,12 @@ public class FSNamesystem
                 leafInode.spaceConsumedInTree(srcCounts);
               } else{
                 isDir =true;
-                if(leafInode instanceof INodeDirectoryWithQuota && dir
+                if(leafInode instanceof INodeDirectory && dir
                     .isQuotaEnabled()){
-                  quotaDirAttributes = ((INodeDirectoryWithQuota) leafInode)
-                      .getINodeAttributes();
+                  final DirectoryWithQuotaFeature q = ((INodeDirectory) leafInode).getDirectoryWithQuotaFeature();
+                  if (q != null) {
+                    quotaDirAttributes = q.getINodeAttributes((INodeDirectory) leafInode);
+                  }
                 }
               }
             }
@@ -8973,12 +8975,14 @@ public class FSNamesystem
       @Override
       public Object performTask() throws IOException {
         INode subtreeRoot = getINode(path);
-        if(subtreeRoot instanceof INodeDirectoryWithQuota){
-          INodeDirectoryWithQuota quotaDir = (INodeDirectoryWithQuota)
-              subtreeRoot;
-          return new LastUpdatedContentSummary(quotaDir.numItemsInTree(),
-              quotaDir.diskspaceConsumed(), quotaDir.getQuotaCounts().get(Quota.NAMESPACE), quotaDir
-              .getQuotaCounts().get(Quota.DISKSPACE));
+        if(subtreeRoot instanceof INodeDirectory){
+          INodeDirectory quotaDir = (INodeDirectory) subtreeRoot;
+          final DirectoryWithQuotaFeature q = quotaDir.getDirectoryWithQuotaFeature();
+          if (q != null) {
+            return new LastUpdatedContentSummary(q.numItemsInTree(quotaDir),
+                q.diskspaceConsumed(quotaDir), quotaDir.getQuotaCounts().get(Quota.NAMESPACE), quotaDir
+                .getQuotaCounts().get(Quota.DISKSPACE));
+          }
         }
         return null;
       }

@@ -279,7 +279,7 @@ public abstract class BaseINodeLock extends Lock {
     List<INodeCandidatePrimaryKey> pks =
         new ArrayList<>();
     for (INode inode : getAllResolvedINodes()) {
-      if (inode instanceof INodeDirectoryWithQuota) {
+      if ((inode instanceof INodeDirectory) && ((INodeDirectory) inode).isWithQuota()) {
         INodeCandidatePrimaryKey pk =
             new INodeCandidatePrimaryKey(inode.getId());
         pks.add(pk);

@@ -58,7 +58,7 @@ public class TestFsLimits {
   static PermissionStatus perms =
       new PermissionStatus("admin", "admin", FsPermission.getDefault());
 
-  static INodeDirectoryWithQuota rootInode;
+  static INodeDirectory rootInode;
   
   static private FSNamesystem getMockNamesystem() {
     FSNamesystem fsn = mock(FSNamesystem.class);
@@ -193,7 +193,7 @@ public class TestFsLimits {
             Class<?> generated = null;
             try {
               fs.verifyFsLimits(inodes, 1, child);
-              INodeDirectoryWithQuota.getRootDir().addChild(child, false);
+              INodeDirectory.getRootDir().addChild(child, false);
             } catch (QuotaExceededException e) {
               generated = e.getClass();
             }

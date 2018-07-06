@@ -27,9 +27,9 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.server.namenode.DirectoryWithQuotaFeature;
 import org.apache.hadoop.hdfs.server.namenode.FileUnderConstructionFeature;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.INodeSymlink;
 
@@ -216,7 +216,7 @@ public class INodeDALAdaptor
 
       if (inode.isDirectory()) {
         hopINode.setUnderConstruction(false);
-        hopINode.setDirWithQuota(inode instanceof INodeDirectoryWithQuota);
+        hopINode.setDirWithQuota(((INodeDirectory) inode).isWithQuota());
         hopINode.setMetaEnabled(((INodeDirectory) inode).isMetaEnabled());
         hopINode.setChildrenNum(((INodeDirectory) inode).getChildrenNum());
       }
@@ -257,7 +257,9 @@ public class INodeDALAdaptor
             (hopINode.getPermission()));
         if (hopINode.isDirectory()) {
           if (hopINode.isDirWithQuota()) {
-            inode = new INodeDirectoryWithQuota(hopINode.getId(), hopINode.getName(), ps, true);
+            inode = new INodeDirectory(hopINode.getId(), hopINode.getName(), ps, true);
+            DirectoryWithQuotaFeature quota = new DirectoryWithQuotaFeature();
+            ((INodeDirectory)inode).addFeature(quota);
           } else {
             String iname = (hopINode.getName().length() == 0) ? INodeDirectory.ROOT_NAME : hopINode.getName();
             inode = new INodeDirectory(hopINode.getId(), iname, ps, true);

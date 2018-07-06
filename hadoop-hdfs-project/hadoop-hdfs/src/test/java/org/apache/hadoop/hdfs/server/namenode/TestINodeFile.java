@@ -523,7 +523,7 @@ public class TestINodeFile {
     }
   }
   
-  public INodeDirectoryWithQuota getRootDir(final MiniDFSCluster cluster) throws Exception {
+  public INodeDirectory getRootDir(final MiniDFSCluster cluster) throws Exception {
     HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -540,7 +540,7 @@ public class TestINodeFile {
         return cluster.getNameNode().getNamesystem().getFSDirectory().getRootDir();
       }
     };
-    return (INodeDirectoryWithQuota) handler.handle();
+    return (INodeDirectory) handler.handle();
   }
 
   @Test
@@ -1011,7 +1011,8 @@ public class TestINodeFile {
       // set quota to dir, which leads to node replacement
       hdfs.setQuota(dir, Long.MAX_VALUE - 1, Long.MAX_VALUE - 1);
       dirNode = getINode(dir.toString(), fsdir, cluster);
-      assertTrue(dirNode instanceof INodeDirectoryWithQuota);
+      assertTrue(dirNode instanceof INodeDirectory);
+      assertTrue(((INodeDirectory) dirNode).isWithQuota());
       // the inode in inodeMap should also be replaced
       dirNodeFromNode = fsdir.getInode(dirNode.getId());
       assertEquals(dirNode, dirNodeFromNode);

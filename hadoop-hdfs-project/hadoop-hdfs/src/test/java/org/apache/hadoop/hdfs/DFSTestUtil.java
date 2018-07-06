@@ -75,7 +75,7 @@ import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
@@ -1132,15 +1132,15 @@ public class DFSTestUtil {
     createRootFolder(new PermissionStatus("user", "grp", new FsPermission((short) 0755)));
   }
 
-  public static INodeDirectoryWithQuota createRootFolder(final PermissionStatus ps) throws IOException {
+  public static INodeDirectory createRootFolder(final PermissionStatus ps) throws IOException {
     LightWeightRequestHandler addRootINode =
         new LightWeightRequestHandler(HDFSOperationType.SET_ROOT) {
           @Override
           public Object performTask() throws IOException {
-            INodeDirectoryWithQuota newRootINode = null;
+            INodeDirectory newRootINode = null;
             INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory.getDataAccess(INodeDataAccess.class);
 
-            newRootINode = INodeDirectoryWithQuota.createRootDir(ps);
+            newRootINode = INodeDirectory.createRootDir(ps);
 
             // Set the block storage policy to DEFAULT
             newRootINode.setBlockStoragePolicyIDNoPersistance(TestBlockStoragePolicy.DEFAULT_STORAGE_POLICY.getId());
@@ -1160,7 +1160,7 @@ public class DFSTestUtil {
             return newRootINode;
           }
         };
-    return (INodeDirectoryWithQuota) addRootINode.handle();
+    return (INodeDirectory) addRootINode.handle();
   }
 
   public static class Builder {

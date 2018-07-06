@@ -186,7 +186,6 @@ public class TestFSDirectory {
     int j = line.lastIndexOf('@');
     final String classname = line.substring(i+1, j);
     Assert.assertTrue(classname.equals(INodeFile.class.getSimpleName())
-        || classname.equals(INodeDirectory.class.getSimpleName())
-        || classname.equals(INodeDirectoryWithQuota.class.getSimpleName()));
+        || classname.equals(INodeDirectory.class.getSimpleName()));
   }
 }

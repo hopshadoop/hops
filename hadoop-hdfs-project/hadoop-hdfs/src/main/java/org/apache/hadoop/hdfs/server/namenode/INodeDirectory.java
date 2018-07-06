@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -27,6 +28,7 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 
 import java.io.FileNotFoundException;
@@ -40,6 +42,21 @@ import org.apache.hadoop.fs.PathIsNotDirectoryException;
  * Directory INode class.
  */
 public class INodeDirectory extends INode {
+  /** Directory related features such as quota and snapshots. */
+  public static abstract class Feature implements INode.Feature<Feature> {
+    private Feature nextFeature;
+    
+    @Override
+    public Feature getNextFeature() {
+      return nextFeature;
+    }
+    
+    @Override
+    public void setNextFeature(Feature next) {
+      this.nextFeature = next;
+    }
+  }
+  
   /**
    * Cast INode to INodeDirectory.
    */
@@ -65,6 +82,9 @@ public class INodeDirectory extends INode {
 
   private int childrenNum;
   
+  /** A linked list of {@link Feature}s. */
+  private Feature headFeature = null;
+  
   public INodeDirectory(int id, String name, PermissionStatus permissions)
       throws IOException {
     super(id, name, permissions);
@@ -88,16 +108,23 @@ public class INodeDirectory extends INode {
     super(id, name, permissions, null, mtime, 0L);
   }
   
+  INodeDirectory(INodeDirectory other) throws IOException {
+    this(other, true);
+  }
+  
   /**
    * copy constructor
    *
    * @param other
    */
-  INodeDirectory(INodeDirectory other)
+  INodeDirectory(INodeDirectory other, boolean copyFeatures)
       throws IOException {
     super(other);
     //HOP: FIXME: Mahmoud: the new directory has the same id as the "other"
     // directory so we don't need to notify the children of the directory change
+    if (copyFeatures) {
+      this.headFeature = other.headFeature;
+    }
   }
   
   /**
@@ -108,6 +135,81 @@ public class INodeDirectory extends INode {
     return true;
   }
 
+  public static INodeDirectory createRootDir(PermissionStatus permissions) throws IOException {
+    final INodeDirectory newRootINode = new INodeDirectory(ROOT_INODE_ID, ROOT_NAME, permissions);
+    newRootINode.inTree();
+    newRootINode.setParentIdNoPersistance(ROOT_PARENT_ID);
+    newRootINode.setPartitionIdNoPersistance(getRootDirPartitionKey());
+    //newRootINode.addDirectoryWithQuotaFeature(Long.MAX_VALUE, HdfsConstants.QUOTA_RESET);
+    return newRootINode;
+  }
+  
+  public static INodeDirectory getRootDir()
+    throws StorageException, TransactionContextException {
+    INode inode = EntityManager.find(Finder.ByINodeIdFTIS, ROOT_INODE_ID);
+    return (INodeDirectory) inode;
+  }
+  
+  void setQuota(long nsQuota, long nsCount, long dsQuota, long dsCount)
+    throws StorageException, TransactionContextException {
+    DirectoryWithQuotaFeature quota = getDirectoryWithQuotaFeature();
+    if (quota != null) {
+      // already has quota; so set the quota to the new values
+      quota.setQuota(this, nsQuota, dsQuota);
+    } else {
+      addDirectoryWithQuotaFeature(nsQuota, nsCount, dsQuota, dsCount);
+    }
+  }
+
+  @Override
+  public Quota.Counts getQuotaCounts() throws StorageException, TransactionContextException {
+    final DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
+    return q != null ? q.getQuota(this) : super.getQuotaCounts();
+  }
+  
+  public void addSpaceConsumed(long nsDelta, long dsDelta)
+    throws StorageException, TransactionContextException {
+    DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
+    if (q != null) {
+      q.addSpaceConsumed(this, nsDelta, dsDelta);
+    } else {
+      parent.addSpaceConsumed(nsDelta, dsDelta);
+    }
+  }
+  
+  /**
+   * If the directory contains a {@link DirectoryWithQuotaFeature}, return it;
+   * otherwise, return null.
+   */
+  public final DirectoryWithQuotaFeature getDirectoryWithQuotaFeature() {
+    for (Feature f = headFeature; f != null; f = f.nextFeature) {
+      if (f instanceof DirectoryWithQuotaFeature) {
+        return (DirectoryWithQuotaFeature) f;
+      }
+    }
+    return null;
+  }
+  
+  /** Is this directory with quota? */
+  public final boolean isWithQuota() {
+    return getDirectoryWithQuotaFeature() != null;
+  }
+  
+  DirectoryWithQuotaFeature addDirectoryWithQuotaFeature(long nsQuota, long nsCount, long dsQuota, long dsCount)
+    throws StorageException, TransactionContextException {
+    Preconditions.checkState(!isWithQuota(), "Directory is already with quota");
+    final DirectoryWithQuotaFeature quota = new DirectoryWithQuotaFeature(this, nsQuota, nsCount, dsQuota, dsCount);
+    addFeature(quota);
+    return quota;
+  }
+  
+  public void addFeature(Feature f) {
+    headFeature = INode.Feature.Util.addFeature(f, headFeature);
+  }
+  
+  void removeFeature(Feature f) {
+    headFeature = INode.Feature.Util.removeFeature(f, headFeature);
+  }
   /**
    * @return this object.
    */
@@ -244,8 +346,6 @@ public class INodeDirectory extends INode {
    *
    * @param components
    *     array of path component name
-   * @param existing
-   *     array to fill with existing INodes
    * @param resolveLink
    *     indicates whether UnresolvedLinkException should
    *     be thrown when the path refers to a symbolic link.
@@ -430,20 +530,37 @@ public class INodeDirectory extends INode {
   @Override
   DirCounts spaceConsumedInTree(DirCounts counts)
       throws StorageException, TransactionContextException {
-    counts.nsCount += 1;
-    if (isInTree()) {
-      List<INode> children = getChildren();
-      if (children != null) {
-        for (INode child : children) {
-          child.spaceConsumedInTree(counts);
+    if (isWithQuota()) {
+      final DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
+      if (q != null) {
+        q.spaceConsumedInTree(this, counts);
+      }
+    } else {
+      counts.nsCount += 1;
+      if (isInTree()) {
+        List<INode> children = getChildren();
+        if (children != null) {
+          for (INode child : children) {
+            child.spaceConsumedInTree(counts);
+          }
         }
       }
     }
     return counts;
   }
-
+  
   @Override
   ContentSummaryComputationContext computeContentSummary(ContentSummaryComputationContext summary)
+    throws StorageException, TransactionContextException {
+    final DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
+    if (q != null) {
+      return q.computeContentSummary(this, summary);
+    } else {
+      return computeDirectoryContentSummary(summary);
+    }
+  }
+  
+  ContentSummaryComputationContext computeDirectoryContentSummary(ContentSummaryComputationContext summary)
       throws StorageException, TransactionContextException {
     List<INode> childrenList = getChildrenList();
     // Explicit traversing is done to enable repositioning after relinquishing
@@ -631,7 +748,7 @@ public class INodeDirectory extends INode {
   
   @Override
   public INode cloneInode () throws IOException{
-    return new INodeDirectory(this);
+    return new INodeDirectory(this, true);
   }  
   
   public int getChildrenNum() {
