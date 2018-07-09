@@ -27,7 +27,7 @@ import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 /**
  * Quota feature for {@link INodeDirectory}
  */
-public class DirectoryWithQuotaFeature extends INodeDirectory.Feature {
+public class DirectoryWithQuotaFeature implements INode.Feature {
   
   public DirectoryWithQuotaFeature() {
   }

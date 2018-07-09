@@ -41,21 +41,7 @@ import org.apache.hadoop.fs.PathIsNotDirectoryException;
 /**
  * Directory INode class.
  */
-public class INodeDirectory extends INode {
-  /** Directory related features such as quota and snapshots. */
-  public static abstract class Feature implements INode.Feature<Feature> {
-    private Feature nextFeature;
-    
-    @Override
-    public Feature getNextFeature() {
-      return nextFeature;
-    }
-    
-    @Override
-    public void setNextFeature(Feature next) {
-      this.nextFeature = next;
-    }
-  }
+public class INodeDirectory extends INodeWithAdditionalFields {
   
   /**
    * Cast INode to INodeDirectory.
@@ -82,11 +68,9 @@ public class INodeDirectory extends INode {
 
   private int childrenNum;
   
-  /** A linked list of {@link Feature}s. */
-  private Feature headFeature = null;
-  
   public INodeDirectory(int id, String name, PermissionStatus permissions)
       throws IOException {
+    
     super(id, name, permissions);
   }
   
@@ -105,7 +89,7 @@ public class INodeDirectory extends INode {
    */
   INodeDirectory(int id, byte[] name, PermissionStatus permissions, long mtime)
       throws IOException {
-    super(id, name, permissions, null, mtime, 0L);
+    super(id, name, permissions, mtime, 0L, false);
   }
   
   INodeDirectory(INodeDirectory other) throws IOException {
@@ -123,7 +107,7 @@ public class INodeDirectory extends INode {
     //HOP: FIXME: Mahmoud: the new directory has the same id as the "other"
     // directory so we don't need to notify the children of the directory change
     if (copyFeatures) {
-      this.headFeature = other.headFeature;
+      this.features = other.features;
     }
   }
   
@@ -140,7 +124,6 @@ public class INodeDirectory extends INode {
     newRootINode.inTree();
     newRootINode.setParentIdNoPersistance(ROOT_PARENT_ID);
     newRootINode.setPartitionIdNoPersistance(getRootDirPartitionKey());
-    //newRootINode.addDirectoryWithQuotaFeature(Long.MAX_VALUE, HdfsConstants.QUOTA_RESET);
     return newRootINode;
   }
   
@@ -173,7 +156,7 @@ public class INodeDirectory extends INode {
     if (q != null) {
       q.addSpaceConsumed(this, nsDelta, dsDelta);
     } else {
-      parent.addSpaceConsumed(nsDelta, dsDelta);
+      parent.addSpaceConsumed2Parent(nsDelta, dsDelta);
     }
   }
   
@@ -182,7 +165,7 @@ public class INodeDirectory extends INode {
    * otherwise, return null.
    */
   public final DirectoryWithQuotaFeature getDirectoryWithQuotaFeature() {
-    for (Feature f = headFeature; f != null; f = f.nextFeature) {
+    for (Feature f : features) {
       if (f instanceof DirectoryWithQuotaFeature) {
         return (DirectoryWithQuotaFeature) f;
       }
@@ -203,13 +186,6 @@ public class INodeDirectory extends INode {
     return quota;
   }
   
-  public void addFeature(Feature f) {
-    headFeature = INode.Feature.Util.addFeature(f, headFeature);
-  }
-  
-  void removeFeature(Feature f) {
-    headFeature = INode.Feature.Util.removeFeature(f, headFeature);
-  }
   /**
    * @return this object.
    */

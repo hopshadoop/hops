@@ -47,24 +47,7 @@ import java.util.List;
  * I-node for closed file.
  */
 @InterfaceAudience.Private
-public class INodeFile extends INode implements BlockCollection {
-  /**
-   * A feature contains specific information for a type of INodeFile. E.g.,
-   * we can have separate features for Under-Construction and Snapshot
-   */
-  public static abstract class Feature implements INode.Feature<Feature> {
-    private Feature nextFeature;
-    
-    @Override
-    public Feature getNextFeature() {
-      return nextFeature;
-    }
-    
-    @Override
-    public void setNextFeature(Feature next) {
-      this.nextFeature = next;
-    }
-  }
+public class INodeFile extends INodeWithAdditionalFields implements BlockCollection {
   
   /**
    * Cast INode to INodeFile.
@@ -82,7 +65,6 @@ public class INodeFile extends INode implements BlockCollection {
   private int generationStamp = (int) GenerationStamp.LAST_RESERVED_STAMP;
   private long size = 0;
   private boolean isFileStoredInDB = false;
-  private Feature headFeature;
   
   /**
    * @return true unconditionally.
@@ -134,7 +116,7 @@ public class INodeFile extends INode implements BlockCollection {
     setFileStoredInDBNoPersistence(other.isFileStoredInDB());
     setPartitionIdNoPersistance(other.getPartitionId());
     this.header = other.getHeader();
-    this.headFeature = other.headFeature;
+    this.features = other.features;
   }
   
   /**
@@ -142,7 +124,7 @@ public class INodeFile extends INode implements BlockCollection {
    * otherwise, return null.
    */
   public final FileUnderConstructionFeature getFileUnderConstructionFeature() {
-    for (Feature f = this.headFeature; f != null; f = f.nextFeature) {
+    for (Feature f : features) {
       if (f instanceof FileUnderConstructionFeature) {
         return (FileUnderConstructionFeature) f;
       }
@@ -155,16 +137,6 @@ public class INodeFile extends INode implements BlockCollection {
   public boolean isUnderConstruction() {
     return getFileUnderConstructionFeature() != null;
   }
-  
-  public void addFeature(Feature f) {
-    headFeature = INode.Feature.Util.addFeature(f, headFeature);
-  }
-  
-  void removeFeature(Feature f) {
-    headFeature = INode.Feature.Util.removeFeature(f, headFeature);
-  }
-  
-  /* Start of Under-Construction Feature */
   
   /**
    * @return the replication factor of the file.

@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.io.IOUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -1034,6 +1035,7 @@ public class TestINodeFile {
   public void testDotdotInodePath() throws Exception {
     final Configuration conf = new Configuration();
     MiniDFSCluster cluster = null;
+    DFSClient client = null;
     try {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
@@ -1046,7 +1048,7 @@ public class TestINodeFile {
       long parentId = getINode("/", fsdir, cluster).getId();
       String testPath = "/.reserved/.inodes/" + dirId + "/..";
 
-      DFSClient client = new DFSClient(NameNode.getAddress(conf), conf);
+      client = new DFSClient(NameNode.getAddress(conf), conf);
       HdfsFileStatus status = client.getFileInfo(testPath);
       assertTrue(parentId == status.getFileId());
       
@@ -1056,6 +1058,7 @@ public class TestINodeFile {
       assertTrue(parentId == status.getFileId());
       
     } finally {
+      IOUtils.cleanup(LOG, client);
       if (cluster != null) {
         cluster.shutdown();
       }
