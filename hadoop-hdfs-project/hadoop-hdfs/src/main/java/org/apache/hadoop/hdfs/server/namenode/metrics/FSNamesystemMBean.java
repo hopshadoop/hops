@@ -161,4 +161,10 @@ public interface FSNamesystemMBean {
    * @return number of content stale storages
    */
   public int getNumStaleStorages();
+  
+  /**
+   * Number of blocks pending deletion
+   * @return number of blocks pending deletion
+   */
+  long getPendingDeletionBlocks() throws IOException;
 }

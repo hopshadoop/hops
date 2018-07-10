@@ -5503,6 +5503,7 @@ public class FSNamesystem
     return blockManager.getScheduledReplicationBlocksCount();
   }
 
+  @Override
   @Metric
   public long getPendingDeletionBlocks() throws IOException {
     return blockManager.getPendingDeletionBlocksCount();
