@@ -44,6 +44,7 @@ import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
+import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -327,7 +328,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
         InvalidToken.class,
         LeaseExpiredException.class,
         NSQuotaExceededException.class,
-        DSQuotaExceededException.class);
+        DSQuotaExceededException.class,
+        AclException.class);
   }
   
   /** Allow access to the client RPC server for testing */
