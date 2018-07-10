@@ -81,6 +81,8 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.unix.DomainSocket;
+import org.apache.hadoop.net.unix.TemporarySocketDirectory;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -89,6 +91,7 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -122,6 +125,8 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
 import org.junit.Assert;
+import org.junit.Assume;
+
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -1399,4 +1404,43 @@ public class DFSTestUtil {
     long c = (val + factor - 1) / factor;
     return c * factor;
 }
+  
+  /**
+   * A short-circuit test context which makes it easier to get a short-circuit
+   * configuration and set everything up.
+   */
+  public static class ShortCircuitTestContext implements Closeable {
+    private final String testName;
+    private final TemporarySocketDirectory sockDir;
+    private boolean closed = false;
+    private boolean formerTcpReadsDisabled;
+    
+    public ShortCircuitTestContext(String testName) {
+      this.testName = testName;
+      this.sockDir = new TemporarySocketDirectory();
+      DomainSocket.disableBindPathValidation();
+      formerTcpReadsDisabled = DFSInputStream.tcpReadsDisabledForTesting;
+      Assume.assumeTrue(DomainSocket.getLoadingFailureReason() == null);
+    }
+    
+    public Configuration newConfiguration() {
+      Configuration conf = new Configuration();
+      conf.setBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY, true);
+      conf.set(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
+          new File(sockDir.getDir(),
+              testName + "._PORT.sock").getAbsolutePath());
+      return conf;
+    }
+    
+    public String getTestName() {
+      return testName;
+    }
+    
+    public void close() throws IOException {
+      if (closed) return;
+      closed = true;
+      DFSInputStream.tcpReadsDisabledForTesting = formerTcpReadsDisabled;
+      sockDir.close();
+    }
+  }
 }
