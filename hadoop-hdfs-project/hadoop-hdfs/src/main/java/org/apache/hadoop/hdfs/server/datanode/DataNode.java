@@ -1264,6 +1264,9 @@ public class DataNode extends Configured
       checkBlockToken(new ExtendedBlock(bpId, blockIds[i]),
           tokens.get(i), BlockTokenSecretManager.AccessMode.READ);
     }
+    
+    DataNodeFaultInjector.get().getHdfsBlocksMetadata();
+    
     return data.getHdfsBlocksMetadata(bpId, blockIds);
   }
   
