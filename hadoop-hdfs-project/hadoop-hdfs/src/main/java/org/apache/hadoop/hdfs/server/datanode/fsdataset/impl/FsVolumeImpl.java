@@ -32,10 +32,10 @@ import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The underlying volume used to store replica.
@@ -48,7 +48,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
   private final String storageID;
   private final StorageType storageType;
   private final Map<String, BlockPoolSlice> bpSlices =
-      new HashMap<>();
+      new ConcurrentHashMap<>();
   private final File currentDir;    // <StorageDirectory>/current
   private final DF usage;
   private final long reserved;
