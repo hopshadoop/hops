@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.junit.Before;
 import org.junit.BeforeClass;
 
 /**
@@ -33,11 +34,15 @@ public class TestNameNodeAcl extends FSAclBaseTest {
 
   @BeforeClass
   public static void init() throws Exception {
-    Configuration conf = new Configuration();
+    conf = new Configuration();
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
-    fs = cluster.getFileSystem();
+  }
+  
+  @Before
+  public void setUp() throws Exception {
+    super.setUp();
     assertTrue(fs instanceof DistributedFileSystem);
   }
 }
