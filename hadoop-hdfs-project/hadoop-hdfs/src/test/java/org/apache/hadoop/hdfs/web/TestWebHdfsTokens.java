@@ -27,9 +27,6 @@ import java.io.IOException;
 import java.net.URI;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.DelegationTokenRenewer;
-import org.apache.hadoop.fs.DelegationTokenRenewer.RenewAction;
-import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.web.resources.DeleteOpParam;
 import org.apache.hadoop.hdfs.web.resources.GetOpParam;
 import org.apache.hadoop.hdfs.web.resources.HttpOpParam;
@@ -60,11 +57,10 @@ public class TestWebHdfsTokens {
     return fs;
   }
 
-  @SuppressWarnings("unchecked")
-  @Test(timeout=1000)
+  @Test(timeout = 5000)
   public void testTokenForNonTokenOp() throws IOException {
     WebHdfsFileSystem fs = spyWebhdfsInSecureSetup();
-    Token<DelegationTokenIdentifier> token = mock(Token.class);
+    Token<?> token = mock(Token.class);
     doReturn(token).when(fs).getDelegationToken(null);
 
     // should get/set/renew token
@@ -81,22 +77,21 @@ public class TestWebHdfsTokens {
     verify(fs, never()).setDelegationToken(token);
   }
   
-  @Test(timeout=1000)
+  @Test(timeout = 5000)
   public void testNoTokenForGetToken() throws IOException {
     checkNoTokenForOperation(GetOpParam.Op.GETDELEGATIONTOKEN);
   }
   
-  @Test(timeout=1000)
+  @Test(timeout = 5000)
   public void testNoTokenForCanclToken() throws IOException {
     checkNoTokenForOperation(PutOpParam.Op.RENEWDELEGATIONTOKEN);
   }
 
-  @Test(timeout=1000)
+  @Test(timeout = 5000)
   public void testNoTokenForCancelToken() throws IOException {
     checkNoTokenForOperation(PutOpParam.Op.CANCELDELEGATIONTOKEN);
   }
 
-  @SuppressWarnings("unchecked")
   private void checkNoTokenForOperation(HttpOpParam.Op op) throws IOException {
     WebHdfsFileSystem fs = spyWebhdfsInSecureSetup();
     doReturn(null).when(fs).getDelegationToken(null);
@@ -106,7 +101,7 @@ public class TestWebHdfsTokens {
     fs.toUrl(op, null);
     verify(fs, never()).getDelegationToken();
     verify(fs, never()).getDelegationToken(null);
-    verify(fs, never()).setDelegationToken(any(Token.class));
+    verify(fs, never()).setDelegationToken((Token<?>)any(Token.class));
   }
   
   @Test(timeout=1000)
