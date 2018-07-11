@@ -100,7 +100,7 @@ public class TestFsLimits {
     int maxComponentLength =
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_KEY,
             DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_DEFAULT);
-    assertEquals(0, maxComponentLength);
+    assertEquals(255, maxComponentLength);
   }
   
   @Test
