@@ -1031,7 +1031,12 @@ public class WebHdfsFileSystem extends FileSystem
     return JsonUtil.toMD5MD5CRC32FileChecksum(m);
   }
 
-
+  @Override
+  public String getCanonicalServiceName() {
+    return tokenServiceName == null ? super.getCanonicalServiceName()
+        : tokenServiceName.toString();
+  }
+  
   @Override
   public void access(final Path path, final FsAction mode) throws IOException {
     final HttpOpParam.Op op = GetOpParam.Op.CHECKACCESS;
