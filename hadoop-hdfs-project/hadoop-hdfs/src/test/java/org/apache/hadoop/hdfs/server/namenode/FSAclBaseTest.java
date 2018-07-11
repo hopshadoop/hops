@@ -33,15 +33,18 @@ import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
@@ -56,6 +59,7 @@ public abstract class FSAclBaseTest {
 
   protected static MiniDFSCluster cluster;
   protected static FileSystem fs;
+  protected static Configuration conf;
   private static int pathCount = 0;
   private static Path path;
 
@@ -68,11 +72,34 @@ public abstract class FSAclBaseTest {
   }
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
+    fs = createFileSystem();
     pathCount += 1;
     path = new Path("/p" + pathCount);
   }
-
+  
+  /**
+   * Creates a FileSystem for the super-user
+   *
+   * @return FileSystem for super-user
+   * @throws Exception if creation fails
+   */
+  protected FileSystem createFileSystem() throws Exception {
+    return cluster.getFileSystem();
+  }
+  
+  /**
+   * Creates a FileSystem for a specific user.
+   *
+   * @param user UserGroupInformation specific user
+   * @return FileSystem for specific user
+   * @throws Exception if creation fails
+   */
+  protected FileSystem createFileSystem(UserGroupInformation user)
+    throws Exception {
+    return DFSTestUtil.getFileSystemAs(user, cluster.getConfiguration(0));
+  }
+  
   @Test
   public void testModifyAclEntries() throws IOException {
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short)0750));

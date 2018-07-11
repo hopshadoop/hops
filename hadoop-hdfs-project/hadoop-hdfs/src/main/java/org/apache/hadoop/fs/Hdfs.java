@@ -22,6 +22,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.CorruptFileBlockIterator;
@@ -410,6 +412,39 @@ public class Hdfs extends AbstractFileSystem {
     dfs.checkAccess(getUriPath(path), mode);
   }
 
+  @Override
+  public void modifyAclEntries(Path path, List<AclEntry> aclSpec)
+    throws IOException {
+    dfs.modifyAclEntries(getUriPath(path), aclSpec);
+  }
+  
+  @Override
+  public void removeAclEntries(Path path, List<AclEntry> aclSpec)
+    throws IOException {
+    dfs.removeAclEntries(getUriPath(path), aclSpec);
+  }
+  
+  @Override
+  public void removeDefaultAcl(Path path) throws IOException {
+    dfs.removeDefaultAcl(getUriPath(path));
+  }
+  
+  @Override
+  public void removeAcl(Path path) throws IOException {
+    dfs.removeAcl(getUriPath(path));
+  }
+  
+  @Override
+  public void setAcl(Path path, List<AclEntry> aclSpec)
+    throws IOException {
+    dfs.setAcl(getUriPath(path), aclSpec);
+  }
+  
+  @Override
+  public AclStatus getAclStatus(Path path) throws IOException {
+    return dfs.getAclStatus(getUriPath(path));
+  }
+  
   /**
    * Renew an existing delegation token.
    *

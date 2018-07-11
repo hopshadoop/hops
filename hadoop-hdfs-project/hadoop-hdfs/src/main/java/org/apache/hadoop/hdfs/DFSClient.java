@@ -3430,7 +3430,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     }
   }
 
-  void modifyAclEntries(final String src, final List<AclEntry> aclSpec)
+  public void modifyAclEntries(final String src, final List<AclEntry> aclSpec)
           throws IOException {
     checkOpen();
     try {
@@ -3452,7 +3452,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     }
   }
 
-  void removeAclEntries(final String src, final List<AclEntry> aclSpec)
+  public void removeAclEntries(final String src, final List<AclEntry> aclSpec)
           throws IOException {
     checkOpen();
     try {
@@ -3474,7 +3474,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     }
   }
 
-  void removeDefaultAcl(final String src) throws IOException {
+  public void removeDefaultAcl(final String src) throws IOException {
     checkOpen();
     try {
       ClientActionHandler handler = new ClientActionHandler() {
@@ -3495,7 +3495,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     }
   }
 
-  void removeAcl(final String src) throws IOException {
+  public void removeAcl(final String src) throws IOException {
     checkOpen();
     try {
       ClientActionHandler handler = new ClientActionHandler() {
@@ -3516,7 +3516,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     }
   }
 
-  void setAcl(final String src, final List<AclEntry> aclSpec) throws IOException {
+  public void setAcl(final String src, final List<AclEntry> aclSpec) throws IOException {
     checkOpen();
     try {
       ClientActionHandler handler = new ClientActionHandler() {
@@ -3537,7 +3537,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     }
   }
 
-  AclStatus getAclStatus(final String src) throws IOException {
+  public AclStatus getAclStatus(final String src) throws IOException {
     checkOpen();
     try {
       ClientActionHandler handler = new ClientActionHandler() {
