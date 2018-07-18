@@ -4350,7 +4350,7 @@ public class BlockManager {
             computeDatanodeWork();
             processPendingReplications();
           } else {
-            LOG.warn("Namesystem is not leader: will not run replication monitor");
+            LOG.debug("Namesystem is not leader: will not run replication monitor");
           }
           Thread.sleep(replicationRecheckInterval);
         } catch (Throwable t) {

@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileContext;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -65,6 +66,8 @@ public class TestHistoryFileManager {
             "test-classes" + File.separator + "core-site.xml";
     Configuration conf = new HdfsConfiguration();
     Configuration conf2 = new HdfsConfiguration();
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, /*default 15*/ 1);
+    conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY, "1,1");
     dfsCluster = new MiniDFSCluster.Builder(conf).build();
     conf2.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, conf.get(
         MiniDFSCluster.HDFS_MINIDFS_BASEDIR, MiniDFSCluster.getBaseDirectory())
@@ -103,6 +106,8 @@ public class TestHistoryFileManager {
   @Test
   public void testCreateDirsWithoutFileSystem() throws Exception {
     Configuration conf = new YarnConfiguration();
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, /*default 15*/ 3);
+    conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY, "1,1");
     conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "hdfs://localhost:1");
     testTryCreateHistoryDirs(conf, false);
   }

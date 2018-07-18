@@ -229,7 +229,7 @@ public class DatanodeWebHdfsMethods {
                   overwrite.getValue() ?
                       EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE) :
                       EnumSet.of(CreateFlag.CREATE), replication.getValue(conf),
-                  blockSize.getValue(conf), null, b, null), null);
+                  blockSize.getValue(conf), null, b, null, null), null);
           IOUtils.copyBytes(in, out, b);
           out.close();
           out = null;

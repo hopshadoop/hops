@@ -30,10 +30,7 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 
 import java.io.IOException;
 import java.util.EnumSet;
@@ -116,20 +113,22 @@ public class TestResolveHdfsSymlink {
    * @throws InterruptedException
    */
   @SuppressWarnings({"unchecked", "deprecation"})
-  @Test
-  public void testFcDelegationToken()
-      throws UnsupportedFileSystemException, IOException, InterruptedException {
-    FileContext fcHdfs =
-        FileContext.getFileContext(cluster.getFileSystem().getUri());
+  @Ignore
+  @Test //[S] we do not support hdfs like ha configuration such as ha-hdfs:localhost, plus kerberos is also not supported
+  public void testFcDelegationToken() throws UnsupportedFileSystemException,
+          IOException, InterruptedException {
+    FileContext fcHdfs = FileContext.getFileContext(cluster.getFileSystem()
+            .getUri());
     final AbstractFileSystem afs = fcHdfs.getDefaultFileSystem();
-    final List<Token<?>> tokenList = afs.getDelegationTokens(
-        UserGroupInformation.getCurrentUser().getUserName());
-    ((Hdfs) afs).renewDelegationToken(
-        (Token<DelegationTokenIdentifier>) tokenList.get(0));
+    final List<Token<?>> tokenList =
+            afs.getDelegationTokens(UserGroupInformation.getCurrentUser()
+                    .getUserName());
+    ((Hdfs) afs).renewDelegationToken((Token<DelegationTokenIdentifier>) tokenList
+            .get(0));
     ((Hdfs) afs).cancelDelegationToken(
-        (Token<? extends AbstractDelegationTokenIdentifier>) tokenList.get(0));
+            (Token<? extends AbstractDelegationTokenIdentifier>) tokenList.get(0));
   }
-  
+
   /**
    * Verifies that attempting to resolve a non-symlink results in client
    * exception

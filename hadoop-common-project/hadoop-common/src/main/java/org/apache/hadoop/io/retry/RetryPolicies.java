@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.ipc.NotALeaderException;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.ipc.StandbyException;
@@ -173,7 +174,30 @@ public class RetryPolicies {
       RetryPolicy fallbackPolicy, int maxFailovers, int maxRetries,
       long delayMillis, long maxDelayBase) {
     return new FailoverOnNetworkExceptionRetry(fallbackPolicy, maxFailovers,
-        maxRetries, delayMillis, maxDelayBase);
+        maxRetries, delayMillis, maxDelayBase, null);
+  }
+
+  public static final RetryPolicy failoverOnNetworkException(
+          RetryPolicy fallbackPolicy, int maxFailovers, int maxRetries,
+          long delayMillis, long maxDelayBase,
+          Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap) {
+    return new FailoverOnNetworkExceptionRetry(fallbackPolicy, maxFailovers,
+            maxRetries, delayMillis, maxDelayBase, exceptionToPolicyMap);
+  }
+
+  public static final RetryPolicy failoverOnLeaderChange(
+          RetryPolicy fallbackPolicy, int maxFailovers, int maxRetries,
+          long delayMillis, long maxDelayBase) {
+    return new FailoverOnLeaderChange(fallbackPolicy, maxFailovers,
+            maxRetries, delayMillis, maxDelayBase, null);
+  }
+
+  public static final RetryPolicy failoverOnLeaderChange(
+          RetryPolicy fallbackPolicy, int maxFailovers, int maxRetries,
+          long delayMillis, long maxDelayBase,
+          Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap) {
+    return new FailoverOnLeaderChange(fallbackPolicy, maxFailovers,
+            maxRetries, delayMillis, maxDelayBase, exceptionToPolicyMap);
   }
 
   static class TryOnceThenFail implements RetryPolicy {
@@ -616,36 +640,43 @@ public class RetryPolicies {
    */
   static class FailoverOnNetworkExceptionRetry implements RetryPolicy {
     
-    private RetryPolicy fallbackPolicy;
-    private int maxFailovers;
-    private int maxRetries;
-    private long delayMillis;
-    private long maxDelayBase;
+    protected RetryPolicy fallbackPolicy;
+    protected int maxFailovers;
+    protected int maxRetries;
+    protected long delayMillis;
+    protected long maxDelayBase;
+    protected Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap;
     
     public FailoverOnNetworkExceptionRetry(RetryPolicy fallbackPolicy,
         int maxFailovers) {
-      this(fallbackPolicy, maxFailovers, 0, 0, 0);
+      this(fallbackPolicy, maxFailovers, 0, 0, 0, null);
     }
     
     public FailoverOnNetworkExceptionRetry(RetryPolicy fallbackPolicy,
         int maxFailovers, long delayMillis, long maxDelayBase) {
-      this(fallbackPolicy, maxFailovers, 0, delayMillis, maxDelayBase);
+      this(fallbackPolicy, maxFailovers, 0, delayMillis, maxDelayBase, null);
     }
     
     public FailoverOnNetworkExceptionRetry(RetryPolicy fallbackPolicy,
-        int maxFailovers, int maxRetries, long delayMillis, long maxDelayBase) {
+        int maxFailovers, int maxRetries, long delayMillis, long maxDelayBase,
+        Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap) {
       this.fallbackPolicy = fallbackPolicy;
       this.maxFailovers = maxFailovers;
       this.maxRetries = maxRetries;
       this.delayMillis = delayMillis;
       this.maxDelayBase = maxDelayBase;
+      if(exceptionToPolicyMap!=null) {
+        this.exceptionToPolicyMap = exceptionToPolicyMap;
+      }else{
+        this.exceptionToPolicyMap = new HashMap<Class<? extends Exception>, RetryPolicy>();
+      }
     }
 
     /**
      * @return 0 if this is our first failover/retry (i.e., retry immediately),
      *         sleep exponentially otherwise
      */
-    private long getFailoverOrRetrySleepTime(int times) {
+    protected long getFailoverOrRetrySleepTime(int times) {
       return times == 0 ? 0 : 
         calculateExponentialTime(delayMillis, times, maxDelayBase);
     }
@@ -653,14 +684,19 @@ public class RetryPolicies {
     @Override
     public RetryAction shouldRetry(Exception e, int retries,
         int failovers, boolean isIdempotentOrAtMostOnce) throws Exception {
-      if (failovers >= maxFailovers) {
-        return new RetryAction(RetryAction.RetryDecision.FAIL, 0,
-            "failovers (" + failovers + ") exceeded maximum allowed ("
-            + maxFailovers + ")");
+
+      RetryAction action = checkRetryCount(e , retries, failovers);
+      if(action != null){
+        return action;
       }
-      if (retries - failovers > maxRetries) {
-        return new RetryAction(RetryAction.RetryDecision.FAIL, 0, "retries ("
-            + retries + ") exceeded maximum allowed (" + maxRetries + ")");
+
+      for(Class wrappedException : exceptionToPolicyMap.keySet()){
+        if(wrappsException(e, wrappedException)){
+          RetryPolicy policy = exceptionToPolicyMap.get(wrappedException);
+          if (policy != null) {
+            return policy.shouldRetry(e, retries, failovers, isIdempotentOrAtMostOnce);
+          }
+        }
       }
 
       if (e instanceof ConnectException ||
@@ -693,6 +729,61 @@ public class RetryPolicies {
           return fallbackPolicy.shouldRetry(e, retries, failovers,
               isIdempotentOrAtMostOnce);
       }
+    }
+
+    protected RetryAction checkRetryCount(Exception e, int retries, int failovers)
+            throws Exception {
+      if (failovers >= maxFailovers) {
+        return new RetryAction(RetryAction.RetryDecision.FAIL, 0,
+                "failovers (" + failovers + ") exceeded maximum allowed ("
+                        + maxFailovers + ")");
+      }
+      if (retries - failovers > maxRetries) {
+        return new RetryAction(RetryAction.RetryDecision.FAIL, 0, "retries ("
+                + retries + ") exceeded maximum allowed (" + maxRetries + ")");
+      }
+
+      return null;
+    }
+  }
+
+  /**
+   * Fail over and retry in the case of:
+   *   Leader dies (Network failure)
+   *   Leader node changes.
+   *
+   *   If an operation that is supposted to be executed on the leader node
+   *   is passed to a non-leader node then the non-leader node will thow
+   *   NotALeaderException. In case of NotALeaderException the client should
+   *   failover to the new leader namenode
+   */
+  static class FailoverOnLeaderChange extends FailoverOnNetworkExceptionRetry {
+
+    public FailoverOnLeaderChange(RetryPolicy fallbackPolicy,
+                                  int maxFailovers,
+                                  int maxRetries,
+                                  long delayMillis,
+                                  long maxDelayBase,
+                                  Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap) {
+      super(fallbackPolicy, maxFailovers, maxRetries, delayMillis, maxDelayBase, exceptionToPolicyMap);
+    }
+
+    @Override
+    public RetryAction shouldRetry(Exception e, int retries,
+                                   int failovers,
+                                   boolean isIdempotentOrAtMostOnce) throws Exception {
+
+      RetryAction action = checkRetryCount(e , retries, failovers);
+      if(action != null){
+        return action;
+      }
+
+      if (isWrappedNotALeaderException(e)) {
+        return new RetryAction(RetryAction.RetryDecision.FAILOVER_AND_RETRY,
+                getFailoverOrRetrySleepTime(failovers));
+      }
+
+      return super.shouldRetry(e, retries, failovers, isIdempotentOrAtMostOnce);
     }
   }
 
@@ -734,4 +825,21 @@ public class RetryPolicies {
     return unwrapped instanceof RetriableException ? 
         (RetriableException) unwrapped : null;
   }
+
+  private static boolean isWrappedNotALeaderException(Exception e) {
+    if (!(e instanceof RemoteException)) {
+      return false;
+    }
+    Exception unwrapped = ((RemoteException)e).unwrapRemoteException(
+            NotALeaderException.class);
+    return unwrapped instanceof NotALeaderException;
+  }
+
+  static boolean wrappsException(Exception wrapper, Class wrappedException) {
+    if (!(wrapper instanceof RemoteException)) {
+      return false;
+    }
+    return wrappedException.getName().equals(((RemoteException)wrapper).getClassName());
+  }
+
 }

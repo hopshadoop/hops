@@ -1153,7 +1153,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
         // get a new generation stamp and an access token
         LocatedBlock lb =
-                dfsClient.updateBlockForPipeline(block, dfsClient.clientName);
+                dfsClient.namenode.updateBlockForPipeline(block, dfsClient.clientName);
         newGS = lb.getBlock().getGenerationStamp();
         accessToken = lb.getBlockToken();
 
@@ -1177,7 +1177,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
         ExtendedBlock newBlock =
             new ExtendedBlock(block.getBlockPoolId(), block.getBlockId(),
                 block.getNumBytes(), newGS);
-        dfsClient.updatePipeline(dfsClient.clientName, block, newBlock,
+        dfsClient.namenode.updatePipeline(dfsClient.clientName, block, newBlock,
             nodes, storageIDs);
         // update client side generation stamp
         block = newBlock;
@@ -1323,7 +1323,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
         if (!success) {
           DFSClient.LOG.info("Abandoning " + block);
-          dfsClient.abandonBlock(block, src, dfsClient.clientName);
+          dfsClient.namenode.abandonBlock(block, src, dfsClient.clientName);
           block = null;
           DFSClient.LOG.info("Excluding datanode " + nodes[errorIndex]);
           excludedNodes.put(nodes[errorIndex], nodes[errorIndex]);
@@ -1474,7 +1474,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
         while (true) {
           try {
             return dfsClient
-                    .addBlock(src, dfsClient.clientName, block, excludedNodes, fileId, favoredNodes);
+                    .namenode.addBlock(src, dfsClient.clientName, block, excludedNodes, fileId,
+                            favoredNodes);
           } catch (RemoteException e) {
             IOException ue =
                     e.unwrapRemoteException(FileNotFoundException.class,
@@ -1654,7 +1655,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       final int dbFileMaxSize) throws IOException {
     final HdfsFileStatus stat;
     try {
-      stat = dfsClient.create(src, masked, dfsClient.clientName,
+      stat = dfsClient.namenode.create(src, masked, dfsClient.clientName,
           new EnumSetWritable<>(flag), createParent, replication,
               blockSize, policy);
     } catch (RemoteException re) {
@@ -1711,12 +1712,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     this(dfsClient, src, progress, stat, checksum, saveSmallFilesInDB,  dbFileMaxSize);
 
     initialFileSize = stat.getLen(); // length of file when opened
-    if (!stat.isFileStoredInDB()) {
-      isThisFileStoredInDB = false;
-    } else {
-      isThisFileStoredInDB = true;
-    }
-    
+    isThisFileStoredInDB = stat.isFileStoredInDB();
+
     // The last partial block of the file has to be filled.
     if (lastBlock != null && !isThisFileStoredInDB) {
       LOG.debug("Stuffed Inode:  appending to a file stored on datanodes");
@@ -1738,28 +1735,29 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   static DFSOutputStream newStreamForAppend(DFSClient dfsClient, String src,
                                             int buffersize, Progressable progress, LocatedBlock lastBlock,
                                             HdfsFileStatus stat, DataChecksum checksum, boolean saveSmallFilesInDB,
-                                            final int dbFileMaxSize) throws IOException {
-    String errorMessage = null;
-    if ((stat.isFileStoredInDB() == true && !saveSmallFilesInDB)) {
-      errorMessage = "The file is stored in the database. Parameter to store the data in the database is disabled. " +
-              "Set the " + DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY + " configuration parameter in the hdfs " +
-              "configuration file";
-    } else if (stat.isFileStoredInDB()) {
-      if (stat.getLen() > stat.getBlockSize()) {
+                                            final int dbFileMaxSize, boolean emulateHDFSClient)
+          throws IOException {
+
+    if (stat.isFileStoredInDB()) {
+      String errorMessage = null;
+      if (!saveSmallFilesInDB && !emulateHDFSClient) {
+        errorMessage = "The file is stored in the database. Parameter to store the data in the database is disabled. " +
+                "Set the " + DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY + " configuration parameter in the hdfs " +
+                "configuration file";
+      } else if (stat.getLen() > stat.getBlockSize()) {
         errorMessage = "Invalid paraters for appending a file stored in the database. Block size can not be smaller " +
                 "than the max size of a file stored in the database";
       } else if (dbFileMaxSize > stat.getBlockSize()) {
         errorMessage = "Invalid paraters for appending a file stored in the database. Files stored in the database " +
                 "can not be larger than a HDFS block";
       }
-    }
 
-    if (errorMessage != null) {
-      throw new IOException(errorMessage + " Stat.isStoredInDB: " + stat.isFileStoredInDB() +
-              " saveSmallFilesInDB: " + saveSmallFilesInDB + " Stat.len: " + stat.getLen() + " dbFileMaxSize: " +
-              dbFileMaxSize + " BlockSize: " + stat.getBlockSize());
+      if (errorMessage != null) {
+        throw new IOException(errorMessage + " Stat.isStoredInDB: " + stat.isFileStoredInDB() +
+                " saveSmallFilesInDB: " + saveSmallFilesInDB + " Stat.len: " + stat.getLen() + " dbFileMaxSize: " +
+                dbFileMaxSize + " BlockSize: " + stat.getBlockSize());
+      }
     }
-
 
     final DFSOutputStream out =
             new DFSOutputStream(dfsClient, src, progress, lastBlock,
@@ -2101,7 +2099,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       // namenode.
       if (persistBlocks.getAndSet(false) || updateLength) {
         try {
-          dfsClient.fsync(src, dfsClient.clientName, lastBlockLength);
+          dfsClient.namenode.fsync(src, dfsClient.clientName, lastBlockLength);
         } catch (IOException ioe) {
           DFSClient.LOG
                   .warn("Unable to persist blocks in hflush for " + src, ioe);
@@ -2370,7 +2368,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
     try {
       fileComplete =
-              dfsClient.complete(src, dfsClient.clientName, last, fileId, data);
+              dfsClient.namenode.complete(src, dfsClient.clientName, last, fileId, data);
     } catch (RemoteException e) {
       IOException nonRetirableExceptions =
               e.unwrapRemoteException(NSQuotaExceededException.class,

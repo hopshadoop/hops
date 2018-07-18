@@ -64,7 +64,6 @@ public class TestSubtreeLockACL extends TestCase{
   
   {
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
-    conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
   }
   
   public void setup() throws IOException {
