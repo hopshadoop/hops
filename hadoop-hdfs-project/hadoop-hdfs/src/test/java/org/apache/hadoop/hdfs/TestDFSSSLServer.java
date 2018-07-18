@@ -56,6 +56,8 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
     @Before
     public void setUp() throws Exception {
         conf = new HdfsConfiguration();
+        conf.setInt(DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, /*default 15*/ 1);
+        conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY, "1,1");
         filesToPurge = prepareCryptoMaterial(conf, classpathDir);
         setCryptoConfig(conf, classpathDir);
         

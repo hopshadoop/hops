@@ -19,6 +19,7 @@ import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.tukaani.xz.UnsupportedOptionsException;
 
 import java.io.IOException;
 import java.util.Random;
@@ -27,6 +28,7 @@ public class TestUtil {
 
   public static void createRandomFile(DistributedFileSystem dfs, Path path,
       long seed, int blockCount, int blockSize) throws IOException {
+
     FSDataOutputStream out =
         dfs.create(path, new EncodingPolicy("src", (short) 1));
     byte[] buffer = randomBytes(seed, blockCount, blockSize);

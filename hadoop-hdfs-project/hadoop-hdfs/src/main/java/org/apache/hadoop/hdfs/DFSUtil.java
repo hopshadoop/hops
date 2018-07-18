@@ -1149,5 +1149,11 @@ public class DFSUtil {
     }
     return builder;
   }
+
+  public static Map<String, Map<String, InetSocketAddress>> getHaNnRpcAddresses(Configuration conf){
+    throw new UnsupportedOperationException("Not yet implemented");
+//    return DFSUtilClient.getAddresses(conf, null, DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY);
+  }
+
 }
 

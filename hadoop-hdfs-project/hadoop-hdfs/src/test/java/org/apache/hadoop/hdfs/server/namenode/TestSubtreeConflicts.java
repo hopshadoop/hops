@@ -76,7 +76,6 @@ public class TestSubtreeConflicts extends TestCase {
       Configuration conf = new HdfsConfiguration();
 //      conf.setInt(DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_KEY,1);
       conf.setBoolean(DFSConfigKeys.DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY,hierarchicalLocking);
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -164,7 +163,6 @@ public class TestSubtreeConflicts extends TestCase {
     try {
       Configuration conf = new HdfsConfiguration();
 //      conf.setInt(DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_KEY,1);
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 1);
       conf.setInt(DFSConfigKeys.DFS_DIR_DELETE_BATCH_SIZE, 0); // do not batch delete ops
 
       cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).build();

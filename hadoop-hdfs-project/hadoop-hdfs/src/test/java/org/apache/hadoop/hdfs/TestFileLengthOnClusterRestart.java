@@ -40,7 +40,7 @@ public class TestFileLengthOnClusterRestart {
     final Configuration conf = new HdfsConfiguration();
     // create cluster
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 512);
-
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_MAX_ATTEMPTS_KEY, 1);
     final MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     HdfsDataInputStream in = null;

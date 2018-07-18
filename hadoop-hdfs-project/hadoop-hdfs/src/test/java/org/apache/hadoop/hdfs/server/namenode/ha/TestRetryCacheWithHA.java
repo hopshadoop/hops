@@ -98,6 +98,8 @@ public class TestRetryCacheWithHA {
   public void setup() throws Exception {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BlockSize);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
+    conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, /*default 10*/ 0);
+    conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY,"1000,2");
     cluster = new MiniDFSCluster.Builder(conf)
         .nnTopology(MiniDFSNNTopology.simpleHOPSTopology(2))
         .numDataNodes(DataNodes).build();

@@ -145,22 +145,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODES_SERVICE_RPC_ADDRESS_KEY =
       "dfs.namenodes.servicerpc.addresses";
 
-  public static final String DFS_NAMENODE_SELECTOR_POLICY_KEY =
-      "dfs.namenode.selector-policy";
-  public static final String DFS_NAMENODE_SELECTOR_POLICY_DEFAULT =
-      "RANDOM_STICKY";     //RANDOM ROUND_ROBIN RANDOM_STICKY
-  
-  public static final String DFS_BLOCK_POOL_ID_KEY = "dfs.block.pool.id";
-  public static final String DFS_BLOCK_POOL_ID_DEFAULT = "HOP_BLOCK_POOL_123";
-  
   public static final String DFS_NAME_SPACE_ID_KEY = "dfs.name.space.id";
   public static final int DFS_NAME_SPACE_ID_DEFAULT = 911; // :)
   
-  public static final String DFS_CLIENT_RETRIES_ON_FAILURE_KEY =
-      "dfs.client.max.retries.on.failure";
-  public static final int DFS_CLIENT_RETRIES_ON_FAILURE_DEFAULT = 2;
-      //min value is 0. Better set it >= 1
-
   public static final String DFS_NAMENODE_TX_RETRY_COUNT_KEY =
           "dfs.namenode.tx.retry.count";
   public static final int DFS_NAMENODE_TX_RETRY_COUNT_DEFAULT = 5;
@@ -169,15 +156,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
           "dfs.namenode.tx.initial.wait.time.before.retry";
   public static final int DFS_NAMENODE_TX_INITIAL_WAIT_TIME_BEFORE_RETRY_DEFAULT = 2000;
 
-  public static final String DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_KEY =
-      "dfs.client.initial.wait.on.retry";
-  public static final int DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_DEFAULT = 1000;
-  
-  public static final String DFS_CLIENT_REFRESH_NAMENODE_LIST_IN_MS_KEY =
-      "dfs.client.refresh.namenode.list";
-  public static final int DFS_CLIENT_REFRESH_NAMENODE_LIST_IN_MS_DEFAULT =
-      60 * 1000; //time in milliseconds.
-  
   public static final String DFS_SET_PARTITION_KEY_ENABLED =
       "dfs.ndb.setpartitionkey.enabled";
   public static final boolean DFS_SET_PARTITION_KEY_ENABLED_DEFAULT = true;
@@ -325,7 +303,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int DFS_BYTES_PER_CHECKSUM_DEFAULT = 512;
   public static final String DFS_CLIENT_RETRY_POLICY_ENABLED_KEY =
       "dfs.client.retry.policy.enabled";
-  public static final boolean DFS_CLIENT_RETRY_POLICY_ENABLED_DEFAULT = false;
+  public static final boolean DFS_CLIENT_RETRY_POLICY_ENABLED_DEFAULT = true;
   public static final String DFS_CLIENT_RETRY_POLICY_SPEC_KEY =
       "dfs.client.retry.policy.spec";
   public static final String DFS_CLIENT_RETRY_POLICY_SPEC_DEFAULT =
@@ -826,7 +804,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final long DFS_CLIENT_MMAP_RETRY_TIMEOUT_MS_DEFAULT = 5 * 60 * 1000;
   public static final String DFS_CLIENT_SHORT_CIRCUIT_REPLICA_STALE_THRESHOLD_MS = "dfs.client.short.circuit.replica.stale.threshold.ms";
   public static final long DFS_CLIENT_SHORT_CIRCUIT_REPLICA_STALE_THRESHOLD_MS_DEFAULT = 30 * 60 * 1000;
-  
+  public static final String DFS_CLIENT_MMAP_CACHE_THREAD_RUNS_PER_TIMEOUT = "dfs.client.mmap.cache.thread.runs.per.timeout";
+  public static final int DFS_CLIENT_MMAP_CACHE_THREAD_RUNS_PER_TIMEOUT_DEFAULT  = 4;
+
   //Keys with no defaults
   public static final String DFS_DATANODE_PLUGINS_KEY = "dfs.datanode.plugins";
   public static final String DFS_DATANODE_FSDATASET_FACTORY_KEY =

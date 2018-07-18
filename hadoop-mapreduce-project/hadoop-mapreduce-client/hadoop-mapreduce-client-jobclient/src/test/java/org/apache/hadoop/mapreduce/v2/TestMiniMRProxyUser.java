@@ -39,10 +39,9 @@ import java.security.PrivilegedExceptionAction;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TestMiniMRProxyUser {
+  
 
   private MiniDFSCluster dfsCluster = null;
   private MiniMRCluster mrCluster = null;
@@ -68,7 +67,7 @@ public class TestMiniMRProxyUser {
     conf.set("hadoop.security.authentication", "simple");
     conf.set("hadoop.proxyuser." + proxyUser + ".hosts", sb.toString());
     conf.set("hadoop.proxyuser." + proxyUser + ".groups", proxyGroup);
-
+    
     String[] userGroups = new String[]{proxyGroup};
     UserGroupInformation.createUserForTesting(proxyUser, userGroups);
     UserGroupInformation.createUserForTesting("u1", userGroups);
