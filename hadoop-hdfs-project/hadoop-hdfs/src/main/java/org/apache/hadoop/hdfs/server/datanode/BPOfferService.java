@@ -745,14 +745,14 @@ class BPOfferService implements Runnable {
   private BRTask brTask = new BRTask();
   private Future futur = null;
   private void startBRThread() throws InterruptedException, ExecutionException{
-    if(futur == null || futur.isDone()){
-      if(futur!=null){
+    if (futur == null || futur.isDone()) {
+      if (futur != null) {
         //check that previous run did not end with an exception
-	try{
-	  futur.get();
-	}finally{
-	    futur=null;
-	}
+        try {
+          futur.get();
+        } finally {
+          futur = null;
+        }
       }
       futur = brDispatcher.submit(brTask);
     }
@@ -768,8 +768,11 @@ class BPOfferService implements Runnable {
     @Override
     public Object call() throws Exception {
       List<DatanodeCommand> cmds = blockReport();
-      
-      blkReportHander.processCommand(cmds == null ? null : cmds.toArray(new DatanodeCommand[cmds.size()]));
+
+      if(cmds != null && blkReportHander != null) { //it is not null if the block report is
+        // successful
+        blkReportHander.processCommand(cmds == null ? null : cmds.toArray(new DatanodeCommand[cmds.size()]));
+      }
       
       // Now safe to start scanning the block pool.
       // If it has already been started, this is a no-op.

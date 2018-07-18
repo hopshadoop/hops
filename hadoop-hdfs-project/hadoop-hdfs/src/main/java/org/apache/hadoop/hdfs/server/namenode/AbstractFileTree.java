@@ -34,14 +34,13 @@ import io.hops.transaction.context.EntityContext;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.SubtreeLockHelper;
-import io.hops.transaction.lock.SubtreeLockedException;
-import io.hops.transaction.lock.SubtreeRetriableException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
+import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.security.AccessControlException;
 
 import java.io.IOException;
@@ -135,8 +134,9 @@ abstract class AbstractFileTree {
                     getActiveNameNodes().getActiveNodes();
                 if (SubtreeLockHelper.isSTOLocked(child.isSubtreeLocked(),
                     child.getSubtreeLockOwner(), activeNamenodes)) {
-                  exception = new SubtreeLockedException(child.getName(),
-                      activeNamenodes);
+                  exception = new RetriableException("The subtree: "+child.getName()
+                      +" is locked by Namenode: "+child.getSubtreeLockOwner()+"."+
+                          " Active Namenodes: "+activeNamenodes);
                   return null;
                 }
 
@@ -258,7 +258,7 @@ abstract class AbstractFileTree {
           // This should not happen as it is a Runnable
           String message = "FileTree.buildUp received an unexpected execution exception";
           LOG.warn( message, e);
-          throw new SubtreeRetriableException(message);
+          throw new RetriableException(message);
         }
       }
     }
@@ -281,7 +281,7 @@ abstract class AbstractFileTree {
     return (INode) new LightWeightRequestHandler(
         HDFSOperationType.GET_SUBTREE_ROOT) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask() throws IOException {
         INodeDataAccess<INode> dataAccess =
             (INodeDataAccess) HdfsStorageFactory
                 .getDataAccess(INodeDataAccess.class);

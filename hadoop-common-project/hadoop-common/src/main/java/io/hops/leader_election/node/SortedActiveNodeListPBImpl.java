@@ -119,7 +119,7 @@ public class SortedActiveNodeListPBImpl implements SortedActiveNodeList {
     if (this.isEmpty()) {
       return "No Active NameNodes";
     } else {
-      return "Active NameNodes are "+ Arrays.toString(this.getSortedActiveNodes().toArray());
+      return Arrays.toString(this.getSortedActiveNodes().toArray());
     }
   }
   @Override

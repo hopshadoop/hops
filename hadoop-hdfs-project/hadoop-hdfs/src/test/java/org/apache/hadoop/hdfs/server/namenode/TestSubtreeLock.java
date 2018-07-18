@@ -25,7 +25,6 @@ import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
-import io.hops.transaction.lock.SubtreeLockedException;
 import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -35,6 +34,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.*;
+import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.junit.Assert;
@@ -56,7 +56,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -75,7 +74,7 @@ public class TestSubtreeLock extends TestCase {
       boolean exception = false;
       try {
         namesystem.lockSubtree(path1.toUri().getPath(), SubTreeOperation.Type.NA);
-      } catch (SubtreeLockedException e) {
+      } catch (RetriableException e) {
         exception = true;
       }
       assertTrue("Succeeded to acquire lock on previously locked node",
@@ -84,7 +83,7 @@ public class TestSubtreeLock extends TestCase {
       exception = false;
       try {
         namesystem.lockSubtree(path2.toUri().getPath(), SubTreeOperation.Type.NA);
-      } catch (SubtreeLockedException e) {
+      } catch (RetriableException e) {
         exception = true;
       }
       assertTrue("Succeeded to acquire lock on previously locked subtree",
@@ -105,7 +104,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -118,7 +116,7 @@ public class TestSubtreeLock extends TestCase {
       boolean exception = false;
       try {
         namesystem.lockSubtree("/A/B/C", SubTreeOperation.Type.NA);
-      } catch (SubtreeLockedException e) {
+      } catch (RetriableException e) {
         exception = true;
       }
       assertTrue("Failed. Took a lock while sub tree was locked", exception);
@@ -138,7 +136,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -181,7 +178,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -230,7 +226,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf)
               .nnTopology(MiniDFSNNTopology.simpleHOPSTopology(2)).format(true)
               .numDataNodes(1).build();
@@ -254,7 +249,7 @@ public class TestSubtreeLock extends TestCase {
       try {
         namesystem1.lockSubtree(path1.toUri().getPath(),
                 SubTreeOperation.Type.NA);
-      } catch (SubtreeLockedException e) {
+      } catch (RetriableException e) {
         exception = true;
       }
       assertTrue("Succeeded to acquire lock on previously locked node",
@@ -282,10 +277,6 @@ public class TestSubtreeLock extends TestCase {
     Thread lockKeeper = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      final int RETRY_WAIT = conf.getInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY,
-              DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_DEFAULT);
-      final long RETRY_COUNT = conf.getInt(DFSConfigKeys.DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_KEY,
-              DFSConfigKeys.DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_DEFAULT);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -299,7 +290,7 @@ public class TestSubtreeLock extends TestCase {
         public void run() {
           super.run();
           try {
-            Thread.sleep((RETRY_COUNT - 1) * RETRY_WAIT);
+            Thread.sleep(10000); // 10 sec, See DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_DEFAULT
             namesystem.unlockSubtree(path1.toUri().getPath(),
                     getSubTreeRootID(path1.toUri().getPath()));
           } catch (Exception e) {
@@ -336,7 +327,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       assertFalse(cluster.getFileSystem().delete(new Path("/"), true));
@@ -352,7 +342,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       assertFalse(cluster.getFileSystem().delete(new Path("/foo/"), true));
@@ -369,7 +358,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -404,7 +392,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -453,7 +440,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -474,7 +460,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -496,7 +481,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -530,7 +514,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -554,7 +537,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -579,7 +561,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -622,7 +603,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -656,7 +636,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -747,7 +726,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -788,7 +766,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -834,7 +811,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 
@@ -870,7 +846,6 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
 

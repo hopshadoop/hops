@@ -855,6 +855,7 @@ public class TestDFSClientRetries {
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DATANODES_KEY, 1);
     conf.setInt(MiniDFSCluster.DFS_NAMENODE_SAFEMODE_EXTENSION_TESTING_KEY,
         5000);
+//    conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY, "1000,5");
 
     final short numDatanodes = 3;
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)

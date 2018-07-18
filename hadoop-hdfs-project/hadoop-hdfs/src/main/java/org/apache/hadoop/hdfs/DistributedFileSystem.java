@@ -18,55 +18,6 @@
 
 package org.apache.hadoop.hdfs;
 
-import io.hops.metadata.hdfs.entity.EncodingPolicy;
-import io.hops.metadata.hdfs.entity.EncodingStatus;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.BlockStorageLocation;
-import org.apache.hadoop.fs.ContentSummary;
-import org.apache.hadoop.fs.CreateFlag;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileSystemLinkResolver;
-import org.apache.hadoop.fs.FsServerDefaults;
-import org.apache.hadoop.fs.FsStatus;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
-import org.apache.hadoop.fs.Options;
-import org.apache.hadoop.fs.Options.ChecksumOpt;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.UnresolvedLinkException;
-import org.apache.hadoop.fs.VolumeId;
-import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.fs.permission.AclEntry;
-import org.apache.hadoop.fs.permission.AclStatus;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
-import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
-import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.DirectoryListing;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
-import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
-import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.security.token.SecretManager.InvalidToken;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.Progressable;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -75,18 +26,74 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+
+import io.hops.metadata.hdfs.entity.EncodingPolicy;
+import io.hops.metadata.hdfs.entity.EncodingStatus;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.BlockStorageLocation;
+//import org.apache.hadoop.fs.CacheFlag;
+import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FSLinkResolver;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileSystemLinkResolver;
+import org.apache.hadoop.fs.FsServerDefaults;
+import org.apache.hadoop.fs.FsStatus;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.fs.Options.ChecksumOpt;
+import org.apache.hadoop.fs.ParentNotDirectoryException;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.fs.UnsupportedFileSystemException;
+import org.apache.hadoop.fs.VolumeId;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclStatus;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.client.HdfsAdmin;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
+import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
+//import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
+//import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
+//import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
+import org.apache.hadoop.hdfs.protocol.*;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
+//import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
+//import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+//import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
+import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
+import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.token.SecretManager.InvalidToken;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.Progressable;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 
-/**
- * *************************************************************
+/****************************************************************
  * Implementation of the abstract FileSystem for the DFS system.
  * This object is the way end-user code interacts with a Hadoop
  * DistributedFileSystem.
- * <p/>
- * ***************************************************************
- */
-@InterfaceAudience.LimitedPrivate({"MapReduce", "HBase"})
+ *
+ *****************************************************************/
+@InterfaceAudience.LimitedPrivate({ "MapReduce", "HBase" })
 @InterfaceStability.Unstable
 public class DistributedFileSystem extends FileSystem {
   private Path workingDir;
@@ -94,8 +101,8 @@ public class DistributedFileSystem extends FileSystem {
 
   DFSClient dfs;
   private boolean verifyChecksum = true;
-  
-  static {
+
+  static{
     HdfsConfiguration.init();
   }
 
@@ -114,15 +121,13 @@ public class DistributedFileSystem extends FileSystem {
   }
 
   @Deprecated
-  public DistributedFileSystem(InetSocketAddress namenode, Configuration conf)
-      throws IOException {
+  public DistributedFileSystem(InetSocketAddress namenode,
+    Configuration conf) throws IOException {
     initialize(NameNode.getUri(namenode), conf);
   }
 
   @Override
-  public URI getUri() {
-    return uri;
-  }
+  public URI getUri() { return uri; }
 
   @Override
   public void initialize(URI uri, Configuration conf) throws IOException {
@@ -131,11 +136,11 @@ public class DistributedFileSystem extends FileSystem {
 
     String host = uri.getHost();
     if (host == null) {
-      throw new IOException("Incomplete HDFS URI, no host: " + uri);
+      throw new IOException("Incomplete HDFS URI, no host: "+ uri);
     }
 
     this.dfs = new DFSClient(uri, conf, statistics);
-    this.uri = URI.create(uri.getScheme() + "://" + uri.getAuthority());
+    this.uri = URI.create(uri.getScheme()+"://"+uri.getAuthority());
     this.workingDir = getHomeDirectory();
   }
 
@@ -154,40 +159,40 @@ public class DistributedFileSystem extends FileSystem {
     return dfs.getDefaultReplication();
   }
 
-  private Path makeAbsolute(Path f) {
-    if (f.isAbsolute()) {
-      return f;
-    } else {
-      return new Path(workingDir, f);
-    }
-  }
-
   @Override
   public void setWorkingDirectory(Path dir) {
-    String result = makeAbsolute(dir).toUri().getPath();
+    String result = fixRelativePart(dir).toUri().getPath();
     if (!DFSUtil.isValidName(result)) {
-      throw new IllegalArgumentException(
-          "Invalid DFS directory name " + result);
+      throw new IllegalArgumentException("Invalid DFS directory name " +
+                                         result);
     }
-    workingDir = makeAbsolute(dir);
+    workingDir = fixRelativePart(dir);
   }
 
-  
+
   @Override
   public Path getHomeDirectory() {
     return makeQualified(new Path("/user/" + dfs.ugi.getShortUserName()));
   }
 
+  /**
+   * Checks that the passed URI belongs to this filesystem and returns
+   * just the path component. Expects a URI with an absolute path.
+   *
+   * @param file URI with absolute path
+   * @return path component of {file}
+   * @throws IllegalArgumentException if URI does not belong to this DFS
+   */
   private String getPathName(Path file) {
     checkPath(file);
-    String result = makeAbsolute(file).toUri().getPath();
+    String result = file.toUri().getPath();
     if (!DFSUtil.isValidName(result)) {
       throw new IllegalArgumentException("Pathname " + result + " from " +
-          file + " is not a valid DFS filename.");
+                                         file+" is not a valid DFS filename.");
     }
     return result;
   }
-  
+
   @Override
   public BlockLocation[] getFileBlockLocations(FileStatus file, long start,
       long len) throws IOException {
@@ -196,13 +201,24 @@ public class DistributedFileSystem extends FileSystem {
     }
     return getFileBlockLocations(file.getPath(), start, len);
   }
-  
-  @Override
-  public BlockLocation[] getFileBlockLocations(Path p, long start, long len)
-      throws IOException {
-    statistics.incrementReadOps(1);
-    return dfs.getBlockLocations(getPathName(p), start, len);
 
+  @Override
+  public BlockLocation[] getFileBlockLocations(Path p,
+      final long start, final long len) throws IOException {
+    statistics.incrementReadOps(1);
+    final Path absF = fixRelativePart(p);
+    return new FileSystemLinkResolver<BlockLocation[]>() {
+      @Override
+      public BlockLocation[] doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return dfs.getBlockLocations(getPathName(p), start, len);
+      }
+      @Override
+      public BlockLocation[] next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.getFileBlockLocations(p, start, len);
+      }
+    }.resolve(this, absF);
   }
 
   /**
@@ -210,30 +226,28 @@ public class DistributedFileSystem extends FileSystem {
    * of blocks is normally constructed via a series of calls to
    * {@link DistributedFileSystem#getFileBlockLocations(Path, long, long)} to
    * get the blocks for ranges of a file.
-   * <p/>
+   *
    * The returned array of {@link BlockStorageLocation} augments
    * {@link BlockLocation} with a {@link VolumeId} per block replica. The
-   * VolumeId specifies the volume on the datanode on which the replica
-   * resides.
+   * VolumeId specifies the volume on the datanode on which the replica resides.
    * The VolumeId associated with a replica may be null because volume
    * information can be unavailable if the corresponding datanode is down or
    * if the requested block is not found.
-   * <p/>
+   *
    * This API is unstable, and datanode-side support is disabled by default. It
    * can be enabled by setting "dfs.datanode.hdfs-blocks-metadata.enabled" to
    * true.
    *
    * @param blocks
-   *     List of target BlockLocations to query volume location information
+   *          List of target BlockLocations to query volume location information
    * @return volumeBlockLocations Augmented array of
-   * {@link BlockStorageLocation}s containing additional volume location
-   * information for each replica of each block.
+   *         {@link BlockStorageLocation}s containing additional volume location
+   *         information for each replica of each block.
    */
   @InterfaceStability.Unstable
   public BlockStorageLocation[] getFileBlockStorageLocations(
-      List<BlockLocation> blocks)
-      throws IOException, UnsupportedOperationException,
-      InvalidBlockTokenException {
+      List<BlockLocation> blocks) throws IOException,
+      UnsupportedOperationException, InvalidBlockTokenException {
     return dfs.getBlockStorageLocations(blocks);
   }
 
@@ -245,55 +259,68 @@ public class DistributedFileSystem extends FileSystem {
   /**
    * Start the lease recovery of a file
    *
-   * @param f
-   *     a file
+   * @param f a file
    * @return true if the file is already closed
-   * @throws IOException
-   *     if an error occurs
+   * @throws IOException if an error occurs
    */
-  public boolean recoverLease(Path f) throws IOException {
-    return dfs.recoverLease(getPathName(f));
+  public boolean recoverLease(final Path f) throws IOException {
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<Boolean>() {
+      @Override
+      public Boolean doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return dfs.recoverLease(getPathName(p));
+      }
+      @Override
+      public Boolean next(final FileSystem fs, final Path p)
+          throws IOException {
+        if (fs instanceof DistributedFileSystem) {
+          DistributedFileSystem myDfs = (DistributedFileSystem)fs;
+          return myDfs.recoverLease(p);
+        }
+        throw new UnsupportedOperationException("Cannot recoverLease through" +
+            " a symlink to a non-DistributedFileSystem: " + f + " -> " + p);
+      }
+    }.resolve(this, absF);
   }
 
-  @SuppressWarnings("deprecation")
   @Override
-  public HdfsDataInputStream open(Path f, int bufferSize) throws IOException {
-    statistics.incrementReadOps(1);
-    return new DFSClient.DFSDataInputStream(
-        dfs.open(getPathName(f), bufferSize, verifyChecksum));
-  }
-
-  /**
-   * This optional operation is not yet supported.
-   */
-  @Override
-  public HdfsDataOutputStream append(Path f, int bufferSize,
-      Progressable progress) throws IOException {
-    statistics.incrementWriteOps(1);
-    return dfs.append(getPathName(f), bufferSize, progress, statistics);
-  }
-
-  /**
-   * Create a file that will be erasure-coded asynchronously after creation.
-   * Using this method ensures that the file is being written in a way that
-   * ensures optimal block placement for the given encoding policy.
-   *
-   * @param f
-   *    the path
-   * @param policy
-   *    the erasure coding policy to be applied
-   * @return
-   *    the stream to be written to
-   * @throws IOException
-   */
-  public HdfsDataOutputStream create(Path f, EncodingPolicy policy)
+  public FSDataInputStream open(Path f, final int bufferSize)
       throws IOException {
-    return create(f, true, policy);
+    statistics.incrementReadOps(1);
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<FSDataInputStream>() {
+      @Override
+      public FSDataInputStream doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return new HdfsDataInputStream(
+            dfs.open(getPathName(p), bufferSize, verifyChecksum));
+      }
+      @Override
+      public FSDataInputStream next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.open(p, bufferSize);
+      }
+    }.resolve(this, absF);
   }
 
-  public HdfsDataOutputStream create(Path f, short replication,
-      EncodingPolicy policy) throws IOException {
-    return create(f, true, replication, policy);
+  @Override
+  public FSDataOutputStream append(Path f, final int bufferSize,
+      final Progressable progress) throws IOException {
+    statistics.incrementWriteOps(1);
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<FSDataOutputStream>() {
+      @Override
+      public FSDataOutputStream doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return dfs.append(getPathName(p), bufferSize, progress, statistics);
+      }
+      @Override
+      public FSDataOutputStream next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.append(p, bufferSize);
+      }
+    }.resolve(this, absF);
   }
 
   /**
@@ -303,205 +330,183 @@ public class DistributedFileSystem extends FileSystem {
    *
    * @param f
    *    the path
-   * @param overwrite
-   *    whether an existing file should be overwritten or not
+   * @param policy
+   *    the erasure coding policy to be applied
+   * @return
+   *    the stream to be written to
+   * @throws IOException
+   */
+  public HdfsDataOutputStream create(Path f, EncodingPolicy
+          policy)
+          throws IOException {
+    return this.create(f, getDefaultReplication(f),  true, policy);
+  }
+
+  /**
+   * Create a file that will be erasure-coded asynchronously after creation.
+   * Using this method ensures that the file is being written in a way that
+   * ensures optimal block placement for the given encoding policy.
+   *
+   * @param f
+   *    the path
    * @param replication
-   *    the replication factor used to write the file before it is encoded
-   * @param policy
-   *    the erasure coding policy to be applied
-   * @return
-   *    the stream to be written to
-   * @throws IOException
-   */
-  public HdfsDataOutputStream create(Path f, boolean overwrite,
-      short replication, EncodingPolicy policy) throws IOException {
-    return create(f, overwrite, getConf().getInt("io.file.buffer.size", 4096),
-        replication, getDefaultBlockSize(f), null, policy);
-  }
-
-  /**
-   * Create a file that will be erasure-coded asynchronously after creation.
-   * Using this method ensures that the file is being written in a way that
-   * ensures optimal block placement for the given encoding policy.
-   *
-   * @param f
-   *    the path
+   *    replication
    * @param overwrite
-   *    whether an existing file should be overwritten or not
+   *    overwrite
    * @param policy
    *    the erasure coding policy to be applied
    * @return
    *    the stream to be written to
    * @throws IOException
    */
-  public HdfsDataOutputStream create(Path f, boolean overwrite,
-      EncodingPolicy policy) throws IOException {
-    return create(f, overwrite, getDefaultReplication(f), policy);
+  public HdfsDataOutputStream create(Path f, short replication, boolean overwrite, EncodingPolicy
+          policy)
+          throws IOException {
+    return this.create(f, FsPermission.getFileDefault(), overwrite,
+            getConf().getInt("io.file.buffer.size", 4096), replication,
+            getDefaultBlockSize(f), null, null, policy);
   }
 
-  public HdfsDataOutputStream create(Path f, boolean overwrite, int bufferSize,
-      short replication, long blockSize, Progressable progress,
-      EncodingPolicy policy) throws IOException {
-    return this.create(f, FsPermission.getFileDefault()
-            .applyUMask(FsPermission.getUMask(getConf())), overwrite,
-        bufferSize, replication, blockSize, progress, policy);
-  }
-
-  /**
-   * Create a file that will be erasure-coded asynchronously after creation.
-   * Using this method ensures that the file is being written in a way that
-   * ensures optimal block placement for the given encoding policy.
-   *
-   * @param f
-   *    the path
-   * @param permission
-   *    the file permissions
-   * @param overwrite
-   *    whether an existing file should be overwritten or not
-   * @param bufferSize
-   *    the buffer size
-   * @param replication
-   *    the replication factor used to write the file before it is encoded
-   * @param blockSize
-   *    the block size to be used
-   * @param progress
-   *    the Progressable to report to
-   * @param policy
-   *    the erasure coding policy to be applied
-   * @return
-   *    the stream to be written to
-   * @throws IOException
-   */
-  public HdfsDataOutputStream create(Path f, FsPermission permission,
+  @Override
+  public FSDataOutputStream create(Path f, FsPermission permission,
       boolean overwrite, int bufferSize, short replication, long blockSize,
-      Progressable progress, EncodingPolicy policy) throws IOException {
+      Progressable progress) throws IOException {
     return this.create(f, permission,
-        overwrite ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE) :
-            EnumSet.of(CreateFlag.CREATE), bufferSize, replication, blockSize,
-        progress, null, policy);
+        overwrite ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)
+            : EnumSet.of(CreateFlag.CREATE), bufferSize, replication,
+        blockSize, progress, null);
   }
 
   /**
-   * Same as  
-   * {@link #create(Path, FsPermission, boolean, int, short, long, 
-   * Progressable)} with the addition of favoredNodes that is a hint to 
+   * Same as
+   * {@link #create(Path, FsPermission, boolean, int, short, long,
+   * Progressable)} with the addition of favoredNodes that is a hint to
    * where the namenode should place the file blocks.
    * The favored nodes hint is not persisted in HDFS. Hence it may be honored
    * at the creation time only. HDFS could move the blocks during balancing or
    * replication, to move the blocks from favored nodes. A value of null means
    * no favored nodes for this create
    */
-  public HdfsDataOutputStream create(Path f, FsPermission permission,
-      boolean overwrite, int bufferSize, short replication, long blockSize,
-      Progressable progress, InetSocketAddress[] favoredNodes, EncodingPolicy policy) throws IOException {
+  public HdfsDataOutputStream create(final Path f,
+      final FsPermission permission, final boolean overwrite,
+      final int bufferSize, final short replication, final long blockSize,
+      final Progressable progress, final InetSocketAddress[] favoredNodes,
+      final EncodingPolicy policy)
+          throws IOException {
     statistics.incrementWriteOps(1);
-    final DFSOutputStream out = dfs.create(getPathName(f), permission,
-        overwrite ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)
-            : EnumSet.of(CreateFlag.CREATE),
-        true, replication, blockSize, progress, bufferSize, null, favoredNodes, policy);
-    return new HdfsDataOutputStream(out, statistics);
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<HdfsDataOutputStream>() {
+      @Override
+      public HdfsDataOutputStream doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        final DFSOutputStream out = dfs.create(getPathName(f), permission,
+            overwrite ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)
+                : EnumSet.of(CreateFlag.CREATE),
+            true, replication, blockSize, progress, bufferSize, null,
+            favoredNodes, policy);
+        return new HdfsDataOutputStream(out, statistics);
+      }
+      @Override
+      public HdfsDataOutputStream next(final FileSystem fs, final Path p)
+          throws IOException {
+        if (fs instanceof DistributedFileSystem) {
+          DistributedFileSystem myDfs = (DistributedFileSystem)fs;
+          return myDfs.create(p, permission, overwrite, bufferSize, replication,
+              blockSize, progress, favoredNodes, policy);
+        }
+        throw new UnsupportedOperationException("Cannot create with" +
+            " favoredNodes through a symlink to a non-DistributedFileSystem: "
+            + f + " -> " + p);
+      }
+    }.resolve(this, absF);
   }
 
   @Override
-  public HdfsDataOutputStream create(Path f, FsPermission permission,
-      boolean overwrite, int bufferSize, short replication, long blockSize,
-      Progressable progress) throws IOException {
-    return this.create(f, permission,
-        overwrite ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE) :
-            EnumSet.of(CreateFlag.CREATE), bufferSize, replication, blockSize,
-        progress, null);
-  }
-  
-  @Override
-  public HdfsDataOutputStream create(Path f, FsPermission permission,
-      EnumSet<CreateFlag> cflags, int bufferSize, short replication,
-      long blockSize, Progressable progress, ChecksumOpt checksumOpt)
-      throws IOException {
-    return create(f, permission, cflags, bufferSize, replication, blockSize,
-        progress, checksumOpt, null);
+  public FSDataOutputStream create(final Path f, final FsPermission permission,
+    final EnumSet<CreateFlag> cflags, final int bufferSize,
+    final short replication, final long blockSize, final Progressable progress,
+    final ChecksumOpt checksumOpt) throws IOException {
+    statistics.incrementWriteOps(1);
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<FSDataOutputStream>() {
+      @Override
+      public FSDataOutputStream doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return new HdfsDataOutputStream(dfs.create(getPathName(p), permission,
+            cflags, replication, blockSize, progress, bufferSize, checksumOpt, null),
+            statistics);
+      }
+      @Override
+      public FSDataOutputStream next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.create(p, permission, cflags, bufferSize,
+            replication, blockSize, progress, checksumOpt);
+      }
+    }.resolve(this, absF);
   }
 
-  /**
-   * Create a file that will be erasure-coded asynchronously after creation.
-   * Using this method ensures that the file is being written in a way that
-   * ensures optimal block placement for the given encoding policy.
-   *
-   * @param f
-   *    the path
-   * @param permission
-   *    the file permissions
-   * @pram cflags
-   *    the creation flags
-   * @param bufferSize
-   *    the buffer size
-   * @param replication
-   *    the replication factor used to write the file before it is encoded
-   * @param blockSize
-   *    the block size to be used
-   * @param progress
-   *    the Progressable to report to
-   * @param checksumOpt
-   *    the checksum options
-   * @param policy
-   *    the erasure coding policy to be applied
-   * @return
-   *    the stream to be written to
-   * @throws IOException
-   */
-  public HdfsDataOutputStream create(Path f, FsPermission permission,
-      EnumSet<CreateFlag> cflags, int bufferSize, short replication,
-      long blockSize, Progressable progress, ChecksumOpt checksumOpt,
-      EncodingPolicy policy) throws IOException {
-    statistics.incrementWriteOps(1);
-    final DFSOutputStream out =
-        dfs.create(getPathName(f), permission, cflags, replication, blockSize,
-            progress, bufferSize, checksumOpt, policy);
-    return new HdfsDataOutputStream(out, statistics);
-  }
-  
-  @SuppressWarnings("deprecation")
   @Override
   protected HdfsDataOutputStream primitiveCreate(Path f,
-      FsPermission absolutePermission, EnumSet<CreateFlag> flag, int bufferSize,
-      short replication, long blockSize, Progressable progress,
-      ChecksumOpt checksumOpt) throws IOException {
+    FsPermission absolutePermission, EnumSet<CreateFlag> flag, int bufferSize,
+    short replication, long blockSize, Progressable progress,
+    ChecksumOpt checksumOpt) throws IOException {
     statistics.incrementWriteOps(1);
-    return new HdfsDataOutputStream(
-        dfs.primitiveCreate(getPathName(f), absolutePermission, flag, true,
-            replication, blockSize, progress, bufferSize, checksumOpt),
-        statistics);
-  }
+    return new HdfsDataOutputStream(dfs.primitiveCreate(
+        getPathName(fixRelativePart(f)),
+        absolutePermission, flag, true, replication, blockSize,
+        progress, bufferSize, checksumOpt),statistics);
+   }
 
   /**
    * Same as create(), except fails if parent directory doesn't already exist.
    */
   @Override
-  public HdfsDataOutputStream createNonRecursive(Path f,
-      FsPermission permission, EnumSet<CreateFlag> flag, int bufferSize,
-      short replication, long blockSize, Progressable progress)
-      throws IOException {
+  @SuppressWarnings("deprecation")
+  public FSDataOutputStream createNonRecursive(final Path f,
+      final FsPermission permission, final EnumSet<CreateFlag> flag,
+      final int bufferSize, final short replication, final long blockSize,
+      final Progressable progress) throws IOException {
     statistics.incrementWriteOps(1);
     if (flag.contains(CreateFlag.OVERWRITE)) {
       flag.add(CreateFlag.CREATE);
     }
-    return new HdfsDataOutputStream(
-        dfs.create(getPathName(f), permission, flag, false, replication,
-            blockSize, progress, bufferSize, null), statistics);
-  }
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<FSDataOutputStream>() {
+      @Override
+      public FSDataOutputStream doCall(final Path p) throws IOException,
+          UnresolvedLinkException {
+        return new HdfsDataOutputStream(dfs.create(getPathName(p), permission,
+            flag, false, replication, blockSize, progress, bufferSize, null),
+            statistics);
+      }
 
-  public HdfsDataOutputStream sendBlock(Path f, LocatedBlock block,
-      Progressable progress, ChecksumOpt checksumOpt) throws IOException {
-    statistics.incrementWriteOps(1);
-    final DFSOutputStream out =
-        dfs.sendBlock(getPathName(f), block, progress, checksumOpt);
-    return new HdfsDataOutputStream(out, statistics);
+      @Override
+      public FSDataOutputStream next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.createNonRecursive(p, permission, flag, bufferSize,
+            replication, blockSize, progress);
+      }
+    }.resolve(this, absF);
   }
 
   @Override
-  public boolean setReplication(Path src, short replication)
-      throws IOException {
+  public boolean setReplication(Path src,
+                                final short replication
+                               ) throws IOException {
     statistics.incrementWriteOps(1);
-    return dfs.setReplication(getPathName(src), replication);
+    Path absF = fixRelativePart(src);
+    return new FileSystemLinkResolver<Boolean>() {
+      @Override
+      public Boolean doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return dfs.setReplication(getPathName(p), replication);
+      }
+      @Override
+      public Boolean next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.setReplication(p, replication);
+      }
+    }.resolve(this, absF);
   }
 
   /**
@@ -511,27 +516,27 @@ public class DistributedFileSystem extends FileSystem {
    * @param policyName The name of the storage policy.
    */
   public void setStoragePolicy(final Path src, final String policyName)
-      throws IOException {
+          throws IOException {
     statistics.incrementWriteOps(1);
 
     Path absF = fixRelativePart(src);
     new FileSystemLinkResolver<Void>() {
       @Override
       public Void doCall(final Path p)
-          throws IOException, UnresolvedLinkException {
+              throws IOException, UnresolvedLinkException {
         dfs.setStoragePolicy(getPathName(p), policyName);
         return null;
       }
       @Override
       public Void next(final FileSystem fs, final Path p)
-          throws IOException {
+              throws IOException {
         if (fs instanceof DistributedFileSystem) {
           ((DistributedFileSystem) fs).setStoragePolicy(p, policyName);
           return null;
         } else {
           throw new UnsupportedOperationException(
-              "Cannot perform setStoragePolicy on a non-DistributedFileSystem: "
-                  + src + " -> " + p);
+                  "Cannot perform setStoragePolicy on a non-DistributedFileSystem: "
+                          + src + " -> " + p);
         }
       }
     }.resolve(this, absF);
@@ -557,41 +562,96 @@ public class DistributedFileSystem extends FileSystem {
   }
 
   public void setMetaEnabled(Path src, boolean metaEnabled)
-      throws IOException {
+          throws IOException {
     statistics.incrementWriteOps(1);
     dfs.setMetaEnabled(getPathName(src), metaEnabled);
   }
 
   public int getNameNodesCount()
-      throws IOException {
+          throws IOException {
     return dfs.getNameNodesCount();
   }
+
   /**
    * Move blocks from srcs to trg and delete srcs afterwards.
    * The file block sizes must be the same.
-   * 
-   * @param trg
-   *     existing file to append to
-   * @param psrcs
-   *     list of files (same block size, same replication)
+   *
+   * @param trg existing file to append to
+   * @param psrcs list of files (same block size, same replication)
    * @throws IOException
    */
   @Override
-  public void concat(Path trg, Path[] psrcs) throws IOException {
-    String[] srcs = new String[psrcs.length];
-    for (int i = 0; i < psrcs.length; i++) {
-      srcs[i] = getPathName(psrcs[i]);
-    }
+  public void concat(Path trg, Path [] psrcs) throws IOException {
     statistics.incrementWriteOps(1);
-    dfs.concat(getPathName(trg), srcs);
+    // Make target absolute
+    Path absF = fixRelativePart(trg);
+    // Make all srcs absolute
+    Path[] srcs = new Path[psrcs.length];
+    for (int i=0; i<psrcs.length; i++) {
+      srcs[i] = fixRelativePart(psrcs[i]);
+    }
+    // Try the concat without resolving any links
+    String[] srcsStr = new String[psrcs.length];
+    try {
+      for (int i=0; i<psrcs.length; i++) {
+        srcsStr[i] = getPathName(srcs[i]);
+      }
+      dfs.concat(getPathName(trg), srcsStr);
+    } catch (UnresolvedLinkException e) {
+      // Exception could be from trg or any src.
+      // Fully resolve trg and srcs. Fail if any of them are a symlink.
+      FileStatus stat = getFileLinkStatus(absF);
+      if (stat.isSymlink()) {
+        throw new IOException("Cannot concat with a symlink target: "
+            + trg + " -> " + stat.getPath());
+      }
+      absF = fixRelativePart(stat.getPath());
+      for (int i=0; i<psrcs.length; i++) {
+        stat = getFileLinkStatus(srcs[i]);
+        if (stat.isSymlink()) {
+          throw new IOException("Cannot concat with a symlink src: "
+              + psrcs[i] + " -> " + stat.getPath());
+        }
+        srcs[i] = fixRelativePart(stat.getPath());
+      }
+      // Try concat again. Can still race with another symlink.
+      for (int i=0; i<psrcs.length; i++) {
+        srcsStr[i] = getPathName(srcs[i]);
+      }
+      dfs.concat(getPathName(absF), srcsStr);
+    }
   }
 
-  
+
   @SuppressWarnings("deprecation")
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
     statistics.incrementWriteOps(1);
-    return dfs.rename(getPathName(src), getPathName(dst));
+
+    final Path absSrc = fixRelativePart(src);
+    final Path absDst = fixRelativePart(dst);
+
+    // Try the rename without resolving first
+    try {
+      return dfs.rename(getPathName(absSrc), getPathName(absDst));
+    } catch (UnresolvedLinkException e) {
+      // Fully resolve the source
+      final Path source = getFileLinkStatus(absSrc).getPath();
+      // Keep trying to resolve the destination
+      return new FileSystemLinkResolver<Boolean>() {
+        @Override
+        public Boolean doCall(final Path p)
+            throws IOException, UnresolvedLinkException {
+          return dfs.rename(getPathName(source), getPathName(p));
+        }
+        @Override
+        public Boolean next(final FileSystem fs, final Path p)
+            throws IOException {
+          // Should just throw an error in FileSystem#checkPath
+          return doCall(p);
+        }
+      }.resolve(this, absDst);
+    }
   }
 
   /**
@@ -599,77 +659,110 @@ public class DistributedFileSystem extends FileSystem {
    */
   @SuppressWarnings("deprecation")
   @Override
-  public void rename(Path src, Path dst, Options.Rename... options)
+  public void rename(Path src, Path dst, final Options.Rename... options)
       throws IOException {
     statistics.incrementWriteOps(1);
-    dfs.rename(getPathName(src), getPathName(dst), options);
+    final Path absSrc = fixRelativePart(src);
+    final Path absDst = fixRelativePart(dst);
+    // Try the rename without resolving first
+    try {
+      dfs.rename(getPathName(absSrc), getPathName(absDst), options);
+    } catch (UnresolvedLinkException e) {
+      // Fully resolve the source
+      final Path source = getFileLinkStatus(absSrc).getPath();
+      // Keep trying to resolve the destination
+      new FileSystemLinkResolver<Void>() {
+        @Override
+        public Void doCall(final Path p)
+            throws IOException, UnresolvedLinkException {
+          dfs.rename(getPathName(source), getPathName(p), options);
+          return null;
+        }
+        @Override
+        public Void next(final FileSystem fs, final Path p)
+            throws IOException {
+          // Should just throw an error in FileSystem#checkPath
+          return doCall(p);
+        }
+      }.resolve(this, absDst);
+    }
   }
-  
+
   @Override
-  public boolean delete(Path f, boolean recursive) throws IOException {
+  public boolean delete(Path f, final boolean recursive) throws IOException {
     statistics.incrementWriteOps(1);
-    return dfs.delete(getPathName(f), recursive);
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<Boolean>() {
+      @Override
+      public Boolean doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return dfs.delete(getPathName(p), recursive);
+      }
+      @Override
+      public Boolean next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.delete(p, recursive);
+      }
+    }.resolve(this, absF);
   }
-  
+
   @Override
   public ContentSummary getContentSummary(Path f) throws IOException {
     statistics.incrementReadOps(1);
-    return dfs.getContentSummary(getPathName(f));
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<ContentSummary>() {
+      @Override
+      public ContentSummary doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return dfs.getContentSummary(getPathName(p));
+      }
+      @Override
+      public ContentSummary next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.getContentSummary(p);
+      }
+    }.resolve(this, absF);
   }
 
-  /**
-   * Set a directory's quotas
-   *
-   * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#setQuota(String, long,
-   * long)
+  /** Set a directory's quotas
+   * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#setQuota(String, long, long)
    */
-  public void setQuota(Path src, long namespaceQuota, long diskspaceQuota)
-      throws IOException {
-    dfs.setQuota(getPathName(src), namespaceQuota, diskspaceQuota);
-  }
-  
-  private FileStatus makeQualified(HdfsFileStatus f, Path parent) {
-    return new FileStatus(f.getLen(), f.isDir(), f.getReplication(),
-        f.getBlockSize(), f.getModificationTime(), f.getAccessTime(),
-        f.getPermission(), f.getOwner(), f.getGroup(), (f.getFullPath(parent))
-        .makeQualified(getUri(), getWorkingDirectory())); // fully-qualify path
-  }
-
-  private LocatedFileStatus makeQualifiedLocated(HdfsLocatedFileStatus f,
-      Path parent) {
-    return new LocatedFileStatus(f.getLen(), f.isDir(), f.getReplication(),
-        f.getBlockSize(), f.getModificationTime(), f.getAccessTime(),
-        f.getPermission(), f.getOwner(), f.getGroup(), null,
-        (f.getFullPath(parent)).makeQualified(getUri(), getWorkingDirectory()),
-        // fully-qualify path
-        DFSUtil.locatedBlocks2Locations(f.getBlockLocations()));
+  public void setQuota(Path src, final long namespaceQuota,
+      final long diskspaceQuota) throws IOException {
+    Path absF = fixRelativePart(src);
+    new FileSystemLinkResolver<Void>() {
+      @Override
+      public Void doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        dfs.setQuota(getPathName(p), namespaceQuota, diskspaceQuota);
+        return null;
+      }
+      @Override
+      public Void next(final FileSystem fs, final Path p)
+          throws IOException {
+        // setQuota is not defined in FileSystem, so we only can resolve
+        // within this DFS
+        return doCall(p);
+      }
+    }.resolve(this, absF);
   }
 
-  /**
-   * List all the entries of a directory
-   * <p/>
-   * Note that this operation is not atomic for a large directory.
-   * The entries of a directory may be fetched from NameNode multiple times.
-   * It only guarantees that  each name occurs once if a directory
-   * undergoes changes between the calls.
-   */
-  @Override
-  public FileStatus[] listStatus(Path p) throws IOException {
+  private FileStatus[] listStatusInternal(Path p) throws IOException {
     String src = getPathName(p);
 
     // fetch the first batch of entries in the directory
-    DirectoryListing thisListing =
-        dfs.listPaths(src, HdfsFileStatus.EMPTY_NAME);
+    DirectoryListing thisListing = dfs.listPaths(
+        src, HdfsFileStatus.EMPTY_NAME);
 
     if (thisListing == null) { // the directory does not exist
       throw new FileNotFoundException("File " + p + " does not exist.");
     }
-    
+
     HdfsFileStatus[] partialListing = thisListing.getPartialListing();
     if (!thisListing.hasMore()) { // got all entries of the directory
       FileStatus[] stats = new FileStatus[partialListing.length];
       for (int i = 0; i < partialListing.length; i++) {
-        stats[i] = makeQualified(partialListing[i], p);
+        stats[i] = partialListing[i].makeQualified(getUri(), p);
       }
       statistics.incrementReadOps(1);
       return stats;
@@ -678,11 +771,12 @@ public class DistributedFileSystem extends FileSystem {
     // The directory size is too big that it needs to fetch more
     // estimate the total number of entries in the directory
     int totalNumEntries =
-        partialListing.length + thisListing.getRemainingEntries();
-    ArrayList<FileStatus> listing = new ArrayList<>(totalNumEntries);
+      partialListing.length + thisListing.getRemainingEntries();
+    ArrayList<FileStatus> listing =
+      new ArrayList<FileStatus>(totalNumEntries);
     // add the first batch of entries to the array list
     for (HdfsFileStatus fileStatus : partialListing) {
-      listing.add(makeQualified(fileStatus, p));
+      listing.add(fileStatus.makeQualified(getUri(), p));
     }
     statistics.incrementLargeReadOps(1);
 
@@ -696,7 +790,7 @@ public class DistributedFileSystem extends FileSystem {
 
       partialListing = thisListing.getPartialListing();
       for (HdfsFileStatus fileStatus : partialListing) {
-        listing.add(makeQualified(fileStatus, p));
+        listing.add(fileStatus.makeQualified(getUri(), p));
       }
       statistics.incrementLargeReadOps(1);
     } while (thisListing.hasMore());
@@ -704,9 +798,35 @@ public class DistributedFileSystem extends FileSystem {
     return listing.toArray(new FileStatus[listing.size()]);
   }
 
+  /**
+   * List all the entries of a directory
+   *
+   * Note that this operation is not atomic for a large directory.
+   * The entries of a directory may be fetched from NameNode multiple times.
+   * It only guarantees that  each name occurs once if a directory
+   * undergoes changes between the calls.
+   */
+  @Override
+  public FileStatus[] listStatus(Path p) throws IOException {
+    Path absF = fixRelativePart(p);
+    return new FileSystemLinkResolver<FileStatus[]>() {
+      @Override
+      public FileStatus[] doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return listStatusInternal(p);
+      }
+      @Override
+      public FileStatus[] next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.listStatus(p);
+      }
+    }.resolve(this, absF);
+  }
+
   @Override
   protected RemoteIterator<LocatedFileStatus> listLocatedStatus(final Path p,
-      final PathFilter filter) throws IOException {
+      final PathFilter filter)
+  throws IOException {
     final Path absF = fixRelativePart(p);
     return new RemoteIterator<LocatedFileStatus>() {
       private DirectoryListing thisListing;
@@ -715,7 +835,9 @@ public class DistributedFileSystem extends FileSystem {
       private LocatedFileStatus curStat = null;
 
       { // initializer
-        src = getPathName(absF);
+        // Fully resolve symlinks in path first to avoid additional resolution
+        // round-trips as we fetch more batches of listings
+        src = getPathName(resolvePath(absF));
         // fetch the first batch of entries in the directory
         thisListing = dfs.listPaths(src, HdfsFileStatus.EMPTY_NAME, true);
         statistics.incrementReadOps(1);
@@ -727,22 +849,23 @@ public class DistributedFileSystem extends FileSystem {
       @Override
       public boolean hasNext() throws IOException {
         while (curStat == null && hasNextNoFilter()) {
-          LocatedFileStatus next = makeQualifiedLocated(
-              (HdfsLocatedFileStatus) thisListing.getPartialListing()[i++], absF);
+          LocatedFileStatus next =
+              ((HdfsLocatedFileStatus)thisListing.getPartialListing()[i++])
+              .makeQualifiedLocated(getUri(), absF);
           if (filter.accept(next.getPath())) {
             curStat = next;
           }
         }
         return curStat != null;
       }
-      
+
       /** Check if there is a next item before applying the given filter */
       private boolean hasNextNoFilter() throws IOException {
         if (thisListing == null) {
           return false;
         }
-        if (i >= thisListing.getPartialListing().length &&
-            thisListing.hasMore()) {
+        if (i>=thisListing.getPartialListing().length
+            && thisListing.hasMore()) {
           // current listing is exhausted & fetch a new listing
           thisListing = dfs.listPaths(src, thisListing.getLastName(), true);
           statistics.incrementReadOps(1);
@@ -751,7 +874,7 @@ public class DistributedFileSystem extends FileSystem {
           }
           i = 0;
         }
-        return (i < thisListing.getPartialListing().length);
+        return (i<thisListing.getPartialListing().length);
       }
 
       @Override
@@ -765,48 +888,67 @@ public class DistributedFileSystem extends FileSystem {
       }
     };
   }
-  
+
   /**
    * Create a directory, only when the parent directories exist.
-   * <p/>
+   *
    * See {@link FsPermission#applyUMask(FsPermission)} for details of how
    * the permission is applied.
    *
-   * @param f
-   *     The path to create
-   * @param permission
-   *     The permission.  See FsPermission#applyUMask for
-   *     details about how this is used to calculate the
-   *     effective permission.
+   * @param f           The path to create
+   * @param permission  The permission.  See FsPermission#applyUMask for
+   *                    details about how this is used to calculate the
+   *                    effective permission.
    */
   public boolean mkdir(Path f, FsPermission permission) throws IOException {
-    statistics.incrementWriteOps(1);
-    return dfs.mkdirs(getPathName(f), permission, false);
+    return mkdirsInternal(f, permission, false);
   }
 
   /**
    * Create a directory and its parent directories.
-   * <p/>
+   *
    * See {@link FsPermission#applyUMask(FsPermission)} for details of how
    * the permission is applied.
    *
-   * @param f
-   *     The path to create
-   * @param permission
-   *     The permission.  See FsPermission#applyUMask for
-   *     details about how this is used to calculate the
-   *     effective permission.
+   * @param f           The path to create
+   * @param permission  The permission.  See FsPermission#applyUMask for
+   *                    details about how this is used to calculate the
+   *                    effective permission.
    */
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
+    return mkdirsInternal(f, permission, true);
+  }
+
+  private boolean mkdirsInternal(Path f, final FsPermission permission,
+      final boolean createParent) throws IOException {
     statistics.incrementWriteOps(1);
-    return dfs.mkdirs(getPathName(f), permission, true);
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<Boolean>() {
+      @Override
+      public Boolean doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return dfs.mkdirs(getPathName(p), permission, createParent);
+      }
+
+      @Override
+      public Boolean next(final FileSystem fs, final Path p)
+          throws IOException {
+        // FileSystem doesn't have a non-recursive mkdir() method
+        // Best we can do is error out
+        if (!createParent) {
+          throw new IOException("FileSystem does not support non-recursive"
+              + "mkdir");
+        }
+        return fs.mkdirs(p, permission);
+      }
+    }.resolve(this, absF);
   }
 
   @SuppressWarnings("deprecation")
   @Override
   protected boolean primitiveMkdir(Path f, FsPermission absolutePermission)
-      throws IOException {
+    throws IOException {
     statistics.incrementWriteOps(1);
     return dfs.primitiveMkdir(getPathName(f), absolutePermission);
   }
@@ -827,18 +969,13 @@ public class DistributedFileSystem extends FileSystem {
     return "DFS[" + dfs + "]";
   }
 
-  /**
-   * @deprecated DFSClient should not be accessed directly.
-   */
   @InterfaceAudience.Private
-  @Deprecated
+  @VisibleForTesting
   public DFSClient getClient() {
     return dfs;
   }
-  
-  /**
-   * @deprecated Use {@link org.apache.hadoop.fs.FsStatus} instead
-   */
+
+  /** @deprecated Use {@link org.apache.hadoop.fs.FsStatus} instead */
   @InterfaceAudience.Private
   @Deprecated
   public static class DiskStatus extends FsStatus {
@@ -854,46 +991,37 @@ public class DistributedFileSystem extends FileSystem {
       return super.getUsed();
     }
   }
-  
+
   @Override
   public FsStatus getStatus(Path p) throws IOException {
     statistics.incrementReadOps(1);
     return dfs.getDiskStatus();
   }
 
-  /**
-   * Return the disk usage of the filesystem, including total capacity,
+  /** Return the disk usage of the filesystem, including total capacity,
    * used space, and remaining space
-   *
    * @deprecated Use {@link org.apache.hadoop.fs.FileSystem#getStatus()}
-   * instead
-   */
-  @Deprecated
+   * instead */
+   @Deprecated
   public DiskStatus getDiskStatus() throws IOException {
     return new DiskStatus(dfs.getDiskStatus());
   }
-  
-  /**
-   * Return the total raw capacity of the filesystem, disregarding
+
+  /** Return the total raw capacity of the filesystem, disregarding
    * replication.
-   *
    * @deprecated Use {@link org.apache.hadoop.fs.FileSystem#getStatus()}
-   * instead
-   */
-  @Deprecated
-  public long getRawCapacity() throws IOException {
+   * instead */
+   @Deprecated
+  public long getRawCapacity() throws IOException{
     return dfs.getDiskStatus().getCapacity();
   }
 
-  /**
-   * Return the total raw used space in the filesystem, disregarding
+  /** Return the total raw used space in the filesystem, disregarding
    * replication.
-   *
    * @deprecated Use {@link org.apache.hadoop.fs.FileSystem#getStatus()}
-   * instead
-   */
-  @Deprecated
-  public long getRawUsed() throws IOException {
+   * instead */
+   @Deprecated
+  public long getRawUsed() throws IOException{
     return dfs.getDiskStatus().getUsed();
   }
 
@@ -927,22 +1055,18 @@ public class DistributedFileSystem extends FileSystem {
 
   @Override
   public RemoteIterator<Path> listCorruptFileBlocks(Path path)
-      throws IOException {
+    throws IOException {
     return new CorruptFileBlockIterator(dfs, path);
   }
 
-  /**
-   * @return datanode statistics.
-   */
+  /** @return datanode statistics. */
   public DatanodeInfo[] getDataNodeStats() throws IOException {
     return getDataNodeStats(DatanodeReportType.ALL);
   }
 
-  /**
-   * @return datanode statistics for the given type.
-   */
-  public DatanodeInfo[] getDataNodeStats(final DatanodeReportType type)
-      throws IOException {
+  /** @return datanode statistics for the given type. */
+  public DatanodeInfo[] getDataNodeStats(final DatanodeReportType type
+      ) throws IOException {
     return dfs.datanodeReport(type);
   }
 
@@ -950,10 +1074,10 @@ public class DistributedFileSystem extends FileSystem {
    * Enter, leave or get safe mode.
    *
    * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#setSafeMode(
-   *HdfsConstants.SafeModeAction, boolean)
+   *    HdfsConstants.SafeModeAction,boolean)
    */
   public boolean setSafeMode(HdfsConstants.SafeModeAction action)
-      throws IOException {
+  throws IOException {
     return setSafeMode(action, false);
   }
 
@@ -961,18 +1085,47 @@ public class DistributedFileSystem extends FileSystem {
    * Enter, leave or get safe mode.
    *
    * @param action
-   *     One of SafeModeAction.ENTER, SafeModeAction.LEAVE and
-   *     SafeModeAction.GET
+   *          One of SafeModeAction.ENTER, SafeModeAction.LEAVE and
+   *          SafeModeAction.GET
    * @param isChecked
-   *     If true check only for Active NNs status, else check first NN's
-   *     status
-   * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#setSafeMode(SafeModeAction,
-   * boolean)
+   *          If true check only for Active NNs status, else check first NN's
+   *          status
+   * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#setSafeMode(SafeModeAction, boolean)
    */
   public boolean setSafeMode(HdfsConstants.SafeModeAction action,
       boolean isChecked) throws IOException {
     return dfs.setSafeMode(action, isChecked);
   }
+
+//  /**
+//   * Save namespace image.
+//   *
+//   * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#saveNamespace()
+//   */
+//  public void saveNamespace() throws AccessControlException, IOException {
+//    dfs.saveNamespace();
+//  }
+//
+//  /**
+//   * Rolls the edit log on the active NameNode.
+//   * Requires super-user privileges.
+//   * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#rollEdits()
+//   * @return the transaction ID of the newly created segment
+//   */
+//  public long rollEdits() throws AccessControlException, IOException {
+//    return dfs.rollEdits();
+//  }
+//
+//  /**
+//   * enable/disable/check restoreFaileStorage
+//   *
+//   * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#restoreFailedStorage(String arg)
+//   */
+//  public boolean restoreFailedStorage(String arg)
+//      throws AccessControlException, IOException {
+//    return dfs.restoreFailedStorage(arg);
+//  }
+
 
   /**
    * Refreshes the list of hosts and excluded hosts from the configured
@@ -981,6 +1134,22 @@ public class DistributedFileSystem extends FileSystem {
   public void refreshNodes() throws IOException {
     dfs.refreshNodes();
   }
+
+//  /**
+//   * Finalize previously upgraded files system state.
+//   * @throws IOException
+//   */
+//  public void finalizeUpgrade() throws IOException {
+//    dfs.finalizeUpgrade();
+//  }
+//
+//  /*
+//   * Requests the namenode to dump data strcutures into specified
+//   * file.
+//   */
+//  public void metaSave(String pathname) throws IOException {
+//    dfs.metaSave(pathname);
+//  }
 
   @Override
   public FsServerDefaults getServerDefaults() throws IOException {
@@ -992,18 +1161,17 @@ public class DistributedFileSystem extends FileSystem {
    * is corrupt but we will report both to the namenode.  In the future,
    * we can consider figuring out exactly which block is corrupt.
    */
-  // We do not see a need for user to report block checksum errors and do not  
+  // We do not see a need for user to report block checksum errors and do not
   // want to rely on user to report block corruptions.
   @Deprecated
-  public boolean reportChecksumFailure(Path f, FSDataInputStream in, long inPos,
-      FSDataInputStream sums, long sumsPos) {
+  public boolean reportChecksumFailure(Path f,
+    FSDataInputStream in, long inPos,
+    FSDataInputStream sums, long sumsPos) {
 
-    if (!(in instanceof HdfsDataInputStream &&
-        sums instanceof HdfsDataInputStream)) {
+    if(!(in instanceof HdfsDataInputStream && sums instanceof HdfsDataInputStream))
       throw new IllegalArgumentException(
           "Input streams must be types of HdfsDataInputStream");
-    }
-    
+
     LocatedBlock lblocks[] = new LocatedBlock[2];
 
     // Find block in data stream.
@@ -1015,8 +1183,9 @@ public class DistributedFileSystem extends FileSystem {
     }
     DatanodeInfo[] dataNode = {dfsIn.getCurrentDatanode()};
     lblocks[0] = new LocatedBlock(dataBlock, dataNode);
-    LOG.info("Found checksum error in data stream at " + dataBlock +
-        " on datanode=" + dataNode[0]);
+    LOG.info("Found checksum error in data stream at "
+        + dataBlock + " on datanode="
+        + dataNode[0]);
 
     // Find block in checksum stream
     HdfsDataInputStream dfsSums = (HdfsDataInputStream) sums;
@@ -1027,8 +1196,8 @@ public class DistributedFileSystem extends FileSystem {
     }
     DatanodeInfo[] sumsNode = {dfsSums.getCurrentDatanode()};
     lblocks[1] = new LocatedBlock(sumsBlock, sumsNode);
-    LOG.info("Found checksum error in checksum stream at " + sumsBlock +
-        " on datanode=" + sumsNode[0]);
+    LOG.info("Found checksum error in checksum stream at "
+        + sumsBlock + " on datanode=" + sumsNode[0]);
 
     // Ask client to delete blocks.
     dfs.reportChecksumFailure(f.toString(), lblocks);
@@ -1038,50 +1207,218 @@ public class DistributedFileSystem extends FileSystem {
 
   /**
    * Returns the stat information about the file.
-   *
-   * @throws FileNotFoundException
-   *     if the file does not exist.
+   * @throws FileNotFoundException if the file does not exist.
    */
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
     statistics.incrementReadOps(1);
-    HdfsFileStatus fi = dfs.getFileInfo(getPathName(f));
-    if (fi != null) {
-      return makeQualified(fi, f);
-    } else {
-      throw new FileNotFoundException("File does not exist: " + f);
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<FileStatus>() {
+      @Override
+      public FileStatus doCall(final Path p) throws IOException,
+          UnresolvedLinkException {
+        HdfsFileStatus fi = dfs.getFileInfo(getPathName(p));
+        if (fi != null) {
+          return fi.makeQualified(getUri(), p);
+        } else {
+          throw new FileNotFoundException("File does not exist: " + p);
+        }
+      }
+      @Override
+      public FileStatus next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.getFileStatus(p);
+      }
+    }.resolve(this, absF);
+  }
+
+  @SuppressWarnings("deprecation")
+  @Override
+  public void createSymlink(final Path target, final Path link,
+      final boolean createParent) throws AccessControlException,
+      FileAlreadyExistsException, FileNotFoundException,
+      ParentNotDirectoryException, UnsupportedFileSystemException,
+      IOException {
+    if (!FileSystem.areSymlinksEnabled()) {
+      throw new UnsupportedOperationException("Symlinks not supported");
     }
-  }
-
-  @Override
-  public MD5MD5CRC32FileChecksum getFileChecksum(Path f) throws IOException {
-    statistics.incrementReadOps(1);
-    return dfs.getFileChecksum(getPathName(f));
-  }
-
-  @Override
-  public void setPermission(Path p, FsPermission permission)
-      throws IOException {
     statistics.incrementWriteOps(1);
-    dfs.setPermission(getPathName(p), permission);
+    final Path absF = fixRelativePart(link);
+    new FileSystemLinkResolver<Void>() {
+      @Override
+      public Void doCall(final Path p) throws IOException,
+          UnresolvedLinkException {
+        dfs.createSymlink(target.toString(), getPathName(p), createParent);
+        return null;
+      }
+      @Override
+      public Void next(final FileSystem fs, final Path p)
+          throws IOException, UnresolvedLinkException {
+        fs.createSymlink(target, p, createParent);
+        return null;
+      }
+    }.resolve(this, absF);
   }
 
   @Override
-  public void setOwner(Path p, String username, String groupname)
-      throws IOException {
+  public boolean supportsSymlinks() {
+    return true;
+  }
+
+  @Override
+  public FileStatus getFileLinkStatus(final Path f)
+      throws AccessControlException, FileNotFoundException,
+      UnsupportedFileSystemException, IOException {
+    statistics.incrementReadOps(1);
+    final Path absF = fixRelativePart(f);
+    FileStatus status = new FileSystemLinkResolver<FileStatus>() {
+      @Override
+      public FileStatus doCall(final Path p) throws IOException,
+          UnresolvedLinkException {
+        HdfsFileStatus fi = dfs.getFileLinkInfo(getPathName(p));
+        if (fi != null) {
+          return fi.makeQualified(getUri(), p);
+        } else {
+          throw new FileNotFoundException("File does not exist: " + p);
+        }
+      }
+      @Override
+      public FileStatus next(final FileSystem fs, final Path p)
+        throws IOException, UnresolvedLinkException {
+        return fs.getFileLinkStatus(p);
+      }
+    }.resolve(this, absF);
+    // Fully-qualify the symlink
+    if (status.isSymlink()) {
+      Path targetQual = FSLinkResolver.qualifySymlinkTarget(this.getUri(),
+          status.getPath(), status.getSymlink());
+      status.setSymlink(targetQual);
+    }
+    return status;
+  }
+
+  @Override
+  public Path getLinkTarget(final Path f) throws AccessControlException,
+      FileNotFoundException, UnsupportedFileSystemException, IOException {
+    statistics.incrementReadOps(1);
+    final Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<Path>() {
+      @Override
+      public Path doCall(final Path p) throws IOException,
+          UnresolvedLinkException {
+        HdfsFileStatus fi = dfs.getFileLinkInfo(getPathName(p));
+        if (fi != null) {
+          return fi.makeQualified(getUri(), p).getSymlink();
+        } else {
+          throw new FileNotFoundException("File does not exist: " + p);
+        }
+      }
+      @Override
+      public Path next(final FileSystem fs, final Path p)
+        throws IOException, UnresolvedLinkException {
+        return fs.getLinkTarget(p);
+      }
+    }.resolve(this, absF);
+  }
+
+  @Override
+  protected Path resolveLink(Path f) throws IOException {
+    statistics.incrementReadOps(1);
+    String target = dfs.getLinkTarget(getPathName(fixRelativePart(f)));
+    if (target == null) {
+      throw new FileNotFoundException("File does not exist: " + f.toString());
+    }
+    return new Path(target);
+  }
+
+  @Override
+  public FileChecksum getFileChecksum(Path f) throws IOException {
+    statistics.incrementReadOps(1);
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<FileChecksum>() {
+      @Override
+      public FileChecksum doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return dfs.getFileChecksum(getPathName(p));
+      }
+
+      @Override
+      public FileChecksum next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.getFileChecksum(p);
+      }
+    }.resolve(this, absF);
+  }
+
+  @Override
+  public void setPermission(Path p, final FsPermission permission
+      ) throws IOException {
+    statistics.incrementWriteOps(1);
+    Path absF = fixRelativePart(p);
+    new FileSystemLinkResolver<Void>() {
+      @Override
+      public Void doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        dfs.setPermission(getPathName(p), permission);
+        return null;
+      }
+
+      @Override
+      public Void next(final FileSystem fs, final Path p)
+          throws IOException {
+        fs.setPermission(p, permission);
+        return null;
+      }
+    }.resolve(this, absF);
+  }
+
+  @Override
+  public void setOwner(Path p, final String username, final String groupname
+      ) throws IOException {
     if (username == null && groupname == null) {
       throw new IOException("username == null && groupname == null");
     }
     statistics.incrementWriteOps(1);
-    dfs.setOwner(getPathName(p), username, groupname);
+    Path absF = fixRelativePart(p);
+    new FileSystemLinkResolver<Void>() {
+      @Override
+      public Void doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        dfs.setOwner(getPathName(p), username, groupname);
+        return null;
+      }
+
+      @Override
+      public Void next(final FileSystem fs, final Path p)
+          throws IOException {
+        fs.setOwner(p, username, groupname);
+        return null;
+      }
+    }.resolve(this, absF);
   }
 
   @Override
-  public void setTimes(Path p, long mtime, long atime) throws IOException {
+  public void setTimes(Path p, final long mtime, final long atime
+      ) throws IOException {
     statistics.incrementWriteOps(1);
-    dfs.setTimes(getPathName(p), mtime, atime);
+    Path absF = fixRelativePart(p);
+    new FileSystemLinkResolver<Void>() {
+      @Override
+      public Void doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        dfs.setTimes(getPathName(p), mtime, atime);
+        return null;
+      }
+
+      @Override
+      public Void next(final FileSystem fs, final Path p)
+          throws IOException {
+        fs.setTimes(p, mtime, atime);
+        return null;
+      }
+    }.resolve(this, absF);
   }
-  
+
 
   @Override
   protected int getDefaultPort() {
@@ -1089,10 +1426,11 @@ public class DistributedFileSystem extends FileSystem {
   }
 
   @Override
-  public Token<DelegationTokenIdentifier> getDelegationToken(String renewer)
-      throws IOException {
+  public
+  Token<DelegationTokenIdentifier> getDelegationToken(String renewer
+  ) throws IOException {
     Token<DelegationTokenIdentifier> result =
-        dfs.getDelegationToken(renewer == null ? null : new Text(renewer));
+      dfs.getDelegationToken(renewer == null ? null : new Text(renewer));
     return result;
   }
 
@@ -1100,12 +1438,11 @@ public class DistributedFileSystem extends FileSystem {
    * Delegation Token Operations
    * These are DFS only operations.
    */
-  
+
   /**
    * Get a valid Delegation Token.
    *
-   * @param renewer
-   *     Name of the designated renewer for the token
+   * @param renewer Name of the designated renewer for the token
    * @return Token<DelegationTokenIdentifier>
    * @throws IOException
    * @deprecated use {@link #getDelegationToken(String)}
@@ -1115,12 +1452,11 @@ public class DistributedFileSystem extends FileSystem {
       throws IOException {
     return getDelegationToken(renewer.toString());
   }
-  
+
   /**
    * Renew an existing delegation token.
    *
-   * @param token
-   *     delegation token obtained earlier
+   * @param token delegation token obtained earlier
    * @return the new expiration time
    * @throws IOException
    * @deprecated Use Token.renew instead.
@@ -1137,8 +1473,7 @@ public class DistributedFileSystem extends FileSystem {
   /**
    * Cancel an existing delegation token.
    *
-   * @param token
-   *     delegation token
+   * @param token delegation token
    * @throws IOException
    * @deprecated Use Token.cancel instead.
    */
@@ -1157,8 +1492,7 @@ public class DistributedFileSystem extends FileSystem {
    * The bandwidth parameter is the max number of bytes per second of network
    * bandwidth to be used by a datanode during balancing.
    *
-   * @param bandwidth
-   *     Blanacer bandwidth in bytes per second for all datanodes.
+   * @param bandwidth Balancer bandwidth in bytes per second for all datanodes.
    * @throws IOException
    */
   public void setBalancerBandwidth(long bandwidth) throws IOException {
@@ -1168,23 +1502,22 @@ public class DistributedFileSystem extends FileSystem {
   /**
    * Get a canonical service name for this file system. If the URI is logical,
    * the hostname part of the URI will be returned.
-   *
    * @return a service string that uniquely identifies this file system.
    */
   @Override
   public String getCanonicalServiceName() {
     return dfs.getCanonicalServiceName();
   }
-  
+
   @Override
   protected URI canonicalizeUri(URI uri) {
-//    if (HAUtil.isLogicalUri(getConf(), uri)) {
-//      // Don't try to DNS-resolve logical URIs, since the 'authority'
-//      // portion isn't a proper hostname
-//      return uri;
-//    } else {
+    if (HAUtil.isLogicalUri(getConf(), uri)) {
+      // Don't try to DNS-resolve logical URIs, since the 'authority'
+      // portion isn't a proper hostname
+      return uri;
+    } else {
       return NetUtils.getCanonicalUri(uri, getDefaultPort());
-//    }
+    }
   }
 
   /**
@@ -1193,11 +1526,189 @@ public class DistributedFileSystem extends FileSystem {
    *
    * @return true if NameNode is in safemode, false otherwise.
    * @throws IOException
-   *     when there is an issue communicating with the NameNode
+   *           when there is an issue communicating with the NameNode
    */
   public boolean isInSafeMode() throws IOException {
     return setSafeMode(SafeModeAction.SAFEMODE_GET, true);
   }
+
+//  /** @see HdfsAdmin#allowSnapshot(Path) */
+//  public void allowSnapshot(final Path path) throws IOException {
+//    Path absF = fixRelativePart(path);
+//    new FileSystemLinkResolver<Void>() {
+//      @Override
+//      public Void doCall(final Path p)
+//          throws IOException, UnresolvedLinkException {
+//        dfs.allowSnapshot(getPathName(p));
+//        return null;
+//      }
+//
+//      @Override
+//      public Void next(final FileSystem fs, final Path p)
+//          throws IOException {
+//        if (fs instanceof DistributedFileSystem) {
+//          DistributedFileSystem myDfs = (DistributedFileSystem)fs;
+//          myDfs.allowSnapshot(p);
+//        } else {
+//          throw new UnsupportedOperationException("Cannot perform snapshot"
+//              + " operations on a symlink to a non-DistributedFileSystem: "
+//              + path + " -> " + p);
+//        }
+//        return null;
+//      }
+//    }.resolve(this, absF);
+//  }
+//
+//  /** @see HdfsAdmin#disallowSnapshot(Path) */
+//  public void disallowSnapshot(final Path path) throws IOException {
+//    Path absF = fixRelativePart(path);
+//    new FileSystemLinkResolver<Void>() {
+//      @Override
+//      public Void doCall(final Path p)
+//          throws IOException, UnresolvedLinkException {
+//        dfs.disallowSnapshot(getPathName(p));
+//        return null;
+//      }
+//
+//      @Override
+//      public Void next(final FileSystem fs, final Path p)
+//          throws IOException {
+//        if (fs instanceof DistributedFileSystem) {
+//          DistributedFileSystem myDfs = (DistributedFileSystem)fs;
+//          myDfs.disallowSnapshot(p);
+//        } else {
+//          throw new UnsupportedOperationException("Cannot perform snapshot"
+//              + " operations on a symlink to a non-DistributedFileSystem: "
+//              + path + " -> " + p);
+//        }
+//        return null;
+//      }
+//    }.resolve(this, absF);
+//  }
+//
+//  @Override
+//  public Path createSnapshot(final Path path, final String snapshotName)
+//      throws IOException {
+//    Path absF = fixRelativePart(path);
+//    return new FileSystemLinkResolver<Path>() {
+//      @Override
+//      public Path doCall(final Path p)
+//          throws IOException, UnresolvedLinkException {
+//        return new Path(dfs.createSnapshot(getPathName(p), snapshotName));
+//      }
+//
+//      @Override
+//      public Path next(final FileSystem fs, final Path p)
+//          throws IOException {
+//        if (fs instanceof DistributedFileSystem) {
+//          DistributedFileSystem myDfs = (DistributedFileSystem)fs;
+//          return myDfs.createSnapshot(p);
+//        } else {
+//          throw new UnsupportedOperationException("Cannot perform snapshot"
+//              + " operations on a symlink to a non-DistributedFileSystem: "
+//              + path + " -> " + p);
+//        }
+//      }
+//    }.resolve(this, absF);
+//  }
+//
+//  @Override
+//  public void renameSnapshot(final Path path, final String snapshotOldName,
+//      final String snapshotNewName) throws IOException {
+//    Path absF = fixRelativePart(path);
+//    new FileSystemLinkResolver<Void>() {
+//      @Override
+//      public Void doCall(final Path p)
+//          throws IOException, UnresolvedLinkException {
+//        dfs.renameSnapshot(getPathName(p), snapshotOldName, snapshotNewName);
+//        return null;
+//      }
+//
+//      @Override
+//      public Void next(final FileSystem fs, final Path p)
+//          throws IOException {
+//        if (fs instanceof DistributedFileSystem) {
+//          DistributedFileSystem myDfs = (DistributedFileSystem)fs;
+//          myDfs.renameSnapshot(p, snapshotOldName, snapshotNewName);
+//        } else {
+//          throw new UnsupportedOperationException("Cannot perform snapshot"
+//              + " operations on a symlink to a non-DistributedFileSystem: "
+//              + path + " -> " + p);
+//        }
+//        return null;
+//      }
+//    }.resolve(this, absF);
+//  }
+//
+//  /**
+//   * @return All the snapshottable directories
+//   * @throws IOException
+//   */
+//  public SnapshottableDirectoryStatus[] getSnapshottableDirListing()
+//      throws IOException {
+//    return dfs.getSnapshottableDirListing();
+//  }
+//
+//  @Override
+//  public void deleteSnapshot(final Path snapshotDir, final String snapshotName)
+//      throws IOException {
+//    Path absF = fixRelativePart(snapshotDir);
+//    new FileSystemLinkResolver<Void>() {
+//      @Override
+//      public Void doCall(final Path p)
+//          throws IOException, UnresolvedLinkException {
+//        dfs.deleteSnapshot(getPathName(p), snapshotName);
+//        return null;
+//      }
+//
+//      @Override
+//      public Void next(final FileSystem fs, final Path p)
+//          throws IOException {
+//        if (fs instanceof DistributedFileSystem) {
+//          DistributedFileSystem myDfs = (DistributedFileSystem)fs;
+//          myDfs.deleteSnapshot(p, snapshotName);
+//        } else {
+//          throw new UnsupportedOperationException("Cannot perform snapshot"
+//              + " operations on a symlink to a non-DistributedFileSystem: "
+//              + snapshotDir + " -> " + p);
+//        }
+//        return null;
+//      }
+//    }.resolve(this, absF);
+//  }
+//
+//  /**
+//   * Get the difference between two snapshots, or between a snapshot and the
+//   * current tree of a directory.
+//   *
+//   * @see DFSClient#getSnapshotDiffReport(Path, String, String)
+//   */
+//  public SnapshotDiffReport getSnapshotDiffReport(final Path snapshotDir,
+//      final String fromSnapshot, final String toSnapshot) throws IOException {
+//    Path absF = fixRelativePart(snapshotDir);
+//    return new FileSystemLinkResolver<SnapshotDiffReport>() {
+//      @Override
+//      public SnapshotDiffReport doCall(final Path p)
+//          throws IOException, UnresolvedLinkException {
+//        return dfs.getSnapshotDiffReport(getPathName(p), fromSnapshot,
+//            toSnapshot);
+//      }
+//
+//      @Override
+//      public SnapshotDiffReport next(final FileSystem fs, final Path p)
+//          throws IOException {
+//        if (fs instanceof DistributedFileSystem) {
+//          DistributedFileSystem myDfs = (DistributedFileSystem)fs;
+//          myDfs.getSnapshotDiffReport(p, fromSnapshot, toSnapshot);
+//        } else {
+//          throw new UnsupportedOperationException("Cannot perform snapshot"
+//              + " operations on a symlink to a non-DistributedFileSystem: "
+//              + snapshotDir + " -> " + p);
+//        }
+//        return null;
+//      }
+//    }.resolve(this, absF);
+//  }
 
   /**
    * Get the close status of a file
@@ -1205,23 +1716,42 @@ public class DistributedFileSystem extends FileSystem {
    *
    * @return return true if file is closed
    * @throws FileNotFoundException if the file does not exist.
-   * @throws IOException If an I/O error occurred     
+   * @throws IOException If an I/O error occurred
    */
-  public boolean isFileClosed(Path src) throws IOException {
-    return dfs.isFileClosed(getPathName(src));
+  public boolean isFileClosed(final Path src) throws IOException {
+    Path absF = fixRelativePart(src);
+    return new FileSystemLinkResolver<Boolean>() {
+      @Override
+      public Boolean doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        return dfs.isFileClosed(getPathName(p));
+      }
+
+      @Override
+      public Boolean next(final FileSystem fs, final Path p)
+          throws IOException {
+        if (fs instanceof DistributedFileSystem) {
+          DistributedFileSystem myDfs = (DistributedFileSystem)fs;
+          return myDfs.isFileClosed(p);
+        } else {
+          throw new UnsupportedOperationException("Cannot call isFileClosed"
+              + " on a symlink to a non-DistributedFileSystem: "
+              + src + " -> " + p);
+        }
+      }
+    }.resolve(this, absF);
   }
 
-  /**
-   * Get the erasure coding status of a file
+   /* Get the erasure coding status of a file
    *
-   * @param filePath
+           * @param filePath
    *    the path of the file
    * @return
-   *    the encoding status of the file
+           *    the encoding status of the file
    * @throws IOException
    */
   public EncodingStatus getEncodingStatus(final String filePath)
-      throws IOException {
+          throws IOException {
     return dfs.getEncodingStatus(filePath);
   }
 
@@ -1239,7 +1769,7 @@ public class DistributedFileSystem extends FileSystem {
    * @throws IOException
    */
   public void encodeFile(final String filePath, final EncodingPolicy policy)
-      throws IOException {
+          throws IOException {
     dfs.encodeFile(filePath, policy);
   }
 
@@ -1255,7 +1785,7 @@ public class DistributedFileSystem extends FileSystem {
    * @throws IOException
    */
   public void revokeEncoding(final String filePath, final short replication)
-      throws IOException {
+          throws IOException {
     dfs.revokeEncoding(filePath, replication);
   }
 
@@ -1306,12 +1836,12 @@ public class DistributedFileSystem extends FileSystem {
 
   public void enableSetPartitionKey() throws IOException {
     changeConf(DFSConfigKeys.DFS_SET_PARTITION_KEY_ENABLED,
-        String.valueOf(true));
+            String.valueOf(true));
   }
-  
+
   public void disableSetPartitionKey() throws IOException {
     changeConf(DFSConfigKeys.DFS_SET_PARTITION_KEY_ENABLED,
-        String.valueOf(false));
+            String.valueOf(false));
   }
 
   private void changeConf(String prop, String value) throws IOException {
@@ -1330,7 +1860,7 @@ public class DistributedFileSystem extends FileSystem {
 
       @Override
       public Void next(final FileSystem fs, final Path p)
-          throws IOException {
+              throws IOException {
         fs.access(p, mode);
         return null;
       }
@@ -1346,7 +1876,7 @@ public class DistributedFileSystem extends FileSystem {
    * @throws IOException
    */
   public LastUpdatedContentSummary getLastUpdatedContentSummary(Path f) throws
-      IOException {
+          IOException {
     statistics.incrementReadOps(1);
     return dfs.getLastUpdatedContentSummary(getPathName(f));
   }
@@ -1356,7 +1886,7 @@ public class DistributedFileSystem extends FileSystem {
    */
   @Override
   public void modifyAclEntries(Path path, final List<AclEntry> aclSpec)
-      throws IOException {
+          throws IOException {
     Path absF = fixRelativePart(path);
     new FileSystemLinkResolver<Void>() {
       @Override
@@ -1378,7 +1908,7 @@ public class DistributedFileSystem extends FileSystem {
    */
   @Override
   public void removeAclEntries(Path path, final List<AclEntry> aclSpec)
-      throws IOException {
+          throws IOException {
     Path absF = fixRelativePart(path);
     new FileSystemLinkResolver<Void>() {
       @Override
@@ -1409,7 +1939,7 @@ public class DistributedFileSystem extends FileSystem {
       }
       @Override
       public Void next(final FileSystem fs, final Path p)
-        throws IOException, UnresolvedLinkException {
+              throws IOException, UnresolvedLinkException {
         fs.removeDefaultAcl(p);
         return null;
       }
@@ -1430,7 +1960,7 @@ public class DistributedFileSystem extends FileSystem {
       }
       @Override
       public Void next(final FileSystem fs, final Path p)
-        throws IOException, UnresolvedLinkException {
+              throws IOException, UnresolvedLinkException {
         fs.removeAcl(p);
         return null;
       }
@@ -1471,9 +2001,170 @@ public class DistributedFileSystem extends FileSystem {
       }
       @Override
       public AclStatus next(final FileSystem fs, final Path p)
-        throws IOException, UnresolvedLinkException {
+              throws IOException, UnresolvedLinkException {
         return fs.getAclStatus(p);
       }
     }.resolve(this, absF);
   }
+
+  public HdfsDataOutputStream sendBlock(Path f, LocatedBlock block,
+                                        Progressable progress, ChecksumOpt checksumOpt) throws IOException {
+    statistics.incrementWriteOps(1);
+    final DFSOutputStream out =
+            dfs.sendBlock(getPathName(f), block, progress, checksumOpt);
+    return new HdfsDataOutputStream(out, statistics);
+  }
+//  /**
+//   * @see {@link #addCacheDirective(CacheDirectiveInfo, EnumSet)}
+//   */
+//  public long addCacheDirective(CacheDirectiveInfo info) throws IOException {
+//    return addCacheDirective(info, EnumSet.noneOf(CacheFlag.class));
+//  }
+//
+//  /**
+//   * Add a new CacheDirective.
+//   *
+//   * @param info Information about a directive to add.
+//   * @param flags {@link CacheFlag}s to use for this operation.
+//   * @return the ID of the directive that was created.
+//   * @throws IOException if the directive could not be added
+//   */
+//  public long addCacheDirective(
+//      CacheDirectiveInfo info, EnumSet<CacheFlag> flags) throws IOException {
+//    Preconditions.checkNotNull(info.getPath());
+//    Path path = new Path(getPathName(fixRelativePart(info.getPath()))).
+//        makeQualified(getUri(), getWorkingDirectory());
+//    return dfs.addCacheDirective(
+//        new CacheDirectiveInfo.Builder(info).
+//            setPath(path).
+//            build(),
+//        flags);
+//  }
+//
+//  /**
+//   * @see {@link #modifyCacheDirective(CacheDirectiveInfo, EnumSet)}
+//   */
+//  public void modifyCacheDirective(CacheDirectiveInfo info) throws IOException {
+//    modifyCacheDirective(info, EnumSet.noneOf(CacheFlag.class));
+//  }
+//
+//  /**
+//   * Modify a CacheDirective.
+//   *
+//   * @param info Information about the directive to modify. You must set the ID
+//   *          to indicate which CacheDirective you want to modify.
+//   * @param flags {@link CacheFlag}s to use for this operation.
+//   * @throws IOException if the directive could not be modified
+//   */
+//  public void modifyCacheDirective(
+//      CacheDirectiveInfo info, EnumSet<CacheFlag> flags) throws IOException {
+//    if (info.getPath() != null) {
+//      info = new CacheDirectiveInfo.Builder(info).
+//          setPath(new Path(getPathName(fixRelativePart(info.getPath()))).
+//              makeQualified(getUri(), getWorkingDirectory())).build();
+//    }
+//    dfs.modifyCacheDirective(info, flags);
+//  }
+//
+//  /**
+//   * Remove a CacheDirectiveInfo.
+//   *
+//   * @param id identifier of the CacheDirectiveInfo to remove
+//   * @throws IOException if the directive could not be removed
+//   */
+//  public void removeCacheDirective(long id)
+//      throws IOException {
+//    dfs.removeCacheDirective(id);
+//  }
+//
+//  /**
+//   * List cache directives.  Incrementally fetches results from the server.
+//   *
+//   * @param filter Filter parameters to use when listing the directives, null to
+//   *               list all directives visible to us.
+//   * @return A RemoteIterator which returns CacheDirectiveInfo objects.
+//   */
+//  public RemoteIterator<CacheDirectiveEntry> listCacheDirectives(
+//      CacheDirectiveInfo filter) throws IOException {
+//    if (filter == null) {
+//      filter = new CacheDirectiveInfo.Builder().build();
+//    }
+//    if (filter.getPath() != null) {
+//      filter = new CacheDirectiveInfo.Builder(filter).
+//          setPath(new Path(getPathName(fixRelativePart(filter.getPath())))).
+//          build();
+//    }
+//    final RemoteIterator<CacheDirectiveEntry> iter =
+//        dfs.listCacheDirectives(filter);
+//    return new RemoteIterator<CacheDirectiveEntry>() {
+//      @Override
+//      public boolean hasNext() throws IOException {
+//        return iter.hasNext();
+//      }
+//
+//      @Override
+//      public CacheDirectiveEntry next() throws IOException {
+//        // Although the paths we get back from the NameNode should always be
+//        // absolute, we call makeQualified to add the scheme and authority of
+//        // this DistributedFilesystem.
+//        CacheDirectiveEntry desc = iter.next();
+//        CacheDirectiveInfo info = desc.getInfo();
+//        Path p = info.getPath().makeQualified(getUri(), getWorkingDirectory());
+//        return new CacheDirectiveEntry(
+//            new CacheDirectiveInfo.Builder(info).setPath(p).build(),
+//            desc.getStats());
+//      }
+//    };
+//  }
+//
+//  /**
+//   * Add a cache pool.
+//   *
+//   * @param info
+//   *          The request to add a cache pool.
+//   * @throws IOException
+//   *          If the request could not be completed.
+//   */
+//  public void addCachePool(CachePoolInfo info) throws IOException {
+//    CachePoolInfo.validate(info);
+//    dfs.addCachePool(info);
+//  }
+//
+//  /**
+//   * Modify an existing cache pool.
+//   *
+//   * @param info
+//   *          The request to modify a cache pool.
+//   * @throws IOException
+//   *          If the request could not be completed.
+//   */
+//  public void modifyCachePool(CachePoolInfo info) throws IOException {
+//    CachePoolInfo.validate(info);
+//    dfs.modifyCachePool(info);
+//  }
+//
+//  /**
+//   * Remove a cache pool.
+//   *
+//   * @param poolName
+//   *          Name of the cache pool to remove.
+//   * @throws IOException
+//   *          if the cache pool did not exist, or could not be removed.
+//   */
+//  public void removeCachePool(String poolName) throws IOException {
+//    CachePoolInfo.validateName(poolName);
+//    dfs.removeCachePool(poolName);
+//  }
+//
+//  /**
+//   * List all cache pools.
+//   *
+//   * @return A remote iterator from which you can get CachePoolEntry objects.
+//   *          Requests will be made as needed.
+//   * @throws IOException
+//   *          If there was an error listing cache pools.
+//   */
+//  public RemoteIterator<CachePoolEntry> listCachePools() throws IOException {
+//    return dfs.listCachePools();
+//  }
 }

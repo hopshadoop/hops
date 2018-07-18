@@ -67,19 +67,19 @@ abstract class BaseEncodingStatusLock extends Lock {
       for (String target : targets) {
         INode iNode = iNodeLock.getTargetINode(target);
         if (!BaseINodeLock.isStoredInDB(iNode)) {
-		acquireLocks(iNode);
-		if(includeChildren){
-		  List<INode> children = iNodeLock.getChildINodes(target);
-		  if(children!=null){
-		    for(INode child:children){
-		      acquireLocks(child);
-		    }
-		  }
+          acquireLocks(iNode);
+          if (includeChildren) {
+            List<INode> children = iNodeLock.getChildINodes(target);
+            if (children != null) {
+              for (INode child : children) {
+                acquireLocks(child);
+              }
+            }
+          }
+        } else {
+          LOG.debug("Stuffed Inode:  BaseEncodingStatusLock. Skipping acquring locks on the inode named: " + iNode.getLocalName() + " as the file is stored in the database");
         }
-      }else{
-          LOG.debug("Stuffed Inode:  BaseEncodingStatusLock. Skipping acquring locks on the inode named: "+iNode.getLocalName()+" as the file is stored in the database");
-        }
-    }
+      }
 }
 
 
