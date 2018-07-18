@@ -162,13 +162,7 @@ static int doTestHdfsOperations(struct tlhThreadInfo *ti, hdfsFS fs,
 
     file = hdfsOpenFile(fs, paths->file1, O_WRONLY, 0, 0, 0);
     EXPECT_NONNULL(file);
-
-    EXPECT_ZERO(hdfsFileGetReadStatistics(file, &readStats));
-    errno = 0;
-    EXPECT_ZERO(readStats->totalBytesRead);
-    EXPECT_ZERO(readStats->totalLocalBytesRead);
-    EXPECT_ZERO(readStats->totalShortCircuitBytesRead);
-    hdfsFileFreeReadStatistics(readStats);
+    
     /* TODO: implement writeFully and use it here */
     expected = strlen(paths->prefix);
     ret = hdfsWrite(fs, file, paths->prefix, expected);
@@ -190,6 +184,12 @@ static int doTestHdfsOperations(struct tlhThreadInfo *ti, hdfsFS fs,
     file = hdfsOpenFile(fs, paths->file1, O_RDONLY, 0, 0, 0);
     EXPECT_NONNULL(file);
 
+    EXPECT_ZERO(hdfsFileGetReadStatistics(file, &readStats));
+    errno = 0;
+    EXPECT_ZERO(readStats->totalBytesRead);
+    EXPECT_ZERO(readStats->totalLocalBytesRead);
+    EXPECT_ZERO(readStats->totalShortCircuitBytesRead);
+    hdfsFileFreeReadStatistics(readStats);
     /* TODO: implement readFully and use it here */
     ret = hdfsRead(fs, file, tmp, sizeof(tmp));
     if (ret < 0) {
