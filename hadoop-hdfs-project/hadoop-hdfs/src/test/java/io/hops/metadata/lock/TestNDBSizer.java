@@ -29,7 +29,6 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.junit.Before;
 
@@ -75,7 +74,7 @@ public class TestNDBSizer {
 
     final List<INode> newFiles = new LinkedList<>();
     for (int i = 0; i < NUM_INODES; i++) {
-      INodeDirectory dir = new INodeDirectoryWithQuota(i, "",
+      INodeDirectory dir = new INodeDirectory(i, "",
           new PermissionStatus("salman", "usr",
               new FsPermission((short) 0777)), true);
       dir.setLocalNameNoPersistance(filename + Integer.toString(i));

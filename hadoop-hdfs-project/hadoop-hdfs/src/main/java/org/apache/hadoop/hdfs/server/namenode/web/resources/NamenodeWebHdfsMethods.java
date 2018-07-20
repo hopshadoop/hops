@@ -118,6 +118,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.net.NetworkTopology;
 
 /**
  * Web-hdfs NameNode implementation.
@@ -259,7 +260,12 @@ public class NamenodeWebHdfsMethods {
       final UserParam username, final DoAsParam doAsUser, final String path,
       final HttpOpParam.Op op, final long openOffset, final long blocksize,
       final Param<?, ?>... parameters) throws URISyntaxException, IOException {
-    final DatanodeInfo dn = chooseDatanode(namenode, path, op, openOffset, blocksize);
+    final DatanodeInfo dn;
+    try {
+      dn = chooseDatanode(namenode, path, op, openOffset, blocksize);
+    } catch (NetworkTopology.InvalidTopologyException ite) {
+      throw new IOException("Failed to find datanode, suggest to check cluster health.", ite);
+    }
 
     final String delegationQuery;
     if (!UserGroupInformation.isSecurityEnabled()) {

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -31,7 +32,10 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -43,7 +47,8 @@ import java.util.List;
  * I-node for closed file.
  */
 @InterfaceAudience.Private
-public class INodeFile extends INode implements BlockCollection {
+public class INodeFile extends INodeWithAdditionalFields implements BlockCollection {
+  
   /**
    * Cast INode to INodeFile.
    */
@@ -111,8 +116,28 @@ public class INodeFile extends INode implements BlockCollection {
     setFileStoredInDBNoPersistence(other.isFileStoredInDB());
     setPartitionIdNoPersistance(other.getPartitionId());
     this.header = other.getHeader();
+    this.features = other.features;
   }
-
+  
+  /**
+   * If the inode contains a {@link FileUnderConstructionFeature}, return it;
+   * otherwise, return null.
+   */
+  public final FileUnderConstructionFeature getFileUnderConstructionFeature() {
+    for (Feature f : features) {
+      if (f instanceof FileUnderConstructionFeature) {
+        return (FileUnderConstructionFeature) f;
+      }
+    }
+    return null;
+  }
+  
+  /** Is this file under construction? */
+  @Override // BlockCollection
+  public boolean isUnderConstruction() {
+    return getFileUnderConstructionFeature() != null;
+  }
+  
   /**
    * @return the replication factor of the file.
    */
@@ -138,7 +163,12 @@ public class INodeFile extends INode implements BlockCollection {
   public long getPreferredBlockSize() {
     return HeaderFormat.getPreferredBlockSize(header);
   }
-
+  
+  @Override
+  public BlockInfo getBlock(int index) throws TransactionContextException, StorageException {
+    return (BlockInfo) EntityManager.find(BlockInfo.Finder.ByINodeIdAndIndex, id, index);
+  }
+  
   /**
    * @return the blocks of the file.
    */
@@ -412,6 +442,13 @@ public class INodeFile extends INode implements BlockCollection {
    */
   BlockInfo getPenultimateBlock()
       throws StorageException, TransactionContextException {
+    if (isUnderConstruction()) {
+      FileUnderConstructionFeature uc = getFileUnderConstructionFeature();
+      if (uc != null && uc.getPenultimateBlockId() > -1) {
+        return EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+            uc.getPenultimateBlockId(), getId());
+      }
+    }
     BlockInfo[] blocks = getBlocks();
     if (blocks == null || blocks.length <= 1) {
       return null;
@@ -421,6 +458,13 @@ public class INodeFile extends INode implements BlockCollection {
 
   @Override
   public BlockInfo getLastBlock() throws IOException, StorageException {
+    if (isUnderConstruction()) {
+      FileUnderConstructionFeature uc = getFileUnderConstructionFeature();
+      if (uc != null && uc.getLastBlockId() > -1) {
+        return EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+            uc.getLastBlockId(), getId());
+      }
+    }
     BlockInfo[] blocks = getBlocks();
     return blocks == null || blocks.length == 0 ? null :
         blocks[blocks.length - 1];
@@ -433,7 +477,6 @@ public class INodeFile extends INode implements BlockCollection {
   }
   
 
-
   /** @return the diskspace required for a full block. */
   final long getBlockDiskspace() {
     return getPreferredBlockSize() * getBlockReplication();
@@ -444,24 +487,92 @@ public class INodeFile extends INode implements BlockCollection {
     header = HeaderFormat.combineReplication(header, replication);
     save();
   }
-
-  public INodeFileUnderConstruction convertToUnderConstruction(
-      String clientName, String clientMachine, DatanodeID clientNode)
-      throws IOException {
-    INodeFileUnderConstruction ucfile =
-        new INodeFileUnderConstruction(this, clientName, clientMachine,
-            clientNode);
-    BlockInfo lastBlock = getLastBlock();
-    BlockInfo penultimateBlock = getPenultimateBlock();
-    if(lastBlock != null){
-      ucfile.setLastBlockId(lastBlock.getBlockId());
-    }
-    if(penultimateBlock != null){
-      ucfile.setPenultimateBlockId(penultimateBlock.getBlockId());
-    }
-    save(ucfile);
-    return ucfile;
+  
+  public INodeFile toUnderConstruction(String clientName, String clientMachine, DatanodeID clientNode)
+    throws IOException {
+    FileUnderConstructionFeature uc = new FileUnderConstructionFeature(clientName, clientMachine, clientNode, this);
+    addFeature(uc);
+    save();
+    return this;
   }
+  
+  /**
+   * Convert the file to a complete file, i.e., to remove the Under-Construction
+   * feature.
+   */
+  public INodeFile toCompleteFile(long mtime) throws IOException, StorageException {
+    FileUnderConstructionFeature uc = getFileUnderConstructionFeature();
+    if (uc != null) {
+      if (!isFileStoredInDB()) {
+        assert assertAllBlocksComplete() : "Can't finalize inode " + this +
+            " since it contains non-complete blocks! Blocks are " + getBlocks();
+      }
+      removeFeature(uc);
+      this.setModificationTime(mtime);
+    }
+    return this;
+  }
+  
+  /**
+   * @return true if all of the blocks in this file are marked as completed.
+   */
+  private boolean assertAllBlocksComplete()
+      throws StorageException, TransactionContextException {
+    for (BlockInfo b : getBlocks()) {
+      if (!b.isComplete()) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  @Override
+  public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock, DatanodeStorageInfo[] locations)
+      throws IOException {
+    Preconditions.checkState(isUnderConstruction());
+    if (numBlocks() == 0) {
+      throw new IOException("Failed to set last block: File is empty.");
+    }
+    BlockInfoUnderConstruction ucBlock = lastBlock
+        .convertToBlockUnderConstruction(HdfsServerConstants.BlockUCState.UNDER_CONSTRUCTION,
+            locations);
+    ucBlock.setBlockCollection(this);
+    setBlock(numBlocks() - 1, ucBlock);
+    return ucBlock;
+  }
+  
+  /**
+   * Remove a block from the block list. This block should be
+   * the last one on the list
+   */
+  boolean removeLastBlock(Block oldBlock) throws IOException, StorageException {
+    final BlockInfo[] blocks = getBlocks();
+    if (blocks == null || blocks.length == 0) {
+      return false;
+    }
+    int size_1 = blocks.length - 1;
+    if (!blocks[size_1].equals(oldBlock)) {
+      return false;
+    }
+    removeBlock(blocks[blocks.length - 1]);
+    return true;
+  }
+  
+  public void removeBlock(BlockInfo block)
+      throws StorageException, TransactionContextException {
+    BlockInfo[] blks = getBlocks();
+    int index = block.getBlockIndex();
+    
+    block.setBlockCollection(null);
+    
+    if (index != blks.length) {
+      for (int i = index + 1; i < blks.length; i++) {
+        blks[i].setBlockIndex(i - 1);
+      }
+    }
+  }
+  
+  /* End of Under-Construction Feature */
   
   public BlockInfo findMaxBlk()
       throws StorageException, TransactionContextException {

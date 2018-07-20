@@ -80,7 +80,6 @@ class BlockReceiver implements Closeable {
   private boolean needsChecksumTranslation;
   private OutputStream out = null; // to block file at local disk
   private FileDescriptor outFd;
-  private OutputStream cout = null; // output stream for cehcksum file
   private DataOutputStream checksumOut = null; // to crc file at local disk
   private int bytesPerChecksum;
   private int checksumSize;
@@ -229,9 +228,8 @@ class BlockReceiver implements Closeable {
         LOG.warn("Could not get file descriptor for outputstream of class " +
             out.getClass());
       }
-      this.cout = streams.getChecksumOut();
       this.checksumOut = new DataOutputStream(
-          new BufferedOutputStream(cout, HdfsConstants.SMALL_BUFFER_SIZE));
+          new BufferedOutputStream(streams.getChecksumOut(), HdfsConstants.SMALL_BUFFER_SIZE));
       // write data chunk header if creating a new replica
       if (isCreate) {
         BlockMetadataHeader.writeHeader(checksumOut, diskChecksum);
@@ -288,9 +286,9 @@ class BlockReceiver implements Closeable {
         long flushStartNanos = System.nanoTime();
         checksumOut.flush();
         long flushEndNanos = System.nanoTime();
-        if (syncOnClose && (cout instanceof FileOutputStream)) {
+        if (syncOnClose) {
           long fsyncStartNanos = flushEndNanos;
-          ((FileOutputStream) cout).getChannel().force(true);
+          streams.syncChecksumOut();
           datanode.metrics.addFsyncNanos(System.nanoTime() - fsyncStartNanos);
         }
         flushTotalNanos += flushEndNanos - flushStartNanos;
@@ -309,9 +307,9 @@ class BlockReceiver implements Closeable {
         long flushStartNanos = System.nanoTime();
         out.flush();
         long flushEndNanos = System.nanoTime();
-        if (syncOnClose && (out instanceof FileOutputStream)) {
+        if (syncOnClose) {
           long fsyncStartNanos = flushEndNanos;
-          ((FileOutputStream) out).getChannel().force(true);
+          streams.syncDataOut();
           datanode.metrics.addFsyncNanos(System.nanoTime() - fsyncStartNanos);
         }
         flushTotalNanos += flushEndNanos - flushStartNanos;
@@ -345,9 +343,9 @@ class BlockReceiver implements Closeable {
       long flushStartNanos = System.nanoTime();
       checksumOut.flush();
       long flushEndNanos = System.nanoTime();
-      if (isSync && (cout instanceof FileOutputStream)) {
+      if (isSync) {
         long fsyncStartNanos = flushEndNanos;
-        ((FileOutputStream) cout).getChannel().force(true);
+        streams.syncChecksumOut();
         datanode.metrics.addFsyncNanos(System.nanoTime() - fsyncStartNanos);
       }
       flushTotalNanos += flushEndNanos - flushStartNanos;
@@ -356,9 +354,9 @@ class BlockReceiver implements Closeable {
       long flushStartNanos = System.nanoTime();
       out.flush();
       long flushEndNanos = System.nanoTime();
-      if (isSync && (out instanceof FileOutputStream)) {
+      if (isSync) {
         long fsyncStartNanos = flushEndNanos;
-        ((FileOutputStream) out).getChannel().force(true);
+        streams.syncDataOut();
         datanode.metrics.addFsyncNanos(System.nanoTime() - fsyncStartNanos);
       }
       flushTotalNanos += flushEndNanos - flushStartNanos;

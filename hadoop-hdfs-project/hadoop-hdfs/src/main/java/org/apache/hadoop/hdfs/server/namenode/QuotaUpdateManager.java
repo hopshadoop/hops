@@ -267,13 +267,15 @@ public class QuotaUpdateManager {
         }
 
         if (dir != null && dir.isQuotaSet()) {
-          INodeDirectoryWithQuota quotaDir = (INodeDirectoryWithQuota) dir;
-          INodeAttributes attributes = quotaDir.getINodeAttributes();
-          attributes.setNsCount(attributes.getNsCount() + namespaceDelta);
-          attributes.setDiskspace(attributes.getDiskspace() + diskspaceDelta);
-          LOG.debug("applying aggregated update for directory " + dir.getId() +
-              " with namespace delta " + namespaceDelta +
-              " and diskspace delta " + diskspaceDelta);
+          final DirectoryWithQuotaFeature q = dir.getDirectoryWithQuotaFeature();
+          if (q != null) {
+            INodeAttributes attributes = q.getINodeAttributes(dir);
+            attributes.setNsCount(attributes.getNsCount() + namespaceDelta);
+            attributes.setDiskspace(attributes.getDiskspace() + diskspaceDelta);
+            LOG.debug("applying aggregated update for directory " + dir.getId() +
+                " with namespace delta " + namespaceDelta +
+                " and diskspace delta " + diskspaceDelta);
+          }
         }
 
         if (dir != null && dir.getId() != INodeDirectory.ROOT_INODE_ID) {

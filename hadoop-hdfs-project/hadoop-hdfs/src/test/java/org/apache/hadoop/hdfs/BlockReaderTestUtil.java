@@ -31,6 +31,7 @@ import java.util.Random;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.client.DfsClientShmManager;
 import org.apache.hadoop.hdfs.client.ShortCircuitCache;
 import org.apache.hadoop.hdfs.client.ShortCircuitReplica;
 import org.apache.hadoop.hdfs.net.Peer;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.server.datanode.ShortCircuitRegistry;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -212,6 +214,19 @@ public class BlockReaderTestUtil {
     LogManager.getLogger(ShortCircuitCache.class.getName()).setLevel(
         Level.TRACE);
     LogManager.getLogger(ShortCircuitReplica.class.getName()).setLevel(
+        Level.TRACE);
+    LogManager.getLogger(BlockReaderLocal.class.getName()).setLevel(
+        Level.TRACE);
+  }
+
+  public static void enableShortCircuitShmTracing() {
+    LogManager.getLogger(DfsClientShmManager.class.getName()).setLevel(
+        Level.TRACE);
+    LogManager.getLogger(ShortCircuitRegistry.class.getName()).setLevel(
+        Level.TRACE);
+    LogManager.getLogger(ShortCircuitShm.class.getName()).setLevel(
+        Level.TRACE);
+    LogManager.getLogger(DataNode.class.getName()).setLevel(
         Level.TRACE);
   }
 }

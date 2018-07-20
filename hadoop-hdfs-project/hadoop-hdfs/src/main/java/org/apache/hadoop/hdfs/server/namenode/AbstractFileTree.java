@@ -728,6 +728,10 @@ abstract class AbstractFileTree {
   }
   
   private static ProjectedINode newProjectedInode(INode from, long size) {
+    boolean dirWithQuota = false;
+    if (from instanceof INodeDirectory && ((INodeDirectory) from).isWithQuota()) {
+      dirWithQuota = true;
+    }
     ProjectedINode result = new ProjectedINode(from.getId(),
         from.getParentId(),
         from.getLocalName(),
@@ -738,7 +742,7 @@ abstract class AbstractFileTree {
         from.getGroupID(),
         from.getHeader(),
         from.isSymlink(),
-        from instanceof INodeDirectoryWithQuota,
+        dirWithQuota,
         from.isUnderConstruction(),
         from.isSTOLocked(),
         from.getSTOLockOwner(),

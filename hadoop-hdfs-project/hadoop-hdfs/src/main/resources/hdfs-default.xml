@@ -993,6 +993,27 @@
   </property>
 
   <property>
+    <name>dfs.datanode.shared.file.descriptor.paths</name>
+    <value>/dev/shm,/tmp</value>
+    <description>
+      A comma-separated list of paths to use when creating file descriptors that
+      will be shared between the DataNode and the DFSClient.  Typically we use
+      /dev/shm, so that the file descriptors will not be written to disk.
+      Systems that don't have /dev/shm will fall back to /tmp by default.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.short.circuit.shared.memory.watcher.interrupt.check.ms</name>
+    <value>60000</value>
+    <description>
+      The length of time in milliseconds that the short-circuit shared memory
+      watcher will go between checking for java interruptions sent from other
+      threads.  This is provided mainly for unit tests.
+    </description>
+  </property>
+
+  <property>
     <name>dfs.namenode.kerberos.internal.spnego.principal</name>
     <value>${dfs.web.authentication.kerberos.principal}</value>
   </property>
@@ -1164,10 +1185,10 @@
   </property>
 
   <property>
-    <name>dfs.client.file-block-storage-locations.timeout</name>
-    <value>60</value>
+    <name>dfs.client.file-block-storage-locations.timeout.millis</name>
+    <value>1000</value>
     <description>
-      Timeout (in seconds) for the parallel RPCs made in
+      Timeout (in milliseconds) for the parallel RPCs made in
       DistributedFileSystem#getFileBlockStorageLocations().
     </description>
   </property>
@@ -1356,25 +1377,33 @@
   </property>
   
   <property>
+    <name>dfs.client.mmap.enabled</name>
+    <value>true</value>
+    <description>
+      If this is set to false, the client won't attempt to perform memory-mapped reads.
+    </description>
+  </property>
+
+  <property>
     <name>dfs.client.mmap.cache.size</name>
-    <value>1024</value>
+    <value>256</value>
     <description>
       When zero-copy reads are used, the DFSClient keeps a cache of recently used
       memory mapped regions.  This parameter controls the maximum number of
       entries that we will keep in that cache.
 
-      If this is set to 0, we will not allow mmap.
-
       The larger this number is, the more file descriptors we will potentially
       use for memory-mapped files.  mmaped files also use virtual address space.
       You may need to increase your ulimit virtual address space limits before
       increasing the client mmap cache size.
+      
+      Note that you can still do zero-copy reads when this size is set to 0.
     </description>
   </property>
 
   <property>
     <name>dfs.client.mmap.cache.timeout.ms</name>
-    <value>900000</value>
+    <value>3600000</value>
     <description>
       The minimum length of time that we will keep an mmap entry in the cache
       between uses.  If an entry is in the cache longer than this, and nobody
@@ -1384,7 +1413,7 @@
   
   <property>
     <name>dfs.client.mmap.retry.timeout.ms</name>
-    <value>300000</value>
+    <value>1800000</value>
     <description>
       The minimum amount of time that we will wait before retrying a failed mmap
       operation.

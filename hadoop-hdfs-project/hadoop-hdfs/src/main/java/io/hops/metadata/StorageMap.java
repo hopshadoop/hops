@@ -122,6 +122,7 @@ public class StorageMap {
       final int sid = storageInfo.getSid();
       final String datanodeUuid = storageInfo.getDatanodeDescriptor().getDatanodeUuid();
       final int storageType = storageInfo.getStorageType().ordinal();
+      final String state = storageInfo.getState().toString();
 
       // Get the list of storages we know to be on this DN
       ArrayList<Integer> sids = this.datanodeUuidToSids.get(datanodeUuid);
@@ -152,7 +153,7 @@ public class StorageMap {
                     .getDataAccess(StorageDataAccess.class);
             Storage h = da.findByPk(sid);
             if (h == null) {
-              h = new Storage(sid, datanodeUuid, storageType);
+              h = new Storage(sid, datanodeUuid, storageType, state);
               da.add(h);
             }
             return null;

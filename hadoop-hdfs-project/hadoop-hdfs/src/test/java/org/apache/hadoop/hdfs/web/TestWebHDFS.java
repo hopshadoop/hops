@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.test.GenericTestUtils;
 
 /**
  * Test WebHDFS
@@ -254,6 +255,31 @@ public class TestWebHDFS {
     }
   }
 
+  /**
+   * Test for catching "no datanode" IOException, when to create a file
+   * but datanode is not running for some reason.
+   */
+  @Test(timeout=300000)
+  public void testCreateWithNoDN() throws Exception {
+    MiniDFSCluster cluster = null;
+    final Configuration conf = WebHdfsTestUtil.createConf();
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+      conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 1);
+      cluster.waitActive();
+      FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(conf,
+          WebHdfsFileSystem.SCHEME);
+      fs.create(new Path("/testnodatanode"));
+      Assert.fail("No exception was thrown");
+    } catch (IOException ex) {
+      GenericTestUtils.assertExceptionContains("Failed to find datanode", ex);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
   /**
    * WebHdfs should be enabled by default after HDFS-5532
    * 

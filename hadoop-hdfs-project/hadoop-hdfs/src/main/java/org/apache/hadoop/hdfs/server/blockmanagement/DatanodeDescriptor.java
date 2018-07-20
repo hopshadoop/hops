@@ -444,28 +444,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     }
   }
 
-  public Iterator<DatanodeStorageInfo> getStorageIterator() throws IOException {
-    return getAllMachineStorages().iterator();
-  }
-
-  private List<DatanodeStorageInfo> getAllMachineStorages() throws IOException {
-    final String uuid = getDatanodeUuid();
-
-    LightWeightRequestHandler findStoragesHandler = new LightWeightRequestHandler(
-        HDFSOperationType.GET_ALL_STORAGE_IDS) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        StorageDataAccess storages = (StorageDataAccess) HdfsStorageFactory.getDataAccess(StorageDataAccess.class);
-
-        HdfsStorageFactory.getConnector().beginTransaction();
-        List<BlockInfo> list = storages.findByHostUuid(uuid);
-        HdfsStorageFactory.getConnector().commit();
-
-        return list;
-      }
-    };
-    return (List<DatanodeStorageInfo>) findStoragesHandler.handle();
-  }
 
   private static class BlockIterator implements Iterator<BlockInfo> {
 

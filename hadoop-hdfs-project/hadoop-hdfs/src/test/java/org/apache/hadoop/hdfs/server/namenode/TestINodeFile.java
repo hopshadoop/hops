@@ -23,7 +23,6 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.metadata.HdfsStorageFactory;
-import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -34,7 +33,10 @@ import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.io.IOUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -70,23 +72,17 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 
+import static org.apache.hadoop.util.Time.now;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assert.assertSame;
 import org.junit.Before;
 import org.junit.Ignore;
 import static org.mockito.Matchers.anyObject;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.junit.Assert.assertSame;
-import static org.mockito.Mockito.mock;
 
 public class TestINodeFile {
   public static final Log LOG = LogFactory.getLog(TestINodeFile.class);
@@ -363,7 +359,6 @@ public class TestINodeFile {
 
   /**
    * Test for the static {@link INodeFile#valueOf(INode, String)}
-   * and {@link INodeFileUnderConstruction#valueOf(INode, String)} methods.
    *
    * @throws IOException
    */
@@ -380,14 +375,6 @@ public class TestINodeFile {
       //cast to INodeFile, should fail
       try {
         INodeFile.valueOf(from, path);
-        fail();
-      } catch (FileNotFoundException fnfe) {
-        assertTrue(fnfe.getMessage().contains("File does not exist"));
-      }
-
-      //cast to INodeFileUnderConstruction, should fail
-      try {
-        INodeFileUnderConstruction.valueOf(from, path);
         fail();
       } catch (FileNotFoundException fnfe) {
         assertTrue(fnfe.getMessage().contains("File does not exist"));
@@ -410,14 +397,6 @@ public class TestINodeFile {
       final INodeFile f = INodeFile.valueOf(from, path);
       assertTrue(f == from);
 
-      //cast to INodeFileUnderConstruction, should fail
-      try {
-        INodeFileUnderConstruction.valueOf(from, path);
-        fail();
-      } catch (IOException ioe) {
-        assertTrue(ioe.getMessage().contains("File is not under construction"));
-      }
-
       //cast to INodeDirectory, should fail
       try {
         INodeDirectory.valueOf(from, path);
@@ -427,19 +406,13 @@ public class TestINodeFile {
       }
     }
 
-    {//cast from INodeFileUnderConstruction
-      final INode from =
-          new INodeFileUnderConstruction(0, perm, replication, 0L, 0L, "client",
-              "machine", null, (byte) 0);
+    {
+      final INode from = new INodeFile(0, perm, BlockInfo.EMPTY_ARRAY,
+          replication, 0L, 0L, 0L, (byte) 0);
       
       //cast to INodeFile, should success
       final INodeFile f = INodeFile.valueOf(from, path);
       assertTrue(f == from);
-
-      //cast to INodeFileUnderConstruction, should success
-      final INodeFileUnderConstruction u =
-          INodeFileUnderConstruction.valueOf(from, path);
-      assertTrue(u == from);
 
       //cast to INodeDirectory, should fail
       try {
@@ -455,14 +428,6 @@ public class TestINodeFile {
       //cast to INodeFile, should fail
       try {
         INodeFile.valueOf(from, path);
-        fail();
-      } catch (FileNotFoundException fnfe) {
-        assertTrue(fnfe.getMessage().contains("Path is not a file"));
-      }
-
-      //cast to INodeFileUnderConstruction, should fail
-      try {
-        INodeFileUnderConstruction.valueOf(from, path);
         fail();
       } catch (FileNotFoundException fnfe) {
         assertTrue(fnfe.getMessage().contains("Path is not a file"));
@@ -559,7 +524,7 @@ public class TestINodeFile {
     }
   }
   
-  public INodeDirectoryWithQuota getRootDir(final MiniDFSCluster cluster) throws Exception {
+  public INodeDirectory getRootDir(final MiniDFSCluster cluster) throws Exception {
     HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -576,7 +541,7 @@ public class TestINodeFile {
         return cluster.getNameNode().getNamesystem().getFSDirectory().getRootDir();
       }
     };
-    return (INodeDirectoryWithQuota) handler.handle();
+    return (INodeDirectory) handler.handle();
   }
 
   @Test
@@ -1047,7 +1012,8 @@ public class TestINodeFile {
       // set quota to dir, which leads to node replacement
       hdfs.setQuota(dir, Long.MAX_VALUE - 1, Long.MAX_VALUE - 1);
       dirNode = getINode(dir.toString(), fsdir, cluster);
-      assertTrue(dirNode instanceof INodeDirectoryWithQuota);
+      assertTrue(dirNode instanceof INodeDirectory);
+      assertTrue(((INodeDirectory) dirNode).isWithQuota());
       // the inode in inodeMap should also be replaced
       dirNodeFromNode = fsdir.getInode(dirNode.getId());
       assertEquals(dirNode, dirNodeFromNode);
@@ -1069,6 +1035,7 @@ public class TestINodeFile {
   public void testDotdotInodePath() throws Exception {
     final Configuration conf = new Configuration();
     MiniDFSCluster cluster = null;
+    DFSClient client = null;
     try {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
@@ -1081,7 +1048,7 @@ public class TestINodeFile {
       long parentId = getINode("/", fsdir, cluster).getId();
       String testPath = "/.reserved/.inodes/" + dirId + "/..";
 
-      DFSClient client = new DFSClient(NameNode.getAddress(conf), conf);
+      client = new DFSClient(NameNode.getAddress(conf), conf);
       HdfsFileStatus status = client.getFileInfo(testPath);
       assertTrue(parentId == status.getFileId());
       
@@ -1091,6 +1058,7 @@ public class TestINodeFile {
       assertTrue(parentId == status.getFileId());
       
     } finally {
+      IOUtils.cleanup(LOG, client);
       if (cluster != null) {
         cluster.shutdown();
       }
@@ -1233,5 +1201,52 @@ public class TestINodeFile {
     };
     return (INode) getInodeHandler.handle();
   }
+ 
+  @Test
+  public void testFileUnderConstruction() throws IOException {
+    replication = 3;
+    final INodeFile file = new INodeFile(0, perm, null,
+        replication, 0L, 0L, preferredBlockSize, (byte) 0);
+    assertFalse(file.isUnderConstruction());
+    
+    final String clientName = "client";
+    final String clientMachine = "machine";
+    
+    HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.ADD_INODE) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        // We don't need lock in this test
+      }
   
+      @Override
+      public Object performTask() throws IOException {
+        file.setPartitionId(1);
+        final DatanodeID dnID = new DatanodeID("127.0.0.1:1337");
+        file.toUnderConstruction(clientName, clientMachine, dnID);
+        return null;
+      }
+    };
+    handler.handle();
+    
+    assertTrue(file.isUnderConstruction());
+    FileUnderConstructionFeature uc = file.getFileUnderConstructionFeature();
+    assertEquals(clientName, uc.getClientName());
+    assertEquals(clientMachine, uc.getClientMachine());
+    Assert.assertNotNull(uc.getClientNode());
+    
+    handler = new HopsTransactionalRequestHandler(HDFSOperationType.ADD_INODE) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        // We don't need lock in this test
+      }
+  
+      @Override
+      public Object performTask() throws IOException {
+        file.toCompleteFile(now());
+        return null;
+      }
+    };
+    handler.handle();
+    assertFalse(file.isUnderConstruction());
+  }
 }

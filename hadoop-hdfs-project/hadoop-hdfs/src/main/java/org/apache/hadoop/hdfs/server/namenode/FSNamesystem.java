@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.hops.common.IDsGeneratorFactory;
@@ -105,6 +106,7 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
@@ -2219,8 +2221,9 @@ public class FSNamesystem
     }
 
     try {
-      final INode myFile = dir.getINode(src);
-      if (myFile == null) {
+      final INode inode = dir.getINode(src);
+      
+      if (inode == null) {
         if (!create) {
           throw new FileNotFoundException("failed to overwrite non-existent file "
              + src + " on client " + clientMachine);
@@ -2235,6 +2238,7 @@ public class FSNamesystem
           }
         } else {
           // If lease soft limit time is expired, recover the lease
+          final INodeFile myFile = INodeFile.valueOf(dir.getINode(src), src);
           recoverLeaseInternal(myFile, src, holder, clientMachine, false);
           throw new FileAlreadyExistsException("failed to create file " + src
               + " on client " + clientMachine + " because the file exists");
@@ -2243,13 +2247,14 @@ public class FSNamesystem
 
       checkFsObjectLimit();
       final DatanodeDescriptor clientNode = blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
-
-      INodeFileUnderConstruction newNode = dir.addFile(src, permissions,
-          replication, blockSize, holder, clientMachine, clientNode);
+      
+      INodeFile newNode = dir.addFile(src, permissions, replication, blockSize,
+          holder, clientMachine, clientNode);
       if (newNode == null) {
         throw new IOException("DIR* NameSystem.startFile: " + "Unable to add file to namespace.");
       }
-      leaseManager.addLease(newNode.getClientName(), src);
+      leaseManager.addLease(newNode.getFileUnderConstructionFeature()
+          .getClientName(), src);
 
       if (NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug("DIR* NameSystem.startFile: "
@@ -2339,9 +2344,10 @@ public class FSNamesystem
   private LocatedBlock prepareFileForWrite(String src, INodeFile file,
       String leaseHolder, String clientMachine, DatanodeDescriptor clientNode)
       throws IOException {
-    INodeFileUnderConstruction cons =
-        file.convertToUnderConstruction(leaseHolder, clientMachine, clientNode);
-    Lease lease = leaseManager.addLease(cons.getClientName(), src);
+    INodeFile cons =
+        file.toUnderConstruction(leaseHolder, clientMachine, clientNode);
+    Lease lease = leaseManager.addLease(cons.getFileUnderConstructionFeature()
+        .getClientName(), src);
     if(cons.isFileStoredInDB()){
       LOG.debug("Stuffed Inode:  prepareFileForWrite stored in database. " +
           "Returning phantom block");
@@ -2416,12 +2422,10 @@ public class FSNamesystem
     return (Boolean) recoverLeaseHandler.handle(this);
   }
 
-  private void recoverLeaseInternal(INode fileInode, String src, String holder,
+  private void recoverLeaseInternal(INodeFile fileInode, String src, String holder,
       String clientMachine, boolean force)
       throws IOException {
     if (fileInode != null && fileInode.isUnderConstruction()) {
-      INodeFileUnderConstruction pendingFile =
-          (INodeFileUnderConstruction) fileInode;
       //
       // If the file is under construction , then it must be in our
       // leases. Find the appropriate lease record.
@@ -2444,7 +2448,9 @@ public class FSNamesystem
       //
       // Find the original holder.
       //
-      lease = leaseManager.getLease(pendingFile.getClientName());
+      FileUnderConstructionFeature uc = fileInode.getFileUnderConstructionFeature();
+      String clientName = uc.getClientName();
+      lease = leaseManager.getLease(clientName);
       if (lease == null) {
         throw new AlreadyBeingCreatedException(
             "failed to create file " + src + " for " + holder +
@@ -2455,19 +2461,19 @@ public class FSNamesystem
         // close now: no need to wait for soft lease expiration and
         // close only the file src
         LOG.info("recoverLease: " + lease + ", src=" + src +
-            " from client " + pendingFile.getClientName());
+            " from client " + clientName);
         internalReleaseLease(lease, src, holder);
       } else {
-        assert lease.getHolder().equals(pendingFile.getClientName()) :
+        assert lease.getHolder().equals(clientName) :
             "Current lease holder " + lease.getHolder() +
-                " does not match file creator " + pendingFile.getClientName();
+                " does not match file creator " + clientName;
         //
         // If the original holder has not renewed in the last SOFTLIMIT
         // period, then start lease recovery.
         //
         if (leaseManager.expiredSoftLimit(lease)) {
           LOG.info("startFile: recover " + lease + ", src=" + src + " client " +
-              pendingFile.getClientName());
+              clientName);
           boolean isClosed = internalReleaseLease(lease, src, null);
           if (!isClosed) {
             throw new RecoveryInProgressException.NonAbortingRecoveryInProgressException(
@@ -2475,7 +2481,7 @@ public class FSNamesystem
                     ". Lease recovery is in progress. Try again later.");
           }
         } else {
-          final BlockInfo lastBlock = pendingFile.getLastBlock();
+          final BlockInfo lastBlock = fileInode.getLastBlock();
           if (lastBlock != null &&
               lastBlock.getBlockUCState() == BlockUCState.UNDER_RECOVERY) {
             throw new RecoveryInProgressException(
@@ -2486,8 +2492,8 @@ public class FSNamesystem
                 "Failed to create file [" + src + "] for [" + holder +
                     "] on client [" + clientMachine +
                     "], because this file is already being created by [" +
-                    pendingFile.getClientName() + "] on [" +
-                    pendingFile.getClientMachine() + "]");
+                    clientName + "] on [" +
+                    uc.getClientMachine() + "]");
           }
         }
       }
@@ -2725,8 +2731,7 @@ public class FSNamesystem
               throw e;
             }
             INode[] inodes = inodesInPath.getINodes();
-            final INodeFileUnderConstruction pendingFile =
-                (INodeFileUnderConstruction) inodes[inodes.length - 1];
+            final INodeFile pendingFile = inodes[inodes.length - 1].asFile();
 
             if (onRetryBlock[0] != null && onRetryBlock[0].getLocations().length > 0) {
               // This is a retry. Just return the last block if having locations.
@@ -2740,12 +2745,10 @@ public class FSNamesystem
                   + maxBlocksPerFile);
             }
             blockSize = pendingFile.getPreferredBlockSize();
-
-            String host = pendingFile.getClientMachine();
-
-            clientNode = pendingFile.getClientNode() == null ? null :
+            
+            clientNode = pendingFile.getFileUnderConstructionFeature().getClientNode() == null ? null :
                 getBlockManager().getDatanodeManager()
-                    .getDatanode(pendingFile.getClientNode());
+                    .getDatanode(pendingFile.getFileUnderConstructionFeature().getClientNode());
 
             replication = pendingFile.getBlockReplication();
 
@@ -2765,8 +2768,7 @@ public class FSNamesystem
             INodesInPath iNodesInPath2 =
                 analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
             INode[] inodes2 = iNodesInPath2.getINodes();
-            final INodeFileUnderConstruction pendingFile2 =
-                (INodeFileUnderConstruction) inodes2[inodes2.length - 1];
+            final INodeFile pendingFile2 = inodes2[inodes2.length - 1].asFile();
 
             if (onRetryBlock[0] != null) {
               if (onRetryBlock[0].getLocations().length > 0) {
@@ -2834,7 +2836,8 @@ public class FSNamesystem
     Block previousBlock = ExtendedBlock.getLocalBlock(previous);
     final INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, true);
     final INode[] inodes = inodesInPath.getINodes();
-    final INodeFileUnderConstruction pendingFile =
+    
+    final INodeFile pendingFile =
         checkLease(src, fileId, clientName, inodes[inodes.length - 1]);
     BlockInfo lastBlockInFile = pendingFile.getLastBlock();
     if (!Block.matchingIdAndGenStamp(previousBlock, lastBlockInFile)) {
@@ -2954,11 +2957,12 @@ public class FSNamesystem
             checkNameNodeSafeMode("Cannot add datanode; src=" + src + ", blk=" + blk);
 
             //check lease
-            final INodeFileUnderConstruction file = checkLease(src,
+            final INodeFile file = checkLease(src,
                 clientName, false);
             //clientNode = file.getClientNode(); HOP
-            clientNode = getBlockManager().getDatanodeManager()
-                .getDatanode(file.getClientNode());
+            clientNode = file.getFileUnderConstructionFeature().getClientNode() == null ? null :
+                getBlockManager().getDatanodeManager()
+                    .getDatanode(file.getFileUnderConstructionFeature().getClientNode());
             preferredBlockSize = file.getPreferredBlockSize();
 
             byte storagePolicyID = file.getStoragePolicyID();
@@ -3013,7 +3017,7 @@ public class FSNamesystem
                   "BLOCK* NameSystem.abandonBlock: " + b + "of file " + src);
             }
             checkNameNodeSafeMode("Cannot abandon block " + b + " for fle" + src);
-            INodeFileUnderConstruction file = checkLease(src, holder, false);
+            INodeFile file = checkLease(src, holder, false);
             boolean removed = dir.removeBlock(src, file, ExtendedBlock.getLocalBlock(b));
             if (!removed) {
               return true;
@@ -3036,36 +3040,37 @@ public class FSNamesystem
   }
 
   // make sure that we still have the lease on this file.
-  private INodeFileUnderConstruction checkLease(String src, String holder)
+  private INodeFile checkLease(String src, String holder)
       throws LeaseExpiredException, UnresolvedLinkException, StorageException,
       TransactionContextException, FileNotFoundException {
     return checkLease(src, INodeDirectory.ROOT_PARENT_ID, holder, true);
   }
 
-  private INodeFileUnderConstruction checkLease(String src, String holder,
+  private INodeFile checkLease(String src, String holder,
       boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
       UnresolvedLinkException, StorageException,
       TransactionContextException, FileNotFoundException {
     return checkLease(src, INodeDirectory.ROOT_PARENT_ID, holder, updateLastTwoBlocksInFile);
   }
 
-  private INodeFileUnderConstruction checkLease(String src, int fileId, String holder,
+  private INodeFile checkLease(String src, int fileId, String holder,
       boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
       UnresolvedLinkException, StorageException,
       TransactionContextException, FileNotFoundException {
     return checkLease(src, fileId, holder, dir.getINode(src), updateLastTwoBlocksInFile);
   }
 
-  private INodeFileUnderConstruction checkLease(String src, long fileId, String holder,
+  private INodeFile checkLease(String src, long fileId, String holder,
       INode file) throws LeaseExpiredException, StorageException,
       TransactionContextException, FileNotFoundException {
     return checkLease(src, fileId, holder, file, true);
   }
 
-  private INodeFileUnderConstruction checkLease(String src, long fileId, String holder,
-      INode file, boolean updateLastTwoBlocksInFile) throws
+  private INodeFile checkLease(String src, long fileId, String holder,
+      INode inode, boolean updateLastTwoBlocksInFile) throws
       LeaseExpiredException, StorageException,
       TransactionContextException, FileNotFoundException {
+    final INodeFile file = inode.asFile();
     if (file == null || !(file instanceof INodeFile)) {
       Lease lease = leaseManager.getLease(holder);
       throw new LeaseExpiredException(
@@ -3080,18 +3085,18 @@ public class FSNamesystem
               (lease != null ? lease.toString() :
                   "Holder " + holder + " does not have any open files."));
     }
-    INodeFileUnderConstruction pendingFile = (INodeFileUnderConstruction) file;
-    if (holder != null && !pendingFile.getClientName().equals(holder)) {
+    String clientName = file.getFileUnderConstructionFeature().getClientName();
+    if (holder != null && !clientName.equals(holder)) {
       throw new LeaseExpiredException(
           "Lease mismatch on " + src + " owned by " +
-              pendingFile.getClientName() + " but is accessed by " + holder);
+              clientName + " but is accessed by " + holder);
     }
 
     if(updateLastTwoBlocksInFile) {
-      pendingFile.updateLastTwoBlocks(leaseManager.getLease(holder), src);
+      file.getFileUnderConstructionFeature().updateLastTwoBlocks(leaseManager.getLease(holder), src);
     }
-    INode.checkId(fileId, pendingFile);
-    return pendingFile;
+    INode.checkId(fileId, file);
+    return file;
   }
 
   /**
@@ -3161,7 +3166,7 @@ public class FSNamesystem
       Block last, long fileId)
       throws IOException {
     final INodesInPath iip = dir.getLastINodeInPath(src);
-    INodeFileUnderConstruction pendingFile;
+    INodeFile pendingFile;
     try {
       pendingFile = checkLease(src,fileId, holder, iip.getINode(0));
     } catch (LeaseExpiredException lee) {
@@ -3209,7 +3214,7 @@ public class FSNamesystem
   private boolean completeFileStoredInDataBase(String src, String holder, long fileId,
       final byte[] data)
       throws IOException {
-    INodeFileUnderConstruction pendingFile;
+    INodeFile pendingFile;
     final INodesInPath iip = dir.getRootDir().getLastINodeInPath(src, true);
     pendingFile = checkLease(src,fileId, holder, iip.getINode(0));
 
@@ -3290,7 +3295,7 @@ public class FSNamesystem
       for (BlockInfo block : v.getBlocks()) {
         if (!block.isComplete()) {
           BlockInfo cBlock = blockManager
-              .tryToCompleteBlock((MutableBlockCollection) v,
+              .tryToCompleteBlock(v,
                   block.getBlockIndex());
           if (cBlock != null) {
             block = cBlock;
@@ -3310,7 +3315,7 @@ public class FSNamesystem
       BlockInfo b = v.getPenultimateBlock();
       if (b != null && !b.isComplete()) {
         blockManager
-            .tryToCompleteBlock((MutableBlockCollection) v, b.getBlockIndex());
+            .tryToCompleteBlock(v, b.getBlockIndex());
         b = v.getPenultimateBlock();
         if (!b.isComplete()) {
           LOG.warn("BLOCK* checkFileProgress: " + b +
@@ -3718,9 +3723,9 @@ public class FSNamesystem
         NameNode.stateChangeLog
             .info("BLOCK* fsync: " + src + " for " + clientName);
         checkNameNodeSafeMode("Cannot fsync file " + src);
-        INodeFileUnderConstruction pendingFile = checkLease(src, clientName);
+        INodeFile pendingFile = checkLease(src, clientName);
         if (lastBlockLength > 0) {
-          pendingFile.updateLengthOfLastBlock(lastBlockLength);
+          pendingFile.getFileUnderConstructionFeature().updateLengthOfLastBlock(pendingFile, lastBlockLength);
         }
         dir.persistBlocks(src, pendingFile);
         pendingFile.recomputeFileSize();
@@ -3754,8 +3759,7 @@ public class FSNamesystem
     LOG.info("Recovering " + lease + ", src=" + src);
     assert !isInSafeMode();
 
-    final INodeFileUnderConstruction pendingFile =
-        INodeFileUnderConstruction.valueOf(dir.getINode(src), src);
+    final INodeFile pendingFile = INodeFile.valueOf(dir.getINode(src), src);
     int nrBlocks = pendingFile.numBlocks();
     BlockInfo[] blocks = pendingFile.getBlocks();
 
@@ -3876,7 +3880,7 @@ public class FSNamesystem
   }
 
   private Lease reassignLease(Lease lease, String src, String newHolder,
-      INodeFileUnderConstruction pendingFile)
+      INodeFile pendingFile)
       throws StorageException, TransactionContextException {
     if (newHolder == null) {
       return lease;
@@ -3885,16 +3889,16 @@ public class FSNamesystem
   }
 
   private Lease reassignLeaseInternal(Lease lease, String src, String newHolder,
-      INodeFileUnderConstruction pendingFile)
+      INodeFile pendingFile)
       throws StorageException, TransactionContextException {
-    pendingFile.setClientName(newHolder);
+    pendingFile.getFileUnderConstructionFeature().setClientName(newHolder);
     return leaseManager.reassignLease(lease, src, newHolder);
   }
 
   private void commitOrCompleteLastBlock(
-      final INodeFileUnderConstruction fileINode, final Block commitBlock)
+      final INodeFile fileINode, final Block commitBlock)
       throws IOException {
-
+    Preconditions.checkArgument(fileINode.isUnderConstruction());
     if (!blockManager.commitOrCompleteLastBlock(fileINode, commitBlock)) {
       return;
     }
@@ -3914,26 +3918,26 @@ public class FSNamesystem
   }
 
   private void finalizeINodeFileUnderConstruction(String src,
-      INodeFileUnderConstruction pendingFile)
+      INodeFile pendingFile)
       throws IOException {
     finalizeINodeFileUnderConstructionInternal(src, pendingFile, false);
   }
 
   private void finalizeINodeFileUnderConstructionStoredInDB(String src,
-      INodeFileUnderConstruction pendingFile)
+      INodeFile pendingFile)
       throws IOException {
     finalizeINodeFileUnderConstructionInternal(src, pendingFile, true);
   }
 
   private void finalizeINodeFileUnderConstructionInternal(String src,
-      INodeFileUnderConstruction pendingFile, boolean skipReplicationChecks)
+      INodeFile pendingFile, boolean skipReplicationChecks)
       throws IOException {
-    leaseManager.removeLease(pendingFile.getClientName(), src);
-
-    // The file is no longer pending.
-    // Create permanent INode, update blocks
-    INodeFile newFile = pendingFile.convertToInodeFile();
+    FileUnderConstructionFeature uc = pendingFile.getFileUnderConstructionFeature();
+    Preconditions.checkArgument(uc != null);
+    leaseManager.removeLease(uc.getClientName(), src);
+    
     // close file and persist block allocations for this file
+    INodeFile newFile = pendingFile.toCompleteFile(now());
     dir.closeFile(src, newFile);
 
     if (!skipReplicationChecks) {
@@ -4010,11 +4014,9 @@ public class FSNamesystem
               " for block " + lastBlock);
         }
 
-        INodeFileUnderConstruction pendingFile = (INodeFileUnderConstruction) iFile;
-
         if (deleteBlock) {
           Block blockToDel = ExtendedBlock.getLocalBlock(lastBlock);
-          boolean remove = pendingFile.removeLastBlock(blockToDel);
+          boolean remove = iFile.removeLastBlock(blockToDel);
           if (remove) {
             blockManager.removeBlockFromMap(storedBlock);
           }
@@ -4054,14 +4056,14 @@ public class FSNamesystem
               blockManager.getDatanodeManager().getDatanodeStorageInfos(
                   trimmedTargets.toArray(new DatanodeID[trimmedTargets.size()]),
                   trimmedStorages.toArray(new String[trimmedStorages.size()]));
-          pendingFile.setLastBlock(storedBlock, trimmedStorageInfos);
+          iFile.setLastBlock(storedBlock, trimmedStorageInfos);
         }
 
         if (closeFile) {
-          src = closeFileCommitBlocks(pendingFile, storedBlock);
+          src = closeFileCommitBlocks(iFile, storedBlock);
         } else {
           // If this commit does not want to close the file, persist blocks
-          src = persistBlocks(pendingFile);
+          src = persistBlocks(iFile);
         }
         if (closeFile) {
           LOG.info(
@@ -4087,7 +4089,7 @@ public class FSNamesystem
    * @throws IOException
    */
   @VisibleForTesting
-  String closeFileCommitBlocks(INodeFileUnderConstruction pendingFile,
+  String closeFileCommitBlocks(INodeFile pendingFile,
       BlockInfo storedBlock)
       throws IOException {
 
@@ -4110,7 +4112,7 @@ public class FSNamesystem
    * @throws IOException
    */
   @VisibleForTesting
-  String persistBlocks(INodeFileUnderConstruction pendingFile)
+  String persistBlocks(INodeFile pendingFile)
       throws IOException {
     String src = pendingFile.getFullPathName();
     dir.persistBlocks(src, pendingFile);
@@ -5291,13 +5293,12 @@ public class FSNamesystem
           int numUCBlocks = 0;
           for (LeasePath leasePath : lease.getPaths()) {
             final String path = leasePath.getPath();
-            INodeFileUnderConstruction cons;
+            final INodeFile cons;
             try {
-              cons = INodeFileUnderConstruction.valueOf(dir.getINode(path), path);
+              cons = dir.getINode(path).asFile();
+              Preconditions.checkState(cons.isUnderConstruction());
             } catch (UnresolvedLinkException e) {
               throw new AssertionError("Lease files should reside on this FS");
-            } catch (IOException e) {
-              throw new RuntimeException(e);
             }
             BlockInfo[] blocks = cons.getBlocks();
             if (blocks == null) {
@@ -5502,6 +5503,7 @@ public class FSNamesystem
     return blockManager.getScheduledReplicationBlocksCount();
   }
 
+  @Override
   @Metric
   public long getPendingDeletionBlocks() throws IOException {
     return blockManager.getPendingDeletionBlocksCount();
@@ -5624,7 +5626,7 @@ public class FSNamesystem
     return IDsGeneratorFactory.getInstance().getUniqueBlockID();
   }
 
-  private INodeFileUnderConstruction checkUCBlock(ExtendedBlock block,
+  private INodeFile checkUCBlock(ExtendedBlock block,
       String clientName) throws IOException {
     checkNameNodeSafeMode("Cannot get a new generation stamp and an "
         + "access token for block " + block);
@@ -5646,13 +5648,12 @@ public class FSNamesystem
     }
 
     // check lease
-    INodeFileUnderConstruction pendingFile = (INodeFileUnderConstruction) file;
-    if (clientName == null || !clientName.equals(pendingFile.getClientName())) {
+    if (clientName == null || !clientName.equals(file.getFileUnderConstructionFeature().getClientName())) {
       throw new LeaseExpiredException("Lease mismatch: " + block +
           " is accessed by a non lease holder " + clientName);
     }
 
-    return pendingFile;
+    return file;
   }
 
   /**
@@ -5811,10 +5812,10 @@ public class FSNamesystem
       ExtendedBlock newBlock, DatanodeID[] newNodes, String[] newStorageIDs)
       throws IOException, StorageException {
     // check the vadility of the block and lease holder name
-    final INodeFileUnderConstruction pendingFile =
+    final INodeFile pendingFile =
         checkUCBlock(oldBlock, clientName);
 
-    pendingFile.updateLastTwoBlocks(leaseManager.getLease(clientName));
+    pendingFile.getFileUnderConstructionFeature().updateLastTwoBlocks(leaseManager.getLease(clientName));
 
     final BlockInfoUnderConstruction blockInfo =
         (BlockInfoUnderConstruction) pendingFile.getLastBlock();
@@ -8759,10 +8760,12 @@ public class FSNamesystem
                 leafInode.spaceConsumedInTree(srcCounts);
               } else{
                 isDir =true;
-                if(leafInode instanceof INodeDirectoryWithQuota && dir
+                if(leafInode instanceof INodeDirectory && dir
                     .isQuotaEnabled()){
-                  quotaDirAttributes = ((INodeDirectoryWithQuota) leafInode)
-                      .getINodeAttributes();
+                  final DirectoryWithQuotaFeature q = ((INodeDirectory) leafInode).getDirectoryWithQuotaFeature();
+                  if (q != null) {
+                    quotaDirAttributes = q.getINodeAttributes((INodeDirectory) leafInode);
+                  }
                 }
               }
             }
@@ -8973,12 +8976,14 @@ public class FSNamesystem
       @Override
       public Object performTask() throws IOException {
         INode subtreeRoot = getINode(path);
-        if(subtreeRoot instanceof INodeDirectoryWithQuota){
-          INodeDirectoryWithQuota quotaDir = (INodeDirectoryWithQuota)
-              subtreeRoot;
-          return new LastUpdatedContentSummary(quotaDir.numItemsInTree(),
-              quotaDir.diskspaceConsumed(), quotaDir.getQuotaCounts().get(Quota.NAMESPACE), quotaDir
-              .getQuotaCounts().get(Quota.DISKSPACE));
+        if(subtreeRoot instanceof INodeDirectory){
+          INodeDirectory quotaDir = (INodeDirectory) subtreeRoot;
+          final DirectoryWithQuotaFeature q = quotaDir.getDirectoryWithQuotaFeature();
+          if (q != null) {
+            return new LastUpdatedContentSummary(q.numItemsInTree(quotaDir),
+                q.diskspaceConsumed(quotaDir), quotaDir.getQuotaCounts().get(Quota.NAMESPACE), quotaDir
+                .getQuotaCounts().get(Quota.DISKSPACE));
+          }
         }
         return null;
       }

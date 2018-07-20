@@ -1197,6 +1197,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
         block = lb.getBlock();
         block.setNumBytes(0);
+        bytesSent = 0;
         accessToken = lb.getBlockToken();
         nodes = lb.getLocations();
 

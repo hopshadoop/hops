@@ -233,6 +233,7 @@ public class DataNode extends Configured
   AtomicInteger xmitsInProgress = new AtomicInteger();
   Daemon dataXceiverServer = null;
   Daemon localDataXceiverServer = null;
+  ShortCircuitRegistry shortCircuitRegistry = null;
   ThreadGroup threadGroup = null;
   private DNConf dnConf;
   private volatile boolean heartbeatsDisabledForTests = false;
@@ -587,6 +588,7 @@ public class DataNode extends Configured
             domainPeerServer.getBindPath());
       }
     }
+    this.shortCircuitRegistry = new ShortCircuitRegistry(conf);
   }
 
   static DomainPeerServer getDomainPeerServer(Configuration conf,
@@ -1245,7 +1247,8 @@ public class DataNode extends Configured
   }
 
   @Override
-  public HdfsBlocksMetadata getHdfsBlocksMetadata(List<ExtendedBlock> blocks,
+  public HdfsBlocksMetadata getHdfsBlocksMetadata(
+      String bpId, long[] blockIds,
       List<Token<BlockTokenIdentifier>> tokens)
       throws IOException, UnsupportedOperationException {
     if (!getHdfsBlockLocationsEnabled) {
@@ -1253,15 +1256,15 @@ public class DataNode extends Configured
           "Datanode#getHdfsBlocksMetadata " +
               " is not enabled in datanode config");
     }
-    if (blocks.size() != tokens.size()) {
+    if (blockIds.length != tokens.size()) {
       throw new IOException("Differing number of blocks and tokens");
     }
     // Check access for each block
-    for (int i = 0; i < blocks.size(); i++) {
-      checkBlockToken(blocks.get(i), tokens.get(i),
-          BlockTokenSecretManager.AccessMode.READ);
+    for (int i = 0; i < blockIds.length; i++) {
+      checkBlockToken(new ExtendedBlock(bpId, blockIds[i]),
+          tokens.get(i), BlockTokenSecretManager.AccessMode.READ);
     }
-    return data.getHdfsBlocksMetadata(blocks);
+    return data.getHdfsBlocksMetadata(bpId, blockIds);
   }
   
   private void checkBlockToken(ExtendedBlock block,
@@ -1393,7 +1396,7 @@ public class DataNode extends Configured
       MBeans.unregister(dataNodeInfoBeanName);
       dataNodeInfoBeanName = null;
     }
-    
+    if (shortCircuitRegistry != null) shortCircuitRegistry.shutdown();
     if (revocationListFetcherService != null) {
       try {
         revocationListFetcherService.serviceStop();
@@ -2153,6 +2156,7 @@ public class DataNode extends Configured
    *
    * @return the fsdataset that stores the blocks
    */
+  @VisibleForTesting
   public FsDatasetSpi<?> getFSDataset() {
     return data;
   }
@@ -2732,5 +2736,9 @@ public class DataNode extends Configured
   byte[] getSmallFileDataFromNN(ExtendedBlock block) throws IOException {
     BPOfferService bpos = getBPOSForBlock(block);
     return bpos.getSmallFileDataFromNN((int)block.getBlockId());
+  }
+  
+  public ShortCircuitRegistry getShortCircuitRegistry() {
+    return shortCircuitRegistry;
   }
 }

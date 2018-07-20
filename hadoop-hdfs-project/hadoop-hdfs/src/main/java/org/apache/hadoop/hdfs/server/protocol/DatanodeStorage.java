@@ -29,7 +29,17 @@ public class DatanodeStorage {
    */
   public enum State {
     NORMAL,
-    READ_ONLY,
+    /**
+     * A storage that represents a read-only path to replicas stored on a shared storage device.
+     * Replicas on {@link #READ_ONLY_SHARED} storage are not counted towards live replicas.
+     * 
+     * <p>
+     * In certain implementations, a {@link #READ_ONLY_SHARED} storage may be correlated to 
+     * its {@link #NORMAL} counterpart using the {@link DatanodeStorage#storageID}.  This
+     * property should be used for debugging purposes only.
+     * </p> 
+     */
+    READ_ONLY_SHARED,
     FAILED
   }
   

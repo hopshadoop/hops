@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.hops.common.IDsGenerator;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -227,7 +228,7 @@ public class FSDirectory implements Closeable {
    * @throws QuotaExceededException
    * @throws UnresolvedLinkException
    */
-  INodeFileUnderConstruction addFile(String path, PermissionStatus permissions,
+  INodeFile addFile(String path, PermissionStatus permissions,
       short replication, long preferredBlockSize, String clientName,
       String clientMachine, DatanodeDescriptor clientNode)
       throws IOException {
@@ -245,9 +246,9 @@ public class FSDirectory implements Closeable {
     if (!mkdirs(parent.toString(), permissions, true, modTime)) {
       return null;
     }
-    INodeFileUnderConstruction newNode =
-        new INodeFileUnderConstruction(IDsGeneratorFactory.getInstance().getUniqueINodeID(), permissions, replication,
-            preferredBlockSize, modTime, clientName, clientMachine, clientNode, (byte) 0);
+    INodeFile newNode = new INodeFile(IDsGeneratorFactory.getInstance().getUniqueINodeID(), permissions,
+        BlockInfo.EMPTY_ARRAY, replication, modTime, modTime, preferredBlockSize, (byte) 0);
+    newNode.toUnderConstruction(clientName, clientMachine, clientNode);
 
     boolean added = false;
     added = addINode(path, newNode);
@@ -271,8 +272,8 @@ public class FSDirectory implements Closeable {
       throws QuotaExceededException, StorageException,
       TransactionContextException, IOException {
     final INode[] inodes = inodesInPath.getINodes();
-      final INodeFileUnderConstruction fileINode =
-          INodeFileUnderConstruction.valueOf(inodes[inodes.length-1], path);
+    final INodeFile fileINode = inodes[inodes.length - 1].asFile();
+    Preconditions.checkState(fileINode.isUnderConstruction());
 
     long diskspaceTobeConsumed = fileINode.getBlockDiskspace();
     //When appending to a small file stored in DB we should consider the file
@@ -304,8 +305,9 @@ public class FSDirectory implements Closeable {
   /**
    * Persist the block list for the inode.
    */
-  void persistBlocks(String path, INodeFileUnderConstruction file)
+  void persistBlocks(String path, INodeFile file)
       throws StorageException, TransactionContextException {
+    Preconditions.checkArgument(file.isUnderConstruction());
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug(
           "DIR* FSDirectory.persistBlocks: " + path + " with " +
@@ -318,6 +320,7 @@ public class FSDirectory implements Closeable {
    * Persist the new block (the last block of the given file).
    */
   void persistNewBlock(String path, INodeFile file) throws IOException {
+    Preconditions.checkArgument(file.isUnderConstruction());
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       String block ="";
       if(file.getLastBlock()!=null){
@@ -350,13 +353,15 @@ public class FSDirectory implements Closeable {
    * Remove a block from the file.
    * @return Whether the block exists in the corresponding file
    */
-  boolean removeBlock(String path, INodeFileUnderConstruction fileNode,
+  boolean removeBlock(String path, INodeFile fileNode,
       Block block) throws IOException, StorageException {
+    Preconditions.checkArgument(fileNode.isUnderConstruction());
     return unprotectedRemoveBlock(path, fileNode, block);
   }
   
-  boolean unprotectedRemoveBlock(String path, INodeFileUnderConstruction fileNode,
+  boolean unprotectedRemoveBlock(String path, INodeFile fileNode,
       Block block) throws IOException, StorageException {
+    Preconditions.checkArgument(fileNode.isUnderConstruction());
     // modify file-> block and blocksMap
     boolean removed = fileNode.removeLastBlock(block);
     if (!removed) {
@@ -1571,9 +1576,10 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
           // ancestor is reached
           return;
         }
-        if (inodes[i].isQuotaSet()) { // a directory with quota
-          INodeDirectoryWithQuota node = (INodeDirectoryWithQuota) inodes[i];
-          node.verifyQuota(nsDelta, dsDelta);
+        final DirectoryWithQuotaFeature q =
+            inodes[i].asDirectory().getDirectoryWithQuotaFeature();
+        if (q != null) { // a directory with quota
+          q.verifyQuota(inodes[i].asDirectory(), nsDelta, dsDelta);
         }
       }
     } catch (QuotaExceededException e) {
@@ -1931,8 +1937,10 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
 
     if (dir.isQuotaSet()) {
-      ((INodeDirectoryWithQuota) dir)
-          .setSpaceConsumed(counts.nsCount, counts.dsCount);
+      final DirectoryWithQuotaFeature q = dir.getDirectoryWithQuotaFeature();
+      if (q != null) {
+        q.setSpaceConsumed(dir, counts.nsCount, counts.dsCount);
+      }
 
       // check if quota is violated for some reason.
       final Quota.Counts oldQuota = dir.getQuotaCounts();
@@ -2023,25 +2031,11 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       if (dsQuota == HdfsConstants.QUOTA_DONT_SET) {
         dsQuota = oldDsQuota;
       }
-
-      if (dirNode instanceof INodeDirectoryWithQuota) {
-        // a directory with quota; so set the quota to the new value
-        ((INodeDirectoryWithQuota) dirNode).setQuota(nsQuota, dsQuota);
-        if (!dirNode.isQuotaSet()) {
-          // will not come here for root because root's nsQuota is always set
-          INodeDirectory newNode = new INodeDirectory(dirNode);
-          INodeDirectory parent = (INodeDirectory) inodes[inodes.length - 2];
-          dirNode = newNode;
-          parent.replaceChild(newNode);
-        }
-      } else {
-        // a non-quota directory; so replace it with a directory with quota
-        INodeDirectoryWithQuota newNode =
-            new INodeDirectoryWithQuota(nsQuota, dsQuota, nsCount, dsCount, dirNode);
-        // non-root directory node; parent != null
+      
+      if (!dirNode.isRoot()) {
+        dirNode.setQuota(nsQuota, nsCount, dsQuota, dsCount);
         INodeDirectory parent = (INodeDirectory) inodes[inodes.length - 2];
-        dirNode = newNode;
-        parent.replaceChild(newNode);
+        parent.replaceChild(dirNode);
       }
       return (oldNsQuota != nsQuota || oldDsQuota != dsQuota) ? dirNode : null;
     }
@@ -2617,9 +2611,9 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return src.startsWith(DOT_RESERVED_PATH_PREFIX);
   }
 
-  public INodeDirectoryWithQuota getRootDir()
+  public INodeDirectory getRootDir()
       throws StorageException, TransactionContextException {
-    return INodeDirectoryWithQuota.getRootDir();
+    return INodeDirectory.getRootDir();
   }
 
   public boolean isQuotaEnabled() {
@@ -2627,20 +2621,20 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   }
   
   //add root inode if its not there
-  public INodeDirectoryWithQuota createRoot(
+  public INodeDirectory createRoot(
       final PermissionStatus ps, final boolean overwrite) throws IOException {
     LightWeightRequestHandler addRootINode =
         new LightWeightRequestHandler(HDFSOperationType.SET_ROOT) {
           @Override
           public Object performTask() throws IOException {
-            INodeDirectoryWithQuota newRootINode = null;
+            INodeDirectory newRootINode = null;
             INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
                 .getDataAccess(INodeDataAccess.class);
-            INodeDirectoryWithQuota rootInode = (INodeDirectoryWithQuota) da
+            INodeDirectory rootInode = (INodeDirectory) da
                 .findInodeByNameParentIdAndPartitionIdPK(INodeDirectory.ROOT_NAME,
                     INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey());
             if (rootInode == null || overwrite == true) {
-              newRootINode = INodeDirectoryWithQuota.createRootDir(ps);
+              newRootINode = INodeDirectory.createRootDir(ps);
               // Set the block storage policy to DEFAULT
               List<INode> newINodes = new ArrayList();
               newINodes.add(newRootINode);
@@ -2659,7 +2653,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
             return newRootINode;
           }
         };
-    return (INodeDirectoryWithQuota) addRootINode.handle();
+    return (INodeDirectory) addRootINode.handle();
   }
 
   public boolean hasChildren(final int parentId, final boolean areChildrenRandomlyPartitioned) throws IOException {

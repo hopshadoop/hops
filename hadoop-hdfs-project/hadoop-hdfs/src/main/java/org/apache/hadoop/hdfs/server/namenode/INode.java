@@ -128,7 +128,6 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   protected boolean inTree = false;
   protected int parentId = 0;
   public static int RANDOM_PARTITIONING_MAX_LEVEL=1;
-  protected Integer partitionId;
 
   protected boolean subtreeLocked;
   protected long subtreeLockOwner;
@@ -213,9 +212,6 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
 
   }
   
-  
-  long header = 0L;
-
   /** Wrapper of two counters for namespace consumed and diskspace consumed. */
   static class DirCounts {
     /** namespace count */
@@ -238,89 +234,17 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     }
   }
 
-  private String userName;
-  private String groupName;
-
-  private int userId;
-  private int groupId;
-
-  private FsPermission permission;
-
-  private int logicalTime;
-  
   private int numAces;
-  
-  /**
-   * The inode id
-   */
-  final protected int id;
-  
-  /**
-   * The inode name is in java UTF8 encoding;
-   * The name in HdfsFileStatus should keep the same encoding as this.
-   * if this encoding is changed, implicitly getFileInfo and listStatus in
-   * clientProtocol are changed; The decoding at the client
-   * side should change accordingly.
-   */
-  private byte[] name = null;
-
-  protected INodeDirectory parent = null;
-  protected long modificationTime = 0L;
-  protected long accessTime = 0L;
+  /** parent is {@link INodeDirectory} */
+  protected INode parent = null;
   protected LinkedElement next = null;
   
-  INode(int id, byte[] name, PermissionStatus permission, INodeDirectory parent,
-      long modificationTime, long accessTime, boolean inTree) throws IOException{
-    this.id = id;
-    this.name = name;
-    this.permission = permission.getPermission();
-    this.userName = permission.getUserName();
-    this.userId = UsersGroups.getUserID(permission.getUserName());
-    this.groupName = permission.getGroupName();
-    this.groupId = UsersGroups.getGroupID(permission.getGroupName());
+  INode(INode parent) {
     this.parent = parent;
-    this.modificationTime = modificationTime;
-    this.accessTime = accessTime;
-    this.inTree = inTree;
-  }
-
-  INode(int id, byte[] name, PermissionStatus permission, INodeDirectory parent,
-      long modificationTime, long accessTime) throws IOException{
-     this(id, name, permission, parent, modificationTime, accessTime, false);
-  }
-  
-  INode(int id, PermissionStatus permissions, long mtime, long atime) throws IOException{
-    this(id, permissions, mtime, atime, false);
-  }
-  
-  INode(int id, PermissionStatus permissions, long mtime, long atime, boolean inTree) throws IOException{
-    this(id, null, permissions, null, mtime, atime, inTree);
-  }
-  
-  protected INode(int id, String name, PermissionStatus permissions) throws IOException {
-    this(id, name, permissions, false);
-  }
-  
-  protected INode(int id, String name, PermissionStatus permissions, boolean inTree)
-      throws IOException {
-    this(id, DFSUtil.string2Bytes(name), permissions, null, 0L, 0L, inTree);
-  }
-  
-  /** @param other Other node to be copied */
-  INode(INode other) throws IOException {
-    this(other.getId(), other.getLocalNameBytes(), other.getPermissionStatus(), other.
-        getParent(),
-        other.getModificationTime(), other.getAccessTime(), other.inTree);
-    this.header = other.header;
-    this.partitionId = other.partitionId;
-    this.parentId = other.parentId;    
-    this.logicalTime = other.logicalTime;
   }
 
   /** Get inode id */
-  public int getId() {
-    return this.id;
-  }
+  public abstract int getId();
 
   public AclFeature getAclFeature() throws TransactionContextException, StorageException, AclException {
     return INodeAclHelper.getAclFeature(this);
@@ -337,86 +261,35 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   /**
    * Check whether this is the root inode.
    */
-  boolean isRoot() {
-    return name.length == 0;
+  final boolean isRoot() {
+    return getLocalNameBytes().length == 0;
   }
   
   /**
    * Get the {@link PermissionStatus}
    */
-  public PermissionStatus getPermissionStatus() throws IOException {
-    return new PermissionStatus(getUserName(), getGroupName(),
-        getFsPermission());
-  }
+  public abstract PermissionStatus getPermissionStatus() throws IOException;
 
   /**
    * Get user name
    */
-  public String getUserName() throws IOException {
-    if(userName == null || userName.isEmpty()){
-      userName = UsersGroups.getUser(userId);
-    }
-    return userName;
-  }
+  public abstract String getUserName() throws IOException;
 
-  public int getUserID(){
-    return userId;
-  }
-
-  public void setUserIDNoPersistance(int userId){
-    this.userId = userId;
-  }
-  /**
-   * Set user
-   */
-  public void setUserNoPersistance(String user) throws IOException {
-    this.userName = user;
-    this.userId = UsersGroups.getUserID(user);
-  }
+  public abstract int getUserID();
 
   /**
    * Get group name
    */
-  public String getGroupName() throws IOException {
-    if(groupName == null || groupName.isEmpty()){
-      groupName = UsersGroups.getGroup(groupId);
-    }
-    return groupName;
-  }
+  public abstract String getGroupName() throws IOException;
 
-  public int getGroupID(){
-    return groupId;
-  }
-
-  public void setGroupIDNoPersistance(int groupId){
-    this.groupId = groupId;
-  }
-
-  /**
-   * Set group
-   */
-  public void setGroupNoPersistance(String group) throws IOException {
-    this.groupName = group;
-    this.groupId = UsersGroups.getGroupID(group);
-  }
+  public abstract int getGroupID();
 
   /**
    * Get the {@link FsPermission}
    */
-  public FsPermission getFsPermission() {
-    return permission;
-  }
+  public abstract FsPermission getFsPermission();
 
-  protected short getFsPermissionShort() {
-    return permission.toShort();
-  }
-
-  /**
-   * Set the {@link FsPermission} of this {@link INode}
-   */
-  private void setPermissionNoPersistance(FsPermission permission) {
-    this.permission = permission;
-  }
+  protected abstract short getFsPermissionShort();
 
   /**
    * Check whether it's a file.
@@ -500,6 +373,18 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   abstract ContentSummaryComputationContext computeContentSummary(ContentSummaryComputationContext summary)
       throws StorageException, TransactionContextException;
   
+  public void addSpaceConsumed(long nsDelta, long dsDelta)
+    throws StorageException, TransactionContextException {
+    addSpaceConsumed2Parent(nsDelta, dsDelta);
+  }
+  
+  void addSpaceConsumed2Parent(long nsDelta, long dsDelta)
+    throws StorageException, TransactionContextException {
+    if (parent != null) {
+      parent.addSpaceConsumed(nsDelta, dsDelta);
+    }
+  }
+  
   /**
    * Get the quota set for this inode
    *
@@ -528,6 +413,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    * @return null if the local name is null; otherwise, return the local name.
    */
   public String getLocalName() {
+    final byte[] name = getLocalNameBytes();
     return name == null? null: DFSUtil.bytes2String(name);
   }
 
@@ -548,24 +434,18 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    * @return null if the local name is null;
    *         otherwise, return the local name byte array.
    */
-  byte[] getLocalNameBytes() {
-    return name;
-  }
+  abstract byte[] getLocalNameBytes();
 
   
   /**
    * Set local file name
    */
-  public void setLocalNameNoPersistance(String name) {
-    this.name = DFSUtil.string2Bytes(name);
-  }
+  public abstract void setLocalNameNoPersistance(String name);
 
   /**
    * Set local file name
    */
-  public void setLocalNameNoPersistance(byte[] name) {
-    this.name = name;
-  }
+  public abstract void setLocalNameNoPersistance(byte[] name);
   
   public String getFullPathName()
       throws StorageException, TransactionContextException {
@@ -606,9 +486,16 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
 
   @VisibleForTesting
   public String toDetailString() throws StorageException, TransactionContextException {
-    return toString() + "(" + getObjectString() + "), " + getParentString();
+    final INodeDirectory p = getParent();
+    return toStringWithObjectType()
+        + ", parent=" + (p == null ? null : p.toStringWithObjectType());
   }
 
+  @VisibleForTesting
+  public String toStringWithObjectType() {
+    return toString() + "(" + getObjectString() + ")";
+  }
+  
   /**
    * Get parent directory
    *
@@ -621,11 +508,11 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
       return null;
     }
     if (parent == null) {
-      parent = (INodeDirectory) EntityManager
+      parent = (INode) EntityManager
           .find(INode.Finder.ByINodeIdFTIS, getParentId());
     }
 
-    return this.parent;
+    return this.parent.asDirectory();
   }
 
   /**
@@ -633,41 +520,24 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    *
    * @return access time
    */
-  public long getModificationTime() {
-    return this.modificationTime;
-  }
+  public abstract long getModificationTime();
 
   /**
    * Set last modification time of inode.
    */
-  public void setModificationTimeNoPersistance(long modtime) {
-    if (this.modificationTime <= modtime) {
-      this.modificationTime = modtime;
-    }
-  }
-
-  /**
-   * Always set the last modification time of inode.
-   */
-  protected void setModificationTimeForceNoPersistance(long modtime) {
-    this.modificationTime = modtime;
-  }
+  public abstract void setModificationTimeNoPersistance(long modtime);
 
   /**
    * Get access time of inode.
    *
    * @return access time
    */
-  public long getAccessTime() {
-    return accessTime;
-  }
+  public abstract long getAccessTime();
 
   /**
    * Set last access time of inode.
    */
-  public void setAccessTimeNoPersistance(long atime) {
-    accessTime = atime;
-  }
+  public abstract void setAccessTimeNoPersistance(long atime);
 
   /**
    * 1) If the file or directory is specificed with a storage policy, return it.
@@ -766,7 +636,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     if (parent == null) {
       return false;
     } else {
-      parent.removeChild(this);
+      ((INodeDirectory) parent).removeChild(this);
       parent = null;
       return true;
     }
@@ -776,6 +646,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
 
   @Override
   public final int compareTo(byte[] bytes) {
+    final byte[] name = getLocalNameBytes();
     final byte[] left = name == null ? EMPTY_BYTES : name;
     final byte[] right = bytes == null ? EMPTY_BYTES : bytes;
     return SignedBytes.lexicographicalComparator().compare(left, right);
@@ -789,11 +660,13 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     if (that == null || !(that instanceof INode)) {
       return false;
     }
-    return id == ((INode) that).id;
+    
+    return this.getId() == ((INode) that).getId();
   }
-
+  
   @Override
   public final int hashCode() {
+    final int id = this.getId();
     return (int)(id^(id>>>32));
   }
 
@@ -827,23 +700,16 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   /**
    * Set user
    */
-  protected void setUser(String user)
-      throws IOException {
-    setUserNoPersistance(user);
-    save();
-  }
+  protected abstract void setUser(String user) throws IOException;
+  
+  public abstract void setUserIDNoPersistance(int userID);
 
-  protected void setGroup(String group)
-      throws IOException {
-    setGroupNoPersistance(group);
-    save();
-  }
+  protected abstract void setGroup(String group) throws IOException;
+  
+  public abstract void setGroupIDNoPersistance(int groupID);
 
-  void setPermission(FsPermission permission)
-      throws StorageException, TransactionContextException {
-    setPermissionNoPersistance(permission);
-    save();
-  }
+  abstract void setPermission(FsPermission permission)
+      throws StorageException, TransactionContextException;
 
   protected void setPermissionStatus(PermissionStatus ps)
       throws IOException {
@@ -858,23 +724,14 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     save();
   }
   
-  public void setLocalName(byte[] name)
-      throws StorageException, TransactionContextException {
-    setLocalNameNoPersistance(name);
-    save();
-  }
+  public abstract void setLocalName(byte[] name)
+      throws StorageException, TransactionContextException;
   
-  public void setModificationTime(long modtime)
-      throws StorageException, TransactionContextException {
-    setModificationTimeNoPersistance(modtime);
-    save();
-  }
+  public abstract void setModificationTime(long modtime)
+      throws StorageException, TransactionContextException;
 
-  public void setAccessTime(long atime)
-      throws TransactionContextException, StorageException {
-    setAccessTimeNoPersistance(atime);
-    save();
-  }
+  public abstract void setAccessTime(long atime)
+      throws TransactionContextException, StorageException;
 
   public void setBlockStoragePolicyID(byte blockStoragePolicyID)
       throws TransactionContextException, StorageException {
@@ -887,11 +744,8 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     this.blockStoragePolicyID = blockStoragePolicyID;
   }
 
-  void setModificationTimeForce(long modtime)
-      throws StorageException, TransactionContextException {
-    setModificationTimeForceNoPersistance(modtime);
-    save();
-  }
+  abstract void setModificationTimeForce(long modtime)
+      throws StorageException, TransactionContextException;
   
   public int getNumAces(){
     return numAces;
@@ -931,9 +785,12 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
       throws StorageException, TransactionContextException {
     EntityManager.remove(node);
     //if This inode is of type INodeDirectoryWithQuota then also delete the INode Attribute table
-    if (node instanceof INodeDirectoryWithQuota) {
-      ((INodeDirectoryWithQuota) node).removeAttributes();
+    if ((node instanceof INodeDirectory) && ((INodeDirectory) node).isWithQuota()) {
+      final DirectoryWithQuotaFeature q = ((INodeDirectory) node).getDirectoryWithQuotaFeature();
+      q.removeAttributes((INodeDirectory) node);
+      ((INodeDirectory) node).removeFeature(q);
     }
+    
     cleanParity(node);
   }
 
@@ -979,23 +836,8 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     setSubtreeLocked(false);
   }
 
-  public void logMetadataEvent(MetadataLogEntry.Operation operation)
-      throws StorageException, TransactionContextException {
-    if(isUnderConstruction()){
-      return;
-    }
-    if (isPathMetaEnabled()) {
-      if(getPartitionId() == null){
-        throw new RuntimeException("Trying to log metadata for an inode that " +
-            "wasn't commited to the database");
-      }
-      INodeDirectory datasetDir = getMetaEnabledParent();
-      EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(),
-          getPartitionId(), getParentId(), getLocalName(), ++logicalTime,
-          operation));
-      save();
-    }
-  }
+  public abstract void logMetadataEvent(MetadataLogEntry.Operation operation)
+      throws StorageException, TransactionContextException;
 
   boolean isPathMetaEnabled() throws TransactionContextException, StorageException {
     return getMetaEnabledParent() != null;
@@ -1013,19 +855,12 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     return null;
   }
 
-  public Integer getPartitionId(){
-    return  partitionId;
-  }
+  public abstract Integer getPartitionId();
 
-  public void setPartitionIdNoPersistance(Integer partitionId){
-    this.partitionId = partitionId;
-  }
+  public abstract void setPartitionIdNoPersistance(Integer partitionId);
 
-  public void setPartitionId(Integer partitionId) throws
-      TransactionContextException, StorageException {
-    setPartitionIdNoPersistance(partitionId);
-    save();
-  }
+  public abstract void setPartitionId(Integer partitionId) throws
+      TransactionContextException, StorageException;
 
   public void calculateAndSetPartitionIdNoPersistance(int parentId, String name, short depth){
     setPartitionIdNoPersistance(calculatePartitionId(parentId,name,depth));
@@ -1062,13 +897,9 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     }
   }
 
-  public long getHeader() {
-    return header;
-  }
+  public abstract long getHeader();
 
-  public void setHeaderNoPersistance(long header) {
-    this.header = header;
-  }
+  public abstract void setHeaderNoPersistance(long header);
 
   public void setHasBlocks(boolean hasBlocks) throws TransactionContextException, StorageException {
     setHasBlocksNoPersistance(hasBlocks);
@@ -1076,16 +907,13 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   }
 
   @VisibleForTesting
-  public void setHasBlocksNoPersistance(boolean hasBlocks) throws TransactionContextException, StorageException {
-    header = HeaderFormat.combineHasBlocksNoPersistance(header, hasBlocks);
-  }
+  public abstract void setHasBlocksNoPersistance(boolean hasBlocks)
+      throws TransactionContextException, StorageException;
   
-  public boolean hasBlocks(){
-   return HeaderFormat.hasBlocks(header);
-  }
+  public abstract boolean hasBlocks();
 
   public short myDepth() throws TransactionContextException, StorageException {
-    if(id == INodeDirectory.ROOT_INODE_ID){
+    if(getId() == INodeDirectory.ROOT_INODE_ID){
       return INodeDirectory.ROOT_DIR_DEPTH;
     }
 
@@ -1115,13 +943,9 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     return true;
   }
 
-  public int getLogicalTime(){
-    return logicalTime;
-  }
+  public abstract int getLogicalTime();
 
-  public void setLogicalTimeNoPersistance(Integer logicalTime){
-    this.logicalTime = logicalTime;
-  }
+  public abstract void setLogicalTimeNoPersistance(Integer logicalTime);
   
   /**
    * Dump the subtree starting from this inode.
@@ -1208,5 +1032,12 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   @Override
   public LinkedElement getNext() {
     return next;
+  }
+  
+  /**
+   * INode feature such as {@link FileUnderConstructionFeature}
+   * and {@link DirectoryWithQuotaFeature}.
+   */
+  public interface Feature {
   }
 }

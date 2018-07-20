@@ -118,6 +118,8 @@ public class HdfsConfiguration extends Configuration {
         DFSConfigKeys.DFS_DATANODE_MAX_RECEIVER_THREADS_KEY);
     deprecate("io.bytes.per.checksum",
         DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY);
+    deprecate("dfs.client.file-block-storage-locations.timeout",
+        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS);
   }
 
   public static void main(String[] args) {

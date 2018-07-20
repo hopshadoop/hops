@@ -49,7 +49,8 @@ public class Lease implements Comparable<Lease> {
   public static enum Finder implements FinderType<Lease> {
 
     ByHolder,
-    ByHolderId;
+    ByHolderId,
+    All;
 
     @Override
     public Class getType() {
@@ -63,6 +64,8 @@ public class Lease implements Comparable<Lease> {
           return Annotation.PrimaryKey;
         case ByHolderId:
           return Annotation.PrunedIndexScan;
+        case All:
+          return Annotation.FullTable;
         default:
           throw new IllegalStateException();
       }

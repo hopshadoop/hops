@@ -33,7 +33,7 @@ import java.util.List;
  * An {@link INode} representing a symbolic link.
  */
 @InterfaceAudience.Private
-public class INodeSymlink extends INode {
+public class INodeSymlink extends INodeWithAdditionalFields {
   private final byte[] symlink; // The target URI
 
   public INodeSymlink(int id, String value, long mtime, long atime, PermissionStatus permissions) throws IOException {
