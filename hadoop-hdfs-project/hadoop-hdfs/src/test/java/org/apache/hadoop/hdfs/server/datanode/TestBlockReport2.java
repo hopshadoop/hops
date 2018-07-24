@@ -293,7 +293,7 @@ public class TestBlockReport2 {
    *
    * @throws IOException
    */
-  @Ignore // Deleting a file does not trigger delete reports
+  @Ignore //We do not yet handle file deletes yet
   @Test
   public void blockReport_01() throws IOException, InterruptedException {
     DistributedFileSystem fs = null;
@@ -431,7 +431,7 @@ public class TestBlockReport2 {
    * @throws IOException
    * @throws InterruptedException
    */
-  @Ignore //Don't know what's going wrong yet
+  @Ignore //Requires implementation that handles block recovery
   @Test
   public void blockReport_03() throws IOException, InterruptedException {
     DistributedFileSystem fs = null;
@@ -514,13 +514,13 @@ public class TestBlockReport2 {
   /**
    * Test hard lease recovery
    */
-  @Ignore // Think this case can't be handled by bucket report
+  @Ignore //Requires implementation that handles block recovery
   @Test
   public void blockReport_04() throws Exception {
     blockReprot_hardlease(true);
   }
 
-  @Ignore // Think this case can't be handled by bucket report
+  @Ignore //Requires implementation that handles block recovery
   @Test
   public void blockReport_05() throws Exception {
     blockReprot_hardlease(false);
@@ -691,7 +691,6 @@ public class TestBlockReport2 {
     blockReportReplication((short) 3, (short) 6);
   }
 
-  @Ignore  //Don't know why this doesn't work
   @Test
   public void blockReport_08() throws IOException, InterruptedException {
     //for some reason reducing the replicaton doe snot work well
@@ -771,7 +770,7 @@ public class TestBlockReport2 {
   }
 
 
-  @Ignore // Don't know why this doesn't work
+  @Ignore //We do not yet handle file deletes yet
   @Test
   public void blockReport_09() throws IOException, InterruptedException {
     concurrentWrites(1 /*threads*/,
@@ -780,7 +779,7 @@ public class TestBlockReport2 {
             0 /*threshold*/);
   }
 
-  @Ignore // Don't know why this doesn't work
+  @Ignore //We do not yet handle file deletes yet
   @Test
   public void blockReport_10() throws IOException, InterruptedException {
     concurrentWrites(5 /*threads*/,
@@ -890,6 +889,7 @@ public class TestBlockReport2 {
       fs = (DistributedFileSystem) cluster.getFileSystem();
 
       Thread.sleep(5000);
+
       //after initial BR
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
@@ -910,7 +910,6 @@ public class TestBlockReport2 {
    * @throws IOException
    * @throws InterruptedException
    */
-   @Ignore //This test doesn't make sense
    @Test
   public void blockReport_12() throws IOException, InterruptedException {
     DistributedFileSystem fs = null;
@@ -972,8 +971,6 @@ public class TestBlockReport2 {
    * @throws IOException
    * @throws InterruptedException
    */
-  @Ignore // Hash buckets do not match report after sending. Either they contain non-finalized blocks
-          // or there is some logical problem with letting the full block report "reset" hashes.
   @Test
   public void blockReport_13() throws IOException, InterruptedException {
     DistributedFileSystem fs = null;
@@ -986,6 +983,7 @@ public class TestBlockReport2 {
       Configuration conf = new Configuration();
       int numBuckets = 5;
       setConfiguration(conf,numBuckets);
+      HashBuckets.setNumBucketsForTest(numBuckets);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -1011,11 +1009,12 @@ public class TestBlockReport2 {
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
 
       deleteHashes(0, cluster);
-      //Increase the number of bucktes
+      //Increase the number of buckets
       cluster.shutdown();
       conf = new Configuration();
       numBuckets = 10;
       setConfiguration(conf,numBuckets);
+      HashBuckets.setNumBucketsForTest(numBuckets);
       cluster = new MiniDFSCluster.Builder(conf).format
               (false).numDataNodes(NUM_DATANODES).build();
       cluster.waitActive();
@@ -1033,6 +1032,7 @@ public class TestBlockReport2 {
       conf = new Configuration();
       numBuckets = 3;
       setConfiguration(conf,numBuckets);
+      HashBuckets.setNumBucketsForTest(numBuckets);
       cluster = new MiniDFSCluster.Builder(conf).format
               (false).numDataNodes(NUM_DATANODES).build();
       cluster.waitActive();
@@ -1040,7 +1040,6 @@ public class TestBlockReport2 {
 
       matchDNandNNState(0, NUM_DATANODES, cluster, NUM_DATANODES*numBuckets, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, NUM_DATANODES*numBuckets, numBuckets);
-
 
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
@@ -1072,39 +1071,31 @@ public class TestBlockReport2 {
       Map<DatanodeStorage, BlockReport> storageReports = getDNBR(cluster, dn, numBuckets);
 
       for (Map.Entry<DatanodeStorage, BlockReport> entry : storageReports.entrySet()) {
-        BlockReport value = entry.getValue();
-        List<Long> dnHashes = new ArrayList<>();
-        for (long hash : value.getHashes()) {
-          dnHashes.add(hash);
-        }
+        BlockReport report = entry.getValue();
 
         DatanodeStorageInfo storage = cluster.getNamesystem().getBlockManager().getDatanodeManager().getDatanode(dn.getDatanodeId()).getStorageInfo(entry.getKey().getStorageID());
         List<HashBucket> storageHashes = getStorageHashes(storage);
+        if (storageHashes.size() > report.getHashes().length){
+          LOG.warn("More hashes on namenode than on datanode. After reconfiguration, remaining buckets should be cleaned");
+        }
 
-        assertFalse("More buckets on NN than on DN. might indicate configuration issue.", storageHashes.size() > dnHashes.size());
+        Collections.sort(storageHashes, new Comparator<HashBucket>() {
+          @Override
+          public int compare(HashBucket o1, HashBucket o2) {
+            return o1.getBucketId() - o2.getBucketId();
+          }
+        });
 
-        if (storageHashes.size() != dnHashes.size()){
+
+        if (storageHashes.size() != report.getHashes().length){
           LOG.debug("Number of hashes on NN doesn't match DN. This should only be the case before first report.");
         }
 
-        List<Long> nnHashes = new ArrayList<>();
-        for (HashBucket storageHash : storageHashes) {
-          nnHashes.add(storageHash.getHash());
-        }
-        for (int j = 0; j < dnHashes.size() - storageHashes.size() ; j++){
-          nnHashes.add(0L); //fill with zeros unordered
-        }
+        LOG.debug("DN Hash: " + Arrays.toString(report.getHashes()));
+        LOG.debug("NN Hash: " + Arrays.toString(storageHashes.toArray()));
 
-        Collections.sort(nnHashes);
-        Collections.sort(dnHashes);
-
-        LOG.debug("DN Hash: " + Arrays.toString(dnHashes.toArray()));
-        LOG.debug("NN Hash: " + Arrays.toString(nnHashes.toArray()));
-
-        for (int j = 0; j < numBuckets; j++) {
-          Long dnHash = dnHashes.get(j);
-          Long nnHash = nnHashes.get(j);
-          if (!dnHash.equals(nnHash)) {
+        for (int hashIndex = 0 ; hashIndex < report.getHashes().length ; hashIndex++) {
+          if (report.getHashes()[hashIndex] != storageHashes.get(hashIndex).getHash()) {
             mismatchCount++;
           }
         }
@@ -1205,14 +1196,11 @@ public class TestBlockReport2 {
   private List<HashBucket> getStorageHashes(DatanodeStorageInfo storage) throws IOException {
     List<HashBucket> namenodeHashes = HashBuckets.getInstance().getBucketsForStorage(storage);
 
-    boolean hasIncorrectStorageBucket = false;
     for (HashBucket namenodeHash : namenodeHashes) {
       if (namenodeHash.getStorageId() != storage.getSid()){
-        hasIncorrectStorageBucket = true;
-        break;
+        fail("HashBuckets.getBucketForStorage() returned incorrect storage hash");
       }
     }
-    assertFalse("HashBuckets.getBucketForStorage() returned incorrect storage hash", hasIncorrectStorageBucket);
 
     return namenodeHashes;
   }

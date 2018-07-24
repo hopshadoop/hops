@@ -45,15 +45,16 @@ public class LastBlockReplicasHashBucketLock extends Lock {
           Collections.sort(replicas, new Comparator<Replica>() {
             @Override
             public int compare(Replica o1, Replica o2) {
-              return new Integer(o1.getBucketId()).compareTo(o2.getBucketId());
+              return new Integer(o1.getStorageId()).compareTo(o2.getStorageId());
             }
           });
 
           //FIXME-BR why lock buckets for all the replicas. Only the last
           // replica should be locked. Am I missing something
+          final int bucketId = HashBuckets.getInstance().getBucketForBlock(lastBlock);
           for (Replica replica : replicas) {
             EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId, replica
-                .getStorageId(), replica.getBucketId());
+                .getStorageId(), bucketId);
           }
         }
       }

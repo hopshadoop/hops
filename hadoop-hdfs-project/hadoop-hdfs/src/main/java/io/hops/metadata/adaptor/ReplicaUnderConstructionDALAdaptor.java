@@ -83,7 +83,7 @@ public class ReplicaUnderConstructionDALAdaptor extends
     if (hdfsClass != null) {
       return new ReplicaUnderConstruction(hdfsClass.getState().ordinal(),
           hdfsClass.getStorageId(), hdfsClass.getBlockId(),
-          hdfsClass.getInodeId(), hdfsClass.getBucketId(), hdfsClass.getChosenAsPrimary(),
+          hdfsClass.getInodeId(), hdfsClass.getChosenAsPrimary(),
           hdfsClass.getGenerationStamp());
     } else {
       return null;
@@ -99,7 +99,6 @@ public class ReplicaUnderConstructionDALAdaptor extends
           dalClass.getStorageId(),
           dalClass.getBlockId(),
           dalClass.getInodeId(),
-          dalClass.getBucketId(),
           dalClass.getChosenAsPrimary(),
           dalClass.getGenerationStamp());
     } else {

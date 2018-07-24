@@ -404,6 +404,7 @@ public class TestNameNodeMetrics {
    */
   @Test
   public void testSyncAndBlockReportMetric() throws Exception {
+    Thread.sleep(10000);
     MetricsRecordBuilder rb = getMetrics(NN_METRICS);
     // Each datanode reports in when the cluster comes up
     assertCounter("BlockReportNumOps",
