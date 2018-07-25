@@ -644,6 +644,7 @@ public class TestUsersGroups {
     for(Future<Boolean> f : futures){
       assertTrue(f.get());
     }
+    cluster.shutdown();
   }
 
 
@@ -652,36 +653,40 @@ public class TestUsersGroups {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
         .build();
-    cluster.waitActive();
+    try {
+      cluster.waitActive();
 
-    DistributedFileSystem dfs = cluster.getFileSystem();
-    Path base = new Path("/base");
-    dfs.mkdirs(base);
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      Path base = new Path("/base");
+      dfs.mkdirs(base);
 
-    final String username = "user";
-    final String groupname = "group";
-    final String newgroupname = "newgroup";
+      final String username = "user";
+      final String groupname = "group";
+      final String newgroupname = "newgroup";
 
-    dfs.setOwner(base, username, groupname);
+      dfs.setOwner(base, username, groupname);
 
-    FileStatus fileStatus = dfs.getFileStatus(base);
-    assertEquals(username, fileStatus.getOwner());
-    assertEquals(groupname, fileStatus.getGroup());
+      FileStatus fileStatus = dfs.getFileStatus(base);
+      assertEquals(username, fileStatus.getOwner());
+      assertEquals(groupname, fileStatus.getGroup());
 
-    int userId = UsersGroups.getUserID(username);
+      int userId = UsersGroups.getUserID(username);
 
-    removeUser(userId);
+      removeUser(userId);
 
-    dfs.setOwner(base, username, newgroupname);
+      dfs.setOwner(base, username, newgroupname);
 
-    fileStatus = dfs.getFileStatus(base);
-    assertEquals(username, fileStatus.getOwner());
-    assertEquals(newgroupname, fileStatus.getGroup());
+      fileStatus = dfs.getFileStatus(base);
+      assertEquals(username, fileStatus.getOwner());
+      assertEquals(newgroupname, fileStatus.getGroup());
 
-    int newUserId = UsersGroups.getUserID(username);
+      int newUserId = UsersGroups.getUserID(username);
 
-    assertTrue(newUserId > userId);
-    assertNotEquals(userId, newUserId);
+      assertTrue(newUserId > userId);
+      assertNotEquals(userId, newUserId);
+    } finally {
+      cluster.shutdown();
+    }
   }
 
 }

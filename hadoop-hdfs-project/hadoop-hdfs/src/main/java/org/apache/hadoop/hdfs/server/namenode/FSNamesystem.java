@@ -939,6 +939,7 @@ public class FSNamesystem
       if (smmthread != null) {
         smmthread.interrupt();
       }
+      subtreeOperationsExecutor.shutdownNow();
     } finally {
       // using finally to ensure we also wait for lease daemon
       try {
@@ -6830,7 +6831,7 @@ public class FSNamesystem
     return isPermissionEnabled;
   }
 
-  ExecutorService getSubtreeOperationsExecutor() {
+  public ExecutorService getSubtreeOperationsExecutor() {
     return subtreeOperationsExecutor;
   }
 
@@ -8845,10 +8846,6 @@ public class FSNamesystem
     }
 
     public List<AclEntry>[] getPathInodeAcls() { return pathInodeAcls; }
-  }
-
-  public ExecutorService getExecutorService(){
-    return subtreeOperationsExecutor;
   }
 
   public boolean storeSmallFilesInDB() {
