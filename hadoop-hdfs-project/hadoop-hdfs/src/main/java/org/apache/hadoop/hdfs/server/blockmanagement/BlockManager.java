@@ -2225,13 +2225,14 @@ public class BlockManager {
           + " of " + numBlocksLogged + " reported.");
     }
     try {
-      List<Future<Object>> futures = ((FSNamesystem) namesystem).getExecutorService().invokeAll(addTasks);
+      List<Future<Object>> futures = ((FSNamesystem) namesystem).getSubtreeOperationsExecutor().invokeAll(addTasks);
       //Check for exceptions
       for (Future<Object> maybeException : futures){
         maybeException.get();
       }
     } catch (InterruptedException e) {
-      e.printStackTrace();
+      LOG.error(e);
+      throw new IOException(e);
     } catch (ExecutionException e) {
       throw (IOException) e.getCause();
     }
@@ -2305,18 +2306,7 @@ public class BlockManager {
     stats.numBuckets = newReport.getBuckets().length;
     stats.numBlocks = newReport.getNumberOfBlocks();
   
-    HashMatchingResult matchingResult;
-    if (firstBlockReport){
-        //First block report, or report in safe mode, should always process complete report.
-      List<Integer> allBucketIds = new ArrayList<>();
-      for (int i = 0; i < newReport.getBuckets().length; i++){
-        allBucketIds.add(i);
-      }
-      matchingResult = new HashMatchingResult(new ArrayList<Integer>(),
-          allBucketIds );
-    } else {
-      matchingResult = calculateMismatchedHashes(storage, newReport);
-    }
+    HashMatchingResult matchingResult = calculateMismatchedHashes(storage, newReport, firstBlockReport);
     stats.numBucketsMatching = matchingResult.matchingBuckets.size();
     
     
@@ -2368,37 +2358,41 @@ public class BlockManager {
                                                final Map<Long, Integer> mismatchedBlocksAndInodes,
                                                final Set<Long> aggregatedSafeBlocks,
                                                final Set<Long> allMismatchedBlocksOnServer,
-                                               final Map<Long,Long> invalidatedReplicas) {
+                                               final Map<Long,Long> invalidatedReplicas) throws IOException {
 
     final Collection<Callable<Void>> subTasks = new ArrayList<>();
     for (final int bucketId : matchingResult.mismatchedBuckets) {
       final Bucket bucket = newReport.getBuckets()[bucketId];
       final List<ReportedBlock> bucketBlocks = Arrays.asList(bucket.getBlocks());
-      if(bucket.getBlocks().length>0){
-        final Callable<Void> subTask = new Callable<Void>() {
-          @Override
-          public Void call() throws Exception {
-            final HopsTransactionalRequestHandler processReportHandler =
-                    processBucketInternal(storage, bucketId, toAdd, toInvalidate,
-                            toCorrupt, toUC, firstBlockReport,
-                            mismatchedBlocksAndInodes,
-                            aggregatedSafeBlocks, allMismatchedBlocksOnServer,
-                            invalidatedReplicas, bucketBlocks);
-            processReportHandler.handle();
-            return null;
-          }
-        };
-        subTasks.add(subTask); // collect subtasks
-      }
+      final Callable<Void> subTask = new Callable<Void>() {
+        @Override
+        public Void call() throws IOException {
+          final HopsTransactionalRequestHandler processReportHandler = processBucketInternal(storage, bucketId, toAdd,
+              toInvalidate,
+              toCorrupt, toUC, firstBlockReport,
+              mismatchedBlocksAndInodes,
+              aggregatedSafeBlocks, allMismatchedBlocksOnServer,
+              invalidatedReplicas, bucketBlocks);
+          processReportHandler.handle();
+          return null;
+        }
+      };
+      subTasks.add(subTask); // collect subtasks
     }
 
     try {
-      ((FSNamesystem) namesystem).getExecutorService().invokeAll(subTasks);
-    } catch (Exception e) {
+      List<Future<Void>> futures = ((FSNamesystem) namesystem).getSubtreeOperationsExecutor().invokeAll(subTasks);
+      for (Future<Void> maybeException : futures){
+        maybeException.get();
+      }
+    } catch (InterruptedException e) {
       LOG.error("Exception was thrown during block report processing", e);
+      throw new IOException(e);
+    } catch (ExecutionException e) {
+      throw (IOException) e.getCause();
     }
   }
-
+  
   private HopsTransactionalRequestHandler processBucketInternal(final DatanodeStorageInfo storage,
                                                                 final int bucketId,
                                                                 final Collection<BlockInfo> toAdd,
@@ -2412,29 +2406,30 @@ public class BlockManager {
                                                                 final Map<Long,Long> invalidatedReplicas,
                                                                 final List<ReportedBlock> reportedBlocks ) {
 
-    return new HopsTransactionalRequestHandler( HDFSOperationType.PROCESS_REPORT) {
+    return new HopsTransactionalRequestHandler(HDFSOperationType.PROCESS_REPORT) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        List<Long> resolvedBlockIds = new ArrayList<>();
-        List<Integer> inodeIds = new ArrayList<>();
-        List<Long> unResolvedBlockIds = new ArrayList<>();
+        if (!reportedBlocks.isEmpty()) {
+          List<Long> resolvedBlockIds = new ArrayList<>();
+          List<Integer> inodeIds = new ArrayList<>();
+          List<Long> unResolvedBlockIds = new ArrayList<>();
 
-        for (ReportedBlock reportedBlock : reportedBlocks) {
-          Integer inodeId = mismatchedBlocksAndInodes.get
-                  (reportedBlock.getBlockId());
-          if (inodeId != null) {
-            resolvedBlockIds.add(reportedBlock.getBlockId());
-            inodeIds.add(inodeId);
-          } else {
-            unResolvedBlockIds.add(reportedBlock.getBlockId());
+          for (ReportedBlock reportedBlock : reportedBlocks) {
+            Integer inodeId = mismatchedBlocksAndInodes.get(reportedBlock.getBlockId());
+            if (inodeId != null) {
+              resolvedBlockIds.add(reportedBlock.getBlockId());
+              inodeIds.add(inodeId);
+            } else {
+              unResolvedBlockIds.add(reportedBlock.getBlockId());
+            }
           }
-        }
 
-        locks.add(lf.getBlockReportingLocks(Longs.toArray(resolvedBlockIds),
-                        Ints.toArray(inodeIds),
-                        Longs.toArray(unResolvedBlockIds), storage.getSid()))
-                .add(lf.getIndividualHashBucketLock(storage.getSid(), bucketId));
+          locks.add(lf.getBlockReportingLocks(Longs.toArray(resolvedBlockIds),
+              Ints.toArray(inodeIds),
+              Longs.toArray(unResolvedBlockIds), storage.getSid()));
+        }
+        locks.add(lf.getIndividualHashBucketLock(storage.getSid(), bucketId));
       }
 
       @Override
@@ -2492,7 +2487,7 @@ public class BlockManager {
   }
 
   private HashMatchingResult calculateMismatchedHashes(DatanodeStorageInfo storage,
-      BlockReport report) throws IOException {
+      BlockReport report, Boolean firstBlockReport) throws IOException {
     List<HashBucket> storedHashes = HashBuckets.getInstance().getBucketsForStorage(storage);
     Map<Integer, HashBucket> storedHashesMap = new HashMap<>();
     for (HashBucket allStorageHash : storedHashes) {
@@ -2508,8 +2503,21 @@ public class BlockManager {
         mismatchedBuckets.add(i);
         continue;
       }
-
+      
       long storedHash = storedHashesMap.get(i).getHash();
+      
+      //First block report, or report in safe mode, should always process complete report.
+      if (firstBlockReport) {
+        //if the bucket is empty there is nothing to process 
+        //except if the namenode think that there should be things in the bucket
+        if (report.getBuckets()[i].getBlocks().length == 0 && storedHash == 0) {
+          matchedBuckets.add(i);
+          continue;
+        }
+        mismatchedBuckets.add(i);
+        continue;
+      }
+
       long reportedHash = report.getHashes()[i];
 
       if (storedHash == reportedHash){
@@ -3613,7 +3621,7 @@ public class BlockManager {
    * The given node is reporting that it received a certain block.
    */
   @VisibleForTesting
-  boolean addBlock(DatanodeStorageInfo storage, Block block, String delHint)
+  void addBlock(DatanodeStorageInfo storage, Block block, String delHint)
       throws IOException {
     DatanodeDescriptor node = storage.getDatanodeDescriptor();
     // Decrement number of blocks scheduled to this datanode.
@@ -3635,7 +3643,7 @@ public class BlockManager {
     // Modify the blocks->datanode map and node's map.
     //
     pendingReplications.decrement(getBlockInfo(block), node);
-    return processAndHandleReportedBlock(storage, block, ReplicaState.FINALIZED,
+    processAndHandleReportedBlock(storage, block, ReplicaState.FINALIZED,
         delHintNode);
   }
 
@@ -3648,7 +3656,7 @@ public class BlockManager {
    * @return true if the block was new, false otherwise
    * @throws IOException
    */
-  private boolean processAndHandleReportedBlock(
+  private void processAndHandleReportedBlock(
       DatanodeStorageInfo storage, Block block,
       ReplicaState reportedState, DatanodeDescriptor delHintNode)
       throws IOException {
@@ -3668,16 +3676,13 @@ public class BlockManager {
         toUC.size() + toAdd.size() + toInvalidate.size() + toCorrupt.size() <=
             1 : "The block should be only in one of the lists.";
 
-    boolean wasnew = false;
     for (StatefulBlockInfo b : toUC) {
       addStoredBlockUnderConstruction(b, storage);
-      wasnew = true;
     }
     long numBlocksLogged = 0;
     for (BlockInfo b : toAdd) {
       addStoredBlock(b, storage, delHintNode, numBlocksLogged < maxNumBlocksToLog);
       numBlocksLogged++;
-      wasnew = true;
     }
     if (numBlocksLogged > maxNumBlocksToLog) {
       blockLog.info("BLOCK* addBlock: logged info for " + maxNumBlocksToLog
@@ -3692,7 +3697,6 @@ public class BlockManager {
     for (BlockToMarkCorrupt b : toCorrupt) {
       markBlockAsCorrupt(b, storage, storage.getDatanodeDescriptor());
     }
-    return wasnew;
   }
 
   /**
@@ -3780,55 +3784,33 @@ public class BlockManager {
                 " dataNode=" + node.getXferAddr() + " storage=" + storage.getStorageID() +
                     " sid: " + storage.getSid() + " status=" + rdbi.getStatus());
             HashBuckets hashBuckets = HashBuckets.getInstance();
-            boolean isNew;
             switch (rdbi.getStatus()) {
               case CREATING:
-                isNew = processAndHandleReportedBlock(storage, rdbi.getBlock(),
+                processAndHandleReportedBlock(storage, rdbi.getBlock(),
                         ReplicaState.RBW, null);
-                if (isNew){
-                  hashBuckets.applyHash(storage.getSid(), ReplicaState.RBW, rdbi.getBlock());
-                }
                 received[0]++;
                 break;
               case APPENDING:
-                isNew = processAndHandleReportedBlock(storage, rdbi.getBlock(),
+                processAndHandleReportedBlock(storage, rdbi.getBlock(),
                     ReplicaState.RBW, null);
-                if (isNew) {
-                  hashBuckets.applyHash(storage.getSid(), ReplicaState.RBW, rdbi.getBlock());
-                }
                 received[0]++;
                 break;
               case RECOVERING_APPEND:
-                isNew = processAndHandleReportedBlock(storage, rdbi.getBlock(),
+                processAndHandleReportedBlock(storage, rdbi.getBlock(),
                     ReplicaState.RBW, null);
-                if (isNew) {
-                  //To be able to undo previous hash correctly we need to know the previous
-                  //generation stamp. For now, will generally cause mismatch.
-                  hashBuckets.applyHash(storage.getSid(), ReplicaState.RBW, rdbi.getBlock());
-                }
                 received[0]++;
                 break;
               case RECEIVED:
-                isNew = addBlock(storage, rdbi.getBlock(), rdbi.getDelHints());
-                if (!isNew){
-                  hashBuckets.undoHash(storage.getSid(), ReplicaState.RBW, rdbi.getBlock());
-                }
-                hashBuckets.applyHash(storage.getSid(), ReplicaState.FINALIZED,
-                        rdbi.getBlock());
+                addBlock(storage, rdbi.getBlock(), rdbi.getDelHints());
+                hashBuckets.applyHash(storage.getSid(), ReplicaState.FINALIZED, rdbi.getBlock());
                 received[0]++;
                 break;
               case UPDATE_RECOVERED:
                 addBlock(storage, rdbi.getBlock(), rdbi.getDelHints());
-                //To be able to undo previous hash correctly, we need to know what state
-                //was previously known on the nn. For now, will generally cause mismatch, which
-                //is not optimal but acceptable.
-                hashBuckets.applyHash(storage.getSid(), ReplicaState.FINALIZED, rdbi.getBlock());
                 received[0]++;
                 break;
               case DELETED:
                 removeStoredBlock(rdbi.getBlock(), storage.getDatanodeDescriptor());
-                hashBuckets.undoHash(storage.getSid(), ReplicaState.FINALIZED,
-                    rdbi.getBlock());
                 deleted[0]++;
                 break;
               default:
