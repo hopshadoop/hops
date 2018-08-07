@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
+import org.apache.hadoop.ipc.RetriableException;
 
 import java.io.IOException;
 import java.util.*;
@@ -427,7 +428,7 @@ public class INodeLock extends BaseINodeLock {
   }
 
   private List<INode> acquireINodeLockByPath(String path)
-      throws UnresolvedPathException, StorageException, SubtreeLockedException,
+      throws UnresolvedPathException, StorageException, RetriableException,
       TransactionContextException {
     List<INode> resolvedINodes = new ArrayList<>();
     byte[][] components = INode.getPathComponents(path);
@@ -471,7 +472,7 @@ public class INodeLock extends BaseINodeLock {
   }
 
   private TransactionLockTypes.INodeLockType identifyLockType(int count,
-      byte[][] components) throws StorageException {
+      byte[][] components) {
     TransactionLockTypes.INodeLockType lkType;
     if (isTarget(count, components)) {
       lkType = this.lockType;
@@ -492,11 +493,12 @@ public class INodeLock extends BaseINodeLock {
     return count == components.length - 2;
   }
 
-  private void checkSubtreeLock(INode iNode) throws SubtreeLockedException {
+  private void checkSubtreeLock(INode iNode) throws RetriableException {
     if (SubtreeLockHelper.isSTOLocked(iNode.isSTOLocked(),
             iNode.getSTOLockOwner(), activeNamenodes)) {
       if (!ignoredSTOInodes.contains(iNode.getId())) {
-        throw new SubtreeLockedException(iNode.getLocalName(), activeNamenodes);
+        throw new RetriableException("The subtree "+iNode.getLocalName() +" is locked by " +
+                "Namenode Id: " + iNode.getSTOLockOwner() + ". Active Namenodes are: "+activeNamenodes);
       } else {
         LOG.debug("Ignoring subtree lock for inode id: "+iNode.getId());
       }

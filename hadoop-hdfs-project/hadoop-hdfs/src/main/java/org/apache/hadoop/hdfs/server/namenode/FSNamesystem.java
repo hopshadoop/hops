@@ -135,8 +135,7 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.ipc.StandbyException;
+import org.apache.hadoop.ipc.*;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -257,8 +256,6 @@ import org.apache.hadoop.hdfs.server.namenode.startupprogress.Status;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Step;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StepType;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
-import org.apache.hadoop.ipc.RetriableException;
-import org.apache.hadoop.ipc.RetryCacheDistributed;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
 import org.apache.hadoop.ipc.RetryCacheDistributed.CacheEntryWithPayload;
 import org.apache.hadoop.util.StringUtils;
@@ -6857,8 +6854,10 @@ public class FSNamesystem
       final long dsQuota) throws IOException {
     checkSuperuserPrivilege();
     checkNameNodeSafeMode("Cannot set quota on " + path1);
-    if (!isLeader()) {
-      throw new RuntimeException("Asked non leading node to setQuota");
+
+    if(!nameNode.isLeader() && dir.isQuotaEnabled()){
+      throw new NotALeaderException("Quota enabled. Delete operation can only be performed on a " +
+              "leader namenode");
     }
 
     INodeIdentifier subtreeRoot = null;
@@ -7580,6 +7579,11 @@ public class FSNamesystem
     //only for testing
     saveTimes();
 
+    if(!nameNode.isLeader() && dir.isQuotaEnabled()){
+      throw new NotALeaderException("Quota enabled. Delete operation can only be performed on a " +
+              "leader namenode");
+    }
+
     boolean ret = false;
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog
@@ -7770,7 +7774,8 @@ public class FSNamesystem
                         //at this point the delete op is expected to succeed. Apart from DB errors
                         // this can only fail if the quiesce phase in subtree operation failed to
                         // quiesce the subtree. See TestSubtreeConflicts.testConcurrentSTOandInodeOps
-                        throw new SubtreeQuiesceException("Unable to Delete path: "+path1+". Possible subtree quiesce failure");
+                        throw new RetriableException("Unable to Delete path: "+path1+"."+
+                                " Possible subtree quiesce failure");
 
                       }
                       return true;
@@ -7920,7 +7925,7 @@ public class FSNamesystem
    * @return number of active operations in the descendant tree
    */
   private void checkSubTreeLocks(String path) throws TransactionContextException,
-          StorageException, SubtreeLockedException{
+          StorageException, RetriableException{
     List<SubTreeOperation> ops = (List<SubTreeOperation>)
         EntityManager.findList(SubTreeOperation.Finder.ByPathPrefix,
             path);  // THIS RETURNS ONLY ONE SUBTREE OP IN THE CHILD TREE. INCREASE THE LIMIT IN IMPL LAYER IF NEEDED
@@ -7931,9 +7936,9 @@ public class FSNamesystem
 
     for(SubTreeOperation op : ops){
       if(activeNameNodeIds.contains(op.getNameNodeId())){
-        throw new SubtreeLockedException("There is at least one ongoing " +
-            "subtree operation on the descendants. Path: "+op.getPath()
-            +" Operation "+op.getOpType()+" NameNodeId "+ op.getNameNodeId());
+        throw new RetriableException("At least one ongoing " +
+            "subtree operation on the descendants of this subtree, e.g., Path: "+op.getPath()
+            +" Operation: "+op.getOpType()+" NameNodeId: "+ op.getNameNodeId());
       }else{ // operation started by a dead namenode.
         //TODO: what if the activeNameNodeIds does not contain all new namenode ids
         //An operation belonging to new namenode might be considered dead

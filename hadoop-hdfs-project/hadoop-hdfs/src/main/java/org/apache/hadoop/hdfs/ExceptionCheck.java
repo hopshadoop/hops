@@ -16,8 +16,6 @@
 package org.apache.hadoop.hdfs;
 
 import io.hops.exception.StorageException;
-import io.hops.transaction.lock.SubtreeQuiesceException;
-import io.hops.transaction.lock.SubtreeRetriableException;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RetriableException;
 
@@ -90,8 +88,7 @@ public class ExceptionCheck {
 
       if (unwrappedException != null &&
               !(unwrappedException instanceof RemoteException)) {
-        if (unwrappedException instanceof SubtreeRetriableException ||
-                unwrappedException instanceof StorageException ||
+        if ( unwrappedException instanceof StorageException ||
                 unwrappedException instanceof RetriableException) {
           return true;
         }

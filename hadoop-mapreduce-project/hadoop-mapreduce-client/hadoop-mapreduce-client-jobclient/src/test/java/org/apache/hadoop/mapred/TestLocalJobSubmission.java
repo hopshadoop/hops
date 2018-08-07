@@ -29,6 +29,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.hadoop.hdfs.server.namenode.ha.HopsRandomStickyFailoverProxyProvider;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
@@ -38,6 +39,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
+import org.apache.log4j.Level;
+import org.apache.commons.logging.impl.Log4JLogger;
 
 /**
  * check for the job submission options of
@@ -51,6 +54,10 @@ public class TestLocalJobSubmission {
   public void configure() throws Exception {
   }
 
+  private static void initLoggers() {
+    ((Log4JLogger) HopsRandomStickyFailoverProxyProvider.LOG).getLogger().setLevel(Level.ALL);
+  }
+
   @After
   public void cleanup() {
   }
@@ -62,6 +69,7 @@ public class TestLocalJobSubmission {
    */
   @Test
   public void testLocalJobLibjarsOption() throws IOException {
+    initLoggers();
     Path jarPath = makeJar(new Path(TEST_ROOT_DIR, "test.jar"));
 
     Configuration conf = new Configuration();

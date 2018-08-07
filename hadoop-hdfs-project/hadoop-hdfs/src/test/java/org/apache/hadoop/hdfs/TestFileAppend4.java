@@ -151,7 +151,7 @@ public class TestFileAppend4 {
    * before calling completeFile, and then tries to recover
    * the lease from another thread.
    */
-  @Test(timeout=60000)
+  @Test(timeout=300000)
   public void testRecoverFinalizedBlock() throws Throwable {
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(5).build();
 
@@ -305,7 +305,7 @@ public class TestFileAppend4 {
   /**
    * Test the updation of NeededReplications for the Appended Block
    */
-  @Test(timeout = 60000)
+  @Test(timeout = 300000)
   public void testUpdateNeededReplicationsForAppendedFile() throws Exception {
     Configuration conf = new Configuration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)

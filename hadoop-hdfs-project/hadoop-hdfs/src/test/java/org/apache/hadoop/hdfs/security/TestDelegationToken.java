@@ -44,10 +44,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.log4j.Level;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -156,7 +153,8 @@ public class TestDelegationToken {
       // PASS
     }
   }
-  
+
+  @Ignore
   @Test
   public void testAddDelegationTokensDFSApi() throws Exception {
     UserGroupInformation ugi =
@@ -204,6 +202,7 @@ public class TestDelegationToken {
     }
   }
 
+  @Ignore
   @Test
   public void testDelegationTokenWithDoAs() throws Exception {
     final DistributedFileSystem dfs = cluster.getFileSystem();
