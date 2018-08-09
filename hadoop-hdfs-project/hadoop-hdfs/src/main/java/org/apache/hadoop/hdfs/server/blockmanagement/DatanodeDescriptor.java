@@ -17,14 +17,10 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.StorageMap;
-import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
-import io.hops.metadata.hdfs.dal.StorageDataAccess;
-import io.hops.transaction.handler.HDFSOperationType;
-import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -239,6 +235,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return false;
   }
 
+  @VisibleForTesting
   public DatanodeStorageInfo getStorageInfo(String storageID) {
     synchronized (storageMap) {
       return this.storageMap.get(storageID);

@@ -21,7 +21,6 @@ import com.google.protobuf.ServiceException;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.leader_election.proto.ActiveNodeProtos;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -223,8 +222,7 @@ public class DatanodeProtocolClientSideTranslatorPB
     for (StorageReceivedDeletedBlocks storageBlock : receivedAndDeletedBlocks) {
       StorageReceivedDeletedBlocksProto.Builder repBuilder =
           StorageReceivedDeletedBlocksProto.newBuilder();
-      repBuilder.setStorageUuid(storageBlock.getStorage().getStorageID());  // Set for
-      // wire compatibility.
+      repBuilder.setStorageUuid(storageBlock.getStorage().getStorageID());  // Set for wire compatibility.
       repBuilder.setStorage(PBHelper.convert(storageBlock.getStorage()));
       for (ReceivedDeletedBlockInfo rdBlock : storageBlock.getBlocks()) {
         repBuilder.addBlocks(PBHelper.convert(rdBlock));
