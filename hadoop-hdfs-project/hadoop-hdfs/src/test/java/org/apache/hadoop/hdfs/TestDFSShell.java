@@ -207,10 +207,7 @@ public class TestDFSShell {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
-    FileSystem fs = cluster.getFileSystem();
-    assertTrue("Not a HDFS: " + fs.getUri(),
-        fs instanceof DistributedFileSystem);
-    final DistributedFileSystem dfs = (DistributedFileSystem) fs;
+    DistributedFileSystem fs = cluster.getFileSystem();
     PrintStream psBackup = System.out;
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     PrintStream psOut = new PrintStream(out);
@@ -247,10 +244,6 @@ public class TestDFSShell {
       assertTrue(returnString.contains("23"));
       
     } finally {
-      try {
-        dfs.close();
-      } catch (Exception e) {
-      }
       System.setOut(psBackup);
       cluster.shutdown();
     }
