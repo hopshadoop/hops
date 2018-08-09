@@ -117,7 +117,6 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Keeps information related to the blocks stored in the Hadoop cluster.
@@ -2924,7 +2923,7 @@ public class BlockManager {
         numLiveReplicas >= minReplication) {
       storedBlock =
           completeBlock(bc, storedBlock, false);
-    } else if (storedBlock.isComplete()) {
+    } else if (storedBlock.isComplete() && added) {
       // check whether safe replication is reached for the block
       // only complete blocks are counted towards that
       // Is no-op if not in safe mode.
