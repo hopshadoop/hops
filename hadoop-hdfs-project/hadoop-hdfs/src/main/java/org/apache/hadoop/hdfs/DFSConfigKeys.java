@@ -407,7 +407,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.datanode.use.datanode.hostname";
   public static final boolean DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT = false;
 
-  public static final String DFS_NAMENODE_HTTP_PORT_KEY = "dfs.http.port";
   public static final int DFS_NAMENODE_HTTP_PORT_DEFAULT = 50070;
   public static final String DFS_NAMENODE_HTTP_ADDRESS_KEY =
       "dfs.namenode.http-address";
@@ -603,7 +602,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   //Following keys have no defaults
   public static final String DFS_DATANODE_DATA_DIR_KEY =
       "dfs.datanode.data.dir";
-  public static final String DFS_NAMENODE_HTTPS_PORT_KEY = "dfs.https.port";
   public static final int DFS_NAMENODE_HTTPS_PORT_DEFAULT = 50470;
   public static final String DFS_NAMENODE_HTTPS_ADDRESS_KEY =
       "dfs.namenode.https-address";

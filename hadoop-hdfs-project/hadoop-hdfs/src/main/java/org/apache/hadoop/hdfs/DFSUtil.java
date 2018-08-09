@@ -23,6 +23,7 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.protobuf.BlockingService;
 import org.apache.commons.cli.CommandLine;
@@ -425,7 +426,7 @@ public class DFSUtil {
     String key = addSuffix(DFS_HA_NAMENODES_KEY_PREFIX, nsId);
     return conf.getTrimmedStringCollection(key);
   }
-
+  
   /** Add non empty and non null suffix to a key */
   private static String addSuffix(String key, String suffix) {
     if (suffix == null || suffix.isEmpty()) {
@@ -450,26 +451,6 @@ public class DFSUtil {
   public static String addKeySuffixes(String key, String... suffixes) {
     String keySuffix = concatSuffixes(suffixes);
     return addSuffix(key, keySuffix);
-  }
-  
-  /**
-   * Resolve an HDFS URL into real INetSocketAddress. It works like a DNS resolver
-   * when the URL points to an non-HA cluster. When the URL points to an HA
-   * cluster, the resolver further resolves the logical name (i.e., the authority
-   * in the URL) into real namenode addresses.
-   */
-  public static InetSocketAddress resolveWebHdfsUri(URI uri, Configuration conf)
-      throws IOException {
-    int defaultPort;
-    String scheme = uri.getScheme();
-    if (WebHdfsFileSystem.SCHEME.equals(scheme)) {
-      defaultPort = DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT;
-    } else if (SWebHdfsFileSystem.SCHEME.equals(scheme)) {
-      defaultPort = DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT;
-    } else {
-      throw new IllegalArgumentException("Unsupported scheme: " + scheme);
-    }
-    return NetUtils.createSocketAddr(uri.getAuthority(), defaultPort);
   }
   
   /**

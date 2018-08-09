@@ -98,9 +98,11 @@ import org.mortbay.util.ajax.JSON;
 
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.web.resources.FsActionParam;
+import org.apache.hadoop.io.retry.RetryPolicies;
 
 /** A FileSystem for HDFS over the web. */
 public class WebHdfsFileSystem extends FileSystem
@@ -113,7 +115,7 @@ public class WebHdfsFileSystem extends FileSystem
   /** Http URI: http://namenode:port/{PATH_PREFIX}/path/to/file */
   public static final String PATH_PREFIX = "/" + SCHEME + "/v" + VERSION;
 
-  /** Default connection factory may be overriden in tests to use smaller timeout values */
+  /** Default connection factory may be overridden in tests to use smaller timeout values */
   protected URLConnectionFactory connectionFactory;
   
   /** Delegation token kind */
@@ -121,12 +123,13 @@ public class WebHdfsFileSystem extends FileSystem
   protected TokenAspect<? extends WebHdfsFileSystem> tokenAspect;
 
   private UserGroupInformation ugi;
-  private InetSocketAddress nnAddr;
   private URI uri;
   private Token<?> delegationToken;
   protected Text tokenServiceName;
   private RetryPolicy retryPolicy = null;
   private Path workingDir;
+  private InetSocketAddress nnAddrs[];
+  private int currentNNAddrIndex;
 
   /**
    * Return the protocol scheme for the FileSystem.
@@ -168,6 +171,7 @@ public class WebHdfsFileSystem extends FileSystem
         DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
 
     ugi = UserGroupInformation.getCurrentUser();
+    
     this.uri = URI.create(uri.getScheme() + "://" + uri.getAuthority());
 
     // In non-HA case, the code needs to call getCanonicalUri() in order to
@@ -175,15 +179,16 @@ public class WebHdfsFileSystem extends FileSystem
     this.tokenServiceName = new Text(this.uri.getAuthority());
     initializeTokenAspect();
     
-    this.nnAddr = DFSUtil.resolveWebHdfsUri(this.uri, conf);
-    this.retryPolicy =
-        RetryUtils.getDefaultRetryPolicy(
-            conf, 
-            DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_ENABLED_KEY,
-            DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_ENABLED_DEFAULT,
-            DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_SPEC_KEY,
-            DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_SPEC_DEFAULT,
-            SafeModeException.class);
+    this.nnAddrs = resolveNNAddr();
+    
+    this.retryPolicy = RetryUtils.getDefaultRetryPolicy(
+        conf,
+        DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_ENABLED_KEY,
+        DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_ENABLED_DEFAULT,
+        DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_SPEC_KEY,
+        DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_SPEC_DEFAULT,
+        SafeModeException.class);
+    
     this.workingDir = getHomeDirectory();
 
     if (UserGroupInformation.isSecurityEnabled()) {
@@ -210,8 +215,7 @@ public class WebHdfsFileSystem extends FileSystem
 
   @Override
   protected int getDefaultPort() {
-    return getConf().getInt(DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_KEY,
-        DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT);
+    return DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT;
   }
 
   @Override
@@ -321,6 +325,18 @@ public class WebHdfsFileSystem extends FileSystem
     return ((RemoteException)ioe).unwrapRemoteException();
   }
 
+  private synchronized InetSocketAddress getCurrentNNAddr() {
+    return nnAddrs[currentNNAddrIndex];
+  }
+  /**
+   * Reset the appropriate state to gracefully fail over to another name node
+   */
+  private synchronized void resetStateToFailOver() {
+    currentNNAddrIndex = (currentNNAddrIndex + 1) % nnAddrs.length;
+    delegationToken = null;
+    tokenAspect.reset();
+  }
+  
   /**
    * Return a URL pointing to given path on the namenode.
    *
@@ -330,6 +346,7 @@ public class WebHdfsFileSystem extends FileSystem
    * @throws IOException on error constructing the URL
    */
   private URL getNamenodeURL(String path, String query) throws IOException {
+    InetSocketAddress nnAddr = getCurrentNNAddr();
     final URL url = new URL(getTransportScheme(), nnAddr.getHostName(),
           nnAddr.getPort(), path + '?' + query);
     if (LOG.isTraceEnabled()) {
@@ -509,14 +526,23 @@ public class WebHdfsFileSystem extends FileSystem
 
     private void shouldRetry(final IOException ioe, final int retry
         ) throws IOException {
+      InetSocketAddress nnAddr = getCurrentNNAddr();
       if (checkRetry) {
         try {
           final RetryPolicy.RetryAction a = retryPolicy.shouldRetry(
               ioe, retry, 0, true);
-          if (a.action == RetryPolicy.RetryAction.RetryDecision.RETRY) {
+          
+          boolean isRetry = a.action == RetryPolicy.RetryAction.RetryDecision.RETRY;
+          boolean isFailoverAndRetry = a.action == RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY;
+          if (isRetry || isFailoverAndRetry) {
             LOG.info("Retrying connect to namenode: " + nnAddr
                 + ". Already tried " + retry + " time(s); retry policy is "
                 + retryPolicy + ", delay " + a.delayMillis + "ms.");
+            
+            if (isFailoverAndRetry) {
+              resetStateToFailOver();
+            }
+            
             Thread.sleep(a.delayMillis);
             return;
           }
@@ -1041,5 +1067,24 @@ public class WebHdfsFileSystem extends FileSystem
   public void access(final Path path, final FsAction mode) throws IOException {
     final HttpOpParam.Op op = GetOpParam.Op.CHECKACCESS;
     run(op, path, new FsActionParam(mode));
+  }
+  
+  /**
+   * Resolve an HDFS URL into real INetSocketAddress. It works like a DNS
+   * resolver when the URL points to an non-HA cluster. When the URL points to
+   * an HA cluster, the resolver further resolves the logical name (i.e., the
+   * authority in the URL) into real namenode addresses.
+   */
+  private InetSocketAddress[] resolveNNAddr() throws IOException {
+    Configuration conf = getConf();
+    final String scheme = uri.getScheme();
+    ArrayList<InetSocketAddress> ret = new ArrayList<InetSocketAddress>();
+
+    InetSocketAddress addr = NetUtils.createSocketAddr(uri.getAuthority(),
+        getDefaultPort());
+    ret.add(addr);
+
+    InetSocketAddress[] r = new InetSocketAddress[ret.size()];
+    return ret.toArray(r);
   }
 }
