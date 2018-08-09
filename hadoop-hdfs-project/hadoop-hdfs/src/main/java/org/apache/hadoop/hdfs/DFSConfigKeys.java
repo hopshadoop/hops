@@ -589,7 +589,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   //Filesystem limit keys
   public static final String DFS_NAMENODE_MAX_COMPONENT_LENGTH_KEY =
       "dfs.namenode.fs-limits.max-component-length";
-  public static final int DFS_NAMENODE_MAX_COMPONENT_LENGTH_DEFAULT = 0;
+  public static final int DFS_NAMENODE_MAX_COMPONENT_LENGTH_DEFAULT = 255;
       // no limit
   public static final String DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY =
       "dfs.namenode.fs-limits.max-directory-items";
