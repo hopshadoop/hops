@@ -180,6 +180,15 @@ public class NamenodeWebHdfsMethods {
     response.setContentType(null);
   }
 
+  private static NamenodeProtocols getRPCServer(NameNode namenode)
+      throws IOException {
+     final NamenodeProtocols np = namenode.getRpcServer();
+     if (np == null) {
+       throw new IOException("Namenode is in startup mode");
+     }
+     return np;
+  }
+  
   @VisibleForTesting
   static DatanodeInfo chooseDatanode(final NameNode namenode, final String path,
       final HttpOpParam.Op op, final long openOffset, final long blocksize) throws IOException {
@@ -200,7 +209,7 @@ public class NamenodeWebHdfsMethods {
     } else if (op == GetOpParam.Op.OPEN ||
         op == GetOpParam.Op.GETFILECHECKSUM || op == PostOpParam.Op.APPEND) {
       //choose a datanode containing a replica 
-      final NamenodeProtocols np = namenode.getRpcServer();
+      final NamenodeProtocols np = getRPCServer(namenode);
       final HdfsFileStatus status = np.getFileInfo(path);
       if (status == null) {
         throw new FileNotFoundException("File " + path + " not found.");
@@ -436,7 +445,7 @@ public class NamenodeWebHdfsMethods {
     final Configuration conf =
         (Configuration) context.getAttribute(JspHelper.CURRENT_CONF);
     final NameNode namenode = (NameNode) context.getAttribute("name.node");
-    final NamenodeProtocols np = namenode.getRpcServer();
+    final NamenodeProtocols np = getRPCServer(namenode);
 
     switch (op.getValue()) {
       case CREATE: {
@@ -630,7 +639,7 @@ public class NamenodeWebHdfsMethods {
             .type(MediaType.APPLICATION_OCTET_STREAM).build();
       }
       case CONCAT: {
-        namenode.getRpcServer().concat(fullpath, concatSrcs.getAbsolutePaths());
+        getRPCServer(namenode).concat(fullpath, concatSrcs.getAbsolutePaths());
         return Response.ok().build();
       }
       default:
@@ -745,7 +754,7 @@ public class NamenodeWebHdfsMethods {
       FsActionParam fsAction)
       throws IOException, URISyntaxException {
     final NameNode namenode = (NameNode) context.getAttribute("name.node");
-    final NamenodeProtocols np = namenode.getRpcServer();
+    final NamenodeProtocols np = getRPCServer(namenode);
 
     switch (op.getValue()) {
       case OPEN: {
@@ -950,7 +959,7 @@ public class NamenodeWebHdfsMethods {
     switch (op.getValue()) {
       case DELETE: {
         final boolean b =
-            namenode.getRpcServer().delete(fullpath, recursive.getValue());
+            getRPCServer(namenode).delete(fullpath, recursive.getValue());
         final String js = JsonUtil.toJsonString("boolean", b);
         return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
       }
