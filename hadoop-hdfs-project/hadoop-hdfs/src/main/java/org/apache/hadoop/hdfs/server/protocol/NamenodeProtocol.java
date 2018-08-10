@@ -34,7 +34,7 @@ import org.apache.hadoop.io.retry.Idempotent;
  * ***************************************************************************
  */
 @KerberosInfo(
-    serverPrincipal = DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY)
+    serverPrincipal = DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public interface NamenodeProtocol {
   /**

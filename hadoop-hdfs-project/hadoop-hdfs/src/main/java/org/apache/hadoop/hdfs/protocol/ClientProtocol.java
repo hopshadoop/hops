@@ -68,7 +68,7 @@ import org.apache.hadoop.io.retry.AtMostOnce;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 @KerberosInfo(
-    serverPrincipal = DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY)
+    serverPrincipal = DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY)
 @TokenInfo(DelegationTokenSelector.class)
 public interface ClientProtocol {
 
