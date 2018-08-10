@@ -54,6 +54,7 @@ class RollingLogsImpl implements RollingLogs {
               RollingLogsImpl.this + " is not yet opened.");
         }
         out.print(csq);
+        out.flush();
       }
       return this;
     }
