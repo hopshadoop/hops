@@ -44,29 +44,36 @@ import org.apache.hadoop.fs.Path;
   /**
    * Path component length is too long
    */
-  public static final class PathComponentTooLongException
-      extends FSLimitException {
+  public static final
+  class PathComponentTooLongException extends FSLimitException {
     protected static final long serialVersionUID = 1L;
 
-    protected PathComponentTooLongException() {
-    }
+    private String childName;
+
+    protected PathComponentTooLongException() {}
 
     protected PathComponentTooLongException(String msg) {
       super(msg);
     }
     
-    public PathComponentTooLongException(long quota, long count) {
+    public PathComponentTooLongException(long quota, long count,
+        String parentPath, String childName) {
       super(quota, count);
+      setPathName(parentPath);
+      this.childName = childName;
+    }
+
+    String getParentPath() {
+      return pathName;
     }
 
     @Override
     public String getMessage() {
-      Path violator = new Path(pathName);
-      return "The maximum path component name limit of " + violator.getName() +
-          " in directory " + violator.getParent() +
-          " is exceeded: limit=" + quota + " length=" + count;
+      return "The maximum path component name limit of " + childName +
+      " in directory " + getParentPath() +
+      " is exceeded: limit=" + quota + " length=" + count; 
     }
-  }
+}
 
   /**
    * Directory has too many items

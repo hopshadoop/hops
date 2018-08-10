@@ -161,7 +161,10 @@ public class FSDirectory implements Closeable {
     this.maxDirItems =
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY,
             DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_DEFAULT);
-
+    Preconditions.checkArgument(maxDirItems >= 0, "Cannot set "
+        + DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY
+        + " to a value less than 0");
+    
     int threshold =
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_NAME_CACHE_THRESHOLD_KEY,
             DFSConfigKeys.DFS_NAMENODE_NAME_CACHE_THRESHOLD_DEFAULT);
@@ -535,6 +538,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
 
     // Ensure dst has quota to accommodate rename
+    verifyFsLimitsForRename(srcInodesInPath, dstInodesInPath, dstComponents[dstComponents.length-1]);
     verifyQuotaForRename(srcInodes, dstInodes, srcCounts,  dstCounts);
     INode removedSrc = removeLastINodeForRename(srcInodesInPath, srcCounts);
     if (removedSrc == null) {
@@ -699,6 +703,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
 
     // Ensure dst has quota to accommodate rename
+    verifyFsLimitsForRename(srcInodesInPath, dstInodesInPath, dstComponents[dstComponents.length-1]);
     verifyQuotaForRename(srcInodes, dstInodes, srcCounts, dstCounts);
 
     boolean added = false;
@@ -1626,6 +1631,81 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     verifyQuota(dstInodes, dstInodes.length - 1, nsDelta, dsDelta,
         commonAncestor);
   }
+
+  /**
+   * Checks file system limits (max component length and max directory items)
+   * during a rename operation.
+   *
+   * @param srcIIP INodesInPath containing every inode in the rename source
+   * @param dstIIP INodesInPath containing every inode in the rename destination
+   * @throws PathComponentTooLongException child's name is too long.
+   * @throws MaxDirectoryItemsExceededException too many children.
+   */
+  private void verifyFsLimitsForRename(INodesInPath srcIIP, INodesInPath dstIIP, byte[] dstChildName)
+      throws PathComponentTooLongException, MaxDirectoryItemsExceededException, StorageException, TransactionContextException {
+    INode[] dstInodes = dstIIP.getINodes();
+    int pos = dstInodes.length - 1;
+    verifyMaxComponentLength(dstChildName, dstInodes, pos);
+    // Do not enforce max directory items if renaming within same directory.
+    if (maxDirItems > 0 && srcIIP.getINode(-2) != dstIIP.getINode(-2)) {
+      verifyMaxDirItems(dstInodes, pos);
+    }
+  }
+  
+  /**
+   * Verify child's name for fs limit.
+   *
+   * @param childName byte[] containing new child name
+   * @param parentPath Object either INode[] or String containing parent path
+   * @param pos int position of new child in path
+   * @throws PathComponentTooLongException child's name is too long.
+   */
+  private void verifyMaxComponentLength(byte[] childName, Object parentPath,
+      int pos) throws PathComponentTooLongException {
+    if (maxComponentLength == 0) {
+      return;
+    }
+
+    final int length = childName.length;
+    if (length > maxComponentLength) {
+      final String p = parentPath instanceof INode[] ? getFullPathName((INode[]) parentPath, pos - 1)
+          : (String) parentPath;
+      final PathComponentTooLongException e = new PathComponentTooLongException(
+          maxComponentLength, length, p, DFSUtil.bytes2String(childName));
+      if (ready) {
+        throw e;
+      } else {
+        // Do not throw if edits log is still being processed
+        NameNode.LOG.error("ERROR in FSDirectory.verifyINodeName", e);
+      }
+    }
+  }
+
+  /**
+   * Verify children size for fs limit.
+   *
+   * @param pathComponents INode[] containing full path of inodes to new child
+   * @param pos int position of new child in pathComponents
+   * @throws MaxDirectoryItemsExceededException too many children.
+   */
+  private void verifyMaxDirItems(INode[] pathComponents, int pos)
+      throws MaxDirectoryItemsExceededException, StorageException, TransactionContextException {
+
+    final INodeDirectory parent = pathComponents[pos - 1].asDirectory();
+    final int count = parent.getChildrenNum();
+    if (count >= maxDirItems) {
+      final MaxDirectoryItemsExceededException e
+          = new MaxDirectoryItemsExceededException(maxDirItems, count);
+      if (ready) {
+        e.setPathName(getFullPathName(pathComponents, pos - 1));
+        throw e;
+      } else {
+        // Do not throw if edits log is still being processed
+        NameNode.LOG.error("FSDirectory.verifyMaxDirItems: "
+            + e.getLocalizedMessage());
+      }
+    }
+  }
   
   /**
    * Verify that filesystem limit constraints are not violated
@@ -1644,12 +1724,14 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         int length = child.getLocalName().length();
         if (length > maxComponentLength) {
           includeChildName = true;
-          throw new PathComponentTooLongException(maxComponentLength, length);
+          final String p = getFullPathName((INode[]) pathComponents, pos - 1);
+          throw new PathComponentTooLongException(
+          maxComponentLength, length, p, child.getLocalName());
         }
       }
       if (maxDirItems != 0) {
         INodeDirectory parent = (INodeDirectory) pathComponents[pos - 1];
-        int count = parent.getChildrenList().size();
+        int count = parent.getChildrenNum();
         if (count >= maxDirItems) {
           throw new MaxDirectoryItemsExceededException(maxDirItems, count);
         }
