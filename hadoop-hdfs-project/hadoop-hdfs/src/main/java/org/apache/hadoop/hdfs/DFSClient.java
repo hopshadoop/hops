@@ -168,6 +168,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
 import java.net.ConnectException;
+import org.apache.hadoop.hdfs.shortcircuit.DomainSocketFactory;
 import org.tukaani.xz.UnsupportedOptionsException;
 
 /********************************************************
@@ -420,6 +421,19 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
 
       delayBeforeClose = conf.getInt(DFSConfigKeys.DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_KEY,
               DFSConfigKeys.DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_DEFAULT);
+    }
+
+    public boolean isUseLegacyBlockReaderLocal() {
+      return useLegacyBlockReaderLocal;
+    }
+    public String getDomainSocketPath() {
+      return domainSocketPath;
+    }
+    public boolean isShortCircuitLocalReads() {
+      return shortCircuitLocalReads;
+    }
+    public boolean isDomainSocketDataTraffic() {
+      return domainSocketDataTraffic;
     }
 
     private DataChecksum.Type getChecksumType(Configuration conf) {
@@ -994,11 +1008,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
                                      AccessControlException.class);
     }
   }
-
-  private static Map<String, Boolean> localAddrMap = Collections
-      .synchronizedMap(new HashMap<String, Boolean>());
-
-  static boolean isLocalAddress(InetSocketAddress targetAddr) {
+  
+  private static Map<String, Boolean> localAddrMap =
+      Collections.synchronizedMap(new HashMap<String, Boolean>());
+  
+  public static boolean isLocalAddress(InetSocketAddress targetAddr) {
     InetAddress addr = targetAddr.getAddress();
     Boolean cached = localAddrMap.get(addr.getHostAddress());
     if (cached != null) {

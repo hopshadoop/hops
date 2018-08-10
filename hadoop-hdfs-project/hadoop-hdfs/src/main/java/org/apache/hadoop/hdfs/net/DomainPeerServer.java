@@ -23,8 +23,6 @@ import java.net.SocketTimeoutException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.hdfs.net.PeerServer;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.classification.InterfaceAudience;
 
