@@ -64,7 +64,6 @@ public class TestDelegationTokenFetcher {
    * Namenode,
    * pulls out the correct user's token and successfully serializes it to disk.
    */
-  @SuppressWarnings("deprecation")
   @Test
   public void expectedTokenIsRetrievedFromDFS() throws Exception {
     final byte[] ident =
@@ -87,7 +86,6 @@ public class TestDelegationTokenFetcher {
                 return new Token<?>[]{t};
               }
             });
-    when(dfs.renewDelegationToken(eq(t))).thenReturn(1000L);
     when(dfs.getUri()).thenReturn(uri);
     FakeRenewer.reset();
 
