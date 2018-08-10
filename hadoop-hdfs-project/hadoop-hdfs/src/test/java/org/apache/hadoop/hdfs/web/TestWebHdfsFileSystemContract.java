@@ -34,7 +34,7 @@ import org.apache.hadoop.hdfs.web.resources.DoAsParam;
 import org.apache.hadoop.hdfs.web.resources.GetOpParam;
 import org.apache.hadoop.hdfs.web.resources.HttpOpParam;
 import org.apache.hadoop.hdfs.web.resources.LengthParam;
-import org.apache.hadoop.hdfs.web.resources.NamenodeRpcAddressParam;
+import org.apache.hadoop.hdfs.web.resources.NamenodeAddressParam;
 import org.apache.hadoop.hdfs.web.resources.OffsetParam;
 import org.apache.hadoop.hdfs.web.resources.PutOpParam;
 import org.apache.hadoop.io.IOUtils;
@@ -473,7 +473,7 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
       AppendTestUtil.testAppend(fs, new Path(dir, "append"));
     }
 
-    {//test NamenodeRpcAddressParam not set.
+    {//test NamenodeAddressParam not set.
       final HttpOpParam.Op op = PutOpParam.Op.CREATE;
       final URL url = webhdfs.toUrl(op, dir);
       HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -484,9 +484,9 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
       final String redirect = conn.getHeaderField("Location");
       conn.disconnect();
 
-      //remove NamenodeRpcAddressParam
+      //remove NamenodeAddressParam
       WebHdfsFileSystem.LOG.info("redirect = " + redirect);
-      final int i = redirect.indexOf(NamenodeRpcAddressParam.NAME);
+      final int i = redirect.indexOf(NamenodeAddressParam.NAME);
       final int j = redirect.indexOf("&", i);
       String modified = redirect.substring(0, i - 1) + redirect.substring(j);
       WebHdfsFileSystem.LOG.info("modified = " + modified);
