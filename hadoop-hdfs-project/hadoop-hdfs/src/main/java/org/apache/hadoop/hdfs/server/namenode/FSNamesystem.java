@@ -2203,8 +2203,8 @@ public class FSNamesystem
     // Verify that the destination does not exist as a directory already.
     boolean pathExists = dir.exists(src);
     if (pathExists && dir.isDir(src)) {
-      throw new FileAlreadyExistsException(
-          "Cannot create file " + src + "; already exists as a directory.");
+      throw new FileAlreadyExistsException(src +
+          " already exists as a directory");
     }
     if (isPermissionEnabled) {
       if (overwrite && pathExists) {
@@ -2223,8 +2223,8 @@ public class FSNamesystem
       
       if (inode == null) {
         if (!create) {
-          throw new FileNotFoundException("failed to overwrite non-existent file "
-             + src + " on client " + clientMachine);
+          throw new FileNotFoundException("Can't overwrite non-existent " +
+              src + " for client " + clientMachine);
         }
       } else {
         if (overwrite) {
@@ -2238,8 +2238,8 @@ public class FSNamesystem
           // If lease soft limit time is expired, recover the lease
           final INodeFile myFile = INodeFile.valueOf(dir.getINode(src), src);
           recoverLeaseInternal(myFile, src, holder, clientMachine, false);
-          throw new FileAlreadyExistsException("failed to create file " + src
-              + " on client " + clientMachine + " because the file exists");
+          throw new FileAlreadyExistsException(src + " for client " +
+              clientMachine + " already exists");
         }
       }
 
@@ -2249,18 +2249,18 @@ public class FSNamesystem
       INodeFile newNode = dir.addFile(src, permissions, replication, blockSize,
           holder, clientMachine, clientNode);
       if (newNode == null) {
-        throw new IOException("DIR* NameSystem.startFile: " + "Unable to add file to namespace.");
+        throw new IOException("Unable to add " + src +  " to namespace");
       }
       leaseManager.addLease(newNode.getFileUnderConstructionFeature()
           .getClientName(), src);
 
       if (NameNode.stateChangeLog.isDebugEnabled()) {
-        NameNode.stateChangeLog.debug("DIR* NameSystem.startFile: "
-            + "add " + src + " to namespace for " + holder);
+        NameNode.stateChangeLog.debug("DIR* NameSystem.startFile: added " +
+            src + " inode " + newNode.getId() + " " + holder);
       }
     } catch (IOException ie) {
-      NameNode.stateChangeLog
-          .warn("DIR* NameSystem.startFile: " + ie.getMessage());
+        NameNode.stateChangeLog.warn("DIR* NameSystem.startFile: " + src + " " +
+          ie.getMessage());
       throw ie;
     }
   }
@@ -2298,7 +2298,7 @@ public class FSNamesystem
       final INode inode = dir.getINode(src);
       if (inode == null) {
         throw new FileNotFoundException("failed to append to non-existent file "
-          + src + " on client " + clientMachine);
+          + src + " for client " + clientMachine);
       }
       final INodeFile myFile = INodeFile.valueOf(inode, src);
 
@@ -2439,7 +2439,7 @@ public class FSNamesystem
             lease.getHolder().equals(holder)) {
           throw new AlreadyBeingCreatedException(
               "failed to create file " + src + " for " + holder +
-                  " on client " + clientMachine +
+                  " for client " + clientMachine +
                   " because current leaseholder is trying to recreate file.");
         }
       }
@@ -2452,7 +2452,7 @@ public class FSNamesystem
       if (lease == null) {
         throw new AlreadyBeingCreatedException(
             "failed to create file " + src + " for " + holder +
-                " on client " + clientMachine +
+                " for client " + clientMachine +
                 " because pendingCreates is non-null but no leases found.");
       }
       if (force) {
@@ -2714,9 +2714,8 @@ public class FSNamesystem
             Node clientNode;
 
             if (NameNode.stateChangeLog.isDebugEnabled()) {
-              NameNode.stateChangeLog.debug(
-                  "BLOCK* NameSystem.getAdditionalBlock: file " + src +
-                      " for " + clientName);
+              NameNode.stateChangeLog.debug("BLOCK* NameSystem.getAdditionalBlock: "
+                  + src + " inodeId " + fileId + " for " + clientName);
             }
 
             // Part I. Analyze the state of the file with respect to the input data.

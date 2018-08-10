@@ -269,6 +269,7 @@ public class TestFileCreation {
         // expected
       }
       
+      //
       // create a new file in home directory. Do not close it.
       //
       Path file1 = new Path("filestatus.dat");
