@@ -241,7 +241,12 @@ public class NameNode implements NameNodeStatusMXBean {
   private long stoTableCleanDelay = 0;
 
   private ObjectName nameNodeStatusBeanName;
-
+  /**
+   * The service name of the delegation token issued by the namenode. It is
+   * the name service id in HA mode, or the rpc address in non-HA mode.
+   */
+  private String tokenServiceName;
+  
   /**
    * Format a new filesystem. Destroys any filesystem that may already exist
    * at this location.  *
@@ -282,6 +287,13 @@ public class NameNode implements NameNodeStatusMXBean {
   public static StartupProgress getStartupProgress() {
     return startupProgress;
   }
+  
+  /**
+   * Return the service name of the issued delegation token.
+   *
+   * @return The name service id in HA-mode, or the rpc address in non-HA mode
+   */
+  public String getTokenServiceName() { return tokenServiceName; }
 
   public static InetSocketAddress getAddress(String address) {
     return NetUtils.createSocketAddr(address, DEFAULT_PORT);
@@ -513,6 +525,7 @@ public class NameNode implements NameNodeStatusMXBean {
     loadNamesystem(conf);
 
     rpcServer = createRpcServer(conf);
+    tokenServiceName = NetUtils.getHostPortString(rpcServer.getRpcAddress());
     httpServer.setNameNodeAddress(getNameNodeAddress());
 
     startCommonServices(conf);
@@ -1089,7 +1102,7 @@ public class NameNode implements NameNodeStatusMXBean {
     }
   }
 
-  /**
+  /** 
    */
   public static void main(String argv[]) throws Exception {
     if (DFSUtil.parseHelpArgument(argv, NameNode.USAGE, System.out, true)) {

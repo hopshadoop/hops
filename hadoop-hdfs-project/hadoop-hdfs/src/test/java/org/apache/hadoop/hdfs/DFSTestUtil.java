@@ -121,6 +121,7 @@ import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 import org.apache.hadoop.fs.FileContext;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
+import org.apache.hadoop.io.retry.DefaultFailoverProxyProvider;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
@@ -207,7 +208,7 @@ public class DFSTestUtil {
 
     Users.addUserToGroup(fsOwnerShortUserName, superGroup);
   }
-  
+   
   /**
    * class MyFile contains enough information to recreate the contents of
    * a single file.
