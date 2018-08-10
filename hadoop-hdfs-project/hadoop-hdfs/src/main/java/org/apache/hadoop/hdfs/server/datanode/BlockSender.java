@@ -618,7 +618,7 @@ class BlockSender implements java.io.Closeable {
         if (LOG.isTraceEnabled()) {
           LOG.trace("Failed to send data: ", e);
         } else {
-          LOG.info("Failed to send data: ", e);
+          LOG.info("Failed to send data: " + e);
         }
       } else {
         /* Exception while writing to the client. Connection closure from
