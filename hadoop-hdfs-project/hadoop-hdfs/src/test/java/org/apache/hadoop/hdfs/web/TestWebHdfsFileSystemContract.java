@@ -422,7 +422,7 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
           new DoAsParam(ugi.getShortUserName() + "proxy"));
       final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
       conn.connect();
-      assertEquals(HttpServletResponse.SC_UNAUTHORIZED, conn.getResponseCode());
+      assertEquals(HttpServletResponse.SC_FORBIDDEN, conn.getResponseCode());
       conn.disconnect();
     }
 
