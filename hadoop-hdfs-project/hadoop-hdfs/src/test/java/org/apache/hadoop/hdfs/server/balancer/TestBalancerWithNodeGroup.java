@@ -54,7 +54,7 @@ public class TestBalancerWithNodeGroup extends TestCase {
   private static final Log LOG = LogFactory.getLog(
   "org.apache.hadoop.hdfs.TestBalancerWithNodeGroup");
   
-  final private static long CAPACITY = 5000L;
+  final private static long CAPACITY = 6000L;
   final private static String RACK0 = "/rack0";
   final private static String RACK1 = "/rack1";
   final private static String NODEGROUP0 = "/nodegroup0";
