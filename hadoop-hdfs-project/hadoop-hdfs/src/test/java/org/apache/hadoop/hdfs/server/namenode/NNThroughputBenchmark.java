@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -937,16 +938,9 @@ public class NNThroughputBenchmark implements Tool {
     BlockReport blockReportList;
     int dnIdx;
 
-    /**
-     * Return a a 6 digit integer port.
-     * This is necessary in order to provide lexocographic ordering.
-     * Host names are all the same, the ordering goes by port numbers.
-     */
     private static int getNodePort(int num) throws IOException {
-      int port = 100000 + num;
-      if (String.valueOf(port).length() > 6) {
-        throw new IOException("Too many data-nodes");
-      }
+      int port = 1 + num;
+      Preconditions.checkState(port < Short.MAX_VALUE);
       return port;
     }
 

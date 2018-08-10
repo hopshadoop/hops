@@ -80,6 +80,13 @@ import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMet
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * ********************************************************
@@ -153,7 +160,7 @@ public class NameNode implements NameNodeStatusMXBean {
     DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
     DFS_NAMENODE_SERVICE_RPC_BIND_HOST_KEY, DFS_NAMENODE_HTTP_ADDRESS_KEY, DFS_NAMENODE_HTTPS_ADDRESS_KEY,
     DFS_NAMENODE_KEYTAB_FILE_KEY,
-    DFS_NAMENODE_USER_NAME_KEY, DFS_NAMENODE_INTERNAL_SPNEGO_USER_NAME_KEY};
+    DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY, DFS_NAMENODE_KERBEROS_INTERNAL_SPNEGO_PRINCIPAL_KEY};
 
   private static final String USAGE =
       "Usage: java NameNode [" + 
@@ -465,7 +472,7 @@ public class NameNode implements NameNodeStatusMXBean {
   void loginAsNameNodeUser(Configuration conf) throws IOException {
     InetSocketAddress socAddr = getRpcServerAddress(conf);
     SecurityUtil
-        .login(conf, DFS_NAMENODE_KEYTAB_FILE_KEY, DFS_NAMENODE_USER_NAME_KEY,
+        .login(conf, DFS_NAMENODE_KEYTAB_FILE_KEY, DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY,
             socAddr.getHostName());
   }
 
@@ -811,7 +818,7 @@ public class NameNode implements NameNodeStatusMXBean {
     if (UserGroupInformation.isSecurityEnabled()) {
       InetSocketAddress socAddr = getAddress(conf);
       SecurityUtil
-          .login(conf, DFS_NAMENODE_KEYTAB_FILE_KEY, DFS_NAMENODE_USER_NAME_KEY,
+          .login(conf, DFS_NAMENODE_KEYTAB_FILE_KEY, DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY,
               socAddr.getHostName());
     }
 
@@ -847,7 +854,7 @@ public class NameNode implements NameNodeStatusMXBean {
     if (UserGroupInformation.isSecurityEnabled()) {
       InetSocketAddress socAddr = getAddress(conf);
       SecurityUtil
-              .login(conf, DFS_NAMENODE_KEYTAB_FILE_KEY, DFS_NAMENODE_USER_NAME_KEY,
+              .login(conf, DFS_NAMENODE_KEYTAB_FILE_KEY, DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY,
                       socAddr.getHostName());
     }
 

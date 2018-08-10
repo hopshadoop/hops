@@ -156,6 +156,13 @@ import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.net.unix.DomainSocket;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * *******************************************************
@@ -1933,7 +1940,7 @@ public class DataNode extends Configured
     Collection<StorageLocation> dataDirs = getStorageLocations(conf);
     UserGroupInformation.setConfiguration(conf);
     SecurityUtil
-        .login(conf, DFS_DATANODE_KEYTAB_FILE_KEY, DFS_DATANODE_USER_NAME_KEY);
+        .login(conf, DFS_DATANODE_KEYTAB_FILE_KEY, DFS_DATANODE_KERBEROS_PRINCIPAL_KEY);
     return makeInstance(dataDirs, conf, resources);
   }
 
