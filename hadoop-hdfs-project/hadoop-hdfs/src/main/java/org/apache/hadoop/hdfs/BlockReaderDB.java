@@ -7,7 +7,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.EnumSet;
 import org.apache.hadoop.fs.ReadOption;
-import org.apache.hadoop.hdfs.client.ClientMmap;
+import org.apache.hadoop.hdfs.shortcircuit.ClientMmap;
 
 /**
  * Created by salman on 3/29/16.

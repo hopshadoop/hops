@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs;
+package org.apache.hadoop.hdfs.shortcircuit;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -38,6 +38,7 @@ import org.apache.hadoop.util.StringUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.primitives.Ints;
+import org.apache.hadoop.hdfs.ExtendedBlockId;
 
 import sun.misc.Unsafe;
 

@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.hdfs;
 
+import org.apache.hadoop.hdfs.shortcircuit.DomainSocketFactory;
 import com.google.common.annotations.VisibleForTesting;
 
 import java.util.HashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSClient.Conf;
-import org.apache.hadoop.hdfs.client.ShortCircuitCache;
+import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 
