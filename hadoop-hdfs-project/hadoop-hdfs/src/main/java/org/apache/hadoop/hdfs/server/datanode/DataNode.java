@@ -154,6 +154,7 @@ import org.apache.hadoop.hdfs.net.DomainPeerServer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer3;
+import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.net.unix.DomainSocket;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -273,7 +274,8 @@ public class DataNode extends Configured
   private SecureResources secureResources = null;
   private AbstractList<StorageLocation> dataDirs;
   private Configuration conf;
-
+  private final long maxNumberOfBlocksToLog;
+  
   private final List<String> usersWithLocalPathAccess;
   private boolean connectToDnViaHostname;
   ReadaheadPool readaheadPool;
@@ -296,7 +298,9 @@ public class DataNode extends Configured
       final AbstractList<StorageLocation> dataDirs,
       final SecureResources resources) throws IOException {
     super(conf);
-
+    this.maxNumberOfBlocksToLog = conf.getLong(DFS_MAX_NUM_BLOCKS_TO_LOG_KEY,
+        DFS_MAX_NUM_BLOCKS_TO_LOG_DEFAULT);
+    
     this.usersWithLocalPathAccess = Arrays.asList(conf.getTrimmedStrings(
         DFSConfigKeys.DFS_BLOCK_LOCAL_PATH_ACCESS_USER_KEY));
     this.connectToDnViaHostname =
@@ -803,6 +807,27 @@ public class DataNode extends Configured
     this.conf = conf;
     this.dnConf = new DNConf(conf);
 
+    if (dnConf.maxLockedMemory > 0) {
+      if (!NativeIO.POSIX.getCacheManipulator().verifyCanMlock()) {
+        throw new RuntimeException(String.format(
+            "Cannot start datanode because the configured max locked memory" +
+            " size (%s) is greater than zero and native code is not available.",
+            DFS_DATANODE_MAX_LOCKED_MEMORY_KEY));
+      }
+      long ulimit = NativeIO.POSIX.getCacheManipulator().getMemlockLimit();
+      if (dnConf.maxLockedMemory > ulimit) {
+      throw new RuntimeException(String.format(
+          "Cannot start datanode because the configured max locked memory" +
+          " size (%s) of %d bytes is more than the datanode's available" +
+          " RLIMIT_MEMLOCK ulimit of %d bytes.",
+          DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
+          dnConf.maxLockedMemory,
+          ulimit));
+      }
+    }
+    LOG.info("Starting DataNode with maxLockedMemory = " +
+        dnConf.maxLockedMemory);
+
     storage = new DataStorage();
     
     try {
@@ -1180,6 +1205,10 @@ public class DataNode extends Configured
     }
   }
 
+  public long getMaxNumberOfBlocksToLog() {
+    return maxNumberOfBlocksToLog;
+  }
+  
   @Override
   public BlockLocalPathInfo getBlockLocalPathInfo(ExtendedBlock block,
       Token<BlockTokenIdentifier> token) throws IOException {

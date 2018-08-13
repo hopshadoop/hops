@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.util.Collection;
+import java.util.List;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -249,7 +250,7 @@ class BPServiceActor implements Runnable {
       }
     }
   }
-
+  
   HeartbeatResponse sendHeartBeat() throws IOException {
     StorageReport[] reports =
         dn.getFSDataset().getStorageReports(bpos.getBlockPoolId());
@@ -260,6 +261,8 @@ class BPServiceActor implements Runnable {
 
     return bpNamenode.sendHeartbeat(bpRegistration,
         reports,
+        dn.getFSDataset().getCacheCapacity(),
+        dn.getFSDataset().getCacheUsed(),
         dn.getXmitsInProgress(),
         dn.getXceiverCount(),
         dn.getFSDataset().getNumFailedVolumes());
@@ -317,11 +320,12 @@ class BPServiceActor implements Runnable {
    * forever calling remote NameNode functions.
    */
   private void offerService() throws Exception {
-    LOG.info("For namenode " + nnAddr + " using DELETEREPORT_INTERVAL of " +
-        dnConf.deleteReportInterval + " msec " + " BLOCKREPORT_INTERVAL of " +
-        dnConf.blockReportInterval + "msec" + " Initial delay: " +
-        dnConf.initialBlockReportDelay + "msec" + "; heartBeatInterval=" +
-        dnConf.heartBeatInterval);
+    LOG.info("For namenode " + nnAddr + " using"
+        + " DELETEREPORT_INTERVAL of " + dnConf.deleteReportInterval + " msec "
+        + " BLOCKREPORT_INTERVAL of " + dnConf.blockReportInterval + "msec"
+        + " CACHEREPORT_INTERVAL of " + dnConf.cacheReportInterval + "msec"
+        + " Initial delay: " + dnConf.initialBlockReportDelay + "msec"
+        + "; heartBeatInterval=" + dnConf.heartBeatInterval);
 
 
     bpos.startWhirlingSufiThread();
@@ -583,9 +587,23 @@ class BPServiceActor implements Runnable {
     return bpNamenode.blockReport(registration, poolId, reports);
   }
 
+  public DatanodeCommand cacheReport(DatanodeRegistration bpRegistration, String bpid, List<Long> blockIds) throws
+      IOException {
+    return bpNamenode.cacheReport(bpRegistration, bpid, blockIds, dn.getFSDataset().getCacheCapacity(),
+        dn.getFSDataset().getCacheUsed());
+  }
+  
   public ActiveNode nextNNForBlkReport(long noOfBlks) throws IOException {
     if (bpNamenode != null) {
       return bpNamenode.getNextNamenodeToSendBlockReport(noOfBlks);
+    } else {
+      return null;
+    }
+  }
+
+  public ActiveNode nextNNForCacheReport(long noOfBlks) throws IOException {
+    if (bpNamenode != null) {
+      return bpNamenode.getNextNamenodeToSendCacheReport(noOfBlks);
     } else {
       return null;
     }

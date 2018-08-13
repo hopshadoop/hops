@@ -15521,7 +15521,7 @@
       </comparators>
     </test>
 
-   <test> <!--Tested -->
+    <test> <!--Tested -->
       <description>help: help for dfsadmin report</description>
       <test-commands>
         <dfs-admin-command>-fs NAMENODE -help report</dfs-admin-command>

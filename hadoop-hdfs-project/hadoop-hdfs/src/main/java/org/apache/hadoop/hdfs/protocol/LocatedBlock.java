@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.StorageType;
@@ -26,6 +28,7 @@ import org.apache.hadoop.security.token.Token;
 
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 
 /**
  * Associates a block with the Datanodes that contain its replicas
@@ -49,18 +52,22 @@ public class LocatedBlock {
   private boolean corrupt;
   private Token<BlockTokenIdentifier> blockToken =
       new Token<>();
-
-  private byte[] data = null;
+  /**
+   * List of cached datanode locations
+   */
+  private DatanodeInfo[] cachedLocs;
 
   // Used when there are no locations
   private static final DatanodeInfo[] EMPTY_LOCS = new DatanodeInfo[0];
+
+  private byte[] data = null;
 
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs) {
     this(b, locs, -1, false); // startOffset is unknown
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, long startOffset, boolean corrupt) {
-    this(b, locs, null, null, startOffset, corrupt);
+    this(b, locs, null, null, startOffset, corrupt, EMPTY_LOCS);
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeStorageInfo[] storages) {
@@ -68,14 +75,14 @@ public class LocatedBlock {
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs, StorageType[] storageTypes) {
-    this(b, locs, storageIDs, storageTypes, -1, false); // startOffset is unknown
+    this(b, locs, storageIDs, storageTypes, -1, false, EMPTY_LOCS); // startOffset is unknown
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeStorageInfo[] storages, long startOffset, boolean corrupt) {
     this(b, DatanodeStorageInfo.toDatanodeInfos(storages),
         DatanodeStorageInfo.toStorageIDs(storages),
         DatanodeStorageInfo.toStorageTypes(storages),
-        startOffset, corrupt);
+        startOffset, corrupt, EMPTY_LOCS);
   }
 
   public static LocatedBlock createLocatedBlock(ExtendedBlock b,
@@ -88,26 +95,34 @@ public class LocatedBlock {
       storageIDs[i] = storages[i].getStorageID();
       storageType[i] = storages[i].getStorageType();
     }
-    return new LocatedBlock(b, locs, storageIDs, storageType, startOffset, corrupt);
+    return new LocatedBlock(b, locs, storageIDs, storageType, startOffset, corrupt, EMPTY_LOCS);
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs,
-      StorageType[] storageTypes, long startOffset, boolean corrupt) {
-      this(b, locs, storageIDs, storageTypes, startOffset, corrupt, new Token<BlockTokenIdentifier>());
+      StorageType[] storageTypes, long startOffset, boolean corrupt, DatanodeInfo[] cachedLocs) {
+      this(b, locs, storageIDs, storageTypes, startOffset, corrupt, new Token<BlockTokenIdentifier>(), cachedLocs);
   }
   
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs,
-      StorageType[] storageTypes, long startOffset, boolean corrupt, Token<BlockTokenIdentifier> blockToken) {
+      StorageType[] storageTypes, long startOffset, boolean corrupt, Token<BlockTokenIdentifier> blockToken,
+      DatanodeInfo[] cachedLocs) {
     this.b = b;
     this.offset = startOffset;
     this.corrupt = corrupt;
     if (locs == null) {
-      this.locs = new DatanodeInfo[0];
+      this.locs = EMPTY_LOCS;
     } else {
       this.locs = locs;
     }
     this.storageIDs = storageIDs;
     this.storageTypes = storageTypes;
+    Preconditions.checkArgument(cachedLocs != null,
+        "cachedLocs should not be null, use a different constructor");
+    if (cachedLocs.length == 0) {
+      this.cachedLocs = EMPTY_LOCS;
+    } else {
+      this.cachedLocs = cachedLocs;
+    }
     this.data = null;
     this.blockToken = blockToken;
   }
@@ -200,6 +215,36 @@ public class LocatedBlock {
     return this.corrupt;
   }
 
+   /**
+   * Add a the location of a cached replica of the block.
+   * 
+   * @param loc of datanode with the cached replica
+   */
+  public void addCachedLoc(DatanodeInfo loc) {
+    List<DatanodeInfo> cachedList = Lists.newArrayList(cachedLocs);
+    if (cachedList.contains(loc)) {
+      return;
+    }
+    // Try to re-use a DatanodeInfo already in loc
+    for (int i=0; i<locs.length; i++) {
+      if (locs[i].equals(loc)) {
+        cachedList.add(locs[i]);
+        cachedLocs = cachedList.toArray(cachedLocs);
+        return;
+      }
+    }
+    // Not present in loc, add it and go
+    cachedList.add(loc);
+    cachedLocs = cachedList.toArray(cachedLocs);
+  }
+
+  /**
+   * @return Datanodes with a cached block replica
+   */
+  public DatanodeInfo[] getCachedLocations() {
+    return cachedLocs;
+  }
+  
   @Override
   public String toString() {
     return getClass().getSimpleName() + "{" + b + "; getBlockSize()=" +

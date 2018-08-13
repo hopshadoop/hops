@@ -90,6 +90,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
 import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
 import static org.apache.hadoop.util.Time.now;
@@ -2295,12 +2296,19 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
 
     int childrenNum = node.isDirectory() ? node.asDirectory().getChildrenNum() : 0;
     
-    return new HdfsLocatedFileStatus(size, node.isDirectory(), replication,
+    HdfsLocatedFileStatus status = new HdfsLocatedFileStatus(size, node.isDirectory(), replication,
         blocksize, node.getModificationTime(),
         node.getAccessTime(), node.getFsPermission(),
         node.getUserName(), node.getGroupName(),
         node.isSymlink() ? node.asSymlink().getSymlink() : null, path,
         node.getId(), loc, childrenNum, isFileStoredInDB, storagePolicy);
+    if (loc != null) {
+      CacheManager cacheManager = namesystem.getCacheManager();
+      for (LocatedBlock lb: loc.getLocatedBlocks()) {
+        cacheManager.setCachedLocations(lb, node.getId());
+      }
+    }
+    return status;
   }
 
   /**

@@ -51,6 +51,7 @@ function print_usage(){
   echo "  getconf              get config values from configuration"
   echo "  groups               get the groups which users belong to"
   echo "						Use -help to see options"
+  echo "  cacheadmin           configure the HDFS cache"
   echo ""
   echo "Most commands print help when invoked w/o parameters."
 }
@@ -127,6 +128,8 @@ elif [ "$COMMAND" = "mover" ] ; then
   HADOOP_OPTS="${HADOOP_OPTS} ${HADOOP_MOVER_OPTS}"
 elif [ "$COMMAND" = "storagepolicies" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.GetStoragePolicies
+elif [ "$COMMAND" = "cacheadmin" ] ; then
+  CLASS=org.apache.hadoop.hdfs.tools.CacheAdmin
 else
   CLASS="$COMMAND"
 fi

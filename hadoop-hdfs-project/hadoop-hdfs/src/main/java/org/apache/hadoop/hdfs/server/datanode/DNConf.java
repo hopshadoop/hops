@@ -49,6 +49,7 @@ public class DNConf {
   final long blockReportSplitThreshold;
   final long deleteReportInterval;
   final long initialBlockReportDelay;
+  final long cacheReportInterval;
   final int writePacketSize;
 
   final String minimumNameNodeVersion;
@@ -57,6 +58,8 @@ public class DNConf {
   final long xceiverStopTimeout;
 
   final int iBRDispatherTPSize;
+  
+  final long maxLockedMemory;
 
   public DNConf(Configuration conf) {
     socketTimeout = conf.getInt(DFS_CLIENT_SOCKET_TIMEOUT_KEY,
@@ -92,6 +95,8 @@ public class DNConf {
             DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     this.blockReportInterval = conf.getLong(DFS_BLOCKREPORT_INTERVAL_MSEC_KEY,
         DFS_BLOCKREPORT_INTERVAL_MSEC_DEFAULT);
+    this.cacheReportInterval = conf.getLong(DFS_CACHEREPORT_INTERVAL_MSEC_KEY,
+        DFS_CACHEREPORT_INTERVAL_MSEC_DEFAULT);
     this.blockReportSplitThreshold = conf.getLong(DFS_BLOCKREPORT_SPLIT_THRESHOLD_KEY,
         DFS_BLOCKREPORT_SPLIT_THRESHOLD_DEFAULT);
     long initBRDelay = conf.getLong(DFS_BLOCKREPORT_INITIAL_DELAY_KEY,
@@ -126,6 +131,10 @@ public class DNConf {
     
     this.iBRDispatherTPSize = conf.getInt(DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_KEY,
             DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_DEFAULT);
+    
+    this.maxLockedMemory = conf.getLong(
+        DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
+        DFS_DATANODE_MAX_LOCKED_MEMORY_DEFAULT);
   }
   
   // We get minimumNameNodeVersion via a method so it can be mocked out in tests.
@@ -135,5 +144,9 @@ public class DNConf {
   
   public long getXceiverStopTimeout() {
     return xceiverStopTimeout;
+  }
+  
+  public long getMaxLockedMemory() {
+    return maxLockedMemory;
   }
 }

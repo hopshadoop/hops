@@ -60,6 +60,17 @@ public class IDsGeneratorFactory {
     }
   }
 
+  private class CacheDirectiveIDGen extends IDsGenerator{
+    CacheDirectiveIDGen(int batchSize, float threshold) {
+      super(batchSize, threshold);
+    }
+
+    @Override
+    CountersQueue.Counter incrementCounter(int inc) throws IOException {
+      return HdfsVariables.incrementCacheDirectiveIdCounter(inc);
+    }
+  }
+  
   private static IDsGeneratorFactory factory;
   private IDsGeneratorFactory(){
   }
@@ -75,8 +86,8 @@ public class IDsGeneratorFactory {
 
   Boolean isConfigured = false;
   void setConfiguration(int inodeIdsBatchSize, int blockIdsBatchSize,
-      int quotaUpdateIdsBatchSize, float inodeIdsThreshold,
-      float blockIdsThreshold, float quotaUpdateIdsThreshold) {
+      int quotaUpdateIdsBatchSize, int cacheDirectiveIdsBatchSize, float inodeIdsThreshold,
+      float blockIdsThreshold, float quotaUpdateIdsThreshold, float cacheDirectiveIdsThreshold) {
 
     synchronized (isConfigured) {
       if (isConfigured) {
@@ -91,6 +102,8 @@ public class IDsGeneratorFactory {
     iDsGenerators.add(new BlockIDGen(blockIdsBatchSize, blockIdsThreshold));
     iDsGenerators.add(new QuotaUpdateIDGen(quotaUpdateIdsBatchSize,
         quotaUpdateIdsThreshold));
+    iDsGenerators.add(new CacheDirectiveIDGen(cacheDirectiveIdsBatchSize,
+        cacheDirectiveIdsThreshold));
   }
 
   public int getUniqueINodeID(){
@@ -107,6 +120,9 @@ public class IDsGeneratorFactory {
     return (int)iDsGenerators.get(2).getUniqueID();
   }
 
+  public long getUniqueCacheDirectiveID(){
+    return iDsGenerators.get(3).getUniqueID();
+  }
 
   void getNewIDs() throws IOException {
     for(IDsGenerator iDsGenerator : iDsGenerators){

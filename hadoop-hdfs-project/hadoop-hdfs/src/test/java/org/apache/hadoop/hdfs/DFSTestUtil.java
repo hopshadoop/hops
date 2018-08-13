@@ -34,9 +34,6 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
-import com.google.common.collect.Lists;
-
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -49,7 +46,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Options.Rename;
-import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -115,14 +111,15 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.fs.CacheFlag;
 
 import static org.apache.hadoop.fs.CreateFlag.CREATE;
 import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 import org.apache.hadoop.fs.FileContext;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
-import org.apache.hadoop.io.retry.DefaultFailoverProxyProvider;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
+import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
 import org.junit.Assert;
@@ -1036,8 +1033,8 @@ public class DFSTestUtil {
         DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
-        DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT, 1, 2, 3, 4, 5, 6, "local",
-        adminState);
+        DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT, 
+        1l, 2l, 3l, 4l, 0l, 0l, 5, 6, "local", adminState);
   }
 
   public static DatanodeDescriptor[] toDatanodeDescriptor(
@@ -1384,6 +1381,27 @@ public class DFSTestUtil {
       locatedBlocks = DFSClientAdapter.callGetBlockLocations(
           cluster.getNameNodeRpc(nnIndex), filePath, 0L, bytes.length);
     } while (locatedBlocks.isUnderConstruction());
+    // OP_ADD_CACHE_POOL
+    filesystem.addCachePool(new CachePoolInfo("pool1"));
+    // OP_MODIFY_CACHE_POOL
+    filesystem.modifyCachePool(new CachePoolInfo("pool1").setLimit(99l));
+    // OP_ADD_PATH_BASED_CACHE_DIRECTIVE
+    long id = filesystem.addCacheDirective(
+        new CacheDirectiveInfo.Builder().
+            setPath(new Path("/path")).
+            setReplication((short)1).
+            setPool("pool1").
+            build(), EnumSet.of(CacheFlag.FORCE));
+    // OP_MODIFY_PATH_BASED_CACHE_DIRECTIVE
+    filesystem.modifyCacheDirective(
+        new CacheDirectiveInfo.Builder().
+            setId(id).
+            setReplication((short)2).
+            build(), EnumSet.of(CacheFlag.FORCE));
+    // OP_REMOVE_PATH_BASED_CACHE_DIRECTIVE
+    filesystem.removeCacheDirective(id);
+    // OP_REMOVE_CACHE_POOL
+    filesystem.removeCachePool("pool1");
   }
   
 

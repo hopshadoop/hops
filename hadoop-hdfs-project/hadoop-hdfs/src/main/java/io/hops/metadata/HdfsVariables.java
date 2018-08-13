@@ -45,6 +45,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 public class HdfsVariables {
 
@@ -125,6 +127,17 @@ public class HdfsVariables {
     }.handle();
   }
 
+  public static CountersQueue.Counter incrementCacheDirectiveIdCounter(
+      final int increment) throws IOException {
+    return (CountersQueue.Counter) new LightWeightRequestHandler(
+        HDFSOperationType.UPDATE_CACHE_DIRECTIVE_ID_COUNTER) {
+      @Override
+      public Object performTask() throws IOException {
+        return incrementCounter(Variable.Finder.CacheDirectiveID, increment);
+      }
+    }.handle();
+  }
+  
   private static CountersQueue.Counter incrementCounter(final Variable.Finder
       finder, final int increment)
       throws StorageException {
@@ -391,6 +404,52 @@ public class HdfsVariables {
     return key;
   }
   
+  private static final Log LOG = LogFactory.getLog(HdfsVariables.class);
+  
+  public static boolean getNeedRescan()
+      throws StorageException, TransactionContextException, IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(HDFSOperationType.GET_NEED_RESCAN) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithReadLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            return vd.getVariable(Variable.Finder.NeedRescan);
+          }
+        });
+      }
+    };
+    IntVariable var = (IntVariable) handler.handle();
+    if (var.getValue() != 0) {
+      return true;
+    }
+    return false;
+  }
+
+  public static void setNeedRescan(final boolean needRescan)
+      throws StorageException, TransactionContextException, IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_NEED_RESCAN) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            int val;
+            if (needRescan) {
+              val = 1;
+            } else {
+              val = 0;
+            }
+            vd.setVariable(new IntVariable(Variable.Finder.NeedRescan, val));
+            return null;
+          }
+        });
+      }
+    }.handle();
+  }
+  
   private static Variable getVariableLightWeight(final Variable.Finder varType)
       throws IOException {
     return (Variable) new LightWeightRequestHandler(
@@ -424,6 +483,10 @@ public class HdfsVariables {
     Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxBlkPerTW,
             new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW,
                     DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW_DEFAULT)).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.CacheDirectiveID,
+        new LongVariable(1).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.NeedRescan,
+        new IntVariable(0).getBytes());
     VarsRegister.registerHdfsDefaultValues();
     // This is a workaround that is needed until HA-YARN has its own format command
     VarsRegister.registerYarnDefaultValues();

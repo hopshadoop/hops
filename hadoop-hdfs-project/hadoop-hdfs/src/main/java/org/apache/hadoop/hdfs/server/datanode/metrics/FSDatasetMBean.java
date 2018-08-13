@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
+ * <p>
  *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,13 +31,13 @@ import java.io.IOException;
  * be published as an interface.
  * <p/>
  * <p/>
- * Data Node runtime statistic  info is report in another MBean
+ * Data Node runtime statistic info is report in another MBean
  *
  * @see org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics
  */
 @InterfaceAudience.Private
 public interface FSDatasetMBean {
-  
+
   /**
    * Returns the total space (in bytes) used by a block pool
    *
@@ -45,7 +45,7 @@ public interface FSDatasetMBean {
    * @throws IOException
    */
   public long getBlockPoolUsed(String bpid) throws IOException;
-  
+
   /**
    * Returns the total space (in bytes) used by dfs datanode
    *
@@ -53,17 +53,6 @@ public interface FSDatasetMBean {
    * @throws IOException
    */
   public long getDfsUsed() throws IOException;
-
-  /**
-   * Returns the storage id of the underlying storage
-   */
-  public String getStorageInfo();
-
-  /**
-   * Returns the number of failed volumes in the datanode.
-   * @return The number of failed volumes in the datanode.
-   */
-  public int getNumFailedVolumes();
 
   /**
    * Returns total capacity (in bytes) of storage (used and unused)
@@ -79,4 +68,41 @@ public interface FSDatasetMBean {
    * @throws IOException
    */
   public long getRemaining() throws IOException;
+
+  /**
+   * Returns the storage id of the underlying storage
+   */
+  public String getStorageInfo();
+
+  /**
+   * Returns the number of failed volumes in the datanode.
+   *
+   * @return The number of failed volumes in the datanode.
+   */
+  public int getNumFailedVolumes();
+
+  /**
+   * Returns the amount of cache used by the datanode (in bytes).
+   */
+  public long getCacheUsed();
+
+  /**
+   * Returns the total cache capacity of the datanode (in bytes).
+   */
+  public long getCacheCapacity();
+
+  /**
+   * Returns the number of blocks cached.
+   */
+  public long getNumBlocksCached();
+
+  /**
+   * Returns the number of blocks that the datanode was unable to cache
+   */
+  public long getNumBlocksFailedToCache();
+
+  /**
+   * Returns the number of blocks that the datanode was unable to uncache
+   */
+  public long getNumBlocksFailedToUncache();
 }

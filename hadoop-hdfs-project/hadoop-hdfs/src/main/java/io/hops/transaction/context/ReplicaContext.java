@@ -138,7 +138,7 @@ public class ReplicaContext
     final long blockId = (Long) params[0];
     final int inodeId = (Integer) params[1];
     List<Replica> results = null;
-    if (containsByBlock(blockId) || containsByINode(inodeId)) {
+    if (containsByBlock(blockId) || (containsByINode(inodeId) && storageCallPrevented)) {
       results = getByBlock(blockId);
       hit(iFinder, results, "bid", blockId);
     } else {

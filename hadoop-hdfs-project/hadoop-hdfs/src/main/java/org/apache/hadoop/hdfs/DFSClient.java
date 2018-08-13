@@ -97,6 +97,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.BlockStorageLocation;
+import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
@@ -121,6 +122,11 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
+import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
+import org.apache.hadoop.hdfs.protocol.CacheDirectiveIterator;
+import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
+import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
+import org.apache.hadoop.hdfs.protocol.CachePoolIterator;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.*;
@@ -169,6 +175,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
 import java.net.ConnectException;
 import org.apache.hadoop.hdfs.shortcircuit.DomainSocketFactory;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.tukaani.xz.UnsupportedOptionsException;
 
 /********************************************************
@@ -2302,6 +2309,82 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     return namenode.setSafeMode(action, isChecked);
   }
 
+  public long addCacheDirective(
+      final CacheDirectiveInfo info, final EnumSet<CacheFlag> flags) throws IOException {
+    checkOpen();
+    try {
+      if (!flags.contains(CacheFlag.FORCE)) {
+        return leaderNN.addCacheDirective(info, flags);
+      }else {
+        return namenode.addCacheDirective(info, flags);
+      }
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException();
+    }
+  }
+
+  public void modifyCacheDirective(
+      final CacheDirectiveInfo info, final EnumSet<CacheFlag> flags) throws IOException {
+    checkOpen();
+    try {
+      if (!flags.contains(CacheFlag.FORCE)) {
+        leaderNN.modifyCacheDirective(info, flags);
+      } else {
+        namenode.modifyCacheDirective(info, flags);
+      }
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException();
+    }
+  }
+
+  public void removeCacheDirective(final long id)
+      throws IOException {
+    checkOpen();
+    try {
+      namenode.removeCacheDirective(id);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException();
+    }
+  }
+
+  public RemoteIterator<CacheDirectiveEntry> listCacheDirectives(
+      CacheDirectiveInfo filter) throws IOException {
+    return new CacheDirectiveIterator(leaderNN, filter);
+  }
+
+  public void addCachePool(final CachePoolInfo info) throws IOException {
+    checkOpen();
+    try {
+      leaderNN.addCachePool(info);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException();
+    }
+  }
+
+  public void modifyCachePool(final CachePoolInfo info) throws IOException {
+    checkOpen();
+    try {
+      namenode.modifyCachePool(info);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException();
+    }
+  }
+
+  public void removeCachePool(final String poolName) throws IOException {
+    checkOpen();
+    try {
+      namenode.removeCachePool(poolName);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException();
+    }
+  }
+
+  public RemoteIterator<CachePoolEntry> listCachePools() throws IOException {
+
+    return new CachePoolIterator(leaderNN);
+
+  }
+  
   @VisibleForTesting
   ExtendedBlock getPreviousBlock(String file) {
     return filesBeingWritten.get(file).getBlock();
@@ -2494,7 +2577,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
   public DomainSocketFactory getDomainSocketFactory() {
     return domainSocketFactory;
   }
-
+  
   public void disableLegacyBlockReaderLocal() {
     shouldUseLegacyBlockReaderLocal = false;
   }

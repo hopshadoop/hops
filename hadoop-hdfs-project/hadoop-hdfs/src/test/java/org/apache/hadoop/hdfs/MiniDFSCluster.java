@@ -1799,6 +1799,29 @@ public class MiniDFSCluster {
     client.close();
   }
   
+//  public void waitAlone(int nnIndex) throws IOException {
+//    if (nameNodes.length == 0 || nameNodes[nnIndex] == null ||
+//        nameNodes[nnIndex].nameNode == null) {
+//      return;
+//    }
+//    InetSocketAddress addr = nameNodes[nnIndex].nameNode.getServiceRpcAddress();
+//    assert addr.getPort() != 0;
+//    DFSClient client = new DFSClient(addr, conf);
+//
+//    // ensure all datanodes have registered and sent heartbeat to the namenode
+//    while (client.getNameNodesCount()!=1) {
+//      try {
+//        LOG.info("Waiting for cluster to become active");
+//        Thread.sleep(100);
+//        client.close();
+//        client = new DFSClient(addr, conf);
+//      } catch (InterruptedException e) {
+//      }
+//    }
+//
+//    client.close();
+//  }
+  
   /**
    * Wait until the cluster is active and running.
    */

@@ -32,6 +32,8 @@ import io.hops.metadata.hdfs.entity.Ace;
 import io.hops.metadata.hdfs.entity.HashBucket;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.adaptor.BlockInfoDALAdaptor;
+import io.hops.metadata.adaptor.CacheDirectiveDALAdaptor;
+import io.hops.metadata.adaptor.CachePoolDALAdaptor;
 import io.hops.metadata.adaptor.INodeAttributeDALAdaptor;
 import io.hops.metadata.adaptor.INodeDALAdaptor;
 import io.hops.metadata.adaptor.LeaseDALAdaptor;
@@ -49,6 +51,9 @@ import io.hops.metadata.election.dal.LeDescriptorDataAccess;
 import io.hops.metadata.election.entity.LeDescriptor.HdfsLeDescriptor;
 import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
+import io.hops.metadata.hdfs.dal.CacheDirectiveDataAccess;
+import io.hops.metadata.hdfs.dal.CachePoolDataAccess;
+import io.hops.metadata.hdfs.dal.CachedBlockDataAccess;
 import io.hops.metadata.hdfs.dal.CorruptReplicaDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.dal.ExcessReplicaDataAccess;
@@ -67,6 +72,7 @@ import io.hops.metadata.hdfs.dal.RetryCacheEntryDataAccess;
 import io.hops.metadata.hdfs.dal.UnderReplicatedBlockDataAccess;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
+import io.hops.metadata.hdfs.entity.CachedBlock;
 import io.hops.metadata.hdfs.entity.CorruptReplica;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.ExcessReplica;
@@ -84,6 +90,9 @@ import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.AcesContext;
 import io.hops.transaction.context.BlockChecksumContext;
 import io.hops.transaction.context.BlockInfoContext;
+import io.hops.transaction.context.CacheDirectiveContext;
+import io.hops.transaction.context.CachePoolContext;
+import io.hops.transaction.context.CachedBlockContext;
 import io.hops.transaction.context.ContextInitializer;
 import io.hops.transaction.context.CorruptReplicaContext;
 import io.hops.transaction.context.EncodingStatusContext;
@@ -133,6 +142,8 @@ import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.hadoop.hdfs.protocol.CacheDirective;
+import org.apache.hadoop.hdfs.server.namenode.CachePool;
 
 public class HdfsStorageFactory {
 
@@ -240,6 +251,10 @@ public class HdfsStorageFactory {
     dataAccessAdaptors.put(INodeAttributesDataAccess.class,
         new INodeAttributeDALAdaptor((INodeAttributesDataAccess) getDataAccess(
             INodeAttributesDataAccess.class)));
+    dataAccessAdaptors.put(CacheDirectiveDataAccess.class, new CacheDirectiveDALAdaptor(
+        (CacheDirectiveDataAccess) getDataAccess(CacheDirectiveDataAccess.class)));
+    dataAccessAdaptors.put(CachePoolDataAccess.class, new CachePoolDALAdaptor(
+        (CachePoolDataAccess) getDataAccess(CachePoolDataAccess.class)));
   }
 
   private static ContextInitializer getContextInitializer() {
@@ -315,15 +330,21 @@ public class HdfsStorageFactory {
         entityContexts.put(MetadataLogEntry.class, new MetadataLogContext(
             (MetadataLogDataAccess) getDataAccess(MetadataLogDataAccess.class)
         ));
-		entityContexts.put(SubTreeOperation.class, new SubTreeOperationsContext(
-                (OngoingSubTreeOpsDataAccess)
-                getDataAccess(OngoingSubTreeOpsDataAccess.class)));
-		entityContexts.put(HashBucket.class, new HashBucketContext(
-        (HashBucketDataAccess) getDataAccess(HashBucketDataAccess.class)));
-		entityContexts.put(Ace.class, new AcesContext((AceDataAccess) getDataAccess(AceDataAccess.class)));
+        entityContexts.put(SubTreeOperation.class, new SubTreeOperationsContext(
+            (OngoingSubTreeOpsDataAccess) getDataAccess(OngoingSubTreeOpsDataAccess.class)));
+        entityContexts.put(HashBucket.class, new HashBucketContext(
+            (HashBucketDataAccess) getDataAccess(HashBucketDataAccess.class)));
+        entityContexts.put(Ace.class, new AcesContext((AceDataAccess) getDataAccess(AceDataAccess.class)));
 
-    entityContexts.put(RetryCacheEntry.class, new RetryCacheEntryContext(
-        (RetryCacheEntryDataAccess) getDataAccess(RetryCacheEntryDataAccess.class)));
+        entityContexts.put(RetryCacheEntry.class, new RetryCacheEntryContext(
+            (RetryCacheEntryDataAccess) getDataAccess(RetryCacheEntryDataAccess.class)));
+        
+        entityContexts.put(CacheDirective.class, new CacheDirectiveContext(
+            (CacheDirectiveDataAccess) getDataAccess(CacheDirectiveDataAccess.class)));
+        entityContexts.put(CachePool.class, new CachePoolContext(
+            (CachePoolDataAccess) getDataAccess(CachePoolDataAccess.class)));
+        entityContexts.put(CachedBlock.class, new CachedBlockContext(
+            (CachedBlockDataAccess) getDataAccess(CachedBlockDataAccess.class)));
         return entityContexts;
       }
 

@@ -16,6 +16,8 @@
 package io.hops.transaction.lock;
 
 import com.google.common.collect.Iterables;
+import com.google.common.primitives.Longs;
+import io.hops.common.INodeUtil;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
@@ -25,7 +27,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
 
 public final class BlockLock extends IndividualBlockLock {
 
@@ -43,35 +48,51 @@ public final class BlockLock extends IndividualBlockLock {
 
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
-    BaseINodeLock inodeLock = (BaseINodeLock) locks.getLock(Type.INode);
     boolean individualBlockAlreadyRead = false;
-    Iterable blks = Collections.EMPTY_LIST;
-    for (INode inode : inodeLock.getAllResolvedINodes()) {
-      if(BaseINodeLock.isStoredInDB(inode)){
-        LOG.debug("Stuffed Inode:  BlockLock. Skipping acquring locks on the inode named: "+inode.getLocalName()+" as the file is stored in the database");
-        announceEmptyFile(inode.getId());
-        continue;
-      }
-      if (inode instanceof INodeFile) {
-        Collection<BlockInfo> inodeBlocks = Collections.EMPTY_LIST;
-        if(((INodeFile) inode).hasBlocks()) {
-          inodeBlocks =
-                  acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByINodeId,
-                          inode.getId());
-        }
-
-        if (!individualBlockAlreadyRead) {
-          individualBlockAlreadyRead = inode.getId() == inodeId;
-        }
-
-        if (inodeBlocks == null || inodeBlocks.isEmpty()) {
+    if (locks.containsLock(Type.INode)) {
+      BaseINodeLock inodeLock = (BaseINodeLock) locks.getLock(Type.INode);
+      Iterable blks = Collections.EMPTY_LIST;
+      for (INode inode : inodeLock.getAllResolvedINodes()) {
+        if (BaseINodeLock.isStoredInDB(inode)) {
+          LOG.debug("Stuffed Inode:  BlockLock. Skipping acquring locks on the inode named: " + inode.getLocalName()
+              + " as the file is stored in the database");
           announceEmptyFile(inode.getId());
+          continue;
         }
+        if (inode instanceof INodeFile) {
+          Collection<BlockInfo> inodeBlocks = Collections.EMPTY_LIST;
+          if (((INodeFile) inode).hasBlocks()) {
+            inodeBlocks = acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByINodeId,
+                inode.getId());
+          }
 
-        blks = Iterables.concat(blks, inodeBlocks);
-        files.add((INodeFile) inode);
+          if (!individualBlockAlreadyRead) {
+            individualBlockAlreadyRead = inode.getId() == inodeId;
+          }
+
+          if (inodeBlocks == null || inodeBlocks.isEmpty()) {
+            announceEmptyFile(inode.getId());
+          }
+
+          blks = Iterables.concat(blks, inodeBlocks);
+          files.add((INodeFile) inode);
+        }
       }
+    } else if (locks.containsLock(Type.AllCachedBlock)) {
+      AllCachedBlockLock cachedBlockLock = (AllCachedBlockLock) locks.getLock(Type.AllCachedBlock);
+      Collection<io.hops.metadata.hdfs.entity.CachedBlock> cBlocks = cachedBlockLock.getAllResolvedCachedBlock();
+      Set<Long> blockIdSet = new HashSet<>();
+      for (io.hops.metadata.hdfs.entity.CachedBlock cBlock : cBlocks) {
+        blockIdSet.add(cBlock.getBlockId());
+      }
+      long[] blockIds = Longs.toArray(blockIdSet);
+      int[] inodeIds = INodeUtil.resolveINodesFromBlockIds(blockIds);
+      blocks.addAll(acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByBlockIdsAndINodeIds, blockIds, inodeIds));
+    } else {
+      throw new TransactionLocks.LockNotAddedException(
+          "BlockLock must come either after an InodeLock of a AllCachedBlockLock");
     }
+
 
     if (!individualBlockAlreadyRead) {
       super.acquire(locks);

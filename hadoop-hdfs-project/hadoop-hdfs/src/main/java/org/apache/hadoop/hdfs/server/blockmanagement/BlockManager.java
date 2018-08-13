@@ -117,13 +117,6 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Keeps information related to the blocks stored in the Hadoop cluster.
@@ -4333,6 +4326,14 @@ public class BlockManager {
   public Iterator<Block> getCorruptReplicaBlockIterator() {
     return neededReplications
         .iterator(UnderReplicatedBlocks.QUEUE_WITH_CORRUPT_BLOCKS);
+  }
+
+  /**
+   * Get the replicas which are corrupt for a given block.
+   */
+  public Collection<DatanodeDescriptor> getCorruptReplicas(Block block) throws StorageException,
+      TransactionContextException {
+    return corruptReplicas.getNodes(getBlockInfo(block));
   }
 
   /**

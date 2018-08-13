@@ -25,6 +25,9 @@ import java.nio.MappedByteBuffer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.io.nativeio.NativeIO;
+
 /**
  * A reference to a memory-mapped region used by an HDFS client.
  */
@@ -72,4 +75,20 @@ public class ClientMmap implements Closeable {
   public MappedByteBuffer getMappedByteBuffer() {
     return map;
   }
+
+//  public void setLastEvictableTimeNs(long lastEvictableTimeNs) {
+//    this.lastEvictableTimeNs = lastEvictableTimeNs;
+//  }
+//
+//  public long getLastEvictableTimeNs() {
+//    return this.lastEvictableTimeNs;
+//  }
+//
+//  /**
+//   * Unmap the memory region.
+//   */
+//  void unmap() {
+//    assert(refCount.get() == 0);
+//    NativeIO.POSIX.munmap(map);
+//  }
 }
