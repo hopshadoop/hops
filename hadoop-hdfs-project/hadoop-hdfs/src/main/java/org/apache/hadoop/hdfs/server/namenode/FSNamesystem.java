@@ -707,7 +707,7 @@ public class FSNamesystem
           + " of total heap and retry cache entry expiry time is "
           + entryExpiryMillis + " millis");
       long entryExpiryNanos = entryExpiryMillis * 1000 * 1000;
-      return new RetryCacheDistributed("Namenode Retry Cache", heapPercent,
+      return new RetryCacheDistributed("NameNodeRetryCache", heapPercent,
           entryExpiryNanos);
     }
     return null;
