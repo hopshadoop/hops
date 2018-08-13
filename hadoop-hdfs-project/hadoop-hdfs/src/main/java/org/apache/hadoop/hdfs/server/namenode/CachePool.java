@@ -52,8 +52,6 @@ import java.util.List;
  */
 @InterfaceAudience.Private
 public final class CachePool {
-  public static final Log LOG = LogFactory.getLog(CachePool.class);
-  
   public enum Finder implements FinderType<CachePool> {
     ByName, All;
 

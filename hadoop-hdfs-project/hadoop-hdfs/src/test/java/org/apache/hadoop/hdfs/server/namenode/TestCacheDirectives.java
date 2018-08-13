@@ -91,6 +91,7 @@ import com.google.common.base.Supplier;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import java.util.Set;
+import org.apache.hadoop.hdfs.BlockReaderTestUtil;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveIteratorForTesting;
 
 public class TestCacheDirectives {
@@ -142,10 +143,7 @@ public class TestCacheDirectives {
     namenode = cluster.getNameNode();
     prevCacheManipulator = NativeIO.POSIX.getCacheManipulator();
     NativeIO.POSIX.setCacheManipulator(new NoMlockCacheManipulator());
-    LogManager.getLogger(CacheReplicationMonitor.class.getName()).setLevel(
-        Level.TRACE);
-    LogManager.getLogger(CacheManager.class.getName()).setLevel(
-        Level.TRACE);
+    BlockReaderTestUtil.enableHdfsCachingTracing();
   }
 
   @After
