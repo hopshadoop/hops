@@ -17,7 +17,10 @@
  */
 package org.apache.hadoop.fs;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CACHEREPORT_INTERVAL_MSEC_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MMAP_ENABLED;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_SIZE;
 
@@ -50,6 +53,8 @@ import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache.CacheVisitor;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitReplica;
+import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
+import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.IOUtils;
@@ -69,6 +74,7 @@ import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 
 /**
  * This class tests if EnhancedByteBufferAccess works correctly.
@@ -124,8 +130,8 @@ public class TestEnhancedByteBufferAccess {
     conf.setBoolean(DFSConfigKeys.
         DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY, true);
     conf.setLong(DFS_HEARTBEAT_INTERVAL_KEY, 1);
-//    conf.setLong(DFS_CACHEREPORT_INTERVAL_MSEC_KEY, 1000);
-//    conf.setLong(DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS, 1000);
+    conf.setLong(DFS_CACHEREPORT_INTERVAL_MSEC_KEY, 1000);
+    conf.setLong(DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS, 1000);
     return conf;
   }
 
@@ -577,84 +583,84 @@ public class TestEnhancedByteBufferAccess {
     }
   }
 
-//  /**
-//   * Test that we can zero-copy read cached data even without disabling
-//   * checksums.
-//   */
-//  @Test(timeout=120000)
-//  public void testZeroCopyReadOfCachedData() throws Exception {
-//    BlockReaderTestUtil.enableShortCircuitShmTracing();
-//    BlockReaderTestUtil.enableBlockReaderFactoryTracing();
-//    BlockReaderTestUtil.enableHdfsCachingTracing();
-//
-//    final int TEST_FILE_LENGTH = 16385;
-//    final Path TEST_PATH = new Path("/a");
-//    final int RANDOM_SEED = 23453;
-//    HdfsConfiguration conf = initZeroCopyTest();
-//    conf.setBoolean(DFSConfigKeys.
-//        DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY, false);
-//    final String CONTEXT = "testZeroCopyReadOfCachedData";
-//    conf.set(DFSConfigKeys.DFS_CLIENT_CONTEXT, CONTEXT);
-//    conf.setLong(DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
-//        DFSTestUtil.roundUpToMultiple(TEST_FILE_LENGTH, 4096));
-//    MiniDFSCluster cluster = null;
-//    ByteBuffer result = null;
-//    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
-//    cluster.waitActive();
-//    FsDatasetSpi<?> fsd = cluster.getDataNodes().get(0).getFSDataset();
-//    DistributedFileSystem fs = cluster.getFileSystem();
-//    DFSTestUtil.createFile(fs, TEST_PATH,
-//        TEST_FILE_LENGTH, (short)1, RANDOM_SEED);
-//    DFSTestUtil.waitReplication(fs, TEST_PATH, (short)1);
-//    byte original[] = DFSTestUtil.
-//        calculateFileContentsFromSeed(RANDOM_SEED, TEST_FILE_LENGTH);
-//
-//    // Prior to caching, the file can't be read via zero-copy
-//    FSDataInputStream fsIn = fs.open(TEST_PATH);
-//    try {
-//      result = fsIn.read(null, TEST_FILE_LENGTH / 2,
-//          EnumSet.noneOf(ReadOption.class));
-//      Assert.fail("expected UnsupportedOperationException");
-//    } catch (UnsupportedOperationException e) {
-//      // expected
-//    }
-//    // Cache the file
-//    fs.addCachePool(new CachePoolInfo("pool1"));
-//    long directiveId = fs.addCacheDirective(new CacheDirectiveInfo.Builder().
-//        setPath(TEST_PATH).
-//        setReplication((short)1).
-//        setPool("pool1").
-//        build());
-//    int numBlocks = (int)Math.ceil((double)TEST_FILE_LENGTH / BLOCK_SIZE);
-//    DFSTestUtil.verifyExpectedCacheUsage(
-//        DFSTestUtil.roundUpToMultiple(TEST_FILE_LENGTH, BLOCK_SIZE),
-//        numBlocks, cluster.getDataNodes().get(0).getFSDataset());
-//    try {
-//      result = fsIn.read(null, TEST_FILE_LENGTH,
-//          EnumSet.noneOf(ReadOption.class));
-//    } catch (UnsupportedOperationException e) {
-//      Assert.fail("expected to be able to read cached file via zero-copy");
-//    }
-//    // Verify result
-//    Assert.assertArrayEquals(Arrays.copyOfRange(original, 0,
-//        BLOCK_SIZE), byteBufferToArray(result));
-//    // check that the replica is anchored 
-//    final ExtendedBlock firstBlock =
-//        DFSTestUtil.getFirstBlock(fs, TEST_PATH);
-//    final ShortCircuitCache cache = ClientContext.get(
-//        CONTEXT, new DFSClient.Conf(conf)). getShortCircuitCache();
-//    waitForReplicaAnchorStatus(cache, firstBlock, true, true, 1);
-//    // Uncache the replica
-//    fs.removeCacheDirective(directiveId);
-//    waitForReplicaAnchorStatus(cache, firstBlock, false, true, 1);
-//    fsIn.releaseBuffer(result);
-//    waitForReplicaAnchorStatus(cache, firstBlock, false, false, 1);
-//    DFSTestUtil.verifyExpectedCacheUsage(0, 0, fsd);
-//
-//    fsIn.close();
-//    fs.close();
-//    cluster.shutdown();
-//  }
+  /**
+   * Test that we can zero-copy read cached data even without disabling
+   * checksums.
+   */
+  @Test(timeout=120000)
+  public void testZeroCopyReadOfCachedData() throws Exception {
+    BlockReaderTestUtil.enableShortCircuitShmTracing();
+    BlockReaderTestUtil.enableBlockReaderFactoryTracing();
+    BlockReaderTestUtil.enableHdfsCachingTracing();
+
+    final int TEST_FILE_LENGTH = 16385;
+    final Path TEST_PATH = new Path("/a");
+    final int RANDOM_SEED = 23453;
+    HdfsConfiguration conf = initZeroCopyTest();
+    conf.setBoolean(DFSConfigKeys.
+        DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY, false);
+    final String CONTEXT = "testZeroCopyReadOfCachedData";
+    conf.set(DFSConfigKeys.DFS_CLIENT_CONTEXT, CONTEXT);
+    conf.setLong(DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
+        DFSTestUtil.roundUpToMultiple(TEST_FILE_LENGTH, 4096));
+    MiniDFSCluster cluster = null;
+    ByteBuffer result = null;
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+    cluster.waitActive();
+    FsDatasetSpi<?> fsd = cluster.getDataNodes().get(0).getFSDataset();
+    DistributedFileSystem fs = cluster.getFileSystem();
+    DFSTestUtil.createFile(fs, TEST_PATH,
+        TEST_FILE_LENGTH, (short)1, RANDOM_SEED);
+    DFSTestUtil.waitReplication(fs, TEST_PATH, (short)1);
+    byte original[] = DFSTestUtil.
+        calculateFileContentsFromSeed(RANDOM_SEED, TEST_FILE_LENGTH);
+
+    // Prior to caching, the file can't be read via zero-copy
+    FSDataInputStream fsIn = fs.open(TEST_PATH);
+    try {
+      result = fsIn.read(null, TEST_FILE_LENGTH / 2,
+          EnumSet.noneOf(ReadOption.class));
+      Assert.fail("expected UnsupportedOperationException");
+    } catch (UnsupportedOperationException e) {
+      // expected
+    }
+    // Cache the file
+    fs.addCachePool(new CachePoolInfo("pool1"));
+    long directiveId = fs.addCacheDirective(new CacheDirectiveInfo.Builder().
+        setPath(TEST_PATH).
+        setReplication((short)1).
+        setPool("pool1").
+        build());
+    int numBlocks = (int)Math.ceil((double)TEST_FILE_LENGTH / BLOCK_SIZE);
+    DFSTestUtil.verifyExpectedCacheUsage(
+        DFSTestUtil.roundUpToMultiple(TEST_FILE_LENGTH, BLOCK_SIZE),
+        numBlocks, cluster.getDataNodes().get(0).getFSDataset());
+    try {
+      result = fsIn.read(null, TEST_FILE_LENGTH,
+          EnumSet.noneOf(ReadOption.class));
+    } catch (UnsupportedOperationException e) {
+      Assert.fail("expected to be able to read cached file via zero-copy");
+    }
+    // Verify result
+    Assert.assertArrayEquals(Arrays.copyOfRange(original, 0,
+        BLOCK_SIZE), byteBufferToArray(result));
+    // check that the replica is anchored 
+    final ExtendedBlock firstBlock =
+        DFSTestUtil.getFirstBlock(fs, TEST_PATH);
+    final ShortCircuitCache cache = ClientContext.get(
+        CONTEXT, new DFSClient.Conf(conf)). getShortCircuitCache();
+    waitForReplicaAnchorStatus(cache, firstBlock, true, true, 1);
+    // Uncache the replica
+    fs.removeCacheDirective(directiveId);
+    waitForReplicaAnchorStatus(cache, firstBlock, false, true, 1);
+    fsIn.releaseBuffer(result);
+    waitForReplicaAnchorStatus(cache, firstBlock, false, false, 1);
+    DFSTestUtil.verifyExpectedCacheUsage(0, 0, fsd);
+
+    fsIn.close();
+    fs.close();
+    cluster.shutdown();
+  }
   
   private void waitForReplicaAnchorStatus(final ShortCircuitCache cache,
       final ExtendedBlock block, final boolean expectedIsAnchorable,
