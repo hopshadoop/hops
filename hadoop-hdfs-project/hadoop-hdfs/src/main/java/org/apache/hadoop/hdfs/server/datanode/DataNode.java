@@ -1174,7 +1174,7 @@ public class DataNode extends Configured
     }
   }
 
-  DataNodeMetrics getMetrics() {
+  public DataNodeMetrics getMetrics() {
     return metrics;
   }
   
