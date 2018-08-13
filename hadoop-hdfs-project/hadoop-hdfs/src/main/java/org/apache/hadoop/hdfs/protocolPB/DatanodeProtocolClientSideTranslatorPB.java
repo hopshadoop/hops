@@ -35,12 +35,15 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ActiveNameno
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockReceivedAndDeletedRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockReportRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockReportResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.CacheReportRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.CacheReportResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.CommitBlockSynchronizationRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ErrorReportRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.HeartbeatRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.HeartbeatResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.NameNodeAddressRequestForBlockReportingProto;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.NameNodeAddressRequestForCacheReportingProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.RegisterDatanodeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.RegisterDatanodeResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ReportBadBlocksRequestProto;
@@ -73,6 +76,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -164,14 +168,19 @@ public class DatanodeProtocolClientSideTranslatorPB
 
   @Override
   public HeartbeatResponse sendHeartbeat(DatanodeRegistration registration,
-      StorageReport[] reports, int xmitsInProgress, int xceiverCount,
+      StorageReport[] reports, long cacheCapacity, long cacheUsed, int xmitsInProgress, int xceiverCount,
       int failedVolumes) throws IOException {
     HeartbeatRequestProto.Builder builder = HeartbeatRequestProto.newBuilder()
         .setRegistration(PBHelper.convert(registration))
         .setXmitsInProgress(xmitsInProgress).setXceiverCount(xceiverCount)
         .setFailedVolumes(failedVolumes);
     builder.addAllReports(PBHelper.convertStorageReports(reports));
-
+    if (cacheCapacity != 0) {
+      builder.setCacheCapacity(cacheCapacity);
+    }
+    if (cacheUsed != 0) {
+      builder.setCacheUsed(cacheUsed);
+    }
     HeartbeatResponseProto resp;
     try {
       resp = rpcProxy.sendHeartbeat(NULL_CONTROLLER, builder.build());
@@ -209,6 +218,31 @@ public class DatanodeProtocolClientSideTranslatorPB
       throw ProtobufHelper.getRemoteException(se);
     }
     return resp.hasCmd() ? PBHelper.convert(resp.getCmd()) : null;
+  }
+
+  @Override
+  public DatanodeCommand cacheReport(DatanodeRegistration registration,
+      String poolId, List<Long> blockIds, long cacheCapacity, long cacheUsed) throws IOException {
+    CacheReportRequestProto.Builder builder =
+        CacheReportRequestProto.newBuilder()
+        .setRegistration(PBHelper.convert(registration))
+        .setBlockPoolId(poolId);
+    for (Long blockId : blockIds) {
+      builder.addBlocks(blockId);
+    }
+    builder.setCacheCapacity(cacheCapacity);
+    builder.setCacheUsed(cacheUsed);
+    
+    CacheReportResponseProto resp;
+    try {
+      resp = rpcProxy.cacheReport(NULL_CONTROLLER, builder.build());
+    } catch (ServiceException se) {
+      throw ProtobufHelper.getRemoteException(se);
+    }
+    if (resp.hasCmd()) {
+      return PBHelper.convert(resp.getCmd());
+    }
+    return null;
   }
 
   @Override
@@ -336,6 +370,22 @@ public class DatanodeProtocolClientSideTranslatorPB
     }
   }
 
+  @Override
+  public ActiveNode getNextNamenodeToSendCacheReport(long noOfBlks) throws IOException {
+
+    NameNodeAddressRequestForCacheReportingProto.Builder request =
+        NameNodeAddressRequestForCacheReportingProto.newBuilder();
+    request.setNoOfBlks(noOfBlks);
+    try {
+      ActiveNodeProtos.ActiveNodeProto response = rpcProxy
+          .getNextNamenodeToSendCacheReport(NULL_CONTROLLER, request.build());
+      ActiveNode aNamenode = PBHelper.convert(response);
+      return aNamenode;
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+  
   /**
    * Read the small file data
    *

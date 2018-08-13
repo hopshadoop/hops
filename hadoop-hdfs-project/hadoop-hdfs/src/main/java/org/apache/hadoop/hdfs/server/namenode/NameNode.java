@@ -75,6 +75,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
+import org.apache.hadoop.hdfs.server.datanode.CRLoadBalancingException;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMetrics;
 import org.apache.hadoop.ipc.Server;
@@ -247,6 +248,11 @@ public class NameNode implements NameNodeStatusMXBean {
   private MDCleaner mdCleaner;
   private long stoTableCleanDelay = 0;
 
+  /**
+   * for cache report load balancing
+   */
+  private BRTrackingService crTrackingService;
+  
   private ObjectName nameNodeStatusBeanName;
   /**
    * The service name of the delegation token issued by the namenode. It is
@@ -510,6 +516,11 @@ public class NameNode implements NameNodeStatusMXBean {
     this.mdCleaner = MDCleaner.getInstance();
     this.stoTableCleanDelay = conf.getLong(DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY,
             DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_DEFAULT);
+
+    this.crTrackingService = new BRTrackingService(conf.getLong(DFSConfigKeys.DFS_CR_LB_DB_VAR_UPDATE_THRESHOLD,
+            DFSConfigKeys.DFS_CR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT),
+            conf.getLong(DFSConfigKeys.DFS_CR_LB_TIME_WINDOW_SIZE,
+                    DFSConfigKeys.DFS_CR_LB_TIME_WINDOW_SIZE_DEFAULT));
 
     String fsOwnerShortUserName = UserGroupInformation.getCurrentUser()
         .getShortUserName();
@@ -1214,7 +1225,7 @@ public class NameNode implements NameNodeStatusMXBean {
 
   public ActiveNode getNextNamenodeToSendBlockReport(final long noOfBlks) throws IOException {
     if(leaderElection.isLeader()) {
-      LOG.debug("NN Id: "+leaderElection.getCurrentId()+") Received request to assign work ("+noOfBlks+" blks) ");
+      LOG.debug("NN Id: "+leaderElection.getCurrentId()+") Received request to assign block report work ("+noOfBlks+" blks) ");
       ActiveNode an = brTrackingService.assignWork(leaderElection.getActiveNamenodes(), noOfBlks);
       return an;
     }else{
@@ -1224,6 +1235,18 @@ public class NameNode implements NameNodeStatusMXBean {
     }
   }
 
+  public ActiveNode getNextNamenodeToSendCacheReport(final long noOfBlks) throws IOException {
+    if(leaderElection.isLeader()) {
+      LOG.debug("NN Id: "+leaderElection.getCurrentId()+") Received request to assign cache report work ("+noOfBlks+" blks) ");
+      ActiveNode an = crTrackingService.assignWork(leaderElection.getActiveNamenodes(), noOfBlks);
+      return an;
+    }else{
+      String msg = "NN Id: "+leaderElection.getCurrentId()+") Received request to assign work ("+noOfBlks+" blks). Returning null as I am not the leader NN";
+      LOG.debug(msg);
+      throw new CRLoadBalancingException(msg);
+    }
+  }
+  
   private static void dropAndCreateDB(Configuration conf) throws IOException {
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.getConnector().dropAndRecreateDB();

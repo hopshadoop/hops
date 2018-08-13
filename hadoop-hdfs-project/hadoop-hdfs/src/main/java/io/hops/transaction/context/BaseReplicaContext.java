@@ -52,7 +52,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
       entityMap.remove(key);
     }
 
-    entityMap = inodesToReplicas.get(key.getBlockId());
+    entityMap = inodesToReplicas.get(key.getInodeId());
     if (entityMap != null) {
       entityMap.remove(key);
     }
@@ -75,7 +75,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
     addInternal(getKey(entity), entity);
   }
 
-  private void addInternal(Key key, Entity entity) {
+  protected void addInternal(Key key, Entity entity) {
     Map<Key, Entity> entityMap;
     if (key.hasBlockId()) {
       entityMap = blocksToReplicas.get(key.getBlockId());

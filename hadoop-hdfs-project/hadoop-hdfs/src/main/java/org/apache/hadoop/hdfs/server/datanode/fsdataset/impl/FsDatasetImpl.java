@@ -86,6 +86,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import org.apache.hadoop.io.IOUtils;
 
 /**
@@ -193,6 +194,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   final Map<String, DatanodeStorage> storageMap;
   final ReplicaMap volumeMap;
   final FsDatasetAsyncDiskService asyncDiskService;
+  final FsDatasetCache cacheManager;
   private final Configuration conf;
   private final int validVolsRequired;
 
@@ -247,7 +249,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
 
     volumes = new FsVolumeList(volsFailed, blockChooserImpl);
     asyncDiskService = new FsDatasetAsyncDiskService(datanode);
-
+    cacheManager = new FsDatasetCache(this);
     for (int idx = 0; idx < storage.getNumStorageDirs(); idx++) {
       addVolume(dataLocations, storage.getStorageDir(idx));
     }
@@ -346,6 +348,31 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   @Override
   public int getNumFailedVolumes() {
     return volumes.numberOfFailedVolumes();
+  }
+
+  @Override // FSDatasetMBean
+  public long getCacheUsed() {
+    return cacheManager.getCacheUsed();
+  }
+
+  @Override // FSDatasetMBean
+  public long getCacheCapacity() {
+    return cacheManager.getCacheCapacity();
+  }
+
+  @Override // FSDatasetMBean
+  public long getNumBlocksFailedToCache() {
+    return cacheManager.getNumBlocksFailedToCache();
+  }
+
+  @Override // FSDatasetMBean
+  public long getNumBlocksFailedToUncache() {
+    return cacheManager.getNumBlocksFailedToUncache();
+  }
+
+  @Override // FSDatasetMBean
+  public long getNumBlocksCached() {
+    return cacheManager.getNumBlocksCached();
   }
 
   /**
@@ -606,6 +633,8 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   private synchronized ReplicaBeingWritten append(String bpid,
       FinalizedReplica replicaInfo, long newGS, long estimateBlockLen)
       throws IOException {
+    // If the block is cached, start uncaching it.
+    cacheManager.uncacheBlock(bpid, replicaInfo.getBlockId());
     // unlink the finalized replica
     replicaInfo.unlinkBlock(1);
     
@@ -1099,6 +1128,11 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     return blockReportsMap;
   }
 
+  @Override // FsDatasetSpi
+  public List<Long> getCacheReport(String bpid) {
+    return cacheManager.getCachedBlocks(bpid);
+  }
+
   /**
    * Get the list of finalized blocks from in-memory blockmap for a block pool.
    */
@@ -1247,7 +1281,11 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
         volumeMap.remove(bpid, invalidBlk);
       }
     
-      // Delete the block asynchronously to make sure we can do it fast enough
+      // If the block is cached, start uncaching it.
+      cacheManager.uncacheBlock(bpid, invalidBlk.getBlockId());
+      // Delete the block asynchronously to make sure we can do it fast enough.
+      // It's ok to unlink the block file before the uncache operation
+      // finishes.
       asyncDiskService.deleteAsync(v, f,
           FsDatasetUtil.getMetaFile(f, invalidBlk.getGenerationStamp()),
           new ExtendedBlock(bpid, invalidBlk));
@@ -1263,6 +1301,71 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     }
   }
 
+  /**
+   * Asynchronously attempts to cache a single block via {@link FsDatasetCache}.
+   */
+  private void cacheBlock(String bpid, long blockId) {
+    FsVolumeImpl volume;
+    String blockFileName;
+    long length, genstamp;
+    Executor volumeExecutor;
+
+    synchronized (this) {
+      ReplicaInfo info = volumeMap.get(bpid, blockId);
+      boolean success = false;
+      try {
+        if (info == null) {
+          LOG.warn("Failed to cache block with id " + blockId + ", pool " +
+              bpid + ": ReplicaInfo not found.");
+          return;
+        }
+        if (info.getState() != ReplicaState.FINALIZED) {
+          LOG.warn("Failed to cache block with id " + blockId + ", pool " +
+              bpid + ": replica is not finalized; it is in state " +
+              info.getState());
+          return;
+        }
+        try {
+          volume = (FsVolumeImpl)info.getVolume();
+          if (volume == null) {
+            LOG.warn("Failed to cache block with id " + blockId + ", pool " +
+                bpid + ": volume not found.");
+            return;
+          }
+        } catch (ClassCastException e) {
+          LOG.warn("Failed to cache block with id " + blockId +
+              ": volume was not an instance of FsVolumeImpl.");
+          return;
+        }
+        success = true;
+      } finally {
+        if (!success) {
+          cacheManager.numBlocksFailedToCache.incrementAndGet();
+        }
+      }
+      blockFileName = info.getBlockFile().getAbsolutePath();
+      length = info.getVisibleLength();
+      genstamp = info.getGenerationStamp();
+      volumeExecutor = volume.getCacheExecutor();
+    }
+    cacheManager.cacheBlock(blockId, bpid, 
+        blockFileName, length, genstamp, volumeExecutor);
+  }
+
+  @Override // FsDatasetSpi
+  public void cache(String bpid, long[] blockIds) {
+    for (int i=0; i < blockIds.length; i++) {
+      cacheBlock(bpid, blockIds[i]);
+    }
+  }
+
+  @Override // FsDatasetSpi
+  public void uncache(String bpid, long[] blockIds) {
+    for (int i=0; i < blockIds.length; i++) {
+      cacheManager.uncacheBlock(bpid, blockIds[i]);
+    }
+  }
+  
   @Override // FsDatasetSpi
   public synchronized boolean contains(final ExtendedBlock block) {
     final long blockId = block.getLocalBlock().getBlockId();

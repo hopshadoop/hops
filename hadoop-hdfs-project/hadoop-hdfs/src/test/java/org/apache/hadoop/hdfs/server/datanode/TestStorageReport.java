@@ -40,6 +40,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyLong;
 
 public class TestStorageReport {
   public static final Log LOG = LogFactory.getLog(TestStorageReport.class);
@@ -99,7 +100,7 @@ public class TestStorageReport {
 
     Mockito.verify(nnSpy).sendHeartbeat(
         any(DatanodeRegistration.class),
-        captor.capture(), anyInt(), anyInt(), anyInt());
+        captor.capture(), anyLong(), anyLong(), anyInt(), anyInt(), anyInt());
 
     StorageReport[] reports = captor.getValue();
 

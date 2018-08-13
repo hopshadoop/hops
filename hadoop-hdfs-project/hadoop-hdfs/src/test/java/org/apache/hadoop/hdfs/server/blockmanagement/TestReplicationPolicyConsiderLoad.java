@@ -94,7 +94,7 @@ public class TestReplicationPolicyConsiderLoad {
           2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*blockSize, 0L);
       dataNodes[i].updateHeartbeat(
           BlockManagerTestUtil.getStorageReportsForDatanode(dataNodes[i]),
-          /*0L, 0L,*/ 0, 0);
+          0L, 0L, 0, 0);
     }
   }
 
@@ -109,18 +109,18 @@ public class TestReplicationPolicyConsiderLoad {
       String blockPoolId = namenode.getNamesystem().getBlockPoolId();
       dnManager.handleHeartbeat(dnrList.get(3),
           BlockManagerTestUtil.getStorageReportsForDatanode(dataNodes[3]),
-          blockPoolId,/* dataNodes[3].getCacheCapacity(),
-          dataNodes[3].getCacheRemaining(),*/
+          blockPoolId, dataNodes[3].getCacheCapacity(),
+          dataNodes[3].getCacheRemaining(),
           2, 0, 0);
       dnManager.handleHeartbeat(dnrList.get(4),
           BlockManagerTestUtil.getStorageReportsForDatanode(dataNodes[4]),
-          blockPoolId, /*dataNodes[4].getCacheCapacity(),
-          dataNodes[4].getCacheRemaining(),*/
+          blockPoolId, dataNodes[4].getCacheCapacity(),
+          dataNodes[4].getCacheRemaining(),
           4, 0, 0);
       dnManager.handleHeartbeat(dnrList.get(5),
           BlockManagerTestUtil.getStorageReportsForDatanode(dataNodes[5]),
-          blockPoolId, /*dataNodes[5].getCacheCapacity(),
-          dataNodes[5].getCacheRemaining(),*/
+          blockPoolId, dataNodes[5].getCacheCapacity(),
+          dataNodes[5].getCacheRemaining(),
           4, 0, 0);
 
       for (int i = 0; i < 3; i++) {

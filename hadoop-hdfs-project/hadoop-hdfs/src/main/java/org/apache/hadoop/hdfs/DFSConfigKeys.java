@@ -87,6 +87,16 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.namenode.blockid.updateThreshold";
   public static final float DFS_NAMENODE_BLOCKID_UPDATE_THRESHOLD_DEFAULT =
       (float) 0.5;
+  
+  public static final String DFS_NAMENODE_CACHE_DIRECTIVE_ID_BATCH_SIZE =
+      "dfs.namenode.cache.directive.id.batchsize";
+  public static final int DFS_NAMENODE_CACHE_DIRECTIVE_ID_BATCH_SIZE_DEFAULT =
+      100000;
+
+  public static final String DFS_NAMENODE_CACHE_DIRECTIVE_ID_UPDATE_THRESHOLD =
+      "dfs.namenode.cache.directive.updateThreshold";
+  public static final float
+      DFS_NAMENODE_CACHE_DIRECTIVE_ID_UPDATE_THRESHOLD_DEFAULT = (float) 0.5;
 
   public static final String DFS_NAMENODE_IDSMONITOR_CHECK_INTERVAL_IN_MS =
       "dfs.namenode.id.updateThreshold";
@@ -257,8 +267,16 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final long DFS_BR_LB_TIME_WINDOW_SIZE_DEFAULT = 60*1000; //1 min
   
   public static final String DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD =
-          "dfs.blk.report.load.balancing.db.var.update.threashold";
+          "dfs.block.report.load.balancing.db.var.update.threashold";
   public static final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT = 60*1000;
+  
+  public static final String DFS_CR_LB_TIME_WINDOW_SIZE =
+          "dfs.cache.report.load.balancing.time.window.size";
+  public static final long DFS_CR_LB_TIME_WINDOW_SIZE_DEFAULT = 60*1000; //1 min
+  
+  public static final String DFS_CR_LB_DB_VAR_UPDATE_THRESHOLD =
+          "dfs.cache.report.load.balancing.db.var.update.threashold";
+  public static final long DFS_CR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT = 60*1000;
   
   public static final String DFS_STORE_SMALL_FILES_IN_DB_KEY =
           "dfs.store.small.files.in.db";
@@ -406,6 +424,13 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_DATANODE_USE_DN_HOSTNAME =
       "dfs.datanode.use.datanode.hostname";
   public static final boolean DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT = false;
+  public static final String  DFS_DATANODE_MAX_LOCKED_MEMORY_KEY = "dfs.datanode.max.locked.memory";
+  public static final long    DFS_DATANODE_MAX_LOCKED_MEMORY_DEFAULT = 0;
+  public static final String  DFS_DATANODE_FSDATASETCACHE_MAX_THREADS_PER_VOLUME_KEY = "dfs.datanode.fsdatasetcache.max.threads.per.volume";
+  public static final int     DFS_DATANODE_FSDATASETCACHE_MAX_THREADS_PER_VOLUME_DEFAULT = 4;
+  public static final String  DFS_NAMENODE_PATH_BASED_CACHE_BLOCK_MAP_ALLOCATION_PERCENT =
+    "dfs.namenode.path.based.cache.block.map.allocation.percent";
+  public static final float    DFS_NAMENODE_PATH_BASED_CACHE_BLOCK_MAP_ALLOCATION_PERCENT_DEFAULT = 0.25f;
 
   public static final int DFS_NAMENODE_HTTP_PORT_DEFAULT = 50070;
   public static final String DFS_NAMENODE_HTTP_ADDRESS_KEY =
@@ -525,6 +550,16 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   
   public static final String DFS_NAMENODE_DATANODE_REGISTRATION_IP_HOSTNAME_CHECK_KEY = "dfs.namenode.datanode.registration.ip-hostname-check";
   public static final boolean DFS_NAMENODE_DATANODE_REGISTRATION_IP_HOSTNAME_CHECK_DEFAULT = true;
+
+  public static final String  DFS_NAMENODE_LIST_CACHE_POOLS_NUM_RESPONSES =
+      "dfs.namenode.list.cache.pools.num.responses";
+  public static final int     DFS_NAMENODE_LIST_CACHE_POOLS_NUM_RESPONSES_DEFAULT = 100;
+  public static final String  DFS_NAMENODE_LIST_CACHE_DIRECTIVES_NUM_RESPONSES =
+      "dfs.namenode.list.cache.directives.num.responses";
+  public static final int     DFS_NAMENODE_LIST_CACHE_DIRECTIVES_NUM_RESPONSES_DEFAULT = 100;
+  public static final String  DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS =
+      "dfs.namenode.path.based.cache.refresh.interval.ms";
+  public static final long    DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS_DEFAULT = 300000L;
 
   // Whether to enable datanode's stale state detection and usage for reads
   public static final String DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY =
@@ -700,6 +735,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_HEARTBEAT_INTERVAL_KEY =
       "dfs.heartbeat.interval";
   public static final long DFS_HEARTBEAT_INTERVAL_DEFAULT = 3;
+  public static final String  DFS_NAMENODE_PATH_BASED_CACHE_RETRY_INTERVAL_MS = "dfs.namenode.path.based.cache.retry.interval.ms";
+  public static final long    DFS_NAMENODE_PATH_BASED_CACHE_RETRY_INTERVAL_MS_DEFAULT = 60000L;
   public static final String DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY =
       "dfs.namenode.decommission.interval";
   public static final int DFS_NAMENODE_DECOMMISSION_INTERVAL_DEFAULT = 30;
@@ -766,6 +803,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_BLOCKREPORT_INITIAL_DELAY_KEY =
       "dfs.blockreport.initialDelay";
   public static final int DFS_BLOCKREPORT_INITIAL_DELAY_DEFAULT = 0;
+  public static final String  DFS_CACHEREPORT_INTERVAL_MSEC_KEY = "dfs.cachereport.intervalMsec";
+  public static final long    DFS_CACHEREPORT_INTERVAL_MSEC_DEFAULT = 10 * 1000;
   public static final String  DFS_BLOCKREPORT_SPLIT_THRESHOLD_KEY = "dfs.blockreport.split.threshold";
   public static final long    DFS_BLOCKREPORT_SPLIT_THRESHOLD_DEFAULT = 1000 * 1000;
   public static final String DFS_BLOCK_INVALIDATE_LIMIT_KEY =

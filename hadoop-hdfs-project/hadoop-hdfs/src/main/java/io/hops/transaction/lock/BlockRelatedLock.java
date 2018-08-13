@@ -16,6 +16,7 @@
 package io.hops.transaction.lock;
 
 import io.hops.metadata.common.FinderType;
+import io.hops.metadata.hdfs.entity.CachedBlock;
 import io.hops.metadata.hdfs.entity.CorruptReplica;
 import io.hops.metadata.hdfs.entity.ExcessReplica;
 import io.hops.metadata.hdfs.entity.Replica;
@@ -92,6 +93,8 @@ final class BlockRelatedLock extends LockWithType {
       case PendingBlock:
         return byBlockID ? PendingBlockInfo.Finder.ByBlockIdAndINodeId :
                 PendingBlockInfo.Finder.ByINodeId;
+      case CachedBlock:
+        return byBlockID ? CachedBlock.Finder.ByBlockIdAndInodeId : CachedBlock.Finder.ByInodeId;
     }
     return null;
   }

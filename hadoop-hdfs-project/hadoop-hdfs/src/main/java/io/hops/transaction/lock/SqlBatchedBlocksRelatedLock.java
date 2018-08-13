@@ -16,6 +16,7 @@
 package io.hops.transaction.lock;
 
 import io.hops.metadata.common.FinderType;
+import io.hops.metadata.hdfs.entity.CachedBlock;
 import io.hops.metadata.hdfs.entity.CorruptReplica;
 import io.hops.metadata.hdfs.entity.ExcessReplica;
 import io.hops.metadata.hdfs.entity.Replica;
@@ -60,6 +61,8 @@ final class SqlBatchedBlocksRelatedLock extends LockWithType {
         return UnderReplicatedBlock.Finder.ByINodeIds;
       case PendingBlock:
         return PendingBlockInfo.Finder.ByINodeIds;
+      case CachedBlock :
+        return CachedBlock.Finder.ByInodeIds;
     }
     return null;
   }

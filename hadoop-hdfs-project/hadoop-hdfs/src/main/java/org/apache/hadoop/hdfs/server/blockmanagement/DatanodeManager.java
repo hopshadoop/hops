@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
 import io.hops.metadata.StorageMap;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -77,6 +78,8 @@ import java.util.*;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
 import java.net.InetSocketAddress;
+import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
+import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.net.NetUtils;
 import static org.apache.hadoop.util.Time.now;
 
@@ -185,7 +188,11 @@ public class DatanodeManager {
   private boolean hasClusterEverBeenMultiRack = false;
 
   private final boolean checkIpHostnameInRegistration;
-
+  /**
+   * Whether we should tell datanodes what to cache in replies to
+   * heartbeat messages.
+   */
+//  private boolean shouldSendCachingCommands = false;
   private final StorageMap storageMap = new StorageMap();
 
    /**
@@ -194,7 +201,17 @@ public class DatanodeManager {
    * Software version -> Number of datanodes with this version
    */
   private HashMap<String, Integer> datanodesSoftwareVersions = new HashMap<String, Integer>(4, 0.75f);
-
+  
+  /**
+   * The minimum time between resending caching directives to Datanodes,
+   * in milliseconds.
+   *
+   * Note that when a rescan happens, we will send the new directives
+   * as soon as possible.  This timeout only applies to resending 
+   * directives that we've already sent.
+   */
+  private final long timeBetweenResendingCachingDirectivesMs;
+  
   DatanodeManager(final BlockManager blockManager, final Namesystem namesystem,
       final Configuration conf) throws IOException {
     this.namesystem = namesystem;
@@ -281,6 +298,9 @@ public class DatanodeManager {
         DFSConfigKeys.DFS_NAMENODE_USE_STALE_DATANODE_FOR_WRITE_RATIO_KEY +
             " = '" + ratioUseStaleDataNodesForWrite + "' is invalid. " +
             "It should be a positive non-zero float value, not greater than 1.0f.");
+    this.timeBetweenResendingCachingDirectivesMs = conf.getLong(
+        DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_RETRY_INTERVAL_MS,
+        DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_RETRY_INTERVAL_MS_DEFAULT);
   }
 
   private static long getStaleIntervalFromConf(Configuration conf,
@@ -1216,7 +1236,7 @@ public class DatanodeManager {
    * Handle heartbeat from datanodes.
    */
   public DatanodeCommand[] handleHeartbeat(DatanodeRegistration nodeReg,
-      StorageReport[] reports, final String blockPoolId, int xceiverCount,
+      StorageReport[] reports, final String blockPoolId, long cacheCapacity, long cacheUsed, int xceiverCount,
       int maxTransfers, int failedVolumes) throws IOException {
     synchronized (heartbeatManager) {
       synchronized (datanodeMap) {
@@ -1237,7 +1257,7 @@ public class DatanodeManager {
           return new DatanodeCommand[]{RegisterCommand.REGISTER};
         }
 
-        heartbeatManager.updateHeartbeat(nodeinfo, reports, xceiverCount, failedVolumes);
+        heartbeatManager.updateHeartbeat(nodeinfo, reports, cacheCapacity, cacheUsed, xceiverCount, failedVolumes);
 
         // If we are in safemode, do not send back any recovery / replication
         // requests. Don't even drain the existing queue of work.
@@ -1300,6 +1320,29 @@ public class DatanodeManager {
               new BlockCommand(DatanodeProtocol.DNA_INVALIDATE, blockPoolId,
                   blks));
         }
+        boolean sendingCachingCommands = false;
+        long nowMs = Time.monotonicNow();
+        if (namesystem.isLeader() && 
+            ((nowMs - nodeinfo.getLastCachingDirectiveSentTimeMs()) >=
+                timeBetweenResendingCachingDirectivesMs)) {
+          DatanodeCommand pendingCacheCommand =
+              getCacheCommand(nodeinfo.getPendingCachedTX(this), nodeinfo,
+                DatanodeProtocol.DNA_CACHE, blockPoolId);
+          if (pendingCacheCommand != null) {
+            cmds.add(pendingCacheCommand);
+            sendingCachingCommands = true;
+          }
+          DatanodeCommand pendingUncacheCommand =
+              getCacheCommand(nodeinfo.getPendingUncachedTX(this), nodeinfo,
+                DatanodeProtocol.DNA_UNCACHE, blockPoolId);
+          if (pendingUncacheCommand != null) {
+            cmds.add(pendingUncacheCommand);
+            sendingCachingCommands = true;
+          }
+          if (sendingCachingCommands) {
+            nodeinfo.setLastCachingDirectiveSentTimeMs(nowMs);
+          }
+        }
 
         blockManager.addKeyUpdateCommand(cmds, nodeinfo);
 
@@ -1318,6 +1361,37 @@ public class DatanodeManager {
     }
 
     return new DatanodeCommand[0];
+  }
+
+  /**
+   * Convert a CachedBlockList into a DatanodeCommand with a list of blocks.
+   *
+   * @param list       The {@link CachedBlocksList}.  This function 
+   *                   clears the list.
+   * @param datanode   The datanode.
+   * @param action     The action to perform in the command.
+   * @param poolId     The block pool id.
+   * @return           A DatanodeCommand to be sent back to the DN, or null if
+   *                   there is nothing to be done.
+   */
+  private DatanodeCommand getCacheCommand(Collection<CachedBlock> list,
+      DatanodeDescriptor datanode, int action, String poolId) {
+    if(list==null){
+      return null;
+    }
+    int length = list.size();
+    if (length == 0) {
+      return null;
+    }
+    // Read the existing cache commands.
+    long[] blockIds = new long[length];
+    int i = 0;
+    for (Iterator<CachedBlock> iter = list.iterator();
+            iter.hasNext(); ) {
+      CachedBlock cachedBlock = iter.next();
+      blockIds[i++] = cachedBlock.getBlockId();
+    }
+    return new BlockIdCommand(action, poolId, blockIds);
   }
 
   /**
@@ -1359,10 +1433,22 @@ public class DatanodeManager {
    * on their next heartbeats. This includes block invalidations,
    * recoveries, and replication requests.
    */
-  public void clearPendingQueues() {
+  public void clearPendingQueues() throws TransactionContextException, StorageException, IOException {
     synchronized (datanodeMap) {
       for (DatanodeDescriptor dn : datanodeMap.values()) {
         dn.clearBlockQueues();
+      }
+    }
+  }
+  
+  /**
+   * Reset the lastCachingDirectiveSentTimeMs field of all the DataNodes we
+   * know about.
+   */
+  public void resetLastCachingDirectiveSentTime() {
+    synchronized (datanodeMap) {
+      for (DatanodeDescriptor dn : datanodeMap.values()) {
+        dn.setLastCachingDirectiveSentTimeMs(0L);
       }
     }
   }
@@ -1371,6 +1457,20 @@ public class DatanodeManager {
   public String toString() {
     return getClass().getSimpleName() + ": " + host2DatanodeMap;
   }
+
+  //HOPS as we are distributed we may stop one NN without stopping all of them. In this case we should not clear
+  //the information used by the other NN.
+  //TODO: check if there is some case where we really need to do the clear.
+//  public void clearPendingCachingCommands() {
+//    for (DatanodeDescriptor dn : datanodeMap.values()) {
+//      dn.getPendingCached().clear();
+//      dn.getPendingUncached().clear();
+//    }
+//  }
+//
+//  public void setShouldSendCachingCommands(boolean shouldSendCachingCommands) {
+//    this.shouldSendCachingCommands = shouldSendCachingCommands;
+//  }
 
   /** @return the Host2NodesMap */
   public Host2NodesMap getHost2DatanodeMap() {

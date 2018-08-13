@@ -64,6 +64,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 
 import static org.apache.hadoop.util.Time.now;
@@ -129,6 +130,9 @@ class BPOfferService implements Runnable {
   // to make sure the "happens-before" consistency.
   private volatile long lastBlockReport = 0;
   private boolean resetBlockReportTime = true;
+  
+  volatile long lastCacheReport = 0;
+  
   private BPServiceActor blkReportHander = null;
   private List<ActiveNode> nnList = Collections.synchronizedList(new ArrayList<ActiveNode>());
   private List<InetSocketAddress> blackListNN = Collections.synchronizedList(new ArrayList<InetSocketAddress>());
@@ -584,6 +588,21 @@ class BPOfferService implements Runnable {
     }
   }
 
+  private String blockIdArrayToString(long ids[]) {
+    long maxNumberOfBlocksToLog = dn.getMaxNumberOfBlocksToLog();
+    StringBuilder bld = new StringBuilder();
+    String prefix = "";
+    for (int i = 0; i < ids.length; i++) {
+      if (i >= maxNumberOfBlocksToLog) {
+        bld.append("...");
+        break;
+      }
+      bld.append(prefix).append(ids[i]);
+      prefix = ", ";
+    }
+    return bld.toString();
+  }
+  
   /**
    * @param cmd
    * @return true if further processing may be required or false otherwise.
@@ -593,7 +612,9 @@ class BPOfferService implements Runnable {
       BPServiceActor actor) throws IOException {
     final BlockCommand bcmd =
         cmd instanceof BlockCommand ? (BlockCommand) cmd : null;
-
+    final BlockIdCommand blockIdCmd = 
+      cmd instanceof BlockIdCommand ? (BlockIdCommand)cmd: null;
+    
     switch (cmd.getAction()) {
       case DatanodeProtocol.DNA_TRANSFER:
         // Send a copy of a block to another datanode
@@ -618,6 +639,18 @@ class BPOfferService implements Runnable {
           throw e;
         }
         dn.metrics.incrBlocksRemoved(toDelete.length);
+        break;
+      case DatanodeProtocol.DNA_CACHE:
+        LOG.info("DatanodeCommand action: DNA_CACHE for " + blockIdCmd.getBlockPoolId() + " of ["
+            + blockIdArrayToString(blockIdCmd.getBlockIds()) + "]");
+        dn.getFSDataset().cache(blockIdCmd.getBlockPoolId(), blockIdCmd.getBlockIds());
+        dn.metrics.incrBlocksCached(blockIdCmd.getBlockIds().length);
+        break;
+      case DatanodeProtocol.DNA_UNCACHE:
+        LOG.info("DatanodeCommand action: DNA_UNCACHE for " + blockIdCmd.getBlockPoolId() + " of ["
+            + blockIdArrayToString(blockIdCmd.getBlockIds()) + "]");
+        dn.getFSDataset().uncache(blockIdCmd.getBlockPoolId(), blockIdCmd.getBlockIds());
+        dn.metrics.incrBlocksUncached(blockIdCmd.getBlockIds().length);
         break;
       case DatanodeProtocol.DNA_SHUTDOWN:
         // TODO: DNA_SHUTDOWN appears to be unused - the NN never sends this command
@@ -773,6 +806,9 @@ class BPOfferService implements Runnable {
         // successful
         blkReportHander.processCommand(cmds == null ? null : cmds.toArray(new DatanodeCommand[cmds.size()]));
       }
+      
+      DatanodeCommand cmd = cacheReport(cmds!=null);
+      blkReportHander.processCommand(new DatanodeCommand[]{cmd});
       
       // Now safe to start scanning the block pool.
       // If it has already been started, this is a no-op.
@@ -1027,6 +1063,50 @@ public class IncrementalBRTask implements Callable{
     }
   }
 
+  DatanodeCommand cacheReport(boolean hasHandler) throws IOException {
+    // If caching is disabled, do not send a cache report
+    if (dn.getFSDataset().getCacheCapacity() == 0) {
+      return null;
+    }
+    // send cache report if timer has expired.
+    DatanodeCommand cmd = null;
+    long startTime = Time.monotonicNow();
+    if (startTime - lastCacheReport > dnConf.cacheReportInterval) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Sending cacheReport from service actor: " + this);
+      }
+      lastCacheReport = startTime;
+
+      String bpid = getBlockPoolId();
+      List<Long> blockIds = dn.getFSDataset().getCacheReport(bpid);
+      long createTime = Time.monotonicNow();
+
+      // Get a namenode to send the report(s) to (if we did a block report we send to the same node)
+      if (!hasHandler) {
+        ActiveNode an = nextNNForCacheReport(blockIds.size());
+        if (an != null) {
+          blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
+          if (blkReportHander == null || !blkReportHander.isInitialized()) {
+            return null; //no one is ready to handle the request, return now without changing the values of lastBlockReport. it will be retried in next cycle
+          }
+        } else {
+          LOG.warn("Unable to send cache report");
+          return null;
+        }
+      }
+      
+      cmd = blkReportHander.cacheReport(bpRegistration, bpid, blockIds);
+      long sendTime = Time.monotonicNow();
+      long createCost = createTime - startTime;
+      long sendCost = sendTime - createTime;
+      dn.getMetrics().addCacheReport(sendCost);
+      LOG.debug("CacheReport of " + blockIds.size()
+          + " block(s) took " + createCost + " msec to generate and "
+          + sendCost + " msecs for RPC and NN processing");
+    }
+    return cmd;
+  }
+  
   /**
    * This methods arranges for the data node to send the block report at the
    * next heartbeat.
@@ -1270,20 +1350,41 @@ public class IncrementalBRTask implements Callable{
 
     ActiveNode annToBR = null;
     BPServiceActor leaderActor = getLeaderActor();
-      if (leaderActor != null) {
-        try {
-          annToBR = leaderActor.nextNNForBlkReport(noOfBlks);
-        } catch (RemoteException e) {
-            if(e.getClassName().equals(BRLoadBalancingException.class.getName())){
-                LOG.warn(e);
-            }else{
-                throw e;
-            }
+    if (leaderActor != null) {
+      try {
+        annToBR = leaderActor.nextNNForBlkReport(noOfBlks);
+      } catch (RemoteException e) {
+        if (e.getClassName().equals(BRLoadBalancingException.class.getName())) {
+          LOG.warn(e);
+        } else {
+          throw e;
         }
       }
+    }
     return annToBR;
+  }
+
+  private ActiveNode nextNNForCacheReport(long noOfBlks) throws IOException {
+    if (nnList == null || nnList.isEmpty()) {
+      return null;
     }
 
+    ActiveNode annToBR = null;
+    BPServiceActor leaderActor = getLeaderActor();
+    if (leaderActor != null) {
+      try {
+        annToBR = leaderActor.nextNNForCacheReport(noOfBlks);
+      } catch (RemoteException e) {
+        if (e.getClassName().equals(CRLoadBalancingException.class.getName())) {
+          LOG.warn(e);
+        } else {
+          throw e;
+        }
+      }
+    }
+    return annToBR;
+  }
+  
   private BPServiceActor getLeaderActor() {
     if (nnList.size() > 0) {
       ActiveNode leaderNode = null;

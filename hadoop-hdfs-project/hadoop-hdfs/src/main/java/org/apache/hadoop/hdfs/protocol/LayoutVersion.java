@@ -110,7 +110,8 @@ public class LayoutVersion {
         + " Use distinct StorageUuid per storage directory."),
     EDITLOG_ADD_BLOCK(-46, "Add new editlog that only records allocation of "
         + "the new block instead of the entire block list"),
-    EXTENDED_ACL(-47, "Extended ACL");
+    CACHING(-47, "Support for cache pools and path-based caching"),
+    EXTENDED_ACL(-48, "Extended ACL");
   
     final int lv;
     final int ancestorLV;

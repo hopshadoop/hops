@@ -21,7 +21,7 @@
   dust.loadSource(dust.compile($('#tmpl-dfshealth').html(), 'dfshealth'));
   dust.loadSource(dust.compile($('#tmpl-startup-progress').html(), 'startup-progress'));
   dust.loadSource(dust.compile($('#tmpl-datanode').html(), 'datanode-info'));
-  dust.loadSource(dust.compile($('#tmpl-snapshot').html(), 'snapshot-info'));
+//  dust.loadSource(dust.compile($('#tmpl-snapshot').html(), 'snapshot-info'));
 
   function load_overview() {
     var BEANS = [

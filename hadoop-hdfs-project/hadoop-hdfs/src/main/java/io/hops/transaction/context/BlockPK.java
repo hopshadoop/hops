@@ -27,6 +27,9 @@ class BlockPK {
   private long blockId = Long.MIN_VALUE;
   private int inodeId = BlockInfo.NON_EXISTING_ID;
 
+  BlockPK() {
+  }
+  
   BlockPK(long blockId) {
     this.blockId = blockId;
   }
@@ -161,5 +164,82 @@ class BlockPK {
       keys.add(new BlockPK(inodeId));
     }
     return keys;
+  }
+  
+  static class CachedBlockPK extends BlockPK {
+    private String datanodeId=null;
+
+    CachedBlockPK(long blockId, int inodeId, String datanodeId) {
+      super(blockId, inodeId);
+      this.datanodeId = datanodeId;
+    }
+
+    CachedBlockPK(long blockId, int inodeId) {
+      super(blockId, inodeId);
+    }
+      
+    CachedBlockPK(String datanodeId) {
+      this.datanodeId = datanodeId;
+    }
+
+    CachedBlockPK(int inodeId) {
+      super(inodeId);
+    }
+
+    String getDatanodeId() {
+      return datanodeId;
+    }
+    
+    boolean hasDatanodeId(){
+      return datanodeId!=null;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof CachedBlockPK)) {
+        return false;
+      }
+      if (!super.equals(o)) {
+        return false;
+      }
+
+      // So it's the same block, now check if it's the same replica
+      CachedBlockPK cachedBlockPK = (CachedBlockPK) o;
+      return datanodeId.equals(cachedBlockPK.datanodeId);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = super.hashCode();
+      result = 31 * result + datanodeId.hashCode();
+      return result;
+    }
+
+    static List<CachedBlockPK> getKeys(long[] blockIds, int storageId) {
+      List<BlockPK.CachedBlockPK> keys = new ArrayList<>(blockIds.length);
+      for (long blockId : blockIds) {
+        keys.add(new BlockPK.CachedBlockPK(blockId, storageId));
+      }
+      return keys;
+    }
+
+    static List<BlockPK.CachedBlockPK> getKeys(int[] inodeIds) {
+      List<BlockPK.CachedBlockPK> keys = new ArrayList<>(inodeIds.length);
+      for (int inodeId : inodeIds) {
+        keys.add(new BlockPK.CachedBlockPK(inodeId));
+      }
+      return keys;
+    }
+
+    static List<CachedBlockPK> getKeys(long[] blockIds, int[] inodeIds, String datanodeId) {
+      List<BlockPK.CachedBlockPK> keys = new ArrayList<>(blockIds.length);
+      for (int i = 0; i < blockIds.length; i++) {
+        keys.add(new BlockPK.CachedBlockPK(blockIds[i], inodeIds[i], datanodeId));
+      }
+      return keys;
+    }
   }
 }

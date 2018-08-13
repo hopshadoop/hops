@@ -995,7 +995,7 @@ public class NNThroughputBenchmark implements Tool {
           {new StorageReport(storage, false, DF_CAPACITY,
               DF_USED, DF_CAPACITY - DF_USED, DF_USED)};
       DatanodeCommand[] cmds =
-          nameNodeProto.sendHeartbeat(dnRegistration, rep, 0, 0, 0)
+          nameNodeProto.sendHeartbeat(dnRegistration, rep, 0L, 0L, 0, 0, 0)
               .getCommands();
       if (cmds != null) {
         for (DatanodeCommand cmd : cmds) {
@@ -1046,7 +1046,7 @@ public class NNThroughputBenchmark implements Tool {
       StorageReport[] rep = { new StorageReport(storage,
           false, DF_CAPACITY, DF_USED, DF_CAPACITY - DF_USED, DF_USED) };
       DatanodeCommand[] cmds = nameNodeProto.sendHeartbeat(dnRegistration,
-          rep, 0, 0, 0).getCommands();
+          rep, 0L, 0L, 0, 0, 0).getCommands();
       if (cmds != null) {
         for (DatanodeCommand cmd : cmds) {
           if (cmd.getAction() == DatanodeProtocol.DNA_TRANSFER) {

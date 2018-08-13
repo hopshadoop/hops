@@ -25,6 +25,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.ipc.RetryCache;
 
 public class LockFactory {
@@ -60,7 +61,11 @@ public class LockFactory {
     /**
      * PendingBlock
      */
-    PE
+    PE,
+    /**
+     * Cached Blocks
+     */
+    CA
   }
 
   private LockFactory() {
@@ -111,6 +116,10 @@ public class LockFactory {
     return new BlockRelatedLock(Lock.Type.PendingBlock);
   }
 
+  public Lock getCachedBlockLock() {
+    return new BlockRelatedLock(Lock.Type.CachedBlock);
+  }
+  
   public Lock getSqlBatchedBlocksLock() {
     return new SqlBatchedBlocksLock();
   }
@@ -143,6 +152,10 @@ public class LockFactory {
     return new SqlBatchedBlocksRelatedLock(Lock.Type.PendingBlock);
   }
 
+  public Lock getSqlBatchedCachedBlockLock() {
+    return new SqlBatchedBlocksRelatedLock(Lock.Type.CachedBlock);
+  }
+  
   public Lock getIndividualBlockLock(long blockId, INodeIdentifier inode) {
     return new IndividualBlockLock(blockId, inode);
   }
@@ -305,6 +318,9 @@ public class LockFactory {
         case ER:
           list.add(getExcessReplicaLock());
           break;
+        case CA:
+          list.add(getCachedBlockLock());
+          break;
       }
     }
     return list;
@@ -335,6 +351,8 @@ public class LockFactory {
         case ER:
           list.add(getSqlBatchedExcessReplicasLock());
           break;
+        case CA:
+          list.add(getSqlBatchedCachedBlockLock());
       }
     }
     return list;
@@ -355,5 +373,41 @@ public class LockFactory {
     BaseINodeLock.enableSetRandomPartitionKey(conf.getBoolean(DFSConfigKeys
         .DFS_SET_RANDOM_PARTITION_KEY_ENABLED, DFSConfigKeys
         .DFS_SET_RANDOM_PARTITION_KEY_ENABLED_DEFAULT));
+  }  
+  public Lock getCacheDirectiveLock(long id) {
+    return new CacheDirectiveLock(id);
   }
+  
+  public Lock getCacheDirectiveLock(String poolName) {
+    return new CacheDirectiveLock(poolName);
+  }
+  
+  public Lock getCacheDirectiveLock(long id, final String path, final String pool, final int maxNumResults){
+    return new CacheDirectiveLock(id, path, pool, maxNumResults);
+  }
+  
+  public Lock getCachePoolLock(String poolName) {
+    return new CachePoolLock(poolName);
+  }
+  
+  public Lock getCachePoolsLock(List<String> poolNames) {
+    return new CachePoolLock(poolNames);
+  }
+  
+  public Lock getCachePoolLock(TransactionLockTypes.LockType lockType) {
+    return new CachePoolLock(lockType);
+  }
+    
+  public Lock getCachedBlockReportingLocks(List<Long> blockIds, DatanodeID datanodeId) {
+    return new CachedBlockLock(blockIds, datanodeId);
+  }
+  
+  public Lock getDatanodeCachedBlockLocks(DatanodeID datanodeId) {
+    return new CachedBlockLock(datanodeId);
+  }
+  
+  public Lock getAllCachedBlockLocks(){
+    return new AllCachedBlockLock();
+  }
+    
 }

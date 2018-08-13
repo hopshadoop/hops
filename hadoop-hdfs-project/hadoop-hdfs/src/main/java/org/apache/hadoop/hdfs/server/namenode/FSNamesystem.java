@@ -30,7 +30,10 @@ import io.hops.exception.*;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
+import io.hops.metadata.common.entity.Variable;
+import io.hops.metadata.hdfs.dal.AceDataAccess;
 import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
+import io.hops.metadata.hdfs.dal.CacheDirectiveDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.RetryCacheEntryDataAccess;
@@ -184,6 +187,8 @@ import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
 import org.apache.commons.logging.impl.Log4JLogger;
+import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
+import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.DirectoryListingStartAfterNotFoundException;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
@@ -247,6 +252,11 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_KEY;
+import org.apache.hadoop.hdfs.protocol.CacheDirective;
+import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
+import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
+import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
+import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Phase;
@@ -386,6 +396,7 @@ public class FSNamesystem
    */
   FSDirectory dir;
   private final BlockManager blockManager;
+  private final CacheManager cacheManager;
   private final DatanodeStatistics datanodeStatistics;
 
   // whether setStoragePolicy is allowed.
@@ -644,6 +655,7 @@ public class FSNamesystem
 
       this.dtSecretManager = createDelegationTokenSecretManager(conf);
       this.dir = new FSDirectory(this, conf);
+      this.cacheManager = new CacheManager(this, conf, blockManager);
       this.safeMode = new SafeModeInfo(conf);
       this.auditLoggers = initAuditLoggers(conf);
       this.isDefaultAuditLogger = auditLoggers.size() == 1 &&
@@ -834,6 +846,9 @@ public class FSNamesystem
       if (erasureCodingEnabled) {
         erasureCodingManager.activate();
       }
+      
+      cacheManager.startMonitorThread();
+//      blockManager.getDatanodeManager().setShouldSendCachingCommands(true);
     } finally {
       startingActiveService = false;
     }
@@ -875,6 +890,16 @@ public class FSNamesystem
 
     if (erasureCodingManager != null) {
       erasureCodingManager.close();
+    }
+    
+    if (cacheManager != null) {
+      cacheManager.stopMonitorThread();
+      //HOPS as we are distributed we may stop one NN without stopping all of them. In this case we should not clear
+      //the information used by the other NN.
+      //TODO: check if there is some case where we really need to do the clear.
+//      cacheManager.clearDirectiveStats();
+//      blockManager.getDatanodeManager().clearPendingCachingCommands();
+//      blockManager.getDatanodeManager().setShouldSendCachingCommands(false);
     }
   }
 
@@ -1271,7 +1296,7 @@ public class FSNamesystem
                         .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
                         .skipReadingQuotaAttr(!dir.isQuotaEnabled());
                 locks.add(il).add(lf.getBlockLock())
-                        .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
+                        .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
                 locks.add(lf.getAcesLock());
               }
 
@@ -1325,7 +1350,7 @@ public class FSNamesystem
                     .setNameNodeID(nameNode.getId())
                     .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
             locks.add(il).add(lf.getBlockLock())
-                .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
+                .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
           }
 
           @Override
@@ -1451,9 +1476,13 @@ public class FSNamesystem
       final long fileSize = inode.computeFileSizeNotIncludingLastUcBlock();
       boolean isUc = inode.isUnderConstruction();
 
-      return blockManager
-          .createLocatedBlocks(inode.getBlocks(), fileSize,
-              isUc, offset, length, needBlockToken);
+    LocatedBlocks blocks = blockManager.createLocatedBlocks(inode.getBlocks(), fileSize,
+        isUc, offset, length, needBlockToken);
+    // Set caching information for the located blocks.
+    for (LocatedBlock lb : blocks.getLocatedBlocks()) {
+      cacheManager.setCachedLocations(lb, inode.getId());
+    }
+    return blocks;      
   }
 
   /**
@@ -2637,7 +2666,7 @@ public class FSNamesystem
           if (locatedBlock != null) {
             LocatedBlock lb = new LocatedBlock(locatedBlock.getBlock(), locatedBlock.getLocations(), locatedBlock.
                 getStorageIDs(), locatedBlock.getStorageTypes(), locatedBlock.getStartOffset(), locatedBlock.isCorrupt(),
-                locatedBlock.getBlockToken());
+                locatedBlock.getBlockToken(), locatedBlock.getCachedLocations());
             locatedBlockBytes = PBHelper.convert(lb).toByteArray();
           }
           RetryCacheDistributed.setState(cacheEntry, success, locatedBlockBytes);
@@ -4194,7 +4223,7 @@ public class FSNamesystem
                     .skipReadingQuotaAttr(true);
             locks.add(il);
             if (needLocation) {
-              locks.add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
+              locks.add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
             }
             locks.add(lf.getAcesLock());
           }
@@ -4287,13 +4316,13 @@ public class FSNamesystem
    * @throws IOException
    */
   HeartbeatResponse handleHeartbeat(DatanodeRegistration nodeReg,
-      StorageReport[] reports, int xceiverCount,
+      StorageReport[] reports, long cacheCapacity, long cacheUsed, int xceiverCount,
       int xmitsInProgress, int failedVolumes) throws IOException {
     final int maxTransfer =
         blockManager.getMaxReplicationStreams() - xmitsInProgress;
 
     DatanodeCommand[] cmds = blockManager.getDatanodeManager()
-        .handleHeartbeat(nodeReg, reports, blockPoolId, xceiverCount,
+        .handleHeartbeat(nodeReg, reports, blockPoolId, cacheCapacity, cacheUsed, xceiverCount,
             maxTransfer, failedVolumes);
 
     return new HeartbeatResponse(cmds);
@@ -5241,6 +5270,16 @@ public class FSNamesystem
       return;
     }
     safeMode.setBlockTotal(blockManager.getTotalCompleteBlocks());
+  }
+  
+  @Override // NameNodeMXBean
+  public long getCacheCapacity() {
+    return datanodeStatistics.getCacheCapacity();
+  }
+
+  @Override // NameNodeMXBean
+  public long getCacheUsed() {
+    return datanodeStatistics.getCacheUsed();
   }
 
   /**
@@ -6457,6 +6496,10 @@ public class FSNamesystem
   public FSDirectory getFSDirectory() {
     return dir;
   }
+  /** @return the cache manager. */
+  public CacheManager getCacheManager() {
+    return cacheManager;
+  }
 
   @Override  // NameNodeMXBean
   public String getCorruptFiles() {
@@ -6552,6 +6595,336 @@ public class FSNamesystem
       avgLoad = (double)xceivers/nodes;
     }
     return avgLoad;
+  }
+
+  long addCacheDirective(final CacheDirectiveInfo directive, final EnumSet<CacheFlag> flags)
+      throws IOException {
+    cacheManager.validatePoolName(directive);
+    final String path = cacheManager.validatePath(directive);
+    if (isInSafeMode()) {
+      throw new SafeModeException(
+          "Cannot add cache directive", safeMode);
+    }
+    if (directive.getId() != null) {
+      throw new IOException("addDirective: you cannot specify an ID " + "for this operation.");
+    }
+    if (!flags.contains(CacheFlag.FORCE)) {
+          cacheManager.waitForRescanIfNeeded();
+    }
+    final long id = cacheManager.getNextDirectiveId();
+    HopsTransactionalRequestHandler addDirectiveHandler = new HopsTransactionalRequestHandler(HDFSOperationType.ADD_CACHE_DIRECTIVE) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
+            add(lf.getCachePoolLock(directive.getPool()));
+        INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, path)
+            .setNameNodeID(nameNode.getId())
+            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+            .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+        
+        locks.add(il).
+            add(lf.getCacheDirectiveLock(id)).
+            add(lf.getBlockLock());
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        final FSPermissionChecker pc = isPermissionEnabled ? getPermissionChecker() : null;
+
+        final CacheEntryWithPayload cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache, null);
+
+        if (cacheEntry != null && cacheEntry.isSuccess()) {
+          return PBHelper.bytesToLong(cacheEntry.getPayload());
+        }
+        boolean success = false;
+        
+        Long result = null;
+        try {
+          
+          CacheDirectiveInfo effectiveDirective = cacheManager.addDirective(directive, pc, flags, id);
+          result = effectiveDirective.getId();
+          success = true;
+        } finally {
+          if (isAuditEnabled() && isExternalInvocation()) {
+            logAuditEvent(success, "addCacheDirective", null, null, null);
+          }
+          RetryCacheDistributed.setState(cacheEntry, success, PBHelper.longToBytes(result));
+        }
+        return result;
+      }
+    };
+    return (Long) addDirectiveHandler.handle();
+  }
+
+  void modifyCacheDirective(final CacheDirectiveInfo directive,
+      final EnumSet<CacheFlag> flags) throws IOException {
+    if (!flags.contains(CacheFlag.FORCE)) {
+      cacheManager.waitForRescanIfNeeded();
+    }
+    new HopsTransactionalRequestHandler(HDFSOperationType.MODIFY_CACHE_DIRECTIVE) {
+      String path;
+      List<String> pools = new ArrayList<>(2);
+      
+      @Override
+      public void setUp() throws StorageException, IOException {
+        CacheDirectiveDataAccess da = (CacheDirectiveDataAccess) HdfsStorageFactory
+            .getDataAccess(CacheDirectiveDataAccess.class);
+          CacheDirective originalDirective = (CacheDirective) da.find(directive.getId());
+        if(directive.getPath()!=null){
+          path=directive.getPath().toString();
+        }else if(originalDirective!=null){
+          path=originalDirective.getPath();
+        }
+        if(directive.getPool()!=null){
+          pools.add(directive.getPool());
+        }
+        if(originalDirective!=null){
+          pools.add(originalDirective.getPoolName());
+        }
+          
+      }
+      
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
+            add(lf.getCacheDirectiveLock(directive.getId())).
+            add(lf.getCachePoolsLock(pools));
+         INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, path)
+            .setNameNodeID(nameNode.getId())
+            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+            .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+
+        locks.add(il).
+            add(lf.getBlockLock());
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        final FSPermissionChecker pc = isPermissionEnabled ? getPermissionChecker() : null;
+        boolean success = false;
+        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache);
+        if (cacheEntry != null && cacheEntry.isSuccess()) {
+          return null;
+        }
+        
+        try {
+          if (isInSafeMode()) {
+            throw new SafeModeException(
+                "Cannot add cache directive", safeMode);
+          }
+          cacheManager.modifyDirective(directive, pc, flags);
+          success = true;
+        } finally {
+          if (isAuditEnabled() && isExternalInvocation()) {
+            logAuditEvent(success, "modifyCacheDirective", null, null, null);
+          }
+          RetryCacheDistributed.setState(cacheEntry, success);
+        }
+        return null;
+      }
+    }.handle();
+
+  }
+
+  void removeCacheDirective(final Long id) throws IOException {
+    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_CACHE_DIRECTIVE) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
+            add(lf.getCacheDirectiveLock(id)).
+            add(lf.getCachePoolLock(LockType.WRITE));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        final FSPermissionChecker pc = isPermissionEnabled ? getPermissionChecker() : null;
+        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache);
+        if (cacheEntry != null && cacheEntry.isSuccess()) {
+          return null;
+        }
+        boolean success = false;
+        try {
+          if (isInSafeMode()) {
+            throw new SafeModeException(
+                "Cannot remove cache directives", safeMode);
+          }
+          cacheManager.removeDirective(id, pc);
+          success = true;
+        } finally {
+          if (isAuditEnabled() && isExternalInvocation()) {
+            logAuditEvent(success, "removeCacheDirective", null, null,
+                null);
+          }
+          RetryCacheDistributed.setState(cacheEntry, success);
+        }
+        return null;
+      }
+    }.handle();
+  }
+
+  BatchedListEntries<CacheDirectiveEntry> listCacheDirectives(
+      long startId, CacheDirectiveInfo filter) throws IOException {
+    final FSPermissionChecker pc = isPermissionEnabled ?
+        getPermissionChecker() : null;
+    BatchedListEntries<CacheDirectiveEntry> results;
+    cacheManager.waitForRescanIfNeeded();
+    boolean success = false;
+    try {
+      results =
+          cacheManager.listCacheDirectives(startId, filter, pc);
+      success = true;
+    } finally {
+      if (isAuditEnabled() && isExternalInvocation()) {
+        logAuditEvent(success, "listCacheDirectives", null, null,
+            null);
+      }
+    }
+    return results;
+}
+  
+  public void addCachePool(final CachePoolInfo req) throws IOException {
+    CachePoolInfo.validate(req);
+    final String poolName = req.getPoolName();
+    new HopsTransactionalRequestHandler(HDFSOperationType.ADD_CACHE_POOL) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
+            add(lf.getCachePoolLock(poolName));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        final FSPermissionChecker pc = isPermissionEnabled ? getPermissionChecker() : null;
+        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache);
+        if (cacheEntry != null && cacheEntry.isSuccess()) {
+          return null; // Return previous response
+        }
+        boolean success = false;
+        try {
+          if (isInSafeMode()) {
+            throw new SafeModeException(
+                "Cannot add cache pool " + req.getPoolName(), safeMode);
+          }
+          if (pc != null) {
+            pc.checkSuperuserPrivilege();
+          }
+          CachePoolInfo info = cacheManager.addCachePool(req);
+
+          success = true;
+        } finally {
+
+          if (isAuditEnabled() && isExternalInvocation()) {
+            logAuditEvent(success, "addCachePool", req.getPoolName(), null, null);
+          }
+          RetryCacheDistributed.setState(cacheEntry, success);
+        }
+        return null;
+      }
+    }.handle();
+  }
+
+  //Need write lock on variable NeedRescan
+  public void modifyCachePool(final CachePoolInfo req) throws IOException {
+    CachePoolInfo.validate(req);
+    final String poolName = req.getPoolName();
+    new HopsTransactionalRequestHandler(HDFSOperationType.MODIFY_CACHE_POOL) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
+            add(lf.getCachePoolLock(poolName));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        final FSPermissionChecker pc = isPermissionEnabled ? getPermissionChecker() : null;
+        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache);
+        if (cacheEntry != null && cacheEntry.isSuccess()) {
+          return null; // Return previous response
+        }
+        boolean success = false;
+        try {
+          if (isInSafeMode()) {
+            throw new SafeModeException(
+                "Cannot modify cache pool " + req.getPoolName(), safeMode);
+          }
+          if (pc != null) {
+            pc.checkSuperuserPrivilege();
+          }
+          cacheManager.modifyCachePool(req);
+          success = true;
+        } finally {
+          if (isAuditEnabled() && isExternalInvocation()) {
+            logAuditEvent(success, "modifyCachePool", req.getPoolName(), null, null);
+          }
+          RetryCacheDistributed.setState(cacheEntry, success);
+        }
+        return null;
+      }
+    }.handle();
+  }
+
+  //Need write lock on variable NeedRescan
+  public void removeCachePool(final String cachePoolName) throws IOException {
+    CachePoolInfo.validateName(cachePoolName);
+    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_CACHE_POOL) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
+            add(lf.getCachePoolLock(cachePoolName)).
+            add(lf.getCacheDirectiveLock(cachePoolName));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        final FSPermissionChecker pc = isPermissionEnabled ? getPermissionChecker() : null;
+        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache);
+        if (cacheEntry != null && cacheEntry.isSuccess()) {
+          return null; // Return previous response
+        }
+        boolean success = false;
+        try {
+          if (isInSafeMode()) {
+            throw new SafeModeException(
+                "Cannot remove cache pool " + cachePoolName, safeMode);
+          }
+          if (pc != null) {
+            pc.checkSuperuserPrivilege();
+          }
+          cacheManager.removeCachePool(cachePoolName);
+          success = true;
+        } finally {
+          if (isAuditEnabled() && isExternalInvocation()) {
+            logAuditEvent(success, "removeCachePool", cachePoolName, null, null);
+          }
+        }
+        return null;
+      }
+    }.handle();
+  }
+
+  //need to lock varialbe needRescan with Read lock
+  public BatchedListEntries<CachePoolEntry> listCachePools(String prevKey)
+      throws IOException {
+    final FSPermissionChecker pc =
+        isPermissionEnabled ? getPermissionChecker() : null;
+    BatchedListEntries<CachePoolEntry> results;
+    boolean success = false;
+    cacheManager.waitForRescanIfNeeded();
+    try {
+      results = cacheManager.listCachePools(pc, prevKey);
+      success = true;
+    } finally {
+      if (isAuditEnabled() && isExternalInvocation()) {
+        logAuditEvent(success, "listCachePools", null, null, null);
+      }
+    }
+    return results;
   }
 
   /**

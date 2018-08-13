@@ -156,7 +156,10 @@ public class TestBlockRecovery {
         .thenReturn(new NamespaceInfo(1, CLUSTER_ID, POOL_ID, 1L));
 
     when(namenode.sendHeartbeat(Mockito.any(DatanodeRegistration.class),
-        Mockito.any(StorageReport[].class), Mockito.anyInt(), Mockito.anyInt(),
+        Mockito.any(StorageReport[].class),
+        Mockito.anyLong(),
+        Mockito.anyLong(),
+        Mockito.anyInt(), Mockito.anyInt(),
         Mockito.anyInt()))
         .thenReturn(new HeartbeatResponse(new DatanodeCommand[0]));
 

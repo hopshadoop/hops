@@ -63,6 +63,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.SecureRandom;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -384,9 +385,14 @@ public class DFSUtil {
             new NodeBase(xferAddrs[hCnt], locations[hCnt].getNetworkLocation());
         racks[hCnt] = node.toString();
       }
-      blkLocations[idx] =
-          new BlockLocation(xferAddrs, hosts, racks, blk.getStartOffset(),
-              blk.getBlockSize(), blk.isCorrupt());
+      DatanodeInfo[] cachedLocations = blk.getCachedLocations();
+      String[] cachedHosts = new String[cachedLocations.length];
+      for (int i = 0; i < cachedLocations.length; i++) {
+        cachedHosts[i] = cachedLocations[i].getHostName();
+      }
+      blkLocations[idx] = new BlockLocation(xferAddrs, hosts, cachedHosts,
+          racks, blk.getStartOffset(),
+          blk.getBlockSize(), blk.isCorrupt());
       idx++;
     }
     return blkLocations;
@@ -1135,6 +1141,74 @@ public class DFSUtil {
     throw new UnsupportedOperationException("Not yet implemented");
 //    return DFSUtilClient.getAddresses(conf, null, DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY);
   }
+  
+  /**
+   * Converts a Date into an ISO-8601 formatted datetime string.
+   */
+  public static String dateToIso8601String(Date date) {
+    SimpleDateFormat df =
+        new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.ENGLISH);
+    return df.format(date);
+  }
 
+  /**
+   * Converts a time duration in milliseconds into DDD:HH:MM:SS format.
+   */
+  public static String durationToString(long durationMs) {
+    boolean negative = false;
+    if (durationMs < 0) {
+      negative = true;
+      durationMs = -durationMs;
+    }
+    // Chop off the milliseconds
+    long durationSec = durationMs / 1000;
+    final int secondsPerMinute = 60;
+    final int secondsPerHour = 60*60;
+    final int secondsPerDay = 60*60*24;
+    final long days = durationSec / secondsPerDay;
+    durationSec -= days * secondsPerDay;
+    final long hours = durationSec / secondsPerHour;
+    durationSec -= hours * secondsPerHour;
+    final long minutes = durationSec / secondsPerMinute;
+    durationSec -= minutes * secondsPerMinute;
+    final long seconds = durationSec;
+    final long milliseconds = durationMs % 1000;
+    String format = "%03d:%02d:%02d:%02d.%03d";
+    if (negative)  {
+      format = "-" + format;
+    }
+    return String.format(format, days, hours, minutes, seconds, milliseconds);
+  }
+
+  /**
+   * Converts a relative time string into a duration in milliseconds.
+   */
+  public static long parseRelativeTime(String relTime) throws IOException {
+    if (relTime.length() < 2) {
+      throw new IOException("Unable to parse relative time value of " + relTime
+          + ": too short");
+    }
+    String ttlString = relTime.substring(0, relTime.length()-1);
+    long ttl;
+    try {
+      ttl = Long.parseLong(ttlString);
+    } catch (NumberFormatException e) {
+      throw new IOException("Unable to parse relative time value of " + relTime
+          + ": " + ttlString + " is not a number");
+    }
+    if (relTime.endsWith("s")) {
+      // pass
+    } else if (relTime.endsWith("m")) {
+      ttl *= 60;
+    } else if (relTime.endsWith("h")) {
+      ttl *= 60*60;
+    } else if (relTime.endsWith("d")) {
+      ttl *= 60*60*24;
+    } else {
+      throw new IOException("Unable to parse relative time value of " + relTime
+          + ": unknown time unit " + relTime.charAt(relTime.length() - 1));
+    }
+    return ttl*1000;
+  }
 }
 

@@ -158,6 +158,16 @@ class HeartbeatManager implements DatanodeStatistics {
   public synchronized int getXceiverCount() {
     return stats.xceiverCount;
   }
+  
+  @Override
+  public synchronized long getCacheCapacity() {
+    return stats.cacheCapacity;
+  }
+
+  @Override
+  public synchronized long getCacheUsed() {
+    return stats.cacheUsed;
+  }
 
   @Override
   public synchronized int getInServiceXceiverCount() {
@@ -185,7 +195,7 @@ class HeartbeatManager implements DatanodeStatistics {
       addDatanode(d);
 
       //update its timestamp
-      d.updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0, 0);
+      d.updateHeartbeatState(StorageReport.EMPTY_ARRAY,  0L, 0L, 0, 0);
     }
   }
 
@@ -209,9 +219,9 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   synchronized void updateHeartbeat(final DatanodeDescriptor node,
-      StorageReport[] reports, int xceiverCount, int failedVolumes) {
+      StorageReport[] reports, long cacheCapacity, long cacheUsed, int xceiverCount, int failedVolumes) {
     stats.subtract(node);
-    node.updateHeartbeat(reports, xceiverCount, failedVolumes);
+    node.updateHeartbeat(reports, cacheCapacity, cacheUsed, xceiverCount, failedVolumes);
     stats.add(node);
   }
 
@@ -370,6 +380,8 @@ class HeartbeatManager implements DatanodeStatistics {
     private long blockPoolUsed = 0L;
 
     private int xceiverCount = 0;
+    private long cacheCapacity = 0L;
+    private long cacheUsed = 0L;
     private int nodesInServiceXceiverCount = 0;
 
     private int nodesInService = 0;
@@ -387,6 +399,8 @@ class HeartbeatManager implements DatanodeStatistics {
       } else {
         capacityTotal += node.getDfsUsed();
       }
+      cacheCapacity += node.getCacheCapacity();
+      cacheUsed += node.getCacheUsed();
     }
 
     private void subtract(final DatanodeDescriptor node) {
@@ -401,6 +415,8 @@ class HeartbeatManager implements DatanodeStatistics {
       } else {
         capacityTotal -= node.getDfsUsed();
       }
+      cacheCapacity -= node.getCacheCapacity();
+      cacheUsed -= node.getCacheUsed();
     }
     
     /**

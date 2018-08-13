@@ -123,4 +123,39 @@ public class TestDatanodeConfig {
       throw new IOException("Bad URI", e);
     }
   }
+  
+  @Test(timeout=60000)
+  public void testMemlockLimit() throws Exception {
+    assumeTrue(NativeIO.isAvailable());
+    final long memlockLimit =
+        NativeIO.POSIX.getCacheManipulator().getMemlockLimit();
+
+    // Can't increase the memlock limit past the maximum.
+    assumeTrue(memlockLimit != Long.MAX_VALUE);
+
+    Configuration conf = cluster.getConfiguration(0);
+    long prevLimit = conf.
+        getLong(DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
+            DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_DEFAULT);
+    try {
+      // Try starting the DN with limit configured to the ulimit
+      conf.setLong(DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
+          memlockLimit);
+      DataNode dn = null;
+      dn = DataNode.createDataNode(new String[]{},  conf);
+      dn.shutdown();
+      // Try starting the DN with a limit > ulimit
+      conf.setLong(DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
+          memlockLimit+1);
+      try {
+        dn = DataNode.createDataNode(new String[]{}, conf);
+      } catch (RuntimeException e) {
+        GenericTestUtils.assertExceptionContains(
+            "more than the datanode's available RLIMIT_MEMLOCK", e);
+      }
+    } finally {
+      conf.setLong(DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
+          prevLimit);
+    }
+  }
 }

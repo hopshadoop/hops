@@ -21,6 +21,11 @@ import com.google.common.annotations.VisibleForTesting;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.StorageMap;
+import io.hops.transaction.EntityManager;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -47,6 +52,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
+import org.apache.hadoop.hdfs.server.namenode.CachedBlock.Type;
 
 /**
  * This class extends the DatanodeInfo class with ephemeral information (eg
@@ -71,6 +78,95 @@ public class DatanodeDescriptor extends DatanodeInfo {
   private final Map<String, DatanodeStorageInfo> storageMap =
       new HashMap<String, DatanodeStorageInfo>();
   
+//  /**
+//   * A list of CachedBlock objects on this datanode.
+//   */
+//  public static class CachedBlocksList extends IntrusiveCollection<CachedBlock> {
+//
+//    public enum Type {
+//      PENDING_CACHED,
+//      CACHED,
+//      PENDING_UNCACHED
+//    }
+//
+//    private final DatanodeDescriptor datanode;
+//
+//    private final Type type;
+//
+//    CachedBlocksList(DatanodeDescriptor datanode, Type type) {
+//      this.datanode = datanode;
+//      this.type = type;
+//    }
+//
+//    public DatanodeDescriptor getDatanode() {
+//      return datanode;
+//    }
+//
+//    public Type getType() {
+//      return type;
+//    }
+//  }
+
+  public Collection<CachedBlock> getPendingCachedTX(final DatanodeManager datanodeManager) throws
+      TransactionContextException, StorageException, IOException {
+    final DatanodeID dnId = this;
+    return (Collection<CachedBlock>) new HopsTransactionalRequestHandler(HDFSOperationType.GET_PENDING_CACHED) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getDatanodeCachedBlockLocks(dnId));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+//        return getPendingCached(datanodeManager);
+  Collection<io.hops.metadata.hdfs.entity.CachedBlock> tmp = EntityManager.findList(io.hops.metadata.hdfs.entity.CachedBlock.Finder.ByDatanodeAndTypes, dnId.getDatanodeUuid(),
+        Type.PENDING_CACHED);
+  return CachedBlock.toHops(tmp, datanodeManager);
+      }
+    }.handle();
+  }
+  
+  public Collection<CachedBlock> getPendingCached(DatanodeManager datanodeManager) throws TransactionContextException, StorageException {
+    //get from db
+    return CachedBlock.toHops(EntityManager.findList(io.hops.metadata.hdfs.entity.CachedBlock.Finder.ByDatanodeAndTypes, this.getDatanodeUuid(),
+        Type.PENDING_CACHED), datanodeManager);
+  }
+
+  public Collection<CachedBlock> getCached(DatanodeManager datanodeManager) throws TransactionContextException, StorageException {
+    //get from db
+    return CachedBlock.toHops(EntityManager.findList(io.hops.metadata.hdfs.entity.CachedBlock.Finder.ByDatanodeAndTypes, this.getDatanodeUuid(),
+        Type.CACHED), datanodeManager);
+  }
+  
+    public Collection<CachedBlock> getPendingUncachedTX(final DatanodeManager datanodeManager) throws
+      TransactionContextException, StorageException, IOException {
+    final DatanodeID dnId = this;
+    return (Collection<CachedBlock>) new HopsTransactionalRequestHandler(HDFSOperationType.GET_PENDING_UNCACHED) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getDatanodeCachedBlockLocks(dnId));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        return getPendingUncached(datanodeManager);
+      }
+    }.handle();
+  }
+
+  public Collection<CachedBlock> getPendingUncached(DatanodeManager datanodeManager) throws TransactionContextException, StorageException {
+    //get from db
+    return CachedBlock.toHops(EntityManager.findList(io.hops.metadata.hdfs.entity.CachedBlock.Finder.ByDatanodeAndTypes, this.getDatanodeUuid(),
+        Type.PENDING_UNCACHED), datanodeManager);
+  }
+
+  /**
+   * The time when the last batch of caching directives was sent, in
+   * monotonic milliseconds.
+   */
+  private long lastCachingDirectiveSentTimeMs;
 
   /**
    * Block and targets pair
@@ -205,7 +301,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   public DatanodeDescriptor(StorageMap storageMap, DatanodeID nodeID) {
     super(nodeID);
     this.globalStorageMap = storageMap;
-    updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0, 0);
+    updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0L, 0L, 0, 0);
   }
 
   /**
@@ -220,7 +316,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
       networkLocation) {
     super(nodeID, networkLocation);
     this.globalStorageMap = storageMap;
-    updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0, 0);
+    updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0L, 0L, 0, 0);
   }
 
   /**
@@ -283,7 +379,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return false;
   }
 
-  public void resetBlocks() {
+  public void resetBlocks() throws StorageException, TransactionContextException, IOException {
     setCapacity(0);
     setRemaining(0);
     setBlockPoolUsed(0);
@@ -291,16 +387,51 @@ public class DatanodeDescriptor extends DatanodeInfo {
     setXceiverCount(0);
     this.invalidateBlocks.clear();
     this.volumeFailures = 0;
+    // pendingCached, cached, and pendingUncached are protected by the
+    // FSN lock.
+//    this.pendingCached.clear();
+//    this.cached.clear();
+//    this.pendingUncached.clear();
+    clearCache();
   }
   
-  public void clearBlockQueues() {
+  public void clearBlockQueues() throws TransactionContextException, StorageException, IOException {
     synchronized (invalidateBlocks) {
       this.invalidateBlocks.clear();
       this.recoverBlocks.clear();
       this.replicateBlocks.clear();
     }
+    // pendingCached, cached, and pendingUncached are protected by the
+    // FSN lock.
+//    this.pendingCached.clear();
+//    this.cached.clear();
+//    this.pendingUncached.clear();
+    clearCache();
   }
 
+  private void clearCache() throws IOException{
+    final DatanodeID datanodeID = this;
+    new HopsTransactionalRequestHandler(HDFSOperationType.CLEAR_CACHED_BLOCKS) {
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getDatanodeCachedBlockLocks(datanodeID));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        Collection<io.hops.metadata.hdfs.entity.CachedBlock> toRemove = EntityManager.findList(
+            io.hops.metadata.hdfs.entity.CachedBlock.Finder.ByDatanodeId, datanodeID);
+        if (toRemove != null) {
+          for (io.hops.metadata.hdfs.entity.CachedBlock block : toRemove) {
+            EntityManager.remove(block);
+          }
+        }
+        return null;
+      }
+    }.handle();
+  }
   public int numBlocks() throws IOException {
 
     int blocks = 0;
@@ -312,20 +443,24 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return blocks;
   }
 
-  public void updateHeartbeat(StorageReport[] reports, int xceiverCount,
-      int volFailures) {
-    updateHeartbeatState(reports, xceiverCount, volFailures);
+  public void updateHeartbeat(StorageReport[] reports, long cacheCapacity,
+      long cacheUsed, int xceiverCount, int volFailures) {
+    updateHeartbeatState(reports, cacheCapacity, cacheUsed, xceiverCount, volFailures);
     heartbeatedSinceRegistration = true;
   }
 
   /**
    * process datanode heartbeat or stats initialization.
    */
-  public void updateHeartbeatState(StorageReport[] reports, int xceiverCount, int volFailures) {
+  public void updateHeartbeatState(StorageReport[] reports, long cacheCapacity,
+      long cacheUsed, int xceiverCount, int volFailures) {
     long totalCapacity = 0;
     long totalRemaining = 0;
     long totalBlockPoolUsed = 0;
     long totalDfsUsed = 0;
+    
+    setCacheCapacity(cacheCapacity);
+    setCacheUsed(cacheUsed);
     Set<DatanodeStorageInfo> failedStorageInfos = null;
 
     // Decide if we should check for any missing StorageReport and mark it as
@@ -827,5 +962,21 @@ public class DatanodeDescriptor extends DatanodeInfo {
         return false;
     }
     return true;
+  }
+  
+  /**
+   * @return   The time at which we last sent caching directives to this 
+   *           DataNode, in monotonic milliseconds.
+   */
+  public long getLastCachingDirectiveSentTimeMs() {
+    return this.lastCachingDirectiveSentTimeMs;
+  }
+
+  /**
+   * @param time  The time at which we last sent caching directives to this 
+   *              DataNode, in monotonic milliseconds.
+   */
+  public void setLastCachingDirectiveSentTimeMs(long time) {
+    this.lastCachingDirectiveSentTimeMs = time;
   }
 }
