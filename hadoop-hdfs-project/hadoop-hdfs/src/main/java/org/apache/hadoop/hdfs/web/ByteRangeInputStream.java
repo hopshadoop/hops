@@ -90,9 +90,10 @@ public abstract class ByteRangeInputStream extends FSInputStream {
    * @param r
    *     Resolved url
    */
-  public ByteRangeInputStream(URLOpener o, URLOpener r) {
+  public ByteRangeInputStream(URLOpener o, URLOpener r) throws IOException {
     this.originalURL = o;
     this.resolvedURL = r;
+    getInputStream();
   }
   
   protected abstract URL getResolvedUrl(final HttpURLConnection connection)
