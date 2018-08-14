@@ -429,6 +429,11 @@ public class INodeDirectory extends INodeWithAdditionalFields {
    *         otherwise, return true;
    */
   boolean addChild(final INode node, final boolean setModTime) throws IOException{
+    return addChild(node, setModTime, true);
+  }
+  
+  boolean addChild(final INode node, final boolean setModTime, final boolean
+      logMetadataEvent) throws IOException{
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
       return false;
@@ -457,8 +462,10 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     if (node.getGroupName() == null) {
       node.setGroup(getGroupName());
     }
-
-    node.logMetadataEvent(MetadataLogEntry.Operation.ADD);
+  
+    if (logMetadataEvent) {
+      node.logMetadataEvent(MetadataLogEntry.Operation.ADD);
+    }
 
     return true;
   }

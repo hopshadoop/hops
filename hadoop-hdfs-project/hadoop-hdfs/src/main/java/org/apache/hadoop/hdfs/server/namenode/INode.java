@@ -947,6 +947,8 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
 
   public abstract void setLogicalTimeNoPersistance(Integer logicalTime);
   
+  public abstract int incrementLogicalTime();
+  
   /**
    * Dump the subtree starting from this inode.
    *
