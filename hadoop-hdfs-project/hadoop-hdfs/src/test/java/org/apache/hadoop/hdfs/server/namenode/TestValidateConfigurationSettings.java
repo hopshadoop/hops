@@ -18,24 +18,23 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.BindException;
+import java.util.Random;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.After;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.net.BindException;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.junit.After;
-
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 /**
- * This class tests the validation of the configuration object when passed
+ * This class tests the validation of the configuration object when passed 
  * to the NameNode
  */
 public class TestValidateConfigurationSettings {
@@ -46,35 +45,67 @@ public class TestValidateConfigurationSettings {
   }
 
   /**
-   * Tests setting the rpc port to the same as the web port to test that
+   * Tests setting the rpc port to the same as the web port to test that 
    * an exception
    * is thrown when trying to re-use the same port
    */
   @Test(expected = BindException.class)
-  public void testThatMatchingRPCandHttpPortsThrowException()   //HOP: fails in the master branch
+  public void testThatMatchingRPCandHttpPortsThrowException() 
       throws IOException {
 
-    Configuration conf = new HdfsConfiguration();
-    // set both of these to port 9000, should fail
-    FileSystem.setDefaultUri(conf, "hdfs://localhost:9000");
-    conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "127.0.0.1:9000");
-    DFSTestUtil.formatNameNode(conf);
-    new NameNode(conf);
+    NameNode nameNode = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      File nameDir = new File(MiniDFSCluster.getBaseDirectory(), "name");
+
+      Random rand = new Random();
+      final int port = 30000 + rand.nextInt(30000);
+
+      // set both of these to the same port. It should fail.
+      FileSystem.setDefaultUri(conf, "hdfs://localhost:" + port);
+      conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "127.0.0.1:" + port);
+      DFSTestUtil.formatNameNode(conf);
+      nameNode = new NameNode(conf);
+    } finally {
+      if (nameNode != null) {
+        nameNode.stop();
+      }
+    }
   }
 
   /**
-   * Tests setting the rpc port to a different as the web port that an
-   * exception is NOT thrown
+   * Tests setting the rpc port to a different as the web port that an 
+   * exception is NOT thrown 
    */
   @Test
-  public void testThatDifferentRPCandHttpPortsAreOK()       //HOP: fails in the master branch
+  public void testThatDifferentRPCandHttpPortsAreOK() 
       throws IOException {
 
     Configuration conf = new HdfsConfiguration();
-    FileSystem.setDefaultUri(conf, "hdfs://localhost:8000");
-    conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "127.0.0.1:9000");
-    DFSTestUtil.formatNameNode(conf);
-    NameNode nameNode = new NameNode(conf); // should be OK!
-    nameNode.stop();
+    File nameDir = new File(MiniDFSCluster.getBaseDirectory(), "name");
+
+    Random rand = new Random();
+
+    // A few retries in case the ports we choose are in use.
+    for (int i = 0; i < 5; ++i) {
+      final int port1 = 30000 + rand.nextInt(10000);
+      final int port2 = port1 + 1 + rand.nextInt(10000);
+
+      FileSystem.setDefaultUri(conf, "hdfs://localhost:" + port1);
+      conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "127.0.0.1:" + port2);
+      DFSTestUtil.formatNameNode(conf);
+      NameNode nameNode = null;
+
+      try {
+        nameNode = new NameNode(conf); // should be OK!
+        break;
+      } catch(BindException be) {
+        continue;     // Port in use? Try another.
+      } finally {
+        if (nameNode != null) {
+          nameNode.stop();
+        }
+      }
+    }
   }
 }
