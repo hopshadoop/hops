@@ -7851,9 +7851,25 @@ public class FSNamesystem
       INodeIdentifier srcSubTreeRoot){
     if(pathIsMetaEnabled(srcInfo.pathInodes) || pathIsMetaEnabled(dstInfo
         .pathInodes)){
-      boolean isRenameLocalOrRenameDataSet = dstDataSet == null ? srcDataSet
-          .equalsIdentifier(srcSubTreeRoot) : srcDataSet.equals(dstDataSet);
-      return !isRenameLocalOrRenameDataSet;
+      if(srcDataSet == null){
+        if(dstDataSet == null){
+          //shouldn't happen
+        }else{
+          //Moving a non metaEnabled directory under a metaEnabled directory
+          return true;
+        }
+      }else{
+        if(dstDataSet == null){
+          //rename a metadateEnabled directory to a non metadataEnabled
+          // directory, always log the subtree except if it is a rename of the
+          // dataset
+          return !srcDataSet.equalsIdentifier(srcSubTreeRoot);
+        }else{
+          //Move from one dataset to another, always log except if it is the
+          //same dataset
+          return !srcDataSet.equals(dstDataSet);
+        }
+      }
     }
     return false;
   }

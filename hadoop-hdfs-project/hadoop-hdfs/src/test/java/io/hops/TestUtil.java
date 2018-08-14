@@ -30,7 +30,7 @@ import java.io.IOException;
 public class TestUtil {
 
   /**
-   * Get the inodeId for a file.
+   * Get the inodeId for a file/directory.
    *
    * @param nameNode the NameNode
    * @param path the path to the file
@@ -39,21 +39,34 @@ public class TestUtil {
    */
   public static int getINodeId(final NameNode nameNode, final Path path)
       throws IOException {
+    return getINode(nameNode, path).getId();
+  }
+  
+  /**
+   * Get the inode row for a file/directory.
+   *
+   * @param nameNode the NameNode
+   * @param path the path to the file
+   * @return the INode
+   * @throws IOException
+   */
+  public static INode getINode(final NameNode nameNode, final Path path)
+      throws IOException {
     final String filePath = path.toUri().getPath();
-    return (Integer) new HopsTransactionalRequestHandler(
+    return (INode) new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED, TransactionLockTypes.INodeResolveType.PATH, filePath)
-                .setNameNodeID(nameNode.getId()).setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            .setNameNodeID(nameNode.getId()).setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
         locks.add(il);
       }
-
+      
       @Override
       public Object performTask() throws IOException {
         INode targetNode = nameNode.getNamesystem().getINode(filePath);
-        return targetNode.getId();
+        return targetNode;
       }
     }.handle();
   }

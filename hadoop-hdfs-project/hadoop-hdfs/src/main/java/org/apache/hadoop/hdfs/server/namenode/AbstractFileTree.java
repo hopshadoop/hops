@@ -496,19 +496,33 @@ abstract class AbstractFileTree {
       
       @Override
       protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
-        if (srcDataset != null) {
-          node.incrementLogicalTime();
-          metadataLogEntries.add(new MetadataLogEntry(srcDataset.getId(),
-              node.getId(), node.getPartitionId(), node.getParentId(), node
-              .getName(), node.getLogicalTime(), MetadataLogEntry.Operation
-              .DELETE));
+        if(srcDataset == null){
+          if(dstDataset == null){
+            //Do nothing as non of the directories are metaEnabled
+          }else{
+            //Moving a non metaEnabled directory under a metaEnabled directory
+            metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
+                node.getId(), node.getPartitionId(), node.getParentId(), node
+                .getName(), node.incrementLogicalTime(), MetadataLogEntry.Operation
+                .ADD));
+          }
+        }else{
+          if(dstDataset == null){
+            //rename a metadateEnabled directory to a non metadataEnabled
+            // directory
+            metadataLogEntries.add(new MetadataLogEntry(srcDataset.getId(),
+                node.getId(), node.getPartitionId(), node.getParentId(), node
+                .getName(), node.incrementLogicalTime(), MetadataLogEntry.Operation
+                .DELETE));
+          }else{
+            //Move from one dataset to another
+            metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
+                node.getId(), node.getPartitionId(), node.getParentId(), node
+                .getName(), node.incrementLogicalTime(), MetadataLogEntry
+                .Operation.CHANGEDATASET));
+          }
         }
-        if (dstDataset != null) {
-          node.incrementLogicalTime();
-          metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
-              node.getId(), node.getPartitionId(), node.getParentId(), node
-              .getName(), node.getLogicalTime(), MetadataLogEntry.Operation.ADD));
-        }
+        
         super.addChildNode(parent, level, node);
       }
       

@@ -600,11 +600,15 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
           }
           getFSNamesystem().removePathAndBlocks(src, collectedBlocks);
         }
-
+  
+        if(!restoreSrc && !restoreDst) {
+          logMetadataEventForRename(srcClone, removedSrc);
+        }
+        
         EntityManager.snapshotMaintenance(
             HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
             removedSrc);
-
+        
         return filesDeleted > 0;
       }
     } finally {
@@ -742,11 +746,13 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         srcInodes[srcInodes.length - 2].asDirectory().increaseChildrenNum();
         // update moved leases with new filename
         getFSNamesystem().unprotectedChangeLease(src, dst);
-
+        
+        logMetadataEventForRename(srcClone, srcChild);
+        
         EntityManager.snapshotMaintenance(
             HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
             srcChild);
-
+        
         return true;
       }
     } finally {
@@ -762,6 +768,31 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return false;
   }
 
+  private void logMetadataEventForRename(INode srcClone, INode srcChild)
+      throws TransactionContextException, StorageException {
+    INode srcDataset = srcClone.getMetaEnabledParent();
+    INode dstDataset = srcChild.getMetaEnabledParent();
+  
+    if(srcDataset == null){
+      if(dstDataset == null){
+        //No logging required
+      }else{
+        //rename from non metaEnabled directory to a metaEnabled directoy
+        srcChild.logMetadataEvent(MetadataLogEntry.Operation.ADD);
+      }
+    }else{
+      if(dstDataset == null){
+        //rename from metaEnabled directory to a non metaEnabled directory
+        EntityManager.add(new MetadataLogEntry(srcDataset.getId(),
+            srcClone.getId(), srcClone.getPartitionId(), srcClone
+            .getParentId(), srcClone.getLocalName(), srcChild
+            .incrementLogicalTime(), MetadataLogEntry.Operation.DELETE));
+      }else{
+        //rename across datasets or the same dataset
+        srcChild.logMetadataEvent(MetadataLogEntry.Operation.RENAME);
+      }
+    }
+  }
   /**
    * Set file replication
    *
@@ -882,6 +913,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     if (groupname != null) {
       inode.setGroup(groupname);
     }
+    
+    inode.logMetadataEvent(MetadataLogEntry.Operation.UPDATE);
   }
 
   /**
@@ -1758,9 +1791,11 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * with pos = length - 1.
    */
   private boolean addLastINode(INodesInPath inodesInPath,
-      INode inode, INode.DirCounts counts, boolean checkQuota) throws QuotaExceededException, StorageException, IOException {
+      INode inode, INode.DirCounts counts, boolean checkQuota, boolean
+      logMetadataEvent) throws
+      QuotaExceededException, StorageException, IOException {
     final int pos = inodesInPath.getINodes().length - 1;
-    return addChild(inodesInPath, pos, inode, counts, checkQuota);
+    return addChild(inodesInPath, pos, inode, counts, checkQuota, logMetadataEvent);
   }
 
   private boolean addLastINode(INodesInPath inodesInPath,
@@ -1796,9 +1831,15 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
 
     return addChild(inodesInPath, pos, child, counts, checkQuota);
   }
-
+  
   private boolean addChild(INodesInPath inodesInPath, int pos, INode child,
       INode.DirCounts counts, boolean checkQuota)
+      throws IOException {
+    return addChild(inodesInPath, pos, child, counts, checkQuota, true);
+  }
+  
+  private boolean addChild(INodesInPath inodesInPath, int pos, INode child,
+      INode.DirCounts counts, boolean checkQuota, boolean logMetadataEvent)
       throws IOException {
     final INode[] inodes = inodesInPath.getINodes();
     // Disallow creation of /.reserved. This may be created when loading
@@ -1826,7 +1867,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     if (inodes[pos-1] == null) {
       throw new NullPointerException("Panic: parent does not exist");
     }
-    final boolean added = ((INodeDirectory)inodes[pos-1]).addChild(child, true);
+    final boolean added = ((INodeDirectory)inodes[pos-1]).addChild(child,
+        true, logMetadataEvent);
     if (!added) {
       updateCount(inodesInPath, pos, -counts.getNsCount(), -counts.getDsCount(), true);
     } 
@@ -1846,7 +1888,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   private boolean addLastINodeNoQuotaCheck(INodesInPath inodesInPath, INode child, INode.DirCounts counts)
       throws IOException {
     try {
-      return addLastINode(inodesInPath, child, counts, false);
+      return addLastINode(inodesInPath, child, counts, false, false);
     } catch (QuotaExceededException e) {
       NameNode.LOG.warn("FSDirectory.addChildNoQuotaCheck - unexpected", e);
     }
@@ -1877,7 +1919,6 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     INode removedNode = null;
     if (forRename) {
       removedNode = inodes[pos];
-      removedNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
     } else {
       removedNode = ((INodeDirectory) inodes[pos - 1])
           .removeChild(inodes[pos]);

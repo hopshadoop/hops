@@ -307,7 +307,7 @@ public abstract class INodeWithAdditionalFields extends INode {
       }
       INodeDirectory datasetDir = getMetaEnabledParent();
       EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(),
-          getPartitionId(), getParentId(), getLocalName(), ++logicalTime,
+          getPartitionId(), getParentId(), getLocalName(), incrementLogicalTime(),
           operation));
       save();
     }
@@ -319,6 +319,10 @@ public abstract class INodeWithAdditionalFields extends INode {
   
   public final void setLogicalTimeNoPersistance(Integer logicalTime) {
     this.logicalTime = logicalTime;
+  }
+  
+  public final int incrementLogicalTime(){
+    return ++logicalTime;
   }
   
   /**
