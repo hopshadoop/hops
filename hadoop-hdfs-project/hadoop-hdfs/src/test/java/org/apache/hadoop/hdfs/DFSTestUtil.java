@@ -21,6 +21,7 @@ package org.apache.hadoop.hdfs;
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Supplier;
+import com.google.common.collect.Lists;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -117,6 +118,10 @@ import org.apache.hadoop.fs.CacheFlag;
 import static org.apache.hadoop.fs.CreateFlag.CREATE;
 import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 import org.apache.hadoop.fs.FileContext;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclEntryScope;
+import org.apache.hadoop.fs.permission.AclEntryType;
+import org.apache.hadoop.fs.permission.FsAction;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
@@ -1406,6 +1411,34 @@ public class DFSTestUtil {
     filesystem.removeCacheDirective(id);
     // OP_REMOVE_CACHE_POOL
     filesystem.removeCachePool("pool1");
+    // OP_SET_ACL
+    List<AclEntry> aclEntryList = Lists.newArrayList();
+    aclEntryList.add(
+        new AclEntry.Builder()
+            .setPermission(FsAction.READ_WRITE)
+            .setScope(AclEntryScope.ACCESS)
+            .setType(AclEntryType.USER)
+            .build());
+    aclEntryList.add(
+        new AclEntry.Builder()
+            .setName("user")
+            .setPermission(FsAction.READ_WRITE)
+            .setScope(AclEntryScope.ACCESS)
+            .setType(AclEntryType.USER)
+            .build());
+    aclEntryList.add(
+        new AclEntry.Builder()
+            .setPermission(FsAction.WRITE)
+            .setScope(AclEntryScope.ACCESS)
+            .setType(AclEntryType.GROUP)
+            .build());
+    aclEntryList.add(
+        new AclEntry.Builder()
+            .setPermission(FsAction.NONE)
+            .setScope(AclEntryScope.ACCESS)
+            .setType(AclEntryType.OTHER)
+            .build());
+    filesystem.setAcl(pathConcatTarget, aclEntryList);
   }
   
 
