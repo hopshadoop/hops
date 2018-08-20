@@ -48,6 +48,7 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.NodeBase;
+import org.apache.hadoop.net.StandardSocketFactory;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
@@ -71,6 +72,8 @@ import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.server.blockmanagement.NumberReplicas;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
+
+import javax.net.SocketFactory;
 
 /**
  * This class provides rudimentary checking of DFS volumes for errors and
@@ -614,7 +617,7 @@ public class NamenodeFsck {
       dfs.close();
     }
   }
-
+  
   /*
    * XXX (ab) Bulk of this method is copied verbatim from {@link DFSClient}, which is
    * bad. Both places should be refactored to provide a method to copy blocks
@@ -666,10 +669,15 @@ public class NamenodeFsck {
             setConfiguration(namenode.conf).
             setRemotePeerFactory(new RemotePeerFactory() {
               @Override
+              public SocketFactory getSocketFactory(Configuration conf) throws IOException {
+                return new StandardSocketFactory();
+              }
+  
+              @Override
               public Peer newConnectedPeer(InetSocketAddress addr)
                   throws IOException {
                 Peer peer = null;
-                Socket s = NetUtils.getDefaultSocketFactory(conf).createSocket();
+                Socket s = getSocketFactory(namenode.conf).createSocket();
                 try {
                   s.connect(addr, HdfsServerConstants.READ_TIMEOUT);
                   s.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);

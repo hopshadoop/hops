@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdfs;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -50,6 +51,8 @@ import org.apache.hadoop.hdfs.server.namenode.CacheManager;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
+
+import javax.net.SocketFactory;
 
 /**
  * A helper class to setup the cluster, and get to BlockReader and DataNode for a block.
@@ -192,11 +195,15 @@ public class BlockReaderTestUtil {
       setAllowShortCircuitLocalReads(true).
       setRemotePeerFactory(new RemotePeerFactory() {
         @Override
+        public SocketFactory getSocketFactory(Configuration conf) throws IOException {
+          return NetUtils.getDefaultSocketFactory(conf);
+        }
+  
+        @Override
         public Peer newConnectedPeer(InetSocketAddress addr)
             throws IOException {
           Peer peer = null;
-          Socket sock = NetUtils.
-              getDefaultSocketFactory(fs.getConf()).createSocket();
+          Socket sock = getSocketFactory(fs.getConf()).createSocket();
           try {
             sock.connect(addr, HdfsServerConstants.READ_TIMEOUT);
             sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);

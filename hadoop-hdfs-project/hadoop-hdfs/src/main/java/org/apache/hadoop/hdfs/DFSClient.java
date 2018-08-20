@@ -86,6 +86,8 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.hadoop.net.StandardSocketFactory;
 import org.apache.hadoop.util.Daemon;
 
 import javax.net.SocketFactory;
@@ -2902,14 +2904,19 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
   public ClientContext getClientContext() {
     return clientContext;
   }
-
+  
+  @Override // RemotePeerFactory
+  public SocketFactory getSocketFactory(Configuration conf) {
+    return new StandardSocketFactory();
+  }
+  
   @Override // RemotePeerFactory
   public Peer newConnectedPeer(InetSocketAddress addr) throws IOException {
     Peer peer = null;
     boolean success = false;
     Socket sock = null;
     try {
-      sock = socketFactory.createSocket();
+      sock = getSocketFactory(conf).createSocket();
       NetUtils.connect(sock, addr,
               getRandomLocalInterfaceAddr(),
               dfsClientConf.socketTimeout);
@@ -2924,7 +2931,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
       }
     }
   }
-
+  
   /**
    * Create hedged reads thread pool, HEDGED_READ_THREAD_POOL, if
    * it does not already exist.
