@@ -20,16 +20,27 @@ package org.apache.hadoop.hdfs;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.net.Peer;
+
+import javax.net.SocketFactory;
 
 public interface RemotePeerFactory {
   /**
    * @param addr          The address to connect to.
-   * 
+   *
    * @return              A new Peer connected to the address.
    *
    * @throws IOException  If there was an error connecting or creating 
    *                      the remote socket, encrypted stream, etc.
    */
   Peer newConnectedPeer(InetSocketAddress addr) throws IOException;
+  
+  /**
+   * SocketFactory to be used to establish the connection
+   * @param conf
+   * @return appropriate socket factory
+   * @throws IOException
+   */
+  SocketFactory getSocketFactory(Configuration conf) throws IOException;
 }

@@ -32,7 +32,11 @@ import javax.net.ssl.SSLException;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.file.Paths;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.ipc.RemoteException;
 
@@ -58,6 +62,7 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
         conf = new HdfsConfiguration();
         conf.setInt(DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, /*default 15*/ 1);
         conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY, "1,1");
+        conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, false);
         filesToPurge = prepareCryptoMaterial(conf, classpathDir);
         setCryptoConfig(conf, classpathDir);
         
@@ -112,6 +117,34 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
         LOG.debug("File checksum is: " + checksum.toString());
     }
 
+    @Test
+    public void testCopyFile() throws Exception {
+        // Create binary file of a couple of MB
+        java.nio.file.Path binary = Paths.get(classpathDir, "binary_file.bin");
+        filesToPurge.add(binary);
+        Random rand = new Random();
+        byte[] buffer = new byte[1024];
+        int count = 0;
+        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(binary.toFile()))) {
+            while (count < 5000) {
+                rand.nextBytes(buffer);
+                bos.write(buffer);
+                count++;
+            }
+            bos.flush();
+        }
+        // Copy it to DFS
+        dfs1 = cluster.getFileSystem();
+        Path target = new Path("binary_file");
+        dfs1.copyFromLocalFile(new Path(binary.toString()), target);
+        assertTrue(dfs1.exists(target));
+        // Copy back the file
+        java.nio.file.Path localCopy = Paths.get(classpathDir, "copied_remote_file");
+        dfs1.copyToLocalFile(target, new Path(localCopy.toString()));
+        filesToPurge.add(localCopy);
+        assertTrue(localCopy.toFile().exists());
+    }
+    
     @Test
     public void testRpcCallNonValidCert() throws Exception {
         dfs1 = DistributedFileSystem.newInstance(conf);

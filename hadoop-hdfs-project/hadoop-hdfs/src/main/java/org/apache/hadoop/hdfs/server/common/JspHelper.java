@@ -35,6 +35,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
+import javax.net.SocketFactory;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.jsp.JspWriter;
@@ -62,6 +63,7 @@ import org.apache.hadoop.hdfs.web.resources.DoAsParam;
 import org.apache.hadoop.hdfs.web.resources.UserParam;
 import org.apache.hadoop.http.HtmlQuoting;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.StandardSocketFactory;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -211,7 +213,7 @@ public class JspHelper {
     int index = doRandom ? DFSUtil.getRandom().nextInt(l) : 0;
     return nodes[index];
   }
-
+  
   public static void streamBlockInAscii(InetSocketAddress addr, String poolId,
       long blockId, Token<BlockTokenIdentifier> blockToken, long genStamp,
       long blockSize, long offsetIntoBlock, long chunkSizeToView, 
@@ -239,11 +241,17 @@ public class JspHelper {
       setCachingStrategy(CachingStrategy.newDefaultStrategy()).
       setConfiguration(conf).
       setRemotePeerFactory(new RemotePeerFactory() {
+        
+        @Override
+        public SocketFactory getSocketFactory(Configuration conf) throws IOException {
+          return new StandardSocketFactory();
+        }
+  
         @Override
         public Peer newConnectedPeer(InetSocketAddress addr)
             throws IOException {
           Peer peer = null;
-          Socket sock = NetUtils.getDefaultSocketFactory(conf).createSocket();
+          Socket sock = getSocketFactory(conf).createSocket();
           try {
             sock.connect(addr, HdfsServerConstants.READ_TIMEOUT);
             sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);

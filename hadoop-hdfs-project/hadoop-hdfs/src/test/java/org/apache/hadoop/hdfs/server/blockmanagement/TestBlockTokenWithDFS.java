@@ -60,6 +60,8 @@ import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Assert;
 
+import javax.net.SocketFactory;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -162,10 +164,15 @@ public class TestBlockTokenWithDFS {
           setConfiguration(conf).
           setRemotePeerFactory(new RemotePeerFactory() {
             @Override
+            public SocketFactory getSocketFactory(Configuration conf) throws IOException {
+              return NetUtils.getDefaultSocketFactory(conf);
+            }
+  
+            @Override
             public Peer newConnectedPeer(InetSocketAddress addr)
                 throws IOException {
               Peer peer = null;
-              Socket sock = NetUtils.getDefaultSocketFactory(conf).createSocket();
+              Socket sock = getSocketFactory(conf).createSocket();
               try {
                 sock.connect(addr, HdfsServerConstants.READ_TIMEOUT);
                 sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
