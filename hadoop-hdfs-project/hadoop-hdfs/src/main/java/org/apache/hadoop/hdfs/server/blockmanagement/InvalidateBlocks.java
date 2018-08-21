@@ -127,6 +127,10 @@ class InvalidateBlocks {
     }
   }
 
+  void remove(int sid) throws IOException {
+    removeInvBlocks(sid);
+  }
+  
   /**
    * Remove the block from the specified storage.
    */

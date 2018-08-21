@@ -272,6 +272,11 @@ public class LockFactory {
         inodeId);
   }
   
+  public Lock getBatchedEncodingStatusLock(
+      TransactionLockTypes.LockType lockType, List<INodeIdentifier> inodeIds) {
+    return new BaseEncodingStatusLock.BatchedEncodingStatusLock(lockType,inodeIds);
+  }
+  
   public Lock getSubTreeOpsLock(TransactionLockTypes.LockType lockType, 
           String pathPrefix) {
     return new SubTreeOpLock(lockType, pathPrefix);

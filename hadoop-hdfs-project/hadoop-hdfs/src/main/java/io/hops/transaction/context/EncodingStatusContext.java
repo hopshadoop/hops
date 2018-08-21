@@ -25,8 +25,11 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.transaction.lock.TransactionLocks;
+import java.util.ArrayList;
+import java.util.Collection;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class EncodingStatusContext
@@ -85,6 +88,21 @@ public class EncodingStatusContext
   }
 
   @Override
+  public Collection<EncodingStatus> findList(FinderType<EncodingStatus> finder,
+      Object... params) throws TransactionContextException, StorageException {
+    EncodingStatus.Finder eFinder = (EncodingStatus.Finder) finder;
+
+    switch (eFinder) {
+      case ByInodeIds:
+        return findByINodeIds(eFinder, params);
+      case ByParityInodeIds:
+        return findByParityINodeIds(eFinder, params);
+      default:
+        throw new RuntimeException(UNSUPPORTED_FINDER);
+    }
+  }
+  
+  @Override
   public int count(CounterType<EncodingStatus> counter, Object... params)
       throws TransactionContextException, StorageException {
     EncodingStatus.Counter eCounter = (EncodingStatus.Counter) counter;
@@ -140,6 +158,39 @@ public class EncodingStatusContext
     return result;
   }
 
+  private Collection<EncodingStatus> findByINodeIds(EncodingStatus.Finder eFinder, Object... params)
+      throws StorageCallPreventedException, StorageException {
+    Collection<Integer> inodeIds = (Collection<Integer>) params[0];
+    Collection<EncodingStatus> result = new ArrayList<>(inodeIds.size());
+    Collection<Integer> toGetFromDB = new ArrayList<>();
+    for (int id : inodeIds) {
+      if (contains(id)) {
+        result.add(get(id));
+        hit(eFinder, get(id), "inodeid", id);
+      } else {
+        toGetFromDB.add(id);
+      }
+    }
+    if (!toGetFromDB.isEmpty()) {
+      aboutToAccessStorage(eFinder, toGetFromDB);
+      Collection<EncodingStatus> gotFromDB = dataAccess.findByInodeIds(toGetFromDB);
+      for (EncodingStatus s : gotFromDB) {
+        gotFromDB(s.getInodeId(), s);
+        addInternal(s);
+        miss(eFinder, s, "inodeid", s.getInodeId());
+        result.add(s);
+      }
+      for (int id : toGetFromDB) {
+        if (!contains(id)) {
+          EncodingStatus s = null;
+          gotFromDB(id, s);
+          miss(eFinder, s, "inodeid", id);
+        }
+      }
+    }
+    return result;
+  }
+
   private EncodingStatus findByParityINodeId(EncodingStatus.Finder eFinder,
       final int pairtyINodeId)
       throws StorageCallPreventedException, StorageException {
@@ -157,6 +208,41 @@ public class EncodingStatusContext
     return result;
   }
 
+  private Collection<EncodingStatus> findByParityINodeIds(EncodingStatus.Finder eFinder, Object... params)
+      throws StorageCallPreventedException, StorageException {
+    Collection<Integer> inodeIds = (Collection<Integer>) params[0];
+    Collection<EncodingStatus> result = new ArrayList<>(inodeIds.size());
+    List<Integer> toGetFromDB = new ArrayList<>();
+    for (int pairtyINodeId : inodeIds) {
+      if (parityInodeIdToEncodingStatus.containsKey(pairtyINodeId)) {
+        result.add(parityInodeIdToEncodingStatus.get(pairtyINodeId));
+        hit(eFinder, parityInodeIdToEncodingStatus.get(pairtyINodeId), "parityinodeid", pairtyINodeId);
+      } else {
+        toGetFromDB.add(pairtyINodeId);
+      }
+    }
+    if (!toGetFromDB.isEmpty()) {
+      aboutToAccessStorage(eFinder, toGetFromDB);
+      Collection<EncodingStatus> gotFromDB = dataAccess.findByParityInodeIds(toGetFromDB);
+      if(gotFromDB!=null){
+      for (EncodingStatus s : gotFromDB) {
+        gotFromDB(s);
+        addInternal(s.getParityInodeId(), s);
+        miss(eFinder, s, "parityinodeid", s.getParityInodeId());
+        result.add(s);
+      }
+      }
+      for(int id: toGetFromDB){
+        if(!parityInodeIdToEncodingStatus.containsKey(id)){
+          EncodingStatus s = null;
+          addInternal(id, s);
+          miss(eFinder, s, "parityinodeid", id);
+        }
+      }
+    }
+
+    return result;
+  }
 
   private void addInternal(EncodingStatus encodingStatus) {
     if (encodingStatus != null && encodingStatus.getParityInodeId() != null) {
