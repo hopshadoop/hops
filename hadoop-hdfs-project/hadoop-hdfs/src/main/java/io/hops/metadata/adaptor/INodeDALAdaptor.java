@@ -55,6 +55,12 @@ public class INodeDALAdaptor
   }
 
   @Override
+  public Collection<org.apache.hadoop.hdfs.server.namenode.INode> findInodesByIdsFTIS(int[] inodeId) throws
+      StorageException {
+    return convertDALtoHDFS(dataAccess.findInodesByIdsFTIS(inodeId));
+  }
+  
+  @Override
   public List<org.apache.hadoop.hdfs.server.namenode.INode> findInodesByParentIdFTIS(
       int parentId) throws StorageException {
     List<org.apache.hadoop.hdfs.server.namenode.INode> list =
