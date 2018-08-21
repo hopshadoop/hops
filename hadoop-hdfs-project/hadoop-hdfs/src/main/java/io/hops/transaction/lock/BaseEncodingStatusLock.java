@@ -20,11 +20,15 @@ package io.hops.transaction.lock;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 abstract class BaseEncodingStatusLock extends Lock {
   private final TransactionLockTypes.LockType lockType;
@@ -122,6 +126,37 @@ abstract class BaseEncodingStatusLock extends Lock {
       }
       // It's a parity file
       acquireLock(getLockType(), EncodingStatus.Finder.ByParityInodeId, inodeId);
+    }
+  }
+  
+  final static class BatchedEncodingStatusLock extends BaseEncodingStatusLock {
+
+    private final Set<Integer> inodeIds;
+
+    BatchedEncodingStatusLock(TransactionLockTypes.LockType lockType, List<INodeIdentifier> inodeIdentifiers) {
+      super(lockType);
+      inodeIds = new HashSet<Integer>();
+      for (INodeIdentifier identifier : inodeIdentifiers) {
+        inodeIds.add(identifier.getInodeId());
+      }
+    }
+
+    @Override
+    protected void acquire(TransactionLocks locks) throws IOException {
+      // TODO STEFFEN - Should only acquire the locks if we know it has a status and also not twice.
+      // Maybe add a flag to iNode specifying whether it's encoded or a parity file
+      Collection<EncodingStatus> status = acquireLockList(getLockType(), EncodingStatus.Finder.ByInodeIds, inodeIds);
+
+      for (EncodingStatus s : status) {
+        inodeIds.remove(s.getInodeId());
+      }
+
+      if (inodeIds.isEmpty()) {
+        //it is all source files
+        return;
+      }
+      // It's parity files
+      acquireLockList(getLockType(), EncodingStatus.Finder.ByParityInodeIds, inodeIds);
     }
   }
 }

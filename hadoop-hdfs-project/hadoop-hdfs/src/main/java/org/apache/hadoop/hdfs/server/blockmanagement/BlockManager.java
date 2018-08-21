@@ -309,6 +309,15 @@ public class BlockManager {
    */
   private final int processMisReplicatedNoThreads;
   
+  /**
+   * Number of files to process at one batch
+   */
+  private final int removalBatchSize;
+  /**
+   * Number of threads procession batches in parallel
+   */
+  private final int removalNoThreads;
+  
   public BlockManager(final Namesystem namesystem, final FSClusterStats stats,
       final Configuration conf) throws IOException {
     this.namesystem = namesystem;
@@ -403,6 +412,15 @@ public class BlockManager {
     this.processMisReplicatedNoThreads = conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS,
         DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT);
+    
+    this.removalBatchSize =
+        conf.getInt(DFSConfigKeys.DFS_NAMENODE_REMOVAL_BATCH_SIZE,
+            DFSConfigKeys.DFS_NAMENODE_REMOVAL_BATCH_SIZE_DEFAULT);
+    this.removalNoThreads = conf.getInt(
+        DFSConfigKeys.DFS_NAMENODE_REMOVAL_NO_OF_THREADS,
+        DFSConfigKeys.DFS_NAMENODE_REMOVAL_NO_OF_THREADS_DEFAULT);
+    
+    
     LOG.info("defaultReplication         = " + defaultReplication);
     LOG.info("maxReplication             = " + maxReplication);
     LOG.info("minReplication             = " + minReplication);
@@ -412,8 +430,10 @@ public class BlockManager {
     LOG.info("encryptDataTransfer        = " + encryptDataTransfer);
     LOG.info("maxNumBlocksToLog          = " + maxNumBlocksToLog);
     LOG.info("misReplicatedBatchSize     = " + processMisReplicatedBatchSize);
-    LOG.info("misReplicatedNoOfBatchs     = " + processMisReplicatedNoOfBatchs);   
-    LOG.info("misReplicatedNoOfThreads     = " + processMisReplicatedNoThreads);   
+    LOG.info("misReplicatedNoOfBatchs    = " + processMisReplicatedNoOfBatchs);   
+    LOG.info("misReplicatedNoOfThreads   = " + processMisReplicatedNoThreads);   
+    LOG.info("removalBatchSize           = " + removalBatchSize);
+    LOG.info("removalNoOfThreads         = " + removalNoThreads);   
   }
 
   private NameNodeBlockTokenSecretManager createBlockTokenSecretManager(
@@ -1187,8 +1207,23 @@ public class BlockManager {
   void datanodeRemoved(final DatanodeDescriptor node)
       throws IOException {
     final Iterator<? extends Block> it = node.getBlockIterator();
-    while(it.hasNext()) {
-      removeStoredBlockTx(it.next().getBlockId(), node);
+    final List<Long> allBlockIds = new ArrayList<>();
+    while (it.hasNext()) {
+      allBlockIds.add(it.next().getBlockId());
+    }
+
+    try {
+      Slicer.slice(allBlockIds.size(), removalBatchSize, removalNoThreads,
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex)
+            throws Exception {
+          List<Long> blockIds = allBlockIds.subList(startIndex, endIndex);
+          removeStoredBlocksTx(blockIds, node);
+        }
+      });
+    } catch (Exception ex) {
+      throw new IOException(ex);
     }
 
     node.resetBlocks();
@@ -1216,37 +1251,27 @@ public class BlockManager {
       throws IOException {
     final Iterator<BlockInfo> it = storageInfo.getBlockIterator();
     final DatanodeDescriptor node = storageInfo.getDatanodeDescriptor();
-    while(it.hasNext()) {
-      final BlockInfo block = it.next();
-      new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_STORED_BLOCK) {
-        INodeIdentifier inodeIdentifier;
-
-        @Override
-        public void setUp() throws StorageException {
-          inodeIdentifier = INodeUtil.resolveINodeFromBlockID(block.getBlockId());
-        }
-
-        @Override
-        public void acquireLock(TransactionLocks locks) throws IOException {
-          LockFactory lf = LockFactory.getInstance();
-          locks.add(
-              lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
-              .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
-              .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR, BLK.UC, BLK.IV));
-
-          if (((FSNamesystem) namesystem).isErasureCodingEnabled() && inodeIdentifier != null) {
-            locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE, inodeIdentifier.getInodeId()));
-          }
-        }
-
-        @Override
-        public Object performTask() throws IOException {
-          removeStoredBlock(block, node);
-          invalidateBlocks.remove(storageInfo, block);
-          return null;
-        }
-      }.handle();
+    final List<Long> allBlockIds = new ArrayList<>();
+    while (it.hasNext()) {
+      allBlockIds.add(it.next().getBlockId());
     }
+
+    try {
+      Slicer.slice(allBlockIds.size(), removalBatchSize, removalNoThreads,
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex)
+            throws Exception {
+          List<Long> blockIds = allBlockIds.subList(startIndex, endIndex);
+          removeStoredBlocksTx(blockIds, node);
+        }
+      });
+    } catch (Exception ex) {
+      throw new IOException(ex);
+    }
+
+    invalidateBlocks.remove(storageInfo.getSid());
+
     namesystem.checkSafeMode();
   }
 
@@ -2243,9 +2268,25 @@ public class BlockManager {
     }
     addToInvalidates(toInvalidate, storage);
 
+    final List<Long> allBlockIds = new ArrayList<>();
     for (Long b : toRemove) {
-      removeStoredBlockTx(b, storage.getDatanodeDescriptor());
+      allBlockIds.add(b);
     }
+
+    try {
+      Slicer.slice(allBlockIds.size(), removalBatchSize, removalNoThreads,
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex)
+            throws Exception {
+          List<Long> blockIds = allBlockIds.subList(startIndex, endIndex);
+          removeStoredBlocksTx(blockIds, storage.getDatanodeDescriptor());
+        }
+      });
+    } catch (Exception ex) {
+      throw new IOException(ex);
+    }
+
     return reportStatistics;
   }
   
@@ -4506,6 +4547,46 @@ public class BlockManager {
     OK
   }
 
+  private void removeStoredBlocksTx(final Collection<Long> blockIds, final DatanodeDescriptor node)
+      throws IOException {
+    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_STORED_BLOCKS) {
+      List<INodeIdentifier> inodeIdentifiers;
+
+      @Override
+      public void setUp() throws StorageException {
+        long[] array = new long[blockIds.size()];
+        int i = 0;
+        for (long blockId : blockIds) {
+          array[i] = blockId;
+          i++;
+        }
+        inodeIdentifiers = INodeUtil.getINodeIdentifiersFromBlockIds(array);
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(
+            lf.getBatchedINodesLock(inodeIdentifiers))
+            .add(lf.getSqlBatchedBlocksLock()).add(
+            lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
+                BLK.ER));
+
+        if (((FSNamesystem) namesystem).isErasureCodingEnabled() && inodeIdentifiers != null) {
+          locks.add(lf.getBatchedEncodingStatusLock(LockType.WRITE, inodeIdentifiers));
+        }
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        for (long blockId : blockIds) {
+          BlockInfo block = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, blockId);
+          removeStoredBlock(block, node);
+        }
+        return null;
+      }
+    }.handle(namesystem);
+  }
 
   private void removeStoredBlockTx(final Long b, final DatanodeDescriptor node)
       throws IOException {

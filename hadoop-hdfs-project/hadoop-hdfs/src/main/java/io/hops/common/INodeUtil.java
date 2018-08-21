@@ -49,6 +49,7 @@ import org.apache.hadoop.hdfs.server.namenode.Lease;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -248,6 +249,54 @@ public class INodeUtil {
     }
   }
   
+  public static List<INodeIdentifier> getINodeIdentifiersFromBlockIds(final long[] blockIds)
+      throws StorageException {
+    List<INodeIdentifier> inodeIdentifiers;
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(
+        HDFSOperationType.RESOLVE_INODES_FROM_BLOCKIDS) {
+      @Override
+      public Object performTask() throws IOException {
+        boolean transactionActive = connector.isTransactionActive();
+
+        if (!transactionActive) {
+          connector.beginTransaction();
+        }
+        BlockLookUpDataAccess<BlockLookUp> da = (BlockLookUpDataAccess) HdfsStorageFactory
+            .getDataAccess(BlockLookUpDataAccess.class);
+        int[] inodeIds = da.findINodeIdsByBlockIds(blockIds);
+        if (inodeIds.length == 0) {
+          return null;
+        }
+
+        INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
+            .getDataAccess(INodeDataAccess.class);
+        Collection<INode> inodes = ida.findInodesByIdsFTIS(inodeIds);
+        if (inodes == null) {
+          return null;
+        }
+        List<INodeIdentifier> result = new ArrayList<>(inodes.size());
+        for (INode inode : inodes) {
+          INodeIdentifier inodeIdent = new INodeIdentifier(inode.getId());
+          inodeIdent.setName(inode.getLocalName());
+          inodeIdent.setPid(inode.getParentId());
+          inodeIdent.setPartitionId(inode.getPartitionId());
+          result.add(inodeIdent);
+        }
+        if (!transactionActive) {
+          connector.commit();
+        }
+        return result;
+      }
+    };
+    try {
+      inodeIdentifiers = (List<INodeIdentifier>) handler.handle();
+    } catch (IOException ex) {
+      LOG.error("Could not resolve iNode from blockId (blockid=" + Arrays.toString(blockIds) + ")");
+      throw new StorageException(ex.getMessage());
+    }
+    return inodeIdentifiers;
+  }
+  
   public static int[] resolveINodesFromBlockIds(final long[] blockIds)
       throws StorageException {
     LightWeightRequestHandler handler =
@@ -266,7 +315,7 @@ public class INodeUtil {
       throw new StorageException(ex.getMessage());
     }
   }
-
+ 
   public static INodeIdentifier resolveINodeFromId(final int id)
       throws StorageException {
     INodeIdentifier inodeIdentifier;
