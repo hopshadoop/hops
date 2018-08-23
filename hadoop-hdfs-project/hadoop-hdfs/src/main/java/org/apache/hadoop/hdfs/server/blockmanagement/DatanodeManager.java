@@ -220,7 +220,7 @@ public class DatanodeManager {
     this.networktopology = NetworkTopology.getInstance(conf);
 
     this.heartbeatManager =
-        new HeartbeatManager(namesystem, blockManager, conf);
+        new HeartbeatManager(namesystem, blockManager, conf, storageMap);
 
     this.defaultXferPort = NetUtils.createSocketAddr(
         conf.get(DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY,
@@ -553,6 +553,10 @@ public class DatanodeManager {
     return (node.getLastUpdate() < (Time.now() - heartbeatExpireInterval));
   }
 
+  long getHeartbeatExpireInterval(){
+    return heartbeatExpireInterval;
+  }
+  
   /**
    * Add a datanode.
    */

@@ -170,8 +170,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     // The replica list is unchanged.
     for (ReplicaUnderConstruction r : replicas) {
       if (genStamp != r.getGenerationStamp()) {
-        DatanodeDescriptor dn = datanodeMgr.getDatanodeBySid(r.getStorageId());
-        dn.removeReplica(this);
+        r.getExpectedStorageLocation(datanodeMgr).removeBlock(this);
         NameNode.blockStateChangeLog.info("BLOCK* Removing stale replica "
             + "from location: " + r.getStorageId() + " for block " + r.getBlockId());
       }

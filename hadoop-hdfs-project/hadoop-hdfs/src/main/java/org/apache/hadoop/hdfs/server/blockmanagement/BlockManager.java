@@ -30,6 +30,7 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.blockmanagement.ExcessReplicasMap;
 import io.hops.metadata.common.entity.Variable;
+import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.MisReplicatedRangeQueueDataAccess;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.HashBucket;
@@ -1251,6 +1252,38 @@ public class BlockManager {
     namesystem.checkSafeMode();
   }
 
+    void removeBlocksAssociatedTo(final int sid)
+      throws IOException {
+    final Iterator<BlockInfo> it = getAllStorageBlockInfos(sid).iterator();
+    final List<Long> allBlockIds = new ArrayList<>();
+    while (it.hasNext()) {
+      allBlockIds.add(it.next().getBlockId());
+    }
+
+    removeBlocks(allBlockIds, sid);
+
+    invalidateBlocks.remove(sid);
+
+    namesystem.checkSafeMode();
+  }
+    
+  private List<BlockInfo> getAllStorageBlockInfos(final int sid) throws IOException {
+
+    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_STORAGE_IDS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory
+            .getDataAccess(BlockInfoDataAccess.class);
+        HdfsStorageFactory.getConnector().beginTransaction();
+        List<BlockInfo> list = da.findBlockInfosByStorageId(sid);
+        HdfsStorageFactory.getConnector().commit();
+        return list;
+      }
+    };
+    return (List<BlockInfo>) findBlocksHandler.handle();
+  }
+  
   /**
    * Adds block to list of blocks which will be invalidated on specified
    * datanode and log the operation
@@ -2286,6 +2319,32 @@ public class BlockManager {
       throw new IOException(ex);
     }
   }
+  
+    private void removeBlocks(List<Long> allBlockIds, final int sid) throws IOException {
+    long[] array = new long[allBlockIds.size()];
+    int i = 0;
+    for (long blockId : allBlockIds) {
+      array[i] = blockId;
+      i++;
+    }
+    final Map<INodeIdentifier, List<Long>> inodeIdentifiersToBlockMap = INodeUtil.getINodeIdentifiersForBlockIds(array);
+    final List<INodeIdentifier> inodeIdentifiers = new ArrayList<>(inodeIdentifiersToBlockMap.keySet());
+
+    try {
+      Slicer.slice(inodeIdentifiers.size(), removalBatchSize, removalNoThreads,
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex)
+            throws Exception {
+          List<INodeIdentifier> identifiers = inodeIdentifiers.subList(startIndex, endIndex);
+          removeStoredBlocksTx(identifiers, inodeIdentifiersToBlockMap, sid);
+        }
+      });
+    } catch (Exception ex) {
+      throw new IOException(ex);
+    }
+  }
+  
   
   private static class HashMatchingResult{
     private final List<Integer> matchingBuckets;
@@ -3504,20 +3563,16 @@ public class BlockManager {
    */
   public void removeStoredBlock(Block block, DatanodeDescriptor node)
       throws IOException {
-//    if (blockLog.isDebugEnabled()) {
-      blockLog.info("BLOCK* removeStoredBlock: " + block + " from " + node);
-//    }
-//    try{
+    if (blockLog.isDebugEnabled()) {
+      blockLog.debug("BLOCK* removeStoredBlock: " + block + " from " + node);
+    }
     if (!blocksMap.removeNode(block, node)) {
-//      if (blockLog.isDebugEnabled()) {
-        blockLog.info("BLOCK* removeStoredBlock: " + block +
+      if (blockLog.isDebugEnabled()) {
+        blockLog.debug("BLOCK* removeStoredBlock: " + block +
             " has already been removed from node " + node);
-//      }
+      }
       return;
     }
-//    }catch(Exception e){
-//      LOG.error(e);
-//    }
     //
     // It's possible that the block was removed because of a datanode
     // failure. If the block is still valid, check if replication is
@@ -3592,6 +3647,80 @@ public class BlockManager {
     }
   }
 
+  public void removeStoredBlock(Block block, int sid)
+      throws IOException {
+    if (blockLog.isDebugEnabled()) {
+      blockLog.debug("BLOCK* removeStoredBlock: " + block + " from " + sid);
+    }
+    if (!blocksMap.removeNode(block, sid)) {
+      if (blockLog.isDebugEnabled()) {
+        blockLog.debug("BLOCK* removeStoredBlock: " + block +
+            " has already been removed from node " + sid);
+      }
+      return;
+    }
+    //
+    // It's possible that the block was removed because of a datanode
+    // failure. If the block is still valid, check if replication is
+    // necessary. In that case, put block on a possibly-will-
+    // be-replicated list.
+    //
+    BlockCollection bc = blocksMap.getBlockCollection(block);
+    if (bc != null) {
+      namesystem.decrementSafeBlockCount(getBlockInfo(block));
+      updateNeededReplications(block, -1, 0);
+    }
+
+    // Remove the replica from corruptReplicas
+    corruptReplicas.forceRemoveFromCorruptReplicasMap(getBlockInfo(block), sid);
+
+    FSNamesystem fsNamesystem = (FSNamesystem) namesystem;
+    if (fsNamesystem.isErasureCodingEnabled()) {
+      BlockInfo blockInfo = getStoredBlock(block);
+      EncodingStatus status = EntityManager
+          .find(EncodingStatus.Finder.ByInodeId, blockInfo.getInodeId());
+      if (status != null) {
+        NumberReplicas numberReplicas = countNodes(block);
+        if (numberReplicas.liveReplicas() == 0) {
+          if (status.isCorrupt() == false) {
+            status.setStatus(EncodingStatus.Status.REPAIR_REQUESTED);
+            status.setStatusModificationTime(System.currentTimeMillis());
+          }
+          status.setLostBlocks(status.getLostBlocks() + 1);
+          EntityManager.update(status);
+        }
+      } else {
+        status = EntityManager.find(EncodingStatus.Finder.ByParityInodeId,
+            blockInfo.getInodeId());
+        if (status == null) {
+          LOG.info(
+              "removeStoredBlock returned null for " + blockInfo.getInodeId());
+        } else {
+          LOG.info("removeStoredBlock found " + blockInfo.getInodeId() +
+              " with status " + status);
+        }
+        if (status != null) {
+          NumberReplicas numberReplicas = countNodes(block);
+          if (numberReplicas.liveReplicas() == 0) {
+            if (status.isParityCorrupt() == false) {
+              status.setParityStatus(
+                  EncodingStatus.ParityStatus.REPAIR_REQUESTED);
+              status
+                  .setParityStatusModificationTime(System.currentTimeMillis());
+            }
+            status.setLostParityBlocks(status.getLostParityBlocks() + 1);
+            EntityManager.update(status);
+            LOG.info(
+                "removeStoredBlock updated parity status to repair requested");
+          } else {
+            LOG.info("removeStoredBlock found replicas: " +
+                numberReplicas.liveReplicas());
+          }
+        }
+      }
+    }
+  }
+  
   /**
    * Get all valid locations of the block & add the block to results
    * return the length of the added block; 0 if the block is not added
@@ -4568,36 +4697,34 @@ public class BlockManager {
       }
     }.handle(namesystem);
   }
-
-  private void removeStoredBlockTx(final Long b, final DatanodeDescriptor node)
-      throws IOException {
-    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_STORED_BLOCK) {
-      INodeIdentifier inodeIdentifier;
-
-      @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlockID(b);
-      }
+  
+  private void removeStoredBlocksTx(final List<INodeIdentifier> inodeIdentifiers,
+      final Map<INodeIdentifier, List<Long>> inodeIdentifiersToBlockMap, final int sid) throws
+      IOException {
+    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_STORED_BLOCKS) {
 
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
-            .add(lf.getIndividualBlockLock(b, inodeIdentifier))
-            .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR, BLK.UC));
+            lf.getBatchedINodesLock(inodeIdentifiers))
+            .add(lf.getSqlBatchedBlocksLock()).add(
+            lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
+                BLK.ER));
 
-        if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
-            inodeIdentifier != null) {
-          locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE, inodeIdentifier.getInodeId()));
+        if (((FSNamesystem) namesystem).isErasureCodingEnabled() && inodeIdentifiers != null) {
+          locks.add(lf.getBatchedEncodingStatusLock(LockType.WRITE, inodeIdentifiers));
         }
       }
 
       @Override
       public Object performTask() throws IOException {
-        BlockInfo block =
-            EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, b);
-        removeStoredBlock(block, node);
+        for(INodeIdentifier identifier: inodeIdentifiers){
+          for (long blockId : inodeIdentifiersToBlockMap.get(identifier)) {
+            BlockInfo block = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, blockId);
+            removeStoredBlock(block, sid);
+          }
+        }
         return null;
       }
     }.handle(namesystem);

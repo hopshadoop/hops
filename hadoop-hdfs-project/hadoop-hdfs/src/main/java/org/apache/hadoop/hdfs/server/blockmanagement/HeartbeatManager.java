@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.metadata.StorageMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -30,7 +31,10 @@ import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Manage the heartbeats received from datanodes.
@@ -64,12 +68,15 @@ class HeartbeatManager implements DatanodeStatistics {
    */
   private final Daemon heartbeatThread = new Daemon(new Monitor());
 
-
+  private final StorageMap storageMap;
+  private final Set<Integer> strayStorages = new HashSet();
+  private long lastStorageCheck = -1;
+  
   final Namesystem namesystem;
   final BlockManager blockManager;
 
   HeartbeatManager(final Namesystem namesystem, final BlockManager blockManager,
-      final Configuration conf) {
+      final Configuration conf, StorageMap storageMap) {
     this.namesystem = namesystem;
     this.blockManager = blockManager;
     boolean avoidStaleDataNodesForWrite = conf.getBoolean(
@@ -92,6 +99,7 @@ class HeartbeatManager implements DatanodeStatistics {
     } else {
       this.heartbeatRecheckInterval = recheckInterval;
     }
+    this.storageMap = storageMap;
   }
 
   void activate(Configuration conf) {
@@ -208,6 +216,10 @@ class HeartbeatManager implements DatanodeStatistics {
     stats.add(d);
     datanodes.add(d);
     d.isAlive = true;
+    //the datanode storage are now associated to a datanode 
+    for (DatanodeStorageInfo si : d.getStorageInfos()) {
+      strayStorages.remove(si.getSid());
+    }
   }
 
   synchronized void removeDatanode(DatanodeDescriptor node) {
@@ -329,6 +341,41 @@ class HeartbeatManager implements DatanodeStatistics {
           blockManager.removeBlocksAssociatedTo(failedStorage);
         }
       }
+    }
+    if (namesystem.isLeader()) {
+      if (lastStorageCheck <= 0) {
+        //first time we get through while being leader start waiting for storage to be considered as dead.
+        lastStorageCheck = Time.now();
+        strayStorages.addAll(storageMap.getAllSid());
+        
+        synchronized (this) {
+          //only keep storages that are not associated to a registered datanode
+          for (DatanodeDescriptor dn: datanodes) {
+            for(DatanodeStorageInfo si : dn.getStorageInfos()){
+              strayStorages.remove(si.getSid());
+            }
+          }
+        }
+      }
+      if (!strayStorages.isEmpty() && lastStorageCheck < (Time.now() - blockManager.getDatanodeManager().
+          getHeartbeatExpireInterval())) {
+        //there is storages in the database that do not correspond to any registered datanode
+        //the storages have been there for as long as it would have been needed to detect a dead datanode
+        //we can consider them as dead
+        while (namesystem.isLeader() && !strayStorages.isEmpty()) {
+          synchronized (this) {
+            Iterator<Integer> it = strayStorages.iterator();
+            if(it.hasNext()){
+              int sid = it.next();
+              blockManager.removeBlocksAssociatedTo(sid);
+              it.remove();
+            }
+          }
+        }
+      }
+    }else{
+      //restet "timer" if not leader anymore
+      lastStorageCheck = -1;
     }
   }
 

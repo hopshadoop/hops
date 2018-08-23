@@ -322,6 +322,19 @@ public class BlockInfo extends Block {
     return replica;
   }
 
+  Replica removeReplica(int sid)
+      throws StorageException, TransactionContextException {
+    List<Replica> replicas = getReplicasNoCheck();
+    Replica replica = null;
+    for (Replica r : replicas) {
+      if (r.getStorageId() == sid) {
+        replica = r;
+        remove(r);
+        break;
+      }
+    }
+    return replica;
+  }
   /**
    * Returns true if this block has a replica on the given datanode.
    * @param dn
