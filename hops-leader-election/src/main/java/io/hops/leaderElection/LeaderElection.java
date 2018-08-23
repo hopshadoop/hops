@@ -24,6 +24,7 @@ import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.election.entity.LeDescriptor;
 import io.hops.metadata.election.entity.LeDescriptor.FailedNodeLeDescriptor;
 import io.hops.metadata.election.entity.LeDescriptorFactory;
+import org.apache.hadoop.util.Time;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
@@ -321,15 +322,22 @@ public class LeaderElection extends Thread {
   }
   
   public void waitActive() throws InterruptedException {
+    long start = -1;
     while (true) {
       Thread.sleep(100);
       if (context.memberShip == null) {
         continue;
       }
       if (context.memberShip.size() >= 1) {
-        return;
+        if (start < 0) {
+          start = Time.now();
+        }
+        // HOPS-626
+        if (isLeader() ||
+            Time.now() - start > context.time_period * (context.max_missed_hb_threshold + 1)) {
+          return;
+        }
       }
     }
-    
   }
 }
