@@ -217,4 +217,8 @@ public class StorageMap {
   public List<Integer> getSidsForDatanodeUuid(String datanodeUuid) {
     return datanodeUuidToSids.get(datanodeUuid);
   }
+  
+  public Collection<Integer> getAllSid() {
+    return storageIdtoSId.values();
+  }
 }

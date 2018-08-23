@@ -191,6 +191,18 @@ public class CorruptReplicasMap {
   
   }
 
+  void forceRemoveFromCorruptReplicasMap(BlockInfo blk, int sid) throws StorageException, TransactionContextException {
+    Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
+    if (corruptReplicas == null) {
+      return;
+    }
+    for (CorruptReplica c : corruptReplicas) {
+      if (c.getStorageId() == sid) {
+        removeCorruptReplicaFromDB(new CorruptReplica(c.getStorageId(), blk
+            .getBlockId(), blk.getInodeId(), c.getReason()));
+      }
+    }
+  }
 
   /**
    * Get Nodes which have corrupt replicas of Block

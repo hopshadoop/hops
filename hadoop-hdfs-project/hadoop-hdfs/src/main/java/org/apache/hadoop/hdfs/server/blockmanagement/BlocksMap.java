@@ -183,6 +183,17 @@ class BlocksMap {
     return node.removeReplica(info);
   }
 
+  boolean removeNode(Block b, int sid)
+      throws StorageException, TransactionContextException {
+    BlockInfo info = getStoredBlock(b);
+    if (info == null) {
+      return false;
+    }
+
+    // remove block from the data-node list and the node from the block info
+    return info.removeReplica(sid)!=null;
+  }
+  
   int size() throws IOException {
     LightWeightRequestHandler getAllBlocksSizeHander =
         new LightWeightRequestHandler(HDFSOperationType.GET_ALL_BLOCKS_SIZE) {

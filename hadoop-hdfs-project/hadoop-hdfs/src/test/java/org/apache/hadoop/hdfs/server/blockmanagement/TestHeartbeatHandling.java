@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
@@ -37,7 +39,6 @@ import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
@@ -50,6 +51,12 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DFSTestUtil;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.util.Time;
 
 import static org.junit.Assert.assertEquals;
 
@@ -292,6 +299,64 @@ public class TestHeartbeatHandling {
         return blockInfo;
       }
 
+    }.handle();
+  }
+  
+  /*
+   * test that if a data node dies while the NN is not running the replica stored on this dn will eventually be removed
+   * from the database
+   */
+  @Test(timeout = 120000)
+  public void testDeadReplicasCleanup() throws IOException, InterruptedException, TimeoutException {
+    final Configuration conf = new HdfsConfiguration();
+    conf.setLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 10 * 1000); // 5 minutes
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    try {
+      cluster.waitActive();
+      FileSystem fs = cluster.getFileSystem();
+      Path file1 = new Path("/test1");
+      DFSTestUtil.createFile(fs, file1, 6 * 1024, (short) 3, 1L);
+      //wait for the file to be replicated on all of the datanodes.
+      DFSTestUtil.waitReplication(fs, file1, (short) 3);
+
+      DataNode dn = cluster.getDataNodes().get(0);
+      DatanodeDescriptor dnDescriptor = cluster.getNameNode().getNamesystem().getBlockManager().getDatanodeManager().
+          getDatanode(dn.getDatanodeId());
+
+      cluster.shutdownNameNodes();
+      cluster.stopDataNode(dn.getDisplayName());
+
+      assert getReplicasOnStorage(dnDescriptor.getStorageInfos()[0].getSid()) + getReplicasOnStorage(dnDescriptor.
+          getStorageInfos()[1].getSid()) > 0;
+      cluster.restartNameNode(true, false);
+      assert getReplicasOnStorage(dnDescriptor.getStorageInfos()[0].getSid()) + getReplicasOnStorage(dnDescriptor.
+          getStorageInfos()[1].getSid()) > 0;
+      long start = Time.now();
+      //wait for the namenode to cleanup replicas from the dead datanode
+      while (start > Time.now() - 3 * cluster.getNameNode().getNamesystem().getBlockManager().getDatanodeManager().
+          getHeartbeatExpireInterval()) {
+        if (getReplicasOnStorage(dnDescriptor.getStorageInfos()[0].getSid()) + getReplicasOnStorage(dnDescriptor.
+            getStorageInfos()[1].getSid()) <= 0) {
+          break;
+        }
+        Thread.sleep(1000);
+      }
+      assert getReplicasOnStorage(dnDescriptor.getStorageInfos()[0].getSid()) + getReplicasOnStorage(dnDescriptor.
+          getStorageInfos()[1].getSid()) <= 0;
+
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  private int getReplicasOnStorage(final int sid) throws IOException {
+    return (int) new LightWeightRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory.getDataAccess(ReplicaDataAccess.class);
+        return da.countAllReplicasForStorageId(sid);
+      }
     }.handle();
   }
 }

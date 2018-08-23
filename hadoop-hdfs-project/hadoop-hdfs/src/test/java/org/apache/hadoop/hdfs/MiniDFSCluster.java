@@ -1421,27 +1421,41 @@ public class MiniDFSCluster {
   public synchronized void restartNameNode(boolean waitActive)
       throws IOException {
     checkSingleNameNode();
-    restartNameNode(0, waitActive);
+    restartNameNode(0, waitActive, true);
   }
   
+  /**
+   * Restart the namenode. Optionally wait for the cluster to become active.
+   */
+  public synchronized void restartNameNode(boolean waitActive, boolean deleteReplicaTable)
+      throws IOException {
+    checkSingleNameNode();
+    restartNameNode(0, waitActive, false);
+  }
+    
   /**
    * Restart the namenode at a given index.
    */
   public synchronized void restartNameNode(int nnIndex) throws IOException {
-    restartNameNode(nnIndex, true);
+    restartNameNode(nnIndex, true, true);
   }
 
+  public synchronized void restartNameNode(int nnIndex, boolean waitActive)
+      throws IOException {
+    restartNameNode(nnIndex, waitActive, true);
+  }
   /**
    * Restart the namenode at a given index. Optionally wait for the cluster
    * to become active.
    */
-  public synchronized void restartNameNode(int nnIndex, boolean waitActive)
+  public synchronized void restartNameNode(int nnIndex, boolean waitActive, boolean deleteReplicaTable)
       throws IOException {
     String nnId = nameNodes[nnIndex].nnId;
     Configuration conf = nameNodes[nnIndex].conf;
     shutdownNameNode(nnIndex);
-
-    deleteReplicasTable();  // it will delete the tables if there are no active nn
+    if(deleteReplicaTable){
+      deleteReplicasTable();  // it will delete the tables if there are no active nn
+    }
 
     NameNode nn = NameNode.createNameNode(new String[]{}, conf);
     nameNodes[nnIndex] = new NameNodeInfo(nn, nnId, conf);
