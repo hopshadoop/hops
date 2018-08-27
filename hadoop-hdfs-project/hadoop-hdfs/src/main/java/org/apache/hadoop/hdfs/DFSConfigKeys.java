@@ -126,7 +126,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODE_REMOVAL_BATCH_SIZE =
       "dfs.namenode.removal.batchsize";
   public static final int
-      DFS_NAMENODE_REMOVAL_BATCH_SIZE_DEFAULT = 10000;
+      DFS_NAMENODE_REMOVAL_BATCH_SIZE_DEFAULT = 1000;
   
   public static final String DFS_NAMENODE_REMOVAL_NO_OF_THREADS =
       "dfs.namenode.removal.noofbatches";
