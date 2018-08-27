@@ -1211,20 +1211,8 @@ public class BlockManager {
     while (it.hasNext()) {
       allBlockIds.add(it.next().getBlockId());
     }
-
-    try {
-      Slicer.slice(allBlockIds.size(), removalBatchSize, removalNoThreads,
-          new Slicer.OperationHandler() {
-        @Override
-        public void handle(int startIndex, int endIndex)
-            throws Exception {
-          List<Long> blockIds = allBlockIds.subList(startIndex, endIndex);
-          removeStoredBlocksTx(blockIds, node);
-        }
-      });
-    } catch (Exception ex) {
-      throw new IOException(ex);
-    }
+    
+    removeBlocks(allBlockIds, node);
 
     node.resetBlocks();
     List<Integer> sids = datanodeManager.getSidsOnDatanode(node.getDatanodeUuid());
@@ -1256,19 +1244,7 @@ public class BlockManager {
       allBlockIds.add(it.next().getBlockId());
     }
 
-    try {
-      Slicer.slice(allBlockIds.size(), removalBatchSize, removalNoThreads,
-          new Slicer.OperationHandler() {
-        @Override
-        public void handle(int startIndex, int endIndex)
-            throws Exception {
-          List<Long> blockIds = allBlockIds.subList(startIndex, endIndex);
-          removeStoredBlocksTx(blockIds, node);
-        }
-      });
-    } catch (Exception ex) {
-      throw new IOException(ex);
-    }
+    removeBlocks(allBlockIds, node);
 
     invalidateBlocks.remove(storageInfo.getSid());
 
@@ -2273,21 +2249,34 @@ public class BlockManager {
       allBlockIds.add(b);
     }
 
+    removeBlocks(allBlockIds, storage.getDatanodeDescriptor());
+
+    return reportStatistics;
+  }
+  
+  private void removeBlocks(List<Long> allBlockIds, final DatanodeDescriptor node) throws IOException {
+    long[] array = new long[allBlockIds.size()];
+    int i = 0;
+    for (long blockId : allBlockIds) {
+      array[i] = blockId;
+      i++;
+    }
+    final Map<INodeIdentifier, List<Long>> inodeIdentifiersToBlockMap = INodeUtil.getINodeIdentifiersForBlockIds(array);
+    final List<INodeIdentifier> inodeIdentifiers = new ArrayList<>(inodeIdentifiersToBlockMap.keySet());
+
     try {
-      Slicer.slice(allBlockIds.size(), removalBatchSize, removalNoThreads,
+      Slicer.slice(inodeIdentifiers.size(), removalBatchSize, removalNoThreads,
           new Slicer.OperationHandler() {
         @Override
         public void handle(int startIndex, int endIndex)
             throws Exception {
-          List<Long> blockIds = allBlockIds.subList(startIndex, endIndex);
-          removeStoredBlocksTx(blockIds, storage.getDatanodeDescriptor());
+          List<INodeIdentifier> identifiers = inodeIdentifiers.subList(startIndex, endIndex);
+          removeStoredBlocksTx(identifiers, inodeIdentifiersToBlockMap, node);
         }
       });
     } catch (Exception ex) {
       throw new IOException(ex);
     }
-
-    return reportStatistics;
   }
   
   private static class HashMatchingResult{
@@ -4547,21 +4536,10 @@ public class BlockManager {
     OK
   }
 
-  private void removeStoredBlocksTx(final Collection<Long> blockIds, final DatanodeDescriptor node)
-      throws IOException {
+  private void removeStoredBlocksTx(final List<INodeIdentifier> inodeIdentifiers,
+      final Map<INodeIdentifier, List<Long>> inodeIdentifiersToBlockMap, final DatanodeDescriptor node) throws
+      IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_STORED_BLOCKS) {
-      List<INodeIdentifier> inodeIdentifiers;
-
-      @Override
-      public void setUp() throws StorageException {
-        long[] array = new long[blockIds.size()];
-        int i = 0;
-        for (long blockId : blockIds) {
-          array[i] = blockId;
-          i++;
-        }
-        inodeIdentifiers = INodeUtil.getINodeIdentifiersFromBlockIds(array);
-      }
 
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -4579,9 +4557,11 @@ public class BlockManager {
 
       @Override
       public Object performTask() throws IOException {
-        for (long blockId : blockIds) {
-          BlockInfo block = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, blockId);
-          removeStoredBlock(block, node);
+        for(INodeIdentifier identifier: inodeIdentifiers){
+          for (long blockId : inodeIdentifiersToBlockMap.get(identifier)) {
+            BlockInfo block = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, blockId);
+            removeStoredBlock(block, node);
+          }
         }
         return null;
       }
