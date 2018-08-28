@@ -2071,33 +2071,38 @@ public class BlockManager {
           " because namenode still in startup phase");
       return !node.hasStaleStorages();
     }
-  
-    // Get the storageinfo object that we are updating in this processreport
-    ReportStatistics reportStatistics = processReport(storageInfo, newReport);
-    
-    // Now that we have an up-to-date block report, we know that any
-    // deletions from a previous NN iteration have been accounted for.
-    boolean staleBefore = storageInfo.areBlockContentsStale();
-    storageInfo.receivedBlockReport();
-    if (staleBefore && !storageInfo.areBlockContentsStale()) {
-      LOG.info(
-          "BLOCK* processReport: Received first block report from " + node +
-              " after becoming active. Its block contents are no longer" +
-              " considered stale");
-      rescanPostponedMisreplicatedBlocks();
-    }
+    ReportStatistics reportStatistics = null;
+    try {
+      // Get the storageinfo object that we are updating in this processreport
+      reportStatistics = processReport(storageInfo, newReport);
 
-    final long endTime = Time.now();
+      // Now that we have an up-to-date block report, we know that any
+      // deletions from a previous NN iteration have been accounted for.
+      boolean staleBefore = storageInfo.areBlockContentsStale();
+      storageInfo.receivedBlockReport();
+      if (staleBefore && !storageInfo.areBlockContentsStale()) {
+        LOG.info(
+            "BLOCK* processReport: Received first block report from " + node
+            + " after becoming active. Its block contents are no longer" + " considered stale");
+        rescanPostponedMisreplicatedBlocks();
+      }
 
-    // Log the block report processing stats from Namenode perspective
-    final NameNodeMetrics metrics = NameNode.getNameNodeMetrics();
-    if (metrics != null) {
-      metrics.addBlockReport((int) (endTime - startTime));
+      final long endTime = Time.now();
+
+      // Log the block report processing stats from Namenode perspective
+      final NameNodeMetrics metrics = NameNode.getNameNodeMetrics();
+      if (metrics != null) {
+        metrics.addBlockReport((int) (endTime - startTime));
+      }
+      blockLog.info("BLOCK* processReport success: from " + nodeID + " storage: " + storage + ", blocks: " + newReport.
+          getNumberOfBlocks() + ", processing time: " + (endTime - startTime) + " ms. " + reportStatistics);
+      return !node.hasStaleStorages();
+    } catch (Throwable t) {
+      final long endTime = Time.now();
+      blockLog.error("BLOCK* processReport fail: from " + nodeID + " storage: " + storage + ", blocks: " + newReport.
+          getNumberOfBlocks() + ", processing time: " + (endTime - startTime) + " ms. " + reportStatistics, t);
+      throw t;
     }
-    blockLog.info("BLOCK* processReport: from " + nodeID + " storage: " + storage + ", blocks: " +
-        newReport.getNumberOfBlocks() + ", processing time: " +
-        (endTime - startTime) + " ms. " + reportStatistics);
-    return !node.hasStaleStorages();
   }
 
   /**
@@ -2165,9 +2170,7 @@ public class BlockManager {
   }
 
   @VisibleForTesting
-  public ReportStatistics processReport(
-      final DatanodeStorageInfo storage,
-      final BlockReport report) throws
+  public ReportStatistics processReport(final DatanodeStorageInfo storage,final BlockReport report) throws
       IOException {
     // Normal case:
     // Modify the (block-->datanode) map, according to the difference
@@ -3515,8 +3518,6 @@ public class BlockManager {
 //    }catch(Exception e){
 //      LOG.error(e);
 //    }
-    blockLog.info("BLOCK* removeStoredBlock: " + block +
-            " has already been removed from node " + node);
     //
     // It's possible that the block was removed because of a datanode
     // failure. If the block is still valid, check if replication is
