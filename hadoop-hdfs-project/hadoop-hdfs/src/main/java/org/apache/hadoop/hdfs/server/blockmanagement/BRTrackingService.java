@@ -25,10 +25,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.server.datanode.BRLoadBalancingException;
 
-/**
- *
- * @author salman
- */
 public class BRTrackingService {
 
   private class Work {
@@ -106,9 +102,9 @@ public class BRTrackingService {
     }
   }
 
-  private static long lastChecked = 0;
-  private static long cachedBrLbMaxBlkPerTW = -1;
-  private static long getBrLbMaxBlkPerTW(long DB_VAR_UPDATE_THRESHOLD) throws IOException {
+  private long lastChecked = 0;
+  private long cachedBrLbMaxBlkPerTW = -1;
+  private long getBrLbMaxBlkPerTW(long DB_VAR_UPDATE_THRESHOLD) throws IOException {
     if ((System.currentTimeMillis() - lastChecked) > DB_VAR_UPDATE_THRESHOLD) {
       long newValue = HdfsVariables.getBrLbMaxBlkPerTW();
       if(newValue != cachedBrLbMaxBlkPerTW){

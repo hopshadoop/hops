@@ -75,6 +75,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.datanode.CRLoadBalancingException;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMetrics;
@@ -1223,25 +1225,39 @@ public class NameNode implements NameNodeStatusMXBean {
     }
   }
 
-  public ActiveNode getNextNamenodeToSendBlockReport(final long noOfBlks) throws IOException {
-    if(leaderElection.isLeader()) {
-      LOG.debug("NN Id: "+leaderElection.getCurrentId()+") Received request to assign block report work ("+noOfBlks+" blks) ");
+  public ActiveNode getNextNamenodeToSendBlockReport(final long noOfBlks, DatanodeID nodeID) throws IOException {
+    if (leaderElection.isLeader()) {
+      DatanodeDescriptor node = namesystem.getBlockManager().getDatanodeManager().getDatanode(nodeID);
+      if (node == null || !node.isAlive) {
+        throw new IOException(
+            "ProcessReport from dead or unregistered node: " + nodeID);
+      }
+      LOG.debug("NN Id: " + leaderElection.getCurrentId() + ") Received request to assign block report work ("
+          + noOfBlks + " blks) ");
       ActiveNode an = brTrackingService.assignWork(leaderElection.getActiveNamenodes(), noOfBlks);
       return an;
-    }else{
-      String msg = "NN Id: "+leaderElection.getCurrentId()+") Received request to assign work ("+noOfBlks+" blks). Returning null as I am not the leader NN";
+    } else {
+      String msg = "NN Id: " + leaderElection.getCurrentId() + ") Received request to assign work (" + noOfBlks
+          + " blks). Returning null as I am not the leader NN";
       LOG.debug(msg);
       throw new BRLoadBalancingException(msg);
     }
   }
 
-  public ActiveNode getNextNamenodeToSendCacheReport(final long noOfBlks) throws IOException {
-    if(leaderElection.isLeader()) {
-      LOG.debug("NN Id: "+leaderElection.getCurrentId()+") Received request to assign cache report work ("+noOfBlks+" blks) ");
+  public ActiveNode getNextNamenodeToSendCacheReport(final long noOfBlks, DatanodeID nodeID) throws IOException {
+    if (leaderElection.isLeader()) {
+      DatanodeDescriptor node = namesystem.getBlockManager().getDatanodeManager().getDatanode(nodeID);
+      if (node == null || !node.isAlive) {
+        throw new IOException(
+            "ProcessReport from dead or unregistered node: " + nodeID);
+      }
+      LOG.debug("NN Id: " + leaderElection.getCurrentId() + ") Received request to assign cache report work ("
+          + noOfBlks + " blks) ");
       ActiveNode an = crTrackingService.assignWork(leaderElection.getActiveNamenodes(), noOfBlks);
       return an;
-    }else{
-      String msg = "NN Id: "+leaderElection.getCurrentId()+") Received request to assign work ("+noOfBlks+" blks). Returning null as I am not the leader NN";
+    } else {
+      String msg = "NN Id: " + leaderElection.getCurrentId() + ") Received request to assign work (" + noOfBlks
+          + " blks). Returning null as I am not the leader NN";
       LOG.debug(msg);
       throw new CRLoadBalancingException(msg);
     }

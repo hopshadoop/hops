@@ -221,7 +221,7 @@ public interface DatanodeProtocol {
    * @return active namenode to send the next block report to
    */
   @Idempotent
-  public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks) throws IOException;
+  public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException;
 
   /**
    * The datanode asks the leader namenode which 'namenode' to send the next
@@ -230,7 +230,7 @@ public interface DatanodeProtocol {
    * @return active namenode to send the next block report to
    */
   @Idempotent
-  public ActiveNode getNextNamenodeToSendCacheReport(long noOfBlks) throws IOException;
+  public ActiveNode getNextNamenodeToSendCacheReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException;
   
   /**
    * Read the small file data

@@ -382,6 +382,7 @@ message ActiveNamenodeListResponseProto {
  */
 message NameNodeAddressRequestForBlockReportingProto {
 required uint64 noOfBlks = 1;
+required DatanodeRegistrationProto registration = 2;
 }
 
 /**
@@ -389,6 +390,7 @@ required uint64 noOfBlks = 1;
 */
 message NameNodeAddressRequestForCacheReportingProto {
 required uint64 noOfBlks = 1;
+required DatanodeRegistrationProto registration = 2;
 }
 
 message GetSmallFileDataProto {
