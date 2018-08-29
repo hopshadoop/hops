@@ -300,7 +300,8 @@ public class DatanodeProtocolServerSideTranslatorPB
       NameNodeAddressRequestForBlockReportingProto request)
       throws ServiceException {
     try {
-      ActiveNode response = impl.getNextNamenodeToSendBlockReport(request.getNoOfBlks());
+      ActiveNode response = impl.getNextNamenodeToSendBlockReport(request.getNoOfBlks(), PBHelper.convert(request.
+          getRegistration()));
       ActiveNodeProtos.ActiveNodeProto responseProto =
           PBHelper.convert(response);
       return responseProto;
@@ -315,7 +316,8 @@ public class DatanodeProtocolServerSideTranslatorPB
       NameNodeAddressRequestForCacheReportingProto request)
       throws ServiceException {
     try {
-      ActiveNode response = impl.getNextNamenodeToSendCacheReport(request.getNoOfBlks());
+      ActiveNode response = impl.getNextNamenodeToSendCacheReport(request.getNoOfBlks(), PBHelper.convert(request.
+          getRegistration()));
       ActiveNodeProtos.ActiveNodeProto responseProto =
           PBHelper.convert(response);
       return responseProto;

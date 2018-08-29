@@ -593,17 +593,17 @@ class BPServiceActor implements Runnable {
         dn.getFSDataset().getCacheUsed());
   }
   
-  public ActiveNode nextNNForBlkReport(long noOfBlks) throws IOException {
+  public ActiveNode nextNNForBlkReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException {
     if (bpNamenode != null) {
-      return bpNamenode.getNextNamenodeToSendBlockReport(noOfBlks);
+      return bpNamenode.getNextNamenodeToSendBlockReport(noOfBlks, nodeReg);
     } else {
       return null;
     }
   }
 
-  public ActiveNode nextNNForCacheReport(long noOfBlks) throws IOException {
+  public ActiveNode nextNNForCacheReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException {
     if (bpNamenode != null) {
-      return bpNamenode.getNextNamenodeToSendCacheReport(noOfBlks);
+      return bpNamenode.getNextNamenodeToSendCacheReport(noOfBlks, nodeReg);
     } else {
       return null;
     }

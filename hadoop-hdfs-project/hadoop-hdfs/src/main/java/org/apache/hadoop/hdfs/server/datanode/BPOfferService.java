@@ -1350,7 +1350,7 @@ public class IncrementalBRTask implements Callable{
     BPServiceActor leaderActor = getLeaderActor();
     if (leaderActor != null) {
       try {
-        annToBR = leaderActor.nextNNForBlkReport(noOfBlks);
+        annToBR = leaderActor.nextNNForBlkReport(noOfBlks, bpRegistration);
       } catch (RemoteException e) {
         if (e.getClassName().equals(BRLoadBalancingException.class.getName())) {
           LOG.warn(e);
@@ -1371,7 +1371,7 @@ public class IncrementalBRTask implements Callable{
     BPServiceActor leaderActor = getLeaderActor();
     if (leaderActor != null) {
       try {
-        annToBR = leaderActor.nextNNForCacheReport(noOfBlks);
+        annToBR = leaderActor.nextNNForCacheReport(noOfBlks, bpRegistration);
       } catch (RemoteException e) {
         if (e.getClassName().equals(CRLoadBalancingException.class.getName())) {
           LOG.warn(e);

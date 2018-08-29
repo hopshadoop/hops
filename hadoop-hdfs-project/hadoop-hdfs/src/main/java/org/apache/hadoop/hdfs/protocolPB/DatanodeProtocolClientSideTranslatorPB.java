@@ -355,11 +355,12 @@ public class DatanodeProtocolClientSideTranslatorPB
   }
 
   @Override
-  public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks) throws IOException {
+  public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException {
 
     NameNodeAddressRequestForBlockReportingProto.Builder request =
         NameNodeAddressRequestForBlockReportingProto.newBuilder();
     request.setNoOfBlks(noOfBlks);
+    request.setRegistration(PBHelper.convert(nodeReg));
     try {
       ActiveNodeProtos.ActiveNodeProto response = rpcProxy
           .getNextNamenodeToSendBlockReport(NULL_CONTROLLER, request.build());
@@ -371,11 +372,12 @@ public class DatanodeProtocolClientSideTranslatorPB
   }
 
   @Override
-  public ActiveNode getNextNamenodeToSendCacheReport(long noOfBlks) throws IOException {
+  public ActiveNode getNextNamenodeToSendCacheReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException {
 
     NameNodeAddressRequestForCacheReportingProto.Builder request =
         NameNodeAddressRequestForCacheReportingProto.newBuilder();
     request.setNoOfBlks(noOfBlks);
+    request.setRegistration(PBHelper.convert(nodeReg));
     try {
       ActiveNodeProtos.ActiveNodeProto response = rpcProxy
           .getNextNamenodeToSendCacheReport(NULL_CONTROLLER, request.build());
