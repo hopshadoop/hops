@@ -26,6 +26,7 @@ import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
+import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -68,9 +69,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
+import io.hops.util.Slicer;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_KEY;
 import org.apache.hadoop.hdfs.StorageType;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -83,6 +92,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 public class TestBlockManager {
+  static final Log LOG = LogFactory.getLog(TestBlockManager.class);
+  
   private DatanodeStorageInfo[] storages;
   private List<DatanodeDescriptor> nodes;
   private List<DatanodeDescriptor> rackA;
@@ -102,11 +113,11 @@ public class TestBlockManager {
   
   private Configuration conf = new HdfsConfiguration();
   private FSNamesystem fsn;
-  private BlockManager bm;
+  static private BlockManager bm;
   private int numBuckets;
 
-  private final String USER = "user";
-  private final String GROUP = "grp";
+  static private final String USER = "user";
+  static private final String GROUP = "grp";
 
   @Before
   public void setupMockCluster() throws IOException {
@@ -454,7 +465,7 @@ public class TestBlockManager {
     }
   }
 
-  private BlockInfo blockOnNodes(final long blkId,
+  static private BlockInfo blockOnNodes(final long blkId,
       final List<DatanodeDescriptor> nodes, final int inode_id)
       throws IOException {
     return (BlockInfo) new HopsTransactionalRequestHandler(
@@ -516,13 +527,17 @@ public class TestBlockManager {
 
   private BlockInfo addBlockOnNodes(final long blockId,
       List<DatanodeDescriptor> nodes) throws IOException {
-    final int inode_id = 100;
+    return addBlockOnNodes(blockId, nodes, 100);
+  }
+    
+  static private BlockInfo addBlockOnNodes(final long blockId,
+      List<DatanodeDescriptor> nodes, final int inodeId) throws IOException {
 
     LightWeightRequestHandler handle =
         new LightWeightRequestHandler(HDFSOperationType.TEST) {
           @Override
           public INodeFile performTask() throws IOException {
-            INodeFile file = new INodeFile(inode_id, new PermissionStatus(USER, GROUP,
+            INodeFile file = new INodeFile(inodeId, new PermissionStatus(USER, GROUP,
                 new FsPermission((short) 0777)), null, (short) 3,
                 System.currentTimeMillis(), System.currentTimeMillis(), 1000l, (byte) 0);
             file.setLocalNameNoPersistance("hop");
@@ -539,7 +554,7 @@ public class TestBlockManager {
 
     final BlockCollection bc = (INodeFile) handle.handle();
 
-    final BlockInfo blockInfo = blockOnNodes(blockId, nodes, inode_id);
+    final BlockInfo blockInfo = blockOnNodes(blockId, nodes, inodeId);
 
     new HopsTransactionalRequestHandler(HDFSOperationType.BLOCK_ON_NODES) {
       INodeIdentifier inodeIdentifier;
@@ -827,5 +842,78 @@ public class TestBlockManager {
     excessTypes.add(StorageType.SSD);
     Assert.assertFalse(BlockManager.useDelHint(true, delHint, null,
         moreThan1Racks, excessTypes));
-}
+  }
+  
+  @Test
+  public void testRemoveBlocks() throws IOException, InterruptedException, ExecutionException {
+    List<DatanodeDescriptor> testNodes = new ArrayList<>();
+    testNodes.add(nodes.get(0));
+    testNodes.add(nodes.get(1));
+
+    ExecutorService executor = Executors.newFixedThreadPool(10);
+    List<Future<Object>> futures = new ArrayList<>();
+    long blockId = 0;
+    List<Long> blockIds = new ArrayList<>();
+    for (int i = 2; i < 4000 + 2; i++) {
+      for (int j = 0; j < 2; j++) {
+        blockIds.add(blockId);
+        futures.add(executor.submit(new SliceRunner(blockId++, testNodes, i)));
+      }
+    }
+
+    for (Future<Object> futur : futures) {
+      futur.get();
+    }
+
+    executor.shutdown();
+
+    executor.awaitTermination(10, TimeUnit.SECONDS);
+
+    //check that the replicas info are present in the database
+    for (int sid : testNodes.get(0).getSidsOnNode()) {
+      checkNbReplicas(sid, blockIds.size());
+    }
+    for (int sid : testNodes.get(1).getSidsOnNode()) {
+      checkNbReplicas(sid, blockIds.size());
+    }
+    bm.removeBlocks(blockIds, testNodes.get(0));
+
+    //the replicas should have been removed from node 0 but not from node 1
+    for (int sid : testNodes.get(0).getSidsOnNode()) {
+      checkNbReplicas(sid, 0);
+    }
+    for (int sid : testNodes.get(1).getSidsOnNode()) {
+      checkNbReplicas(sid, blockIds.size());
+    }
+  }
+  
+  private static class SliceRunner implements Callable<Object> {
+    long blockId;
+    List<DatanodeDescriptor> testNodes;
+    int inodeId;
+    
+    public SliceRunner(long blockId, List<DatanodeDescriptor> testNodes, int inodeId) {
+      this.blockId = blockId;
+      this.testNodes = testNodes;
+      this.inodeId = inodeId;
+    }
+
+    @Override
+    public Object call() throws Exception{
+      addBlockOnNodes(blockId++, testNodes, inodeId);
+      return null;
+    }
+  }
+ 
+  private void checkNbReplicas(final int sid, final int expected) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaDataAccess.class);
+        assertEquals(expected, da.countAllReplicasForStorageId(sid));
+        return null;
+      }
+    }.handle();
+  }
 }
