@@ -249,9 +249,9 @@ public class INodeUtil {
     }
   }
   
-  public static Map<INodeIdentifier, List<Long>> getINodeIdentifiersForBlockIds(final long[] blockIds)
+  public static Map<Integer, List<Long>> getINodeIdentifiersForBlockIds(final long[] blockIds)
       throws StorageException {
-    Map<INodeIdentifier, List<Long>> inodeIdentifiers;
+    Map<Integer, List<Long>> inodeIds;
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
         HDFSOperationType.RESOLVE_INODES_FROM_BLOCKIDS) {
       @Override
@@ -266,18 +266,43 @@ public class INodeUtil {
           BlockLookUpDataAccess<BlockLookUp> da = (BlockLookUpDataAccess) HdfsStorageFactory
               .getDataAccess(BlockLookUpDataAccess.class);
           Map<Integer, List<Long>> inodeIds = da.getINodeIdsForBlockIds(blockIds);
-          if (inodeIds.isEmpty()) {
-            return result;
-          }
+          return inodeIds;
 
+        } finally {
+          if (!transactionActive) {
+            connector.commit();
+          }
+        }
+      }
+    };
+    try {
+      inodeIds = (Map<Integer, List<Long>>) handler.handle();
+    } catch (IOException ex) {
+      LOG.error("Could not resolve iNode from blockId (blockid=" + Arrays.toString(blockIds) + ")");
+      throw new StorageException(ex.getMessage());
+    }
+    return inodeIds;
+  }
+  
+  public static List<INodeIdentifier> resolveINodesFromIds(final List<Integer> inodeIds) throws StorageException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(
+        HDFSOperationType.RESOLVE_INODES_FROM_IDS) {
+      @Override
+      public Object performTask() throws IOException {
+        boolean transactionActive = connector.isTransactionActive();
+        try {
+          if (!transactionActive) {
+            connector.beginTransaction();
+          }
           INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
               .getDataAccess(INodeDataAccess.class);
           int[] ids = new int[inodeIds.size()];
           int i = 0;
-          for (int id : inodeIds.keySet()) {
+          for (int id : inodeIds) {
             ids[i] = id;
             i++;
           }
+          List<INodeIdentifier> result = new ArrayList<>(inodeIds.size());
           Collection<INode> inodes = ida.findInodesByIdsFTIS(ids);
           if (inodes == null) {
             return result;
@@ -287,9 +312,10 @@ public class INodeUtil {
             inodeIdent.setName(inode.getLocalName());
             inodeIdent.setPid(inode.getParentId());
             inodeIdent.setPartitionId(inode.getPartitionId());
-            result.put(inodeIdent, inodeIds.get(inodeIdent.getInodeId()));
+            result.add(inodeIdent);
           }
           return result;
+
         } finally {
           if (!transactionActive) {
             connector.commit();
@@ -298,12 +324,11 @@ public class INodeUtil {
       }
     };
     try {
-      inodeIdentifiers = (Map<INodeIdentifier, List<Long>>) handler.handle();
+      return (List<INodeIdentifier>) handler.handle();
     } catch (IOException ex) {
-      LOG.error("Could not resolve iNode from blockId (blockid=" + Arrays.toString(blockIds) + ")");
+      LOG.error("Could not resolve iNode from their Id");
       throw new StorageException(ex.getMessage());
     }
-    return inodeIdentifiers;
   }
   
   public static int[] resolveINodesFromBlockIds(final long[] blockIds)
