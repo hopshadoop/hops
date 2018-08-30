@@ -70,6 +70,7 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.Acces
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
@@ -912,12 +913,14 @@ public class DataNode extends Configured
    * @param nsInfo
    *     the namespace info from the first part of the NN handshake
    */
-  DatanodeRegistration createBPRegistration(NamespaceInfo nsInfo)
-      throws IOException {
+  DatanodeRegistration createBPRegistration(NamespaceInfo nsInfo) {
     StorageInfo storageInfo = storage.getBPStorage(nsInfo.getBlockPoolID());
     if (storageInfo == null) {
       // it's null in the case of SimulatedDataSet
-      storageInfo = new StorageInfo(nsInfo);
+      storageInfo = new StorageInfo(
+          DataNodeLayoutVersion.CURRENT_LAYOUT_VERSION,
+          nsInfo.getNamespaceID(), nsInfo.clusterID, nsInfo.getCTime(),
+          NodeType.DATA_NODE, nsInfo.getBlockPoolID());
     }
 
     DatanodeID dnId =
