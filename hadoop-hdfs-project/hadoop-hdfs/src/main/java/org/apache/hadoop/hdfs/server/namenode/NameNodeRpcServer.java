@@ -26,7 +26,6 @@ import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.security.Users;
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
@@ -74,8 +73,6 @@ import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.IncorrectVersionException;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
@@ -126,7 +123,6 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -152,9 +148,6 @@ import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
-import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
-import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
-import org.tukaani.xz.UnsupportedOptionsException;
 
 /**
  * This class is responsible for handling all of the RPC calls to the NameNode.
@@ -1044,21 +1037,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
           + nodeReg.getClass().getSimpleName() + " ID is " + id
           + " but the expected ID is " + expectedID);
       throw new UnregisteredNodeException(nodeReg);
-    }
-    
-    // verify layout version if there is no rolling upgrade.
-    if (!namesystem.isRollingUpgradeTX()) {
-      final int lv = nodeReg.getVersion();
-      final int expectedLV = nodeReg instanceof NamenodeRegistration?
-          NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION
-          : DataNodeLayoutVersion.CURRENT_LAYOUT_VERSION;
-      if (expectedLV != nodeReg.getVersion()) {
-        LOG.warn("Layout versions mismatched: the "
-            + nodeReg.getClass().getSimpleName() + " LV is " + lv
-            + " but the expected LV is " + expectedLV);
-         throw new UnregisteredNodeException(nodeReg);
-      }
-    }
+    }    
   }
 
 
