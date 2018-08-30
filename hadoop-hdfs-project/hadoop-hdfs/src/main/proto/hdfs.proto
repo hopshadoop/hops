@@ -57,6 +57,15 @@ message DatanodeIDProto {
 }
 
 /**
+ * Datanode local information
+ */
+message DatanodeLocalInfoProto {
+  required string softwareVersion = 1;
+  required string configVersion = 2;
+  required uint64 uptime = 3;
+}
+
+/**
  * DatanodeInfo array
  */
 message DatanodeInfosProto {
@@ -470,5 +479,12 @@ message VersionRequestProto {
  */
 message VersionResponseProto {
   required NamespaceInfoProto info = 1;
+}
+
+/**
+ * Rolling upgrade status
+ */
+message RollingUpgradeStatusProto {
+  required string blockPoolId = 1;
 }
 

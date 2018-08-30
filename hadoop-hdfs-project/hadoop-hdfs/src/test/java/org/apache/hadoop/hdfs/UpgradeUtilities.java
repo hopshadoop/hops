@@ -48,6 +48,7 @@ import java.util.Arrays;
 import java.util.zip.CRC32;
 
 import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType.DATA_NODE;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
 
 /**
  * This class defines a number of static helper methods used by the
@@ -281,10 +282,14 @@ public class UpgradeUtilities {
       if (!aList.isFile()) {
         continue;
       }
-      // skip VERSION file for DataNodes
-      if (nodeType == DATA_NODE && aList.getName().equals("VERSION")) {
+      
+      // skip VERSION and dfsUsed file for DataNodes
+      if (nodeType == DATA_NODE && 
+         (aList.getName().equals("VERSION") || 
+         aList.getName().equals("dfsUsed"))) {
         continue;
       }
+      
       FileInputStream fis = null;
       try {
         fis = new FileInputStream(aList);
@@ -450,7 +455,8 @@ public class UpgradeUtilities {
   public static void createBlockPoolVersionFile(File bpDir, StorageInfo version,
       String bpid) throws IOException {
     // Create block pool version files
-    if (LayoutVersion.supports(Feature.FEDERATION, version.layoutVersion)) {
+    if (DataNodeLayoutVersion.supports(
+        LayoutVersion.Feature.FEDERATION, version.layoutVersion)) {
       File bpCurDir = new File(bpDir, Storage.STORAGE_DIR_CURRENT);
       BlockPoolSliceStorage bpStorage =
           new BlockPoolSliceStorage(version, bpid);
@@ -493,8 +499,8 @@ public class UpgradeUtilities {
    * Return the layout version inherent in the current version
    * of the Namenode, whether it is running or not.
    */
-  public static int getCurrentLayoutVersion() {
-    return HdfsConstants.LAYOUT_VERSION;
+  public static int getCurrentNameNodeLayoutVersion() {
+    return HdfsConstants.NAMENODE_LAYOUT_VERSION;
   }
   
   /**

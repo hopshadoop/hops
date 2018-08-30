@@ -128,6 +128,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RenewL
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RenewLeaseResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ReportBadBlocksRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ReportBadBlocksResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollingUpgradeRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollingUpgradeResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetBalancerBandwidthRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetBalancerBandwidthResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetOwnerRequestProto;
@@ -170,6 +172,7 @@ import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
+import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 
@@ -798,6 +801,22 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
 
   }
 
+  @Override
+  public RollingUpgradeResponseProto rollingUpgrade(RpcController controller,
+      RollingUpgradeRequestProto req) throws ServiceException {
+    try {
+      final RollingUpgradeInfo info = server.rollingUpgrade(
+          PBHelper.convert(req.getAction()));
+      final RollingUpgradeResponseProto.Builder b = RollingUpgradeResponseProto.newBuilder();
+      if (info != null) {
+        b.setRollingUpgradeInfo(PBHelper.convert(info));
+      }
+      return b.build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+  
   @Override
   public ListCorruptFileBlocksResponseProto listCorruptFileBlocks(
       RpcController controller, ListCorruptFileBlocksRequestProto req)

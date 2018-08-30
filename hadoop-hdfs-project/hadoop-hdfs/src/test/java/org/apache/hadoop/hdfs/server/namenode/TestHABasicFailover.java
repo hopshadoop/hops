@@ -119,7 +119,7 @@ public class TestHABasicFailover extends junit.framework.TestCase {
 
       LOG.debug("TestNN going to restart the NN2");
       // restart the newly elected leader and see if it is still the leader
-      cluster.restartNameNode(NN2);
+      cluster.restartNameNode(NN2, false);
 
       cluster.waitActive();
       waitLeaderElection(cluster.getDataNodes(), cluster.getNameNode(NN2),

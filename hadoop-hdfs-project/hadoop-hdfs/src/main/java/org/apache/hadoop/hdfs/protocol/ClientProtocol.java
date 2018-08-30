@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
@@ -1007,7 +1008,16 @@ public interface ClientProtocol {
    */
   @Idempotent
   public void refreshNodes() throws IOException;
-
+  
+  /**
+   * Rolling upgrade operations.
+   * @param action either query, start or finailze.
+   * @return rolling upgrade information.
+   */
+  @Idempotent
+  public RollingUpgradeInfo rollingUpgrade(RollingUpgradeAction action)
+      throws IOException;
+  
   /**
    * @return CorruptFileBlocks, containing a list of corrupt files (with
    * duplicates if there is more than one corrupt block in a file)

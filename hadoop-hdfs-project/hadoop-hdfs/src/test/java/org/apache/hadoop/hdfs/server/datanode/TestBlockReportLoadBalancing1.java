@@ -32,6 +32,7 @@ import org.apache.hadoop.hdfs.MiniDFSNNTopology;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.BRTrackingService;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -337,7 +338,7 @@ public class TestBlockReportLoadBalancing1 {
       cluster.waitActive();
       
       DatanodeRegistration dnr = new DatanodeRegistration(new DatanodeID("test:5050"), new StorageInfo(0, 0, "",
-          0, ""), ExportedBlockKeys.DUMMY_KEYS, "");
+          0, HdfsServerConstants.NodeType.DATA_NODE, ""), ExportedBlockKeys.DUMMY_KEYS, "");
 
       ActiveNode an = null;
       try{

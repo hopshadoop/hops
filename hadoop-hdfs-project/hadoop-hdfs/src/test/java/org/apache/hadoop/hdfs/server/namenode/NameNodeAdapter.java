@@ -198,14 +198,9 @@ public class NameNodeAdapter {
   }
   
   /**
-   * @return true if safemode is not running, or if safemode has already
-   * initialized the replication queues
+   * @return Replication queue initialization status
    */
   public static boolean safeModeInitializedReplQueues(NameNode nn) {
-    SafeModeInfo smi = nn.getNamesystem().getSafeModeInfoForTests();
-    if (smi == null) {
-      return true;
-    }
-    return smi.initializedReplicationQueues;
+    return nn.getNamesystem().isPopulatingReplQueues();
   }
 }

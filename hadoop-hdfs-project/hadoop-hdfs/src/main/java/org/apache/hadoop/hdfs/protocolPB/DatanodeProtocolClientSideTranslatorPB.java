@@ -79,6 +79,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdfs.protocol.RollingUpgradeStatus;
 
 /**
  * This class is the client side translator to translate the requests made on
@@ -193,7 +194,11 @@ public class DatanodeProtocolClientSideTranslatorPB
       cmds[index] = PBHelper.convert(p);
       index++;
     }
-    return new HeartbeatResponse(cmds);
+    RollingUpgradeStatus rollingUpdateStatus = null;
+    if (resp.hasRollingUpgradeStatus()) {
+      rollingUpdateStatus = PBHelper.convert(resp.getRollingUpgradeStatus());
+    }
+    return new HeartbeatResponse(cmds, rollingUpdateStatus);
   }
 
   @Override

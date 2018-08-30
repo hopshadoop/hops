@@ -63,7 +63,7 @@ public class CorruptReplicaContext
   @Override
   public void prepare(TransactionLocks tlm)
       throws TransactionContextException, StorageException {
-    dataAccess.prepare(getRemoved(), getAdded(), getModified());
+    dataAccess.prepare(getRemoved(), getAdded());
   }
 
   @Override

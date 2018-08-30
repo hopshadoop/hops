@@ -373,6 +373,26 @@ message RefreshNodesRequestProto { // no parameters
 message RefreshNodesResponseProto { // void response
 }
 
+enum RollingUpgradeActionProto {
+  QUERY = 1;
+  START = 2;
+  FINALIZE = 3;
+}
+
+message RollingUpgradeRequestProto {
+  required RollingUpgradeActionProto action = 1;
+}
+
+message RollingUpgradeInfoProto {
+  required RollingUpgradeStatusProto status = 1;
+  required uint64 startTime = 2;
+  required uint64 finalizeTime = 3;
+}
+
+message RollingUpgradeResponseProto {
+  optional RollingUpgradeInfoProto rollingUpgradeInfo= 1;
+}
+
 message ListCorruptFileBlocksRequestProto {
   required string path = 1;
   optional string cookie = 2;
@@ -747,6 +767,8 @@ service ClientNamenodeProtocol {
   rpc getPreferredBlockSize (GetPreferredBlockSizeRequestProto) returns (GetPreferredBlockSizeResponseProto);
   rpc setSafeMode (SetSafeModeRequestProto) returns (SetSafeModeResponseProto);
   rpc refreshNodes (RefreshNodesRequestProto) returns (RefreshNodesResponseProto);
+  rpc rollingUpgrade(RollingUpgradeRequestProto)
+      returns(RollingUpgradeResponseProto);
   rpc listCorruptFileBlocks (ListCorruptFileBlocksRequestProto) returns (ListCorruptFileBlocksResponseProto);
   rpc getFileInfo (GetFileInfoRequestProto) returns (GetFileInfoResponseProto);
   rpc addCacheDirective(AddCacheDirectiveRequestProto)

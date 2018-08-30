@@ -339,7 +339,7 @@ public class TestNamenodeRetryCache {
           "does not exist or is not under Construction", e);
     }
     
-    cluster.restartNameNode(0);
+    cluster.restartNameNodes();
     try {
       ns0.updatePipeline("testClient", oldBlock, newBlock, newNodes, newStorages);
     } catch (IOException e) {

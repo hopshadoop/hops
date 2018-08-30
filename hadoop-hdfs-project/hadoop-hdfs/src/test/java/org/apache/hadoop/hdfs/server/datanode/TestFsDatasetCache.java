@@ -149,8 +149,7 @@ public class TestFsDatasetCache {
 
   private static void setHeartbeatResponse(DatanodeCommand[] cmds)
       throws IOException {
-    HeartbeatResponse response = new HeartbeatResponse(
-        cmds);
+    HeartbeatResponse response = new HeartbeatResponse(cmds, null);
     doReturn(response).when(spyNN).sendHeartbeat(
         (DatanodeRegistration) any(),
         (StorageReport[]) any(), anyLong(), anyLong(),

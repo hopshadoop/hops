@@ -21,6 +21,7 @@ package org.apache.hadoop.hdfs.server.protocol;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.util.VersionInfo;
@@ -37,13 +38,14 @@ public class NamespaceInfo extends StorageInfo {
   String softwareVersion;
 
   public NamespaceInfo() {
-    super();
+    super(NodeType.NAME_NODE);
     buildVersion = null;
   }
 
   public NamespaceInfo(int nsID, String clusterID, String bpID, long cT,
       String buildVersion, String softwareVersion) {
-    super(HdfsConstants.LAYOUT_VERSION, nsID, clusterID, cT, bpID);
+        super(HdfsConstants.NAMENODE_LAYOUT_VERSION, nsID, clusterID, cT,
+            NodeType.NAME_NODE, bpID);
     blockPoolID = bpID;
     this.buildVersion = buildVersion;
     this.softwareVersion = softwareVersion;

@@ -1288,7 +1288,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       // finishes.
       asyncDiskService.deleteAsync(v, f,
           FsDatasetUtil.getMetaFile(f, invalidBlk.getGenerationStamp()),
-          new ExtendedBlock(bpid, invalidBlk));
+          new ExtendedBlock(bpid, invalidBlk), dataStorage.getTrashDirectoryForBlockFile(bpid, f));
     }
     if (!errors.isEmpty()) {
       StringBuilder b = new StringBuilder("Failed to delete ")
@@ -1837,12 +1837,14 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   }
   
   @Override
-  public synchronized void addBlockPool(String bpid, Configuration conf)
+  public void addBlockPool(String bpid, Configuration conf)
       throws IOException {
     LOG.info("Adding block pool " + bpid);
-    volumes.addBlockPool(bpid, conf);
-    volumeMap.initBlockPool(bpid);
-    volumes.getVolumeMap(bpid, volumeMap);
+    synchronized(this) {
+      volumes.addBlockPool(bpid, conf);
+      volumeMap.initBlockPool(bpid);
+    }
+    volumes.getAllVolumesMap(bpid, volumeMap);
   }
 
   @Override
@@ -1973,6 +1975,21 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
          blocksVolumeIds, blocksVolumeIndexes);
   }
 
+  @Override
+  public void enableTrash(String bpid) {
+    dataStorage.enableTrash(bpid);
+  }
+  
+  @Override
+  public void restoreTrash(String bpid) {
+    dataStorage.restoreTrash(bpid);
+  }
+  
+  @Override
+  public boolean trashEnabled(String bpid) {
+    return dataStorage.trashEnabled(bpid);
+  }
+  
   @Override
   public RollingLogs createRollingLogs(String bpid, String prefix)
       throws IOException {

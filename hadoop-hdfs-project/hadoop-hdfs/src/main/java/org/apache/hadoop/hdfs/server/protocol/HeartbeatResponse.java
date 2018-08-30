@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.protocol.RollingUpgradeStatus;
 
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -30,12 +31,18 @@ import org.apache.hadoop.classification.InterfaceStability;
    */
   private DatanodeCommand[] commands;
 
+  private RollingUpgradeStatus rollingUpdateStatus;
   
-  public HeartbeatResponse(DatanodeCommand[] cmds) {
+  public HeartbeatResponse(DatanodeCommand[] cmds, RollingUpgradeStatus rollingUpdateStatus) {
     commands = cmds;
+    this.rollingUpdateStatus = rollingUpdateStatus;
   }
   
   public DatanodeCommand[] getCommands() {
     return commands;
+  }
+  
+  public RollingUpgradeStatus getRollingUpdateStatus() {
+    return rollingUpdateStatus;
   }
 }

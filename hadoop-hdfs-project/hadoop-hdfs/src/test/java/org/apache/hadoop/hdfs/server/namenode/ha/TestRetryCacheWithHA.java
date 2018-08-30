@@ -528,7 +528,7 @@ public class TestRetryCacheWithHA {
         active = (standby == 0) ? 1 : 0;
         cluster.shutdownNameNode(standby);
         cluster.waitActive(active);
-        cluster.restartNameNode(standby);
+        cluster.restartNameNode(standby, false);
       }
     }
     assertTrue("All pools must be found", tmpNames.isEmpty());
@@ -549,7 +549,7 @@ public class TestRetryCacheWithHA {
         active = (standby == 0) ? 1 : 0;
         cluster.shutdownNameNode(standby);
         cluster.waitActive(active);
-        cluster.restartNameNode(standby);
+        cluster.restartNameNode(standby, false);
       }
     }
     assertTrue("All pools must be found", tmpNames.isEmpty());

@@ -193,6 +193,19 @@ public class LeaderElection extends Thread {
     return false;
   }
   
+  public synchronized boolean isUpToDate() {
+    if (context.memberShip == null || context.memberShip.size() <= 0) {
+      return false;
+    }
+    long elapsed_time = System.currentTimeMillis() - context.last_hb_time;
+    if (elapsed_time < (context.time_period * context.max_missed_hb_threshold - DRIFT_CONSTANT)) {
+      return true;
+    } else {
+      return false;
+    }
+
+  }
+  
   public void stopElectionThread() {
     running = false;
     this.interrupt();
