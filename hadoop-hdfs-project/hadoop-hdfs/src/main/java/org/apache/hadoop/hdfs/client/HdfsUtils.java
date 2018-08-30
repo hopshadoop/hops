@@ -32,6 +32,13 @@ import org.apache.hadoop.io.IOUtils;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.concurrent.ThreadLocalRandom;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_KEY;
 
 /**
  * The public utility API for HDFS.
@@ -86,5 +93,11 @@ public class HdfsUtils {
     } finally {
       IOUtils.cleanup(LOG, fs);
     }
+  }
+  
+  public static long calculateExponentialTime(long time, int retries,
+      long cap) {
+    long baseTime = Math.min(time * (1L << retries), cap);
+    return (long) (baseTime * (ThreadLocalRandom.current().nextDouble() + 0.5));
   }
 }

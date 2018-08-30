@@ -179,6 +179,7 @@ public class ErasureCodingManager extends Configured {
         try {
           try {
             if (namesystem.isInSafeMode()) {
+              Thread.sleep(recheckInterval);
               continue;
             }
           } catch (IOException e) {

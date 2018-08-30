@@ -39,6 +39,7 @@ import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 
 public class TestFSNamesystem {
 
@@ -90,7 +91,9 @@ public class TestFSNamesystem {
     Configuration conf = new HdfsConfiguration();
     NameNode.initMetrics(conf, NamenodeRole.NAMENODE);
     DFSTestUtil.formatNameNode(conf);
-    FSNamesystem fsn = FSNamesystem.loadFromDisk(conf, null);
+    NameNode nameNode = Mockito.mock(NameNode.class);
+    Mockito.doReturn(true).when(nameNode).isLeader();
+    FSNamesystem fsn = FSNamesystem.loadFromDisk(conf, nameNode);
 
     fsn.leaveSafeMode();
     assertTrue("After leaving safemode FSNamesystem.isInStartupSafeMode still "
@@ -110,7 +113,9 @@ public class TestFSNamesystem {
     Configuration conf = new HdfsConfiguration();
     NameNode.initMetrics(conf, NamenodeRole.NAMENODE);
     DFSTestUtil.formatNameNode(conf);
-    FSNamesystem fsNamesystem = FSNamesystem.loadFromDisk(conf, null);
+    NameNode nameNode = Mockito.mock(NameNode.class);
+    Mockito.doReturn(true).when(nameNode).isLeader();
+    FSNamesystem fsNamesystem = FSNamesystem.loadFromDisk(conf, nameNode);
     FSNamesystem fsn = Mockito.spy(fsNamesystem);
 
     //Make NameNode.getNameNodeMetrics() not return null

@@ -17,6 +17,7 @@ package io.hops.metadata;
 
 import com.google.common.math.IntMath;
 import com.google.common.math.LongMath;
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.hops.common.CountersQueue;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -47,6 +48,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos;
+import org.apache.hadoop.hdfs.protocolPB.PBHelper;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 
 public class HdfsVariables {
 
@@ -300,6 +305,7 @@ public class HdfsVariables {
     vals.add(storageInfo.getNamespaceID());
     vals.add(storageInfo.getClusterID());
     vals.add(storageInfo.getCTime());
+    vals.add(storageInfo.getStorageType().name());
     vals.add(storageInfo.getBlockPoolId());
     Variables
         .updateVariable(new ArrayVariable(Variable.Finder.StorageInfo, vals));
@@ -311,9 +317,32 @@ public class HdfsVariables {
         (ArrayVariable) Variables.getVariable(Variable.Finder.StorageInfo);
     List<Object> vals = (List<Object>) var.getVarsValue();
     return new StorageInfo((Integer) vals.get(0), (Integer) vals.get(1),
-        (String) vals.get(2), (Long) vals.get(3), (String) vals.get(4));
+        (String) vals.get(2), (Long) vals.get(3), HdfsServerConstants.NodeType.valueOf((String) vals.get(4)),
+        (String) vals.get(5));
   }
 
+  public static void setRollingUpgradeInfo(RollingUpgradeInfo rollingUpgradeInfo) throws TransactionContextException,
+      StorageException {
+    if (rollingUpgradeInfo != null) {
+      ClientNamenodeProtocolProtos.RollingUpgradeInfoProto proto = PBHelper.convert(rollingUpgradeInfo);
+      byte[] array = proto.toByteArray();
+      Variables.updateVariable(new ByteArrayVariable(Variable.Finder.RollingUpgradeInfo, proto.toByteArray()));
+    } else {
+      Variables.updateVariable(new ByteArrayVariable(Variable.Finder.RollingUpgradeInfo, null));
+    }
+  }
+
+  public static RollingUpgradeInfo getRollingUpgradeInfo() throws TransactionContextException, StorageException,
+      InvalidProtocolBufferException {
+    ByteArrayVariable var = (ByteArrayVariable) Variables.getVariable(Variable.Finder.RollingUpgradeInfo);
+    if (var == null || var.getLength() <= 0) {
+      return null;
+    }
+    byte[] array = var.getBytes();
+    ClientNamenodeProtocolProtos.RollingUpgradeInfoProto proto = ClientNamenodeProtocolProtos.RollingUpgradeInfoProto.
+        parseFrom((byte[]) var.getValue());
+    return PBHelper.convert(proto);
+  }
   
   public static void updateBlockTokenKeys(BlockKey curr, BlockKey next)
       throws IOException {

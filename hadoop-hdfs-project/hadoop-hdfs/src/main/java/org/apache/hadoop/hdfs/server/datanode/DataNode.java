@@ -126,6 +126,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
@@ -152,6 +153,7 @@ import javax.management.ObjectName;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import org.apache.hadoop.hdfs.net.DomainPeerServer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
+import org.apache.hadoop.hdfs.protocol.DatanodeLocalInfo;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.io.nativeio.NativeIO;
@@ -221,7 +223,13 @@ public class DataNode extends Configured
       LogFactory.getLog(DataNode.class.getName() + ".clienttrace");
   
   private static final String USAGE =
-      "Usage: java DataNode [-rollback | -regular]";
+      "Usage: java DataNode [-regular | -rollback | -rollingupgrade rollback]\n" +
+      "    -regular                 : Normal DataNode startup (default).\n" +
+      "    -rollback                : Rollback a standard upgrade.\n" +
+      "    -rollingupgrade rollback : Rollback a rolling upgrade operation.\n" +
+      "  Refer to HDFS documentation for the difference between standard\n" +
+      "  and rolling upgrades.";
+  
   static final int CURRENT_BLOCK_FORMAT_VERSION = 1;
   
   /**
@@ -233,6 +241,8 @@ public class DataNode extends Configured
   }
   
   volatile boolean shouldRun = true;
+  volatile boolean shutdownForUpgrade = false;
+  private boolean shutdownInProgress = false;
   private BlockPoolManager blockPoolManager;
   volatile FsDatasetSpi<? extends FsVolumeSpi> data = null;
   private String clusterId = null;
@@ -274,6 +284,7 @@ public class DataNode extends Configured
   private SecureResources secureResources = null;
   private AbstractList<StorageLocation> dataDirs;
   private Configuration conf;
+  private String confVersion;
   private final long maxNumberOfBlocksToLog;
   
   private final List<String> usersWithLocalPathAccess;
@@ -309,6 +320,11 @@ public class DataNode extends Configured
     this.getHdfsBlockLocationsEnabled =
         conf.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
             DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT);
+    
+    confVersion = "core-" +
+        conf.get("hadoop.common.configuration.version", "UNSPECIFIED") +
+        ",hdfs-" +
+        conf.get("hadoop.hdfs.configuration.version", "UNSPECIFIED");
     
     // Determine whether we should try to pass file descriptors to clients.
     if (conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
@@ -1346,9 +1362,31 @@ public class DataNode extends Configured
     // offerServices may be modified.
     BPOfferService[] bposArray = this.blockPoolManager == null ? null :
         this.blockPoolManager.getAllNamenodeThreads();
-    this.shouldRun = false;
+    // If shutdown is not for restart, set shouldRun to false early. 
+    if (!shutdownForUpgrade) {
+      shouldRun = false;
+    }
+    
+    // When shutting down for restart, DataXceiverServer is interrupted
+    // in order to avoid any further acceptance of requests, but the peers
+    // for block writes are not closed until the clients are notified.
+    if (dataXceiverServer != null) {
+      ((DataXceiverServer) this.dataXceiverServer.getRunnable()).kill();
+      this.dataXceiverServer.interrupt();
+    }
+    
+    // Record the time of initial notification
+    long timeNotified = Time.now();
+    
+    if (localDataXceiverServer != null) {
+      ((DataXceiverServer) this.localDataXceiverServer.getRunnable()).kill();
+      this.localDataXceiverServer.interrupt();
+    }
+    
+    // Terminate directory scanner and block scanner
     shutdownPeriodicScanners();
     
+    // Stop the web server
     if (infoServer != null) {
       try {
         infoServer.stop();
@@ -1356,29 +1394,26 @@ public class DataNode extends Configured
         LOG.warn("Exception shutting down DataNode", e);
       }
     }
-    if (ipcServer != null) {
-      ipcServer.stop();
-    }
     
     // Interrupt the checkDiskErrorThread and terminate it.
     if(this.checkDiskErrorThread != null) {
       this.checkDiskErrorThread.interrupt();
     }
     
-    if (dataXceiverServer != null) {
-      ((DataXceiverServer) this.dataXceiverServer.getRunnable()).kill();
-      this.dataXceiverServer.interrupt();
-
-    }
-    if (localDataXceiverServer != null) {
-      ((DataXceiverServer) this.localDataXceiverServer.getRunnable()).kill();
-      this.localDataXceiverServer.interrupt();
-    }
+    // shouldRun is set to false here to prevent certain threads from exiting
+    // before the restart prep is done.
+    this.shouldRun = false;
+    
     // wait for all data receiver threads to exit
     if (this.threadGroup != null) {
       int sleepMs = 2;
       while (true) {
-        this.threadGroup.interrupt();
+        // When shutting down for restart, wait 2.5 seconds before forcing
+        // termination of receiver threads.
+        if (!this.shutdownForUpgrade || 
+            (this.shutdownForUpgrade && (Time.now() - timeNotified > 2500))) {
+          this.threadGroup.interrupt();
+        }
         LOG.info("Waiting for threadgroup to exit, active threads is " +
                  this.threadGroup.activeCount());
         if (this.threadGroup.activeCount() == 0) {
@@ -1407,6 +1442,12 @@ public class DataNode extends Configured
         this.localDataXceiverServer.join();
       } catch (InterruptedException ie) {
       }
+    }
+    
+    // IPC server needs to be shutdown late in the process, otherwise
+    // shutdown command response won't get sent.
+    if (ipcServer != null) {
+      ipcServer.stop();
     }
     
     if (blockPoolManager != null) {
@@ -1442,6 +1483,13 @@ public class DataNode extends Configured
       } catch (Exception ex) {
         LOG.warn("Exception while stopping CRL fetcher service, but we are shutting down anyway");
       }
+    }
+    LOG.info("Shutdown complete.");
+    synchronized(this) {
+      // it is already false, but setting it again to avoid a findbug warning.
+      this.shouldRun = false;
+      // Notify the main thread.
+      notifyAll();
     }
   }
   
@@ -2025,6 +2073,7 @@ public class DataNode extends Configured
    * Instantiate & Start a single datanode daemon and wait for it to finish.
    * If this thread is specifically interrupted, it will stop waiting.
    */
+  @VisibleForTesting
   public static DataNode createDataNode(String args[], Configuration conf)
       throws IOException {
     return createDataNode(args, conf, null);
@@ -2034,6 +2083,7 @@ public class DataNode extends Configured
    * Instantiate & Start a single datanode daemon and wait for it to finish.
    * If this thread is specifically interrupted, it will stop waiting.
    */
+  @VisibleForTesting
   @InterfaceAudience.Private
   public static DataNode createDataNode(String args[], Configuration conf,
       SecureResources resources) throws IOException {
@@ -2052,7 +2102,11 @@ public class DataNode extends Configured
             blockPoolManager.getAllNamenodeThreads().length == 0) {
           shouldRun = false;
         }
-        Thread.sleep(2000);
+        // Terminate if shutdown is complete or 2 seconds after all BPs
+        // are shutdown.
+        synchronized(this) {
+          wait(2000);
+        }
       } catch (InterruptedException ex) {
         LOG.warn("Received exception in Datanode#join: " + ex);
       }
@@ -2149,25 +2203,27 @@ public class DataNode extends Configured
    *
    * @return false if passed argements are incorrect
    */
-  private static boolean parseArguments(String args[], Configuration conf) {
-    int argsLen = (args == null) ? 0 : args.length;
+  @VisibleForTesting
+  static boolean parseArguments(String args[], Configuration conf) {
     StartupOption startOpt = StartupOption.REGULAR;
-    for (int i = 0; i < argsLen; i++) {
-      String cmd = args[i];
+    int i = 0;
+    if (args != null && args.length != 0) {
+      String cmd = args[i++];
       if ("-r".equalsIgnoreCase(cmd) || "--rack".equalsIgnoreCase(cmd)) {
         LOG.error("-r, --rack arguments are not supported anymore. RackID " +
             "resolution is handled by the NameNode.");
-        terminate(1);
-      } else if ("-rollback".equalsIgnoreCase(cmd)) {
+        return false;
+      } else if (StartupOption.ROLLBACK.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.ROLLBACK;
-      } else if ("-regular".equalsIgnoreCase(cmd)) {
+      } else if (StartupOption.REGULAR.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.REGULAR;
       } else {
         return false;
       }
     }
+    
     setStartupOption(conf, startOpt);
-    return true;
+    return (args == null || i == args.length);    // Fail if more than one cmd specified!
   }
 
   private static void setStartupOption(Configuration conf, StartupOption opt) {
@@ -2175,8 +2231,9 @@ public class DataNode extends Configured
   }
 
   static StartupOption getStartupOption(Configuration conf) {
-    return StartupOption.valueOf(
-        conf.get(DFS_DATANODE_STARTUP_KEY, StartupOption.REGULAR.toString()));
+    String value = conf.get(DFS_DATANODE_STARTUP_KEY,
+                            StartupOption.REGULAR.toString());
+    return StartupOption.getEnum(value);
   }
 
   /**
@@ -2209,11 +2266,14 @@ public class DataNode extends Configured
 
 
   public static void secureMain(String args[], SecureResources resources) {
+    int errorCode = 0;
     try {
       StringUtils.startupShutdownMessage(DataNode.class, args, LOG);
       DataNode datanode = createDataNode(args, null, resources);
       if (datanode != null) {
         datanode.join();
+      } else {
+        errorCode = 1;
       }
     } catch (Throwable e) {
       LOG.fatal("Exception in secureMain", e);
@@ -2224,7 +2284,7 @@ public class DataNode extends Configured
       // condition was not met. Also, In secure mode, control will go to Jsvc
       // and Datanode process hangs if it does not exit.
       LOG.warn("Exiting Datanode");
-      terminate(0);
+      terminate(errorCode);
     }
   }
   
@@ -2697,6 +2757,43 @@ public class DataNode extends Configured
     data.deleteBlockPool(blockPoolId, force);
   }
 
+  @Override // ClientDatanodeProtocol
+  public synchronized void shutdownDatanode(boolean forUpgrade) throws IOException {
+    LOG.info("shutdownDatanode command received (upgrade=" + forUpgrade +
+        "). Shutting down Datanode...");
+
+    // Shutdown can be called only once.
+    if (shutdownInProgress) {
+      throw new IOException("Shutdown already in progress.");
+    }
+    shutdownInProgress = true;
+    shutdownForUpgrade = forUpgrade;
+
+    // Asynchronously start the shutdown process so that the rpc response can be
+    // sent back.
+    Thread shutdownThread = new Thread() {
+      @Override public void run() {
+        if (!shutdownForUpgrade) {
+          // Delay the shutdown a bit if not doing for restart.
+          try {
+            Thread.sleep(1000);
+          } catch (InterruptedException ie) { }
+        }
+        shutdown();
+      }
+    };
+
+    shutdownThread.setDaemon(true);
+    shutdownThread.start();
+  }
+
+  @Override //ClientDatanodeProtocol
+  public DatanodeLocalInfo getDatanodeInfo() {
+    long uptime = ManagementFactory.getRuntimeMXBean().getUptime()/1000;
+    return new DatanodeLocalInfo(VersionInfo.getVersion(),
+        confVersion, uptime);
+  }
+  
   /**
    * @param addr
    *     rpc address of the namenode
@@ -2724,6 +2821,10 @@ public class DataNode extends Configured
     return bp != null ? bp.isAlive() : false;
   }
 
+  boolean isRestarting() {
+    return shutdownForUpgrade;
+  }
+  
   /**
    * A datanode is considered to be fully started if all the BP threads are
    * alive and all the block pools are initialized.
@@ -2775,6 +2876,11 @@ public class DataNode extends Configured
   byte[] getSmallFileDataFromNN(ExtendedBlock block) throws IOException {
     BPOfferService bpos = getBPOSForBlock(block);
     return bpos.getSmallFileDataFromNN((int)block.getBlockId());
+  }
+  
+  @VisibleForTesting
+  DataStorage getStorage() {
+    return storage;
   }
   
   public ShortCircuitRegistry getShortCircuitRegistry() {

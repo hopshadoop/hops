@@ -42,6 +42,7 @@ import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.BRTrackingService;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.RollingUpgradeStartupOption;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.BRLoadBalancingException;
@@ -67,6 +68,7 @@ import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import javax.management.ObjectName;
@@ -83,13 +85,7 @@ import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMet
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
+import org.apache.hadoop.util.Time;
 
 /**
  * ********************************************************
@@ -175,6 +171,9 @@ public class NameNode implements NameNodeStatusMXBean {
           StartupOption.NONINTERACTIVE.getName() + "] ] | [" +
           //StartupOption.UPGRADE.getName() + "] | [" +
           //StartupOption.ROLLBACK.getName() + "] | [" +
+          StartupOption.ROLLINGUPGRADE.getName() + " <"
+          + RollingUpgradeStartupOption.DOWNGRADE.name().toLowerCase() + "|"
+          + RollingUpgradeStartupOption.ROLLBACK.name().toLowerCase() + "> ] | [" +
           //StartupOption.FINALIZE.getName() + "] | [" +
           //StartupOption.IMPORT.getName() + "] | [" +
           //StartupOption.INITIALIZESHAREDEDITS.getName() + "] | [" +
@@ -851,7 +850,7 @@ public class NameNode implements NameNodeStatusMXBean {
         HdfsStorageFactory.formatHdfsStorage();
       }
       StorageInfo
-          .storeStorageInfoToDB(clusterId);  //this adds new row to the db
+          .storeStorageInfoToDB(clusterId, Time.now());  //this adds new row to the db
     } catch (StorageException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -882,7 +881,7 @@ public class NameNode implements NameNodeStatusMXBean {
       HdfsStorageFactory.setConfiguration(conf);
 //      HdfsStorageFactory.formatAllStorageNonTransactional();
       HdfsStorageFactory.formatStorage();
-      StorageInfo.storeStorageInfoToDB(clusterId);  //this adds new row to the db
+      StorageInfo.storeStorageInfoToDB(clusterId, Time.now());  //this adds new row to the db
     } catch (StorageException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -906,7 +905,8 @@ public class NameNode implements NameNodeStatusMXBean {
     out.println(USAGE + "\n");
   }
 
-  private static StartupOption parseArguments(String args[]) {
+  @VisibleForTesting
+  public static StartupOption parseArguments(String args[]) {
     int argsLen = (args == null) ? 0 : args.length;
     StartupOption startOpt = StartupOption.REGULAR;
     for (int i = 0; i < argsLen; i++) {
@@ -988,6 +988,10 @@ public class NameNode implements NameNodeStatusMXBean {
           i += 2;
           startOpt.setClusterId(args[i]);
         }
+      } else if (StartupOption.ROLLINGUPGRADE.getName().equalsIgnoreCase(cmd)) {
+        startOpt = StartupOption.ROLLINGUPGRADE;
+        ++i;
+        startOpt.setRollingUpgradeStartupOption(args[i]);
       } else if (StartupOption.ROLLBACK.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.ROLLBACK;
       } else if (StartupOption.FINALIZE.getName().equalsIgnoreCase(cmd)) {
@@ -1034,7 +1038,7 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   private static void setStartupOption(Configuration conf, StartupOption opt) {
-    conf.set(DFS_NAMENODE_STARTUP_KEY, opt.toString());
+    conf.set(DFS_NAMENODE_STARTUP_KEY, opt.name());
   }
 
   static StartupOption getStartupOption(Configuration conf) {
@@ -1045,6 +1049,7 @@ public class NameNode implements NameNodeStatusMXBean {
 
   public static NameNode createNameNode(String argv[], Configuration conf)
       throws IOException {
+    LOG.info("createNameNode " + Arrays.asList(argv));
     if (conf == null) {
       conf = new HdfsConfiguration();
     }

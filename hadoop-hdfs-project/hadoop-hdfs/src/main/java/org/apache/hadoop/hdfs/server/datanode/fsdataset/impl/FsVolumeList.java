@@ -26,6 +26,7 @@ import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -109,18 +110,43 @@ class FsVolumeList {
     return remaining;
   }
 
-  void getVolumeMap(String bpid, ReplicaMap volumeMap) throws IOException {
+  void getAllVolumesMap(final String bpid, final ReplicaMap volumeMap) throws IOException {
     long totalStartTime = System.currentTimeMillis();
-    for (FsVolumeImpl v : volumes.get()) {
-      FsDatasetImpl.LOG.info("Adding replicas to map for block pool " + bpid +
-          " on volume " + v + "...");
-      long startTime = System.currentTimeMillis();
-      v.getVolumeMap(bpid, volumeMap);
-      long timeTaken = System.currentTimeMillis() - startTime;
-      FsDatasetImpl.LOG.info("Time to add replicas to map for block pool " + bpid +
-          " on volume " + v + ": " + timeTaken + "ms");
+    final List<IOException> exceptions = Collections.synchronizedList(
+        new ArrayList<IOException>());
+    List<Thread> replicaAddingThreads = new ArrayList<Thread>();
+    for (final FsVolumeImpl v : volumes.get()) {
+      Thread t = new Thread() {
+        public void run() {
+          try {
+            FsDatasetImpl.LOG.info("Adding replicas to map for block pool " + bpid + " on volume " + v + "...");
+            long startTime = Time.monotonicNow();
+            v.getVolumeMap(bpid, volumeMap);
+            long timeTaken = Time.monotonicNow() - startTime;
+            FsDatasetImpl.LOG.info("Time to add replicas to map for block pool"
+                + " " + bpid + " on volume " + v + ": " + timeTaken + "ms");
+          } catch (ClosedChannelException e) {
+            FsDatasetImpl.LOG.info("The volume " + v + " is closed while " + "addng replicas, ignored.");
+          } catch (IOException ioe) {
+            FsDatasetImpl.LOG.info("Caught exception while adding replicas " + "from " + v + ". Will throw later.", ioe);
+            exceptions.add(ioe);
+          }
+        }
+      };
+      replicaAddingThreads.add(t);
+      t.start();
     }
-    long totalTimeTaken = System.currentTimeMillis() - totalStartTime;
+    for (Thread t : replicaAddingThreads) {
+      try {
+        t.join();
+      } catch (InterruptedException ie) {
+        throw new IOException(ie);
+      }
+    }
+    if (!exceptions.isEmpty()) {
+      throw exceptions.get(0);
+    }
+    long totalTimeTaken = Time.monotonicNow() - totalStartTime;
     FsDatasetImpl.LOG.info("Total time to add all replicas to map: "
         + totalTimeTaken + "ms");
   }

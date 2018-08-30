@@ -26,6 +26,7 @@ import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.exception.TransientStorageException;
+import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.blockmanagement.ExcessReplicasMap;
@@ -35,6 +36,7 @@ import io.hops.metadata.hdfs.dal.MisReplicatedRangeQueueDataAccess;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.HashBucket;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.MisReplicatedRange;
 import io.hops.metadata.security.token.block.NameNodeBlockTokenSecretManager;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -287,6 +289,17 @@ public class BlockManager {
   private final long maxNumBlocksToLog;
   
   /**
+   * Process replication queues asynchronously to allow namenode safemode exit
+   * and failover to be faster. HDFS-5496
+   */
+  private Daemon replicationQueuesInitializer = null;
+
+  /**
+   * Progress of the Replication queues initialisation.
+   */
+  private double replicationQueuesInitProgress = 0.0;
+  
+  /**
    * for block replicas placement
    */
   private BlockPlacementPolicy blockplacement;
@@ -399,7 +412,7 @@ public class BlockManager {
     this.maxNumBlocksToLog =
         conf.getLong(DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_KEY,
             DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_DEFAULT);
-    
+        
     this.processReportBatchSize =
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE,
             DFSConfigKeys.DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE_DEFAULT);
@@ -3165,150 +3178,344 @@ public class BlockManager {
    * over or under replicated. Place it into the respective queue.
    */
   public void processMisReplicatedBlocks() throws IOException {
+    //this normaly reinitialize the block scanning, when should we reinitialize the block scanning and
+    //how do we propagate it to all NN?
+    stopReplicationInitializer();
+    if (namesystem.isLeader()) {
+      //it should be ok to reset even if other NN did not restart 
+      //at worse we will have blocks in neededReplication that should not be there
+      //this would only result in these block getting transiantly over replicated
+      HdfsVariables.resetMisReplicatedIndex();
+      neededReplications.clear();
+    }
+    replicationQueuesInitializer = new Daemon() {
+      
+      @Override
+      public void run() {
+        try {
+          processMisReplicatesAsync();
+        } catch (InterruptedException ie) {
+          LOG.info("Interrupted while processing replication queues.");
+        } catch (Exception e) {
+          LOG.error("Error while processing replication queues async", e);
+        }
+      }
+    };
+    replicationQueuesInitializer.setName("Replication Queue Initializer");
+    replicationQueuesInitializer.start();
+  }
+    
+    /*
+   * Stop the ongoing initialisation of replication queues
+   */
+  private void stopReplicationInitializer() {
+    if (replicationQueuesInitializer != null) {
+      replicationQueuesInitializer.interrupt();
+      try {
+        replicationQueuesInitializer.join();
+      } catch (final InterruptedException e) {
+        LOG.warn("Interrupted while waiting for replicationQueueInitializer. Returning..");
+        return;
+      } finally {
+        replicationQueuesInitializer = null;
+      }
+    }
+  }
+    
+//  private void restetMisReplicatesIndex() throws IOException{
+//    while(namesystem.isLeader() && sizeOfMisReplicatedRangeQueue()>0){
+//      cleanMisReplicatedRangeQueue();
+//    }
+//  }
+  
+//  private void lockMisReplicatedRangeQueue(long nnId) throws IOException {
+//    new LightWeightRequestHandler(
+//        HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
+//      @Override
+//      public Object performTask() throws IOException {
+//        HdfsStorageFactory.getConnector().writeLock();
+//        MisReplicatedRangeQueueDataAccess da =
+//            (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
+//                .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
+//        da.insert(nnId, -2, -2);
+//        return null;
+//      }
+//    }.handle();
+//  }
+//  
+//  private void unlockMisReplicatedRangeQueue(long nnId) throws IOException {
+//    new LightWeightRequestHandler(
+//        HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
+//      @Override
+//      public Object performTask() throws IOException {
+//        HdfsStorageFactory.getConnector().writeLock();
+//        MisReplicatedRangeQueueDataAccess da =
+//            (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
+//                .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
+//        da.remove(nnId, -2, -2);
+//        return null;
+//      }
+//    }.handle();
+//  }
+//  
+//  private boolean isMisReplicatedRangeQueueLocked() throws IOException {
+//    return (boolean) new LightWeightRequestHandler(
+//        HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
+//      @Override
+//      public Object performTask() throws IOException {
+//        HdfsStorageFactory.getConnector().writeLock();
+//        MisReplicatedRangeQueueDataAccess da = (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
+//            .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
+//        Long leaderIndex = da.getStartIndex(namesystem.getNameNode().getActiveNameNodes().getLeader().getId());
+//        if (leaderIndex < -1) {
+//          return true;
+//        } else {
+//          return false;
+//        }
+//      }
+//    }.handle();
+//  }
+  
+//  private void waitOnMisReplicatedRangeQueueLock() throws InterruptedException, IOException{
+//    while(isMisReplicatedRangeQueueLocked()){
+//      Thread.sleep(500);
+//    }
+//  }
+  
+  private List<MisReplicatedRange> checkMisReplicatedRangeQueue() throws IOException {
+    final LightWeightRequestHandler cleanMisReplicatedRangeQueueHandler = new LightWeightRequestHandler(
+        HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
+      @Override
+      public Object performTask() throws IOException {
+        HdfsStorageFactory.getConnector().writeLock();
+        MisReplicatedRangeQueueDataAccess da = (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
+            .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
+        List<MisReplicatedRange> ranges = da.getAll();
+        Set<Long> activeNodes = new HashSet<>();
+        for (ActiveNode nn : namesystem.getNameNode().getLeaderElectionInstance().getActiveNamenodes().getActiveNodes()) {
+          activeNodes.add(nn.getId());
+        }
+        List<MisReplicatedRange> toRemove = new ArrayList<>();
+        for (MisReplicatedRange range : ranges) {
+          if (!activeNodes.contains(range.getNnId())) {
+            toRemove.add(range);
+          }
+        }
+        da.remove(toRemove);
+        return toRemove;
+      }
+    };
+    List<MisReplicatedRange> toProcess = new ArrayList<>();
+    while (namesystem.isLeader() && sizeOfMisReplicatedRangeQueue() > 0) {
+      toProcess.addAll((List<MisReplicatedRange>)cleanMisReplicatedRangeQueueHandler.handle());
+    }
+    return toProcess;
+  }
+  
+//  private boolean waitMisReplicatedRangeQueue() throws IOException {
+//    return (boolean) new LightWeightRequestHandler(
+//        HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
+//      @Override
+//      public Object performTask() throws IOException {
+//        HdfsStorageFactory.getConnector().writeLock();
+//        MisReplicatedRangeQueueDataAccess da =
+//            (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
+//                .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
+//        List<Long> startIndexes= da.getAllStartIndex();
+//        
+//        for(long startIndex: startIndexes){
+//          if(startIndex>=0){
+//            return true;
+//          }
+//        }
+//        return false;
+//      }
+//    }.handle();
+//  }
+  
+  private void processMisReplicatesAsync() throws InterruptedException, IOException {
     final AtomicLong nrInvalid = new AtomicLong(0);
     final AtomicLong nrOverReplicated = new AtomicLong(0);
     final AtomicLong nrUnderReplicated = new AtomicLong(0);
     final AtomicLong nrPostponed = new AtomicLong(0);
     final AtomicLong nrUnderConstruction = new AtomicLong(0);
+    long startTimeMisReplicatedScan = Time.now();
     
-    //FIXME [M] we need to have a garbage collection to check for the invalid
-    // blocks
-    final HopsTransactionalRequestHandler processMisReplicatedBlocksHandler =
-        new HopsTransactionalRequestHandler(
-            HDFSOperationType.PROCESS_MIS_REPLICATED_BLOCKS_PER_INODE_BATCH) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = LockFactory.getInstance();
-            List<INodeIdentifier> inodeIdentifiers =
-                (List<INodeIdentifier>) getParams()[0];
-            locks.add(lf.getBatchedINodesLock(inodeIdentifiers))
-                .add(lf.getSqlBatchedBlocksLock()).add(
-                lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
-                    BLK.ER));
+    
+    long totalBlocks = blocksMap.size();
+    replicationQueuesInitProgress = 0;
+    final AtomicLong totalProcessed = new AtomicLong(0);   
+    boolean haveMore;
+    final int filesToProcess = processMisReplicatedBatchSize * processMisReplicatedNoOfBatchs;
+    
+    final HopsTransactionalRequestHandler processMisReplicatedBlocksHandler = new HopsTransactionalRequestHandler(
+        HDFSOperationType.PROCESS_MIS_REPLICATED_BLOCKS_PER_INODE_BATCH) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        List<INodeIdentifier> inodeIdentifiers = (List<INodeIdentifier>) getParams()[0];
+        locks.add(lf.getBatchedINodesLock(inodeIdentifiers))
+            .add(lf.getSqlBatchedBlocksLock()).add(
+            lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
+                BLK.ER));
 
-          }
+      }
 
-          @Override
-          public Object performTask() throws IOException {
-            List<INodeIdentifier> inodeIdentifiers =
-                (List<INodeIdentifier>) getParams()[0];
-            for (INodeIdentifier inodeIdentifier : inodeIdentifiers) {
-              INode inode = EntityManager
-                  .find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId());
-              for (BlockInfo block : ((INodeFile) inode).getBlocks()) {
-                MisReplicationResult res = processMisReplicatedBlock(block);
-                if (LOG.isTraceEnabled()) {
-                  LOG.trace("block " + block + ": " + res);
-                }
-                switch (res) {
-                  case UNDER_REPLICATED:
-                    nrUnderReplicated.incrementAndGet();
-                    break;
-                  case OVER_REPLICATED:
-                    nrOverReplicated.incrementAndGet();
-                    break;
-                  case INVALID:
-                    nrInvalid.incrementAndGet();
-                    break;
-                  case POSTPONE:
-                    nrPostponed.incrementAndGet();
-                    postponeBlock(block);
-                    break;
-                  case UNDER_CONSTRUCTION:
-                    nrUnderConstruction.incrementAndGet();
-                    break;
-                  case OK:
-                    break;
-                  default:
-                    throw new AssertionError("Invalid enum value: " + res);
-                }
-              }
+      @Override
+      public Object performTask() throws IOException {
+        List<INodeIdentifier> inodeIdentifiers = (List<INodeIdentifier>) getParams()[0];
+        for (INodeIdentifier inodeIdentifier : inodeIdentifiers) {
+          INode inode = EntityManager
+              .find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId());
+          for (BlockInfo block : ((INodeFile) inode).getBlocks()) {
+            MisReplicationResult res = processMisReplicatedBlock(block);
+            if (LOG.isTraceEnabled()) {
+              LOG.trace("block " + block + ": " + res);
             }
-            return null;
+            switch (res) {
+              case UNDER_REPLICATED:
+                nrUnderReplicated.incrementAndGet();
+                break;
+              case OVER_REPLICATED:
+                nrOverReplicated.incrementAndGet();
+                break;
+              case INVALID:
+                nrInvalid.incrementAndGet();
+                break;
+              case POSTPONE:
+                nrPostponed.incrementAndGet();
+                postponeBlock(block);
+                break;
+              case UNDER_CONSTRUCTION:
+                nrUnderConstruction.incrementAndGet();
+                break;
+              case OK:
+                break;
+              default:
+                throw new AssertionError("Invalid enum value: " + res);
+            }
+            totalProcessed.incrementAndGet();
           }
-        };
-
-    final int filesToProcess =
-        processMisReplicatedBatchSize * processMisReplicatedNoOfBatchs;
-
-    if (blocksMap.countAllFiles() != 0) {
-      boolean haveMore;
-
-      do {
-        long filesToProcessEndIndex;
-        long filesToProcessStartIndex;
-        do {
-          filesToProcessEndIndex =
-              HdfsVariables.incrementMisReplicatedIndex(filesToProcess);
-          filesToProcessStartIndex = filesToProcessEndIndex - filesToProcess;
-          haveMore =
-              blocksMap.haveFilesWithIdGreaterThan(filesToProcessEndIndex);
-        } while (!blocksMap.haveFilesWithIdBetween(filesToProcessStartIndex,
-            filesToProcessEndIndex) && haveMore);
-
-        addToMisReplicatedRangeQueue(filesToProcessStartIndex,
-            filesToProcessEndIndex);
-
-        final List<INodeIdentifier> allINodes = blocksMap
-            .getAllINodeFiles(filesToProcessStartIndex, filesToProcessEndIndex);
-        LOG.info("processMisReplicated read  " + allINodes.size() + "/" +
-            filesToProcess + " in the Ids range [" + filesToProcessStartIndex +
-            " - " + filesToProcessEndIndex + "]");
-
-        try {
-          Slicer.slice(allINodes.size(), processMisReplicatedBatchSize, processMisReplicatedNoThreads, 
-              new Slicer.OperationHandler() {
-                @Override
-                public void handle(int startIndex, int endIndex)
-                    throws Exception {
-                  List<INodeIdentifier> inodes =
-                      allINodes.subList(startIndex, endIndex);
-                  processMisReplicatedBlocksHandler.setParams(inodes);
-                  processMisReplicatedBlocksHandler.handle(namesystem);
-                }
-              });
-        } catch (Exception ex) {
-          throw new IOException(ex);
         }
+        return null;
+      }
+    };
 
-        removeFromMisReplicatedRangeQueue(filesToProcessStartIndex,
-            filesToProcessEndIndex);
+    addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), -1));
+    
+    while (namesystem.isRunning() && !Thread.currentThread().isInterrupted()) {
+      long filesToProcessEndIndex;
+      long filesToProcessStartIndex;
+      do {
+        filesToProcessEndIndex = HdfsVariables.incrementMisReplicatedIndex(filesToProcess);
+        filesToProcessStartIndex = filesToProcessEndIndex - filesToProcess;
+        haveMore = blocksMap.haveFilesWithIdGreaterThan(filesToProcessEndIndex);
+      } while (!blocksMap.haveFilesWithIdBetween(filesToProcessStartIndex,
+          filesToProcessEndIndex) && haveMore);
 
-      } while (haveMore);
+      addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), filesToProcessStartIndex));
+
+      processMissreplicatedInt(filesToProcessStartIndex, filesToProcessEndIndex, filesToProcess,
+          processMisReplicatedBlocksHandler);
+
+      addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), -1));
+
+      // there is a possibility that if any of the blocks deleted/added during
+      // initialisation, then progress might be different.
+      replicationQueuesInitProgress = Math.min((double) totalProcessed.get()
+          / totalBlocks, 1.0);
+      if (!haveMore) {
+        removeFromMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), -1));
+        if (namesystem.isLeader()) {
+          //get the list of indexes that should have been scanned by namenode that are now dead
+          List<MisReplicatedRange> toProcess = checkMisReplicatedRangeQueue();
+          //(re)scan the corresponding blocks
+          for (MisReplicatedRange range : toProcess) {
+            long startIndex = range.getStartIndex();
+            if (startIndex > 0) {
+              processMissreplicatedInt(startIndex, startIndex + filesToProcess, filesToProcess,
+                  processMisReplicatedBlocksHandler);
+            }
+          }
+        }
+        LOG.info("Total number of blocks            = " + blocksMap.size());
+        LOG.info("Number of invalid blocks          = " + nrInvalid.get());
+        LOG.info("Number of under-replicated blocks = " + nrUnderReplicated.get());
+        LOG.info("Number of  over-replicated blocks = " + nrOverReplicated.get()
+            + ((nrPostponed.get() > 0) ? (" (" + nrPostponed.get() + " postponed)") : ""));
+        LOG.info("Number of blocks being written    = " + nrUnderConstruction.get());
+        NameNode.stateChangeLog
+            .info("STATE* Replication Queue initialization "
+                + "scan for invalid, over- and under-replicated blocks "
+                + "completed in " + (Time.now() - startTimeMisReplicatedScan)
+                + " msec");
+        break;
+      }
     }
-    LOG.info("Total number of blocks            = " + blocksMap.size());
-    LOG.info("Number of invalid blocks          = " + nrInvalid.get());
-    LOG.info("Number of under-replicated blocks = " + nrUnderReplicated.get());
-    LOG.info("Number of  over-replicated blocks = " + nrOverReplicated.get() +
-        ((nrPostponed.get() > 0) ? (" (" + nrPostponed.get() + " postponed)") : ""));
-    LOG.info("Number of blocks being written    = " + nrUnderConstruction.get());
+    if (Thread.currentThread().isInterrupted()) {
+      LOG.info("Interrupted while processing replication queues.");
+    }
+  }
+  
+  private void processMissreplicatedInt(long filesToProcessStartIndex, long filesToProcessEndIndex, int filesToProcess,
+      final HopsTransactionalRequestHandler processMisReplicatedBlocksHandler) throws IOException {
+    final List<INodeIdentifier> allINodes = blocksMap
+        .getAllINodeFiles(filesToProcessStartIndex, filesToProcessEndIndex);
+    LOG.info("processMisReplicated read  " + allINodes.size() + "/" + filesToProcess + " in the Ids range ["
+        + filesToProcessStartIndex + " - " + filesToProcessEndIndex + "]");
+
+    try {
+      Slicer.slice(allINodes.size(), processMisReplicatedBatchSize, processMisReplicatedNoThreads,
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex)
+            throws Exception {
+          List<INodeIdentifier> inodes = allINodes.subList(startIndex, endIndex);
+          processMisReplicatedBlocksHandler.setParams(inodes);
+          processMisReplicatedBlocksHandler.handle(namesystem);
+        }
+      });
+    } catch (Exception ex) {
+      throw new IOException(ex);
+    }
+  }
+  
+  /**
+   * Get the progress of the Replication queues initialisation
+   * 
+   * @return Returns values between 0 and 1 for the progress.
+   */
+  public double getReplicationQueuesInitProgress() {
+    //should we store this in the DB to have update from all the NN?
+    return replicationQueuesInitProgress;
   }
 
-  private void addToMisReplicatedRangeQueue(final long start, final long end)
+  private void addToMisReplicatedRangeQueue(final MisReplicatedRange range)
       throws IOException {
     new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
       @Override
       public Object performTask() throws IOException {
+        HdfsStorageFactory.getConnector().writeLock();
         MisReplicatedRangeQueueDataAccess da =
             (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
                 .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
-        da.insert(start, end);
+        da.insert(range);
         return null;
       }
     }.handle();
   }
 
-  private void removeFromMisReplicatedRangeQueue(final long start,
-      final long end) throws IOException {
+  private void removeFromMisReplicatedRangeQueue(final MisReplicatedRange range) throws IOException {
     new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
       @Override
       public Object performTask() throws IOException {
+        HdfsStorageFactory.getConnector().writeLock();
         MisReplicatedRangeQueueDataAccess da =
             (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
                 .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
-        da.remove(start, end);
+        da.remove(range);
         return null;
       }
     }.handle();
@@ -5049,5 +5256,9 @@ public class BlockManager {
         return null;
       }
     }.handle();
+  }
+ 
+  public void shutdown() {
+    stopReplicationInitializer();
   }
 }

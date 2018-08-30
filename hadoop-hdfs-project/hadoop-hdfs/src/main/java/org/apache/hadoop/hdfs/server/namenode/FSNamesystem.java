@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.common.IDsMonitor;
 import io.hops.common.INodeUtil;
@@ -122,6 +123,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.MutableBlockCollection;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.RollingUpgradeStartupOption;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
@@ -257,6 +259,8 @@ import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
+import org.apache.hadoop.hdfs.protocol.RollingUpgradeException;
+import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Phase;
@@ -459,6 +463,9 @@ public class FSNamesystem
   private static int DB_IN_MEMORY_FILE_MAX_SIZE;
   private final long BIGGEST_DELETABLE_DIR;
 
+  /** flag indicating whether replication queues have been initialized */
+  boolean initializedReplQueues = false;
+  
   /**
    * Whether the namenode is in the middle of starting the active service
    */
@@ -499,17 +506,27 @@ public class FSNamesystem
    * @throws IOException
    *     if loading fails
    */
-  public static FSNamesystem loadFromDisk(Configuration conf, NameNode namenode)
-      throws IOException {
+  static FSNamesystem loadFromDisk(Configuration conf, NameNode namenode) throws IOException {
 
     FSNamesystem namesystem = new FSNamesystem(conf, namenode, false);
     StartupOption startOpt = NameNode.getStartupOption(conf);
     if (startOpt == StartupOption.RECOVER) {
       namesystem.setSafeMode(SafeModeAction.SAFEMODE_ENTER);
     }
-
+    
+    if (RollingUpgradeStartupOption.ROLLBACK.matches(startOpt)) {
+        rollBackRollingUpgradeTX();
+    }
+    
     long loadStart = now();
-
+    switch(startOpt) {
+    case UPGRADE:
+      StorageInfo sinfo = StorageInfo.getStorageInfoFromDB();
+      StorageInfo.updateStorageInfoToDB(sinfo, Time.now());
+    case REGULAR:
+    default:
+      // just load the image
+    }
     namesystem.dir
         .imageLoadComplete();     //HOP: this function was called inside the  namesystem.loadFSImage(...) which is commented out
 
@@ -782,7 +799,7 @@ public class FSNamesystem
     IDsMonitor.getInstance().start();
     RootINodeCache.start();
     if (isClusterInSafeMode()) {
-      assert safeMode != null && !safeMode.isPopulatingReplicationQueues();
+      assert safeMode != null && !isPopulatingReplQueues();
       StartupProgress prog = NameNode.getStartupProgress();
       prog.beginPhase(Phase.SAFEMODE);
       prog.setTotal(Phase.SAFEMODE, STEP_AWAITING_REPORTED_BLOCKS,
@@ -826,10 +843,14 @@ public class FSNamesystem
     try {
       blockManager.getDatanodeManager().markAllDatanodesStale();
 
-      if (isClusterInSafeMode()) {
-        if (!isInSafeMode() || (isInSafeMode() && safeMode.isPopulatingReplicationQueues())) {
+      if (isLeader()) {
+        // the node is starting and directly leader, this means that no NN was alive before
+        // Only need to re-process the queue, If not in SafeMode.
+        if (!isInSafeMode()) {
           LOG.info("Reprocessing replication and invalidation queues");
-          blockManager.processMisReplicatedBlocks();
+          initializeReplQueues();
+        } else {
+          HdfsVariables.resetMisReplicatedIndex();
         }
       }
 
@@ -852,6 +873,15 @@ public class FSNamesystem
     } finally {
       startingActiveService = false;
     }
+  }
+  
+  /**
+   * Initialize replication queues.
+   */
+  private void initializeReplQueues() throws IOException {
+    LOG.info("initializing replication queues");
+    blockManager.processMisReplicatedBlocks();
+    initializedReplQueues = true;
   }
 
   /**
@@ -900,6 +930,8 @@ public class FSNamesystem
 //      cacheManager.clearDirectiveStats();
 //      blockManager.getDatanodeManager().clearPendingCachingCommands();
 //      blockManager.getDatanodeManager().setShouldSendCachingCommands(false);
+//      blockManager.clearQueues();
+//      initializedReplQueues = false;
     }
   }
 
@@ -4318,6 +4350,7 @@ public class FSNamesystem
   HeartbeatResponse handleHeartbeat(DatanodeRegistration nodeReg,
       StorageReport[] reports, long cacheCapacity, long cacheUsed, int xceiverCount,
       int xmitsInProgress, int failedVolumes) throws IOException {
+    //get datanode commands
     final int maxTransfer =
         blockManager.getMaxReplicationStreams() - xmitsInProgress;
 
@@ -4325,7 +4358,7 @@ public class FSNamesystem
         .handleHeartbeat(nodeReg, reports, blockPoolId, cacheCapacity, cacheUsed, xceiverCount,
             maxTransfer, failedVolumes);
 
-    return new HeartbeatResponse(cmds);
+    return new HeartbeatResponse(cmds, getRollingUpgradeInfoTX());
   }
 
   /**
@@ -4578,10 +4611,6 @@ public class FSNamesystem
      */
     private long lastStatusReport = 0;
     /**
-     * flag indicating whether replication queues have been initialized
-     */
-    boolean initializedReplicationQueues = false;
-    /**
      * Was safe mode entered automatically because available resources were low.
      */
     private boolean resourcesLow = false;
@@ -4637,7 +4666,7 @@ public class FSNamesystem
      *
      * @see SafeModeInfo
      */
-    private SafeModeInfo(boolean resourcesLow, boolean isReplQueuesInited) throws IOException {
+    private SafeModeInfo(boolean resourcesLow) throws IOException {
       this.threshold = 1.5f;  // this threshold can never be reached
       this.datanodeThreshold = Integer.MAX_VALUE;
       this.extension = Integer.MAX_VALUE;
@@ -4645,7 +4674,6 @@ public class FSNamesystem
       this.replicationQueueThreshold = 1.5f; // can never be reached
       this.blockTotal = -1;
       this.resourcesLow = resourcesLow;
-      this.initializedReplicationQueues = isReplQueuesInited;
       enter();
       reportStatus("STATE* Safe mode is ON.", true);
     }
@@ -4658,13 +4686,6 @@ public class FSNamesystem
     private boolean isOn() throws IOException {
       doConsistencyCheck();
       return this.reached >= 0 && isClusterInSafeMode();
-    }
-
-    /**
-     * Check if we are populating replication queues.
-     */
-    private boolean isPopulatingReplicationQueues() {
-      return initializedReplicationQueues;
     }
 
     /**
@@ -4683,14 +4704,13 @@ public class FSNamesystem
     private void leave() throws IOException {
       // if not done yet, initialize replication queues.
       // In the standby, do not populate replication queues
-      if (!isPopulatingReplicationQueues() && shouldPopulateReplicationQueues()) {
-        initializeReplicationQueues();
+      if (!isPopulatingReplQueues() && shouldPopulateReplicationQueues()) {
+        initializeReplQueues();
       }
 
       leaveInternal();
 
       HdfsVariables.exitClusterSafeMode();
-      HdfsVariables.resetMisReplicatedIndex();
       clearSafeBlocks();
     }
 
@@ -4721,21 +4741,6 @@ public class FSNamesystem
         prog.endStep(Phase.SAFEMODE, STEP_AWAITING_REPORTED_BLOCKS);
         prog.endPhase(Phase.SAFEMODE);
       }
-    }
-
-    /**
-     * Initialize replication queues.
-     */
-    private void initializeReplicationQueues() throws IOException {
-      LOG.info("initializing replication queues");
-      assert !isPopulatingReplicationQueues() : "Already initialized " +
-          "replication queues";
-      long startTimeMisReplicatedScan = now();
-      blockManager.processMisReplicatedBlocks();
-      initializedReplicationQueues = true;
-      NameNode.stateChangeLog.info("STATE* Replication Queue initialization " +
-          "scan for invalid, over- and under-replicated blocks " +
-          "completed in " + (now() - startTimeMisReplicatedScan) + " ms");
     }
 
     /**
@@ -4818,8 +4823,8 @@ public class FSNamesystem
       if (smmthread == null && needEnter()) {
         enter();
         // check if we are ready to initialize replication queues
-        if (canInitializeReplicationQueues() && !isPopulatingReplicationQueues()) {
-          initializeReplicationQueues();
+        if (canInitializeReplicationQueues() && !isPopulatingReplQueues()) { 
+          initializeReplQueues();
         }
         reportStatus("STATE* Safe mode ON.", false);
         return;
@@ -4841,8 +4846,8 @@ public class FSNamesystem
       reportStatus("STATE* Safe mode extension entered.", true);
 
       // check if we are ready to initialize replication queues
-      if (canInitializeReplicationQueues() && !isPopulatingReplicationQueues()) {
-        initializeReplicationQueues();
+      if (canInitializeReplicationQueues() && !isPopulatingReplQueues()) {
+        initializeReplQueues();
       }
     }
 
@@ -5208,7 +5213,7 @@ public class FSNamesystem
     if (safeMode == null) {
       return true;
     }
-    return safeMode.isPopulatingReplicationQueues();
+    return initializedReplQueues;
   }
 
   private boolean shouldPopulateReplicationQueues() {
@@ -5377,7 +5382,7 @@ public class FSNamesystem
       }
     }
     if (!isInSafeMode()) {
-      safeMode = new SafeModeInfo(resourcesLow, isPopulatingReplQueues());
+      safeMode = new SafeModeInfo(resourcesLow);
       HdfsVariables.enterClusterSafeMode();
       return;
     }
@@ -5599,7 +5604,10 @@ public class FSNamesystem
     if (mxbeanName != null) {
       MBeans.unregister(mxbeanName);
       mxbeanName = null;
-     }
+    }
+    if (blockManager != null) {
+      blockManager.shutdown();
+    }
   }
 
   @Override // FSNamesystemMBean
@@ -6597,6 +6605,157 @@ public class FSNamesystem
     return avgLoad;
   }
 
+  RollingUpgradeInfo queryRollingUpgrade() throws IOException {
+    checkSuperuserPrivilege();
+    return getRollingUpgradeInfoTX();
+  }
+  
+  RollingUpgradeInfo startRollingUpgrade() throws IOException {
+    checkSuperuserPrivilege();
+    long startTime = now();
+    checkNameNodeSafeMode("Failed to start rolling upgrade");
+    RollingUpgradeInfo rollingUpgradeInfo = startRollingUpgradeInternal(startTime);
+
+    if (auditLog.isInfoEnabled() && isExternalInvocation()) {
+      logAuditEvent(true, "startRollingUpgrade", null, null, null);
+    }
+    return rollingUpgradeInfo;
+  }
+
+  /**
+   * Update internal state to indicate that a rolling upgrade is in progress.
+   *
+   * @param startTime
+   */
+  RollingUpgradeInfo startRollingUpgradeInternal(final long startTime) throws IOException {
+    return (RollingUpgradeInfo) new HopsTransactionalRequestHandler(HDFSOperationType.ADD_ROLLING_UPGRADE_INFO) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getVariableLock(Variable.Finder.RollingUpgradeInfo, TransactionLockTypes.LockType.WRITE));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        checkRollingUpgrade("start rolling upgrade");
+        return setRollingUpgradeInfo(startTime);
+      }
+    }.handle();
+  }
+  
+  RollingUpgradeInfo setRollingUpgradeInfo(long startTime) throws TransactionContextException, StorageException {
+    RollingUpgradeInfo rollingUpgradeInfo = new RollingUpgradeInfo(blockPoolId, startTime, 0L);
+    HdfsVariables.setRollingUpgradeInfo(rollingUpgradeInfo);
+    return rollingUpgradeInfo;
+  }
+  
+  public RollingUpgradeInfo getRollingUpgradeInfoTX() throws IOException {
+    return (RollingUpgradeInfo) new HopsTransactionalRequestHandler(HDFSOperationType.GET_ROLLING_UPGRADE_INFO) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getVariableLock(Variable.Finder.RollingUpgradeInfo, TransactionLockTypes.LockType.READ));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        return HdfsVariables.getRollingUpgradeInfo();
+      }
+    }.handle();
+  }
+    
+  @Override  // NameNodeMXBean
+  public RollingUpgradeInfo.Bean getRollingUpgradeStatus() {
+    RollingUpgradeInfo upgradeInfo = null;
+    try{
+      upgradeInfo = getRollingUpgradeInfoTX();
+    }catch(IOException ex){
+      LOG.warn(ex);
+    }
+    if (upgradeInfo != null) {
+      return new RollingUpgradeInfo.Bean(upgradeInfo);
+    }
+    return null;
+  }
+  
+  /** Is rolling upgrade in progress? */
+  public boolean isRollingUpgrade() throws TransactionContextException, StorageException, InvalidProtocolBufferException {
+    return HdfsVariables.getRollingUpgradeInfo()!= null;
+  }
+
+  public boolean isRollingUpgradeTX() throws IOException {
+    return (boolean) new HopsTransactionalRequestHandler(HDFSOperationType.GET_ROLLING_UPGRADE_INFO) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getVariableLock(Variable.Finder.RollingUpgradeInfo, TransactionLockTypes.LockType.READ));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        return isRollingUpgrade();
+      }
+    }.handle();
+  }
+    
+  void checkRollingUpgrade(String action) throws RollingUpgradeException, TransactionContextException, StorageException, InvalidProtocolBufferException {
+    if (isRollingUpgrade()) {
+      throw new RollingUpgradeException("Failed to " + action
+          + " since a rolling upgrade is already in progress."
+          + " Existing rolling upgrade info:\n" + HdfsVariables.getRollingUpgradeInfo());
+    }
+  }
+  
+  RollingUpgradeInfo finalizeRollingUpgrade() throws IOException {
+    checkSuperuserPrivilege();
+    final RollingUpgradeInfo returnInfo;
+    checkNameNodeSafeMode("Failed to finalize rolling upgrade");
+    returnInfo = finalizeRollingUpgradeInternal(now());
+    if (auditLog.isInfoEnabled() && isExternalInvocation()) {
+      logAuditEvent(true, "finalizeRollingUpgrade", null, null, null);
+    }
+    return returnInfo;
+  }
+  
+  RollingUpgradeInfo finalizeRollingUpgradeInternal(final long finalizeTime)
+      throws RollingUpgradeException, IOException {
+    return (RollingUpgradeInfo) new HopsTransactionalRequestHandler(HDFSOperationType.ADD_ROLLING_UPGRADE_INFO) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getVariableLock(Variable.Finder.RollingUpgradeInfo, TransactionLockTypes.LockType.WRITE));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        if (!isRollingUpgrade()) {
+          throw new RollingUpgradeException(
+              "Failed to finalize rolling upgrade since there is no rolling upgrade in progress.");
+        }
+        final long startTime = HdfsVariables.getRollingUpgradeInfo().getStartTime();
+        HdfsVariables.setRollingUpgradeInfo(null);
+        return new RollingUpgradeInfo(blockPoolId, startTime, finalizeTime);
+      }
+    }.handle();
+  }
+  
+  static void rollBackRollingUpgradeTX()
+      throws RollingUpgradeException, IOException {
+    new HopsTransactionalRequestHandler(HDFSOperationType.ADD_ROLLING_UPGRADE_INFO) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getVariableLock(Variable.Finder.RollingUpgradeInfo, TransactionLockTypes.LockType.WRITE));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        HdfsVariables.setRollingUpgradeInfo(null);
+        return null;
+      }
+    }.handle();
+  }
+    
   long addCacheDirective(final CacheDirectiveInfo directive, final EnumSet<CacheFlag> flags)
       throws IOException {
     cacheManager.validatePoolName(directive);

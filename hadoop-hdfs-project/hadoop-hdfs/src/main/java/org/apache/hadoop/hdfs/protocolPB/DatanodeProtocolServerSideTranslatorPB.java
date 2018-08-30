@@ -64,6 +64,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.hadoop.hdfs.protocol.RollingUpgradeStatus;
 
 public class DatanodeProtocolServerSideTranslatorPB
     implements DatanodeProtocolPB {
@@ -127,7 +128,12 @@ public class DatanodeProtocolServerSideTranslatorPB
         }
       }
     }
-
+    RollingUpgradeStatus rollingUpdateStatus = response
+        .getRollingUpdateStatus();
+    if (rollingUpdateStatus != null) {
+      builder.setRollingUpgradeStatus(PBHelper
+          .convertRollingUpgradeStatus(rollingUpdateStatus));
+    }
     return builder.build();
   }
 

@@ -112,14 +112,14 @@ public class TestPBHelper {
   }
 
   private static StorageInfo getStorageInfo(NodeType type) {
-    return new StorageInfo(1, 2, "cid", 3, "bpid"); //HOP: added "bpid"
+    return new StorageInfo(1, 2, "cid", 3, type, "bpid"); //HOP: added "bpid"
   }
 
   @Test
   public void testConvertStoragInfo() {
     StorageInfo info = getStorageInfo(NodeType.NAME_NODE);
     StorageInfoProto infoProto = PBHelper.convert(info);
-    StorageInfo info2 = PBHelper.convert(infoProto);
+    StorageInfo info2 = PBHelper.convert(infoProto, NodeType.NAME_NODE);
     assertEquals(info.getClusterID(), info2.getClusterID());
     assertEquals(info.getCTime(), info2.getCTime());
     assertEquals(info.getLayoutVersion(), info2.getLayoutVersion());
@@ -488,7 +488,7 @@ public class TestPBHelper {
     ExportedBlockKeys expKeys = new ExportedBlockKeys(true, 9, 10,
         getBlockKey(1), keys);
     DatanodeRegistration reg = new DatanodeRegistration(dnId,
-        new StorageInfo(), expKeys, "3.0.0");
+        new StorageInfo(NodeType.DATA_NODE), expKeys, "3.0.0");
     DatanodeRegistrationProto proto = PBHelper.convert(reg);
     DatanodeRegistration reg2 = PBHelper.convert(proto);
     compare(reg.getStorageInfo(), reg2.getStorageInfo());

@@ -30,6 +30,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHED_CONN_RETRY_
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHE_DROP_BEHIND_READS;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHE_DROP_BEHIND_WRITES;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHE_READAHEAD;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_DATANODE_RESTART_TIMEOUT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_DATANODE_RESTART_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_DEFAULT;
@@ -133,6 +135,7 @@ import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferEncryptor;
 import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
@@ -261,6 +264,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     final int getFileBlockStorageLocationsTimeoutMs;
     final int retryTimesForGetLastBlockLength;
     final int retryIntervalForGetLastBlockLength;
+    final long datanodeRestartTimeout;
 
     final boolean useLegacyBlockReader;
     final boolean useLegacyBlockReaderLocal;
@@ -420,6 +424,10 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
               DFSConfigKeys.DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS,
               DFSConfigKeys.DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS_DEFAULT);
 
+      datanodeRestartTimeout = conf.getLong(
+          DFS_CLIENT_DATANODE_RESTART_TIMEOUT_KEY,
+          DFS_CLIENT_DATANODE_RESTART_TIMEOUT_DEFAULT) * 1000;
+      
       storeSmallFilesInDB = conf.getBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY,
               DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_DEFAULT);
 
@@ -661,7 +669,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
       this.initThreadsNumForHedgedReads(numThreads);
     }
   }
-
+  
   /**
    * Return the socket addresses to use with each configured
    * local interface. Local interfaces may be specified by IP
@@ -2308,7 +2316,10 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
    * @see ClientProtocol#setSafeMode(HdfsConstants.SafeModeAction, boolean)
    */
   public boolean setSafeMode(SafeModeAction action, boolean isChecked) throws IOException{
-    return namenode.setSafeMode(action, isChecked);
+    if(leaderNN==null){
+      throw new IOException("no leader namenode availlable");
+    }
+    return leaderNN.setSafeMode(action, isChecked);
   }
 
   public long addCacheDirective(
@@ -2413,6 +2424,10 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
    */
   public void setBalancerBandwidth(long bandwidth) throws IOException {
     namenode.setBalancerBandwidth(bandwidth);
+  }
+  
+  RollingUpgradeInfo rollingUpgrade(RollingUpgradeAction action) throws IOException {
+    return namenode.rollingUpgrade(action);
   }
 
   /**
@@ -2999,5 +3014,9 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
         throw new IOException("The size of a file stored in the database should not more than the size of the default block size");
       }
     }
+  }
+  
+  public boolean hasLeader(){
+    return leaderNN!=null;
   }
 }

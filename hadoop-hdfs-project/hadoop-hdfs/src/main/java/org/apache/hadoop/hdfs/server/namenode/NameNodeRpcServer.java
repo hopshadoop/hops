@@ -53,6 +53,7 @@ import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
@@ -150,6 +151,9 @@ import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_LENGTH;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
+import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
+import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
 import org.tukaani.xz.UnsupportedOptionsException;
 
 /**
@@ -812,6 +816,21 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // ClientProtocol
+  public RollingUpgradeInfo rollingUpgrade(RollingUpgradeAction action) throws IOException {
+    LOG.info("rollingUpgrade " + action);
+    switch(action) {
+    case QUERY:
+      return namesystem.queryRollingUpgrade();
+    case PREPARE:
+      return namesystem.startRollingUpgrade();
+    case FINALIZE:
+      return namesystem.finalizeRollingUpgrade();
+    default:
+      throw new UnsupportedActionException(action + " is not yet supported.");
+    }
+  }
+  
+  @Override // ClientProtocol
   public CorruptFileBlocks listCorruptFileBlocks(String path, String cookie)
       throws IOException {
     String[] cookieTab = new String[]{cookie};
@@ -907,7 +926,6 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // DatanodeProtocol
   public DatanodeRegistration registerDatanode(DatanodeRegistration nodeReg)
       throws IOException {
-    verifyLayoutVersion(nodeReg.getVersion());
     verifySoftwareVersion(nodeReg);
     namesystem.registerDatanode(nodeReg);
     return nodeReg;
@@ -1027,6 +1045,20 @@ class NameNodeRpcServer implements NamenodeProtocols {
           + " but the expected ID is " + expectedID);
       throw new UnregisteredNodeException(nodeReg);
     }
+    
+    // verify layout version if there is no rolling upgrade.
+    if (!namesystem.isRollingUpgradeTX()) {
+      final int lv = nodeReg.getVersion();
+      final int expectedLV = nodeReg instanceof NamenodeRegistration?
+          NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION
+          : DataNodeLayoutVersion.CURRENT_LAYOUT_VERSION;
+      if (expectedLV != nodeReg.getVersion()) {
+        LOG.warn("Layout versions mismatched: the "
+            + nodeReg.getClass().getSimpleName() + " LV is " + lv
+            + " but the expected LV is " + expectedLV);
+         throw new UnregisteredNodeException(nodeReg);
+      }
+    }
   }
 
 
@@ -1074,8 +1106,9 @@ class NameNodeRpcServer implements NamenodeProtocols {
    * @throws IOException
    */
   void verifyLayoutVersion(int version) throws IOException {
-    if (version != HdfsConstants.LAYOUT_VERSION) {
-      throw new IncorrectVersionException(version, "data node");
+    if (version != HdfsConstants.NAMENODE_LAYOUT_VERSION) {
+      throw new IncorrectVersionException(
+          HdfsConstants.NAMENODE_LAYOUT_VERSION, version, "data node");
     }
   }
   

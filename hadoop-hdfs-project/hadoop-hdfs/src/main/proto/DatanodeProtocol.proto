@@ -185,6 +185,7 @@ message HeartbeatRequestProto {
  */
 message HeartbeatResponseProto {
   repeated DatanodeCommandProto cmds = 1; // Returned commands can be null
+  optional RollingUpgradeStatusProto rollingUpgradeStatus = 2;
 }
 
 /**

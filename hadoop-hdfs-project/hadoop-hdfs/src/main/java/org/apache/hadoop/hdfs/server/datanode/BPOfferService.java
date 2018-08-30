@@ -522,6 +522,18 @@ class BPOfferService implements Runnable {
   }
 
   /**
+   * Signal the current rolling upgrade status as indicated by the NN.
+   * @param inProgress true if a rolling upgrade is in progress
+   */
+  void signalRollingUpgrade(boolean inProgress) {
+    if (inProgress) {
+      dn.getFSDataset().enableTrash(getBlockPoolId());
+    } else {
+      dn.getFSDataset().restoreTrash(getBlockPoolId());
+    }
+  }
+  
+  /**
    * @return true if the given NN address is one of the NNs for this block pool
    */
   boolean containsNN(InetSocketAddress addr) {

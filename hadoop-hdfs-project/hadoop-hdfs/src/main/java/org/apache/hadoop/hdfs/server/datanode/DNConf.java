@@ -56,6 +56,7 @@ public class DNConf {
   final String encryptionAlgorithm;
   
   final long xceiverStopTimeout;
+  final long restartReplicaExpiry;
 
   final int iBRDispatherTPSize;
   
@@ -135,6 +136,10 @@ public class DNConf {
     this.maxLockedMemory = conf.getLong(
         DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
         DFS_DATANODE_MAX_LOCKED_MEMORY_DEFAULT);
+    
+    this.restartReplicaExpiry = conf.getLong(
+        DFS_DATANODE_RESTART_REPLICA_EXPIRY_KEY,
+        DFS_DATANODE_RESTART_REPLICA_EXPIRY_DEFAULT) * 1000L;
   }
   
   // We get minimumNameNodeVersion via a method so it can be mocked out in tests.
