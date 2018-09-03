@@ -364,7 +364,9 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
               Ints.toArray(partitionIdsRest));
       Iterator<INode> batchIterator = batch.listIterator();
       for(Integer i : unpopulatedIndeces){
-        result.set(i, batchIterator.next());
+        if(batchIterator.hasNext()){
+          result.set(i, batchIterator.next());
+        }
       }
       return result;
     }
