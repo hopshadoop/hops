@@ -108,7 +108,7 @@ public class TestGetBlocks {
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_KEY,
         staleInterval);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(numDatanodes).racks(racks).build();
+        .numDataNodes(numDatanodes).racks(racks).format(true).build();
 
     cluster.waitActive();
     InetSocketAddress addr = new InetSocketAddress("localhost",
@@ -204,7 +204,7 @@ public class TestGetBlocks {
 
     CONF.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, DEFAULT_BLOCK_SIZE);
     MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(CONF).numDataNodes(REPLICATION_FACTOR)
+        new MiniDFSCluster.Builder(CONF).numDataNodes(REPLICATION_FACTOR).format(true)
             .build();
     try {
       cluster.waitActive();

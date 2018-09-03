@@ -293,7 +293,9 @@ public class INodeLock extends BaseINodeLock {
           int diff = inodes.size() - unverifiedInode;
           while (diff > 0){
             INode node = inodes.remove(inodes.size() - 1);
-            Cache.getInstance().delete(node);
+            if(node!=null){
+              Cache.getInstance().delete(node);
+            }
             diff--;
           }
 
@@ -420,7 +422,9 @@ public class INodeLock extends BaseINodeLock {
     List<INode> resolvedINodes = memcacheResolver.fetchINodes(path);
     if (resolvedINodes != null) {
       for (INode iNode : resolvedINodes) {
-        checkSubtreeLock(iNode);
+        if(iNode!=null){
+          checkSubtreeLock(iNode);
+        }
       }
       handleLockUpgrade(resolvedINodes, INode.getPathComponents(path), path);
     }
