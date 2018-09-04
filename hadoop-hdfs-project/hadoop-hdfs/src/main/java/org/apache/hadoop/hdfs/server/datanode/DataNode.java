@@ -2033,7 +2033,14 @@ public class DataNode extends Configured
       try {
         location = StorageLocation.parse(locationString);
       } catch (IOException ioe) {
-        LOG.error("Failed to parse storage location " + locationString);
+        LOG.error("Failed to initialize storage directory " + locationString
+            + ". Exception details: " + ioe);
+        // Ignore the exception.
+        continue;
+      } catch (SecurityException se) {
+        LOG.error("Failed to initialize storage directory " + locationString
+                     + ". Exception details: " + se);
+        // Ignore the exception.
         continue;
       } catch (IllegalArgumentException iae) {
         LOG.error(iae.toString());
