@@ -2299,25 +2299,20 @@ public class BlockManager {
     }
     addToInvalidates(toInvalidate, storage);
 
-    final List<Long> allBlockIds = new ArrayList<>();
-    for (Long b : toRemove) {
-      allBlockIds.add(b);
-    }
-
-    removeBlocks(allBlockIds, storage.getDatanodeDescriptor());
+    removeBlocks(toRemove, storage.getDatanodeDescriptor());
 
     return reportStatistics;
   }
   
   @VisibleForTesting
-  public void removeBlocks(List<Long> allBlockIds, final DatanodeDescriptor node) throws IOException {
+  public void removeBlocks(Collection<Long> allBlockIds, final DatanodeDescriptor node) throws IOException {
     long[] array = new long[allBlockIds.size()];
     int i = 0;
     for (long blockId : allBlockIds) {
       array[i] = blockId;
       i++;
     }
-    final Map<Integer, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdentifiersForBlockIds(array);
+    final Map<Integer, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(array);
     final List<Integer> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
@@ -2342,7 +2337,7 @@ public class BlockManager {
       array[i] = blockId;
       i++;
     }
-    final Map<Integer, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdentifiersForBlockIds(array);
+    final Map<Integer, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(array);
     final List<Integer> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {

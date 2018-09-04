@@ -856,8 +856,8 @@ public class DFSUtil {
   public static List<InetSocketAddress> getNameNodesServiceRpcAddresses(
       Configuration conf) throws IOException {
     List<InetSocketAddress> addresses = getNameNodesRPCAddresses(conf,
-        DFSConfigKeys.DFS_NAMENODES_SERVICE_RPC_ADDRESS_KEY,
-        DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY);
+        DFSConfigKeys.DFS_NAMENODES_SERVICE_RPC_ADDRESS_KEY, DFS_NAMENODES_RPC_ADDRESS_KEY,
+        DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, DFS_NAMENODE_RPC_ADDRESS_KEY);
     if (addresses.isEmpty()) {
       addresses = getNameNodesRPCAddresses(conf);
     }
@@ -887,8 +887,13 @@ public class DFSUtil {
 
   private static List<InetSocketAddress> getNameNodesRPCAddresses(
       Configuration conf, String listKey, String singleKey) {
+    return getNameNodesRPCAddresses(conf, listKey, listKey, singleKey, singleKey);
+  }
+  
+  private static List<InetSocketAddress> getNameNodesRPCAddresses(
+      Configuration conf, String listKey, String defaultListKey, String singleKey, String defaultSingleKey) {
     List<InetSocketAddress> addresses = new ArrayList<>();
-    for (URI uri : getNameNodesRPCAddressesAsURIs(conf, listKey, singleKey)) {
+    for (URI uri : getNameNodesRPCAddressesAsURIs(conf, listKey, defaultListKey, singleKey, defaultSingleKey)) {
       addresses.add(new InetSocketAddress(uri.getHost(), uri.getPort()));
     }
     return addresses;
@@ -902,10 +907,20 @@ public class DFSUtil {
 
   private static List<URI> getNameNodesRPCAddressesAsURIs(Configuration conf,
       String listKey, String singleKey) {
+    return getNameNodesRPCAddressesAsURIs(conf, listKey, listKey, singleKey, singleKey);
+  }
+  
+  private static List<URI> getNameNodesRPCAddressesAsURIs(Configuration conf,
+      String listKey, String defaultListKey, String singleKey, String defaultSingleKey) {
     List<URI> uris = new ArrayList<>();
     for (String nn : getNameNodesRPCAddressesInternal(conf, listKey,
         singleKey)) {
       uris.add(DFSUtil.createHDFSUri(nn));
+    }
+    if(uris.isEmpty()){
+     for (String nn : getNameNodesRPCAddressesInternal(conf, defaultListKey, defaultSingleKey)) {
+      uris.add(DFSUtil.createHDFSUri(nn));
+      } 
     }
     return uris;
   }
@@ -936,11 +951,6 @@ public class DFSUtil {
         }
       }
     }
-
-//    String defaultAddress = getFSDefaultNameAsHostPortString(conf);
-//    if (defaultAddress != null) {
-//      namenodesSet.add(defaultAddress);
-//    }
 
     String singleNameNode = conf.get(singleKey);
     if (singleNameNode != null && !singleNameNode.isEmpty()) {
@@ -1027,8 +1037,10 @@ public class DFSUtil {
   public static List<URI> getNsServiceRpcUris(Configuration conf)
       throws URISyntaxException {
     return getNameNodesRPCAddressesAsURIs(conf,
+        DFS_NAMENODES_SERVICE_RPC_ADDRESS_KEY,
+        DFS_NAMENODES_RPC_ADDRESS_KEY,
         DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
-        DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY);
+        DFS_NAMENODE_RPC_ADDRESS_KEY);
   }
 
   /**
