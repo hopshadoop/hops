@@ -36,12 +36,14 @@ import java.lang.reflect.Type;
 public class OpenEntity {
   private final HdfsDataInputStream in;
   private final long length;
+  private final int outBufferSize;
   private final DFSClient dfsclient;
   
   OpenEntity(final HdfsDataInputStream in, final long length,
-      final DFSClient dfsclient) {
+      final int outBufferSize, final DFSClient dfsclient) {
     this.in = in;
     this.length = length;
+    this.outBufferSize = outBufferSize;
     this.dfsclient = dfsclient;
   }
   
@@ -70,7 +72,17 @@ public class OpenEntity {
         MultivaluedMap<String, Object> httpHeaders, OutputStream out)
         throws IOException {
       try {
-        IOUtils.copyBytes(e.in, out, e.length, false);
+        byte[] buf = new byte[e.outBufferSize];
+        long remaining = e.length;
+        while (remaining > 0) {
+          int read = e.in.read(buf, 0, (int)Math.min(buf.length, remaining));
+          if (read == -1) { // EOF
+            break;
+          }
+          out.write(buf, 0, read);
+          out.flush();
+          remaining -= read;
+        }
       } finally {
         IOUtils.cleanup(DatanodeWebHdfsMethods.LOG, e.in);
         IOUtils.cleanup(DatanodeWebHdfsMethods.LOG, e.dfsclient);
