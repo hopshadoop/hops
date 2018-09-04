@@ -83,6 +83,7 @@ import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import com.google.common.base.Charsets;
 import org.apache.hadoop.hdfs.ClientContext;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.security.authorize.ProxyServers;
 
 @InterfaceAudience.Private
 public class JspHelper {
@@ -687,7 +688,7 @@ public class JspHelper {
       if (doAsUserFromQuery != null) {
         // create and attempt to authorize a proxy user
         ugi = UserGroupInformation.createProxyUser(doAsUserFromQuery, ugi);
-        ProxyUsers.authorize(ugi, request.getRemoteAddr(), conf);
+        ProxyUsers.authorize(ugi, getRemoteAddr(request), conf);
       }
     }
 
@@ -725,6 +726,21 @@ public class JspHelper {
     return ugi;
   }
 
+  // honor the X-Forwarded-For header set by a configured set of trusted
+  // proxy servers.  allows audit logging and proxy user checks to work
+  // via an http proxy
+  static String getRemoteAddr(HttpServletRequest request) {
+    String remoteAddr = request.getRemoteAddr();
+    String proxyHeader = request.getHeader("X-Forwarded-For");
+    if (proxyHeader != null && ProxyServers.isProxyServer(remoteAddr)) {
+      final String clientAddr = proxyHeader.split(",")[0].trim();
+      if (!clientAddr.isEmpty()) {
+        remoteAddr = clientAddr;
+      }
+    }
+    return remoteAddr;
+  }
+  
   /**
    * Expected user name should be a short name.
    */

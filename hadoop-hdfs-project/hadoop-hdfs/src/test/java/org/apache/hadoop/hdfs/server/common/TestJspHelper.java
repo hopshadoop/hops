@@ -67,6 +67,8 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
+import org.apache.hadoop.security.authorize.ProxyServers;
+import org.junit.BeforeClass;
 import org.mockito.Mockito;
 
 import static org.mockito.Mockito.doAnswer;
@@ -79,6 +81,13 @@ public class TestJspHelper {
   private Configuration conf = new HdfsConfiguration();
   private String jspWriterOutput = "";
 
+  // allow user with TGT to run tests
+  @BeforeClass
+  public static void setupKerb() {
+    System.setProperty("java.security.krb5.kdc", "");
+    System.setProperty("java.security.krb5.realm", "NONE");
+  }    
+  
   public static class DummySecretManager
       extends AbstractDelegationTokenSecretManager<DelegationTokenIdentifier> {
 
@@ -638,5 +647,45 @@ public class TestJspHelper {
     DatanodeID dnWithEmptyIp = new DatanodeID("", "hostName", null,
         50020, 50075, 50076, 50010);
     assertNotNull(JspHelper.Url.authority("http", dnWithEmptyIp));
+  }
+  
+  private static String clientAddr = "1.1.1.1";
+  private static String chainedClientAddr = clientAddr+", 2.2.2.2";
+  private static String proxyAddr = "3.3.3.3";
+  
+  @Test
+  public void testRemoteAddr() {
+    assertEquals(clientAddr, getRemoteAddr(clientAddr, null, false));
+  }
+  
+  @Test
+  public void testRemoteAddrWithUntrustedProxy() {
+    assertEquals(proxyAddr, getRemoteAddr(clientAddr, proxyAddr, false));
+  }
+  @Test
+  public void testRemoteAddrWithTrustedProxy() {
+    assertEquals(clientAddr, getRemoteAddr(clientAddr, proxyAddr, true));
+    assertEquals(clientAddr, getRemoteAddr(chainedClientAddr, proxyAddr, true));
+  }
+  @Test
+  public void testRemoteAddrWithTrustedProxyAndEmptyClient() {
+    assertEquals(proxyAddr, getRemoteAddr(null, proxyAddr, true));
+    assertEquals(proxyAddr, getRemoteAddr("", proxyAddr, true));
+  }
+  private String getRemoteAddr(String clientAddr, String proxyAddr, boolean trusted) {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    Configuration conf = new Configuration();
+    if (proxyAddr == null) {
+      when(req.getRemoteAddr()).thenReturn(clientAddr);
+    } else {
+      when(req.getRemoteAddr()).thenReturn(proxyAddr);
+      when(req.getHeader("X-Forwarded-For")).thenReturn(clientAddr);
+      if (trusted) {
+        conf.set(ProxyServers.CONF_HADOOP_PROXYSERVERS, proxyAddr);
+      }
+    }
+    ProxyUsers.refreshSuperUserGroupsConfiguration(conf);
+    return JspHelper.getRemoteAddr(req);
   }
 }
