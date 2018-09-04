@@ -249,7 +249,7 @@ public class INodeUtil {
     }
   }
   
-  public static Map<Integer, List<Long>> getINodeIdentifiersForBlockIds(final long[] blockIds)
+  public static Map<Integer, List<Long>> getINodeIdsForBlockIds(final long[] blockIds)
       throws StorageException {
     Map<Integer, List<Long>> inodeIds;
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
