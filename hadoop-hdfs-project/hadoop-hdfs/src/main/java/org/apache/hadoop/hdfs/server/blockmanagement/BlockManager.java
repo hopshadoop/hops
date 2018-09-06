@@ -1184,7 +1184,7 @@ public class BlockManager {
     if (numBlocks == 0) {
       return new BlocksWithLocations(new BlockWithLocations[0]);
     }
-    Iterator<BlockInfo> iter = node.getBlockIterator();
+    Iterator<BlockInfo> iter = node.getBlockIterator(false);
     int startBlock =
         DFSUtil.getRandom().nextInt(numBlocks); // starting from a random block
     // skip blocks
@@ -1195,20 +1195,33 @@ public class BlockManager {
     long totalSize = 0;
     BlockInfo curBlock;
     while (totalSize < size && iter.hasNext()) {
-      curBlock = iter.next();
-      if (!curBlock.isComplete()) {
-        continue;
-      }
-      totalSize += addBlock(curBlock, results);
-    }
-    if (totalSize < size) {
-      iter = node.getBlockIterator(); // start from the beginning
-      for (int i = 0; i < startBlock && totalSize < size; i++) {
+      List<Block> toAdd = new ArrayList<>();
+      long estimatedSize = 0;
+      while(totalSize+ estimatedSize < size && iter.hasNext()){
         curBlock = iter.next();
         if (!curBlock.isComplete()) {
           continue;
         }
-        totalSize += addBlock(curBlock, results);
+        toAdd.add(curBlock);
+        estimatedSize += curBlock.getNumBytes();
+      }
+      totalSize += addBlocks(toAdd, results);
+    }
+    if (totalSize < size) {
+      iter = node.getBlockIterator(false); // start from the beginning
+      for (int i = 0; i < startBlock && totalSize < size; ) {
+        List<Block> toAdd = new ArrayList<>();
+        long estimatedSize = 0;
+        while (totalSize + estimatedSize < size && i<startBlock) {
+          curBlock = iter.next();
+          i++;
+          if (!curBlock.isComplete()) {
+            continue;
+          }
+          toAdd.add(curBlock);
+          estimatedSize += curBlock.getNumBytes();
+        }
+        totalSize += addBlocks(toAdd, results);
       }
     }
 
@@ -1221,7 +1234,7 @@ public class BlockManager {
    */
   void datanodeRemoved(final DatanodeDescriptor node)
       throws IOException {
-    final Iterator<? extends Block> it = node.getBlockIterator();
+    final Iterator<? extends Block> it = node.getBlockIterator(true);
     final List<Long> allBlockIds = new ArrayList<>();
     while (it.hasNext()) {
       allBlockIds.add(it.next().getBlockId());
@@ -1252,7 +1265,7 @@ public class BlockManager {
   /** Remove the blocks associated to the given DatanodeStorageInfo. */
   void removeBlocksAssociatedTo(final DatanodeStorageInfo storageInfo)
       throws IOException {
-    final Iterator<BlockInfo> it = storageInfo.getBlockIterator();
+    final Iterator<BlockInfo> it = storageInfo.getBlockIterator(true);
     final DatanodeDescriptor node = storageInfo.getDatanodeDescriptor();
     final List<Long> allBlockIds = new ArrayList<>();
     while (it.hasNext()) {
@@ -3929,54 +3942,68 @@ public class BlockManager {
    * Get all valid locations of the block & add the block to results
    * return the length of the added block; 0 if the block is not added
    */
-  private long addBlock(final Block block, List<BlockWithLocations> results)
+  private long addBlocks(final List<Block> blocks, List<BlockWithLocations> results)
       throws IOException {
-    
-    final List<DatanodeStorageInfo> locations = new ArrayList<DatanodeStorageInfo>();
-    
+
+    final Map<Block, List<DatanodeStorageInfo>> locationsMap = new HashMap<>();
+
     new HopsTransactionalRequestHandler(HDFSOperationType.GET_VALID_BLK_LOCS) {
-      INodeIdentifier inodeIdentifier;
+      List<INodeIdentifier> inodeIdentifiers;
 
       @Override
       public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+        long[] blockIds = new long[blocks.size()];
+        for(int i=0; i<blocks.size(); i++){
+          blockIds[i] = blocks.get(i).getBlockId();
+        }
+        List<Integer> inodeIds = new ArrayList<>(INodeUtil.getINodeIdsForBlockIds(blockIds).keySet());
+        inodeIdentifiers = INodeUtil.resolveINodesFromIds(inodeIds);
       }
 
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
-            .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
-            .add(lf.getBlockRelated(BLK.RE, BLK.IV));
+            lf.getBatchedINodesLock(inodeIdentifiers))
+            .add(lf.getSqlBatchedBlocksLock())
+            .add(lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV));
       }
 
       @Override
       public Object performTask() throws IOException {
-        BlockInfo temp = getBlockInfo(block);
-        final List<DatanodeStorageInfo> ms = getValidLocations(temp);
-        locations.addAll(ms);
+        for (Block block : blocks) {
+          BlockInfo temp = getBlockInfo(block);
+          final List<DatanodeStorageInfo> ms = getValidLocations(temp);
+          if (!ms.isEmpty()) {
+            locationsMap.put(block, ms);
+          }
+        }
         return null;
       }
     }.handle(namesystem);
-    
-    if (locations.isEmpty()) {
+
+    if (locationsMap.isEmpty()) {
       return 0;
     } else {
-      final String[] datanodeUuids = new String[locations.size()];
-      final String[] storageIDs = new String[datanodeUuids.length];
-      final StorageType[] storageTypes = new StorageType[datanodeUuids.length];
-      for(int i = 0; i < locations.size(); i++) {
-        final DatanodeStorageInfo s = locations.get(i);
-        datanodeUuids[i] = s.getDatanodeDescriptor().getDatanodeUuid();
-        storageIDs[i] = s.getStorageID();
-        storageTypes[i] = s.getStorageType();
+      long numBytes = 0;
+      for (Block block : locationsMap.keySet()) {
+        List<DatanodeStorageInfo> locations = locationsMap.get(block);
+        final String[] datanodeUuids = new String[locations.size()];
+        final String[] storageIDs = new String[datanodeUuids.length];
+        final StorageType[] storageTypes = new StorageType[datanodeUuids.length];
+        for (int i = 0; i < locations.size(); i++) {
+          final DatanodeStorageInfo s = locations.get(i);
+          datanodeUuids[i] = s.getDatanodeDescriptor().getDatanodeUuid();
+          storageIDs[i] = s.getStorageID();
+          storageTypes[i] = s.getStorageType();
+        }
+
+        results.add(new BlockWithLocations(block, datanodeUuids, storageIDs,
+            storageTypes));
+        numBytes += block.getNumBytes();
       }
 
-      results.add(new BlockWithLocations(block, datanodeUuids, storageIDs,
-          storageTypes));
-
-      return block.getNumBytes();
+      return numBytes;
     }
   }
 
@@ -4307,7 +4334,7 @@ public class BlockManager {
   void processOverReplicatedBlocksOnReCommission(
       final DatanodeDescriptor srcNode) throws IOException {
     final int[] numOverReplicated = {0};
-    final Iterator<? extends Block> it = srcNode.getBlockIterator();
+    final Iterator<? extends Block> it = srcNode.getBlockIterator(true);
     HopsTransactionalRequestHandler processBlockHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.PROCESS_OVER_REPLICATED_BLOCKS_ON_RECOMMISSION) {
@@ -4367,7 +4394,7 @@ public class BlockManager {
     final int[] decommissionOnlyReplicas = new int[]{0};
     final int[] underReplicatedInOpenFiles = new int[]{0};
 
-    final Iterator<? extends Block> it = srcNode.getBlockIterator();
+    final Iterator<? extends Block> it = srcNode.getBlockIterator(true);
 
     HopsTransactionalRequestHandler checkReplicationHandler =
         new HopsTransactionalRequestHandler(
