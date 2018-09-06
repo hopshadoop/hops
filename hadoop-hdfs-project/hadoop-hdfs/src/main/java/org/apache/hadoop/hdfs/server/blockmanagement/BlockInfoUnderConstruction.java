@@ -18,8 +18,6 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.HdfsStorageFactory;
-import io.hops.metadata.hdfs.dal.ReplicaUnderConstructionDataAccess;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
@@ -30,9 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 
 /**
  * Represents a block that is currently being constructed.<br>
@@ -228,6 +224,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
       // Just set all the replicas to be chosen whether they are alive or not.
       for (int i = 0; i < replicas.size(); i++) {
         replicas.get(i).setChosenAsPrimary(false);
+        update(replicas.get(i));
       }
     }
     long mostRecentLastUpdate = 0;
