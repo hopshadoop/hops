@@ -32,6 +32,9 @@ import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import java.util.Collections;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
@@ -43,8 +46,12 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReport;
  * by this class.
  */
 public class DatanodeStorageInfo {
+  public static final Log LOG = LogFactory.getLog(DatanodeStorageInfo.class);
+  
   public static final DatanodeStorageInfo[] EMPTY_ARRAY = {};
 
+  private static int BLOCKITERATOR_BATCH_SIZE = 10000;
+  
   public static StorageType[] toStorageTypes(DatanodeStorageInfo[] storages) {
     StorageType[] storageTypes = new StorageType[storages.length];
     for(int i = 0; i < storageTypes.length; i++) {
@@ -183,10 +190,14 @@ public class DatanodeStorageInfo {
   /**
    * Iterates over the list of blocks belonging to the Storage.
    */
-  public Iterator<BlockInfo> getBlockIterator() throws IOException {
-    return getAllStorageBlockInfos().iterator();
+  public Iterator<BlockInfo> getBlockIterator(boolean all) throws IOException {
+    if(all){
+      return getAllStorageBlockInfos().iterator();
+    }else{
+      return new BlockIterator();
+    }
   }
-
+  
   private List<BlockInfo> getAllStorageBlockInfos() throws IOException {
     final int sid = this.sid;
 
@@ -205,6 +216,100 @@ public class DatanodeStorageInfo {
     return (List<BlockInfo>) findBlocksHandler.handle();
   }
   
+  private class BlockIterator implements Iterator<BlockInfo> {    
+    private Iterator<BlockInfo> blocks = Collections.EMPTY_LIST.iterator();
+    long index = 0;
+    
+    public BlockIterator(){
+      update();
+    }
+    
+    @Override
+    public boolean hasNext() {
+      if(!blocks.hasNext()){
+        update();
+      }
+      return blocks.hasNext();
+    }
+
+    @Override
+    public BlockInfo next() {
+      if(!blocks.hasNext()){
+        update();
+      }
+      return blocks.next();
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException("Remove unsupported.");
+    }
+
+    private void update(){
+      try{
+      while(!blocks.hasNext() && hasBlocksWithIdGreaterThan(index)){
+        blocks = getStorageBlockInfos(index, BLOCKITERATOR_BATCH_SIZE).iterator();
+        index = index+BLOCKITERATOR_BATCH_SIZE;
+      }
+      }catch(IOException ex){
+        LOG.warn(ex,ex);
+      }
+    }
+    
+  }
+
+  private List<BlockInfo> getStorageBlockInfos(final long from, final int size) throws IOException {
+    final int sid = this.sid;
+
+    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_STORAGE_IDS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        boolean transactionActive = connector.isTransactionActive();
+        try {
+          if (!transactionActive) {
+            connector.beginTransaction();
+          }
+
+          BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory
+              .getDataAccess(BlockInfoDataAccess.class);
+          return da.findBlockInfosByStorageId(sid, from, size);
+        } finally {
+          if (!transactionActive) {
+            connector.commit();
+          }
+        }
+      }
+    };
+    return (List<BlockInfo>) findBlocksHandler.handle();
+  }
+  
+  private boolean hasBlocksWithIdGreaterThan(final long from) throws IOException {
+    final int sid = this.sid;
+
+    LightWeightRequestHandler hasBlocksHandler = new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_STORAGE_IDS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        boolean transactionActive = connector.isTransactionActive();
+        try {
+          if (!transactionActive) {
+            connector.beginTransaction();
+          }
+
+          ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+              .getDataAccess(ReplicaDataAccess.class);
+          return da.hasBlocksWithIdGreaterThan(sid, from);
+        } finally {
+          if (!transactionActive) {
+            connector.commit();
+          }
+        }
+      }
+    };
+    return (boolean) hasBlocksHandler.handle();
+  }
+    
   public void setState(State s) {
     this.state = s;
   }
