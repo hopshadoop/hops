@@ -1471,7 +1471,6 @@ public class TestFileCreation {
   public void test2() throws IOException {
     Configuration conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsVariables.enterClusterSafeMode();
     HdfsVariables.resetMisReplicatedIndex();
   }
   

@@ -38,9 +38,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 
 /**
  * Keeps a Collection for every storage containing blocks
@@ -316,18 +319,21 @@ class InvalidateBlocks {
         .findList(InvalidatedBlock.Finder.All);
   }
 
-  public List<DatanodeInfo> getDatanodes(DatanodeManager manager)
+  public Map<DatanodeInfo, List<Integer>> getDatanodes(DatanodeManager manager)
       throws IOException {
-    HashSet<DatanodeInfo> nodes = new HashSet<DatanodeInfo>();
+    Map<DatanodeInfo, List<Integer>> nodes = new HashMap<DatanodeInfo, List<Integer>>();
     for(int sid : getSids()) {
       DatanodeInfo node = manager.getDatanodeBySid(sid);
-
-      // We should never search for a non-existing storage/datanode
-      assert node != null;
-
-      nodes.add(node);
+      
+      List<Integer> sids = nodes.get(node);
+      if(sids==null){
+        sids = new ArrayList<>();
+        nodes.put(node, sids);
+      }
+      sids.add(sid);
+      
     }
 
-    return new ArrayList<DatanodeInfo>(nodes);
+    return nodes;
   }
 }

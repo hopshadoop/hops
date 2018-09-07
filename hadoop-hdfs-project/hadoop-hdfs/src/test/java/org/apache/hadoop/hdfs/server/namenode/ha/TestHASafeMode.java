@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
+import io.hops.metadata.HdfsVariables;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import java.util.Collections;
@@ -106,9 +107,9 @@ public class TestHASafeMode {
     // let nn0 enter safemode
     NameNodeAdapter.enterSafeMode(nn0, false);
     NameNodeAdapter.enterSafeMode(nn1, false);
-    SafeModeInfo safeMode = (SafeModeInfo) Whitebox.getInternalState(
-        nn0.getNamesystem(), "safeMode");
+    SafeModeInfo safeMode = nn0.getNamesystem().getSafeModeInfoForTests();
     Whitebox.setInternalState(safeMode, "extension", Integer.valueOf(30000));
+    HdfsVariables.setSafeModeInfo(safeMode, safeMode.getReached());
     LOG.info("enter safemode");
     Thread testThread = new Thread() {
       @Override

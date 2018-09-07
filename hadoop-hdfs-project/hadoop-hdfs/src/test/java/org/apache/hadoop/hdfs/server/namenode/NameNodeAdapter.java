@@ -200,7 +200,7 @@ public class NameNodeAdapter {
   /**
    * @return Replication queue initialization status
    */
-  public static boolean safeModeInitializedReplQueues(NameNode nn) {
+  public static boolean safeModeInitializedReplQueues(NameNode nn) throws IOException {
     return nn.getNamesystem().isPopulatingReplQueues();
   }
 }
