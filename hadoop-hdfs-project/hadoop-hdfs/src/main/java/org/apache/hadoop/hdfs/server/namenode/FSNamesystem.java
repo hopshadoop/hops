@@ -437,8 +437,6 @@ public class FSNamesystem
   private final boolean supportAppends;
   private final ReplaceDatanodeOnFailure dtpReplaceDatanodeOnFailure;
 
-  private volatile SafeModeInfo safeMode;  // safe mode information
-
   private final long maxFsObjects;          // maximum number of fs objects
 
   private final long minBlockSize;         // minimum block size
@@ -465,6 +463,8 @@ public class FSNamesystem
 
   /** flag indicating whether replication queues have been initialized */
   boolean initializedReplQueues = false;
+  
+  boolean shouldPopulateReplicationQueue = false;
   
   /**
    * Whether the namenode is in the middle of starting the active service
@@ -673,7 +673,6 @@ public class FSNamesystem
       this.dtSecretManager = createDelegationTokenSecretManager(conf);
       this.dir = new FSDirectory(this, conf);
       this.cacheManager = new CacheManager(this, conf, blockManager);
-      this.safeMode = new SafeModeInfo(conf);
       this.auditLoggers = initAuditLoggers(conf);
       this.isDefaultAuditLogger = auditLoggers.size() == 1 &&
           auditLoggers.get(0) instanceof DefaultAuditLogger;
@@ -798,15 +797,16 @@ public class FSNamesystem
     this.registerMBean(); // register the MBean for the FSNamesystemState
     IDsMonitor.getInstance().start();
     RootINodeCache.start();
-    if (isClusterInSafeMode()) {
-      assert safeMode != null && !isPopulatingReplQueues();
+    if (isLeader()) {
+      HdfsVariables.setSafeModeInfo(new SafeModeInfo(conf), -1);
+      assert safeMode() != null && !isPopulatingReplQueues();
       StartupProgress prog = NameNode.getStartupProgress();
       prog.beginPhase(Phase.SAFEMODE);
       prog.setTotal(Phase.SAFEMODE, STEP_AWAITING_REPORTED_BLOCKS,
-        getCompleteBlocksTotal());
+          getCompleteBlocksTotal());
       setBlockTotal();
-      performPendingSafeModeOperation();
     }
+    shouldPopulateReplicationQueue = true;
     blockManager.activate(conf);
     if (dir.isQuotaEnabled()) {
       quotaUpdateManager.activate();
@@ -945,8 +945,9 @@ public class FSNamesystem
   private void checkNameNodeSafeMode(String errorMsg)
       throws RetriableException, SafeModeException, IOException {
     if (isInSafeMode()) {
+      SafeModeInfo safeMode = safeMode();
       SafeModeException se = new SafeModeException(errorMsg, safeMode);
-      if (shouldRetrySafeMode(this.safeMode)) {
+      if (shouldRetrySafeMode(safeMode)) {
         throw new RetriableException(se);
       } else {
         throw se;
@@ -1447,7 +1448,7 @@ public class FSNamesystem
         // if safe mode & no block locations yet then throw SafeModeException
         if ((b.getLocations() == null) || (b.getLocations().length == 0)) {
           SafeModeException se = new SafeModeException(
-              "Zero blocklocations for " + src, safeMode);
+              "Zero blocklocations for " + src, safeMode());
           throw new RetriableException(se);
         }
       }
@@ -3549,9 +3550,29 @@ public class FSNamesystem
     if (blocks == null) {
       return;
     }
+    removeBlocksAndUpdateSafemodeTotal(blocks);
+  }
+  
+  /**
+   * Removes the blocks from blocksmap and updates the safemode blocks total
+   * 
+   * @param blocks
+   *          An instance of {@link BlocksMapUpdateInfo} which contains a list
+   *          of blocks that need to be removed from blocksMap
+   */
+  void removeBlocksAndUpdateSafemodeTotal(BlocksMapUpdateInfo blocks) throws IOException{
+    int numRemovedComplete = 0;
+    List<Block> removedSafe = new ArrayList<>();
+    
     for (Block b : blocks.getToDeleteList()) {
+      BlockInfo bi = getStoredBlock(b);
+      if (bi.isComplete()) {
+        numRemovedComplete++;
+        removedSafe.add(b);
+      }
       blockManager.removeBlock(b);
     }
+    adjustSafeModeBlockTotals(removedSafe,-numRemovedComplete);
   }
 
   /**
@@ -4368,6 +4389,7 @@ public class FSNamesystem
    * @return true if there were sufficient resources available, false otherwise.
    */
   private boolean nameNodeHasResourcesAvailable() {
+    //TODO check if the database has resources left.
     return hasResourcesAvailable;
   }
 
@@ -4385,7 +4407,7 @@ public class FSNamesystem
     public void run() {
       try {
         while (fsRunning && shouldNNRmRun) {
-          if (!nameNodeHasResourcesAvailable()) {
+          if (isLeader() && !nameNodeHasResourcesAvailable()) {
             String lowResourcesMsg = "NameNode low on available disk space. ";
             if (!isInSafeMode()) {
               FSNamesystem.LOG.warn(lowResourcesMsg + "Entering safe mode.");
@@ -4593,19 +4615,9 @@ public class FSNamesystem
      * <br> 0 safe mode is on, and threshold is not reached yet
      * <br> >0 safe mode is on, but we are in extension period 
      */
-    private long reached = -1;
-    /**
-     * Total number of blocks.
-     */
-    int blockTotal;
-    /**
-     * Number of blocks needed to satisfy safe mode threshold condition
-     */
-    private int blockThreshold;
-    /**
-     * Number of blocks needed before populating replication queues
-     */
-    private int blockReplicationQueueThreshold;
+    private long reached() throws IOException{
+      return HdfsVariables.getSafeModeReached();
+    }
     /**
      * time of the last status printout
      */
@@ -4627,7 +4639,7 @@ public class FSNamesystem
      * @param conf
      *     configuration
      */
-    private SafeModeInfo(Configuration conf) {
+    private SafeModeInfo(Configuration conf) throws IOException {
       this.threshold = conf.getFloat(DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY,
           DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_DEFAULT);
       if (threshold > 1.0) {
@@ -4654,7 +4666,7 @@ public class FSNamesystem
       this.replicationQueueThreshold =
           conf.getFloat(DFS_NAMENODE_REPL_QUEUE_THRESHOLD_PCT_KEY,
               (float) threshold);
-      this.blockTotal = 0;
+      HdfsVariables.setBlockTotal(0);
     }
 
     /**
@@ -4672,12 +4684,54 @@ public class FSNamesystem
       this.extension = Integer.MAX_VALUE;
       this.safeReplication = Short.MAX_VALUE + 1; // more than maxReplication
       this.replicationQueueThreshold = 1.5f; // can never be reached
-      this.blockTotal = -1;
+      HdfsVariables.setBlockTotal(-1);
       this.resourcesLow = resourcesLow;
       enter();
       reportStatus("STATE* Safe mode is ON.", true);
     }
 
+    private SafeModeInfo(double threshold, int datanodeThreshold, int extension, int safeReplication,
+        double replicationQueueThreshold, boolean resourcesLow) throws IOException {
+      this.threshold = threshold;
+      this.datanodeThreshold = datanodeThreshold;
+      this.extension = extension;
+      this.safeReplication = safeReplication;
+      this.replicationQueueThreshold = replicationQueueThreshold;
+      this.resourcesLow = resourcesLow;
+    }
+
+    public double getThreshold() {
+      return threshold;
+    }
+
+    public int getDatanodeThreshold() {
+      return datanodeThreshold;
+    }
+
+    public int getExtension() {
+      return extension;
+    }
+
+    public int getSafeReplication() {
+      return safeReplication;
+    }
+
+    public double getReplicationQueueThreshold() {
+      return replicationQueueThreshold;
+    }
+
+    public long getLastStatusReport() {
+      return lastStatusReport;
+    }
+
+    public boolean isResourcesLow() {
+      return resourcesLow;
+    }
+
+    public long getReached() throws IOException{
+      return reached();
+    }
+    
     /**
      * Check if safe mode is on.
      *
@@ -4685,14 +4739,17 @@ public class FSNamesystem
      */
     private boolean isOn() throws IOException {
       doConsistencyCheck();
-      return this.reached >= 0 && isClusterInSafeMode();
+      return this.reached() >= 0;
     }
 
     /**
      * Enter safe mode.
      */
-    private void enter() {
-      this.reached = 0;
+    private void enter() throws IOException {
+      if(isLeader()){
+        LOG.info("enter safe mode");
+        HdfsVariables.setSafeModeReached(0);
+      }
     }
 
     /**
@@ -4707,10 +4764,9 @@ public class FSNamesystem
       if (!isPopulatingReplQueues() && shouldPopulateReplicationQueues()) {
         initializeReplQueues();
       }
-
+      
       leaveInternal();
 
-      HdfsVariables.exitClusterSafeMode();
       clearSafeBlocks();
     }
 
@@ -4721,11 +4777,12 @@ public class FSNamesystem
       NameNode.getNameNodeMetrics().setSafeModeTime((int) timeInSafeMode);
 
       //Log the following only once (when transitioning from ON -> OFF)
-      if (reached >= 0) {
+      if (reached() >= 0) {
         NameNode.stateChangeLog.info("STATE* Safe mode is OFF");
       }
-      reached = -1;
-      safeMode = null;
+      if(isLeader()){
+        HdfsVariables.exitSafeMode();
+      }
       final NetworkTopology nt =
           blockManager.getDatanodeManager().getNetworkTopology();
       NameNode.stateChangeLog.info(
@@ -4749,7 +4806,7 @@ public class FSNamesystem
      */
     private boolean canInitializeReplicationQueues() throws IOException {
       return shouldPopulateReplicationQueues() &&
-          blockSafe() >= blockReplicationQueueThreshold;
+          blockSafe() >= blockReplicationQueueThreshold();
     }
 
     /**
@@ -4761,10 +4818,13 @@ public class FSNamesystem
      * @return true if can leave or false otherwise.
      */
     private boolean canLeave() throws IOException {
-      if (reached == 0 && isClusterInSafeMode()) {
+      if(!isLeader()){
         return false;
       }
-      if (now() - reached < extension) {
+      if (reached() == 0) {
+        return false;
+      }
+      if (now() - reached() < extension) {
         reportStatus("STATE* Safe mode ON, in safe mode extension.", false);
         return false;
       }
@@ -4783,7 +4843,10 @@ public class FSNamesystem
      * @throws IOException
      */
     private void tryToHelpToGetOut() throws IOException{
-      if (isManual() && !resourcesLow) {
+      //if the cluster was set in safe mode by the admin we should wait for the admin to get out of safe mode
+      //if the cluster has low resources we should wait for the resources to increase to get out of safe mode
+      //if the namenode is the leader it should get out by other means.
+      if (isManual() || areResourcesLow() || isLeader()) {
         return;
       }
       checkMode();
@@ -4804,10 +4867,7 @@ public class FSNamesystem
      * went out of safe mode
      */
     private boolean needEnter() throws IOException {
-      if (!isClusterInSafeMode()) {
-        return false;
-      }
-      return (threshold != 0 && blockSafe() < blockThreshold) ||
+      return (threshold != 0 && blockSafe() < blockThreshold()) ||
           (datanodeThreshold != 0 && getNumLiveDataNodes() < datanodeThreshold) ||
           (!nameNodeHasResourcesAvailable());
     }
@@ -4817,7 +4877,9 @@ public class FSNamesystem
      */
 
     private void checkMode() throws IOException {
-
+      if(!isLeader() && !(reached()>=0)){
+        return;
+      }
       // if smmthread is already running, the block threshold must have been 
       // reached before, there is no need to enter the safe mode again
       if (smmthread == null && needEnter()) {
@@ -4835,12 +4897,14 @@ public class FSNamesystem
         this.leave(); // leave safe mode
         return;
       }
-      if (reached > 0) {  // threshold has already been reached before
+      if (reached() > 0) {  // threshold has already been reached before
         reportStatus("STATE* Safe mode ON.", false);
         return;
       }
       // start monitor
-      reached = now();
+      if(isLeader()){
+        HdfsVariables.setSafeModeReached(now());
+      }
       startSafeModeMonitor();
 
       reportStatus("STATE* Safe mode extension entered.", true);
@@ -4862,14 +4926,19 @@ public class FSNamesystem
     /**
      * Set total number of blocks.
      */
-    private synchronized void setBlockTotal(int total) {
-      this.blockTotal = total;
-      this.blockThreshold = (int) (blockTotal * threshold);
-      this.blockReplicationQueueThreshold = (int) (blockTotal *
-          replicationQueueThreshold);
-      setSafeModePendingOperation(true);
+    private synchronized void setBlockTotal(int total) throws IOException {
+      int blockTotal = total;
+      int blockThreshold = (int) (blockTotal * threshold);
+      int blockReplicationQueueThreshold = (int) (blockTotal * replicationQueueThreshold);
+      HdfsVariables.setBlockTotal(blockTotal, blockThreshold, blockReplicationQueueThreshold);
+      checkMode();
     }
 
+    private synchronized void updateBlockTotal(int deltaTotal) throws IOException {
+      HdfsVariables.updateBlockTotal(deltaTotal, threshold, replicationQueueThreshold);
+      setSafeModePendingOperation(true);
+    }
+    
     /**
      * Increment number of safe blocks if current block has
      * reached minimal replication.
@@ -4881,6 +4950,7 @@ public class FSNamesystem
       addSafeBlock(blk.getBlockId());
 
       // Report startup progress only if we haven't completed startup yet.
+      //todo this will not work with multiple NN
         StartupProgress prog = NameNode.getStartupProgress();
         if (prog.getStatus(Phase.SAFEMODE) != Status.COMPLETE) {
           if (this.awaitingReportedBlocksCounter == null) {
@@ -4963,9 +5033,13 @@ public class FSNamesystem
       int numLive = getNumLiveDataNodes();
       String msg = "";
 
-      long blockSafe;
+      int blockSafe;
+      int blockThreshold;
+      int blockTotal;
       try {
         blockSafe = blockSafe();
+        blockThreshold = blockThreshold();
+        blockTotal = blockTotal();
       } catch (IOException ex) {
         LOG.error(ex);
         return "got exception " + ex.getMessage();
@@ -4991,6 +5065,7 @@ public class FSNamesystem
                       "the minimum number %d. ",
                       numLive, datanodeThreshold);
       }
+      long reached = reached();
       msg += (reached > 0) ? "In safe mode extension. " : "";
       msg += "Safe mode will be turned off automatically ";
       
@@ -5020,8 +5095,12 @@ public class FSNamesystem
     @Override
     public String toString() {
       String blockSafe;
+      long blockThreshold=-1;
+      long reached = -1;
       try {
         blockSafe = "" + blockSafe();
+        blockThreshold = blockThreshold();
+        reached = reached();
       } catch (IOException ex) {
         blockSafe = ex.getMessage();
       }
@@ -5045,7 +5124,9 @@ public class FSNamesystem
       if (!assertsOn) {
         return;
       }
-
+      
+      long blockTotal = blockTotal();
+      
       if (blockTotal == -1 /*&& blockSafe == -1*/) {
         return; // manual safe mode
       }
@@ -5059,9 +5140,27 @@ public class FSNamesystem
       }
     }
 
-    private void adjustBlockTotals(int deltaSafe, int deltaTotal)
+    private void adjustBlockTotals(List<Block> deltaSafe, int deltaTotal)
         throws IOException {
-      //FIXME ?!
+      int oldBlockSafe = 0;
+      if (LOG.isDebugEnabled()) {
+        oldBlockSafe = blockSafe();
+      }
+      
+      if (deltaSafe != null) {
+        for (Block b : deltaSafe) {
+          removeSafeBlock(b.getBlockId());
+        }
+      }
+      
+      if (LOG.isDebugEnabled()) {
+        int newBlockSafe = blockSafe();
+        long blockTotal = blockTotal();
+        LOG.debug("Adjusting block totals from " + oldBlockSafe + "/" + blockTotal + " to " + newBlockSafe + "/"
+            + (blockTotal + deltaTotal));
+      }
+            
+      updateBlockTotal(deltaTotal);
     }
 
     private void setSafeModePendingOperation(Boolean val) {
@@ -5076,6 +5175,7 @@ public class FSNamesystem
       addSafeBlocks(safeBlocks);
       int newSafeBlockSize = blockSafe();
       if (LOG.isDebugEnabled()) {
+        long blockTotal = blockTotal();
         LOG.debug("Adjusting safe blocks from " + lastSafeBlockSize + "/" +
             blockTotal + " to " + newSafeBlockSize + "/" + blockTotal);
       }
@@ -5101,6 +5201,33 @@ public class FSNamesystem
     int blockSafe() throws IOException {
       return getBlockSafe();
     }
+    
+    /**
+     * Get number of total blocks from the database
+     * @return
+     * @throws IOException
+     */
+    int blockTotal() throws IOException {
+      return HdfsVariables.getBlockTotal();
+    }
+    
+    /**
+     * Get blockReplicationQueueThreshold from the database
+     * @return
+     * @throws IOException
+     */
+    int blockReplicationQueueThreshold() throws IOException {
+      return HdfsVariables.getBlockReplicationQueueThreshold();
+    }
+    
+    /**
+     * Get blockThreshold from the database
+     * @return
+     * @throws IOException
+     */
+    int blockThreshold() throws IOException {
+      return HdfsVariables.getBlockThreshold();
+    }
   }
 
   /**
@@ -5119,6 +5246,7 @@ public class FSNamesystem
     public void run() {
       try {
         while (fsRunning) {
+          SafeModeInfo safeMode = safeMode();
           if (safeMode == null) { // Not in safe mode.
             break;
           }
@@ -5162,7 +5290,7 @@ public class FSNamesystem
   @Override
   public void checkSafeMode() throws IOException {
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = safeMode();
     if (safeMode != null) {
       safeMode.checkMode();
     }
@@ -5171,25 +5299,31 @@ public class FSNamesystem
   @Override
   public boolean isInSafeMode() throws IOException {
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = safeMode();
     if (safeMode == null) {
       return false;
     }
-    if (!isClusterInSafeMode()) {
-      safeMode.clusterLeftSafeModeAlready();
-      return false;
-    } else {
+    if(safeMode.isOn() && !isLeader()){
       safeMode.tryToHelpToGetOut();
     }
     return safeMode.isOn();
   }
 
+  private SafeModeInfo safeMode() throws IOException{
+    List<Object> vals = HdfsVariables.getSafeModeFromDB();
+    if(vals==null || vals.isEmpty()){
+      return null;
+    }
+    return new FSNamesystem.SafeModeInfo((double) vals.get(0), (int) vals.get(1), (int) vals.get(2), (int) vals.get(3),
+        (double) vals.get(4), (int) vals.get(5) == 0 ? true : false);
+  }
+  
   @Override
   public boolean isInStartupSafeMode() throws IOException {
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = safeMode();
     if (safeMode == null) {
-      return false;
+        return false;
     }
     // If the NN is in safemode, and not due to manual / low resources, we
     // assume it must be because of startup. If the NN had low resources during
@@ -5204,26 +5338,26 @@ public class FSNamesystem
    * @return true when node is HAState.Active and not in the very first safemode
    */
   @Override
-  public boolean isPopulatingReplQueues() {
+  public boolean isPopulatingReplQueues() throws IOException {
     if (!shouldPopulateReplicationQueues()) {
       return false;
     }
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = safeMode();
     if (safeMode == null) {
-      return true;
+        return true;
     }
     return initializedReplQueues;
   }
 
   private boolean shouldPopulateReplicationQueues() {
-    return true;
+    return shouldPopulateReplicationQueue;
   }
 
   @Override
   public void incrementSafeBlockCount(BlockInfo blk) throws IOException {
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = safeMode();
     if (safeMode == null) {
       return;
     }
@@ -5234,7 +5368,7 @@ public class FSNamesystem
   public void decrementSafeBlockCount(BlockInfo b)
       throws IOException {
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = this.safeMode();
     if (safeMode == null) // mostly true
     {
       return;
@@ -5255,10 +5389,10 @@ public class FSNamesystem
    *     the change i number of total blocks expected
    */
   @Override
-  public void adjustSafeModeBlockTotals(int deltaSafe, int deltaTotal)
+  public void adjustSafeModeBlockTotals(List<Block> deltaSafe, int deltaTotal)
       throws IOException {
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = this.safeMode();
     if (safeMode == null) {
       return;
     }
@@ -5270,7 +5404,7 @@ public class FSNamesystem
    */
   private void setBlockTotal() throws IOException {
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = this.safeMode();
     if (safeMode == null) {
       return;
     }
@@ -5370,10 +5504,14 @@ public class FSNamesystem
    * @throws IOException
    */
   void enterSafeMode(boolean resourcesLow) throws IOException {
+    if(!isLeader()){
+      return;
+    }
     // Stop the secret manager, since rolling the master key would
     // try to write to the edit log
     stopSecretManager();
-
+    shouldPopulateReplicationQueue = true;
+    SafeModeInfo safeMode = safeMode();
     if (safeMode != null) {
       if (resourcesLow) {
         safeMode.setResourcesLow();
@@ -5383,15 +5521,13 @@ public class FSNamesystem
     }
     if (!isInSafeMode()) {
       safeMode = new SafeModeInfo(resourcesLow);
-      HdfsVariables.enterClusterSafeMode();
-      return;
     }
     if (resourcesLow) {
       safeMode.setResourcesLow();
     } else {
       safeMode.setManual();
     }
-
+    HdfsVariables.setSafeModeInfo(safeMode, 0);
     NameNode.stateChangeLog
         .info("STATE* Safe mode is ON" + safeMode.getTurnOffTip());
   }
@@ -5406,14 +5542,14 @@ public class FSNamesystem
       NameNode.stateChangeLog.info("STATE* Safe mode is already OFF");
       return;
     }
-    safeMode.leave();
+    safeMode().leave();
   }
 
   String getSafeModeTip() throws IOException {
     if (!isInSafeMode()) {
       return "";
     }
-    return safeMode.getTurnOffTip();
+    return safeMode().getTurnOffTip();
   }
 
   public void processIncrementalBlockReport(DatanodeRegistration nodeReg, StorageReceivedDeletedBlocks r)
@@ -6579,8 +6715,8 @@ public class FSNamesystem
   }
 
   @VisibleForTesting
-  public SafeModeInfo getSafeModeInfoForTests() {
-    return safeMode;
+  public SafeModeInfo getSafeModeInfoForTests() throws IOException {
+    return safeMode();
   }
 
   @Override
@@ -6762,7 +6898,7 @@ public class FSNamesystem
     final String path = cacheManager.validatePath(directive);
     if (isInSafeMode()) {
       throw new SafeModeException(
-          "Cannot add cache directive", safeMode);
+          "Cannot add cache directive", safeMode());
     }
     if (directive.getId() != null) {
       throw new IOException("addDirective: you cannot specify an ID " + "for this operation.");
@@ -6871,7 +7007,7 @@ public class FSNamesystem
         try {
           if (isInSafeMode()) {
             throw new SafeModeException(
-                "Cannot add cache directive", safeMode);
+                "Cannot add cache directive", safeMode());
           }
           cacheManager.modifyDirective(directive, pc, flags);
           success = true;
@@ -6908,7 +7044,7 @@ public class FSNamesystem
         try {
           if (isInSafeMode()) {
             throw new SafeModeException(
-                "Cannot remove cache directives", safeMode);
+                "Cannot remove cache directives", safeMode());
           }
           cacheManager.removeDirective(id, pc);
           success = true;
@@ -6966,7 +7102,7 @@ public class FSNamesystem
         try {
           if (isInSafeMode()) {
             throw new SafeModeException(
-                "Cannot add cache pool " + req.getPoolName(), safeMode);
+                "Cannot add cache pool " + req.getPoolName(), safeMode());
           }
           if (pc != null) {
             pc.checkSuperuserPrivilege();
@@ -7009,7 +7145,7 @@ public class FSNamesystem
         try {
           if (isInSafeMode()) {
             throw new SafeModeException(
-                "Cannot modify cache pool " + req.getPoolName(), safeMode);
+                "Cannot modify cache pool " + req.getPoolName(), safeMode());
           }
           if (pc != null) {
             pc.checkSuperuserPrivilege();
@@ -7050,7 +7186,7 @@ public class FSNamesystem
         try {
           if (isInSafeMode()) {
             throw new SafeModeException(
-                "Cannot remove cache pool " + cachePoolName, safeMode);
+                "Cannot remove cache pool " + cachePoolName, safeMode());
           }
           if (pc != null) {
             pc.checkSuperuserPrivilege();
@@ -7190,7 +7326,7 @@ public class FSNamesystem
 
   public void performPendingSafeModeOperation() throws IOException {
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = this.safeMode();
     if (safeMode != null) {
       safeMode.performSafeModePendingOperation();
     }
@@ -7257,7 +7393,7 @@ public class FSNamesystem
   @Override
   public void adjustSafeModeBlocks(Set<Long> safeBlocks) throws IOException {
     // safeMode is volatile, and may be set to null at any time
-    SafeModeInfo safeMode = this.safeMode;
+    SafeModeInfo safeMode = this.safeMode();
     if (safeMode == null) {
       return;
     }
@@ -7286,7 +7422,7 @@ public class FSNamesystem
    *      block to be removed from safe blocks
    * @throws IOException
    */
-  private void removeSafeBlock(final Long safeBlock) {
+  private void removeSafeBlock(final Long safeBlock) throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.REMOVE_SAFE_BLOCKS) {
       @Override
       public Object performTask() throws IOException {
@@ -7295,7 +7431,7 @@ public class FSNamesystem
         da.remove(safeBlock);
         return null;
       }
-    };
+    }.handle();
   }
 
   /**
@@ -7347,15 +7483,6 @@ public class FSNamesystem
         return null;
       }
     }.handle();
-  }
-
-  /**
-   * Check if the cluster is in safe mode?
-   * @return true if the cluster in safe mode, false otherwise.
-   * @throws IOException
-   */
-  private boolean isClusterInSafeMode() throws IOException {
-    return HdfsVariables.isClusterInSafeMode();
   }
 
   boolean isPermissionEnabled() {
@@ -9019,7 +9146,7 @@ public class FSNamesystem
   void modifyAclEntries(final String src, final List<AclEntry> aclSpec) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot modify acl entries " + src, safeMode);
+      throw new SafeModeException("Cannot modify acl entries " + src, safeMode());
     }
     new HopsTransactionalRequestHandler(HDFSOperationType.MODIFY_ACL_ENTRIES) {
       @Override
@@ -9048,7 +9175,7 @@ public class FSNamesystem
   void removeAclEntries(final String src, final List<AclEntry> aclSpec) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot remove acl entries " + src, safeMode);
+      throw new SafeModeException("Cannot remove acl entries " + src, safeMode());
     }
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL_ENTRIES) {
 
@@ -9077,7 +9204,7 @@ public class FSNamesystem
   void removeDefaultAcl(final String src) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot remove default acl " + src, safeMode);
+      throw new SafeModeException("Cannot remove default acl " + src, safeMode());
     }
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_DEFAULT_ACL) {
 
@@ -9106,7 +9233,7 @@ public class FSNamesystem
   void removeAcl(final String src) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot remove acl " + src, safeMode);
+      throw new SafeModeException("Cannot remove acl " + src, safeMode());
     }
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL) {
 
@@ -9135,7 +9262,7 @@ public class FSNamesystem
   void setAcl(final String src, final List<AclEntry> aclSpec) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot set acl " + src, safeMode);
+      throw new SafeModeException("Cannot set acl " + src, safeMode());
     }
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_ACL) {
       @Override

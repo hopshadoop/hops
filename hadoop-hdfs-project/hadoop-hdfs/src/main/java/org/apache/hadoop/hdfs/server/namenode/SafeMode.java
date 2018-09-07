@@ -49,7 +49,7 @@ public interface SafeMode {
   /**
    * Check whether replication queues are being populated.
    */
-  public boolean isPopulatingReplQueues();
+  public boolean isPopulatingReplQueues() throws IOException;
 
   /**
    * Increment number of blocks that reached minimal replication.

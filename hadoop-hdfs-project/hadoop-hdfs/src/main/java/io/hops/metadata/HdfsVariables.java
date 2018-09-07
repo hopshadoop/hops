@@ -201,15 +201,27 @@ public class HdfsVariables {
     }.handle();
   }
   
-  public static void enterClusterSafeMode() throws IOException {
-    new LightWeightRequestHandler(HDFSOperationType.ENTER_CLUSTER_SAFE_MODE) {
+  public static void setSafeModeInfo(final FSNamesystem.SafeModeInfo safeModeInfo, final long reached) throws
+      IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_SAFE_MODE_INFO) {
       @Override
       public Object performTask() throws IOException {
         return handleVariableWithWriteLock(new Handler() {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            vd.setVariable(new IntVariable(Variable.Finder.ClusterInSafeMode, 1));
+            vd.setVariable(new LongVariable(Variable.Finder.SafeModeReached, reached));
+            List<Object> vals = new ArrayList<>();
+            if (safeModeInfo != null) {
+              vals.add(safeModeInfo.getThreshold());
+              vals.add(safeModeInfo.getDatanodeThreshold());
+              vals.add(safeModeInfo.getExtension());
+              vals.add(safeModeInfo.getSafeReplication());
+              vals.add(safeModeInfo.getReplicationQueueThreshold());
+              vals.add(safeModeInfo.isResourcesLow() ? 0 : 1);
+            }
+            vd.setVariable(new ArrayVariable(Variable.Finder.SafeModeInfo, vals));
+
             return null;
           }
         });
@@ -217,15 +229,16 @@ public class HdfsVariables {
     }.handle();
   }
   
-  public static void exitClusterSafeMode() throws IOException {
-    new LightWeightRequestHandler(HDFSOperationType.EXIT_CLUSTER_SAFE_MODE) {
+  public static void exitSafeMode() throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.EXIT_SAFE_MODE) {
       @Override
       public Object performTask() throws IOException {
         return handleVariableWithWriteLock(new Handler() {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            vd.setVariable(new IntVariable(Variable.Finder.ClusterInSafeMode, 0));
+            vd.setVariable(new LongVariable(Variable.Finder.SafeModeReached, -1));
+            vd.setVariable(new ArrayVariable(Variable.Finder.SafeModeInfo, new ArrayList<>()));
             return null;
           }
         });
@@ -233,8 +246,41 @@ public class HdfsVariables {
     }.handle();
   }
 
-  public static boolean isClusterInSafeMode() throws IOException {
-    return (Boolean) new LightWeightRequestHandler(
+  public static void setSafeModeReached(final long reached) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_SAFE_MODE_REACHED) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithReadLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            vd.setVariable(new LongVariable(Variable.Finder.SafeModeReached, reached));
+            return null;
+          }
+        });
+      }
+    }.handle();
+  }
+  
+  public static long getSafeModeReached() throws IOException {
+    return (long) new LightWeightRequestHandler(HDFSOperationType.GET_SAFE_MODE_REACHED) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithReadLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            LongVariable var =
+                (LongVariable) vd.getVariable(Variable.Finder.SafeModeReached);
+            return var.getValue();
+          }
+        });
+      }
+    }.handle();
+  }
+
+  public static List<Object> getSafeModeFromDB() throws IOException {
+    return (List<Object>) new LightWeightRequestHandler(
         HDFSOperationType.GET_CLUSTER_SAFE_MODE) {
       @Override
       public Object performTask() throws IOException {
@@ -242,15 +288,15 @@ public class HdfsVariables {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            IntVariable var =
-                (IntVariable) vd.getVariable(Variable.Finder.ClusterInSafeMode);
-            return var.getValue() == 1;
+            ArrayVariable var = (ArrayVariable) vd.getVariable(Variable.Finder.SafeModeInfo);
+            return var.getVarsValue();
+
           }
         });
       }
     }.handle();
   }
-
+  
   public static void setBrLbMasBlkPerMin(final long value) throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_BLKS_PER_TW) {
       @Override
@@ -479,6 +525,145 @@ public class HdfsVariables {
     }.handle();
   }
   
+  public static void setBlockTotal(final int value) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_BLOCK_TOTAL) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            vd.setVariable(new IntVariable(Variable.Finder.BlockTotal, value));
+            vd.setVariable(new IntVariable(Variable.Finder.BlockThreshold, 0));
+            vd.setVariable(new IntVariable(Variable.Finder.BlockReplicationQueueThreshold, 0));
+            System.out.println("GAUTIER blockTotal= " + value);
+            return null;
+          }
+        });
+      }
+    }.handle();
+  }
+
+  public static void setBlockTotal(final int blockTotal, final int blockThreshold,
+      final int blockReplicationQueueThreshold) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_BLOCK_TOTAL) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            vd.setVariable(new IntVariable(Variable.Finder.BlockTotal, blockTotal));
+            vd.setVariable(new IntVariable(Variable.Finder.BlockThreshold, blockThreshold));
+            vd.setVariable(new IntVariable(Variable.Finder.BlockReplicationQueueThreshold,
+                blockReplicationQueueThreshold));
+            System.out.println("GAUTIER blockTotal= " + blockTotal);
+            return null;
+          }
+        });
+      }
+    }.handle();
+  }
+  
+  public static void updateBlockTotal(final int deltaBlockTotal, final double threshold,
+      final double replicationQueueThreshold) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_BLOCK_TOTAL) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            IntVariable blockTotalVar = (IntVariable) vd.getVariable(Variable.Finder.BlockTotal);
+            int blockTotal = blockTotalVar.getValue();
+            IntVariable blockThresholdVar = (IntVariable) vd.getVariable(Variable.Finder.BlockThreshold);
+            int blockThreshold = blockThresholdVar.getValue();
+            IntVariable blockReplicationQueueThresholdVar = (IntVariable) vd.getVariable(
+                Variable.Finder.BlockReplicationQueueThreshold);
+            int blockReplicationQueueThreshold = blockReplicationQueueThresholdVar.getValue();
+
+            assert blockTotal + deltaBlockTotal >= 0 : "Can't reduce blockTotal " + blockTotal + " by "
+                + deltaBlockTotal + ": would be negative";
+
+            int newBlockThreshold = (int) (blockTotal * threshold);
+            int newBlockReplicationQueueThreshold = (int) (blockTotal * replicationQueueThreshold);
+            vd.setVariable(new IntVariable(Variable.Finder.BlockTotal, blockTotal + deltaBlockTotal));
+            vd.setVariable(new IntVariable(Variable.Finder.BlockThreshold, newBlockThreshold));
+            vd.setVariable(new IntVariable(Variable.Finder.BlockReplicationQueueThreshold,
+                newBlockReplicationQueueThreshold));
+            int total = blockTotal + deltaBlockTotal;
+            System.out.println("GAUTIER update blockTotal= " + total);
+            return null;
+          }
+        });
+      }
+    }.handle();
+  }
+
+  public static int getBlockTotal() throws IOException {
+    return (int) new LightWeightRequestHandler(HDFSOperationType.GET_BLOCK_TOTAL) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithReadLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            IntVariable var =
+                (IntVariable) vd.getVariable(Variable.Finder.BlockTotal);
+            int result = 0;
+            if(var.getValue()!=null){
+              result = var.getValue();
+            }
+            return result;
+
+          }
+        });
+      }
+    }.handle();
+  }
+    
+  public static int getBlockThreshold() throws IOException {
+    return (int) new LightWeightRequestHandler(HDFSOperationType.GET_BLOCK_THRESHOLD) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithReadLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            IntVariable var = (IntVariable) vd.getVariable(Variable.Finder.BlockThreshold);
+            int result = 0;
+            if(var.getValue()!=null){
+              result = var.getValue();
+            }
+            return result;
+
+          }
+        });
+      }
+    }.handle();
+  }
+
+  public static int getBlockReplicationQueueThreshold() throws IOException {
+    return (int) new LightWeightRequestHandler(HDFSOperationType.GET_BLOCK_REPLICATION_QUEUE_THRESHOLD) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithReadLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            IntVariable var = (IntVariable) vd.getVariable(Variable.Finder.BlockReplicationQueueThreshold);
+            int result = 0;
+            if(var.getValue()!=null){
+              result = var.getValue();
+            }
+            return result;
+
+          }
+        });
+      }
+    }.handle();
+  }
+
   private static Variable getVariableLightWeight(final Variable.Finder varType)
       throws IOException {
     return (Variable) new LightWeightRequestHandler(
@@ -505,8 +690,8 @@ public class HdfsVariables {
     Variable
         .registerVariableDefaultValue(Variable.Finder.MisReplicatedFilesIndex,
             new LongVariable(0).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.ClusterInSafeMode,
-        new IntVariable(1).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.SafeModeReached,
+        new IntVariable(-1).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.QuotaUpdateID,
         new IntVariable(0).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxBlkPerTW,

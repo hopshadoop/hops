@@ -79,6 +79,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -464,7 +465,7 @@ public class TestBlockToken {
     }
 
     @Override
-    public void adjustSafeModeBlockTotals(int deltaSafe, int deltaTotal)
+    public void adjustSafeModeBlockTotals(List<Block> deltaSafe, int deltaTotal)
         throws IOException {
       throw new UnsupportedOperationException("Not supported yet.");
     }

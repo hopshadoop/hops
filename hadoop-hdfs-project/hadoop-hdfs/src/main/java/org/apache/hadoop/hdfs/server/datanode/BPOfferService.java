@@ -818,7 +818,9 @@ class BPOfferService implements Runnable {
       }
       
       DatanodeCommand cmd = cacheReport(cmds!=null);
-      blkReportHander.processCommand(new DatanodeCommand[]{cmd});
+      if (cmd != null && blkReportHander != null) {
+        blkReportHander.processCommand(new DatanodeCommand[]{cmd});
+      }
       
       // Now safe to start scanning the block pool.
       // If it has already been started, this is a no-op.

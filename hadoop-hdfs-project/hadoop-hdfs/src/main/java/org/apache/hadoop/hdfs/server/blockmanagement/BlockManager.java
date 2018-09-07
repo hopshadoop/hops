@@ -759,7 +759,7 @@ public class BlockManager {
     // count. (We may not have the minimum replica count yet if this is
     // a "forced" completion when a file is getting closed by an
     // OP_CLOSE edit on the standby).
-    namesystem.adjustSafeModeBlockTotals(0, 1);
+    namesystem.adjustSafeModeBlockTotals(null, 1);
     namesystem.incrementSafeBlockCount(curBlock);
 
     return completeBlock;
@@ -828,9 +828,13 @@ public class BlockManager {
 
     // Adjust safe-mode totals, since under-construction blocks don't
     // count in safe-mode.
+    List<Block> deltaSafe = new ArrayList<>();
+    // decrement safe if we had enough
+    if(targets.length >= minReplication){
+      deltaSafe.add(oldBlock);
+    }
     namesystem.adjustSafeModeBlockTotals(
-        // decrement safe if we had enough
-        targets.length >= minReplication ? -1 : 0,
+        deltaSafe,
         // always decrement total blocks
         -1);
 
@@ -1580,15 +1584,14 @@ public class BlockManager {
    * @return total number of block for deletion
    */
   int computeInvalidateWork(int nodesToProcess) throws IOException {
-    final List<DatanodeInfo> nodes = invalidateBlocks.getDatanodes(datanodeManager);
+    final Map<DatanodeInfo, List<Integer>> nodesToSids = invalidateBlocks.getDatanodes(datanodeManager);
+    List<Map.Entry<DatanodeInfo, List<Integer>>> nodes = new ArrayList<>(nodesToSids.entrySet());
     Collections.shuffle(nodes);
 
     nodesToProcess = Math.min(nodes.size(), nodesToProcess);
 
     int blockCnt = 0;
-    for (DatanodeInfo dnInfo : nodes) {
-
-      assert dnInfo != null;
+    for (Map.Entry<DatanodeInfo, List<Integer>> dnInfo : nodes) {
 
       int blocks = invalidateWorkForOneNode(dnInfo);
       if (blocks > 0) {
@@ -4578,22 +4581,20 @@ public class BlockManager {
    *
    * @return number of blocks scheduled for removal during this iteration.
    */
-  private int invalidateWorkForOneNode(DatanodeInfo dn) throws IOException {
+  private int invalidateWorkForOneNode(Map.Entry<DatanodeInfo, List<Integer>> entry) throws IOException {
     // blocks should not be replicated or removed if safe mode is on
     if (namesystem.isInSafeMode()) {
       LOG.debug("In safemode, not computing replication work");
       return 0;
     }
     // get blocks to invalidate for the nodeId
-    assert dn != null;
 
-    DatanodeDescriptor dnDescriptor = datanodeManager.getDatanode(dn);
+    DatanodeDescriptor dnDescriptor = datanodeManager.getDatanode(entry.getKey());
 
     if (dnDescriptor == null) {
-      LOG.warn("DataNode " + dn + " cannot be found with UUID " +
-          dn.getDatanodeUuid() + ", removing block invalidation work.");
-      List<Integer> sids = datanodeManager.getSidsOnDatanode(dn.getDatanodeUuid());
-      invalidateBlocks.remove(sids);
+      LOG.warn("DataNode " + entry.getKey() + " cannot be found for sids " +
+            Arrays.toString(entry.getValue().toArray()) + ", removing block invalidation work.");
+      invalidateBlocks.remove(entry.getValue());
       return 0;
     }
     final List<Block> toInvalidate = invalidateBlocks.invalidateWork(dnDescriptor);
@@ -4604,7 +4605,7 @@ public class BlockManager {
 
     if (blockLog.isInfoEnabled()) {
       blockLog.info("BLOCK* " + getClass().getSimpleName()
-          + ": ask " + dn + " to delete " + toInvalidate);
+          + ": ask " + entry.getKey() + " to delete " + toInvalidate);
     }
 
     return toInvalidate.size();
@@ -5036,7 +5037,7 @@ public class BlockManager {
     // count. (We may not have the minimum replica count yet if this is
     // a "forced" completion when a file is getting closed by an
     // OP_CLOSE edit on the standby).
-    namesystem.adjustSafeModeBlockTotals(0, 1);
+    namesystem.adjustSafeModeBlockTotals(null, 1);
     namesystem.incrementSafeBlockCount(curBlock);
 
     return completeBlock;

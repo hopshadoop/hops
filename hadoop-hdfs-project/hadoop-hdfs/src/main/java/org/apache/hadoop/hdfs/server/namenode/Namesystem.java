@@ -22,6 +22,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.security.AccessControlException;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdfs.protocol.Block;
 
@@ -48,7 +49,7 @@ public interface Namesystem extends SafeMode {
   public boolean isGenStampInFuture(Block block)
       throws StorageException;
 
-  public void adjustSafeModeBlockTotals(int deltaSafe, int deltaTotal)
+  public void adjustSafeModeBlockTotals(List<Block> deltaSafe, int deltaTotal)
       throws IOException;
   
 

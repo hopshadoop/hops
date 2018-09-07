@@ -248,8 +248,7 @@ public class TestPipelinesFailover {
    * Tests lease recovery if a client crashes. This approximates the
    * use case of HBase WALs being recovered after a NN failover.
    */
-  @Test
-//    (timeout=150000)
+  @Test(timeout=150000)
   public void testLeaseRecoveryAfterFailover() throws Exception {
     final Configuration conf = new Configuration();
     // Disable permissions so that another user can recover the lease.
