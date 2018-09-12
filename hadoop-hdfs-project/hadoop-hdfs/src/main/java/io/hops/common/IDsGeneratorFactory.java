@@ -120,8 +120,12 @@ public class IDsGeneratorFactory {
     return (int)iDsGenerators.get(2).getUniqueID();
   }
 
-  public long getUniqueCacheDirectiveID(){
-    return iDsGenerators.get(3).getUniqueID();
+  public long getUniqueCacheDirectiveID() {
+    long id = iDsGenerators.get(3).getUniqueID();
+    if (id == 0) {
+      id = iDsGenerators.get(3).getUniqueID();
+    }
+    return id;
   }
 
   void getNewIDs() throws IOException {

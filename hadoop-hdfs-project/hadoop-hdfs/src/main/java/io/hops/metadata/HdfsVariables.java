@@ -159,7 +159,7 @@ public class HdfsVariables {
           return new CountersQueue.Counter(oldValue, newValue);
 
         }else if(variable instanceof LongVariable){
-          long oldValue = ((LongVariable) variable).getValue();
+          long oldValue = ((LongVariable) variable).getValue() == null ? 0: ((LongVariable) variable).getValue();
           long newValue = LongMath.checkedAdd(oldValue, increment);
           vd.setVariable(new LongVariable(finder, newValue));
           return new CountersQueue.Counter(oldValue, newValue);
@@ -351,8 +351,8 @@ public class HdfsVariables {
     vals.add(storageInfo.getNamespaceID());
     vals.add(storageInfo.getClusterID());
     vals.add(storageInfo.getCTime());
-    vals.add(storageInfo.getStorageType().name());
     vals.add(storageInfo.getBlockPoolId());
+    vals.add(storageInfo.getStorageType().name());
     Variables
         .updateVariable(new ArrayVariable(Variable.Finder.StorageInfo, vals));
   }
@@ -362,9 +362,21 @@ public class HdfsVariables {
     ArrayVariable var =
         (ArrayVariable) Variables.getVariable(Variable.Finder.StorageInfo);
     List<Object> vals = (List<Object>) var.getVarsValue();
-    return new StorageInfo((Integer) vals.get(0), (Integer) vals.get(1),
-        (String) vals.get(2), (Long) vals.get(3), HdfsServerConstants.NodeType.valueOf((String) vals.get(4)),
-        (String) vals.get(5));
+
+    if(vals.size()>=6){
+      return new StorageInfo((Integer) vals.get(0), (Integer) vals.get(1),
+        (String) vals.get(2), (Long) vals.get(3), HdfsServerConstants.NodeType.valueOf((String) vals.get(5)),
+        (String) vals.get(4));
+      
+    }else{
+      //updating from 2.8.2.4
+      StorageInfo info = new StorageInfo((Integer) vals.get(0), (Integer) vals.get(1),
+        (String) vals.get(2), (Long) vals.get(3), HdfsServerConstants.NodeType.NAME_NODE,
+        (String) vals.get(4));
+      setStorageInfo(info);
+      return info;
+    }
+    
   }
 
   public static void setRollingUpgradeInfo(RollingUpgradeInfo rollingUpgradeInfo) throws TransactionContextException,
@@ -496,7 +508,7 @@ public class HdfsVariables {
       }
     };
     IntVariable var = (IntVariable) handler.handle();
-    if (var.getValue() != 0) {
+    if (var.getValue() != null && var.getValue() != 0) {
       return true;
     }
     return false;
