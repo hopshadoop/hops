@@ -160,7 +160,7 @@ public class StorageInfo {
         public void acquireLock(TransactionLocks locks) throws IOException {
           LockFactory lf = LockFactory.getInstance();
           locks.add(lf.getVariableLock(Variable.Finder.StorageInfo,
-              TransactionLockTypes.LockType.READ));
+              TransactionLockTypes.LockType.WRITE));
         }
 
         @Override
