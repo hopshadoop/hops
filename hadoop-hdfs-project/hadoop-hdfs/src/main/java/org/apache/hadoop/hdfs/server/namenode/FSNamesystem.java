@@ -5179,6 +5179,17 @@ public class FSNamesystem
         LOG.debug("Adjusting safe blocks from " + lastSafeBlockSize + "/" +
             blockTotal + " to " + newSafeBlockSize + "/" + blockTotal);
       }
+      
+      StartupProgress prog = NameNode.getStartupProgress();
+        if (prog.getStatus(Phase.SAFEMODE) != Status.COMPLETE) {
+          if (this.awaitingReportedBlocksCounter == null) {
+            this.awaitingReportedBlocksCounter = prog.getCounter(Phase.SAFEMODE,
+              STEP_AWAITING_REPORTED_BLOCKS);
+          }
+          this.awaitingReportedBlocksCounter.add(newSafeBlockSize-lastSafeBlockSize);
+        }
+
+      setSafeModePendingOperation(true);
 
       checkMode();
     }
