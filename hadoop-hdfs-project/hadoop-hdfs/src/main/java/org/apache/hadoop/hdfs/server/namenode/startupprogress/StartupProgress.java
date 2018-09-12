@@ -60,6 +60,11 @@ public class StartupProgress {
      * Atomically increments this counter, adding 1 to the current value.
      */
     void increment();
+    
+    /**
+     * Atomically increments this counter, adding delta to the current value.
+     */
+    void add(int delta);
   }
 
   /**
@@ -156,11 +161,21 @@ public class StartupProgress {
         public void increment() {
           tracking.count.incrementAndGet();
         }
+        
+        @Override
+        public void add(int delta) {
+          tracking.count.addAndGet(delta);
+        }
       };
     } else {
       return new Counter() {
         @Override
         public void increment() {
+          // no-op, because startup has completed
+        }
+        
+        @Override
+        public void add(int delta) {
           // no-op, because startup has completed
         }
       };

@@ -56,7 +56,7 @@
 
     // Workarounds for the fact that JMXJsonServlet returns non-standard JSON strings
     
-    unction workaround(nn) {
+    function workaround(nn) {
 //      nn.JournalTransactionInfo = JSON.parse(nn.JournalTransactionInfo);
 //      nn.NameJournalStatus = JSON.parse(nn.NameJournalStatus);
 //      nn.NameDirStatuses = JSON.parse(nn.NameDirStatuses);
@@ -157,7 +157,7 @@
       return r;
     }
 
-    $.get(
+    $.get(get_location() + 
       '/jmx?qry=Hadoop:service=NameNode,name=NameNodeInfo',
       guard_with_startup_progress(function (resp) {
         var data = workaround(resp.beans[0]);

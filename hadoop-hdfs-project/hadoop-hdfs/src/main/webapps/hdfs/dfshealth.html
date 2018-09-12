@@ -165,27 +165,15 @@
 {/fs}
 </table>
 
-//<div class="page-header"><h1>NameNode Journal Status</h1></div>
-//<p><b>Current transaction ID:</b> {nn.JournalTransactionInfo.LastAppliedOrWrittenTxId}</p>
-//<table class="table" title="NameNode Journals">
-//  <thead>
-//	<tr><th>Journal Manager</th><th>State</th></tr>
-//  </thead>
-//  <tbody>
-//	{#nn.NameJournalStatus}
-//	<tr><td>{manager}</td><td>{stream}</td></tr>
-//	{/nn.NameJournalStatus}
-//  </tbody>
-//</table>
-//
-//<div class="page-header"><h1>NameNode Storage</h1></div>
-//<table class="table" title="NameNode Storage">
-//  <thead><tr><td><b>Storage Directory</b></td><td><b>Type</b></td><td><b>State</b></td></tr></thead>
-//  {#nn.NameDirStatuses}
-//  {#active}{#helper_dir_status type="Active"/}{/active}
-//  {#failed}{#helper_dir_status type="Failed"/}{/failed}
-//  {/nn.NameDirStatuses}
-//</table>
+<!--todo report database status
+<div class="page-header"><h1>NameNode Storage</h1></div>
+<table class="table" title="NameNode Storage">
+  <thead><tr><td><b>Storage Directory</b></td><td><b>Type</b></td><td><b>State</b></td></tr></thead>
+  {#nn.NameDirStatuses}
+  {#active}{#helper_dir_status type="Active"/}{/active}
+  {#failed}{#helper_dir_status type="Failed"/}{/failed}
+  {/nn.NameDirStatuses}
+</table>-->
 </script>
 
 <!--<script type="text/x-dust-template" id="tmpl-snapshot">
@@ -272,7 +260,7 @@
 </small>
 </script>
 
-<!--<script type="text/x-dust-template" id="tmpl-startup-progress">
+<script type="text/x-dust-template" id="tmpl-startup-progress">
 <div class="page-header"><h1>Startup Progress</h1></div>
 <p>Elapsed Time: {elapsedTime|fmt_time}, Percent Complete: {percentComplete|fmt_percentage}</p>
 <table class="table">
@@ -300,7 +288,7 @@
 	{/phases}
   </tbody>
 </table>
-</script>-->
+</script>
 
 <script type="text/javascript" src="/static/jquery-1.10.2.min.js">
 </script><script type="text/javascript" src="/static/bootstrap-3.0.2/js/bootstrap.min.js">
