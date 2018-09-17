@@ -143,7 +143,7 @@ public class LightWeightCache<K, E extends K> extends LightWeightGSet<K, E> {
   }
 
   void setExpirationTime(final Entry e, final long expirationPeriod) {
-    e.setExpirationTime(timer.monotonicNowNanos() + expirationPeriod);
+    e.setExpirationTime(timer.now()+ expirationPeriod);
   }
 
   boolean isExpired(final Entry e, final long now) {
@@ -160,7 +160,7 @@ public class LightWeightCache<K, E extends K> extends LightWeightGSet<K, E> {
 
   /** Evict expired entries. */
   protected void evictExpiredEntries() {
-    final long now = timer.monotonicNowNanos();
+    final long now = timer.now();
     for(int i = 0; i < EVICTION_LIMIT; i++) {
       final Entry peeked = queue.peek();
       if (peeked == null || !isExpired(peeked, now)) {

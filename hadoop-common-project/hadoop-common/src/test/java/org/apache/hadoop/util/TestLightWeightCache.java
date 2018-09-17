@@ -242,7 +242,7 @@ public class TestLightWeightCache {
       } else {
         final IntEntry h = hashMap.remove(key);
         if (h != null) {
-          Assert.assertTrue(cache.isExpired(h, fakeTimer.monotonicNowNanos()));
+          Assert.assertTrue(cache.isExpired(h, fakeTimer.now()));
         }
       }
       return c;
@@ -261,7 +261,7 @@ public class TestLightWeightCache {
       } else {
         final IntEntry h = hashMap.remove(key);
         if (h != null) {
-          Assert.assertTrue(cache.isExpired(h, fakeTimer.monotonicNowNanos()));
+          Assert.assertTrue(cache.isExpired(h, fakeTimer.now()));
         }
       }
       return c;
@@ -281,7 +281,7 @@ public class TestLightWeightCache {
         final IntEntry h = hashMap.put(entry);
         if (h != null && h != entry) {
           // if h == entry, its expiration time is already updated
-          Assert.assertTrue(cache.isExpired(h, fakeTimer.monotonicNowNanos()));
+          Assert.assertTrue(cache.isExpired(h, fakeTimer.now()));
         }
       }
       return c;
@@ -300,7 +300,7 @@ public class TestLightWeightCache {
       } else {
         final IntEntry h = hashMap.remove(key);
         if (h != null) {
-          Assert.assertTrue(cache.isExpired(h, fakeTimer.monotonicNowNanos()));
+          Assert.assertTrue(cache.isExpired(h, fakeTimer.now()));
         }
       }
       return c;
