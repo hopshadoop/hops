@@ -722,9 +722,8 @@ public class FSNamesystem
       LOG.info("Retry cache will use " + heapPercent
           + " of total heap and retry cache entry expiry time is "
           + entryExpiryMillis + " millis");
-      long entryExpiryNanos = entryExpiryMillis * 1000 * 1000;
       return new RetryCacheDistributed("NameNodeRetryCache", heapPercent,
-          entryExpiryNanos);
+          entryExpiryMillis);
     }
     return null;
   }
@@ -9718,14 +9717,13 @@ public class FSNamesystem
   class RetryCacheCleaner implements Runnable {
 
     boolean shouldCacheCleanerRun = true;
-    long entryExpiryNanos;
+    long entryExpiryMillis;
     Timer timer = new Timer();
 
     public RetryCacheCleaner() {
-      long entryExpiryMillis = conf.getLong(
+      entryExpiryMillis = conf.getLong(
           DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY,
           DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_DEFAULT);
-      entryExpiryNanos = entryExpiryMillis * 1000 * 1000;
     }
 
     @Override
@@ -9763,7 +9761,7 @@ public class FSNamesystem
 
                 RetryCacheEntryDataAccess da = (RetryCacheEntryDataAccess) HdfsStorageFactory
                     .getDataAccess(RetryCacheEntryDataAccess.class);
-                da.removeOlds(timer.monotonicNowNanos() - entryExpiryNanos);
+                da.removeOlds(timer.now()- entryExpiryMillis);
                 return null;
               }
             }.handle();

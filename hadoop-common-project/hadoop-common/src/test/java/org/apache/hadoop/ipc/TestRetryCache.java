@@ -51,7 +51,7 @@ public class TestRetryCache {
     AtomicInteger retryCount = new AtomicInteger();
     AtomicInteger operationCount = new AtomicInteger();
     private RetryCache retryCache = new RetryCache("TestRetryCache", 1,
-        100 * 1000 * 1000 * 1000L);
+        100 * 1000L);
 
     /**
      * A server method implemented using {@link RetryCache}.

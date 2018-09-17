@@ -318,7 +318,7 @@ public class RetryCache {
    * clientId and callId extracted from editlog.
    */
   public void addCacheEntry(byte[] clientId, int callId) {
-    CacheEntry newEntry = new CacheEntry(clientId, callId, System.nanoTime()
+    CacheEntry newEntry = new CacheEntry(clientId, callId, System.currentTimeMillis()
         + expirationTime, true);
     lock.lock();
     try {
@@ -333,7 +333,7 @@ public class RetryCache {
       Object payload) {
     // since the entry is loaded from editlog, we can assume it succeeded.    
     CacheEntry newEntry = new CacheEntryWithPayload(clientId, callId, payload,
-        System.nanoTime() + expirationTime, true);
+        System.currentTimeMillis()+ expirationTime, true);
     lock.lock();
     try {
       set.put(newEntry);
@@ -345,13 +345,13 @@ public class RetryCache {
 
   private static CacheEntry newEntry(long expirationTime) {
     return new CacheEntry(Server.getClientId(), Server.getCallId(),
-        System.nanoTime() + expirationTime);
+        System.currentTimeMillis()+ expirationTime);
   }
 
   private static CacheEntryWithPayload newEntry(Object payload,
       long expirationTime) {
     return new CacheEntryWithPayload(Server.getClientId(), Server.getCallId(),
-        payload, System.nanoTime() + expirationTime);
+        payload, System.currentTimeMillis()+ expirationTime);
   }
 
   /** Static method that provides null check for retryCache */

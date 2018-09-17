@@ -106,7 +106,7 @@ public class LightWeightCacheDistributed extends LightWeightCache<CacheEntry, Ca
     CacheEntry entry = super.get(key);
     try{
     RetryCacheEntry existInDB = EntityManager.find(RetryCacheEntry.Finder.ByClientIdAndCallId, key.getClientId(), key.getCallId());
-    if(existInDB != null && existInDB.getExpirationTime()  > timer.monotonicNowNanos()){
+    if(existInDB != null && existInDB.getExpirationTime()  > timer.now()){
       byte state = existInDB.getState() == CacheEntry.INPROGRESS ? CacheEntry.FAILED : existInDB.getState();
       RetryCacheDistributed.CacheEntry exist = new CacheEntryWithPayload(existInDB.getClientId(), existInDB.getCallId(), existInDB.getPayload(), existInDB.getExpirationTime(),state);
       if(entry==null){
