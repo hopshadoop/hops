@@ -3358,59 +3358,6 @@ public class BlockManager {
     final AtomicLong totalProcessed = new AtomicLong(0);   
     boolean haveMore;
     final int filesToProcess = processMisReplicatedBatchSize * processMisReplicatedNoOfBatchs;
-    
-    final HopsTransactionalRequestHandler processMisReplicatedBlocksHandler = new HopsTransactionalRequestHandler(
-        HDFSOperationType.PROCESS_MIS_REPLICATED_BLOCKS_PER_INODE_BATCH) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        List<INodeIdentifier> inodeIdentifiers = (List<INodeIdentifier>) getParams()[0];
-        locks.add(lf.getBatchedINodesLock(inodeIdentifiers))
-            .add(lf.getSqlBatchedBlocksLock()).add(
-            lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
-                BLK.ER));
-
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        List<INodeIdentifier> inodeIdentifiers = (List<INodeIdentifier>) getParams()[0];
-        for (INodeIdentifier inodeIdentifier : inodeIdentifiers) {
-          INode inode = EntityManager
-              .find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId());
-          for (BlockInfo block : ((INodeFile) inode).getBlocks()) {
-            MisReplicationResult res = processMisReplicatedBlock(block);
-            if (LOG.isTraceEnabled()) {
-              LOG.trace("block " + block + ": " + res);
-            }
-            switch (res) {
-              case UNDER_REPLICATED:
-                nrUnderReplicated.incrementAndGet();
-                break;
-              case OVER_REPLICATED:
-                nrOverReplicated.incrementAndGet();
-                break;
-              case INVALID:
-                nrInvalid.incrementAndGet();
-                break;
-              case POSTPONE:
-                nrPostponed.incrementAndGet();
-                postponeBlock(block);
-                break;
-              case UNDER_CONSTRUCTION:
-                nrUnderConstruction.incrementAndGet();
-                break;
-              case OK:
-                break;
-              default:
-                throw new AssertionError("Invalid enum value: " + res);
-            }
-            totalProcessed.incrementAndGet();
-          }
-        }
-        return null;
-      }
-    };
 
     addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), -1));
     
@@ -3426,8 +3373,8 @@ public class BlockManager {
 
       addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), filesToProcessStartIndex));
 
-      processMissreplicatedInt(filesToProcessStartIndex, filesToProcessEndIndex, filesToProcess,
-          processMisReplicatedBlocksHandler);
+      processMissreplicatedInt(filesToProcessStartIndex, filesToProcessEndIndex, filesToProcess, nrInvalid,
+          nrOverReplicated, nrUnderReplicated, nrPostponed, nrUnderConstruction, totalProcessed);
 
       addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), -1));
 
@@ -3444,8 +3391,8 @@ public class BlockManager {
           for (MisReplicatedRange range : toProcess) {
             long startIndex = range.getStartIndex();
             if (startIndex > 0) {
-              processMissreplicatedInt(startIndex, startIndex + filesToProcess, filesToProcess,
-                  processMisReplicatedBlocksHandler);
+              processMissreplicatedInt(startIndex, startIndex + filesToProcess, filesToProcess,nrInvalid,
+                  nrOverReplicated, nrUnderReplicated, nrPostponed, nrUnderConstruction, totalProcessed);
             }
           }
         }
@@ -3469,7 +3416,9 @@ public class BlockManager {
   }
   
   private void processMissreplicatedInt(long filesToProcessStartIndex, long filesToProcessEndIndex, int filesToProcess,
-      final HopsTransactionalRequestHandler processMisReplicatedBlocksHandler) throws IOException {
+      final AtomicLong nrInvalid, final AtomicLong nrOverReplicated, final AtomicLong nrUnderReplicated,
+      final AtomicLong nrPostponed, final AtomicLong nrUnderConstruction, final AtomicLong totalProcessed)
+      throws IOException {
     final List<INodeIdentifier> allINodes = blocksMap
         .getAllINodeFiles(filesToProcessStartIndex, filesToProcessEndIndex);
     LOG.info("processMisReplicated read  " + allINodes.size() + "/" + filesToProcess + " in the Ids range ["
@@ -3481,8 +3430,58 @@ public class BlockManager {
         @Override
         public void handle(int startIndex, int endIndex)
             throws Exception {
-          List<INodeIdentifier> inodes = allINodes.subList(startIndex, endIndex);
-          processMisReplicatedBlocksHandler.setParams(inodes);
+          final List<INodeIdentifier> inodeIdentifiers = allINodes.subList(startIndex, endIndex);
+
+          final HopsTransactionalRequestHandler processMisReplicatedBlocksHandler = new HopsTransactionalRequestHandler(
+              HDFSOperationType.PROCESS_MIS_REPLICATED_BLOCKS_PER_INODE_BATCH) {
+            @Override
+            public void acquireLock(TransactionLocks locks) throws IOException {
+              LockFactory lf = LockFactory.getInstance();
+              locks.add(lf.getBatchedINodesLock(inodeIdentifiers))
+                  .add(lf.getSqlBatchedBlocksLock()).add(
+                  lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
+                      BLK.ER));
+
+            }
+
+            @Override
+            public Object performTask() throws IOException {
+              for (INodeIdentifier inodeIdentifier : inodeIdentifiers) {
+                INode inode = EntityManager
+                    .find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId());
+                for (BlockInfo block : ((INodeFile) inode).getBlocks()) {
+                  MisReplicationResult res = processMisReplicatedBlock(block);
+                  if (LOG.isTraceEnabled()) {
+                    LOG.trace("block " + block + ": " + res);
+                  }
+                  switch (res) {
+                    case UNDER_REPLICATED:
+                      nrUnderReplicated.incrementAndGet();
+                      break;
+                    case OVER_REPLICATED:
+                      nrOverReplicated.incrementAndGet();
+                      break;
+                    case INVALID:
+                      nrInvalid.incrementAndGet();
+                      break;
+                    case POSTPONE:
+                      nrPostponed.incrementAndGet();
+                      postponeBlock(block);
+                      break;
+                    case UNDER_CONSTRUCTION:
+                      nrUnderConstruction.incrementAndGet();
+                      break;
+                    case OK:
+                      break;
+                    default:
+                      throw new AssertionError("Invalid enum value: " + res);
+                  }
+                  totalProcessed.incrementAndGet();
+                }
+              }
+              return null;
+            }
+          };
           processMisReplicatedBlocksHandler.handle(namesystem);
         }
       });
