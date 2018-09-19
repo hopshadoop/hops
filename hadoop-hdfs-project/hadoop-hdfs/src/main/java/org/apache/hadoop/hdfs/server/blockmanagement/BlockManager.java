@@ -760,7 +760,7 @@ public class BlockManager {
     // a "forced" completion when a file is getting closed by an
     // OP_CLOSE edit on the standby).
     namesystem.adjustSafeModeBlockTotals(null, 1);
-    namesystem.incrementSafeBlockCount(curBlock);
+    namesystem.incrementSafeBlockCount(Math.min(numNodes, minReplication), curBlock);
 
     return completeBlock;
   }
@@ -2968,7 +2968,7 @@ public class BlockManager {
       // only complete blocks are counted towards that.
       // In the case that the block just became complete above, completeBlock()
       // handles the safe block count maintenance.
-      namesystem.incrementSafeBlockCount(storedBlock);
+      namesystem.incrementSafeBlockCount(numCurrentReplica, storedBlock);
     }
   }
 
@@ -3047,7 +3047,7 @@ public class BlockManager {
       // Is no-op if not in safe mode.
       // In the case that the block just became complete above, completeBlock()
       // handles the safe block count maintenance.
-      namesystem.incrementSafeBlockCount(storedBlock);
+      namesystem.incrementSafeBlockCount(numCurrentReplica, storedBlock);
     }
 
     // if file is under construction, then done for now
@@ -5037,7 +5037,7 @@ public class BlockManager {
     // a "forced" completion when a file is getting closed by an
     // OP_CLOSE edit on the standby).
     namesystem.adjustSafeModeBlockTotals(null, 1);
-    namesystem.incrementSafeBlockCount(curBlock);
+    namesystem.incrementSafeBlockCount(Math.min(numNodes, minReplication),curBlock);
 
     return completeBlock;
   }
