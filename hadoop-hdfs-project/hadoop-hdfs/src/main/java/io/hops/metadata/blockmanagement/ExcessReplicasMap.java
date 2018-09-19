@@ -181,4 +181,17 @@ public class ExcessReplicasMap {
     return EntityManager.find(ExcessReplica.Finder.ByBlockIdSidAndINodeId,
         block.getBlockId(), sid, block.getInodeId());
   }
+  
+  public int size() throws IOException {
+    return (Integer) new LightWeightRequestHandler(
+        HDFSOperationType.COUNT_CORRUPT_REPLICAS) {
+      @Override
+      public Object performTask() throws IOException {
+        ExcessReplicaDataAccess da =
+            (ExcessReplicaDataAccess) HdfsStorageFactory
+                .getDataAccess(ExcessReplicaDataAccess.class);
+        return da.countAllUniqueBlk();
+      }
+    }.handle();
+  }
 }
