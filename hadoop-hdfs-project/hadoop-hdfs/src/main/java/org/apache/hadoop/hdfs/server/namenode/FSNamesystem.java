@@ -1949,7 +1949,7 @@ public class FSNamesystem
           src) {
         @Override
         public void acquireLock(TransactionLocks locks) throws IOException {
-          int stoRootINodeId = (Integer) getParams()[0];
+          long stoRootINodeId = (Long) getParams()[0];
           LockFactory lf = getInstance();
           INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
                   .setNameNodeID(nameNode.getId())
@@ -3111,7 +3111,7 @@ public class FSNamesystem
     return checkLease(src, INodeDirectory.ROOT_PARENT_ID, holder, updateLastTwoBlocksInFile);
   }
 
-  private INodeFile checkLease(String src, int fileId, String holder,
+  private INodeFile checkLease(String src, long fileId, String holder,
       boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
       UnresolvedLinkException, StorageException,
       TransactionContextException, FileNotFoundException {
@@ -7567,7 +7567,7 @@ public class FSNamesystem
           new AbstractFileTree.IdCollectingCountingFileTree(this,
               subtreeRoot);
       fileTree.buildUp();
-      Iterator<Integer> idIterator =
+      Iterator<Long> idIterator =
           fileTree.getOrderedIds().descendingIterator();
       synchronized (idIterator) {
         quotaUpdateManager.addPrioritizedUpdates(idIterator);
@@ -7885,7 +7885,7 @@ public class FSNamesystem
     return null;
   }
 
-  private void renameTo(final String src1, final int srcINodeID, final String dst1,
+  private void renameTo(final String src1, final long srcINodeID, final String dst1,
                         final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
                         final boolean isUsingSubTreeLocks, final String subTreeLockDst,
                         final Collection<MetadataLogEntry> logEntries,
@@ -8127,7 +8127,7 @@ public class FSNamesystem
         LOG.debug("Rename src: " + src + " dst: " + dst + " does not require sub-tree locking mechanism");
       }
 
-      boolean retValue = renameTo(src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0,
+      boolean retValue = renameTo(src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0L,
               dst, srcCounts, dstCounts, isUsingSubTreeLocks, subTreeLockDst, logEntries);
 
       // the rename Tx has committed. it has also remove the subTreeLocks
@@ -8179,7 +8179,7 @@ public class FSNamesystem
    * instead.
    */
   @Deprecated
-  boolean renameTo(final String src1, final int srcINodeID, final String dst1,
+  boolean renameTo(final String src1, final long srcINodeID, final String dst1,
                    final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
                    final boolean isUsingSubTreeLocks, final String subTreeLockDst,
                    final Collection<MetadataLogEntry> logEntries)
@@ -8347,7 +8347,7 @@ public class FSNamesystem
           delayAfterBbuildingTree("Built tree for "+path1+" for delete op");
 
           if (dir.isQuotaEnabled()) {
-            Iterator<Integer> idIterator = fileTree.getAllINodesIds().iterator();
+            Iterator<Long> idIterator = fileTree.getAllINodesIds().iterator();
             synchronized (idIterator) {
               quotaUpdateManager.addPrioritizedUpdates(idIterator);
               try {
@@ -8378,7 +8378,7 @@ public class FSNamesystem
     }
   }
 
-  private boolean deleteTreeLevel(final String subtreeRootPath, final int subTreeRootID,
+  private boolean deleteTreeLevel(final String subtreeRootPath, final long subTreeRootID,
       final AbstractFileTree.FileTree fileTree, int level) throws TransactionContextException, IOException {
     ArrayList<Future> barrier = new ArrayList<>();
 
@@ -8425,7 +8425,7 @@ public class FSNamesystem
     return result;
   }
 
-  private Future multiTransactionDeleteInternal(final String path1, final int subTreeRootId)
+  private Future multiTransactionDeleteInternal(final String path1, final long subTreeRootId)
           throws StorageException, TransactionContextException, IOException {
    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
    final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
@@ -8645,7 +8645,7 @@ public class FSNamesystem
    * @throws IOException
    */
   @VisibleForTesting
-  void unlockSubtree(final String path, final int ignoreStoInodeId) throws IOException {
+  void unlockSubtree(final String path, final long ignoreStoInodeId) throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.RESET_SUBTREE_LOCK) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -8742,7 +8742,7 @@ public class FSNamesystem
    *    the inode
    * @throws IOException
    */
-  public INode findInode(final int id) throws IOException {
+  public INode findInode(final long id) throws IOException {
     LightWeightRequestHandler findHandler =
         new LightWeightRequestHandler(HDFSOperationType.GET_INODE) {
           @Override
@@ -8765,7 +8765,7 @@ public class FSNamesystem
    *    the path
    * @throws IOException
    */
-  public String getPath(int id, boolean inTree) throws IOException {
+  public String getPath(long id, boolean inTree) throws IOException {
     LinkedList<INode> resolvedInodes = new LinkedList<>();
     boolean resolved[] = new boolean[1];
     INodeUtil.findPathINodesById(id, inTree, resolvedInodes, resolved);
@@ -9102,7 +9102,7 @@ public class FSNamesystem
           logAuditEvent(false, "addBlockChecksum", src);
           throw e;
         }
-        int inodeId = dir.getINode(src).getId();
+        long inodeId = dir.getINode(src).getId();
         BlockChecksum blockChecksum =
             new BlockChecksum(inodeId, blockIndex, checksum);
         EntityManager.add(blockChecksum);
@@ -9567,8 +9567,8 @@ public class FSNamesystem
     return DB_IN_MEMORY_FILE_MAX_SIZE;
   }
 
-  public byte[] getSmallFileData(final int id) throws IOException {
-    final int inodeId = -id;
+  public byte[] getSmallFileData(final long id) throws IOException {
+    final long inodeId = -id;
     return (byte[]) ( new HopsTransactionalRequestHandler(HDFSOperationType.GET_SMALL_FILE_DATA) {
       INodeIdentifier inodeIdentifier;
 

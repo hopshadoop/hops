@@ -88,7 +88,7 @@ public class CorruptReplicaContext
   }
 
   @Override
-  CorruptReplica cloneEntity(CorruptReplica hopCorruptReplica, int inodeId) {
+  CorruptReplica cloneEntity(CorruptReplica hopCorruptReplica, long inodeId) {
     return new CorruptReplica(hopCorruptReplica.getStorageId(),
         hopCorruptReplica.getBlockId(), inodeId, hopCorruptReplica.getReason());
   }
@@ -102,7 +102,7 @@ public class CorruptReplicaContext
   private List<CorruptReplica> findByBlockId(CorruptReplica.Finder cFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
     final long blockId = (Long) params[0];
-    final int inodeId = (Integer) params[1];
+    final long inodeId = (Long) params[1];
     List<CorruptReplica> result = null;
     if (containsByBlock(blockId) || containsByINode(inodeId)) {
       result = getByBlock(blockId);
@@ -111,7 +111,7 @@ public class CorruptReplicaContext
       aboutToAccessStorage(cFinder, params);
       result = dataAccess.findByBlockId(blockId, inodeId);
       Collections.sort(result);
-      gotFromDB(new BlockPK(blockId), result);
+      gotFromDB(new BlockPK(blockId, null), result);
       miss(cFinder, result, "bid", blockId, "inodeid", inodeId);
     }
     return result;
@@ -119,7 +119,7 @@ public class CorruptReplicaContext
 
   private List<CorruptReplica> findByINodeId(CorruptReplica.Finder cFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
     List<CorruptReplica> result = null;
     if (containsByINode(inodeId)) {
       result = getByINode(inodeId);
@@ -127,7 +127,7 @@ public class CorruptReplicaContext
     } else {
       aboutToAccessStorage(cFinder, params);
       result = dataAccess.findByINodeId(inodeId);
-      gotFromDB(new BlockPK(inodeId), result);
+      gotFromDB(new BlockPK(null, inodeId), result);
       miss(cFinder, result, "inodeid", inodeId);
     }
     return result;
@@ -135,7 +135,7 @@ public class CorruptReplicaContext
 
   private List<CorruptReplica> findByINodeIds(CorruptReplica.Finder cFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int[] inodeIds = (int[]) params[0];
+    final long[] inodeIds = (long[]) params[0];
     aboutToAccessStorage(cFinder, params);
     List<CorruptReplica> result = dataAccess.findByINodeIds(inodeIds);
     miss(cFinder, result, "inodeids", Arrays.toString(inodeIds));

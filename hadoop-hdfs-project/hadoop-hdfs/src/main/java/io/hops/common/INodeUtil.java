@@ -72,7 +72,7 @@ public class INodeUtil {
     return buf.toString();
   }
 
-  public static INode getNode(byte[] name, int parentId, int partitionId, boolean transactional)
+  public static INode getNode(byte[] name, long parentId, long partitionId, boolean transactional)
       throws StorageException, TransactionContextException {
     String nameString = DFSUtil.bytes2String(name);
     if (transactional) {
@@ -83,7 +83,7 @@ public class INodeUtil {
     }
   }
 
-  private static INode findINodeWithNoTransaction(String name, int parentId, int partitionId)
+  private static INode findINodeWithNoTransaction(String name, long parentId, long partitionId)
       throws StorageException {
     LOG.debug(String
         .format("Read inode with no transaction by parent_id=%d, name=%s, partitionId=%s",
@@ -118,7 +118,7 @@ public class INodeUtil {
     return  preTxResolvedINodes.size() == components.length;
   }
 
-  public static void findPathINodesById(int inodeId, boolean inTree,
+  public static void findPathINodesById(long inodeId, boolean inTree,
       LinkedList<INode> preTxResolvedINodes, boolean[] isPreTxPathFullyResolved)
       throws StorageException {
     if (inTree) {
@@ -172,7 +172,7 @@ public class INodeUtil {
         INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey(), false);
   }
 
-  public static INode indexINodeScanById(int id) throws StorageException {
+  public static INode indexINodeScanById(long id) throws StorageException {
     LOG.debug(String.format("Read inode with no transaction by id=%d", id));
     INodeDataAccess<INode> da = (INodeDataAccess) HdfsStorageFactory
         .getDataAccess(INodeDataAccess.class);
@@ -249,9 +249,9 @@ public class INodeUtil {
     }
   }
   
-  public static Map<Integer, List<Long>> getINodeIdsForBlockIds(final long[] blockIds)
+  public static Map<Long, List<Long>> getINodeIdsForBlockIds(final long[] blockIds)
       throws StorageException {
-    Map<Integer, List<Long>> inodeIds;
+    Map<Long, List<Long>> inodeIds;
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
         HDFSOperationType.RESOLVE_INODES_FROM_BLOCKIDS) {
       @Override
@@ -265,7 +265,7 @@ public class INodeUtil {
           }
           BlockLookUpDataAccess<BlockLookUp> da = (BlockLookUpDataAccess) HdfsStorageFactory
               .getDataAccess(BlockLookUpDataAccess.class);
-          Map<Integer, List<Long>> inodeIds = da.getINodeIdsForBlockIds(blockIds);
+          Map<Long, List<Long>> inodeIds = da.getINodeIdsForBlockIds(blockIds);
           return inodeIds;
 
         } finally {
@@ -276,7 +276,7 @@ public class INodeUtil {
       }
     };
     try {
-      inodeIds = (Map<Integer, List<Long>>) handler.handle();
+      inodeIds = (Map<Long, List<Long>>) handler.handle();
     } catch (IOException ex) {
       LOG.error("Could not resolve iNode from blockId (blockid=" + Arrays.toString(blockIds) + ")");
       throw new StorageException(ex.getMessage());
@@ -284,7 +284,7 @@ public class INodeUtil {
     return inodeIds;
   }
   
-  public static List<INodeIdentifier> resolveINodesFromIds(final List<Integer> inodeIds) throws StorageException {
+  public static List<INodeIdentifier> resolveINodesFromIds(final List<Long> inodeIds) throws StorageException {
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
         HDFSOperationType.RESOLVE_INODES_FROM_IDS) {
       @Override
@@ -296,9 +296,9 @@ public class INodeUtil {
           }
           INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
               .getDataAccess(INodeDataAccess.class);
-          int[] ids = new int[inodeIds.size()];
+          long[] ids = new long[inodeIds.size()];
           int i = 0;
-          for (int id : inodeIds) {
+          for (long id : inodeIds) {
             ids[i] = id;
             i++;
           }
@@ -331,7 +331,7 @@ public class INodeUtil {
     }
   }
   
-  public static int[] resolveINodesFromBlockIds(final long[] blockIds)
+  public static long[] resolveINodesFromBlockIds(final long[] blockIds)
       throws StorageException {
     LightWeightRequestHandler handler =
         new LightWeightRequestHandler(HDFSOperationType.GET_INODEIDS_FOR_BLKS) {
@@ -344,13 +344,13 @@ public class INodeUtil {
           }
         };
     try {
-      return (int[]) handler.handle();
+      return (long[]) handler.handle();
     } catch (IOException ex) {
       throw new StorageException(ex.getMessage());
     }
   }
  
-  public static INodeIdentifier resolveINodeFromId(final int id)
+  public static INodeIdentifier resolveINodeFromId(final long id)
       throws StorageException {
     INodeIdentifier inodeIdentifier;
 

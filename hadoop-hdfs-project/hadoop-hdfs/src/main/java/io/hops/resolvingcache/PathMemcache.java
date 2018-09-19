@@ -32,13 +32,13 @@ public class PathMemcache extends Memcache {
 
   public static class CacheEntry implements Serializable {
 
-    private int[] inodeIds;
+    private long[] inodeIds;
 
-    public CacheEntry(int[] inodeIds) {
+    public CacheEntry(long[] inodeIds) {
       this.inodeIds = inodeIds;
     }
 
-    public int[] getInodeIds() {
+    public long[] getInodeIds() {
       return inodeIds;
     }
 
@@ -55,7 +55,7 @@ public class PathMemcache extends Memcache {
       return;
     }
     final String key = getKey(path);
-    final int[] inodeIds = getINodeIds(inodes);
+    final long[] inodeIds = getINodeIds(inodes);
     final long startTime = System.currentTimeMillis();
     mc.set(key, keyExpiry, new CacheEntry(inodeIds))
         .addListener(new OperationCompletionListener() {
@@ -74,7 +74,7 @@ public class PathMemcache extends Memcache {
   }
 
   @Override
-  protected int[] getInternal(final MemcachedClient mc, String path) throws
+  protected long[] getInternal(final MemcachedClient mc, String path) throws
       IOException {
     Object ce = null;
     Future<Object> f = mc.asyncGet(getKey(path));
@@ -110,8 +110,8 @@ public class PathMemcache extends Memcache {
     return keyPrefix + DigestUtils.sha256Hex(path);
   }
 
-  private int[] getINodeIds(List<INode> inodes) {
-    int[] inodeIds = new int[inodes.size()];
+  private long[] getINodeIds(List<INode> inodes) {
+    long[] inodeIds = new long[inodes.size()];
     for (int i = 0; i < inodes.size(); i++) {
       inodeIds[i] = inodes.get(i).getId();
     }

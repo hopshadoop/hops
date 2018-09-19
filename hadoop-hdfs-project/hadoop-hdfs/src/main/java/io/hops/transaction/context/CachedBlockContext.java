@@ -111,7 +111,7 @@ public class CachedBlockContext extends BaseReplicaContext<BlockPK.CachedBlockPK
   private List<CachedBlock> findByBlockIdAndInodeId(CachedBlock.Finder iFinder, Object[] params) throws
       StorageCallPreventedException, StorageException {
     final long blockId = (Long) params[0];
-    final int inodeId = (int) params[1];
+    final long inodeId = (long) params[1];
     List<CachedBlock> results = null;
     if (containsByBlock(blockId) || containsByINode(inodeId)) {
       results = getByBlock(blockId);
@@ -127,7 +127,7 @@ public class CachedBlockContext extends BaseReplicaContext<BlockPK.CachedBlockPK
 
   private List<CachedBlock> findByINodeId(CachedBlock.Finder iFinder, Object[] params) throws
       StorageCallPreventedException, StorageException {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
     List<CachedBlock> results = null;
     if (containsByINode(inodeId)) {
       results = getByINode(inodeId);
@@ -143,7 +143,7 @@ public class CachedBlockContext extends BaseReplicaContext<BlockPK.CachedBlockPK
 
   private List<CachedBlock> findByINodeIds(CachedBlock.Finder iFinder, Object[] params) throws
       StorageCallPreventedException, StorageException {
-    int[] ids = (int[]) params[0];
+    long[] ids = (long[]) params[0];
     aboutToAccessStorage(iFinder, params);
     List<CachedBlock> results = dataAccess.findCachedBlockByINodeIds(ids);
     gotFromDB(BlockPK.CachedBlockPK.getKeys(ids), results);
@@ -155,7 +155,7 @@ public class CachedBlockContext extends BaseReplicaContext<BlockPK.CachedBlockPK
       StorageException {
     List<CachedBlock> result = null;
     final long[] blockIds = (long[]) params[0];
-    final int[] inodeIds = (int[]) params[1];
+    final long[] inodeIds = (long[]) params[1];
     final DatanodeID datanodeId = (DatanodeID) params[2];
     aboutToAccessStorage(bFinder, params);
     result = dataAccess.findByIds(blockIds, inodeIds, datanodeId.getDatanodeUuid());
@@ -294,7 +294,7 @@ public class CachedBlockContext extends BaseReplicaContext<BlockPK.CachedBlockPK
   }
 
   @Override
-  CachedBlock cloneEntity(CachedBlock cachedBlock, int inodeId) {
+  CachedBlock cloneEntity(CachedBlock cachedBlock, long inodeId) {
     return new CachedBlock(cachedBlock.getBlockId(), inodeId, cachedBlock.getDatanodeId(), cachedBlock.getStatus(),
         cachedBlock.getReplicationAndMark());
   }

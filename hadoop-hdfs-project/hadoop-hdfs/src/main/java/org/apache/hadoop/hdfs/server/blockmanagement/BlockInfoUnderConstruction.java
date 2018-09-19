@@ -58,14 +58,14 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   /**
    * Create block and set its state to {@link BlockUCState#UNDER_CONSTRUCTION}.
    */
-  public BlockInfoUnderConstruction(Block blk, int inodeId) {
+  public BlockInfoUnderConstruction(Block blk, long inodeId) {
     this(blk, inodeId, BlockUCState.UNDER_CONSTRUCTION);
   }
 
   /**
    * Create a block that is currently being constructed.
    */
-  private BlockInfoUnderConstruction(Block blk, int inodeId,
+  private BlockInfoUnderConstruction(Block blk, long inodeId,
       BlockUCState state) {
     super(blk, inodeId);
     assert getBlockUCState() !=
@@ -76,7 +76,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   /**
    * Create a block that is currently being constructed.
    */
-  public BlockInfoUnderConstruction(Block blk, int inodeId, BlockUCState state,
+  public BlockInfoUnderConstruction(Block blk, long inodeId, BlockUCState state,
       DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
     this(blk, inodeId, state);

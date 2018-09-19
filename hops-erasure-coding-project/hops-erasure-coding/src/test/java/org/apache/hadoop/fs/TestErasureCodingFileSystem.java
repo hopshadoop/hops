@@ -166,7 +166,7 @@ public class TestErasureCodingFileSystem extends ClusterTest {
     LOG.info("Losing block " + lb.toString());
     getCluster().triggerBlockReports();
 
-    final int inodeId = io.hops.TestUtil.getINodeId(cluster.getNameNode(),
+    final long inodeId = io.hops.TestUtil.getINodeId(cluster.getNameNode(),
         testFile);
     new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override

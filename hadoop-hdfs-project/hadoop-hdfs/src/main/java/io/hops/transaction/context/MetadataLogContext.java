@@ -26,11 +26,11 @@ public class MetadataLogContext
   private final MetadataLogDataAccess<MetadataLogEntry> dataAccess;
 
   class Key {
-    private int datasetId;
-    private int inodeId;
+    private long datasetId;
+    private long inodeId;
     private long timestamp;
 
-    public Key(int datasetId, int inodeId, long timestamp) {
+    public Key(long datasetId, long inodeId, long timestamp) {
       this.datasetId = datasetId;
       this.inodeId = inodeId;
       this.timestamp = timestamp;
@@ -58,8 +58,8 @@ public class MetadataLogContext
 
     @Override
     public int hashCode() {
-      int result = datasetId;
-      result = 31 * result + inodeId;
+      int result = Long.hashCode(datasetId);
+      result = 31 * result + Long.hashCode(inodeId);
       result = 31 * result + (int) (timestamp ^ (timestamp >>> 32));
       return result;
     }

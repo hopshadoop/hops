@@ -51,7 +51,7 @@ public class PendingBlockInfoDALAdaptor extends
 
   @Override
   public org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo findByBlockAndInodeIds(
-      long blockId, int inodeId) throws StorageException {
+      long blockId, long inodeId) throws StorageException {
     return convertDALtoHDFS(dataAccces.findByBlockAndInodeIds(blockId, inodeId));
   }
 
@@ -102,14 +102,14 @@ public class PendingBlockInfoDALAdaptor extends
 
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo> findByINodeId(
-      int inodeId) throws StorageException {
+      long inodeId) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo>) convertDALtoHDFS(
         dataAccces.findByINodeId(inodeId));
   }
 
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo> findByINodeIds(
-      int[] inodeIds) throws StorageException {
+      long[] inodeIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo>) convertDALtoHDFS(
         dataAccces.findByINodeIds(inodeIds));
   }

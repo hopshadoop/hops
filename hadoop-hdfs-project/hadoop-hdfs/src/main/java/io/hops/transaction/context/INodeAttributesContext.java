@@ -34,7 +34,7 @@ import java.util.List;
 import org.apache.hadoop.hdfs.server.namenode.Quota;
 
 public class INodeAttributesContext
-    extends BaseEntityContext<Integer, INodeAttributes> {
+    extends BaseEntityContext<Long, INodeAttributes> {
 
   private final INodeAttributesDataAccess<INodeAttributes> dataAccess;
 
@@ -105,7 +105,7 @@ public class INodeAttributesContext
   }
 
   @Override
-  Integer getKey(INodeAttributes iNodeAttributes) {
+  Long getKey(INodeAttributes iNodeAttributes) {
     return iNodeAttributes.getInodeId();
   }
 
@@ -133,7 +133,7 @@ public class INodeAttributesContext
 
   private INodeAttributes findByPrimaryKey(INodeAttributes.Finder qfinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
     INodeAttributes result = null;
     if (contains(inodeId)) {
       result = get(inodeId);
@@ -217,7 +217,7 @@ public class INodeAttributesContext
     }
   }
 
-  private INodeAttributes clone(INodeAttributes src, int inodeId) {
+  private INodeAttributes clone(INodeAttributes src, long inodeId) {
     return new INodeAttributes(inodeId, src.getQuotaCounts().get(Quota.NAMESPACE), src.getNsCount(),
         src.getQuotaCounts().get(Quota.DISKSPACE), src.getDiskspace());
   }

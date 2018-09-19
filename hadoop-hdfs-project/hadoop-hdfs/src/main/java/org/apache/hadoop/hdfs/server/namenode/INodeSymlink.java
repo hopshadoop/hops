@@ -36,11 +36,11 @@ import java.util.List;
 public class INodeSymlink extends INodeWithAdditionalFields {
   private final byte[] symlink; // The target URI
 
-  public INodeSymlink(int id, String value, long mtime, long atime, PermissionStatus permissions) throws IOException {
+  public INodeSymlink(long id, String value, long mtime, long atime, PermissionStatus permissions) throws IOException {
     this(id, value, mtime, atime, permissions, false);
   }
 
-  public INodeSymlink(int id, String value, long mtime, long atime,
+  public INodeSymlink(long id, String value, long mtime, long atime,
       PermissionStatus permissions, boolean inTree) throws IOException {
     super(id, permissions, mtime, atime, inTree);
     this.symlink = DFSUtil.string2Bytes(value);

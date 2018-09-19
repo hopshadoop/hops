@@ -34,7 +34,7 @@ public class AcesContext
     extends BaseEntityContext<Ace.PrimaryKey, Ace> {
   
   private AceDataAccess<Ace> dataAccess;
-  private Map<Integer, List<Ace>> inodeAces = new HashMap<>();
+  private Map<Long, List<Ace>> inodeAces = new HashMap<>();
   
   public AcesContext(AceDataAccess<Ace> aceDataAccess) {
     this.dataAccess = aceDataAccess;
@@ -54,7 +54,7 @@ public class AcesContext
   
   private Collection<Ace> findByPKBatched(Ace.Finder aceFinder, Object[] params)
       throws StorageException, StorageCallPreventedException {
-    int inodeId = (int) params[0];
+    long inodeId = (long) params[0];
     int[] aceIds = (int[]) params[1];
     
     List<Ace> result;

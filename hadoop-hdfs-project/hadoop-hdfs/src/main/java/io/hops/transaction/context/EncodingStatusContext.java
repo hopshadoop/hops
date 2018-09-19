@@ -33,10 +33,10 @@ import java.util.List;
 import java.util.Map;
 
 public class EncodingStatusContext
-    extends BaseEntityContext<Integer, EncodingStatus> {
+    extends BaseEntityContext<Long, EncodingStatus> {
 
   private final EncodingStatusDataAccess<EncodingStatus> dataAccess;
-  private final Map<Integer, EncodingStatus> parityInodeIdToEncodingStatus =
+  private final Map<Long, EncodingStatus> parityInodeIdToEncodingStatus =
       new HashMap<>();
 
   public EncodingStatusContext(
@@ -72,7 +72,7 @@ public class EncodingStatusContext
       Object... params) throws TransactionContextException, StorageException {
     EncodingStatus.Finder eFinder = (EncodingStatus.Finder) finder;
 
-    Integer inodeId = (Integer) params[0];
+    Long inodeId = (Long) params[0];
     if (inodeId == null) {
       return null;
     }
@@ -137,12 +137,12 @@ public class EncodingStatusContext
   }
 
   @Override
-  Integer getKey(EncodingStatus encodingStatus) {
+  Long getKey(EncodingStatus encodingStatus) {
     return encodingStatus.getInodeId();
   }
 
   private EncodingStatus findByINodeId(EncodingStatus.Finder eFinder,
-      final int inodeId)
+      final long inodeId)
       throws StorageCallPreventedException, StorageException {
     EncodingStatus result = null;
     if (contains(inodeId)) {
@@ -160,10 +160,10 @@ public class EncodingStatusContext
 
   private Collection<EncodingStatus> findByINodeIds(EncodingStatus.Finder eFinder, Object... params)
       throws StorageCallPreventedException, StorageException {
-    Collection<Integer> inodeIds = (Collection<Integer>) params[0];
+    Collection<Long> inodeIds = (Collection<Long>) params[0];
     Collection<EncodingStatus> result = new ArrayList<>(inodeIds.size());
-    Collection<Integer> toGetFromDB = new ArrayList<>();
-    for (int id : inodeIds) {
+    Collection<Long> toGetFromDB = new ArrayList<>();
+    for (long id : inodeIds) {
       if (contains(id)) {
         result.add(get(id));
         hit(eFinder, get(id), "inodeid", id);
@@ -180,7 +180,7 @@ public class EncodingStatusContext
         miss(eFinder, s, "inodeid", s.getInodeId());
         result.add(s);
       }
-      for (int id : toGetFromDB) {
+      for (long id : toGetFromDB) {
         if (!contains(id)) {
           EncodingStatus s = null;
           gotFromDB(id, s);
@@ -192,7 +192,7 @@ public class EncodingStatusContext
   }
 
   private EncodingStatus findByParityINodeId(EncodingStatus.Finder eFinder,
-      final int pairtyINodeId)
+      final long pairtyINodeId)
       throws StorageCallPreventedException, StorageException {
     EncodingStatus result = null;
     if (parityInodeIdToEncodingStatus.containsKey(pairtyINodeId)) {
@@ -210,10 +210,10 @@ public class EncodingStatusContext
 
   private Collection<EncodingStatus> findByParityINodeIds(EncodingStatus.Finder eFinder, Object... params)
       throws StorageCallPreventedException, StorageException {
-    Collection<Integer> inodeIds = (Collection<Integer>) params[0];
+    Collection<Long> inodeIds = (Collection<Long>) params[0];
     Collection<EncodingStatus> result = new ArrayList<>(inodeIds.size());
-    List<Integer> toGetFromDB = new ArrayList<>();
-    for (int pairtyINodeId : inodeIds) {
+    List<Long> toGetFromDB = new ArrayList<>();
+    for (long pairtyINodeId : inodeIds) {
       if (parityInodeIdToEncodingStatus.containsKey(pairtyINodeId)) {
         result.add(parityInodeIdToEncodingStatus.get(pairtyINodeId));
         hit(eFinder, parityInodeIdToEncodingStatus.get(pairtyINodeId), "parityinodeid", pairtyINodeId);
@@ -232,7 +232,7 @@ public class EncodingStatusContext
         result.add(s);
       }
       }
-      for(int id: toGetFromDB){
+      for(long id: toGetFromDB){
         if(!parityInodeIdToEncodingStatus.containsKey(id)){
           EncodingStatus s = null;
           addInternal(id, s);
@@ -250,7 +250,7 @@ public class EncodingStatusContext
     }
   }
 
-  private void addInternal(int parityINodeId, EncodingStatus encodingStatus) {
+  private void addInternal(long parityINodeId, EncodingStatus encodingStatus) {
     parityInodeIdToEncodingStatus.put(parityINodeId, encodingStatus);
   }
 

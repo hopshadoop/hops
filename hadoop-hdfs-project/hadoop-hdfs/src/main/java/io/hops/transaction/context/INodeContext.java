@@ -20,6 +20,7 @@ package io.hops.transaction.context;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 import io.hops.exception.LockUpgradeException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -43,7 +44,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public class INodeContext extends BaseEntityContext<Integer, INode> {
+public class INodeContext extends BaseEntityContext<Long, INode> {
 
   protected final static Log LOG = LogFactory.getLog(INodeContext .class);
 
@@ -51,7 +52,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
 
   private final Map<String, INode> inodesNameParentIndex =
       new HashMap<>();
-  private final Map<Integer, List<INode>> inodesParentIndex =
+  private final Map<Long, List<INode>> inodesParentIndex =
       new HashMap<>();
   private final List<INode> renamedInodes = new ArrayList<>();
 
@@ -203,7 +204,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
   }
 
   @Override
-  Integer getKey(INode iNode) {
+  Long getKey(INode iNode) {
     return iNode.getId();
   }
 
@@ -211,7 +212,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
   private INode findByInodeIdFTIS(INode.Finder inodeFinder, Object[] params)
       throws TransactionContextException, StorageException {
     INode result = null;
-    final Integer inodeId = (Integer) params[0];
+    final Long inodeId = (Long) params[0];
     if (contains(inodeId)) {
       result = get(inodeId);
       if(result!=null) {
@@ -240,11 +241,11 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
 
     INode result = null;
     final String name = (String) params[0];
-    final Integer parentId = (Integer) params[1];
-    final Integer partitionId = (Integer) params[2];
-    Integer possibleInodeId = null;
+    final Long parentId = (Long) params[1];
+    final Long partitionId = (Long) params[2];
+    Long possibleInodeId = null;
     if (params.length == 4) {
-      possibleInodeId = (Integer) params[3];
+      possibleInodeId = (Long) params[3];
     }
     final String nameParentKey = INode.nameParentKey(parentId, name);
 
@@ -281,7 +282,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
 
   private List<INode> findByParentIdFTIS(INode.Finder inodeFinder, Object[] params)
       throws TransactionContextException, StorageException {
-    final Integer parentId = (Integer) params[0];
+    final Long parentId = (Long) params[0];
     List<INode> result = null;
     if (inodesParentIndex.containsKey(parentId)) {
       result = inodesParentIndex.get(parentId);
@@ -298,8 +299,8 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
 
   private List<INode> findByParentIdAndPartitionIdPPIS(INode.Finder inodeFinder, Object[] params)
           throws TransactionContextException, StorageException {
-    final Integer parentId = (Integer) params[0];
-    final Integer partitionId = (Integer) params[1];
+    final Long parentId = (Long) params[0];
+    final Long partitionId = (Long) params[1];
     List<INode> result = null;
     if (inodesParentIndex.containsKey(parentId)) {
       result = inodesParentIndex.get(parentId);
@@ -317,8 +318,8 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
   private List<INode> findBatch(INode.Finder inodeFinder, Object[] params)
       throws TransactionContextException, StorageException {
     final String[] names = (String[]) params[0];
-    final int[] parentIds = (int[]) params[1];
-    final int[] partitionIds = (int[]) params[2];
+    final long[] parentIds = (long[]) params[1];
+    final long[] partitionIds = (long[]) params[2];
     return findBatch(inodeFinder, names, parentIds, partitionIds);
   }
 
@@ -326,12 +327,12 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
       Object[] params)
       throws TransactionContextException, StorageException {
     final String[] names = (String[]) params[0];
-    final int[] parentIds = (int[]) params[1];
-    final int[] partitionIds = (int[]) params[2];
+    final long[] parentIds = (long[]) params[1];
+    final long[] partitionIds = (long[]) params[2];
 
     List<String> namesRest = Lists.newArrayList();
-    List<Integer> parentIdsRest = Lists.newArrayList();
-    List<Integer> partitionIdsRest = Lists.newArrayList();
+    List<Long> parentIdsRest = Lists.newArrayList();
+    List<Long> partitionIdsRest = Lists.newArrayList();
     List<Integer> unpopulatedIndeces = Lists.newArrayList();
 
     List<INode> result = new ArrayList<>(Collections.<INode>nCopies(names
@@ -360,8 +361,8 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
     }else{
       List<INode> batch = findBatch(inodeFinder,
               namesRest.toArray(new String[namesRest.size()]),
-              Ints.toArray(parentIdsRest),
-              Ints.toArray(partitionIdsRest));
+              Longs.toArray(parentIdsRest),
+              Longs.toArray(partitionIdsRest));
       Iterator<INode> batchIterator = batch.listIterator();
       for(Integer i : unpopulatedIndeces){
         if(batchIterator.hasNext()){
@@ -373,7 +374,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
   }
 
   private List<INode> findBatch(INode.Finder inodeFinder, String[] names,
-                                int[] parentIds, int[] partitionIds) throws StorageException {
+                                long[] parentIds, long[] partitionIds) throws StorageException {
     INode rootINode = null;
     boolean addCachedRootInode = false;
     if (canReadCachedRootINode(names[0], parentIds[0])) {
@@ -423,7 +424,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
     return finalList;
   }
 
-  private boolean containsRemoved(final Integer parentId, final String name) {
+  private boolean containsRemoved(final Long parentId, final String name) {
     return contains(new Predicate<ContextEntity>() {
       @Override
       public boolean apply(ContextEntity input) {
@@ -436,7 +437,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
   }
 
   private void gotFromDBWithPossibleInodeId(INode result,
-      Integer possibleInodeId) {
+      Long possibleInodeId) {
     if (result == null && possibleInodeId != null) {
       gotFromDB(possibleInodeId, result);
     } else {
@@ -444,7 +445,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
     }
   }
 
-  private boolean canReadCachedRootINode(String name, int parentId) {
+  private boolean canReadCachedRootINode(String name, long parentId) {
     if (name.equals(INodeDirectory.ROOT_NAME) && parentId == INodeDirectory.ROOT_PARENT_ID) {
       if (RootINodeCache.isRootInCache() && currentLockMode.get() == LockMode.READ_COMMITTED) {
         return true;

@@ -125,7 +125,7 @@ public class TestBlockInfoUnderConstruction {
       IOException {
     return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
-      INodeIdentifier inodeIdentifier = new INodeIdentifier(3);
+      INodeIdentifier inodeIdentifier = new INodeIdentifier(3L);
 
       @Override
       public void setUp() throws StorageException {
@@ -163,7 +163,7 @@ public class TestBlockInfoUnderConstruction {
       IOException {
     new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
-      INodeIdentifier inodeIdentifier = new INodeIdentifier(3);
+      INodeIdentifier inodeIdentifier = new INodeIdentifier(3L);
 
       @Override
       public void setUp() throws StorageException {

@@ -284,7 +284,7 @@ class InvalidateBlocks {
     }.handle();
   }
 
-  private InvalidatedBlock findBlock(long blkId, int sid, int
+  private InvalidatedBlock findBlock(long blkId, int sid, long
       inodeId) throws StorageException, TransactionContextException {
     return (InvalidatedBlock) EntityManager
         .find(InvalidatedBlock.Finder.ByBlockIdSidAndINodeId, blkId,

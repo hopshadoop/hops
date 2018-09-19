@@ -40,7 +40,7 @@ public class ReplicaUnderConstructionDALAdaptor extends
   
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction> findReplicaUnderConstructionByINodeId(
-      int inodeId) throws StorageException {
+      long inodeId) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction>) convertDALtoHDFS(
         dataAccces.findReplicaUnderConstructionByINodeId(inodeId));
   }
@@ -48,14 +48,14 @@ public class ReplicaUnderConstructionDALAdaptor extends
   
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction> findReplicaUnderConstructionByINodeIds(
-      int[] inodeIds) throws StorageException {
+      long[] inodeIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction>) convertDALtoHDFS(
         dataAccces.findReplicaUnderConstructionByINodeIds(inodeIds));
   }
   
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction> findReplicaUnderConstructionByBlockId(
-      long blockId, int inodeId) throws StorageException {
+      long blockId, long inodeId) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction>) convertDALtoHDFS(
         dataAccces.findReplicaUnderConstructionByBlockId(blockId, inodeId));
   }
@@ -71,7 +71,7 @@ public class ReplicaUnderConstructionDALAdaptor extends
   }
 
   @Override
-  public void removeByBlockIdAndInodeId(long blockId, int inodeId)
+  public void removeByBlockIdAndInodeId(long blockId, long inodeId)
       throws StorageException {
     dataAccces.removeByBlockIdAndInodeId(blockId, inodeId);
   }

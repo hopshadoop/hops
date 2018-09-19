@@ -37,7 +37,7 @@ final class SqlBatchedBlocksRelatedLock extends LockWithType {
   protected void acquire(TransactionLocks locks) throws IOException {
     Lock inodeLock = locks.getLock(Type.INode);
     if (inodeLock instanceof BatchedINodeLock) {
-      int[] inodeIds = ((BatchedINodeLock) inodeLock).getINodeIds();
+      long[] inodeIds = ((BatchedINodeLock) inodeLock).getINodeIds();
       acquireLockList(DEFAULT_LOCK_TYPE, getFinderType(), inodeIds);
     } else {
       throw new TransactionLocks.LockNotAddedException(

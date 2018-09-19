@@ -105,10 +105,10 @@ abstract class BaseEncodingStatusLock extends Lock {
 
   final static class IndividualEncodingStatusLock
           extends BaseEncodingStatusLock {
-    private final int inodeId;
+    private final long inodeId;
 
     IndividualEncodingStatusLock(TransactionLockTypes.LockType lockType,
-                                 int inodeId) {
+                                 long inodeId) {
       super(lockType);
       this.inodeId = inodeId;
     }
@@ -131,11 +131,11 @@ abstract class BaseEncodingStatusLock extends Lock {
   
   final static class BatchedEncodingStatusLock extends BaseEncodingStatusLock {
 
-    private final Set<Integer> inodeIds;
+    private final Set<Long> inodeIds;
 
     BatchedEncodingStatusLock(TransactionLockTypes.LockType lockType, List<INodeIdentifier> inodeIdentifiers) {
       super(lockType);
-      inodeIds = new HashSet<Integer>();
+      inodeIds = new HashSet<>();
       for (INodeIdentifier identifier : inodeIdentifiers) {
         inodeIds.add(identifier.getInodeId());
       }

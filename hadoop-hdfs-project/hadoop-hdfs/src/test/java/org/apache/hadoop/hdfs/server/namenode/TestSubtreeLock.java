@@ -944,7 +944,7 @@ public class TestSubtreeLock extends TestCase {
     }
   }
 
-  private int getSubTreeRootID(final String path) throws IOException {
+  private long getSubTreeRootID(final String path) throws IOException {
     LinkedList<INode> nodes = new LinkedList<>();
     INodeUtil.resolvePathWithNoTransaction(path, false, nodes);
     return nodes.getLast().getId();

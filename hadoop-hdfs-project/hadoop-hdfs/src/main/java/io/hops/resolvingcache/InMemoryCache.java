@@ -29,7 +29,7 @@ import java.util.List;
 
 public class InMemoryCache extends Cache{
 
-  private ConcurrentLinkedHashMap<String, Integer> cache;
+  private ConcurrentLinkedHashMap<String, Long> cache;
   private int CACHE_MAXIMUM_SIZE;
 
   @Override
@@ -59,14 +59,14 @@ public class InMemoryCache extends Cache{
   }
 
   @Override
-  protected int[] getInternal(String path) throws IOException {
+  protected long[] getInternal(String path) throws IOException {
     String[] pathComponents = INode.getPathNames(path);
-    int[] inodeIds = new int[pathComponents.length];
-    int parentId = INodeDirectory.ROOT_PARENT_ID;
+    long[] inodeIds = new long[pathComponents.length];
+    long parentId = INodeDirectory.ROOT_PARENT_ID;
     int index = 0;
     while(index <pathComponents.length){
       String cmp = pathComponents[index];
-      Integer inodeId = cache.get(INode.nameParentKey(parentId, cmp));
+      Long inodeId = cache.get(INode.nameParentKey(parentId, cmp));
       if(inodeId != null){
         parentId = inodeId;
         inodeIds[index] = inodeId;

@@ -82,13 +82,13 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     return this;
   }
 
-  public INodeFile(int id, PermissionStatus permissions, BlockInfo[] blklist,
+  public INodeFile(long id, PermissionStatus permissions, BlockInfo[] blklist,
       short replication, long modificationTime, long atime,
       long preferredBlockSize, byte storagePolicyID) throws IOException {
     this(id, permissions, blklist, replication, modificationTime, atime, preferredBlockSize, storagePolicyID, false);
   }
 
-  public INodeFile(int id, PermissionStatus permissions, BlockInfo[] blklist,
+  public INodeFile(long id, PermissionStatus permissions, BlockInfo[] blklist,
       short replication, long modificationTime, long atime,
       long preferredBlockSize, byte storagePolicyID, boolean inTree) throws IOException {
     super(id, permissions, modificationTime, atime, inTree);
@@ -98,7 +98,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     this.setBlockStoragePolicyIDNoPersistance(storagePolicyID);
   }
  
-  public INodeFile(int id, PermissionStatus permissions, long header,
+  public INodeFile(long id, PermissionStatus permissions, long header,
       long modificationTime, long atime, boolean isFileStoredInDB, byte storagepolicy, boolean inTree) throws
       IOException {
     super(id, permissions, modificationTime, atime, inTree);

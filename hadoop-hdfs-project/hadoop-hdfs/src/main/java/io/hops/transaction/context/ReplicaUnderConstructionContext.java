@@ -97,7 +97,7 @@ public class ReplicaUnderConstructionContext
 
   @Override
   ReplicaUnderConstruction cloneEntity(
-      ReplicaUnderConstruction replicaUnderConstruction, int inodeId) {
+      ReplicaUnderConstruction replicaUnderConstruction, long inodeId) {
     return new ReplicaUnderConstruction(
         replicaUnderConstruction.getState(),
         replicaUnderConstruction.getStorageId(),
@@ -110,7 +110,7 @@ public class ReplicaUnderConstructionContext
       ReplicaUnderConstruction.Finder rFinder, Object[] params)
       throws TransactionContextException, StorageException {
     final long blockId = (Long) params[0];
-    final int inodeId = (Integer) params[1];
+    final long inodeId = (Long) params[1];
     List<ReplicaUnderConstruction> result = null;
     if (containsByBlock(blockId) || containsByINode(inodeId)) {
       result = getByBlock(blockId);
@@ -128,7 +128,7 @@ public class ReplicaUnderConstructionContext
   private List<ReplicaUnderConstruction> findByINodeId(
       ReplicaUnderConstruction.Finder rFinder, Object[] params)
       throws TransactionContextException, StorageException {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
     List<ReplicaUnderConstruction> result = null;
     if (containsByINode(inodeId)) {
       result = getByINode(inodeId);
@@ -136,7 +136,7 @@ public class ReplicaUnderConstructionContext
     } else {
       aboutToAccessStorage(rFinder, params);
       result = dataAccess.findReplicaUnderConstructionByINodeId(inodeId);
-      gotFromDB(new BlockPK(inodeId), result);
+      gotFromDB(new BlockPK(null, inodeId), result);
       miss(rFinder, result, "inodeid", inodeId);
     }
     return result;
@@ -145,7 +145,7 @@ public class ReplicaUnderConstructionContext
   private List<ReplicaUnderConstruction> findByINodeIds(
       ReplicaUnderConstruction.Finder rFinder, Object[] params)
       throws TransactionContextException, StorageException {
-    final int[] inodeIds = (int[]) params[0];
+    final long[] inodeIds = (long[]) params[0];
     aboutToAccessStorage(rFinder, params);
     List<ReplicaUnderConstruction> result =
         dataAccess.findReplicaUnderConstructionByINodeIds(inodeIds);

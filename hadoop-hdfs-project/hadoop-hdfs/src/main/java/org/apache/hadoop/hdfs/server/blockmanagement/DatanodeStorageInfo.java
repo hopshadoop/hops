@@ -440,7 +440,7 @@ public class DatanodeStorageInfo {
     return (Map<Long, Integer>) findBlocksHandler.handle();
   }
 
-  public Map<Long, Integer> getAllStorageReplicasInBuckets(
+  public Map<Long, Long> getAllStorageReplicasInBuckets(
           final List<Integer> mismatchedBuckets) throws IOException {
     LightWeightRequestHandler findReplicasHandler = new
         LightWeightRequestHandler
@@ -453,7 +453,7 @@ public class DatanodeStorageInfo {
             mismatchedBuckets);
       }
     };
-    return (Map<Long,Integer>) findReplicasHandler.handle();
+    return (Map<Long,Long>) findReplicasHandler.handle();
   }
 
   public Map<Long,Long> getAllStorageInvalidatedReplicasWithGenStamp() throws IOException {

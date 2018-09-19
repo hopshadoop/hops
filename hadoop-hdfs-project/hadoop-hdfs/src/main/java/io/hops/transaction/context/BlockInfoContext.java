@@ -45,7 +45,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
 
   private final static int DEFAULT_NUM_BLOCKS_PER_INODE = 10;
 
-  private final Map<Integer, List<BlockInfo>> inodeBlocks =
+  private final Map<Long, List<BlockInfo>> inodeBlocks =
       new HashMap<>();
   private final List<BlockInfo> concatRemovedBlks = new ArrayList<>();
 
@@ -153,7 +153,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
         //we just have to delete the blocks rows that dont make sence
         break;
       case EmptyFile:
-        Integer inodeId = (Integer) params[0];
+        Long inodeId = (Long) params[0];
         List<BlockInfo> result = Collections.emptyList();
         inodeBlocks.put(inodeId, syncBlockInfoInstances(result));
         break;
@@ -170,7 +170,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       final Object[] params)
       throws TransactionContextException, StorageException {
     List<BlockInfo> result = null;
-    final Integer inodeId = (Integer) params[0];
+    final Long inodeId = (Long) params[0];
     if (inodeBlocks.containsKey(inodeId)) {
       result = inodeBlocks.get(inodeId);
       hit(bFinder, result, "inodeid", inodeId);
@@ -187,7 +187,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       throws TransactionContextException, StorageException {
     List<BlockInfo> result = null;
     final long[] blockIds = (long[]) params[0];
-    final int[] inodeIds = (int[]) params[1];
+    final long[] inodeIds = (long[]) params[1];
     aboutToAccessStorage(bFinder, params);
     result = dataAccess.findByIds(blockIds, inodeIds);
     miss(bFinder, result, "BlockIds", Arrays.toString(blockIds), "InodeIds",
@@ -198,10 +198,10 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   private List<BlockInfo> findByInodeIds(BlockInfo.Finder bFinder,
       Object[] params) throws TransactionContextException, StorageException {
     List<BlockInfo> result = null;
-    final int[] ids = (int[]) params[0];
+    final long[] ids = (long[]) params[0];
     aboutToAccessStorage(bFinder, params);
     result = dataAccess.findByInodeIds(ids);
-    for (int id : ids) {
+    for (long id : ids) {
       inodeBlocks.put(id, null);
     }
     miss(bFinder, result, "InodeIds", Arrays.toString(ids));
@@ -213,7 +213,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       throws TransactionContextException, StorageException {
     List<BlockInfo> blocks = null;
     BlockInfo result = null;
-    final Integer inodeId = (Integer) params[0];
+    final Long inodeId = (Long) params[0];
     final Integer index = (Integer) params[1];
     if (inodeBlocks.containsKey(inodeId)) {
       blocks = inodeBlocks.get(inodeId);
@@ -234,14 +234,14 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       throws TransactionContextException, StorageException {
     BlockInfo result = null;
     long blockId = (Long) params[0];
-    Integer inodeId = null;
+    Long inodeId = null;
     if (params.length > 1 && params[1] != null) {
-      inodeId = (Integer) params[1];
+      inodeId = (Long) params[1];
     }
     if (contains(blockId)) {
       result = get(blockId);
       hit(bFinder, result, "bid", blockId, "inodeId",
-          inodeId != null ? Integer.toString(inodeId) : "NULL");
+          inodeId != null ? Long.toString(inodeId) : "NULL");
     } else {
       // some test intentionally look for blocks that are not in the DB
       // duing the acquire lock phase if we see that an id does not
@@ -261,7 +261,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
 
   private BlockInfo findMaxBlk(BlockInfo.Finder bFinder,
       final Object[] params) {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
     Collection<BlockInfo> notRemovedBlks = Collections2
         .filter(filterValuesNotOnState(State.REMOVED),
             new Predicate<BlockInfo>() {

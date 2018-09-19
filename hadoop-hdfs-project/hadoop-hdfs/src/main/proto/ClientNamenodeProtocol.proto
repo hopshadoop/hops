@@ -659,8 +659,8 @@ message ActiveNamenodeListResponseProto {
 }
 
 message EncodingStatusProto {
-  optional uint32 inodeId = 1;
-  optional uint32 parityInodeId = 2;
+  optional uint64 inodeId = 1;
+  optional uint64 parityInodeId = 2;
   required uint32 status = 3;
   optional uint32 parityStatus = 4;
   optional EncodingPolicyProto policy = 5;

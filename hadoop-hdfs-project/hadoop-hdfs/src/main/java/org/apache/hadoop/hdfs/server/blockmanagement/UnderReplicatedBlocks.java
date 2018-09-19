@@ -668,7 +668,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
       final List<UnderReplicatedBlock> allUrb,
       final List<List<Block>> priorityQueuestmp) throws IOException {
     final long[] blockIds = new long[allUrb.size()];
-    final int[] inodeIds = new int[allUrb.size()];
+    final long[] inodeIds = new long[allUrb.size()];
     final HashMap<Long, UnderReplicatedBlock> allUrbHashMap =
         new HashMap<>();
     for (int i = 0; i < allUrb.size(); i++) {

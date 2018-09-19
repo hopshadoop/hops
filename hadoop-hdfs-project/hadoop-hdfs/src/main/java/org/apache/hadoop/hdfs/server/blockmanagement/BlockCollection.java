@@ -106,5 +106,5 @@ public interface BlockCollection {
    * HOP:
    * Get the Id of associated INode
    */
-  public int getId();
+  public long getId();
 }

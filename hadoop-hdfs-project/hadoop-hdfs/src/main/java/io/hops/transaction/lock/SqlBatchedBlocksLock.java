@@ -25,7 +25,7 @@ public final class SqlBatchedBlocksLock extends BaseIndividualBlockLock {
   protected void acquire(TransactionLocks locks) throws IOException {
     Lock inodeLock = locks.getLock(Type.INode);
     if (inodeLock instanceof BatchedINodeLock) {
-      int[] inodeIds = ((BatchedINodeLock) inodeLock).getINodeIds();
+      long[] inodeIds = ((BatchedINodeLock) inodeLock).getINodeIds();
       blocks.addAll(
           acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByINodeIds,
               inodeIds));

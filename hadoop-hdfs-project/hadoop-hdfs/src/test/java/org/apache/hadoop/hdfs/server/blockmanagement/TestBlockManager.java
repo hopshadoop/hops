@@ -465,7 +465,7 @@ public class TestBlockManager {
   }
 
   static private BlockInfo blockOnNodes(final long blkId,
-      final List<DatanodeDescriptor> nodes, final int inode_id)
+      final List<DatanodeDescriptor> nodes, final long inode_id)
       throws IOException {
     return (BlockInfo) new HopsTransactionalRequestHandler(
         HDFSOperationType.BLOCK_ON_NODES) {

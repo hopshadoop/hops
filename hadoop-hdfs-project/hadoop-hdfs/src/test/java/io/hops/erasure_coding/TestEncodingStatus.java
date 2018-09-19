@@ -63,7 +63,7 @@ public class TestEncodingStatus extends TestCase {
   public void testAddAndFindEncodingStatus() throws IOException {
     final EncodingPolicy policy = new EncodingPolicy("codec", (short) 1);
     final EncodingStatus statusToAdd =
-        new EncodingStatus(1, EncodingStatus.Status.ENCODING_REQUESTED, policy,
+        new EncodingStatus(1L, EncodingStatus.Status.ENCODING_REQUESTED, policy,
             1L);
 
     HopsTransactionalRequestHandler addReq =
@@ -88,14 +88,14 @@ public class TestEncodingStatus extends TestCase {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            Integer id = (Integer) getParams()[0];
+            Long id = (Long) getParams()[0];
             locks.add(lf.getIndivdualEncodingStatusLock(
                 TransactionLockTypes.LockType.READ_COMMITTED, id));
           }
 
           @Override
           public Object performTask() throws StorageException, IOException {
-            Integer id = (Integer) getParams()[0];
+            Long id = (Long) getParams()[0];
             return EntityManager.find(EncodingStatus.Finder.ByInodeId, id);
           }
         };
@@ -136,7 +136,7 @@ public class TestEncodingStatus extends TestCase {
   public void testUpdateEncodingStatus() throws IOException {
     final EncodingPolicy policy = new EncodingPolicy("codec", (short) 1);
     final EncodingStatus statusToAdd =
-        new EncodingStatus(1, EncodingStatus.Status.ENCODING_REQUESTED, policy,
+        new EncodingStatus(1L, EncodingStatus.Status.ENCODING_REQUESTED, policy,
             1L);
 
     HopsTransactionalRequestHandler addReq =
@@ -157,7 +157,7 @@ public class TestEncodingStatus extends TestCase {
 
     final EncodingPolicy policy1 = new EncodingPolicy("codec2", (short) 2);
     final EncodingStatus updatedStatus =
-        new EncodingStatus(1, EncodingStatus.Status.ENCODING_ACTIVE, policy1,
+        new EncodingStatus(1L, EncodingStatus.Status.ENCODING_ACTIVE, policy1,
             2L);
 
     HopsTransactionalRequestHandler updateReq =
@@ -166,14 +166,14 @@ public class TestEncodingStatus extends TestCase {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            Integer id = (Integer) getParams()[0];
+            Long id = (Long) getParams()[0];
             locks.add(lf.getIndivdualEncodingStatusLock(
                 TransactionLockTypes.LockType.WRITE, id));
           }
 
           @Override
           public Object performTask() throws StorageException, IOException {
-            Integer id = (Integer) getParams()[0];
+            Long id = (Long) getParams()[0];
             EntityManager.update(updatedStatus);
             return null;
           }
@@ -187,14 +187,14 @@ public class TestEncodingStatus extends TestCase {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            Integer id = (Integer) getParams()[0];
+            Long id = (Long) getParams()[0];
             locks.add(lf.getIndivdualEncodingStatusLock(
                 TransactionLockTypes.LockType.READ_COMMITTED, id));
           }
 
           @Override
           public Object performTask() throws StorageException, IOException {
-            Integer id = (Integer) getParams()[0];
+            Long id = (Long) getParams()[0];
             return EntityManager.find(EncodingStatus.Finder.ByInodeId, id);
           }
         };
@@ -237,16 +237,16 @@ public class TestEncodingStatus extends TestCase {
     final ArrayList<EncodingStatus> statusToAdd =
         new ArrayList<>();
     statusToAdd.add(
-        new EncodingStatus(1, EncodingStatus.Status.ENCODING_REQUESTED, policy,
+        new EncodingStatus(1L, EncodingStatus.Status.ENCODING_REQUESTED, policy,
             1L));
     statusToAdd
-        .add(new EncodingStatus(2, EncodingStatus.Status.ENCODED, policy, 1L));
+        .add(new EncodingStatus(2L, EncodingStatus.Status.ENCODED, policy, 1L));
     statusToAdd.add(
-        new EncodingStatus(3, EncodingStatus.Status.REPAIR_ACTIVE, policy, 1L));
+        new EncodingStatus(3L, EncodingStatus.Status.REPAIR_ACTIVE, policy, 1L));
     statusToAdd.add(
-        new EncodingStatus(4, EncodingStatus.Status.REPAIR_ACTIVE, policy, 1L));
+        new EncodingStatus(4L, EncodingStatus.Status.REPAIR_ACTIVE, policy, 1L));
     statusToAdd.add(
-        new EncodingStatus(5, EncodingStatus.Status.ENCODING_REQUESTED, policy,
+        new EncodingStatus(5L, EncodingStatus.Status.ENCODING_REQUESTED, policy,
             1L));
 
     HopsTransactionalRequestHandler addReq =
@@ -310,16 +310,16 @@ public class TestEncodingStatus extends TestCase {
     final ArrayList<EncodingStatus> statusToAdd =
         new ArrayList<>();
     statusToAdd.add(
-        new EncodingStatus(1, EncodingStatus.Status.ENCODING_REQUESTED, policy,
+        new EncodingStatus(1L, EncodingStatus.Status.ENCODING_REQUESTED, policy,
             1L));
     statusToAdd
-        .add(new EncodingStatus(2, EncodingStatus.Status.ENCODED, policy, 1L));
+        .add(new EncodingStatus(2L, EncodingStatus.Status.ENCODED, policy, 1L));
     statusToAdd.add(
-        new EncodingStatus(3, EncodingStatus.Status.REPAIR_ACTIVE, policy, 1L));
+        new EncodingStatus(3L, EncodingStatus.Status.REPAIR_ACTIVE, policy, 1L));
     statusToAdd.add(
-        new EncodingStatus(4, EncodingStatus.Status.REPAIR_ACTIVE, policy, 1L));
+        new EncodingStatus(4L, EncodingStatus.Status.REPAIR_ACTIVE, policy, 1L));
     statusToAdd.add(
-        new EncodingStatus(5, EncodingStatus.Status.ENCODING_REQUESTED, policy,
+        new EncodingStatus(5L, EncodingStatus.Status.ENCODING_REQUESTED, policy,
             1L));
 
     HopsTransactionalRequestHandler addReq =

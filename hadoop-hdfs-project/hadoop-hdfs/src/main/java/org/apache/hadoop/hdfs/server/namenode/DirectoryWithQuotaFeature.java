@@ -209,7 +209,7 @@ public class DirectoryWithQuotaFeature implements INode.Feature {
     }
   }
   
-  void changeAttributesPkNoPersistance(final INodeDirectory dir, final Integer id, final boolean inTree)
+  void changeAttributesPkNoPersistance(final INodeDirectory dir, final Long id, final boolean inTree)
     throws StorageException, TransactionContextException {
     getINodeAttributes(dir).setInodeIdNoPersistance(id, inTree);
   }

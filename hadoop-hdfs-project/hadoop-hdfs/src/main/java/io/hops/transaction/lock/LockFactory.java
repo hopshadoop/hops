@@ -250,7 +250,7 @@ public class LockFactory {
     return lock;
   }
 
-  public List<Lock> getBlockReportingLocks(long[] blockIds, int[] inodeIds, long[] unresolvedBlks, int storageId) {
+  public List<Lock> getBlockReportingLocks(long[] blockIds, long[] inodeIds, long[] unresolvedBlks, int storageId) {
     ArrayList<Lock> list = new ArrayList(3);
     list.add(new BatchedBlockLock(blockIds,inodeIds, unresolvedBlks));
     //list.add(new BatchedBlocksRelatedLock.BatchedInvalidatedBlocksLock(storageId));
@@ -267,7 +267,7 @@ public class LockFactory {
     return new BaseEncodingStatusLock.EncodingStatusLock(includeChildren, lockType, targets);
   }
   public Lock getIndivdualEncodingStatusLock(
-      TransactionLockTypes.LockType lockType, int inodeId) {
+      TransactionLockTypes.LockType lockType, long inodeId) {
     return new BaseEncodingStatusLock.IndividualEncodingStatusLock(lockType,
         inodeId);
   }

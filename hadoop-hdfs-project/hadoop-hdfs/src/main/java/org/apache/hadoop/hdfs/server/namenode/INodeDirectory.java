@@ -61,25 +61,25 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   protected static final int DEFAULT_FILES_PER_DIRECTORY = 5;
   public final static String ROOT_NAME = "";
 
-  public static final int ROOT_DIR_PARTITION_KEY = ROOT_PARENT_ID;
+  public static final long ROOT_DIR_PARTITION_KEY = ROOT_PARENT_ID;
   public static final short ROOT_DIR_DEPTH =0;
 
   private boolean metaEnabled;
 
   private int childrenNum;
   
-  public INodeDirectory(int id, String name, PermissionStatus permissions)
+  public INodeDirectory(long id, String name, PermissionStatus permissions)
       throws IOException {
     
     super(id, name, permissions);
   }
   
-  public INodeDirectory(int id, String name, PermissionStatus permissions, boolean inTree)
+  public INodeDirectory(long id, String name, PermissionStatus permissions, boolean inTree)
       throws IOException {
     super(id, name, permissions, inTree);
   }
 
-  public INodeDirectory(int id, PermissionStatus permissions, long mTime)
+  public INodeDirectory(long id, PermissionStatus permissions, long mTime)
       throws IOException {
     super(id, permissions, mTime, 0);
   }
@@ -87,7 +87,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   /**
    * constructor
    */
-  INodeDirectory(int id, byte[] name, PermissionStatus permissions, long mtime)
+  INodeDirectory(long id, byte[] name, PermissionStatus permissions, long mtime)
       throws IOException {
     super(id, name, permissions, mtime, 0L, false);
   }
@@ -230,7 +230,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
         throw new IllegalArgumentException("Invalid parentid");
       }
       short depth = myDepth();
-      int childPartitionKey  = INode.calculatePartitionId(getId(), newChild.getLocalName(), (short) (myDepth()+1));
+      long childPartitionKey  = INode.calculatePartitionId(getId(), newChild.getLocalName(), (short) (myDepth()+1));
       newChild.setPartitionId(childPartitionKey);
       EntityManager.update(newChild);
     }
@@ -244,7 +244,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   private INode getChildINode(byte[] name)
       throws StorageException, TransactionContextException {
     short myDepth = myDepth();
-    int childPartitionId = INode.calculatePartitionId(getId(), DFSUtil.bytes2String(name), (short)(myDepth+1));
+    long childPartitionId = INode.calculatePartitionId(getId(), DFSUtil.bytes2String(name), (short)(myDepth+1));
     INode existingInode = EntityManager
         .find(Finder.ByNameParentIdAndPartitionId, DFSUtil.bytes2String(name),
             getId(), childPartitionId);
@@ -636,7 +636,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     return total;
   }
 
-  public static int getRootDirPartitionKey(){
+  public static long getRootDirPartitionKey(){
     return INode.calculatePartitionId(ROOT_PARENT_ID,ROOT_NAME,ROOT_DIR_DEPTH);
   }
 

@@ -86,7 +86,7 @@ public class INodeResolver {
 
     depth++;
     count++;
-    int partitionId = INode.calculatePartitionId(currentInode.getId(), DFSUtil.bytes2String(components[count]), (short) depth);
+    long partitionId = INode.calculatePartitionId(currentInode.getId(), DFSUtil.bytes2String(components[count]), (short) depth);
 
     currentInode = INodeUtil
         .getNode(components[count], currentInode.getId(), partitionId, transactional);

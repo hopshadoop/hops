@@ -35,7 +35,7 @@ public class QuotaUpdateContext
     extends BaseEntityContext<Integer, QuotaUpdate> {
 
   private final QuotaUpdateDataAccess<QuotaUpdate> dataAccess;
-  private final Map<Integer, List<QuotaUpdate>> inodeIdToQuotaUpdates =
+  private final Map<Long, List<QuotaUpdate>> inodeIdToQuotaUpdates =
       new HashMap<>();
 
   public QuotaUpdateContext(QuotaUpdateDataAccess<QuotaUpdate> dataAccess) {
@@ -98,7 +98,7 @@ public class QuotaUpdateContext
 
   private List<QuotaUpdate> findByINodeId(QuotaUpdate.Finder qFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
     List<QuotaUpdate> result = null;
     if (inodeIdToQuotaUpdates.containsKey(inodeId)) {
       result = inodeIdToQuotaUpdates.get(inodeId);
@@ -112,7 +112,7 @@ public class QuotaUpdateContext
     return result;
   }
 
-  private void gotFromDB(int inodeId, List<QuotaUpdate> quotaUpdates) {
+  private void gotFromDB(long inodeId, List<QuotaUpdate> quotaUpdates) {
     gotFromDB(quotaUpdates);
     inodeIdToQuotaUpdates.put(inodeId, quotaUpdates);
   }

@@ -58,11 +58,11 @@ public class PendingBlockInfo {
   }
 
   private long blockId;
-  private int inodeId;
+  private long inodeId;
   private long timeStamp;
   private final List<String> targets;
 
-  public PendingBlockInfo(long blockId, int inodeId, long timestamp,
+  public PendingBlockInfo(long blockId, long inodeId, long timestamp,
       DatanodeDescriptor[] targets) {
     this.blockId = blockId;
     this.inodeId = inodeId;
@@ -75,7 +75,7 @@ public class PendingBlockInfo {
     }
   }
 
-  public PendingBlockInfo(long blockId, int inodeId, long timestamp,
+  public PendingBlockInfo(long blockId, long inodeId, long timestamp,
       List<String> targets) {
     this.blockId = blockId;
     this.inodeId = inodeId;
@@ -83,7 +83,7 @@ public class PendingBlockInfo {
     this.targets = targets;
   }
   
-  public PendingBlockInfo(long blockId, int inodeId, long timestamp,
+  public PendingBlockInfo(long blockId, long inodeId, long timestamp,
       String target) {
     this.blockId = blockId;
     this.inodeId = inodeId;
@@ -123,7 +123,7 @@ public class PendingBlockInfo {
     return blockId;
   }
   
-  public int getInodeId() {
+  public long getInodeId() {
     return inodeId;
   }
 

@@ -34,7 +34,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
   private Map<Long, Map<Key, Entity>> blocksToReplicas =
       new HashMap<>();
 
-  private Map<Integer, Map<Key, Entity>> inodesToReplicas =
+  private Map<Long, Map<Key, Entity>> inodesToReplicas =
       new HashMap<>();
 
   @Override
@@ -132,7 +132,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
     return blocksToReplicas.containsKey(blockId);
   }
 
-  final boolean containsByINode(int inodeId) {
+  final boolean containsByINode(long inodeId) {
     return inodesToReplicas.containsKey(inodeId);
   }
 
@@ -145,7 +145,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
     return new ArrayList<>(entityMap.values());
   }
 
-  final List<Entity> getByINode(int inodeId) {
+  final List<Entity> getByINode(long inodeId) {
     Map<Key, Entity> entityMap = inodesToReplicas.get(inodeId);
     if (entityMap == null) {
       return null;
@@ -177,11 +177,11 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
         break;
 
       case BlockDoesNotExist:
-        blockDoesNotExist((Long) params[0], (Integer) params[1]);
+        blockDoesNotExist((Long) params[0], (Long) params[1]);
         break;
 
       case EmptyFile:
-        emptyFile((Integer) params[0]);
+        emptyFile((Long) params[0]);
         break;
     }
   }
@@ -236,14 +236,14 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
     }
   }
 
-  private void blockDoesNotExist(long blockId, int inodeId){
+  private void blockDoesNotExist(long blockId, long inodeId){
     emptyFile(inodeId);
     if (!containsByBlock(blockId)) {
       blocksToReplicas.put(blockId, null);
     }
   }
 
-  private void emptyFile(int inodeId){
+  private void emptyFile(long inodeId){
     if(!containsByINode(inodeId)){
       inodesToReplicas.put(inodeId, null);
     }
@@ -251,5 +251,5 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
 
   abstract Entity cloneEntity(Entity entity);
 
-  abstract Entity cloneEntity(Entity entity, int inodeId);
+  abstract Entity cloneEntity(Entity entity, long inodeId);
 }

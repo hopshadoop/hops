@@ -106,8 +106,8 @@ public class IDsGeneratorFactory {
         cacheDirectiveIdsThreshold));
   }
 
-  public int getUniqueINodeID(){
-    int id = (int)iDsGenerators.get(0).getUniqueID();
+  public long getUniqueINodeID(){
+    long id = iDsGenerators.get(0).getUniqueID();
     LOG.debug("Unique INode generated. id="+id);
     return id;
   }

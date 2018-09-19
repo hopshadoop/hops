@@ -103,7 +103,7 @@ public class ReplicaContext
   }
 
   @Override
-  Replica cloneEntity(Replica hopReplica, int inodeId) {
+  Replica cloneEntity(Replica hopReplica, long inodeId) {
     return new Replica(hopReplica.getStorageId(), hopReplica.getBlockId(),
          inodeId, hopReplica.getBucketId());
   }
@@ -136,7 +136,7 @@ public class ReplicaContext
   private List<Replica> findByBlockId(Replica.Finder iFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
     final long blockId = (Long) params[0];
-    final int inodeId = (Integer) params[1];
+    final long inodeId = (Long) params[1];
     List<Replica> results = null;
     if (containsByBlock(blockId) || (containsByINode(inodeId) && storageCallPrevented)) {
       results = getByBlock(blockId);
@@ -144,7 +144,7 @@ public class ReplicaContext
     } else {
       aboutToAccessStorage(iFinder, params);
       results = dataAccess.findReplicasById(blockId, inodeId);
-      gotFromDB(new BlockPK(blockId), results);
+      gotFromDB(new BlockPK(blockId, null), results);
       miss(iFinder, results, "bid", blockId);
     }
     return results;
@@ -152,7 +152,7 @@ public class ReplicaContext
 
   private List<Replica> findByINodeId(Replica.Finder iFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
     List<Replica> results = null;
     if (containsByINode(inodeId)) {
       results = getByINode(inodeId);
@@ -160,7 +160,7 @@ public class ReplicaContext
     } else {
       aboutToAccessStorage(iFinder, params);
       results = dataAccess.findReplicasByINodeId(inodeId);
-      gotFromDB(new BlockPK(inodeId), results);
+      gotFromDB(new BlockPK(null, inodeId), results);
       miss(iFinder, results, "inodeid", inodeId);
     }
     return results;
@@ -168,7 +168,7 @@ public class ReplicaContext
 
   private List<Replica> findyByINodeIds(Replica.Finder iFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    int[] ids = (int[]) params[0];
+    long[] ids = (long[]) params[0];
     aboutToAccessStorage(iFinder, params);
     List<Replica> results = dataAccess.findReplicasByINodeIds(ids);
     gotFromDB(BlockPK.ReplicaPK.getKeys(ids), results);

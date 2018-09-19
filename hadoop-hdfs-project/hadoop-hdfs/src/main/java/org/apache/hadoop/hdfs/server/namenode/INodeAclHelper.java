@@ -67,7 +67,7 @@ public class INodeAclHelper {
     entries = filterUnnamedNonGroupEntries(entries);
     // checkNoUnnamedDefaults(entries);
     
-    int inodeId = inode.getId();
+    long inodeId = inode.getId();
     for (int i = 0 ; i < entries.size() ; i++){
       EntityManager.update(convert(entries.get(i), inodeId, i));
     }
@@ -166,7 +166,7 @@ public class INodeAclHelper {
     return getInheritedDefaultAcesAsAccess(inode.getParent());
   }
   
-  private static Ace convert(AclEntry entry, int inodeId, int index) throws AclException {
+  private static Ace convert(AclEntry entry, long inodeId, int index) throws AclException {
     return new Ace(inodeId,
         index,
         entry.getName(),

@@ -130,10 +130,10 @@ public abstract class Cache {
     }
   }
 
-  public final int[] get(final String path) throws IOException{
+  public final long[] get(final String path) throws IOException{
     if(isStarted){
       final long startTime = System.currentTimeMillis();
-      int[] result = getInternal(path);
+      long[] result = getInternal(path);
       final long elapsed =  (System.currentTimeMillis() - startTime);
       LOG.debug("GET for path (" + path + ")  got value = " + Arrays.toString
           (result) + " in " + elapsed + " " +
@@ -176,7 +176,7 @@ public abstract class Cache {
 
   protected abstract void setInternal(final INode inode);
 
-  protected abstract int[] getInternal(final String path) throws IOException;
+  protected abstract long[] getInternal(final String path) throws IOException;
   protected abstract void deleteInternal(final String path);
   protected abstract void deleteInternal(final INode inode);
   protected abstract void flushInternal();

@@ -97,7 +97,7 @@ public class ExcessReplicaContext
   }
 
   @Override
-  ExcessReplica cloneEntity(ExcessReplica hopExcessReplica, int inodeId) {
+  ExcessReplica cloneEntity(ExcessReplica hopExcessReplica, long inodeId) {
     return new ExcessReplica(hopExcessReplica.getStorageId(),
         hopExcessReplica.getBlockId(), inodeId);
   }
@@ -112,7 +112,7 @@ public class ExcessReplicaContext
       Object[] params) throws StorageCallPreventedException, StorageException {
     final long blockId = (Long) params[0];
     final int storageId = (Integer) params[1];
-    final int inodeId = (Integer) params[2];
+    final long inodeId = (Long) params[2];
     final BlockPK.ReplicaPK key = new BlockPK.ReplicaPK(blockId, inodeId, storageId);
 
     ExcessReplica result = null;
@@ -131,7 +131,7 @@ public class ExcessReplicaContext
   private List<ExcessReplica> findByBlockId(ExcessReplica.Finder eFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
     final long blockId = (Long) params[0];
-    final int inodeId = (Integer) params[1];
+    final long inodeId = (Long) params[1];
     List<ExcessReplica> result = null;
     if (containsByBlock(blockId) || containsByINode(inodeId)) {
       result = getByBlock(blockId);
@@ -140,7 +140,7 @@ public class ExcessReplicaContext
       aboutToAccessStorage(eFinder, params);
       result = dataAccess.findExcessReplicaByBlockId(blockId, inodeId);
       Collections.sort(result);
-      gotFromDB(new BlockPK(blockId), result);
+      gotFromDB(new BlockPK(blockId, null), result);
       miss(eFinder, result, "bid", blockId, "inodeId", inodeId);
     }
     return result;
@@ -148,7 +148,7 @@ public class ExcessReplicaContext
 
   private List<ExcessReplica> findByINodeId(ExcessReplica.Finder eFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
     List<ExcessReplica> result = null;
     if (containsByINode(inodeId)) {
       result = getByINode(inodeId);
@@ -156,7 +156,7 @@ public class ExcessReplicaContext
     } else {
       aboutToAccessStorage(eFinder, params);
       result = dataAccess.findExcessReplicaByINodeId(inodeId);
-      gotFromDB(new BlockPK(inodeId), result);
+      gotFromDB(new BlockPK(null, inodeId), result);
       miss(eFinder, result, "inodeId", inodeId);
     }
     return result;
@@ -164,7 +164,7 @@ public class ExcessReplicaContext
 
   private List<ExcessReplica> findByINodeIds(ExcessReplica.Finder eFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int[] inodeIds = (int[]) params[0];
+    final long[] inodeIds = (long[]) params[0];
     aboutToAccessStorage(eFinder, params);
     List<ExcessReplica> result =
         dataAccess.findExcessReplicaByINodeIds(inodeIds);
