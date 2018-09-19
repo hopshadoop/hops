@@ -4946,21 +4946,23 @@ public class FSNamesystem
      * @param blk
      *     current block
      */
-    private void incrementSafeBlockCount(Block blk) throws IOException {
-      addSafeBlock(blk.getBlockId());
+    private void incrementSafeBlockCount(short replication, Block blk) throws IOException {
+      if (replication == safeReplication) {
+        addSafeBlock(blk.getBlockId());
 
-      // Report startup progress only if we haven't completed startup yet.
-      //todo this will not work with multiple NN
+        // Report startup progress only if we haven't completed startup yet.
+        //todo this will not work with multiple NN
         StartupProgress prog = NameNode.getStartupProgress();
         if (prog.getStatus(Phase.SAFEMODE) != Status.COMPLETE) {
           if (this.awaitingReportedBlocksCounter == null) {
             this.awaitingReportedBlocksCounter = prog.getCounter(Phase.SAFEMODE,
-              STEP_AWAITING_REPORTED_BLOCKS);
+                STEP_AWAITING_REPORTED_BLOCKS);
           }
           this.awaitingReportedBlocksCounter.increment();
         }
 
-      setSafeModePendingOperation(true);
+        setSafeModePendingOperation(true);
+      }
     }
 
     /**
@@ -5366,13 +5368,13 @@ public class FSNamesystem
   }
 
   @Override
-  public void incrementSafeBlockCount(BlockInfo blk) throws IOException {
+  public void incrementSafeBlockCount(int replication, BlockInfo blk) throws IOException {
     // safeMode is volatile, and may be set to null at any time
     SafeModeInfo safeMode = safeMode();
     if (safeMode == null) {
       return;
     }
-    safeMode.incrementSafeBlockCount(blk);
+    safeMode.incrementSafeBlockCount((short)replication, blk);
   }
 
   @Override

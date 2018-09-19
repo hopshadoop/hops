@@ -511,7 +511,7 @@ public class TestBlockToken {
     }
 
     @Override
-    public void incrementSafeBlockCount(BlockInfo blk) throws IOException {
+    public void incrementSafeBlockCount(int replication, BlockInfo blk) throws IOException {
       throw new UnsupportedOperationException("Not supported yet.");
     }
 

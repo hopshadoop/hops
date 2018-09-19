@@ -57,7 +57,7 @@ public interface SafeMode {
    * @param blk
    *     current block
    */
-  public void incrementSafeBlockCount(BlockInfo blk) throws IOException;
+  public void incrementSafeBlockCount(int replication, BlockInfo blk) throws IOException;
 
   /**
    * Decrement number of blocks that reached minimal replication.
