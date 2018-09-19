@@ -39,7 +39,7 @@ public class INodeAttributeDALAdaptor extends
 
   @Override
   public org.apache.hadoop.hdfs.server.namenode.INodeAttributes findAttributesByPk(
-      Integer inodeId) throws StorageException {
+      Long inodeId) throws StorageException {
     return convertDALtoHDFS(dataAccess.findAttributesByPk(inodeId));
   }
 

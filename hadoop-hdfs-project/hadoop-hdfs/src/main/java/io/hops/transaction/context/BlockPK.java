@@ -25,22 +25,18 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
 class BlockPK {
   private long blockId = Long.MIN_VALUE;
-  private int inodeId = BlockInfo.NON_EXISTING_ID;
+  private long inodeId = BlockInfo.NON_EXISTING_ID;
 
   BlockPK() {
   }
-  
-  BlockPK(long blockId) {
-    this.blockId = blockId;
-  }
 
-  BlockPK(int inodeId) {
-    this.inodeId = inodeId;
-  }
-
-  BlockPK(long blockId, int inodeId) {
-    this.blockId = blockId;
-    this.inodeId = inodeId;
+  BlockPK(Long blockId, Long inodeId) {
+    if(blockId!=null){
+      this.blockId = blockId;
+    }
+    if(inodeId!=null){
+      this.inodeId = inodeId;
+    }
   }
 
   boolean hasBlockId() {
@@ -55,7 +51,7 @@ class BlockPK {
     return blockId;
   }
 
-  int getInodeId() {
+  long getInodeId() {
     return inodeId;
   }
 
@@ -83,25 +79,25 @@ class BlockPK {
   @Override
   public int hashCode() {
     int result = (int) (blockId ^ (blockId >>> 32));
-    result = 31 * result + inodeId;
+    result = 31 * result + Long.hashCode(inodeId);
     return result;
   }
 
   static class ReplicaPK extends BlockPK {
     private int storageId;
 
-    ReplicaPK(long blockId, int inodeId, int storageId) {
+    ReplicaPK(long blockId, long inodeId, int storageId) {
       super(blockId, inodeId);
       this.storageId = storageId;
     }
 
     ReplicaPK(long blockId, int storageId) {
-      super(blockId);
+      super(blockId, null);
       this.storageId = storageId;
     }
 
-    ReplicaPK(int inodeId) {
-      super(inodeId);
+    ReplicaPK(long inodeId) {
+      super(null, inodeId);
     }
 
     int getStorageId() {
@@ -140,16 +136,16 @@ class BlockPK {
       return keys;
     }
 
-    static List<BlockPK.ReplicaPK> getKeys(int[] inodeIds) {
+    static List<BlockPK.ReplicaPK> getKeys(long[] inodeIds) {
       List<BlockPK.ReplicaPK> keys =
           new ArrayList<>(inodeIds.length);
-      for (int inodeId : inodeIds) {
+      for (long inodeId : inodeIds) {
         keys.add(new BlockPK.ReplicaPK(inodeId));
       }
       return keys;
     }
 
-    static List<ReplicaPK> getKeys(long[] blockIds, int[] inodeIds, int storageId) {
+    static List<ReplicaPK> getKeys(long[] blockIds, long[] inodeIds, int storageId) {
       List<BlockPK.ReplicaPK> keys = new ArrayList<>(blockIds.length);
       for (int i = 0; i < blockIds.length; i++) {
         keys.add(new BlockPK.ReplicaPK(blockIds[i], inodeIds[i], storageId));
@@ -158,10 +154,10 @@ class BlockPK {
     }
   }
 
-  static List<BlockPK> getBlockKeys(int[] inodeIds) {
+  static List<BlockPK> getBlockKeys(long[] inodeIds) {
     List<BlockPK> keys = new ArrayList<>(inodeIds.length);
-    for (int inodeId : inodeIds) {
-      keys.add(new BlockPK(inodeId));
+    for (long inodeId : inodeIds) {
+      keys.add(new BlockPK(null, inodeId));
     }
     return keys;
   }
@@ -169,12 +165,12 @@ class BlockPK {
   static class CachedBlockPK extends BlockPK {
     private String datanodeId=null;
 
-    CachedBlockPK(long blockId, int inodeId, String datanodeId) {
+    CachedBlockPK(long blockId, long inodeId, String datanodeId) {
       super(blockId, inodeId);
       this.datanodeId = datanodeId;
     }
 
-    CachedBlockPK(long blockId, int inodeId) {
+    CachedBlockPK(long blockId, long inodeId) {
       super(blockId, inodeId);
     }
       
@@ -182,8 +178,8 @@ class BlockPK {
       this.datanodeId = datanodeId;
     }
 
-    CachedBlockPK(int inodeId) {
-      super(inodeId);
+    CachedBlockPK(long inodeId) {
+      super(null, inodeId);
     }
 
     String getDatanodeId() {
@@ -226,9 +222,9 @@ class BlockPK {
       return keys;
     }
 
-    static List<BlockPK.CachedBlockPK> getKeys(int[] inodeIds) {
+    static List<BlockPK.CachedBlockPK> getKeys(long[] inodeIds) {
       List<BlockPK.CachedBlockPK> keys = new ArrayList<>(inodeIds.length);
-      for (int inodeId : inodeIds) {
+      for (long inodeId : inodeIds) {
         keys.add(new BlockPK.CachedBlockPK(inodeId));
       }
       return keys;

@@ -38,15 +38,15 @@ public class INodeMemcache extends Memcache {
   }
 
   @Override
-  protected int[] getInternal(MemcachedClient mc, String path) throws
+  protected long[] getInternal(MemcachedClient mc, String path) throws
       IOException {
     String[] pathComponents = INode.getPathNames(path);
-    int[] inodeIds = new int[pathComponents.length];
-    int parentId = INodeDirectory.ROOT_PARENT_ID;
+    long[] inodeIds = new long[pathComponents.length];
+    long parentId = INodeDirectory.ROOT_PARENT_ID;
     int index = 0;
     while(index <pathComponents.length){
       String cmp = pathComponents[index];
-      Integer inodeId = getInternal(mc, cmp, parentId);
+      Long inodeId = getInternal(mc, cmp, parentId);
       if(inodeId != null){
         parentId = inodeId;
         inodeIds[index] = inodeId;
@@ -82,7 +82,7 @@ public class INodeMemcache extends Memcache {
     return getKey(keyPrefix, inode);
   }
 
-  private Integer getInternal(MemcachedClient mc, String name, Integer
+  private Long getInternal(MemcachedClient mc, String name, Long
       parentId){
     return getInternal(mc, keyPrefix, name, parentId);
   }
@@ -91,19 +91,19 @@ public class INodeMemcache extends Memcache {
     return KEY_PREFIX + inode.nameParentKey();
   }
 
-  private static String getKey(String KEY_PREFIX, String name, Integer
+  private static String getKey(String KEY_PREFIX, String name, Long
       parentId){
     return KEY_PREFIX + INode.nameParentKey(parentId, name);
   }
 
-  static Integer getInternal(MemcachedClient mc, String KEY_PREFIX, String
-      name, Integer parentId){
-    Integer inodeId = null;
+  static Long getInternal(MemcachedClient mc, String KEY_PREFIX, String
+      name, Long parentId){
+    Long inodeId = null;
     Future<Object> f = mc.asyncGet(getKey(KEY_PREFIX, name, parentId));
     try{
       Object res = f.get(1, TimeUnit.SECONDS);
-      if(res instanceof Integer){
-        inodeId = (Integer)res;
+      if(res instanceof Long){
+        inodeId = (Long)res;
       }
     }catch(Exception ex){
       LOG.error(ex);

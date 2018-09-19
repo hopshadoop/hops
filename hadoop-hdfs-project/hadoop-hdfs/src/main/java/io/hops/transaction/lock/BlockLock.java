@@ -86,7 +86,7 @@ public final class BlockLock extends IndividualBlockLock {
         blockIdSet.add(cBlock.getBlockId());
       }
       long[] blockIds = Longs.toArray(blockIdSet);
-      int[] inodeIds = INodeUtil.resolveINodesFromBlockIds(blockIds);
+      long[] inodeIds = INodeUtil.resolveINodesFromBlockIds(blockIds);
       blocks.addAll(acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByBlockIdsAndINodeIds, blockIds, inodeIds));
     } else {
       throw new TransactionLocks.LockNotAddedException(

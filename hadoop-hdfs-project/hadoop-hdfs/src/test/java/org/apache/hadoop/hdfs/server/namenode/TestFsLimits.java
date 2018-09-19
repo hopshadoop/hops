@@ -197,7 +197,7 @@ public class TestFsLimits {
     mkdirs("/4444", null);
   }
 
-  private static int id = 1 + INodeDirectory.ROOT_INODE_ID;
+  private static long id = 1 + INodeDirectory.ROOT_INODE_ID;
 
 //  private void mkdirs(String name, Class<?> expected)
 //      throws Exception {

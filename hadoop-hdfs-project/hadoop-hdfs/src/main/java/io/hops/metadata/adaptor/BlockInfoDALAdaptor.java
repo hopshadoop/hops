@@ -52,13 +52,13 @@ public class BlockInfoDALAdaptor extends
   
   @Override
   public org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo findById(
-      long blockId, int inodeId) throws StorageException {
+      long blockId, long inodeId) throws StorageException {
     return convertDALtoHDFS(dataAccess.findById(blockId, inodeId));
   }
 
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findByInodeId(
-      int id) throws StorageException {
+      long id) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
         dataAccess.findByInodeId(id));
   }
@@ -66,7 +66,7 @@ public class BlockInfoDALAdaptor extends
   
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findByInodeIds(
-      int[] inodeIds) throws StorageException {
+      long[] inodeIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
         dataAccess.findByInodeIds(inodeIds));
   }
@@ -107,13 +107,13 @@ public class BlockInfoDALAdaptor extends
 
   @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findByIds(
-      long[] blockIds, int[] inodeIds) throws StorageException {
+      long[] blockIds, long[] inodeIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
         dataAccess.findByIds(blockIds, inodeIds));
   }
 
   @Override
-  public boolean existsOnAnyStorage(int inodeId, long blockId, List<Integer> sids) throws
+  public boolean existsOnAnyStorage(long inodeId, long blockId, List<Integer> sids) throws
       StorageException {
     return dataAccess.existsOnAnyStorage(inodeId, blockId, sids);
   }

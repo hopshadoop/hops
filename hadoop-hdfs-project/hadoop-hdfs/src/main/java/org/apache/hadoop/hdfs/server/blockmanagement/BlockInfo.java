@@ -151,9 +151,9 @@ public class BlockInfo extends Block {
   private int blockIndex = -1;
   private long timestamp = 1;
   
-  protected int inodeId = NON_EXISTING_ID;
+  protected long inodeId = NON_EXISTING_ID;
   
-  public BlockInfo(Block blk, int inodeId) {
+  public BlockInfo(Block blk, long inodeId) {
     super(blk);
     this.inodeId = inodeId;
     if (blk instanceof BlockInfo) {
@@ -403,15 +403,15 @@ public class BlockInfo extends Block {
     return ucBlock;
   }
   
-  public int getInodeId() {
+  public long getInodeId() {
     return inodeId;
   }
   
-  public void setINodeIdNoPersistance(int id) {
+  public void setINodeIdNoPersistance(long id) {
     this.inodeId = id;
   }
   
-  public void setINodeId(int id)
+  public void setINodeId(long id)
       throws StorageException, TransactionContextException {
     setINodeIdNoPersistance(id);
     save();

@@ -42,7 +42,7 @@ public class CachedBlockLock extends Lock {
   protected void acquire(TransactionLocks locks) throws IOException {
     cachedBlocks = acquireLockList(TransactionLockTypes.LockType.WRITE, CachedBlock.Finder.ByDatanodeId, datanodeId);
     if (blockIds != null) {
-      int[] inodeIds = INodeUtil.resolveINodesFromBlockIds(blockIds);
+      long[] inodeIds = INodeUtil.resolveINodesFromBlockIds(blockIds);
       cachedBlocks.addAll(acquireLockList(TransactionLockTypes.LockType.WRITE,
           CachedBlock.Finder.ByBlockIdsAndINodeIds, blockIds, inodeIds, datanodeId));
     }

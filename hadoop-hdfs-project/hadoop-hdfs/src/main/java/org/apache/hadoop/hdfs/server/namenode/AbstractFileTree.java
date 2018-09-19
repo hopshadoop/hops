@@ -161,9 +161,9 @@ abstract class AbstractFileTree {
     final int BATCHSIZE = 10000;
 
     private class InodesBatch {
-      int[] partitionIDs = null;
+      long[] partitionIDs = null;
       String[] names = null;
-      int[] pids = null;
+      long[] pids = null;
     }
 
     boolean getBatch(List<ProjectedINode> children, InodesBatch inodesBatch) {
@@ -180,8 +180,8 @@ abstract class AbstractFileTree {
       }
 
       inodesBatch.names = new String[remaining];
-      inodesBatch.pids = new int[remaining];
-      inodesBatch.partitionIDs = new int[remaining];
+      inodesBatch.pids = new long[remaining];
+      inodesBatch.partitionIDs = new long[remaining];
 
       for (int i = 0; i < remaining; i++) {
         ProjectedINode inode = children.get(batchIndex++);
@@ -549,10 +549,10 @@ abstract class AbstractFileTree {
     public static class FileTree extends AbstractFileTree {
       public static final int ROOT_LEVEL = 1;
       
-      private final SetMultimap<Integer, ProjectedINode> inodesByParent;
+      private final SetMultimap<Long, ProjectedINode> inodesByParent;
       private final SetMultimap<Integer, ProjectedINode> inodesByLevel;
       private final SetMultimap<Integer, ProjectedINode> dirsByLevel;
-      private final ConcurrentHashMap<Integer, ProjectedINode> inodesById =
+      private final ConcurrentHashMap<Long, ProjectedINode> inodesById =
           new ConcurrentHashMap<>();
       
       public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
@@ -563,7 +563,7 @@ abstract class AbstractFileTree {
       public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
           FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
         super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
-        HashMultimap<Integer, ProjectedINode> parentMap = HashMultimap.create();
+        HashMultimap<Long, ProjectedINode> parentMap = HashMultimap.create();
         inodesByParent = Multimaps.synchronizedSetMultimap(parentMap);
         HashMultimap<Integer, ProjectedINode> levelMap = HashMultimap.create();
         inodesByLevel = Multimaps.synchronizedSetMultimap(levelMap);
@@ -593,7 +593,7 @@ abstract class AbstractFileTree {
         return inodesByLevel.values();
       }
       
-      public Set<Integer> getAllINodesIds() {
+      public Set<Long> getAllINodesIds() {
         return inodesById.keySet();
       }
       
@@ -609,7 +609,7 @@ abstract class AbstractFileTree {
         return inodesByLevel.keySet().size();
       }
       
-      public Collection<ProjectedINode> getChildren(int inodeId) {
+      public Collection<ProjectedINode> getChildren(long inodeId) {
         return inodesByParent.get(inodeId);
       }
       
@@ -621,11 +621,11 @@ abstract class AbstractFileTree {
         return dirsByLevel.get(level);
       }
       
-      public int countChildren(int inodeId) {
+      public int countChildren(long inodeId) {
         return getChildren(inodeId).size();
       }
       
-      public ProjectedINode getInodeById(int id) {
+      public ProjectedINode getInodeById(long id) {
         return inodesById.get(id);
       }
       
@@ -648,8 +648,8 @@ abstract class AbstractFileTree {
     }
     
     static class IdCollectingCountingFileTree extends CountingFileTree {
-      private LinkedList<Integer> ids = new LinkedList<>();
-      private List<Integer> synchronizedList = Collections.synchronizedList(ids);
+      private LinkedList<Long> ids = new LinkedList<>();
+      private List<Long> synchronizedList = Collections.synchronizedList(ids);
       
       public IdCollectingCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
           throws AccessControlException {
@@ -677,7 +677,7 @@ abstract class AbstractFileTree {
       /**
        * @return A list that guarantees to includes parents before their children.
        */
-      public LinkedList<Integer> getOrderedIds() {
+      public LinkedList<Long> getOrderedIds() {
         return ids;
       }
     }

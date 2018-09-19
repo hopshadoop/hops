@@ -53,7 +53,7 @@ public final class CachedBlock {
    * Block id.
    */
   private final long blockId;
-  private final int inodeId;
+  private final long inodeId;
 
   /**
    * Bit 15: Mark
@@ -63,20 +63,20 @@ public final class CachedBlock {
 
   Map<Type, Set<DatanodeDescriptor>> datanodesMap = new HashMap<>();
 
-  public CachedBlock(long blockId, int inodeId, short replication, boolean mark){
+  public CachedBlock(long blockId, long inodeId, short replication, boolean mark){
     this.blockId = blockId;
     this.inodeId = inodeId;
     setReplicationAndMark(replication, mark);
   }
 
-  public CachedBlock(long blockId, int inodeId, short replicationAndMark) throws TransactionContextException,
+  public CachedBlock(long blockId, long inodeId, short replicationAndMark) throws TransactionContextException,
       StorageException {
     this.blockId = blockId;
     this.inodeId = inodeId;
     this.replicationAndMark = replicationAndMark;
   }
 
-  public CachedBlock(long blockId, int inodeId, short replicationAndMark, Type type, DatanodeDescriptor datanode) throws TransactionContextException,
+  public CachedBlock(long blockId, long inodeId, short replicationAndMark, Type type, DatanodeDescriptor datanode) throws TransactionContextException,
       StorageException {
     this.blockId = blockId;
     this.inodeId = inodeId;
@@ -88,7 +88,7 @@ public final class CachedBlock {
     }
   }
 
-  public CachedBlock(long blockId, int inodeId, short replication, boolean mark, DatanodeDescriptor datanode, Type type)
+  public CachedBlock(long blockId, long inodeId, short replication, boolean mark, DatanodeDescriptor datanode, Type type)
       throws TransactionContextException, StorageException {
     this.blockId = blockId;
     this.inodeId = inodeId;
@@ -102,7 +102,7 @@ public final class CachedBlock {
     return blockId;
   }
 
-  public int getInodeId() {
+  public long getInodeId() {
     return inodeId;
   }
   

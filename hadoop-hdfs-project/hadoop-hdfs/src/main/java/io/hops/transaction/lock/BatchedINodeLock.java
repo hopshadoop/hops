@@ -26,19 +26,19 @@ import java.util.List;
 public class BatchedINodeLock extends BaseINodeLock {
 
   private final List<INodeIdentifier> inodeIdentifiers;
-  private int[] inodeIds;
+  private long[] inodeIds;
 
   public BatchedINodeLock(List<INodeIdentifier> inodeIdentifiers) {
     this.inodeIdentifiers = inodeIdentifiers;
-    inodeIds = new int[inodeIdentifiers.size()];
+    inodeIds = new long[inodeIdentifiers.size()];
   }
 
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     if (inodeIdentifiers != null && !inodeIdentifiers.isEmpty()) {
       String[] names = new String[inodeIdentifiers.size()];
-      int[] parentIds = new int[inodeIdentifiers.size()];
-      int[] partitionIds = new int[inodeIdentifiers.size()];
+      long[] parentIds = new long[inodeIdentifiers.size()];
+      long[] partitionIds = new long[inodeIdentifiers.size()];
       for (int i = 0; i < inodeIdentifiers.size(); i++) {
         INodeIdentifier inodeIdentifier = inodeIdentifiers.get(i);
         names[i] = inodeIdentifier.getName();
@@ -62,7 +62,7 @@ public class BatchedINodeLock extends BaseINodeLock {
     }
   }
 
-  int[] getINodeIds() {
+  long[] getINodeIds() {
     return inodeIds;
   }
 

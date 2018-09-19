@@ -2328,8 +2328,8 @@ public class BlockManager {
       array[i] = blockId;
       i++;
     }
-    final Map<Integer, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(array);
-    final List<Integer> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
+    final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(array);
+    final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
       Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads,
@@ -2337,7 +2337,7 @@ public class BlockManager {
         @Override
         public void handle(int startIndex, int endIndex)
             throws Exception {
-          List<Integer> ids = inodeIds.subList(startIndex, endIndex);
+          List<Long> ids = inodeIds.subList(startIndex, endIndex);
           removeStoredBlocksTx(ids, inodeIdsToBlockMap, node);
         }
       });
@@ -2353,8 +2353,8 @@ public class BlockManager {
       array[i] = blockId;
       i++;
     }
-    final Map<Integer, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(array);
-    final List<Integer> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
+    final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(array);
+    final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
       Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads,
@@ -2362,7 +2362,7 @@ public class BlockManager {
         @Override
         public void handle(int startIndex, int endIndex)
             throws Exception {
-          List<Integer> ids = inodeIds.subList(startIndex, endIndex);
+          List<Long> ids = inodeIds.subList(startIndex, endIndex);
           removeStoredBlocksTx(ids, inodeIdsToBlockMap, sid);
         }
       });
@@ -2435,7 +2435,7 @@ public class BlockManager {
     
     final Set<Long> aggregatedSafeBlocks = new HashSet<>();
     
-    final Map<Long, Integer> mismatchedBlocksAndInodes = storage
+    final Map<Long, Long> mismatchedBlocksAndInodes = storage
             .getAllStorageReplicasInBuckets(matchingResult.mismatchedBuckets);
 
     final Set<Long> allMismatchedBlocksOnServer = mismatchedBlocksAndInodes.keySet();
@@ -2472,7 +2472,7 @@ public class BlockManager {
                                                final Collection<Block> toInvalidate,
                                                final Collection<BlockToMarkCorrupt> toCorrupt,
                                                final Collection<StatefulBlockInfo> toUC, final boolean firstBlockReport,
-                                               final Map<Long, Integer> mismatchedBlocksAndInodes,
+                                               final Map<Long, Long> mismatchedBlocksAndInodes,
                                                final Set<Long> aggregatedSafeBlocks,
                                                final Set<Long> allMismatchedBlocksOnServer,
                                                final Map<Long,Long> invalidatedReplicas) throws IOException {
@@ -2517,7 +2517,7 @@ public class BlockManager {
                                                                 final Collection<BlockToMarkCorrupt> toCorrupt,
                                                                 final Collection<StatefulBlockInfo> toUC,
                                                                 final boolean firstBlockReport,
-                                                                final Map<Long, Integer> mismatchedBlocksAndInodes,
+                                                                final Map<Long, Long> mismatchedBlocksAndInodes,
                                                                 final Set<Long> aggregatedSafeBlocks,
                                                                 final Set<Long> allMismatchedBlocksOnServer,
                                                                 final Map<Long,Long> invalidatedReplicas,
@@ -2529,11 +2529,11 @@ public class BlockManager {
         LockFactory lf = LockFactory.getInstance();
         if (!reportedBlocks.isEmpty()) {
           List<Long> resolvedBlockIds = new ArrayList<>();
-          List<Integer> inodeIds = new ArrayList<>();
+          List<Long> inodeIds = new ArrayList<>();
           List<Long> unResolvedBlockIds = new ArrayList<>();
 
           for (ReportedBlock reportedBlock : reportedBlocks) {
-            Integer inodeId = mismatchedBlocksAndInodes.get(reportedBlock.getBlockId());
+            Long inodeId = mismatchedBlocksAndInodes.get(reportedBlock.getBlockId());
             if (inodeId != null) {
               resolvedBlockIds.add(reportedBlock.getBlockId());
               inodeIds.add(inodeId);
@@ -2543,7 +2543,7 @@ public class BlockManager {
           }
 
           locks.add(lf.getBlockReportingLocks(Longs.toArray(resolvedBlockIds),
-              Ints.toArray(inodeIds),
+              Longs.toArray(inodeIds),
               Longs.toArray(unResolvedBlockIds), storage.getSid()));
         }
         locks.add(lf.getIndividualHashBucketLock(storage.getSid(), bucketId));
@@ -3956,7 +3956,7 @@ public class BlockManager {
         for(int i=0; i<blocks.size(); i++){
           blockIds[i] = blocks.get(i).getBlockId();
         }
-        List<Integer> inodeIds = new ArrayList<>(INodeUtil.getINodeIdsForBlockIds(blockIds).keySet());
+        List<Long> inodeIds = new ArrayList<>(INodeUtil.getINodeIdsForBlockIds(blockIds).keySet());
         inodeIdentifiers = INodeUtil.resolveINodesFromIds(inodeIds);
       }
 
@@ -4895,8 +4895,8 @@ public class BlockManager {
     OK
   }
 
-  private void removeStoredBlocksTx(final List<Integer> inodeIds,
-      final Map<Integer, List<Long>> inodeIdsToBlockMap, final DatanodeDescriptor node) throws
+  private void removeStoredBlocksTx(final List<Long> inodeIds,
+      final Map<Long, List<Long>> inodeIdsToBlockMap, final DatanodeDescriptor node) throws
       IOException {
     final AtomicInteger removedBlocks = new AtomicInteger(0);
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_STORED_BLOCKS) {
@@ -4936,8 +4936,8 @@ public class BlockManager {
     LOG.info("removed " + removedBlocks.get() + " replicas from " + node.getName());
   }
   
-  private void removeStoredBlocksTx(final List<Integer> inodeIds,
-      final Map<Integer, List<Long>> inodeIdsToBlockMap, final int sid) throws
+  private void removeStoredBlocksTx(final List<Long> inodeIds,
+      final Map<Long, List<Long>> inodeIdsToBlockMap, final int sid) throws
       IOException {
     final AtomicInteger removedBlocks = new AtomicInteger(0);
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_STORED_BLOCKS) {

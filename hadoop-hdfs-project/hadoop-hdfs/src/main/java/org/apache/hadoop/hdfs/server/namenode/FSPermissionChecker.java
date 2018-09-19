@@ -502,7 +502,7 @@ class FSPermissionChecker {
     }
   }
   
-  boolean check(int inodeId, FsAction access, FsPermission mode, String userName,
+  boolean check(long inodeId, FsAction access, FsPermission mode, String userName,
       String groupName) throws AccessControlException, TransactionContextException, IOException {
     if (user.equals(userName)) { //user class
       if (mode.getUserAction().implies(access)) {

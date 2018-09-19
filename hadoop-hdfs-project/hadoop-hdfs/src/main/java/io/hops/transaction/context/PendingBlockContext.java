@@ -105,7 +105,7 @@ public class PendingBlockContext
   }
 
   @Override
-  PendingBlockInfo cloneEntity(PendingBlockInfo pendingBlockInfo, int inodeId) {
+  PendingBlockInfo cloneEntity(PendingBlockInfo pendingBlockInfo, long inodeId) {
     return new PendingBlockInfo(pendingBlockInfo.getBlockId(), inodeId,
         pendingBlockInfo.getTimeStamp(), pendingBlockInfo.getTargets());
   }
@@ -119,7 +119,7 @@ public class PendingBlockContext
   private PendingBlockInfo findByBlockId(PendingBlockInfo.Finder pFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
     final long blockId = (Long) params[0];
-    final int inodeId = (Integer) params[1];
+    final long inodeId = (Long) params[1];
     PendingBlockInfo result = null;
     if (containsByBlock(blockId) || containsByINode(inodeId)) {
       List<PendingBlockInfo> pblks = getByBlock(blockId);
@@ -160,7 +160,7 @@ public class PendingBlockContext
 
   private List<PendingBlockInfo> findByINodeId(PendingBlockInfo.Finder pFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
     List<PendingBlockInfo> result = null;
     if (containsByINode(inodeId)) {
       result = getByINode(inodeId);
@@ -168,7 +168,7 @@ public class PendingBlockContext
     } else {
       aboutToAccessStorage(pFinder, params);
       result = dataAccess.findByINodeId(inodeId);
-      gotFromDB(new BlockPK(inodeId), result);
+      gotFromDB(new BlockPK(null, inodeId), result);
       miss(pFinder, result, "inodeid", inodeId);
     }
     return result;
@@ -176,7 +176,7 @@ public class PendingBlockContext
 
   private List<PendingBlockInfo> findByINodeIds(PendingBlockInfo.Finder pFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int[] inodeIds = (int[]) params[0];
+    final long[] inodeIds = (long[]) params[0];
     List<PendingBlockInfo> result = null;
     aboutToAccessStorage(pFinder, params);
     result = dataAccess.findByINodeIds(inodeIds);

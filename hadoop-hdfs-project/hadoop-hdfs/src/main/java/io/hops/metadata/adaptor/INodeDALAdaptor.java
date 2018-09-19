@@ -50,19 +50,19 @@ public class INodeDALAdaptor
 
   @Override
   public org.apache.hadoop.hdfs.server.namenode.INode findInodeByIdFTIS(
-      int inodeId) throws StorageException {
+      long inodeId) throws StorageException {
     return convertDALtoHDFS(dataAccess.findInodeByIdFTIS(inodeId));
   }
 
   @Override
-  public Collection<org.apache.hadoop.hdfs.server.namenode.INode> findInodesByIdsFTIS(int[] inodeId) throws
+  public Collection<org.apache.hadoop.hdfs.server.namenode.INode> findInodesByIdsFTIS(long[] inodeId) throws
       StorageException {
     return convertDALtoHDFS(dataAccess.findInodesByIdsFTIS(inodeId));
   }
   
   @Override
   public List<org.apache.hadoop.hdfs.server.namenode.INode> findInodesByParentIdFTIS(
-      int parentId) throws StorageException {
+      long parentId) throws StorageException {
     List<org.apache.hadoop.hdfs.server.namenode.INode> list =
         (List) convertDALtoHDFS(
             dataAccess.findInodesByParentIdFTIS(parentId));
@@ -73,7 +73,7 @@ public class INodeDALAdaptor
 
   @Override
   public List<org.apache.hadoop.hdfs.server.namenode.INode> findInodesByParentIdAndPartitionIdPPIS(
-          int parentId, int partitionId) throws StorageException {
+          long parentId, long partitionId) throws StorageException {
     List<org.apache.hadoop.hdfs.server.namenode.INode> list =
             (List) convertDALtoHDFS(
                     dataAccess.findInodesByParentIdAndPartitionIdPPIS(parentId, partitionId));
@@ -84,7 +84,7 @@ public class INodeDALAdaptor
 
   @Override
   public List<ProjectedINode> findInodesPPISTx(
-          int parentId, int partitionId, EntityContext.LockMode lock) throws StorageException {
+          long parentId, long partitionId, EntityContext.LockMode lock) throws StorageException {
     List<ProjectedINode> list =
             dataAccess.findInodesPPISTx(parentId, partitionId, lock);
     Collections.sort(list);
@@ -93,7 +93,7 @@ public class INodeDALAdaptor
 
   @Override
   public List<ProjectedINode> findInodesFTISTx(
-      int parentId, EntityContext.LockMode lock) throws StorageException {
+      long parentId, EntityContext.LockMode lock) throws StorageException {
     List<ProjectedINode> list =
         dataAccess.findInodesFTISTx(parentId, lock);
     Collections.sort(list);
@@ -101,7 +101,7 @@ public class INodeDALAdaptor
   }
 
   public List<org.apache.hadoop.hdfs.server.namenode.INode> lockInodesUsingPkBatchTx(
-          String[] names, int[] parentIds, int[] partitionIds, EntityContext.LockMode lock)
+          String[] names, long[] parentIds, long[] partitionIds, EntityContext.LockMode lock)
           throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.namenode.INode>) convertDALtoHDFS(
             dataAccess.lockInodesUsingPkBatchTx(names, parentIds, partitionIds, lock));
@@ -109,14 +109,14 @@ public class INodeDALAdaptor
 
   @Override
   public org.apache.hadoop.hdfs.server.namenode.INode findInodeByNameParentIdAndPartitionIdPK(
-      String name, int parentId, int partitionId) throws StorageException {
+      String name, long parentId, long partitionId) throws StorageException {
     return convertDALtoHDFS(
         dataAccess.findInodeByNameParentIdAndPartitionIdPK(name, parentId, partitionId));
   }
 
   @Override
   public List<org.apache.hadoop.hdfs.server.namenode.INode> getINodesPkBatched(
-      String[] names, int[] parentIds, int[] partitionIds) throws StorageException {
+      String[] names, long[] parentIds, long[] partitionIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.namenode.INode>) convertDALtoHDFS(
         dataAccess.getINodesPkBatched(names, parentIds, partitionIds));
   }
@@ -170,7 +170,7 @@ public class INodeDALAdaptor
   }
   
   @Override
-  public boolean hasChildren(int parentId, boolean areChildrenRandomlyPartitioned ) throws StorageException {
+  public boolean hasChildren(long parentId, boolean areChildrenRandomlyPartitioned ) throws StorageException {
     return dataAccess.hasChildren(parentId, areChildrenRandomlyPartitioned);
   }
   

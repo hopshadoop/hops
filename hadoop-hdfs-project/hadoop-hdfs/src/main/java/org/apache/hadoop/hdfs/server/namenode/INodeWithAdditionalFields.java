@@ -32,7 +32,7 @@ import java.io.IOException;
 public abstract class INodeWithAdditionalFields extends INode {
   
   /** The inode id */
-  final protected int id;
+  final protected long id;
   /**
    * The inode name is in java UTF8 encoding;
    * The name in HdfsFileStatus should keep the same encoding as this.
@@ -55,13 +55,13 @@ public abstract class INodeWithAdditionalFields extends INode {
   private int groupId;
   
   long header = 0L;
-  protected Integer partitionId;
+  protected Long partitionId;
   
   /** An array {@link Feature}s. */
   private static final Feature[] EMPTY_FEATURE = new Feature[0];
   protected Feature[] features = EMPTY_FEATURE;
   
-  private INodeWithAdditionalFields(INode parent, int id, byte[] name,
+  private INodeWithAdditionalFields(INode parent, long id, byte[] name,
       PermissionStatus permission, long modificationTime, long accessTime, boolean inTree)
       throws IOException {
     super(parent);
@@ -77,7 +77,7 @@ public abstract class INodeWithAdditionalFields extends INode {
     this.inTree = inTree;
   }
   
-  INodeWithAdditionalFields(int id, byte[] name, PermissionStatus permission,
+  INodeWithAdditionalFields(long id, byte[] name, PermissionStatus permission,
       long modificationTime, long accessTime, boolean inTree) throws IOException {
     this(null, id, name, permission, modificationTime, accessTime, inTree);
   }
@@ -91,28 +91,28 @@ public abstract class INodeWithAdditionalFields extends INode {
     this.logicalTime = other.getLogicalTime();
   }
   
-  INodeWithAdditionalFields(int id, String name, PermissionStatus permissions)
+  INodeWithAdditionalFields(long id, String name, PermissionStatus permissions)
     throws IOException {
     this(id, name, permissions, false);
   }
   
-  INodeWithAdditionalFields(int id, String name, PermissionStatus permissions, boolean inTree)
+  INodeWithAdditionalFields(long id, String name, PermissionStatus permissions, boolean inTree)
     throws IOException {
     this(null, id, DFSUtil.string2Bytes(name), permissions, 0L, 0L, inTree);
   }
   
-  INodeWithAdditionalFields(int id, PermissionStatus permissions, long modificationTime, long accessTime)
+  INodeWithAdditionalFields(long id, PermissionStatus permissions, long modificationTime, long accessTime)
     throws IOException {
     this(id, permissions, modificationTime, accessTime, false);
   }
   
-  INodeWithAdditionalFields(int id, PermissionStatus permissions, long modificationTime,
+  INodeWithAdditionalFields(long id, PermissionStatus permissions, long modificationTime,
       long accessTime, boolean inTree) throws IOException {
     this(id, null, permissions, modificationTime, accessTime, inTree);
   }
   
   /** Get the inode id */
-  public int getId() {
+  public long getId() {
     return this.id;
   }
   
@@ -279,15 +279,15 @@ public abstract class INodeWithAdditionalFields extends INode {
     return HeaderFormat.hasBlocks(header);
   }
   
-  public final Integer getPartitionId() {
+  public final Long getPartitionId() {
     return partitionId;
   }
   
-  public final void setPartitionIdNoPersistance(Integer partitionId) {
+  public final void setPartitionIdNoPersistance(long partitionId) {
     this.partitionId = partitionId;
   }
   
-  public final void setPartitionId(Integer partitionId)
+  public final void setPartitionId(Long partitionId)
     throws StorageException, TransactionContextException {
     setPartitionIdNoPersistance(partitionId);
     save();

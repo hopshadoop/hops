@@ -64,7 +64,7 @@ public class TestHdfsVariables {
   @Test
   public void testIncrementalCounterOverflow() throws Exception {
     try {
-      testIncrementCounter(CounterType.INodeId, Integer.MAX_VALUE / 5);
+      testIncrementCounter(CounterType.INodeId, Long.MAX_VALUE / 5);
       fail("overflow exception was expected");
     }catch (ExecutionException ex){
       if(!ex.getCause().getMessage().equals("overflow")){
@@ -73,7 +73,7 @@ public class TestHdfsVariables {
     }
   }
 
-  void testIncrementCounter(final CounterType counterType, final int increment)
+  void testIncrementCounter(final CounterType counterType, final long increment)
       throws Exception{
     Configuration conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
@@ -141,8 +141,8 @@ public class TestHdfsVariables {
       implements Callable<CountersQueue.Counter>{
 
     private final CounterType counterType;
-    private final int increment;
-    public CounterIncrementer(CounterType counterType, int increment){
+    private final long increment;
+    public CounterIncrementer(CounterType counterType, long increment){
       this.counterType = counterType;
       this.increment = increment;
     }

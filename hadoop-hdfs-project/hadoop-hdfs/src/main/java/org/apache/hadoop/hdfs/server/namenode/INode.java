@@ -126,14 +126,14 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   
 
   protected boolean inTree = false;
-  protected int parentId = 0;
+  protected long parentId = 0;
   public static int RANDOM_PARTITIONING_MAX_LEVEL=1;
 
   protected boolean subtreeLocked;
   protected long subtreeLockOwner;
 
-  public final static int ROOT_PARENT_ID = 0;
-  public final static int ROOT_INODE_ID = 1;
+  public final static long ROOT_PARENT_ID = 0;
+  public final static long ROOT_INODE_ID = 1;
   
   /**
    * To check if the request id is the same as saved id. Don't check fileId
@@ -244,7 +244,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   }
 
   /** Get inode id */
-  public abstract int getId();
+  public abstract long getId();
 
   public AclFeature getAclFeature() throws TransactionContextException, StorageException, AclException {
     return INodeAclHelper.getAclFeature(this);
@@ -666,7 +666,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   
   @Override
   public final int hashCode() {
-    final int id = this.getId();
+    final int id = Long.hashCode(this.getId());
     return (int)(id^(id>>>32));
   }
 
@@ -681,15 +681,15 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     this.parentId = p.getId();
   }
   
-  public void setParentIdNoPersistance(int pid) {
+  public void setParentIdNoPersistance(long pid) {
     this.parentId = pid;
   }
 
-  public int getParentId() {
+  public long getParentId() {
     return this.parentId;
   }
 
-  public static String nameParentKey(Integer parentId, String name) {
+  public static String nameParentKey(long parentId, String name) {
     return parentId + name;
   }
 
@@ -855,23 +855,23 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     return null;
   }
 
-  public abstract Integer getPartitionId();
+  public abstract Long getPartitionId();
 
-  public abstract void setPartitionIdNoPersistance(Integer partitionId);
+  public abstract void setPartitionIdNoPersistance(long partitionId);
 
-  public abstract void setPartitionId(Integer partitionId) throws
+  public abstract void setPartitionId(Long partitionId) throws
       TransactionContextException, StorageException;
 
-  public void calculateAndSetPartitionIdNoPersistance(int parentId, String name, short depth){
+  public void calculateAndSetPartitionIdNoPersistance(long parentId, String name, short depth){
     setPartitionIdNoPersistance(calculatePartitionId(parentId,name,depth));
   }
 
-  public void calculateAndSetPartitionId(int parentId, String name, short depth)
+  public void calculateAndSetPartitionId(long parentId, String name, short depth)
       throws TransactionContextException, StorageException {
     setPartitionIdNoPersistance(calculatePartitionId(parentId,name,depth));
     save();
   }
-  public static int calculatePartitionId(int parentId, String name, short depth){
+  public static long calculatePartitionId(long parentId, String name, short depth){
     if(isTreeLevelRandomPartitioned(depth)){
       return partitionIdHashFunction(parentId,name,depth);
     }else{
@@ -879,7 +879,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     }
   }
 
-  private static int partitionIdHashFunction(int parentId, String name, short depth){
+  private static long partitionIdHashFunction(long parentId, String name, short depth){
     if(depth == INodeDirectory.ROOT_DIR_DEPTH){
       return INodeDirectory.ROOT_DIR_PARTITION_KEY;
     }else{

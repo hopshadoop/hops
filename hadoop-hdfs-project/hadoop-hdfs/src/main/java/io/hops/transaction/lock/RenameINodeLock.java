@@ -75,7 +75,7 @@ final class RenameINodeLock extends INodeLock {
 
       if (dstINodes.size() == dstComponents.length && lastComp.isDirectory()) {
         //the dst exist and is a directory.
-        int parttitionId = INode.calculatePartitionId(lastComp.getId(), srcComponents[srcComponents.length - 1],
+        long parttitionId = INode.calculatePartitionId(lastComp.getId(), srcComponents[srcComponents.length - 1],
             (short)(lastComp.myDepth()+1));
         find(srcComponents[srcComponents.length - 1], lastComp.getId(), parttitionId);
       }

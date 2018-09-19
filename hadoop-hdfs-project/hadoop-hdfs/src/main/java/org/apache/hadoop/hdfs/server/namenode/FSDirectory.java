@@ -1548,7 +1548,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * The parent path to the directory is at [0, pos-1].
    * All ancestors exist. Newly created one stored at index pos.
    */
-  private void unprotectedMkdir(int inodeId, INodesInPath inodesInPath, int pos, byte[] name,
+  private void unprotectedMkdir(long inodeId, INodesInPath inodesInPath, int pos, byte[] name,
       PermissionStatus permission, long timestamp)
       throws IOException {
     final INodeDirectory dir = new INodeDirectory(inodeId, name, permission, timestamp);
@@ -2366,7 +2366,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       }
     }
     final String userName = dirPerms.getUserName();
-    int id = IDsGeneratorFactory.getInstance().getUniqueINodeID();
+    long id = IDsGeneratorFactory.getInstance().getUniqueINodeID();
     INodeSymlink newNode = unprotectedAddSymlink(id, path, target, modTime, modTime,
         new PermissionStatus(userName, null, FsPermission.getDefault()));
 
@@ -2386,7 +2386,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * Add the specified path into the namespace. Invoked from edit log
    * processing.
    */
-  INodeSymlink unprotectedAddSymlink(int id, String path, String target, long mtime,
+  INodeSymlink unprotectedAddSymlink(long id, String path, String target, long mtime,
       long atime, PermissionStatus perm)
       throws IOException {
     final INodeSymlink symlink = new INodeSymlink(id, target, mtime, atime, perm);
@@ -2641,7 +2641,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
 //    }).handle();
 //  }
   
-  String getFullPathName(final int id, final String src) throws IOException {
+  String getFullPathName(final long id, final String src) throws IOException {
     HopsTransactionalRequestHandler getFullPathNameHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_INODE) {
@@ -2671,7 +2671,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return (String) getFullPathNameHandler.handle();
   }
 
-  INode getParent(final int id, final String src) throws IOException {
+  INode getParent(final long id, final String src) throws IOException {
     HopsTransactionalRequestHandler getParentHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_INODE) {
@@ -2701,7 +2701,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return (INode) getParentHandler.handle();
   }
   
-  INode getInode(final int id) throws IOException {
+  INode getInode(final long id) throws IOException {
     HopsTransactionalRequestHandler getInodeHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_INODE) {
@@ -2787,7 +2787,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return (INodeDirectory) addRootINode.handle();
   }
 
-  public boolean hasChildren(final int parentId, final boolean areChildrenRandomlyPartitioned) throws IOException {
+  public boolean hasChildren(final long parentId, final boolean areChildrenRandomlyPartitioned) throws IOException {
     LightWeightRequestHandler hasChildrenHandler =
             new LightWeightRequestHandler(HDFSOperationType.HAS_CHILDREN) {
       @Override

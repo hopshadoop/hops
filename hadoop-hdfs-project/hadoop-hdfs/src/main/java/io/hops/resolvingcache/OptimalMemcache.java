@@ -48,20 +48,20 @@ public class OptimalMemcache extends PathMemcache{
   }
 
   @Override
-  protected int[] getInternal(MemcachedClient mc, String path)
+  protected long[] getInternal(MemcachedClient mc, String path)
       throws IOException {
     int lastIndex = path.lastIndexOf(Path.SEPARATOR);
     if(lastIndex <= 0)
       return null;
 
     String parentPath = path.substring(0, lastIndex);
-    int[] inodeIds = super.getInternal(mc, parentPath);
+    long[] inodeIds = super.getInternal(mc, parentPath);
     if(inodeIds == null)
       return null;
 
     String file = path.substring(lastIndex + 1, path.length());
-    int fileParentId = inodeIds[inodeIds.length - 1];
-    Integer fileInodeId = INodeMemcache.getInternal(mc, keyPrefix, file,
+    long fileParentId = inodeIds[inodeIds.length - 1];
+    Long fileInodeId = INodeMemcache.getInternal(mc, keyPrefix, file,
         fileParentId);
     if(fileInodeId != null){
       inodeIds = Arrays.copyOf(inodeIds, inodeIds.length + 1);

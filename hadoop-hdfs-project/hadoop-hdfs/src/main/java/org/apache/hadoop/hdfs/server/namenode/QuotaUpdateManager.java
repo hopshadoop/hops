@@ -60,7 +60,7 @@ public class QuotaUpdateManager {
 
   private final Daemon updateThread = new Daemon(new QuotaUpdateMonitor());
 
-  private final ConcurrentLinkedQueue<Iterator<Integer>> prioritizedUpdates =
+  private final ConcurrentLinkedQueue<Iterator<Long>> prioritizedUpdates =
       new ConcurrentLinkedQueue<>();
 
   public QuotaUpdateManager(FSNamesystem namesystem, Configuration conf) {
@@ -92,7 +92,7 @@ public class QuotaUpdateManager {
     return IDsGeneratorFactory.getInstance().getUniqueQuotaUpdateID();
   }
 
-  public void addUpdate(final int inodeId, final long namespaceDelta,
+  public void addUpdate(final long inodeId, final long namespaceDelta,
       final long diskspaceDelta)
       throws StorageException, TransactionContextException {
 
@@ -110,7 +110,7 @@ public class QuotaUpdateManager {
         try {
           if (namesystem.isLeader()) {
             if (!prioritizedUpdates.isEmpty()) {
-              Iterator<Integer> iterator = prioritizedUpdates.poll();
+              Iterator<Long> iterator = prioritizedUpdates.poll();
               while (iterator.hasNext()) {
                 processUpdates(iterator.next());
               }
@@ -158,7 +158,7 @@ public class QuotaUpdateManager {
         }
       };
 
-  private void processUpdates(final Integer id) throws IOException {
+  private void processUpdates(final Long id) throws IOException {
     LightWeightRequestHandler findHandler =
         new LightWeightRequestHandler(HDFSOperationType.GET_UPDATES_FOR_ID) {
           @Override
@@ -297,7 +297,7 @@ public class QuotaUpdateManager {
    * @param iterator
    *     Ids to be updates sorted from the leaves to the root of the subtree
    */
-  void addPrioritizedUpdates(Iterator<Integer> iterator) throws QuotaUpdateException {
+  void addPrioritizedUpdates(Iterator<Long> iterator) throws QuotaUpdateException {
       if(namesystem.isLeader()) {
         prioritizedUpdates.add(iterator);
       } else {

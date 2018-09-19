@@ -139,7 +139,7 @@ public class TestDFSPermission {
     });
     fs.setPermission(p1, new FsPermission((short) 0444));
     fs.access(p1, FsAction.READ);
-    int inodeId = TestUtil.getINodeId(cluster.getNameNode(), p1);
+    long inodeId = TestUtil.getINodeId(cluster.getNameNode(), p1);
     try {
       fs.access(p1, FsAction.WRITE);
       fail("The access call should have failed.");
@@ -172,7 +172,7 @@ public class TestDFSPermission {
         return FileSystem.get(conf);
       }
     });
-    int inodeId = TestUtil.getINodeId(cluster.getNameNode(), p2);
+    long inodeId = TestUtil.getINodeId(cluster.getNameNode(), p2);
     fs.access(p2, FsAction.READ);
     try {
       fs.access(p2, FsAction.EXECUTE);
@@ -197,7 +197,7 @@ public class TestDFSPermission {
         return FileSystem.get(conf);
       }
     });
-    int inodeId = TestUtil.getINodeId(cluster.getNameNode(), p3);
+    long inodeId = TestUtil.getINodeId(cluster.getNameNode(), p3);
     fs.access(p3, FsAction.READ);
     try {
       fs.access(p3, FsAction.READ_WRITE);

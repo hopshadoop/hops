@@ -843,7 +843,7 @@ public final class CacheManager {
     return result;
   }
 
-  public void setCachedLocations(LocatedBlock block, int inodeId) throws TransactionContextException, StorageException {
+  public void setCachedLocations(LocatedBlock block, long inodeId) throws TransactionContextException, StorageException {
     CachedBlock cachedBlock = new CachedBlock(block.getBlock().getBlockId(), inodeId, (short) 0, false);
     cachedBlock = getCachedBlock(cachedBlock);
     if (cachedBlock == null) {
@@ -904,7 +904,7 @@ public final class CacheManager {
     for (Iterator<Long> iter = blockIds.iterator(); iter.hasNext();) {
       long blockId = iter.next();
       INodeIdentifier inode = INodeUtil.resolveINodeFromBlockID(blockId);
-      int inodeId = -1;
+      long inodeId = -1;
       if(inode!=null){
         inodeId=inode.getInodeId();
       }

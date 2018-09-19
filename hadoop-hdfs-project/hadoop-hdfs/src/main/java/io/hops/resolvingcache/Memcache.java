@@ -82,7 +82,7 @@ public abstract class Memcache extends Cache {
   }
 
   @Override
-  protected final int[] getInternal(final String path) throws IOException {
+  protected final long[] getInternal(final String path) throws IOException {
     MemcachedClient mc = mcpool.poll();
     if (mc == null) {
       return null;
@@ -129,7 +129,7 @@ public abstract class Memcache extends Cache {
 
   protected abstract void setInternal(final MemcachedClient mc, final INode inode);
 
-  protected abstract int[] getInternal(final MemcachedClient mc, final String
+  protected abstract long[] getInternal(final MemcachedClient mc, final String
       path) throws IOException;
 
   protected abstract void deleteInternal(final MemcachedClient mc, final

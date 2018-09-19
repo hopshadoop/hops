@@ -75,7 +75,7 @@ public class RootINodeCache {
     public void run() {
       running = true;
       LOG.debug("RootCache Started");
-      final int rootPartitionId = INode.calculatePartitionId(INodeDirectory.ROOT_PARENT_ID, INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_DIR_DEPTH);
+      final long rootPartitionId = INode.calculatePartitionId(INodeDirectory.ROOT_PARENT_ID, INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_DIR_DEPTH);
 
       LightWeightRequestHandler getRootINode =
               new LightWeightRequestHandler(HDFSOperationType.GET_ROOT) {

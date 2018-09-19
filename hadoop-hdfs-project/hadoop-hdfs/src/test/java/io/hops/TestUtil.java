@@ -37,7 +37,7 @@ public class TestUtil {
    * @return the inodeId
    * @throws IOException
    */
-  public static int getINodeId(final NameNode nameNode, final Path path)
+  public static long getINodeId(final NameNode nameNode, final Path path)
       throws IOException {
     return getINode(nameNode, path).getId();
   }

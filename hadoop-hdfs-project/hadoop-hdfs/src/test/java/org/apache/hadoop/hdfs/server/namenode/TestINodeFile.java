@@ -874,7 +874,7 @@ public class TestINodeFile {
     return dir; // Last Inode in the chain
   }
 
-  private INodeDirectory addChild(final String prevPath, final String dirPath, final int id, final byte[] component, final PermissionStatus permstatus, final int prevId)
+  private INodeDirectory addChild(final String prevPath, final String dirPath, final int id, final byte[] component, final PermissionStatus permstatus, final long prevId)
       throws Exception {
     HopsTransactionalRequestHandler handler =
         new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
@@ -1220,7 +1220,7 @@ public class TestINodeFile {
   
       @Override
       public Object performTask() throws IOException {
-        file.setPartitionId(1);
+        file.setPartitionId(1L);
         final DatanodeID dnID = new DatanodeID("127.0.0.1:1337");
         file.toUnderConstruction(clientName, clientMachine, dnID);
         return null;

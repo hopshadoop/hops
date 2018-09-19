@@ -206,7 +206,7 @@ public abstract class BaseINodeLock extends Lock {
   }
 
   protected INode find(TransactionLockTypes.INodeLockType lock, String name,
-      int parentId, int partitionId, int possibleINodeId)
+      long parentId, long partitionId, long possibleINodeId)
       throws StorageException, TransactionContextException {
     setINodeLockType(lock);
     INode inode = EntityManager
@@ -216,7 +216,7 @@ public abstract class BaseINodeLock extends Lock {
   }
 
   protected INode find(TransactionLockTypes.INodeLockType lock, String name,
-      int parentId, int partitionId) throws StorageException, TransactionContextException {
+      long parentId, long partitionId) throws StorageException, TransactionContextException {
     setINodeLockType(lock);
     INode inode =
         EntityManager.find(INode.Finder.ByNameParentIdAndPartitionId, name, parentId, partitionId);
@@ -224,7 +224,7 @@ public abstract class BaseINodeLock extends Lock {
     return inode;
   }
 
-  protected INode find(TransactionLockTypes.INodeLockType lock, int id)
+  protected INode find(TransactionLockTypes.INodeLockType lock, long id)
       throws StorageException, TransactionContextException {
     setINodeLockType(lock);
     INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
@@ -233,7 +233,7 @@ public abstract class BaseINodeLock extends Lock {
   }
 
   protected List<INode> find(TransactionLockTypes.INodeLockType lock,
-      String[] names, int[] parentIds, int[] partitionIds, boolean checkLocalCache)
+      String[] names, long[] parentIds, long[] partitionIds, boolean checkLocalCache)
       throws StorageException, TransactionContextException {
     setINodeLockType(lock);
     List<INode> inodes = (List<INode>) EntityManager.findList(checkLocalCache ? INode.Finder
@@ -288,13 +288,13 @@ public abstract class BaseINodeLock extends Lock {
     acquireLockList(DEFAULT_LOCK_TYPE, INodeAttributes.Finder.ByINodeIds, pks);
   }
 
-  protected void setPartitioningKey(Integer partitionId)
+  protected void setPartitioningKey(Long partitionId)
           throws StorageException, TransactionContextException {
     if (setPartitionKeyEnabled && partitionId != null && !isPartitionKeyAlreaySet ) {
       //set partitioning key
       Object[] key = new Object[3];
       key[0] = partitionId;
-      key[1] = 0;
+      key[1] = 0L;
       key[2] = "";
       EntityManager.setPartitionKey(INodeDataAccess.class, key);
       isPartitionKeyAlreaySet=true; //to avoid setting partition key multiple times. It can happen during rename

@@ -25,11 +25,11 @@ import org.apache.commons.lang.ArrayUtils;
 final class BatchedBlockLock extends BaseIndividualBlockLock {
 
   private long[] blockIds;
-  private int[] inodeIds;
+  private long[] inodeIds;
   private final long[] unresolvedBlockIds;
   
 
-  public BatchedBlockLock(long[] blockIds, int[] inodeIds, long[] unresolvedBlockIds) {
+  public BatchedBlockLock(long[] blockIds, long[] inodeIds, long[] unresolvedBlockIds) {
     this.blockIds = blockIds;
     this.inodeIds = inodeIds;
     this.unresolvedBlockIds = unresolvedBlockIds;
@@ -39,7 +39,7 @@ final class BatchedBlockLock extends BaseIndividualBlockLock {
   protected void acquire(TransactionLocks locks) throws IOException {
     //INodes are not locked in this case
     if (unresolvedBlockIds != null && unresolvedBlockIds.length != 0) {
-      int[] inodeIdsForURBlks = INodeUtil.resolveINodesFromBlockIds(unresolvedBlockIds);
+      long[] inodeIdsForURBlks = INodeUtil.resolveINodesFromBlockIds(unresolvedBlockIds);
       blockIds = ArrayUtils.addAll(blockIds, unresolvedBlockIds);
       inodeIds = ArrayUtils.addAll(inodeIds, inodeIdsForURBlks);
     }
@@ -48,7 +48,7 @@ final class BatchedBlockLock extends BaseIndividualBlockLock {
         BlockInfo.Finder.ByBlockIdsAndINodeIds, blockIds, inodeIds));
   }
   
-  Pair<int[], long[]> getINodeBlockIds() {
+  Pair<long[], long[]> getINodeBlockIds() {
     return new Pair<>(inodeIds, blockIds);
   }
   

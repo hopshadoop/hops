@@ -100,7 +100,7 @@ public class HdfsVariables {
   }
 
   public static CountersQueue.Counter incrementBlockIdCounter(
-      final int increment) throws IOException {
+      final long increment) throws IOException {
     return (CountersQueue.Counter) new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_BLOCK_ID_COUNTER) {
       @Override
@@ -111,7 +111,7 @@ public class HdfsVariables {
   }
 
   public static CountersQueue.Counter incrementINodeIdCounter(
-      final int increment) throws IOException {
+      final long increment) throws IOException {
     return (CountersQueue.Counter) new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_INODE_ID_COUNTER) {
       @Override
@@ -122,7 +122,7 @@ public class HdfsVariables {
   }
 
   public static CountersQueue.Counter incrementQuotaUpdateIdCounter(
-      final int increment) throws IOException {
+      final long increment) throws IOException {
     return (CountersQueue.Counter) new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_INODE_ID_COUNTER) {
       @Override
@@ -144,7 +144,7 @@ public class HdfsVariables {
   }
   
   private static CountersQueue.Counter incrementCounter(final Variable.Finder
-      finder, final int increment)
+      finder, final long increment)
       throws StorageException {
 
     return (CountersQueue.Counter) handleVariableWithWriteLock(new Handler() {
@@ -153,8 +153,9 @@ public class HdfsVariables {
           throws StorageException {
         Variable variable =  vd.getVariable(finder);
         if(variable instanceof IntVariable){
+          assert increment==(int) increment;
           int oldValue = ((IntVariable) vd.getVariable(finder)).getValue();
-          int newValue = IntMath.checkedAdd(oldValue, increment);
+          int newValue = IntMath.checkedAdd(oldValue, (int)increment);
           vd.setVariable(new IntVariable(finder, newValue));
           return new CountersQueue.Counter(oldValue, newValue);
 
@@ -693,7 +694,7 @@ public class HdfsVariables {
     Variable.registerVariableDefaultValue(Variable.Finder.BlockID,
         new LongVariable(0).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.INodeID,
-        new IntVariable(2)
+        new LongVariable(2)
             .getBytes()); // 1 is taken by the root and zero is parent of the root
     Variable.registerVariableDefaultValue(Variable.Finder.ReplicationIndex,
         new ArrayVariable(Arrays.asList(0, 0, 0, 0, 0)).getBytes());

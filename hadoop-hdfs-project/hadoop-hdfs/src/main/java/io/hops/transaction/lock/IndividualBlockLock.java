@@ -28,7 +28,7 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
 
   private final static long NON_EXISTING_BLOCK = Long.MIN_VALUE;
   protected final long blockId;
-  protected final int inodeId;
+  protected final long inodeId;
 
   public IndividualBlockLock() {
     this.blockId = NON_EXISTING_BLOCK;
@@ -50,17 +50,17 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
         (HdfsTransactionContextMaintenanceCmds.BlockDoesNotExist, blockId, inodeId);
   }
 
-  protected void announceEmptyFile(int inodeFileId) throws TransactionContextException {
+  protected void announceEmptyFile(long inodeFileId) throws TransactionContextException {
     EntityManager.snapshotMaintenance
         (HdfsTransactionContextMaintenanceCmds.EmptyFile, inodeFileId);
   }
 
-  protected void readBlock(long blkId, int indeId)
+  protected void readBlock(long blkId, long inodeId)
       throws IOException {
     if (blkId != NON_EXISTING_BLOCK || blkId > 0) {
       BlockInfo result =
           acquireLock(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByBlockIdAndINodeId,
-              blkId, indeId);
+              blkId, inodeId);
       if (result != null) {
         blocks.add(result);
       } else {

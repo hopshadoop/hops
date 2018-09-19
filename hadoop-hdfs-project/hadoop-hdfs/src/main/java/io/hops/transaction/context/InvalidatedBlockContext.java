@@ -111,7 +111,7 @@ public class InvalidatedBlockContext
 
   @Override
   InvalidatedBlock cloneEntity(InvalidatedBlock hopInvalidatedBlock,
-      int inodeId) {
+      long inodeId) {
     return new InvalidatedBlock(hopInvalidatedBlock.getStorageId(),
         hopInvalidatedBlock.getBlockId(), inodeId);
   }
@@ -131,7 +131,7 @@ public class InvalidatedBlockContext
       Object[] params) throws StorageCallPreventedException, StorageException {
     final long blockId = (Long) params[0];
     final int storageId = (Integer) params[1];
-    final int inodeId = (Integer) params[2];
+    final long inodeId = (Long) params[2];
 
     final BlockPK.ReplicaPK key = new BlockPK.ReplicaPK(blockId, inodeId, storageId);
     InvalidatedBlock result = null;
@@ -152,7 +152,7 @@ public class InvalidatedBlockContext
   private List<InvalidatedBlock> findByBlockId(InvalidatedBlock.Finder iFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
     final long blockId = (Long) params[0];
-    final int inodeId = (Integer) params[1];
+    final long inodeId = (Long) params[1];
 
     List<InvalidatedBlock> result = null;
     if (containsByBlock(blockId) || containsByINode(inodeId)) {
@@ -162,7 +162,7 @@ public class InvalidatedBlockContext
       aboutToAccessStorage(iFinder, params);
       result = dataAccess.findInvalidatedBlocksByBlockId(blockId, inodeId);
       Collections.sort(result);
-      gotFromDB(new BlockPK(blockId), result);
+      gotFromDB(new BlockPK(blockId, null), result);
       miss(iFinder, result, "bid", blockId, "inodeId", inodeId);
     }
     return result;
@@ -170,7 +170,7 @@ public class InvalidatedBlockContext
 
   private List<InvalidatedBlock> findByINodeId(InvalidatedBlock.Finder iFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int inodeId = (Integer) params[0];
+    final long inodeId = (Long) params[0];
 
     List<InvalidatedBlock> result = null;
     if (containsByINode(inodeId)) {
@@ -179,7 +179,7 @@ public class InvalidatedBlockContext
     } else {
       aboutToAccessStorage(iFinder, params);
       result = dataAccess.findInvalidatedBlocksByINodeId(inodeId);
-      gotFromDB(new BlockPK(inodeId), result);
+      gotFromDB(new BlockPK(null, inodeId), result);
       miss(iFinder, result, "inodeId", inodeId);
     }
     return result;
@@ -205,7 +205,7 @@ public class InvalidatedBlockContext
       InvalidatedBlock.Finder iFinder, Object[] params)
       throws StorageCallPreventedException, StorageException {
     final long[] blockIds = (long[]) params[0];
-    final int[] inodeIds = (int[]) params[1];
+    final long[] inodeIds = (long[]) params[1];
     final int sid = (Integer) params[2];
 
     aboutToAccessStorage(iFinder, params);
@@ -220,7 +220,7 @@ public class InvalidatedBlockContext
 
   private List<InvalidatedBlock> findByINodeIds(InvalidatedBlock.Finder iFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
-    final int[] inodeIds = (int[]) params[0];
+    final long[] inodeIds = (long[]) params[0];
 
     aboutToAccessStorage(iFinder, params);
     List<InvalidatedBlock> result =

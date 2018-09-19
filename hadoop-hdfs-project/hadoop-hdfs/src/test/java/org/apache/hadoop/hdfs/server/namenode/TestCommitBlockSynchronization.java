@@ -73,7 +73,7 @@ public class TestCommitBlockSynchronization {
 
     FSNamesystem namesystem = new FSNamesystem(conf, cluster.getNameNode());
     FSNamesystem namesystemSpy = spy(namesystem);
-    doReturn(1).when(file).getId();
+    doReturn(1L).when(file).getId();
     BlockInfoUnderConstruction blockInfo = createBlockInfoUnderConstruction(targets, block, file);
     
     BlockInfoUnderConstruction mockBlockInfo = mock(BlockInfoUnderConstruction.class);
@@ -99,7 +99,7 @@ public class TestCommitBlockSynchronization {
       final Block block, final INodeFile file) throws IOException {
     return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
-      INodeIdentifier inodeIdentifier = new INodeIdentifier(1);
+      INodeIdentifier inodeIdentifier = new INodeIdentifier(1L);
 
       @Override
       public void setUp() throws StorageException {
@@ -173,7 +173,7 @@ public class TestCommitBlockSynchronization {
         final INodeFile file) throws IOException {
     return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
-      INodeIdentifier inodeIdentifier = new INodeIdentifier(1);
+      INodeIdentifier inodeIdentifier = new INodeIdentifier(1L);
 
       @Override
       public void setUp() throws StorageException {
