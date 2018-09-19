@@ -5701,7 +5701,7 @@ public class FSNamesystem
   }
 
   @Metric
-  public long getExcessBlocks() {
+  public long getExcessBlocks() throws IOException {
     return blockManager.getExcessBlocksCount();
   }
 

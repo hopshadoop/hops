@@ -182,8 +182,8 @@ public class BlockManager {
   /**
    * Used by metrics
    */
-  public long getExcessBlocksCount() {
-    return excessBlocksCount.get();
+  public long getExcessBlocksCount() throws IOException{
+    return excessReplicateMap.size();
   }
 
   /**
@@ -3768,7 +3768,6 @@ public class BlockManager {
     BlockInfo blockInfo = getBlockInfo(block);
 
     if (excessReplicateMap.put(storage.getSid(), blockInfo)) {
-      excessBlocksCount.incrementAndGet();
       if (blockLog.isDebugEnabled()) {
         blockLog.debug(
             "BLOCK* addToExcessReplicate:" + " (" + storage + ", " + block +
@@ -3810,7 +3809,6 @@ public class BlockManager {
     // in "excess" there.
     //
     if (excessReplicateMap.remove(node, getBlockInfo(block))) {
-      excessBlocksCount.decrementAndGet();
       if (blockLog.isDebugEnabled()) {
         blockLog.debug("BLOCK* removeStoredBlock: " + block +
             " is removed from excessBlocks");
