@@ -29,12 +29,12 @@ import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import static junit.framework.Assert.assertFalse;
 import java.io.IOException;
 import org.apache.hadoop.hdfs.server.namenode.TestSubtreeLock;
-import org.junit.Assert;
 
 import static org.junit.Assert.fail;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Test abandoning blocks, which clients do on pipeline creation failure.
@@ -96,7 +96,7 @@ public class TestAbandonBlock {
     cluster.restartNameNode();
     blocks = dfsclient.getNamenode().getBlockLocations(src, 0,
         Integer.MAX_VALUE);
-    Assert.assertEquals("Blocks " + b + " has not been abandoned.",
+    assertEquals("Blocks " + b + " has not been abandoned.",
         orginalNumBlocks, blocks.locatedBlockCount() + 1);
   }
 

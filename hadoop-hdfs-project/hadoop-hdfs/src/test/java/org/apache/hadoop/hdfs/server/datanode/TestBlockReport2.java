@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import io.hops.metadata.hdfs.entity.HashBucket;
-import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -1296,7 +1295,7 @@ public class TestBlockReport2 {
         }
       } catch (Exception e) {
         e.printStackTrace();
-        Assert.fail("Failed to start BlockChecker: " + e);
+        fail("Failed to start BlockChecker: " + e);
       }
     }
   }
