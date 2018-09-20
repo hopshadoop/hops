@@ -5548,7 +5548,24 @@ public class FSNamesystem
     if (!isInSafeMode()) {
       return "";
     }
-    return safeMode().getTurnOffTip();
+    // There is no need to take readLock.
+    // Don't use isInSafeMode as this.safeMode might be set to null.
+    // after isInSafeMode returns.
+    boolean inSafeMode;
+    SafeModeInfo safeMode = safeMode();
+    if (safeMode == null) {
+      inSafeMode = false;
+    } else {
+      if(safeMode.isOn() && !isLeader()){
+      safeMode.tryToHelpToGetOut();
+      }
+      inSafeMode = safeMode.isOn();
+    }
+    if (!inSafeMode) {
+      return "";
+    } else {
+      return safeMode.getTurnOffTip();
+    }
   }
 
   public void processIncrementalBlockReport(DatanodeRegistration nodeReg, StorageReceivedDeletedBlocks r)
@@ -6066,21 +6083,30 @@ public class FSNamesystem
   Collection<CorruptFileBlockInfo> listCorruptFileBlocks(final String path,
       String[] cookieTab) throws IOException {
     checkSuperuserPrivilege();
+    
+    final int[] count = {0};
+    final ArrayList<CorruptFileBlockInfo> corruptFiles = new ArrayList<>();
+    if (cookieTab == null) {
+      cookieTab = new String[]{null};
+    }
+    // Do a quick check if there are any corrupt files without taking the lock
+    if (blockManager.getMissingBlocksCount() == 0) {
+      if (cookieTab[0] == null) {
+        cookieTab[0] = String.valueOf(getIntCookie(cookieTab[0]));
+      }
+      LOG.info("there are no corrupt file blocks.");
+      return corruptFiles;
+    }
+
     if (!isPopulatingReplQueues()) {
       throw new IOException("Cannot run listCorruptFileBlocks because " +
           "replication queues have not been initialized.");
     }
     // print a limited # of corrupt files per call
-    final int[] count = {0};
-    final ArrayList<CorruptFileBlockInfo> corruptFiles =
-        new ArrayList<>();
 
     final Iterator<Block> blkIterator =
         blockManager.getCorruptReplicaBlockIterator();
 
-    if (cookieTab == null) {
-      cookieTab = new String[]{null};
-    }
     final int[] skip = {getIntCookie(cookieTab[0])};
     for (int i = 0; i < skip[0] && blkIterator.hasNext(); i++) {
       blkIterator.next();
