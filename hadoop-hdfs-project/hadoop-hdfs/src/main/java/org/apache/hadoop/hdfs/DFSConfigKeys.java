@@ -451,6 +451,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.namenode.http-address";
   public static final String DFS_NAMENODE_HTTP_ADDRESS_DEFAULT =
       "0.0.0.0:" + DFS_NAMENODE_HTTP_PORT_DEFAULT;
+  public static final String  DFS_NAMENODE_HTTP_BIND_HOST_KEY = "dfs.namenode.http-bind-host";
   public static final String DFS_NAMENODE_RPC_ADDRESS_KEY =
       "dfs.namenode.rpc-address";
   public static final String  DFS_NAMENODE_RPC_BIND_HOST_KEY = "dfs.namenode.rpc-bind-host";
@@ -656,6 +657,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int DFS_NAMENODE_HTTPS_PORT_DEFAULT = 50470;
   public static final String DFS_NAMENODE_HTTPS_ADDRESS_KEY =
       "dfs.namenode.https-address";
+  public static final String  DFS_NAMENODE_HTTPS_BIND_HOST_KEY = "dfs.namenode.https-bind-host";
   public static final String DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT =
       "0.0.0.0:" + DFS_NAMENODE_HTTPS_PORT_DEFAULT;
   public static final String DFS_CLIENT_READ_PREFETCH_SIZE_KEY =
