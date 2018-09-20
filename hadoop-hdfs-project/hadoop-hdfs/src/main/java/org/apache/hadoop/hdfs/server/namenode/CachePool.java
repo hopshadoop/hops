@@ -120,9 +120,7 @@ public final class CachePool {
     UserGroupInformation ugi = null;
     String ownerName = info.getOwnerName();
     if (ownerName == null) {
-      if (ugi == null) {
-        ugi = NameNode.getRemoteUser();
-      }
+      ugi = NameNode.getRemoteUser();
       ownerName = ugi.getShortUserName();
     }
     String groupName = info.getGroupName();

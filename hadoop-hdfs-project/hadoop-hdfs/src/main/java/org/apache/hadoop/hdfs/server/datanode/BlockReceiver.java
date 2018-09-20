@@ -275,9 +275,7 @@ class BlockReceiver implements Closeable {
    */
   @Override
   public void close() throws IOException {
-    if (packetReceiver != null) {
-      packetReceiver.close();
-    }
+    packetReceiver.close();
     
     IOException ioe = null;
     if (syncOnClose && (out != null || checksumOut != null)) {
