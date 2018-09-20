@@ -19,13 +19,11 @@ package org.apache.hadoop.hdfs;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
-import org.apache.hadoop.util.ExitUtil;
 import org.junit.Test;
 
 import java.io.IOException;
+import static org.junit.Assert.fail;
 
-import static junit.framework.Assert.fail;
-import static org.junit.Assert.assertEquals;
 
 /**
  * This class tests various cases during file creation.
