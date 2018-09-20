@@ -223,24 +223,35 @@ public class TestDecommission {
   }
 
   /*
-   * decommission one random node and wait for each to reach the
-   * given {@code waitForState}.
+   * decommission the DN at index dnIndex or one random node if dnIndex is set
+   * to -1 and wait for the node to reach the given {@code waitForState}.
    */
   private DatanodeInfo decommissionNode(int nnIndex,
-      ArrayList<DatanodeInfo> decommissionedNodes, AdminStates waitForState)
-      throws IOException {
+      String datanodeUuid, ArrayList<DatanodeInfo> decommissionedNodes, AdminStates waitForState) throws IOException {
     DFSClient client = getDfsClient(cluster.getNameNode(nnIndex), conf);
     DatanodeInfo[] info = client.datanodeReport(DatanodeReportType.LIVE);
 
     //
-    // pick one datanode randomly.
+    // pick one datanode randomly unless the caller specifies one.
     //
     int index = 0;
-    boolean found = false;
-    while (!found) {
-      index = myrand.nextInt(info.length);
-      if (!info[index].isDecommissioned()) {
-        found = true;
+        if (datanodeUuid == null) {
+      boolean found = false;
+      while (!found) {
+        index = myrand.nextInt(info.length);
+        if (!info[index].isDecommissioned()) {
+          found = true;
+        }
+      }
+    } else {
+      // The caller specifies a DN
+      for (; index < info.length; index++) {
+        if (info[index].getDatanodeUuid().equals(datanodeUuid)) {
+          break;
+        }
+      }
+      if (index == info.length) {
+        throw new IOException("invalid datanodeUuid " + datanodeUuid);
       }
     }
     String nodename = info[index].getXferAddr();
@@ -262,12 +273,13 @@ public class TestDecommission {
     return ret;
   }
 
-  /* stop decommission of the datanode and wait for each to reach the NORMAL state */
-  private void recomissionNode(DatanodeInfo decommissionedNode)
-      throws IOException {
+  /* Ask a specific NN to stop decommission of the datanode and wait for each
+   * to reach the NORMAL state.
+   */
+  private void recomissionNode(int nnIndex, DatanodeInfo decommissionedNode) throws IOException {
     LOG.info("Recommissioning node: " + decommissionedNode);
     writeConfigFile(excludeFile, null);
-    refreshNodes(cluster.getNamesystem(), conf);
+    refreshNodes(cluster.getNamesystem(nnIndex), conf);
     waitNodeState(decommissionedNode, AdminStates.NORMAL);
 
   }
@@ -391,7 +403,7 @@ public class TestDecommission {
     int liveDecomissioned = ns.getNumDecomLiveDataNodes();
 
     // Decommission one node. Verify that node is decommissioned.
-    DatanodeInfo decomNode = decommissionNode(0, decommissionedNodes,
+    DatanodeInfo decomNode = decommissionNode(0, null, decommissionedNodes,
         AdminStates.DECOMMISSIONED);
     decommissionedNodes.add(decomNode);
     assertEquals(deadDecomissioned, ns.getNumDecomDeadDataNodes());
@@ -455,7 +467,7 @@ public class TestDecommission {
         int liveDecomissioned = ns.getNumDecomLiveDataNodes();
 
         // Decommission one node. Verify that node is decommissioned.
-        DatanodeInfo decomNode = decommissionNode(i, decommissionedNodes,
+        DatanodeInfo decomNode = decommissionNode(i, null, decommissionedNodes,
             AdminStates.DECOMMISSIONED);
         decommissionedNodes.add(decomNode);
         assertEquals(deadDecomissioned, ns.getNumDecomDeadDataNodes());
@@ -483,7 +495,7 @@ public class TestDecommission {
       }
     }
 
-    // Restart the cluster and ensure recommissioned datanodes
+    // Restart the cluster and ensure decommissioned datanodes
     // are allowed to register with the namenode
     cluster.shutdown();
 
@@ -513,7 +525,7 @@ public class TestDecommission {
 
       // Decommission one node. Verify that node is decommissioned.
       DatanodeInfo decomNode =
-          decommissionNode(i, decommissionedNodes, AdminStates.DECOMMISSIONED);
+          decommissionNode(i, null, decommissionedNodes, AdminStates.DECOMMISSIONED);
       decommissionedNodes.add(decomNode);
 
       // Ensure decommissioned datanode is not automatically shutdown
@@ -536,7 +548,7 @@ public class TestDecommission {
           + tries + " times.", tries < 20);
 
       // stop decommission and check if the new replicas are removed
-      recomissionNode(decomNode);
+      recomissionNode(0, decomNode);
       // wait for the block to be deleted
       tries = 0;
       while (tries++ < 20) {
@@ -588,7 +600,7 @@ public class TestDecommission {
       FSNamesystem fsn = cluster.getNamesystem(i);
       NameNode namenode = cluster.getNameNode(i);
       DatanodeInfo downnode =
-          decommissionNode(i, null, AdminStates.DECOMMISSION_INPROGRESS);
+          decommissionNode(i, null, null, AdminStates.DECOMMISSION_INPROGRESS);
       // Check namenode stats for multiple datanode heartbeats
       verifyStats(namenode, fsn, downnode, true);
       

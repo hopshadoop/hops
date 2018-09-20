@@ -4329,10 +4329,14 @@ public class BlockManager {
 
   /**
    * On stopping decommission, check if the node has excess replicas.
-   * If there are any excess replicas, call processOverReplicatedBlock()
+   * If there are any excess replicas, call processOverReplicatedBlock().
+   * Process over replicated blocks only when active NN is out of safe mode.
    */
   void processOverReplicatedBlocksOnReCommission(
       final DatanodeDescriptor srcNode) throws IOException {
+    if (!namesystem.isPopulatingReplQueues()) {
+      return;
+    }
     final int[] numOverReplicated = {0};
     final Iterator<? extends Block> it = srcNode.getBlockIterator(true);
     HopsTransactionalRequestHandler processBlockHandler =
@@ -4455,13 +4459,13 @@ public class BlockManager {
                     decommissionOnlyReplicas[0]++;
                   }
                 }
-                if (!neededReplications.contains(getBlockInfo(block)) &&
-                    pendingReplications.getNumReplicas(getBlockInfo(block)) ==
-                        0) {
+                if (!neededReplications.contains(getBlockInfo(block)) && pendingReplications.getNumReplicas(
+                    getBlockInfo(block)) == 0 && namesystem.isPopulatingReplQueues()) {
                   //
                   // These blocks have been reported from the datanode
                   // after the startDecommission method has been executed. These
                   // blocks were in flight when the decommissioning was started.
+                  // Process these blocks only when active NN is out of safe mode.
                   //
                   neededReplications.add(getBlockInfo(block), curReplicas,
                       num.decommissionedReplicas(), curExpectedReplicas);
@@ -4743,8 +4747,11 @@ public class BlockManager {
         try {
           if (namesystem.isLeader()) {
             LOG.debug("Running replication monitor");
-            computeDatanodeWork();
-            processPendingReplications();
+            // Process replication work only when active NN is out of safe mode.
+            if (namesystem.isPopulatingReplQueues()) {
+              computeDatanodeWork();
+              processPendingReplications();
+            }
           } else {
             LOG.debug("Namesystem is not leader: will not run replication monitor");
           }
