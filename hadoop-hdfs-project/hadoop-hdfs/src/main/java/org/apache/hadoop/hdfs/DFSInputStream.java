@@ -1044,6 +1044,8 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
             setEmulateHdfsClient(emulateHdfsClient).
             build();
         int nread = reader.readAll(buf, offset, len);
+        updateReadStatistics(readStatistics, nread, reader);
+
         if (nread != len) {
           throw new IOException("truncated return from reader.read(): " +
                                 "excpected " + len + ", got " + nread);
