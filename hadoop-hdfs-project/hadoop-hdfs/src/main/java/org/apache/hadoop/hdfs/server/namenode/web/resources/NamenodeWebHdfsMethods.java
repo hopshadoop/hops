@@ -178,8 +178,16 @@ public class NamenodeWebHdfsMethods {
 
     //clear content type
     response.setContentType(null);
+    
+    // set the remote address, if coming in via a trust proxy server then
+    // the address with be that of the proxied client
+    REMOTE_ADDRESS.set(JspHelper.getRemoteAddr(request));
   }
 
+  private void reset() {
+    REMOTE_ADDRESS.set(null);
+  }
+    
   private static NamenodeProtocols getRPCServer(NameNode namenode)
       throws IOException {
      final NamenodeProtocols np = namenode.getRpcServer();
@@ -414,14 +422,13 @@ public class NamenodeWebHdfsMethods {
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
       public Response run() throws IOException, URISyntaxException {
-        REMOTE_ADDRESS.set(request.getRemoteAddr());
         try {
           return put(ugi, delegation, username, doAsUser,
               path.getAbsolutePath(), op, destination, owner, group, permission,
               overwrite, bufferSize, replication, blockSize, modificationTime,
               accessTime, renameOptions, createParent, delegationTokenArgument, aclPermission);
         } finally {
-          REMOTE_ADDRESS.set(null);
+          reset();
         }
       }
     });
@@ -612,12 +619,11 @@ public class NamenodeWebHdfsMethods {
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
       public Response run() throws IOException, URISyntaxException {
-        REMOTE_ADDRESS.set(request.getRemoteAddr());
         try {
           return post(ugi, delegation, username, doAsUser,
               path.getAbsolutePath(), op, concatSrcs, bufferSize);
         } finally {
-          REMOTE_ADDRESS.set(null);
+          reset();
         }
       }
     });
@@ -734,13 +740,12 @@ public class NamenodeWebHdfsMethods {
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
       public Response run() throws IOException, URISyntaxException {
-        REMOTE_ADDRESS.set(request.getRemoteAddr());
         try {
           return get(ugi, delegation, username, doAsUser,
               path.getAbsolutePath(), op, offset, length, renewer,
               bufferSize, fsAction);
         } finally {
-          REMOTE_ADDRESS.set(null);
+          reset();
         }
       }
     });
@@ -939,12 +944,11 @@ public class NamenodeWebHdfsMethods {
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
       public Response run() throws IOException {
-        REMOTE_ADDRESS.set(request.getRemoteAddr());
         try {
           return delete(ugi, delegation, username, doAsUser,
               path.getAbsolutePath(), op, recursive);
         } finally {
-          REMOTE_ADDRESS.set(null);
+          reset();
         }
       }
     });
