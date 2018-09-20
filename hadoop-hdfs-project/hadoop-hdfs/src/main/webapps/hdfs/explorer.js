@@ -98,8 +98,7 @@
   }
 
   function get_response_err_msg(data) {
-    var msg = data.RemoteException !== undefined ? data.RemoteException.message : "";
-    return msg;
+    return data.RemoteException !== undefined ? data.RemoteException.message : "";
   }
 
   function view_file_details(path, abs_path) {
