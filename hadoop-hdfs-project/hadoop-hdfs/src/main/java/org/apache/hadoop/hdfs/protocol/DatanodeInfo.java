@@ -29,6 +29,8 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -52,6 +54,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
   private int xceiverCount;
   private String location = NetworkTopology.DEFAULT_RACK;
   private String softwareVersion;
+  private List<String> dependentHostNames = new LinkedList<>();
   
   // Datanode administrative states
   public enum AdminStates {
@@ -331,6 +334,21 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.location = NodeBase.normalize(location);
   }
 
+  /** Add a hostname to a list of network dependencies */
+  public void addDependentHostName(String hostname) {
+    dependentHostNames.add(hostname);
+  }
+  
+  /** List of Network dependencies */
+  public List<String> getDependentHostNames() {
+    return dependentHostNames;
+  }
+  
+  /** Sets the network dependencies */
+  public void setDependentHostNames(List<String> dependencyList) {
+    dependentHostNames = dependencyList;
+  }
+  
   /**
    * A formatted string for reporting the status of the DataNode.
    */
