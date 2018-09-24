@@ -19,7 +19,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import io.hops.common.IDsGenerator;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -57,7 +56,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
@@ -78,7 +76,6 @@ import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectory.INodesInPath;
 import org.apache.hadoop.hdfs.util.ByteArray;
 import org.apache.hadoop.security.AccessControlException;
 
@@ -380,7 +377,7 @@ public class FSDirectory implements Closeable {
     }
 
     // update space consumed
-    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(path, true);
+    final INodesInPath inodesInPath = getINodesInPath4Write(path, true);
     final INode[] inodes = inodesInPath.getINodes();
     updateCount(inodesInPath, inodes.length-1, 0,
         -fileNode.getPreferredBlockSize() * fileNode.getBlockReplication(),
@@ -447,7 +444,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       }
     }
     String error = null;
-    final INodesInPath srcInodesInPath = getRootDir().getExistingPathINodes(src, false);
+    final INodesInPath srcInodesInPath = getINodesInPath4Write(src, false);
     final INode[] srcInodes = srcInodesInPath.getINodes();
     final INode srcInode = srcInodes[srcInodes.length - 1];
     // validate source
@@ -484,8 +481,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       throw new IOException(error);
     }
     final byte[][] dstComponents = INode.getPathComponents(dst);
-    INodesInPath dstInodesInPath = getRootDir().getExistingPathINodes(dstComponents,
-        dstComponents.length, false);
+    INodesInPath dstInodesInPath = getExistingPathINodes(dstComponents);
     final INode[] dstInodes = dstInodesInPath.getINodes();
     INode dstInode = dstInodes[dstInodes.length - 1];
     if (dstInodes.length == 1) {
@@ -647,7 +643,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   boolean unprotectedRenameTo(String src, String dst, long timestamp, INode.DirCounts srcCounts,
       INode.DirCounts dstCounts)
       throws IOException {
-    final INodesInPath srcInodesInPath = getRootDir().getExistingPathINodes(src, false);
+    final INodesInPath srcInodesInPath = getINodesInPath4Write(src, false);
     final INode[] srcInodes = srcInodesInPath.getINodes();
     INode srcInode = srcInodes[srcInodes.length - 1];
 
@@ -689,8 +685,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     
     byte[][] dstComponents = INode.getPathComponents(dst);
     LOG.debug("destination is " + dst);
-    INodesInPath dstInodesInPath = getRootDir().getExistingPathINodes(dstComponents,
-        dstComponents.length, false);
+    INodesInPath dstInodesInPath = getExistingPathINodes(dstComponents);
     final INode[] dstInodes = dstInodesInPath.getINodes();
     if (dstInodes[dstInodes.length - 1] != null) {
       NameNode.stateChangeLog.warn(
@@ -817,7 +812,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       short[] oldReplication)
       throws QuotaExceededException, UnresolvedLinkException, StorageException,
       TransactionContextException {
-    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(src, true);
+    final INodesInPath inodesInPath = getINodesInPath4Write(src, true);
     final INode[] inodes = inodesInPath.getINodes();
     INode inode = inodes[inodes.length - 1];
     if (inode == null || !inode.isFile()) {
@@ -844,7 +839,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   }
 
   void unprotectedSetStoragePolicy(String src, BlockStoragePolicy policy) throws IOException {
-    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(src, true);
+    final INodesInPath inodesInPath = getINodesInPath4Write(src, true);
     final INode[] inodes = inodesInPath.getINodes();
     INode inode = inodes[inodes.length - 1];
 
@@ -864,13 +859,13 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   long getPreferredBlockSize(String path)
       throws UnresolvedLinkException, FileNotFoundException, IOException,
       StorageException {
-    return INodeFile.valueOf(getRootDir().getNode(path, false), path).getPreferredBlockSize();
+    return INodeFile.valueOf(getNode(path, false), path).getPreferredBlockSize();
   }
 
   boolean exists(String src) throws UnresolvedLinkException, StorageException,
       TransactionContextException {
     src = normalizePath(src);
-    INode inode = getRootDir().getNode(src, false);
+    INode inode = getNode(src, false);
     if (inode == null) {
       return false;
     }
@@ -886,7 +881,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   void unprotectedSetPermission(String src, FsPermission permissions)
       throws FileNotFoundException, UnresolvedLinkException, StorageException,
       TransactionContextException {
-    INode inode = getRootDir().getNode(src, true);
+    INode inode = getNode(src, true);
     if (inode == null) {
       throw new FileNotFoundException("File does not exist: " + src);
     }
@@ -900,7 +895,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
 
   void unprotectedSetOwner(String src, String username, String groupname)
       throws IOException {
-    INode inode = getRootDir().getNode(src, true);
+    INode inode = getNode(src, true);
     if (inode == null) {
       throw new FileNotFoundException("File does not exist: " + src);
     }
@@ -946,7 +941,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
     // do the move
     
-    final INodesInPath trgINodesInPath = getExistingPathINodes(target);
+    final INodesInPath trgINodesInPath = getINodesInPath4Write(target);
     final INode[] trgINodes = trgINodesInPath.getINodes();
     INodeFile trgInode = (INodeFile) trgINodes[trgINodes.length - 1];
     INodeDirectory trgParent = (INodeDirectory) trgINodes[trgINodes.length - 2];
@@ -1032,7 +1027,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   boolean isNonEmptyDirectory(String path)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
-    final INode inode = getRootDir().getNode(path, false);
+    final INode inode = getNode(path, false);
     if (inode == null || !inode.isDirectory()) {
       //not found or not a directory
       return false;
@@ -1078,7 +1073,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       TransactionContextException {
     src = normalizePath(src);
 
-    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(src, false);
+    final INodesInPath inodesInPath = getINodesInPath4Write(src, false);
     final INode[] inodes = inodesInPath.getINodes();
     INode targetNode = inodes[inodes.length - 1];
 
@@ -1150,7 +1145,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       boolean needLocation, boolean isSuperUser)
       throws UnresolvedLinkException, IOException, StorageException {
     String srcs = normalizePath(src);
-    INode targetNode = getRootDir().getNode(srcs, true);
+    INode targetNode = getNode(srcs, true);
     if (targetNode == null) {
       return null;
     }
@@ -1209,7 +1204,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   HdfsFileStatus getFileInfo(String src, boolean resolveLink, boolean includeStoragePolicy)
       throws IOException {
     String srcs = normalizePath(src);
-    INode targetNode = getRootDir().getNode(srcs, resolveLink);
+    INode targetNode = getNode(srcs, resolveLink);
     if (targetNode == null) {
       return null;
     } else {
@@ -1225,8 +1220,13 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   Block[] getFileBlocks(String src)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
-    INode i = getRootDir().getNode(src, false);
+    INode i = getNode(src, false);
     return i != null && i.isFile()? ((INodeFile)i).getBlocks(): null;
+  }
+
+  INodesInPath getExistingPathINodes(byte[][] components)
+      throws UnresolvedLinkException, StorageException, TransactionContextException {
+    return INodesInPath.resolve(getRootDir(), components);
   }
 
   /**
@@ -1234,7 +1234,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    */
   public INode getINode(String src) throws UnresolvedLinkException,
       StorageException, TransactionContextException {
-    return getRootDir().getNode(src, true);
+    return getNode(src, true);
   }
 
   /**
@@ -1247,12 +1247,12 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * deepest INodes. The array size will be the number of expected
    * components in the path, and non existing components will be
    * filled with null
-   * @see INodeDirectory#getExistingPathINodes(byte[][], INode[], boolean)
+   * @see INodeDirectory#getINodesInPath4Write(byte[][], INode[], boolean)
    */
-  INodesInPath getExistingPathINodes(String path)
+  INodesInPath getINodesInPath4Write(String path)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
-    return getRootDir().getExistingPathINodes(path, true);
+    return getINodesInPath4Write(path, true);
   }
   
   /**
@@ -1260,7 +1260,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    */
   public INodesInPath getLastINodeInPath(String src)
       throws UnresolvedLinkException, StorageException, TransactionContextException {
-    return getRootDir().getLastINodeInPath(src, true);
+    return getLastINodeInPath(src, true);
   }
 
   /**
@@ -1272,7 +1272,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     String srcs = normalizePath(src);
     if (srcs.startsWith("/") &&
         !srcs.endsWith("/") &&
-        getRootDir().getNode(srcs, false) == null) {
+        getNode(srcs, false) == null) {
       return true;
     } else {
       return false;
@@ -1285,7 +1285,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   boolean isDir(String src) throws UnresolvedLinkException, StorageException,
       TransactionContextException {
     src = normalizePath(src);
-    INode node = getRootDir().getNode(src, false);
+    INode node = getNode(src, false);
     return node != null && node.isDirectory();
   }
 
@@ -1307,7 +1307,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   void updateSpaceConsumed(String path, long nsDelta, long dsDelta)
       throws QuotaExceededException, FileNotFoundException, UnresolvedLinkException, StorageException,
       TransactionContextException {
-    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(path, false);
+    final INodesInPath inodesInPath = getINodesInPath4Write(path, false);
     final INode[] inodes = inodesInPath.getINodes();
     int len = inodes.length;
     if (inodes[len - 1] == null) {
@@ -1461,8 +1461,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     byte[][] components = INode.getPathComponents(names);
     final int lastInodeIndex = components.length - 1;
 
-    INodesInPath inodesInPath = getRootDir().getExistingPathINodes(components,
-        components.length, false);
+    INodesInPath inodesInPath = getExistingPathINodes(components);
     INode[] inodes = inodesInPath.getINodes();
 
     // find the index of the first null in inodes[]
@@ -1535,8 +1534,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       long timestamp)
       throws IOException {
     byte[][] components = INode.getPathComponents(src);
-    INodesInPath inodesInPath = getRootDir().getExistingPathINodes(components,
-        components.length, false);
+    INodesInPath inodesInPath = getExistingPathINodes(components);
     INode[] inodes = inodesInPath.getINodes();
     unprotectedMkdir(inodeId, inodesInPath, inodes.length - 1, components[inodes.length - 1],
         permissions, timestamp);
@@ -1568,8 +1566,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     byte[] path = components[components.length - 1];
     child.setLocalNameNoPersistance(path);
     cacheName(child);
-    INodesInPath inodesInPath = getRootDir().getExistingPathINodes(components,
-        components.length, false);
+    INodesInPath inodesInPath = getExistingPathINodes(components);
     return addLastINode(inodesInPath, child, true);
   }
 
@@ -1987,7 +1984,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       throws FileNotFoundException, UnresolvedLinkException, StorageException,
       TransactionContextException {
     String srcs = normalizePath(src);
-    INode targetNode = getRootDir().getNode(srcs, false);
+    INode targetNode = getNode(srcs, false);
     if (targetNode == null) {
       throw new FileNotFoundException("File does not exist: " + srcs);
     } else {
@@ -2139,7 +2136,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
 
     String srcs = normalizePath(src);
 
-    final INodesInPath inodesInPath = getRootDir().getExistingPathINodes(src, true);
+    final INodesInPath inodesInPath = getINodesInPath4Write(src, true);
     final INode[] inodes = inodesInPath.getINodes();
     INodeDirectory dirNode = INodeDirectory.valueOf(inodes[inodes.length-1], srcs);
     if (dirNode.isRoot() && nsQuota == HdfsConstants.QUOTA_RESET) {
@@ -2563,6 +2560,16 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return !isReservedName(src) ? null : INode.getPathComponents(src);
   }
 
+  /** Check if a given inode name is reserved */
+  public static boolean isReservedName(INode inode) {
+    return CHECK_RESERVED_FILE_NAMES
+            && Arrays.equals(inode.getLocalNameBytes(), DOT_RESERVED);
+  }
+  /** Check if a given path is reserved */
+  public static boolean isReservedName(String src) {
+    return src.startsWith(DOT_RESERVED_PATH_PREFIX);
+  }
+  
   /**
    * Resolve the path of /.reserved/.inodes/<inodeid>/... to a regular path
    *
@@ -2727,19 +2734,46 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return (INode) getInodeHandler.handle();
   }
 
-  /**
-   * Check if a given inode name is reserved
-   */
-  public static boolean isReservedName(INode inode) {
-    return CHECK_RESERVED_FILE_NAMES
-        && Arrays.equals(inode.getLocalNameBytes(), DOT_RESERVED);
+  /** @return the {@link INodesInPath} containing only the last inode. */
+  private INodesInPath getLastINodeInPath(String path, boolean resolveLink
+  ) throws UnresolvedLinkException, StorageException, TransactionContextException {
+    return INodesInPath.resolve(getRootDir(), INode.getPathComponents(path), 1,
+            resolveLink);
   }
 
+    /** @return the {@link INodesInPath} containing all inodes in the path. */
+  INodesInPath getINodesInPath(String path, boolean resolveLink
+  ) throws UnresolvedLinkException, StorageException, TransactionContextException {
+    final byte[][] components = INode.getPathComponents(path);
+    return INodesInPath.resolve(getRootDir(), components, components.length,
+            resolveLink);
+  }
+  /** @return the last inode in the path. */
+  INode getNode(String path, boolean resolveLink)
+          throws UnresolvedLinkException, StorageException, TransactionContextException {
+    return getLastINodeInPath(path, resolveLink).getINode(0);
+  }
   /**
-   * Check if a given path is reserved
+   * @return the INode of the last component in src, or null if the last
+   * component does not exist.
+   * @throws UnresolvedLinkException if symlink can't be resolved
+   * @throws SnapshotAccessControlException if path is in RO snapshot
    */
-  public static boolean isReservedName(String src) {
-    return src.startsWith(DOT_RESERVED_PATH_PREFIX);
+  private INode getINode4Write(String src, boolean resolveLink)
+          throws UnresolvedLinkException, StorageException, TransactionContextException {
+    return getINodesInPath4Write(src, resolveLink).getLastINode();
+  }
+  /**
+   * @return the INodesInPath of the components in src
+   * @throws UnresolvedLinkException if symlink can't be resolved
+   * @throws SnapshotAccessControlException if path is in RO snapshot
+   */
+  private INodesInPath getINodesInPath4Write(String src, boolean resolveLink)
+          throws UnresolvedLinkException, StorageException, TransactionContextException {
+    final byte[][] components = INode.getPathComponents(src);
+    INodesInPath inodesInPath = INodesInPath.resolve(getRootDir(), components,
+            components.length, resolveLink);
+    return inodesInPath;
   }
 
   public INodeDirectory getRootDir()
