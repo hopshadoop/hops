@@ -34,7 +34,6 @@ import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -67,7 +66,7 @@ public class TestFSPermissionChecker {
       UserGroupInformation.createUserForTesting("diana", new String[] { "sales" });
   private static final UserGroupInformation CLARK =
       UserGroupInformation.createUserForTesting("clark", new String[] { "execs" });
-  
+     
   private Configuration conf;
   private MiniDFSCluster cluster;
   
@@ -482,9 +481,9 @@ public class TestFSPermissionChecker {
       
       @Override
       public Object performTask() throws IOException {
-        INodeDirectory inodeRoot = cluster.getNamesystem().getFSDirectory().getRootDir();
+        FSDirectory dir = cluster.getNamesystem().getFSDirectory();
         new FSPermissionChecker(SUPERUSER, SUPERGROUP, user).checkPermission(path,
-            inodeRoot, false, null, null, access, null);
+            dir, false, null, null, access, null);
         return null;
       }
     }.handle();
@@ -505,9 +504,9 @@ public class TestFSPermissionChecker {
         
         @Override
         public Object performTask() throws IOException {
-          INodeDirectory inodeRoot = cluster.getNamesystem().getFSDirectory().getRootDir();
+          FSDirectory dir = cluster.getNamesystem().getFSDirectory();
           new FSPermissionChecker(SUPERUSER, SUPERGROUP, user).checkPermission(path,
-              inodeRoot, false, null, null, access, null);
+              dir, false, null, null, access, null);
           return null;
         }
       }.handle();

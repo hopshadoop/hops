@@ -161,11 +161,11 @@ class FSPermissionChecker {
     }
   }
   
-  void checkPermission(String path, INodeDirectory root, boolean doCheckOwner,
+  void checkPermission(String path, FSDirectory dir, boolean doCheckOwner,
       FsAction ancestorAccess, FsAction parentAccess, FsAction access,
       FsAction subAccess) throws AccessControlException, UnresolvedLinkException, StorageException,
       TransactionContextException, IOException {
-    checkPermission(path, root, doCheckOwner, ancestorAccess, parentAccess, access, subAccess, false);
+    checkPermission(path, dir, doCheckOwner, ancestorAccess, parentAccess, access, subAccess, false);
   }
   
   /**
@@ -204,7 +204,7 @@ class FSPermissionChecker {
    *     Guarded by {@link FSNamesystem#readLock()}
    *     Caller of this method must hold that lock.
    */
-  void checkPermission(String path, INodeDirectory root, boolean doCheckOwner,
+  void checkPermission(String path, FSDirectory dir, boolean doCheckOwner,
       FsAction ancestorAccess, FsAction parentAccess, FsAction access,
       FsAction subAccess, boolean resolveLink) throws AccessControlException, UnresolvedLinkException, StorageException,
       TransactionContextException, IOException {
@@ -215,7 +215,7 @@ class FSPermissionChecker {
     }
     // check if (parentAccess != null) && file exists, then check sb
     // If resolveLink, the check is performed on the link target.
-      final INode[] inodes = root.getExistingPathINodes(path, resolveLink).getINodes();
+      final INode[] inodes = dir.getINodesInPath(path, resolveLink).getINodes();
       int ancestorIndex = inodes.length - 2;
       for(; ancestorIndex >= 0 && inodes[ancestorIndex] == null;
           ancestorIndex--);

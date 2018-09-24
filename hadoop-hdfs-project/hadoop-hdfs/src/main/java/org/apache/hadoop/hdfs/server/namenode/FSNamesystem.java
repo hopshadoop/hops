@@ -32,7 +32,6 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.common.entity.Variable;
-import io.hops.metadata.hdfs.dal.AceDataAccess;
 import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.dal.CacheDirectiveDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
@@ -110,7 +109,6 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
@@ -119,7 +117,6 @@ import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStatistics;
 import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.MutableBlockCollection;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
@@ -130,7 +127,6 @@ import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
 import org.apache.hadoop.hdfs.server.namenode.metrics.FSNamesystemMBean;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectory.INodesInPath;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
@@ -1096,7 +1092,7 @@ public class FSNamesystem
 
     //remove sto from
     if(isSTO){
-      INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, false);
+      INodesInPath inodesInPath = dir.getINodesInPath(src, false);
       INode[] nodes = inodesInPath.getINodes();
       INode inode = nodes[nodes.length - 1];
       if (inode != null && inode.isSTOLocked()) {
@@ -1224,7 +1220,7 @@ public class FSNamesystem
     resultingStat = getAuditFileInfo(src, false);
     logAuditEvent(true, "setOwner", src, null, resultingStat);
     if(isSTO){
-      INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, false);
+      INodesInPath inodesInPath = dir.getINodesInPath(src, false);
       INode[] nodes = inodesInPath.getINodes();
       INode inode = nodes[nodes.length - 1];
       if (inode != null && inode.isSTOLocked()) {
@@ -2890,7 +2886,7 @@ public class FSNamesystem
     checkFsObjectLimit();
 
     Block previousBlock = ExtendedBlock.getLocalBlock(previous);
-    final INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, true);
+    final INodesInPath inodesInPath = dir.getINodesInPath4Write(src);
     final INode[] inodes = inodesInPath.getINodes();
     
     final INodeFile pendingFile =
@@ -3271,7 +3267,7 @@ public class FSNamesystem
       final byte[] data)
       throws IOException {
     INodeFile pendingFile;
-    final INodesInPath iip = dir.getRootDir().getLastINodeInPath(src, true);
+    final INodesInPath iip = dir.getLastINodeInPath(src);
     pendingFile = checkLease(src,fileId, holder, iip.getINode(0));
 
     //in case of appending to small files. we might have to migrate the file from
@@ -5637,7 +5633,7 @@ public class FSNamesystem
       boolean resolveLink) throws AccessControlException, UnresolvedLinkException, TransactionContextException,
       IOException {
     if (!pc.isSuperUser()) {
-      pc.checkPermission(path, dir.getRootDir(), doCheckOwner, ancestorAccess,
+      pc.checkPermission(path, dir, doCheckOwner, ancestorAccess,
           parentAccess, access, subAccess, resolveLink);
     }
   }
@@ -7963,10 +7959,10 @@ public class FSNamesystem
         for (Options.Rename op : options) {
           if (op == Rename.KEEP_ENCODING_STATUS) {
             INodesInPath srcInodesInPath =
-                dir.getRootDir().getExistingPathINodes(src, false);
+                dir.getINodesInPath(src, false);
             INode[] srcNodes = srcInodesInPath.getINodes();
             INodesInPath dstInodesInPath =
-                dir.getRootDir().getExistingPathINodes(dst, false);
+                dir.getINodesInPath(dst, false);
             INode[] dstNodes = dstInodesInPath.getINodes();
             INode srcNode = srcNodes[srcNodes.length - 1];
             INode dstNode = dstNodes[dstNodes.length - 1];
@@ -7999,7 +7995,7 @@ public class FSNamesystem
       INode inode;
       if (!src.equals("/")) {
         EntityManager.remove(new SubTreeOperation(getSubTreeLockPathPrefix(src)));
-        INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(src, false);
+        INodesInPath inodesInPath = dir.getINodesInPath(src, false);
         nodes = inodesInPath.getINodes();
         inode = nodes[nodes.length - 1];
         if (inode != null && inode.isSTOLocked()) {
@@ -8568,11 +8564,11 @@ public class FSNamesystem
       public Object performTask() throws IOException {
         FSPermissionChecker pc = getPermissionChecker();
         if (isPermissionEnabled && !pc.isSuperUser()) {
-          pc.checkPermission(path, dir.getRootDir(), doCheckOwner,
+          pc.checkPermission(path, dir, doCheckOwner,
               ancestorAccess, parentAccess, access, subAccess, true);
         }
 
-        INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(path, false);
+        INodesInPath inodesInPath = dir.getINodesInPath(path, false);
         INode[] nodes = inodesInPath.getINodes();
         INode inode = nodes[nodes.length - 1];
 
@@ -8677,7 +8673,7 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
-        INodesInPath inodesInPath = dir.getRootDir().getExistingPathINodes(path, false);
+        INodesInPath inodesInPath = dir.getINodesInPath(path, false);
         INode[] nodes = inodesInPath.getINodes();
         INode inode = nodes[nodes.length - 1];
         if (inode != null && inode.isSTOLocked()) {
@@ -9082,7 +9078,7 @@ public class FSNamesystem
   public INode getINode(String path)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
-    INodesInPath inodesInPath = dir.getExistingPathINodes(path);
+    INodesInPath inodesInPath = dir.getINodesInPath4Write(path);
     INode[] inodes = inodesInPath.getINodes();
     return inodes[inodes.length - 1];
   }
@@ -9450,15 +9446,14 @@ public class FSNamesystem
           public Object performTask() throws IOException {
             FSPermissionChecker pc = getPermissionChecker();
             if (isPermissionEnabled && !pc.isSuperUser()) {
-              pc.checkPermission(path, dir.getRootDir(), doCheckOwner,
+              pc.checkPermission(path, dir, doCheckOwner,
                   ancestorAccess, parentAccess, access, subAccess, true);
             }
 
             byte[][] pathComponents = INode.getPathComponents(path);
             boolean isDir = false;
             INode.DirCounts srcCounts = new INode.DirCounts();
-            INodeDirectory.INodesInPath dstInodesInPath = dir.getRootDir().getExistingPathINodes(pathComponents,
-                pathComponents.length, false);
+            INodesInPath dstInodesInPath = dir.getExistingPathINodes(pathComponents);
             final INode[] pathInodes = dstInodesInPath.getINodes();
 
             INodeAttributes quotaDirAttributes = null;
@@ -9490,7 +9485,7 @@ public class FSNamesystem
             }
 
             return new PathInformation(path, pathComponents,
-                pathInodes,dstInodesInPath.getCount(),isDir,
+                pathInodes,dstInodesInPath.getNumNonNull(),isDir,
                 srcCounts.getNsCount(), srcCounts.getDsCount(), quotaDirAttributes, acls);
           }
         };
