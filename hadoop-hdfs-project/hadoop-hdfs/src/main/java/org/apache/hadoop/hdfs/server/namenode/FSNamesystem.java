@@ -7301,6 +7301,8 @@ public class FSNamesystem
           }
           sb.append(trackingId);
         }
+        sb.append("\t").append("proto=");
+        sb.append(NamenodeWebHdfsMethods.isWebHdfsInvocation() ? "webhdfs" : "rpc");
         logAuditMessage(sb.toString());
       }
     }
