@@ -1086,6 +1086,12 @@ public class DFSTestUtil {
     return new DatanodeDescriptor(storageMap, dnId, rackLocation);
   }
 
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      String rackLocation, String hostname) {
+    return getDatanodeDescriptor(ipAddr, 
+        DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT, rackLocation, hostname);
+  }
+    
   public static DatanodeStorageInfo createDatanodeStorageInfo(
       String storageID, String ip) throws IOException {
     return createDatanodeStorageInfo(storageID, ip, "defaultRack", "host");

@@ -80,6 +80,7 @@ import static io.hops.transaction.lock.LockFactory.BLK;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
+import org.apache.hadoop.net.DNSToSwitchMappingWithDependency;
 import org.apache.hadoop.net.NetUtils;
 import static org.apache.hadoop.util.Time.now;
 
@@ -844,11 +845,14 @@ public class DatanodeManager {
       nodeS.setDisallowed(false); // Node is in the include list
 
       // resolve network location
-      if (this.rejectUnresolvedTopologyDN) {
-        nodeS.setNetworkLocation(resolveNetworkLocation(nodeS));
+      if(this.rejectUnresolvedTopologyDN) {
+          nodeS.setNetworkLocation(resolveNetworkLocation(nodeS));
+          nodeS.setDependentHostNames(getNetworkDependencies(nodeS));
       } else {
         nodeS.setNetworkLocation(
             resolveNetworkLocationWithFallBackToDefaultLocation(nodeS));
+        nodeS.setDependentHostNames(
+                getNetworkDependenciesWithDefault(nodeS));
       }
       getNetworkTopology().add(nodeS);
 
@@ -866,9 +870,12 @@ public class DatanodeManager {
     // resolve network location
     if (this.rejectUnresolvedTopologyDN) {
       nodeDescr.setNetworkLocation(resolveNetworkLocation(nodeDescr));
+      nodeDescr.setDependentHostNames(getNetworkDependencies(nodeDescr));
     } else {
       nodeDescr.setNetworkLocation(
           resolveNetworkLocationWithFallBackToDefaultLocation(nodeDescr));
+      nodeDescr.setDependentHostNames(
+              getNetworkDependenciesWithDefault(nodeDescr));
     }
     nodeDescr.setSoftwareVersion(nodeReg.getSoftwareVersion());
     addDatanode(nodeDescr);
@@ -1580,6 +1587,49 @@ public class DatanodeManager {
     return networkLocation;
   }
 
+    /**
+   * Resolve a node's dependencies in the network. If the DNS to switch 
+   * mapping fails then this method returns empty list of dependencies 
+   * @param node to get dependencies for
+   * @return List of dependent host names
+   */
+  private List<String> getNetworkDependenciesWithDefault(DatanodeInfo node) {
+    List<String> dependencies;
+    try {
+      dependencies = getNetworkDependencies(node);
+    } catch (UnresolvedTopologyException e) {
+      LOG.error("Unresolved dependency mapping for host " + 
+          node.getHostName() +". Continuing with an empty dependency list");
+      dependencies = Collections.emptyList();
+    }
+    return dependencies;
+  }
+  
+  /**
+   * Resolves a node's dependencies in the network. If the DNS to switch 
+   * mapping fails to get dependencies, then this method throws 
+   * UnresolvedTopologyException. 
+   * @param node to get dependencies for
+   * @return List of dependent host names 
+   * @throws UnresolvedTopologyException if the DNS to switch mapping fails
+   */
+  private List<String> getNetworkDependencies(DatanodeInfo node)
+      throws UnresolvedTopologyException {
+    List<String> dependencies = Collections.emptyList();
+    if (dnsToSwitchMapping instanceof DNSToSwitchMappingWithDependency) {
+      //Get dependencies
+      dependencies = 
+          ((DNSToSwitchMappingWithDependency)dnsToSwitchMapping).getDependency(
+              node.getHostName());
+      if(dependencies == null) {
+        LOG.error("The dependency call returned null for host " + 
+            node.getHostName());
+        throw new UnresolvedTopologyException("The dependency call returned " + 
+            "null for host " + node.getHostName());
+      }
+    }
+    return dependencies;
+  }
   /**
    * Resolve network locations for specified hosts
    *
