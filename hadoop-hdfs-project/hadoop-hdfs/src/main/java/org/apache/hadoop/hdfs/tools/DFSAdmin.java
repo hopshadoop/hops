@@ -58,6 +58,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -390,7 +391,7 @@ public class DFSAdmin extends FsShell {
    * @throws IOException
    *     if the filesystem does not exist.
    */
-  public void report() throws IOException {
+   public void report(String[] argv, int i) throws IOException {
     DistributedFileSystem dfs = getDFS();
     FsStatus ds = dfs.getStatus();
     long capacity = ds.getCapacity();
@@ -401,51 +402,75 @@ public class DFSAdmin extends FsShell {
     if (mode) {
       System.out.println("Safe mode is ON");
     }
-    System.out.println("Configured Capacity: " + capacity + " (" +
-        StringUtils.byteDesc(capacity) + ")");
-    System.out.println("Present Capacity: " + presentCapacity + " (" +
-        StringUtils.byteDesc(presentCapacity) + ")");
-    System.out.println(
-        "DFS Remaining: " + remaining + " (" + StringUtils.byteDesc(remaining) +
-            ")");
-    System.out
-        .println("DFS Used: " + used + " (" + StringUtils.byteDesc(used) + ")");
-    System.out.println("DFS Used%: " +
-        StringUtils.formatPercent(used / (double) presentCapacity, 2));
-      
-      /* These counts are not always upto date. They are updated after  
-       * iteration of an internal list. Should be updated in a few seconds to 
-       * minutes.
-       */
-    System.out.println(
-        "Under replicated blocks: " + dfs.getUnderReplicatedBlocksCount());
-    System.out.println(
-        "Blocks with corrupt replicas: " + dfs.getCorruptBlocksCount());
+    System.out.println("Configured Capacity: " + capacity
+        + " (" + StringUtils.byteDesc(capacity) + ")");
+    System.out.println("Present Capacity: " + presentCapacity
+        + " (" + StringUtils.byteDesc(presentCapacity) + ")");
+    System.out.println("DFS Remaining: " + remaining
+        + " (" + StringUtils.byteDesc(remaining) + ")");
+    System.out.println("DFS Used: " + used
+        + " (" + StringUtils.byteDesc(used) + ")");
+    System.out.println("DFS Used%: "
+        + StringUtils.formatPercent(used / (double) presentCapacity, 2));
+
+    /*
+     * These counts are not always upto date. They are updated after
+     * iteration of an internal list. Should be updated in a few seconds to
+     * minutes. Use "-metaSave" to list of all such blocks and accurate
+     * counts.
+     */
+    System.out.println("Under replicated blocks: " + dfs.getUnderReplicatedBlocksCount());
+    System.out.println("Blocks with corrupt replicas: " + dfs.getCorruptBlocksCount());
     System.out.println("Missing blocks: " + dfs.getMissingBlocksCount());
 
     System.out.println();
-
     System.out.println("-------------------------------------------------");
 
-    DatanodeInfo[] live = dfs.getDataNodeStats(DatanodeReportType.LIVE);
-    DatanodeInfo[] dead = dfs.getDataNodeStats(DatanodeReportType.DEAD);
-    System.out.println("Datanodes available: " + live.length +
-        " (" + (live.length + dead.length) + " total, " +
-        dead.length + " dead)\n");
+    // Parse arguments for filtering the node list
+    List<String> args = Arrays.asList(argv);
+    // Truncate already handled arguments before parsing report()-specific ones
+    args = new ArrayList<String>(args.subList(i, args.size()));
+    final boolean listLive = StringUtils.popOption("-live", args);
+    final boolean listDead = StringUtils.popOption("-dead", args);
+    final boolean listDecommissioning = StringUtils.popOption("-decommissioning", args);
+    // If no filter flags are found, then list all DN types
+    boolean listAll = (!listLive && !listDead && !listDecommissioning);
+    if (listAll || listLive) {
+      DatanodeInfo[] live = dfs.getDataNodeStats(DatanodeReportType.LIVE);
+      if (live.length > 0 || listLive) {
+        System.out.println("Live datanodes (" + live.length + "):\n");
+      }
+      if (live.length > 0) {
+        for (DatanodeInfo dn : live) {
+          System.out.println(dn.getDatanodeReport());
+          System.out.println();
+        }
+      }
 
-    if (live.length > 0) {
-      System.out.println("Live datanodes:");
-      for (DatanodeInfo dn : live) {
-        System.out.println(dn.getDatanodeReport());
-        System.out.println();
+    }
+    if (listAll || listDead) {
+      DatanodeInfo[] dead = dfs.getDataNodeStats(DatanodeReportType.DEAD);
+      if (dead.length > 0 || listDead) {
+        System.out.println("Dead datanodes (" + dead.length + "):\n");
+      }
+      if (dead.length > 0) {
+        for (DatanodeInfo dn : dead) {
+          System.out.println(dn.getDatanodeReport());
+          System.out.println();
+        }
       }
     }
-
-    if (dead.length > 0) {
-      System.out.println("Dead datanodes:");
-      for (DatanodeInfo dn : dead) {
-        System.out.println(dn.getDatanodeReport());
-        System.out.println();
+    if (listAll || listDecommissioning) {
+      DatanodeInfo[] decom = dfs.getDataNodeStats(DatanodeReportType.DECOMMISSIONING);
+      if (decom.length > 0 || listDecommissioning) {
+        System.out.println("Decommissioning datanodes (" + decom.length
+            + "):\n");
+      }
+      if (decom.length > 0) {
+        for (DatanodeInfo dn : decom) {
+          System.out.println(dn.getDatanodeReport());
+          System.out.println();
+        }
       }
     }
   }
@@ -590,7 +615,9 @@ public class DFSAdmin extends FsShell {
     String summary =
         "hadoop dfsadmin performs DFS administrative commands.\n" +
             "The full syntax is: \n\n" +
-            "hadoop dfsadmin [-report] [-safemode <enter | leave | get | wait>]\n" +
+            "hadoop dfsadmin\n" +
+            "\t[-report [-live] [-dead] [-decommissioning]]\n" +
+            "\t[-safemode <enter | leave | get | wait>]\n" +
             "\t[-refreshNodes]\n" +
             "\t[" + SetQuotaCommand.USAGE + "]\n" +
             "\t[" + ClearQuotaCommand.USAGE + "]\n" +
@@ -610,8 +637,9 @@ public class DFSAdmin extends FsShell {
             "\t[-getDatanodeInfo <datanode_host:ipc_port>\n" +
             "\t[-help [cmd]]\n";
 
-    String report =
-        "-report: \tReports basic filesystem information and statistics.\n";
+    String report ="-report [-live] [-dead] [-decommissioning]:\n" +
+      "\tReports basic filesystem information and statistics.\n" +
+      "\tOptional flags may be used to filter the list of displayed DNs.\n";
 
     String safemode =
         "-safemode <enter|leave|get|wait>:  Safe mode maintenance command.\n" +
@@ -897,7 +925,8 @@ public class DFSAdmin extends FsShell {
    */
   private static void printUsage(String cmd) {
     if ("-report".equals(cmd)) {
-      System.err.println("Usage: java DFSAdmin" + " [-report]");
+      System.err.println("Usage: java DFSAdmin"
+          + " [-report] [-live] [-dead] [-decommissioning]");
     } else if ("-safemode".equals(cmd)) {
       System.err.println(
           "Usage: java DFSAdmin" + " [-safemode enter | leave | get | wait]");
@@ -997,7 +1026,7 @@ public class DFSAdmin extends FsShell {
         return exitCode;
       }
     } else if ("-report".equals(cmd)) {
-      if (argv.length != 1) {
+      if (argv.length < 1) {
         printUsage(cmd);
         return exitCode;
       }
@@ -1074,7 +1103,7 @@ public class DFSAdmin extends FsShell {
     exitCode = 0;
     try {
       if ("-report".equals(cmd)) {
-        report();
+        report(argv, i);
       } else if ("-safemode".equals(cmd)) {
         setSafeMode(argv, i);
       } else if ("-refreshNodes".equals(cmd)) {
