@@ -698,6 +698,13 @@ public class MiniDFSCluster {
       }
 
       if (formatThisOne) {
+        // Allow overriding clusterID for specific NNs to test
+        // misconfiguration.
+        if (nn.getClusterId() == null) {
+          StartupOption.FORMAT.setClusterId(clusterId);
+        } else {
+          StartupOption.FORMAT.setClusterId(nn.getClusterId());
+        }
         DFSTestUtil.formatNameNode(conf);
       }
     }

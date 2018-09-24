@@ -242,6 +242,10 @@ class BPOfferService implements Runnable {
     }
   }
 
+  boolean hasBlockPoolId() {
+    return getNamespaceInfo() != null;
+  }
+    
   synchronized NamespaceInfo getNamespaceInfo() {
     return bpNSInfo;
   }
@@ -1010,7 +1014,7 @@ public class IncrementalBRTask implements Callable{
     ActiveNode an = nextNNForBlkReport(totalBlockCount);
     if (an != null) {
       blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
-      if (blkReportHander == null || !blkReportHander.isInitialized()) {
+      if (blkReportHander == null || !blkReportHander.isRunning()) {
         return null; //no one is ready to handle the request, return now without changing the values of lastBlockReport. it will be retried in next cycle
       }
     } else {
@@ -1098,7 +1102,7 @@ public class IncrementalBRTask implements Callable{
         ActiveNode an = nextNNForCacheReport(blockIds.size());
         if (an != null) {
           blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
-          if (blkReportHander == null || !blkReportHander.isInitialized()) {
+          if (blkReportHander == null || !blkReportHander.isRunning()) {
             return null; //no one is ready to handle the request, return now without changing the values of lastBlockReport. it will be retried in next cycle
           }
         } else {
@@ -1487,4 +1491,18 @@ public class IncrementalBRTask implements Callable{
       return (pendingIncrementalBR.remove(blockInfo.getBlock().getBlockId()) != null);
     }
   }
+  
+  /*
+   * Let the actor retry for initialization until all namenodes of cluster have
+   * failed.
+   */
+  boolean shouldRetryInit() {
+    if (hasBlockPoolId()) {
+      // One of the namenode registered successfully. lets continue retry for
+      // other.
+      return true;
+    }
+    return isAlive();
+  }
+  
 }
