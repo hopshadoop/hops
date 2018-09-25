@@ -387,11 +387,10 @@ required DatanodeRegistrationProto registration = 2;
 }
 
 /**
-* getting a name node address from the leader to send cache report
-*/
-message NameNodeAddressRequestForCacheReportingProto {
-required uint64 noOfBlks = 1;
-required DatanodeRegistrationProto registration = 2;
+ * void request
+ */
+message BlockReportCompletedRequestProto {
+required DatanodeRegistrationProto registration = 1;
 }
 
 message GetSmallFileDataProto {
@@ -400,6 +399,9 @@ message GetSmallFileDataProto {
 
 message SmallFileDataResponseProto{
     required bytes data = 1;
+}
+
+message BlockReportCompletedResponseProto{
 }
 
 /**
@@ -468,9 +470,9 @@ service DatanodeProtocolService {
   rpc getNextNamenodeToSendBlockReport (NameNodeAddressRequestForBlockReportingProto) returns (hadoop.common.ActiveNodeProto);
 
   /**
-   * Ask the leader which namenode the datanode should cache report to.
+   * Request leader NN to mark the block report completed.
    */
-  rpc getNextNamenodeToSendCacheReport (NameNodeAddressRequestForCacheReportingProto) returns (hadoop.common.ActiveNodeProto);
+  rpc blockReportCompleted (BlockReportCompletedRequestProto) returns (BlockReportCompletedResponseProto);
 
   /**
   * Ask a namenode to read the small file data

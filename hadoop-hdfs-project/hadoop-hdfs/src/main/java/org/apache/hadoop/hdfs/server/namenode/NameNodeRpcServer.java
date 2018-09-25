@@ -1154,13 +1154,12 @@ class NameNodeRpcServer implements NamenodeProtocols {
     verifyRequest(nodeReg);
     return nn.getNextNamenodeToSendBlockReport(noOfBlks, nodeReg);
   }
-  
+
   @Override
-  public ActiveNode getNextNamenodeToSendCacheReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException {
-    verifyRequest(nodeReg);
-    return nn.getNextNamenodeToSendCacheReport(noOfBlks, nodeReg);
+  public void blockReportCompleted(DatanodeRegistration nodeReg) throws IOException {
+    nn.blockReportCompleted(nodeReg);
   }
-  
+
   @Override
   public void ping() throws IOException {
   }
