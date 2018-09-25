@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.hops.security.Users;
 import io.hops.exception.StorageException;
 import io.hops.leaderElection.HdfsLeDescriptorFactory;
 import io.hops.leaderElection.LeaderElection;
@@ -25,6 +24,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
+import io.hops.security.Users;
 import io.hops.transaction.handler.RequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -39,19 +39,25 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.server.blockmanagement.BRLoadBalancingNonLeaderException;
 import org.apache.hadoop.hdfs.server.blockmanagement.BRTrackingService;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.RollingUpgradeStartupOption;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
-import org.apache.hadoop.hdfs.server.datanode.BRLoadBalancingException;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
+import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMetrics;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.SecurityUtil;
@@ -62,7 +68,9 @@ import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.util.ExitUtil.ExitException;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 
+import javax.management.ObjectName;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
@@ -71,21 +79,9 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import javax.management.ObjectName;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_DEFAULT_NAME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
-import org.apache.hadoop.hdfs.server.datanode.CRLoadBalancingException;
-import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
-import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMetrics;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.metrics2.util.MBeans;
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import org.apache.hadoop.util.Time;
 
 /**
  * ********************************************************
@@ -180,7 +176,7 @@ public class NameNode implements NameNodeStatusMXBean {
           //StartupOption.BOOTSTRAPSTANDBY.getName() + "] | [" +
           //StartupOption.RECOVER.getName() + " [ " +
           //StartupOption.FORCE.getName() + " ] ] | [ "+
-          StartupOption.SET_BLOCK_REPORT_PROCESS_SIZE.getName() + " noOfBlks ] | [" +
+          StartupOption.NO_OF_CONCURRENT_BLOCK_REPORTS.getName() + " concurrentBlockReports ] | [" +
           StartupOption.FORMAT_ALL.getName() + " ] | [" +
           StartupOption.DROP_AND_CREATE_DB.getName() + "]" ;
 
@@ -249,11 +245,6 @@ public class NameNode implements NameNodeStatusMXBean {
   private MDCleaner mdCleaner;
   private long stoTableCleanDelay = 0;
 
-  /**
-   * for cache report load balancing
-   */
-  private BRTrackingService crTrackingService;
-  
   private ObjectName nameNodeStatusBeanName;
   /**
    * The service name of the delegation token issued by the namenode. It is
@@ -531,18 +522,18 @@ public class NameNode implements NameNodeStatusMXBean {
     RequestHandler.setRetryBaseWaitTime(baseWaitTime);
     RequestHandler.setRetryCount(retryCount);
 
-    this.brTrackingService = new BRTrackingService(conf.getLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD,
-            DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT),
-            conf.getLong(DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE,
-                    DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE_DEFAULT));
+    final long updateThreshold = conf.getLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD,
+            DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT);
+    final long  maxConcurrentBRs = conf.getLong( DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS,
+            DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS_DEFAULT);
+    final long brMaxProcessingTime = conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME,
+            DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME_DEFAULT);
+     this.brTrackingService = new BRTrackingService(updateThreshold, maxConcurrentBRs,
+             brMaxProcessingTime);
     this.mdCleaner = MDCleaner.getInstance();
-    this.stoTableCleanDelay = conf.getLong(DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY,
+    this.stoTableCleanDelay = conf.getLong(
+            DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY,
             DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_DEFAULT);
-
-    this.crTrackingService = new BRTrackingService(conf.getLong(DFSConfigKeys.DFS_CR_LB_DB_VAR_UPDATE_THRESHOLD,
-            DFSConfigKeys.DFS_CR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT),
-            conf.getLong(DFSConfigKeys.DFS_CR_LB_TIME_WINDOW_SIZE,
-                    DFSConfigKeys.DFS_CR_LB_TIME_WINDOW_SIZE_DEFAULT));
 
     String fsOwnerShortUserName = UserGroupInformation.getCurrentUser()
         .getShortUserName();
@@ -569,6 +560,12 @@ public class NameNode implements NameNodeStatusMXBean {
     httpServer.setNameNodeAddress(getNameNodeAddress());
 
     startCommonServices(conf);
+
+    if(isLeader()){ //if the newly started namenode is the leader then it means
+      //that is cluster was restarted and we can reset the number of default
+      // concurrent block reports
+      HdfsVariables.setMaxConcurrentBrs(maxConcurrentBRs);
+    }
   }
 
   /**
@@ -932,27 +929,26 @@ public class NameNode implements NameNodeStatusMXBean {
     StartupOption startOpt = StartupOption.REGULAR;
     for (int i = 0; i < argsLen; i++) {
       String cmd = args[i];
-      if (StartupOption.SET_BLOCK_REPORT_PROCESS_SIZE.getName().equalsIgnoreCase(cmd)) {
-        startOpt = StartupOption.SET_BLOCK_REPORT_PROCESS_SIZE;
-        String msg = "Specify a maximum number of blocks that the NameNodes can process for block reporting.";
+      if (StartupOption.NO_OF_CONCURRENT_BLOCK_REPORTS.getName().equalsIgnoreCase(cmd)) {
+        startOpt = StartupOption.NO_OF_CONCURRENT_BLOCK_REPORTS;
+        String msg = "Specify a maximum number of concurrent blocks that the NameNodes can process.";
             if ((i + 1) >= argsLen) {
               // if no of blks not specified then return null
-              
               LOG.fatal(msg);
               return null;
             }
             // Make sure an id is specified and not another flag
-            long noOfBlks = 0;
+            long maxBRs = 0;
             try{
-              noOfBlks = Long.parseLong(args[i+1]);
-              if(noOfBlks < 100000){
-                LOG.fatal("The number should be >= 100K. ");
+              maxBRs = Long.parseLong(args[i+1]);
+              if(maxBRs < 1){
+                LOG.fatal("The number should be >= 1.");
               return null;
               }
             }catch(NumberFormatException e){
               return null;
             }
-            startOpt.setMaxBlkRptProcessSize(noOfBlks);
+            startOpt.setMaxConcurrentBlkReports(maxBRs);
             return startOpt;
       }
       
@@ -1087,9 +1083,10 @@ public class NameNode implements NameNodeStatusMXBean {
         dropAndCreateDB(conf);
         return null;
       }
-      case SET_BLOCK_REPORT_PROCESS_SIZE:
-        HdfsVariables.setBrLbMasBlkPerMin(startOpt.getMaxBlkRptProcessSize());
-        LOG.info("Set block processing size to "+startOpt.getMaxBlkRptProcessSize());
+      case NO_OF_CONCURRENT_BLOCK_REPORTS:
+        HdfsVariables.setMaxConcurrentBrs(startOpt.getMaxConcurrentBlkReports());
+        LOG.info("Setting concurrent block reports processing to "+startOpt
+                .getMaxConcurrentBlkReports());
         return null;
       case FORMAT: {
         boolean aborted = formatHdfs(conf, startOpt.getForceFormat(),
@@ -1256,47 +1253,30 @@ public class NameNode implements NameNodeStatusMXBean {
       DatanodeDescriptor node = namesystem.getBlockManager().getDatanodeManager().getDatanode(nodeID);
       if (node == null || !node.isAlive) {
         throw new IOException(
-            "ProcessReport from dead or unregistered node: " + nodeID);
+            "ProcessReport from dead or unregistered node: " + nodeID+ ". "
+                    + (node != null ? ("The node is alive : " + node.isAlive) : "The node is null "));
       }
-      LOG.debug("NN Id: " + leaderElection.getCurrentId() + ") Received request to assign block report work ("
-          + noOfBlks + " blks) ");
-      ActiveNode an = brTrackingService.assignWork(leaderElection.getActiveNamenodes(), noOfBlks);
+      LOG.debug("NN Id: " + leaderElection.getCurrentId() + ") Received request to assign" +
+              " block report work ("+ noOfBlks + " blks) ");
+      ActiveNode an = brTrackingService.assignWork(leaderElection.getActiveNamenodes(),
+              nodeID.getXferAddr(), noOfBlks);
       return an;
     } else {
-      String msg = "NN Id: " + leaderElection.getCurrentId() + ") Received request to assign work (" + noOfBlks
-          + " blks). Returning null as I am not the leader NN";
+      String msg = "NN Id: " + leaderElection.getCurrentId() + ") Received request to assign" +
+              " work (" + noOfBlks + " blks). Returning null as I am not the leader NN";
       LOG.debug(msg);
-      throw new BRLoadBalancingException(msg);
+      throw new BRLoadBalancingNonLeaderException(msg);
     }
   }
 
-  public ActiveNode getNextNamenodeToSendCacheReport(final long noOfBlks, DatanodeID nodeID) throws IOException {
-    if (leaderElection.isLeader()) {
-      DatanodeDescriptor node = namesystem.getBlockManager().getDatanodeManager().getDatanode(nodeID);
-      if (node == null || !node.isAlive) {
-        throw new IOException(
-            "ProcessReport from dead or unregistered node: " + nodeID);
-      }
-      LOG.debug("NN Id: " + leaderElection.getCurrentId() + ") Received request to assign cache report work ("
-          + noOfBlks + " blks) ");
-      ActiveNode an = crTrackingService.assignWork(leaderElection.getActiveNamenodes(), noOfBlks);
-      return an;
-    } else {
-      String msg = "NN Id: " + leaderElection.getCurrentId() + ") Received request to assign work (" + noOfBlks
-          + " blks). Returning null as I am not the leader NN";
-      LOG.debug(msg);
-      throw new CRLoadBalancingException(msg);
-    }
+  public void blockReportCompleted(final DatanodeID nodeID) throws
+          IOException {
+    brTrackingService.blockReportCompleted(nodeID.getXferAddr());
   }
-  
+
   private static void dropAndCreateDB(Configuration conf) throws IOException {
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.getConnector().dropAndRecreateDB();
-  }
-
-  public boolean isNameNodeAlive(long namenodeId) {
-    List<ActiveNode> activeNamenodes = getActiveNameNodes().getActiveNodes();
-    return isNameNodeAlive(activeNamenodes, namenodeId);
   }
 
   public static boolean isNameNodeAlive(Collection<ActiveNode> activeNamenodes,

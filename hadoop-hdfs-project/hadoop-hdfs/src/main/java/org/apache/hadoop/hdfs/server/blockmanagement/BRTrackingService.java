@@ -17,118 +17,163 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
+
 import java.io.IOException;
 import java.util.*;
 
+import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
+import io.hops.metadata.hdfs.dal.ActiveBlockReportsDataAccess;
+import io.hops.metadata.hdfs.entity.ActiveBlockReport;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hdfs.server.datanode.BRLoadBalancingException;
 
 public class BRTrackingService {
 
-  private class Work {
-
-    private final long startTime;
-    private final long noOfBlks;
-    private final long nnId;
-
-    public Work(final long startTime, final long noOfBlks, final long nnId) {
-      this.startTime = startTime;
-      this.noOfBlks = noOfBlks;
-      this.nnId = nnId;
-    }
-
-    public long getStartTime() {
-      return startTime;
-    }
-
-    public long getNoOfBlks() {
-      return noOfBlks;
-    }
-
-    public long getNNId() { return nnId; }
-  }
-
-  private List workHistory = new LinkedList<Work>();
-
   public static final Log LOG = LogFactory.getLog(BRTrackingService.class);
   private final long DB_VAR_UPDATE_THRESHOLD;
-  private final long BR_LB_TIME_WINDOW_SIZE;
+  private final long BR_MAX_PROCESSING_TIME;
   private int rrIndex = 0; // for round robin allocation
 
 
-  public BRTrackingService(final long DB_VAR_UPDATE_THRESHOLD, final long BR_LB_TIME_WINDOW_SIZE) {
-    workHistory = new LinkedList<Work>();
+  public BRTrackingService(final long DB_VAR_UPDATE_THRESHOLD,
+                           final long MAX_CONCURRENT_BRS,
+                           final long BR_MAX_PROCESSING_TIME) {
     this.DB_VAR_UPDATE_THRESHOLD = DB_VAR_UPDATE_THRESHOLD;
-    this.BR_LB_TIME_WINDOW_SIZE = BR_LB_TIME_WINDOW_SIZE;
+    this.BR_MAX_PROCESSING_TIME = BR_MAX_PROCESSING_TIME;
+    this.cachedMaxConcurrentBRs = MAX_CONCURRENT_BRS;
   }
 
-  private int getRRIndex(final SortedActiveNodeList nnList){
-      if(rrIndex < 0 || rrIndex >= nnList.size()){
-          rrIndex = 0;
-      }
-      return (rrIndex++)%nnList.size();
+  private int getRRIndex(final SortedActiveNodeList nnList) {
+    if (rrIndex < 0 || rrIndex >= nnList.size()) {
+      rrIndex = 0;
+    }
+    return (rrIndex++) % nnList.size();
   }
 
-  private boolean canProcessMoreBR(long noOfBlks) throws IOException {
-    //first remove the old history
-    long timePoint = (System.currentTimeMillis() - BR_LB_TIME_WINDOW_SIZE);
+  private boolean canProcessMoreBR() throws IOException {
 
-    if (workHistory.size() > 0) {
-      for (int i = workHistory.size() - 1; i >= 0; i--) {
-        Work work = (Work) workHistory.get(i);
-        if (work.getStartTime() <=  timePoint) {
-          workHistory.remove(i);
-          LOG.debug("Removing ("+work.getNoOfBlks()+" blks) from history. It was assigned to NN: "+work.getNNId());
-        }
-      }
-    }
+    List<ActiveBlockReport> allActiveBRs = getAllActiveBlockReports();
 
-    long ongoingWork = 0;
-    if (workHistory.size() > 0) {
-      for (int i = workHistory.size() - 1; i >= 0; i--) {
-        Work work = (Work) workHistory.get(i);
-        ongoingWork += work.getNoOfBlks();
-      }
-    }
-
-    LOG.debug("Currently processing at "+ongoingWork+" blks /"+(BR_LB_TIME_WINDOW_SIZE/(double)1000)+" sec");
-    if ((ongoingWork + noOfBlks) > getBrLbMaxBlkPerTW(DB_VAR_UPDATE_THRESHOLD)) {
-      LOG.info("Work ("+noOfBlks+" blks) can not be assigned, ongoing work: " + ongoingWork);
-      return false;
-    } else {
+    if (allActiveBRs.size() < getBrLbMaxConcurrentBRs()) {
       return true;
+    }
+
+    //remove dead operations from the table
+    Iterator<ActiveBlockReport> itr = allActiveBRs.iterator();
+    while (itr.hasNext()) {
+      ActiveBlockReport abr = itr.next();
+      if ((System.currentTimeMillis() - abr.getStartTime()) > BR_MAX_PROCESSING_TIME) {
+        //remove
+        removeActiveBlockReport(abr);
+        itr.remove();
+      }
+    }
+
+    if (allActiveBRs.size() < getBrLbMaxConcurrentBRs()) {
+      return true;
+    } else {
+      return false;
     }
   }
 
   private long lastChecked = 0;
-  private long cachedBrLbMaxBlkPerTW = -1;
-  private long getBrLbMaxBlkPerTW(long DB_VAR_UPDATE_THRESHOLD) throws IOException {
+  private long cachedMaxConcurrentBRs = 0;
+  private long getBrLbMaxConcurrentBRs() throws IOException {
     if ((System.currentTimeMillis() - lastChecked) > DB_VAR_UPDATE_THRESHOLD) {
-      long newValue = HdfsVariables.getBrLbMaxBlkPerTW();
-      if(newValue != cachedBrLbMaxBlkPerTW){
-        cachedBrLbMaxBlkPerTW = newValue;
-        LOG.info("BRTrackingService. Processing "+cachedBrLbMaxBlkPerTW
-                +" per time window");
+      long value = HdfsVariables.getMaxConcurrentBrs();
+      if (value != cachedMaxConcurrentBRs) {
+        cachedMaxConcurrentBRs = value;
+        LOG.info("BRTrackingService param update. Processing " + cachedMaxConcurrentBRs + " " +
+                "concurrent block reports");
       }
       lastChecked = System.currentTimeMillis();
     }
-    return cachedBrLbMaxBlkPerTW;
+    return cachedMaxConcurrentBRs;
   }
 
-  public synchronized ActiveNode assignWork(final SortedActiveNodeList nnList, long noOfBlks) throws IOException {
-    if(canProcessMoreBR(noOfBlks)){
+  public synchronized ActiveNode assignWork(final SortedActiveNodeList nnList,
+                                           String dnAddress, long noOfBlks) throws IOException {
+    if (canProcessMoreBR()) {
       int index = getRRIndex(nnList);
-      if(index >= 0 && index < nnList.size()){
+      if (index >= 0 && index < nnList.size()) {
         ActiveNode an = nnList.getSortedActiveNodes().get(index);
-        Work work  = new Work(System.currentTimeMillis(),noOfBlks,an.getId());
-        workHistory.add(work);
-        LOG.info("Work ("+noOfBlks+" blks)  assigned to NN: "+an.getId());
+        ActiveBlockReport abr = new ActiveBlockReport(dnAddress, an.getId(),
+                System.currentTimeMillis(), noOfBlks);
+        addActiveBlockReport(abr);
+        LOG.info("Block report from "+dnAddress+" comtaining " + noOfBlks + " blocks " +
+                "is assigned to NN: " + an.getId());
         return an;
       }
     }
-    throw new BRLoadBalancingException("Work ("+noOfBlks+" blks) could not be assigned. System is fully loaded now. At most "+getBrLbMaxBlkPerTW(
-            DB_VAR_UPDATE_THRESHOLD )+" blocks can be processed per "+BR_LB_TIME_WINDOW_SIZE);
+    String msg = "Work (" + noOfBlks + " blks) could not be assigned. " +
+            "System is fully loaded now. At most " + getBrLbMaxConcurrentBRs()
+            + " concurrent block reports can be processed.";
+    LOG.info(msg);
+    throw new BRLoadBalancingOverloadException(msg);
+  }
+
+
+  public synchronized void blockReportCompleted( String dnAddress) throws IOException {
+    ActiveBlockReport abr = new ActiveBlockReport(dnAddress, 0, 0, 0);
+    LOG.info("Block report from "+dnAddress+" has completed");
+    removeActiveBlockReport(abr);
+  }
+
+  private int getActiveBlockReportsCount() throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(HDFSOperationType
+            .BR_LB_GET_COUNT) {
+      @Override
+      public Object performTask() throws IOException {
+        ActiveBlockReportsDataAccess da = (ActiveBlockReportsDataAccess) HdfsStorageFactory
+                .getDataAccess(ActiveBlockReportsDataAccess.class);
+        return da.countActiveRports();
+      }
+    };
+    return (int) handler.handle();
+  }
+
+  private List<ActiveBlockReport> getAllActiveBlockReports() throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(HDFSOperationType
+            .BR_LB_GET_ALL) {
+      @Override
+      public Object performTask() throws IOException {
+        ActiveBlockReportsDataAccess da = (ActiveBlockReportsDataAccess) HdfsStorageFactory
+                .getDataAccess(ActiveBlockReportsDataAccess.class);
+        return da.getAll();
+      }
+    };
+    return (List<ActiveBlockReport>) handler.handle();
+  }
+
+
+  private void addActiveBlockReport(final ActiveBlockReport abr) throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(HDFSOperationType
+            .BR_LB_ADD) {
+      @Override
+      public Object performTask() throws IOException {
+        ActiveBlockReportsDataAccess da = (ActiveBlockReportsDataAccess) HdfsStorageFactory
+                .getDataAccess(ActiveBlockReportsDataAccess.class);
+        da.addActiveReport(abr);
+        return null;
+      }
+    };
+    handler.handle();
+  }
+
+  private void removeActiveBlockReport(final ActiveBlockReport abr) throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(HDFSOperationType
+            .BR_LB_REMOVE) {
+      @Override
+      public Object performTask() throws IOException {
+        ActiveBlockReportsDataAccess da = (ActiveBlockReportsDataAccess) HdfsStorageFactory
+                .getDataAccess(ActiveBlockReportsDataAccess.class);
+        da.removeActiveReport(abr);
+        return null;
+      }
+    };
+    handler.handle();
   }
 }

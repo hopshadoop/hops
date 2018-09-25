@@ -41,7 +41,6 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ErrorReportR
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.HeartbeatRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.HeartbeatResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.NameNodeAddressRequestForBlockReportingProto;
-import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.NameNodeAddressRequestForCacheReportingProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ReceivedDeletedBlockInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.RegisterDatanodeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.RegisterDatanodeResponseProto;
@@ -317,21 +316,18 @@ public class DatanodeProtocolServerSideTranslatorPB
   }
 
   @Override
-  public ActiveNodeProtos.ActiveNodeProto getNextNamenodeToSendCacheReport(
-      RpcController controller,
-      NameNodeAddressRequestForCacheReportingProto request)
-      throws ServiceException {
+  public DatanodeProtocolProtos.BlockReportCompletedResponseProto blockReportCompleted(RpcController controller, DatanodeProtocolProtos.BlockReportCompletedRequestProto request) throws ServiceException {
     try {
-      ActiveNode response = impl.getNextNamenodeToSendCacheReport(request.getNoOfBlks(), PBHelper.convert(request.
-          getRegistration()));
-      ActiveNodeProtos.ActiveNodeProto responseProto =
-          PBHelper.convert(response);
-      return responseProto;
+      impl.blockReportCompleted(PBHelper.convert(request.getRegistration()));
+
+      DatanodeProtocolProtos.BlockReportCompletedResponseProto.Builder response =
+              DatanodeProtocolProtos.BlockReportCompletedResponseProto.newBuilder();
+     return response.build();
     } catch (IOException e) {
       throw new ServiceException(e);
     }
   }
-  
+
   @Override
   public DatanodeProtocolProtos.SmallFileDataResponseProto getSmallFileData(RpcController controller, DatanodeProtocolProtos.GetSmallFileDataProto request) throws ServiceException {
     try{

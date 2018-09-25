@@ -35,6 +35,8 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdfs.server.blockmanagement.BRLoadBalancingNonLeaderException;
+import org.apache.hadoop.hdfs.server.blockmanagement.BRLoadBalancingOverloadException;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.BalancerBandwidthCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
@@ -57,8 +59,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -66,8 +66,6 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
-
-import static org.apache.hadoop.util.Time.now;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -157,6 +155,8 @@ class BPOfferService implements Runnable {
       pendingIncrementalBRperStorage = Maps.newHashMap();
 
   private Thread blockReportThread = null;
+
+  private Random rand = new Random(System.currentTimeMillis());
 
 
   BPOfferService(List<InetSocketAddress> nnAddrs, DataNode dn) {
@@ -816,11 +816,15 @@ class BPOfferService implements Runnable {
     public Object call() throws Exception {
       List<DatanodeCommand> cmds = blockReport();
 
-      if(cmds != null && blkReportHander != null) { //it is not null if the block report is
-        // successful
+      boolean brFailed = false;
+      if(cmds != null && blkReportHander != null) { //it is not null if the block report is successful
         blkReportHander.processCommand(cmds == null ? null : cmds.toArray(new DatanodeCommand[cmds.size()]));
       }
-      
+
+      if(cmds == null) { // BR failed
+        brFailed = true;
+      }
+
       DatanodeCommand cmd = cacheReport(cmds!=null);
       if (cmd != null && blkReportHander != null) {
         blkReportHander.processCommand(new DatanodeCommand[]{cmd});
@@ -831,6 +835,11 @@ class BPOfferService implements Runnable {
       if (dn.blockScanner != null) {
         dn.blockScanner.addBlockPool(getBlockPoolId());
       }
+
+      if (brFailed){
+        Thread.sleep(2000); //sleep before retrying to send the block report
+      }
+
       return null;
     }
   }
@@ -907,7 +916,7 @@ public class IncrementalBRTask implements Callable{
 
   /**
    * Retrieve the incremental BR state for a given storage UUID
-   * @param storageUuid
+   * @param storage
    * @return
    */
   private PerStoragePendingIncrementalBR getIncrementalBRMapForStorage(
@@ -929,7 +938,7 @@ public class IncrementalBRTask implements Callable{
    *
    * Caller must synchronize access using pendingIncrementalBRperStorage.
    * @param bInfo
-   * @param storageUuid
+   * @param storage
    */
   boolean addPendingReplicationBlockInfo(ReceivedDeletedBlockInfo bInfo,
       DatanodeStorage storage) {
@@ -1045,6 +1054,10 @@ public class IncrementalBRTask implements Callable{
         }
       }
     }
+
+    LOG.info("Block report completed");
+    getLeaderActor().blockReportCompleted(bpRegistration);
+
     // Log the block report processing stats from Datanode perspective
     long brSendCost = now() - brSendStartTime;
     long brCreateCost = brSendStartTime - brCreateStartTime;
@@ -1097,15 +1110,14 @@ public class IncrementalBRTask implements Callable{
       List<Long> blockIds = dn.getFSDataset().getCacheReport(bpid);
       long createTime = Time.monotonicNow();
 
-      // Get a namenode to send the report(s) to (if we did a block report we send to the same node)
       if (!hasHandler) {
-        ActiveNode an = nextNNForCacheReport(blockIds.size());
-        if (an != null) {
+        if(!nnList.isEmpty()){
+          ActiveNode an = nnList.get(rand.nextInt(nnList.size()));
           blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
           if (blkReportHander == null || !blkReportHander.isRunning()) {
             return null; //no one is ready to handle the request, return now without changing the values of lastBlockReport. it will be retried in next cycle
           }
-        } else {
+        }else {
           LOG.warn("Unable to send cache report");
           return null;
         }
@@ -1193,14 +1205,14 @@ public class IncrementalBRTask implements Callable{
   }
 
 
-  long lastupdate = System.currentTimeMillis();
-  synchronized boolean canUpdateNNList(InetSocketAddress address) {
+  long nnListLastUpdate = System.currentTimeMillis();
+  synchronized boolean canUpdateNNList() {
     if (nnList == null || nnList.size() == 0) {
       return true; // for edge case, any one can update. after that actors will take trun in updating the nnlist
     }
 
-    if( (System.currentTimeMillis() - lastupdate ) > 2000 ){
-      lastupdate = System.currentTimeMillis();
+    if( (System.currentTimeMillis() - nnListLastUpdate ) > 5000 ){
+      nnListLastUpdate = System.currentTimeMillis();
       return  true;
     }else{
         return false;
@@ -1370,8 +1382,15 @@ public class IncrementalBRTask implements Callable{
       try {
         annToBR = leaderActor.nextNNForBlkReport(noOfBlks, bpRegistration);
       } catch (RemoteException e) {
-        if (e.getClassName().equals(BRLoadBalancingException.class.getName())) {
+        if (e.getClassName().equals(BRLoadBalancingNonLeaderException.class.getName())
+                || e.getClassName().equals(BRLoadBalancingOverloadException.class.getName())) {
           LOG.warn(e);
+
+          if(e.getClassName().equals(BRLoadBalancingNonLeaderException.class.getName())){
+            //refresh list of active namenodes
+            nnListLastUpdate = 0; //This will trigger nnList update
+          }
+
         } else {
           throw e;
         }
@@ -1380,27 +1399,6 @@ public class IncrementalBRTask implements Callable{
     return annToBR;
   }
 
-  private ActiveNode nextNNForCacheReport(long noOfBlks) throws IOException {
-    if (nnList == null || nnList.isEmpty()) {
-      return null;
-    }
-
-    ActiveNode annToBR = null;
-    BPServiceActor leaderActor = getLeaderActor();
-    if (leaderActor != null) {
-      try {
-        annToBR = leaderActor.nextNNForCacheReport(noOfBlks, bpRegistration);
-      } catch (RemoteException e) {
-        if (e.getClassName().equals(CRLoadBalancingException.class.getName())) {
-          LOG.warn(e);
-        } else {
-          throw e;
-        }
-      }
-    }
-    return annToBR;
-  }
-  
   private BPServiceActor getLeaderActor() {
     if (nnList.size() > 0) {
       ActiveNode leaderNode = null;

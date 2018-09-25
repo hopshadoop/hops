@@ -298,15 +298,15 @@ public class HdfsVariables {
     }.handle();
   }
   
-  public static void setBrLbMasBlkPerMin(final long value) throws IOException {
-    new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_BLKS_PER_TW) {
+  public static void setMaxConcurrentBrs(final long value) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_CONCURRENT_BRS) {
       @Override
       public Object performTask() throws IOException {
         return handleVariableWithWriteLock(new Handler() {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            vd.setVariable(new LongVariable(Variable.Finder.BrLbMaxBlkPerTW, value));
+            vd.setVariable(new LongVariable(Variable.Finder.BrLbMaxConcurrentBRs, value));
             LOG.debug("Set block report max blocks per time window is : "+ value);
             return null;
           }
@@ -315,9 +315,9 @@ public class HdfsVariables {
     }.handle();
   }
 
-  public static long getBrLbMaxBlkPerTW() throws IOException {
+  public static long getMaxConcurrentBrs() throws IOException {
     return (Long) new LightWeightRequestHandler(
-            HDFSOperationType.GET_BR_LB_MAX_BLKS_PER_TW) {
+            HDFSOperationType.GET_BR_LB_MAX_CONCURRENT_BRS) {
       @Override
       public Object performTask() throws IOException {
         return handleVariableWithReadLock(new Handler() {
@@ -325,7 +325,7 @@ public class HdfsVariables {
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
             LongVariable var =
-                (LongVariable) vd.getVariable(Variable.Finder.BrLbMaxBlkPerTW);
+                (LongVariable) vd.getVariable(Variable.Finder.BrLbMaxConcurrentBRs);
             return var.getValue();
           }
         });
@@ -707,9 +707,9 @@ public class HdfsVariables {
         new IntVariable(-1).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.QuotaUpdateID,
         new IntVariable(0).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxBlkPerTW,
-            new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW,
-                    DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW_DEFAULT)).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxConcurrentBRs,
+            new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS,
+                    DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS_DEFAULT)).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.CacheDirectiveID,
         new LongVariable(1).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.NeedRescan,

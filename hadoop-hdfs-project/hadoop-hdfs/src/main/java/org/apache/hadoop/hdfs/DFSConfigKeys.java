@@ -268,26 +268,20 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.erasure_coding.deletion_limit";
   public static final int DEFAULT_DELETION_LIMIT = 100;
 
-  public static final String DFS_BR_LB_MAX_BLK_PER_TW =
-          "dfs.block.report.load.balancing.max.blks.per.time.window";
-  public static final long DFS_BR_LB_MAX_BLK_PER_TW_DEFAULT = 1000000;
-  
-  public static final String DFS_BR_LB_TIME_WINDOW_SIZE =
-          "dfs.block.report.load.balancing.time.window.size";
-  public static final long DFS_BR_LB_TIME_WINDOW_SIZE_DEFAULT = 60*1000; //1 min
-  
+  public static final String DFS_BR_LB_MAX_CONCURRENT_BRS =
+          "dfs.block.report.load.balancer.max.concurrent.block.reports";
+  public static final long DFS_BR_LB_MAX_CONCURRENT_BRS_DEFAULT = 5;
+
+  //read the new value from the data base after every minute
   public static final String DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD =
           "dfs.block.report.load.balancing.db.var.update.threashold";
   public static final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT = 60*1000;
-  
-  public static final String DFS_CR_LB_TIME_WINDOW_SIZE =
-          "dfs.cache.report.load.balancing.time.window.size";
-  public static final long DFS_CR_LB_TIME_WINDOW_SIZE_DEFAULT = 60*1000; //1 min
-  
-  public static final String DFS_CR_LB_DB_VAR_UPDATE_THRESHOLD =
-          "dfs.cache.report.load.balancing.db.var.update.threashold";
-  public static final long DFS_CR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT = 60*1000;
-  
+
+  //a block report is considered dead if it has not finished processing in one hr
+  public static final String DFS_BR_LB_MAX_BR_PROCESSING_TIME =
+          "dfs.block.report.load.balancing.max.block.report.processing.time";
+  public static final long DFS_BR_LB_MAX_BR_PROCESSING_TIME_DEFAULT = 60*60*1000;
+
   public static final String DFS_STORE_SMALL_FILES_IN_DB_KEY =
           "dfs.store.small.files.in.db";
   public static final boolean DFS_STORE_SMALL_FILES_IN_DB_DEFAULT = false;

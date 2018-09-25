@@ -221,17 +221,16 @@ public interface DatanodeProtocol {
    * @return active namenode to send the next block report to
    */
   @Idempotent
-  public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException;
+  public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks,
+      DatanodeRegistration nodeReg) throws IOException;
 
   /**
-   * The datanode asks the leader namenode which 'namenode' to send the next
-   * cache report to. This is to enusre load balancing of cache reports among
-   * namenodes
-   * @return active namenode to send the next block report to
+   * The datanode informs the leader that the block report has completed.
+   * The NN then removes the block report from active block reports list
    */
   @Idempotent
-  public ActiveNode getNextNamenodeToSendCacheReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException;
-  
+  public void blockReportCompleted(DatanodeRegistration nodeReg) throws IOException;
+
   /**
    * Read the small file data
    * @param id

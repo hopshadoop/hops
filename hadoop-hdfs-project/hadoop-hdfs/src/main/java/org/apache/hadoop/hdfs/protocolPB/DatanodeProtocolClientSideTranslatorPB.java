@@ -43,7 +43,7 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ErrorReportR
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.HeartbeatRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.HeartbeatResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.NameNodeAddressRequestForBlockReportingProto;
-import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.NameNodeAddressRequestForCacheReportingProto;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockReportCompletedRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.RegisterDatanodeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.RegisterDatanodeResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ReportBadBlocksRequestProto;
@@ -377,22 +377,19 @@ public class DatanodeProtocolClientSideTranslatorPB
   }
 
   @Override
-  public ActiveNode getNextNamenodeToSendCacheReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException {
+  public void blockReportCompleted(DatanodeRegistration nodeReg) throws IOException {
 
-    NameNodeAddressRequestForCacheReportingProto.Builder request =
-        NameNodeAddressRequestForCacheReportingProto.newBuilder();
-    request.setNoOfBlks(noOfBlks);
+    BlockReportCompletedRequestProto.Builder request =
+                BlockReportCompletedRequestProto.newBuilder();
     request.setRegistration(PBHelper.convert(nodeReg));
     try {
-      ActiveNodeProtos.ActiveNodeProto response = rpcProxy
-          .getNextNamenodeToSendCacheReport(NULL_CONTROLLER, request.build());
-      ActiveNode aNamenode = PBHelper.convert(response);
-      return aNamenode;
+      rpcProxy.blockReportCompleted (NULL_CONTROLLER, request.build());
+      return;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
   }
-  
+
   /**
    * Read the small file data
    *

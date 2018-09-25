@@ -25,7 +25,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.UnregisteredNodeException;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
@@ -45,7 +44,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
@@ -356,9 +354,7 @@ class BPServiceActor implements Runnable {
         //
         if (startTime - lastHeartbeat > dnConf.heartBeatInterval) {
 
-
-          refreshNNConnection(); //[S] is the frequency of this operation high? only one actor s
-
+          refreshNNConnections();
 
           //
           // All heartbeat messages include following info:
@@ -596,8 +592,8 @@ class BPServiceActor implements Runnable {
    * get the list of active namenodes in the system. It connects to new
    * namenodes and stops the threads connected to dead namenodes
    */
-  private void refreshNNConnection() throws IOException {
-    if (!bpos.canUpdateNNList(nnAddr)) {
+  private void refreshNNConnections() throws IOException {
+    if (!bpos.canUpdateNNList()) {
       return;
     }
 
@@ -619,23 +615,20 @@ class BPServiceActor implements Runnable {
     return bpNamenode.blockReport(registration, poolId, reports);
   }
 
-  public DatanodeCommand cacheReport(DatanodeRegistration bpRegistration, String bpid, List<Long> blockIds) throws
-      IOException {
-    return bpNamenode.cacheReport(bpRegistration, bpid, blockIds, dn.getFSDataset().getCacheCapacity(),
-        dn.getFSDataset().getCacheUsed());
-  }
-  
-  public ActiveNode nextNNForBlkReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException {
-    if (bpNamenode != null) {
-      return bpNamenode.getNextNamenodeToSendBlockReport(noOfBlks, nodeReg);
-    } else {
-      return null;
-    }
+  public void blockReportCompleted(DatanodeRegistration registration) throws IOException {
+    bpNamenode.blockReportCompleted(registration);
   }
 
-  public ActiveNode nextNNForCacheReport(long noOfBlks, DatanodeRegistration nodeReg) throws IOException {
+  public DatanodeCommand cacheReport(DatanodeRegistration bpRegistration,
+                                     String bpid, List<Long> blockIds) throws IOException {
+    return bpNamenode.cacheReport(bpRegistration, bpid, blockIds,
+            dn.getFSDataset().getCacheCapacity(), dn.getFSDataset().getCacheUsed());
+  }
+  
+  public ActiveNode nextNNForBlkReport(long noOfBlks,
+                                       DatanodeRegistration nodeReg) throws IOException {
     if (bpNamenode != null) {
-      return bpNamenode.getNextNamenodeToSendCacheReport(noOfBlks, nodeReg);
+      return bpNamenode.getNextNamenodeToSendBlockReport(noOfBlks, nodeReg);
     } else {
       return null;
     }
