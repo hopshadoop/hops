@@ -119,7 +119,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_BATCHS_DEFAULT = 100;
 
   public static final String DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS =
-      "dfs.namenode.misreplicated.noofbatches";
+      "dfs.namenode.misreplicated.noofthreads";
   public static final int
       DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT = 20;
   
