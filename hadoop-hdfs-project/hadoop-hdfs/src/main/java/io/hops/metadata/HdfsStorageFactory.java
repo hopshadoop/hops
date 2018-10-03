@@ -84,7 +84,6 @@ import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import io.hops.metadata.hdfs.entity.RetryCacheEntry;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
-import io.hops.security.Users;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.AcesContext;
@@ -186,17 +185,16 @@ public class HdfsStorageFactory {
       dStorageFactory.setConfiguration(getMetadataClusterConfiguration(conf));
       initDataAccessWrappers();
       EntityManager.addContextInitializer(getContextInitializer());
-      if(conf.getBoolean(CommonConfigurationKeys.HOPS_GROUPS_ENABLE, CommonConfigurationKeys
-          .HOPS_GROUPS_ENABLE_DEFAULT)) {
-        UsersGroups.init((UserDataAccess) getDataAccess
-            (UserDataAccess.class), (UserGroupDataAccess) getDataAccess
-            (UserGroupDataAccess.class), (GroupDataAccess) getDataAccess
-            (GroupDataAccess.class), conf.getInt(CommonConfigurationKeys
-            .HOPS_GROUPS_UPDATER_ROUND, CommonConfigurationKeys
-            .HOPS_GROUPS_UPDATER_ROUND_DEFAULT), conf.getInt(CommonConfigurationKeys
-            .HOPS_USERS_LRU_THRESHOLD, CommonConfigurationKeys
-            .HOPS_USERS_LRU_THRESHOLD_DEFAULT));
-      }
+  
+      UsersGroups.init((UserDataAccess) getDataAccess
+          (UserDataAccess.class), (UserGroupDataAccess) getDataAccess
+          (UserGroupDataAccess.class), (GroupDataAccess) getDataAccess
+          (GroupDataAccess.class), conf.getInt(CommonConfigurationKeys
+          .HOPS_UG_CACHE_SECS, CommonConfigurationKeys
+          .HOPS_UG_CACHE_SECS_DEFAULT), conf.getInt(CommonConfigurationKeys
+          .HOPS_UG_CACHE_SIZE, CommonConfigurationKeys
+          .HOPS_UG_CACHE_SIZE_DEFUALT));
+      
       isDALInitialized = true;
     }
   }
@@ -364,7 +362,7 @@ public class HdfsStorageFactory {
   
   public static boolean formatStorage() throws StorageException {
     Cache.getInstance().flush();
-    Users.flushCache();
+    UsersGroups.clearCache();
     return dStorageFactory.getConnector().formatStorage();
   }
 

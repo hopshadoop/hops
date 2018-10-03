@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import io.hops.security.HopsGroupsWithFallBack;
 import org.apache.htrace.core.TraceScope;
 import org.apache.htrace.core.Tracer;
 import com.google.common.annotations.VisibleForTesting;
@@ -98,6 +99,8 @@ public class Groups {
   private final AtomicLong backgroundRefreshRunning =
       new AtomicLong(0);
 
+  private final boolean bypassCache;
+  
   public Groups(Configuration conf) {
     this(conf, new Timer());
   }
@@ -109,7 +112,9 @@ public class Groups {
                         ShellBasedUnixGroupsMapping.class, 
                         GroupMappingServiceProvider.class), 
           conf);
-
+    
+    bypassCache = impl instanceof HopsGroupsWithFallBack;
+    
     cacheTimeout = 
       conf.getLong(CommonConfigurationKeys.HADOOP_SECURITY_GROUPS_CACHE_SECS, 
           CommonConfigurationKeys.HADOOP_SECURITY_GROUPS_CACHE_SECS_DEFAULT) * 1000;
@@ -151,7 +156,7 @@ public class Groups {
     if(LOG.isDebugEnabled())
       LOG.debug("Group mapping impl=" + impl.getClass().getName() + 
           "; cacheTimeout=" + cacheTimeout + "; warningDeltaMs=" +
-          warningDeltaMs);
+          warningDeltaMs + "; bypassCache=" + bypassCache);
   }
   
   @VisibleForTesting
@@ -218,15 +223,21 @@ public class Groups {
       }
     }
 
-    // Check the negative cache first
-    if (isNegativeCacheEnabled()) {
-      if (negativeCache.contains(user)) {
-        throw noGroupsForUser(user);
+    if(!bypassCache) {
+      // Check the negative cache first
+      if (isNegativeCacheEnabled()) {
+        if (negativeCache.contains(user)) {
+          throw noGroupsForUser(user);
+        }
       }
     }
 
     try {
-      return cache.get(user);
+      if(bypassCache){
+        return fetchGroupList(user);
+      }else {
+        return cache.get(user);
+      }
     } catch (ExecutionException e) {
       throw (IOException)e.getCause();
     }
@@ -377,25 +388,26 @@ public class Groups {
       });
       return listenableFuture;
     }
-
-    /**
-     * Queries impl for groups belonging to the user. This could involve I/O and take awhile.
-     */
-    private List<String> fetchGroupList(String user) throws IOException {
-      long startMs = timer.monotonicNow();
-      List<String> groupList = impl.getGroups(user);
-      long endMs = timer.monotonicNow();
-      long deltaMs = endMs - startMs ;
-      UserGroupInformation.metrics.addGetGroups(deltaMs);
-      if (deltaMs > warningDeltaMs) {
-        LOG.warn("Potential performance problem: getGroups(user=" + user +") " +
-          "took " + deltaMs + " milliseconds.");
-      }
-
-      return groupList;
-    }
+    
   }
-
+  
+  /**
+   * Queries impl for groups belonging to the user. This could involve I/O and take awhile.
+   */
+  private List<String> fetchGroupList(String user) throws IOException {
+    long startMs = timer.monotonicNow();
+    List<String> groupList = impl.getGroups(user);
+    long endMs = timer.monotonicNow();
+    long deltaMs = endMs - startMs ;
+    UserGroupInformation.metrics.addGetGroups(deltaMs);
+    if (deltaMs > warningDeltaMs) {
+      LOG.warn("Potential performance problem: getGroups(user=" + user +") " +
+          "took " + deltaMs + " milliseconds.");
+    }
+    
+    return groupList;
+  }
+  
   /**
    * Refresh all user-to-groups mappings.
    */
@@ -425,6 +437,11 @@ public class Groups {
     }
   }
 
+  @VisibleForTesting
+  public boolean isCacheEnabled(){
+    return !bypassCache;
+  }
+  
   private static Groups GROUPS = null;
   
   /**

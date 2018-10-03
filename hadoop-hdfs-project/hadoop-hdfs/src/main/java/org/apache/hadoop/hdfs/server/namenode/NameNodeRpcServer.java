@@ -24,7 +24,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
-import io.hops.security.Users;
+import io.hops.security.UsersGroups;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -533,7 +533,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }catch (ForeignKeyConstraintViolationException ex){
       LOG.debug("setOwner: cache is outdated, flush old values and restart " +
           "the operation - " + ex);
-      Users.flushCache(username, groupname);
+      UsersGroups.removeUserFromCache(username);
+      UsersGroups.removeGroupFromCache(groupname);
       namesystem.setOwnerSTO(src, username, groupname);
     }
   }
@@ -1174,12 +1175,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       throws IOException {
     namesystem.changeConf(props, newVals);
   }
-
-  @Override
-  public void flushCache(String userName, String groupName) throws IOException {
-    namesystem.flushCache(userName, groupName);
-  }
-
+  
   @Override // ClientProtocol
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
@@ -1346,5 +1342,17 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public BatchedEntries<CachePoolEntry> listCachePools(String prevKey)
       throws IOException {
     return namesystem.listCachePools(prevKey != null ? prevKey : "");
+  }
+  
+  @Override
+  public void addUserGroup(String userName, String groupName, boolean cacheOnly)
+      throws IOException {
+    namesystem.addUserGroup(userName, groupName, cacheOnly);
+  }
+  
+  @Override
+  public void removeUserGroup(String userName, String groupName,
+      boolean cacheOnly) throws IOException {
+    namesystem.removeUserGroup(userName, groupName, cacheOnly);
   }
 }

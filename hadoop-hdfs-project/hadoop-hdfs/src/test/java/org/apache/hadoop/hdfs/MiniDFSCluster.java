@@ -1362,8 +1362,6 @@ public class MiniDFSCluster {
         shutdownNameNode(i);
       }
     }
-
-
     UsersGroups.stop();
   }
   

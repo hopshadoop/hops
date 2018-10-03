@@ -30,7 +30,7 @@ import io.hops.metadata.StorageMap;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.security.Users;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -212,7 +212,7 @@ public class DFSTestUtil {
     String superGroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
         DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
 
-    Users.addUserToGroup(fsOwnerShortUserName, superGroup);
+    UsersGroups.addUserToGroup(fsOwnerShortUserName, superGroup);
   }
    
   /**

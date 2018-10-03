@@ -773,5 +773,29 @@ public class CommonConfigurationKeysPublic {
           "credential$",
           "oauth.*token$",
           HADOOP_SECURITY_SENSITIVE_CONFIG_KEYS));
+  
+  
+    /*
+   Hops Groups
+   */
+  
+  /**
+   * @see
+   * * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   *    * core-default.xml</a>
+   */
+  public static final String HOPS_UG_CACHE_SECS =
+      "hops.ug.cache.secs";
+  public static final int HOPS_UG_CACHE_SECS_DEFAULT = 120;
+  
+  /**
+   * @see
+   * * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   *    * core-default.xml</a>
+   */
+  public static final String HOPS_UG_CACHE_SIZE =
+      "hops.ug.cache.size";
+  public static final int HOPS_UG_CACHE_SIZE_DEFUALT = 10000;
+  
 }
 

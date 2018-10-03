@@ -24,7 +24,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
-import io.hops.security.Users;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.handler.RequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -540,7 +540,7 @@ public class NameNode implements NameNodeStatusMXBean {
     String superGroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
         DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
 
-    Users.addUserToGroupTx(fsOwnerShortUserName, superGroup);
+    UsersGroups.addUserToGroupTx(fsOwnerShortUserName, superGroup);
   
     try {
       createAndStartCRLFetcherService(conf);

@@ -131,6 +131,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Update
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdatePipelineRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CheckAccessRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLastUpdatedContentSummaryRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AddUserGroupRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AddUserGroupResponseProto;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
@@ -1111,24 +1113,7 @@ public class ClientNamenodeProtocolTranslatorPB
       throw ProtobufHelper.getRemoteException(ex);
     }
   }
-
-  @Override
-  public void flushCache(String userName, String groupName) throws IOException {
-    try {
-      ClientNamenodeProtocolProtos.FlushUsersCacheRequestProto.Builder req =
-          ClientNamenodeProtocolProtos.FlushUsersCacheRequestProto.newBuilder();
-      if(userName != null) {
-        req.setUserName(userName);
-      }
-      if(groupName != null) {
-        req.setGroupName(groupName);
-      }
-      rpcProxy.flushCache(null, req.build());
-    } catch (ServiceException ex) {
-      throw ProtobufHelper.getRemoteException(ex);
-    }
-  }
-
+  
   @Override
   public void checkAccess(String path, FsAction mode) throws IOException {
     CheckAccessRequestProto req = CheckAccessRequestProto.newBuilder()
@@ -1383,6 +1368,44 @@ public class ClientNamenodeProtocolTranslatorPB
               setPrevPoolName(prevKey).build()));
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+  
+  @Override
+  public void addUserGroup(String userName, String groupName,
+      boolean cacheOnly) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.AddUserGroupRequestProto.Builder req =
+          ClientNamenodeProtocolProtos.AddUserGroupRequestProto.newBuilder();
+      if(userName != null) {
+        req.setUserName(userName);
+      }
+      if(groupName != null) {
+        req.setGroupName(groupName);
+      }
+      req.setCacheOnly(cacheOnly);
+      rpcProxy.addUserGroup(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+  
+  @Override
+  public void removeUserGroup(String userName, String groupName,
+      boolean cacheOnly) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.RemoveUserGroupRequestProto.Builder req =
+          ClientNamenodeProtocolProtos.RemoveUserGroupRequestProto.newBuilder();
+      if(userName != null) {
+        req.setUserName(userName);
+      }
+      if(groupName != null) {
+        req.setGroupName(groupName);
+      }
+      req.setCacheOnly(cacheOnly);
+      rpcProxy.removeUserGroup(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
     }
   }
 }

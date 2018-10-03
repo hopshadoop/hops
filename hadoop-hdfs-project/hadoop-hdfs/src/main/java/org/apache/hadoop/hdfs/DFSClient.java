@@ -77,6 +77,7 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -2663,14 +2664,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
       nn.changeConf(props, newVals);
     }
   }
-
-  public void flushCache(final String userName, final String groupName)
-          throws IOException {
-    for(ClientProtocol nn : allNNs) {
-      nn.flushCache(userName, groupName);
-    }
-  }
-
+  
   public void checkAccess(final String src, final FsAction mode)
           throws IOException {
     checkOpen();
@@ -3019,4 +3013,52 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
   public boolean hasLeader(){
     return leaderNN!=null;
   }
+  
+  public void addUserGroup(final String userName, final String groupName)
+      throws IOException {
+    try{
+      namenode.addUserGroup(userName, groupName, false);
+    }catch (RemoteException re){
+      throw re.unwrapRemoteException();
+    }
+    
+    if(userName != null && groupName != null){
+      for(ClientProtocol nn : allNNs) {
+        try{
+          if(!nn.equals(namenode)) {
+            nn.addUserGroup(userName, groupName, true);
+          }
+        }catch (RemoteException re){
+          throw re.unwrapRemoteException();
+        }
+      }
+    }
+  }
+  
+  public void removeUserGroup(final String userName, final String groupName)
+      throws IOException {
+    try{
+      namenode.removeUserGroup(userName, groupName, false);
+    }catch (RemoteException re){
+      throw re.unwrapRemoteException();
+    }
+  
+    for(ClientProtocol nn : allNNs) {
+      try{
+        if (!nn.equals(namenode)) {
+          nn.removeUserGroup(userName, groupName, true);
+        }
+      }catch (RemoteException re){
+        throw re.unwrapRemoteException();
+      }
+    }
+  }
+  
+  @VisibleForTesting
+  @InterfaceAudience.Private
+  public void setNamenodes(Collection<ClientProtocol> namenodes){
+    allNNs.clear();
+    allNNs.addAll(namenodes);
+  }
+  
 }

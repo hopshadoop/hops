@@ -15,17 +15,12 @@
  */
 package io.hops.transaction.lock;
 
-import com.google.common.collect.Lists;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
-import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.security.Users;
 import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.List;
 
 final class IndividualINodeLock extends BaseINodeLock {
