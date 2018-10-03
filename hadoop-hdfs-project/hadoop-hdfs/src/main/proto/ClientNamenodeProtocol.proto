@@ -718,20 +718,30 @@ message ChangeConfProto {
 message ChangeConfResponseProto {
 }
 
-message FlushUsersCacheRequestProto {
-  optional string userName = 1;
-  optional string groupName = 2;
-}
-
-message FlushUsersCacheResponseProto {
-}
-
 message CheckAccessRequestProto {
   required string path = 1;
   required AclEntryProto.FsActionProto mode = 2;
 }
 
 message CheckAccessResponseProto { // void response
+}
+
+message AddUserGroupRequestProto {
+  optional string userName = 1;
+  optional string groupName = 2;
+  required bool cacheOnly = 3;
+}
+
+message AddUserGroupResponseProto {
+}
+
+message RemoveUserGroupRequestProto {
+  optional string userName = 1;
+  optional string groupName = 2;
+  required bool cacheOnly = 3;
+}
+
+message RemoveUserGroupResponseProto {
 }
 
 service ClientNamenodeProtocol {
@@ -817,9 +827,11 @@ service ClientNamenodeProtocol {
   rpc revokeEncoding (RevokeEncodingRequestProto) returns (RevokeEncodingResponseProto);
   rpc getRepairedBlockLocations (GetRepairedBlockLocationsRequsestProto) returns (GetRepairedBlockLocationsResponseProto);
   rpc changeConf (ChangeConfProto) returns (ChangeConfResponseProto);
-  rpc flushCache (FlushUsersCacheRequestProto) returns (FlushUsersCacheResponseProto);
   rpc checkAccess(CheckAccessRequestProto) returns(CheckAccessResponseProto);
   rpc getLastUpdatedContentSummary (GetLastUpdatedContentSummaryRequestProto)
   returns (GetLastUpdatedContentSummaryResponseProto);
-
+  rpc addUserGroup (AddUserGroupRequestProto) returns
+  (AddUserGroupResponseProto);
+  rpc removeUserGroup (RemoveUserGroupRequestProto) returns
+  (RemoveUserGroupResponseProto);
 }

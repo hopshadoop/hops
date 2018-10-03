@@ -152,6 +152,10 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CheckA
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CheckAccessResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLastUpdatedContentSummaryRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLastUpdatedContentSummaryResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AddUserGroupRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AddUserGroupResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RemoveUserGroupRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RemoveUserGroupResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeIDProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto;
@@ -272,11 +276,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       VOID_SET_META_ENABLED_RESPONSE =
       ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto.newBuilder()
           .build();
-
-  public static final ClientNamenodeProtocolProtos.FlushUsersCacheResponseProto
-      VOID_FLUSH_CACHE = ClientNamenodeProtocolProtos.FlushUsersCacheResponseProto
-      .newBuilder().build();
-
+  
   private static final CheckAccessResponseProto
       VOID_CHECKACCESS_RESPONSE = CheckAccessResponseProto.getDefaultInstance();
 
@@ -297,7 +297,14 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
 
   private static final RemoveAclResponseProto
     VOID_REMOVEACL_RESPONSE = RemoveAclResponseProto.getDefaultInstance();
-
+  
+  private static final ClientNamenodeProtocolProtos.AddUserGroupResponseProto
+      VOID_ADD_USER_GROUP_CACHE =
+      ClientNamenodeProtocolProtos.AddUserGroupResponseProto.newBuilder().build();
+  
+  private static final ClientNamenodeProtocolProtos.RemoveUserGroupResponseProto
+      VOID_REMOVE_USER_GROUP_CACHE =
+      ClientNamenodeProtocolProtos.RemoveUserGroupResponseProto.newBuilder().build();
   /**
    * Constructor
    *
@@ -1202,20 +1209,8 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(ex);
     }
   }
-
-  @Override
-  public ClientNamenodeProtocolProtos.FlushUsersCacheResponseProto flushCache(
-      RpcController controller,
-      ClientNamenodeProtocolProtos.FlushUsersCacheRequestProto request)
-      throws ServiceException {
-    try {
-      server.flushCache(request.getUserName(), request.getGroupName());
-      return VOID_FLUSH_CACHE;
-    } catch (IOException ex) {
-      throw new ServiceException(ex);
-    }
-  }
-
+  
+  
   @Override
   public CheckAccessResponseProto checkAccess(RpcController controller,
       CheckAccessRequestProto req) throws ServiceException {
@@ -1417,6 +1412,34 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       return responseBuilder.build();
     } catch (IOException e) {
       throw new ServiceException(e);
+    }
+  }
+  
+  @Override
+  public ClientNamenodeProtocolProtos.AddUserGroupResponseProto addUserGroup(
+      RpcController controller,
+      ClientNamenodeProtocolProtos.AddUserGroupRequestProto request)
+      throws ServiceException {
+    try {
+      server.addUserGroup(request.getUserName(), request.getGroupName(),
+          request.getCacheOnly());
+      return VOID_ADD_USER_GROUP_CACHE;
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+  
+  @Override
+  public ClientNamenodeProtocolProtos.RemoveUserGroupResponseProto removeUserGroup(
+      RpcController controller,
+      ClientNamenodeProtocolProtos.RemoveUserGroupRequestProto request)
+      throws ServiceException {
+    try {
+      server.removeUserGroup(request.getUserName(), request.getGroupName(),
+          request.getCacheOnly());
+      return VOID_REMOVE_USER_GROUP_CACHE;
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
     }
   }
 }

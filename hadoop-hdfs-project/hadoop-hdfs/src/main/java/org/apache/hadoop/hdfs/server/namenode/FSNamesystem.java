@@ -48,7 +48,7 @@ import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.metadata.hdfs.entity.RetryCacheEntry;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.resolvingcache.Cache;
-import io.hops.security.Users;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.RootINodeCache;
 import io.hops.transaction.handler.EncodingStatusOperationType;
@@ -7375,11 +7375,7 @@ public class FSNamesystem
       }
     }
   }
-
-  public void flushCache(String userName, String groupName){
-    Users.flushCache(userName, groupName);
-  }
-
+  
   public class FNode implements Comparable<FNode> {
     private String parentPath;
     private INode inode;
@@ -9896,6 +9892,20 @@ public class FSNamesystem
     }else{
       return null;
     }
+  }
+  
+  
+  public void addUserGroup(String userName, String groupName, boolean cacheOnly)
+      throws IOException {
+    checkSuperuserPrivilege();
+    UsersGroups.addUserToGroupTx(userName, groupName, cacheOnly);
+  }
+  
+  
+  public void removeUserGroup(String userName, String groupName,
+      boolean cacheOnly) throws IOException {
+    checkSuperuserPrivilege();
+    UsersGroups.removeUserFromGroupTx(userName, groupName, cacheOnly);
   }
 }
 

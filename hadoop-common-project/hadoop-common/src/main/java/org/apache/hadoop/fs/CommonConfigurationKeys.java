@@ -360,22 +360,7 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String DFS_LEADER_TP_INCREMENT_KEY =
       "dfs.leader.tp.increment";
   public static final int DFS_LEADER_TP_INCREMENT_DEFAULT = 100; // 100 ms
-
-  /*
-   Hops Groups
-   */
-
-  public static final String HOPS_GROUPS_UPDATER_ROUND =
-      "hops.groups.updater.round";
-  public static final int HOPS_GROUPS_UPDATER_ROUND_DEFAULT = 120;
-
-  public static final String HOPS_USERS_LRU_THRESHOLD =
-      "hops.users.lru.threshold";
-  public static final int HOPS_USERS_LRU_THRESHOLD_DEFAULT = 10000;
-
-  public static final String HOPS_GROUPS_ENABLE =
-      "hops.groups.updater.round";
-  public static final boolean HOPS_GROUPS_ENABLE_DEFAULT = true;
+  
   
   /** Raw coder factory for the RS default codec. */
   public static final String IO_ERASURECODE_CODEC_RS_DEFAULT_RAWCODER_KEY =

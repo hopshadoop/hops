@@ -15,22 +15,24 @@
  */
 package io.hops.security;
 
-import com.google.common.collect.Lists;
 import io.hops.exception.UniqueKeyConstraintViolationException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.GroupDataAccess;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
-import io.hops.metadata.hdfs.entity.Group;
-import io.hops.metadata.hdfs.entity.User;
+import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.JniBasedUnixGroupsMappingWithFallback;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.hamcrest.Matchers;
@@ -38,8 +40,10 @@ import org.junit.After;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -48,17 +52,29 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.fail;
 
 public class TestUsersGroups {
+  
+  static UsersGroupsCache newUsersGroupsMapping(Configuration conf){
+    return new UsersGroupsCache((UserDataAccess)
+        HdfsStorageFactory.getDataAccess(UserDataAccess.class),
+        (UserGroupDataAccess) HdfsStorageFactory.getDataAccess(
+            UserGroupDataAccess.class), (GroupDataAccess)HdfsStorageFactory.getDataAccess(
+        GroupDataAccess.class),conf.getInt(CommonConfigurationKeys
+        .HOPS_UG_CACHE_SECS, CommonConfigurationKeys
+        .HOPS_UG_CACHE_SECS_DEFAULT), conf.getInt(CommonConfigurationKeys
+        .HOPS_UG_CACHE_SIZE, CommonConfigurationKeys
+        .HOPS_UG_CACHE_SIZE_DEFUALT));
+  }
   
   @After
   public void afterTest() {
@@ -66,191 +82,352 @@ public class TestUsersGroups {
   }
   
   @Test
-  public void testUsersGroupsCache(){
-    UsersGroupsCache cache = new UsersGroupsCache(10);
-
-    User currentUser = new User(1, "user0");
-    List<Group> groups = Lists.newArrayList();
-    for(int i=1; i< 10; i++){
-      groups.add(new Group(i, "group"+i));
+  public void testGroupsCacheIsEnabled(){
+    Configuration conf = new HdfsConfiguration();
+    assertFalse(Groups.getUserToGroupsMappingServiceWithLoadedConfiguration(conf)
+        .isCacheEnabled());
+    
+    conf.set(DFSConfigKeys.HADOOP_SECURITY_GROUP_MAPPING,"org.apache.hadoop" +
+        ".security.JniBasedUnixGroupsMappingWithFallback");
+    
+    assertTrue(Groups.getUserToGroupsMappingServiceWithLoadedConfiguration(conf)
+        .isCacheEnabled());
+  
+    conf.set(DFSConfigKeys.HADOOP_SECURITY_GROUP_MAPPING,"io.hops.security" +
+        ".HopsGroupsWithFallBack");
+  
+    assertFalse(Groups.getUserToGroupsMappingServiceWithLoadedConfiguration(conf)
+        .isCacheEnabled());
+  }
+  
+  @Test
+  public void testUsersGroupsCache() throws Exception{
+    Configuration conf = new Configuration();
+    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.setConfiguration(conf);
+    HdfsStorageFactory.formatStorage();
+    
+    UsersGroupsCache cache = newUsersGroupsMapping(conf);
+    
+    String currentUser = "user0";
+    
+    String[] groups = new String[3];
+    for(int i=0; i< 3; i++){
+      groups[i] = "group"+i;
     }
 
-    //user1 -> {group1, group2}
-    cache.addUserGroups(currentUser, groups.subList(0, 2));
+    assertEquals(cache.getUserId(currentUser), 0);
+    
+    //user0 -> {group0, group1}
+    cache.addUserToGroups(currentUser,
+        Arrays.copyOfRange(groups, 0, 2));
 
-    Integer userId = cache.getUserId(currentUser.getName());
-
-    assertNotNull(userId);
-    assertEquals((int)userId, currentUser.getId());
-
+    int userId = cache.getUserId(currentUser);
+    assertNotEquals(userId, 0);
+    assertEquals(currentUser, cache.getUserName(userId));
+    
     for(int i=0; i<2; i++){
-      Integer groupId = cache.getGroupId(groups.get(i).getName());
-      assertNotNull(groupId);
-      assertEquals((int)groupId, groups.get(i).getId());
+      int groupId = cache.getGroupId(groups[i]);
+      assertNotEquals(groupId, 0);
+      assertEquals(groups[i], cache.getGroupName(groupId));
     }
 
-    assertNull(cache.getGroupId(groups.get(2).getName()));
-
-    List<String> cachedGroups = cache.getGroups(currentUser.getName());
+    assertEquals(cache.getGroupId(groups[2]), 0);
+    
+    List<String> cachedGroups = cache.getGroups(currentUser);
     assertNotNull(cachedGroups);
-    assertTrue(cachedGroups.equals(Arrays.asList(groups.get(0).getName(),
-        groups.get(1).getName())));
+    assertTrue(cachedGroups.equals(Arrays.asList(groups[0], groups[1])));
 
-    //remove group by name [group1]
-    cache.removeGroup(groups.get(0).getName());
+    //remove group by name [group0]
+    cache.removeGroup(groups[0]);
 
-    Integer groupId = cache.getGroupId(groups.get(0).getName());
-    assertNull(groupId);
-
-    cachedGroups = cache.getGroups(currentUser.getName());
+    int groupId = cache.getGroupId(groups[0]);
+    assertEquals(groupId, 0);
+    
+    cachedGroups = cache.getGroups(currentUser);
     assertNotNull(cachedGroups);
-    assertTrue(cachedGroups.equals(Arrays.asList(groups.get(1).getName())));
+    assertTrue(cachedGroups.equals(Arrays.asList(groups[1])));
 
-    //remove group by id [2]
-    cache.removeGroup(groups.get(1).getId());
+    //remove group1
+    groupId = cache.getGroupId(groups[1]);
+    cache.removeGroup(groups[1]);
 
-    String groupName = cache.getGroupName(groups.get(1).getId());
+    String groupName = cache.getGroupName(groupId);
     assertNull(groupName);
 
-    cachedGroups = cache.getGroups(currentUser.getName());
+    cachedGroups = cache.getGroups(currentUser);
+    assertNull(cachedGroups);
+    
+    //add group2
+    cache.addGroup(groups[2]);
+    groupId = cache.getGroupId(groups[2]);
+    assertNotEquals(groupId, 0);
+
+    cachedGroups = cache.getGroups(currentUser);
     assertNull(cachedGroups);
 
-    //add group [3]
-
-    cache.addGroup(groups.get(2));
-    groupId = cache.getGroupId(groups.get(2).getName());
-    assertNotNull(groupId);
-    assertEquals((int)groupId, groups.get(2).getId());
-
-    cachedGroups = cache.getGroups(currentUser.getName());
-    assertNull(cachedGroups);
-
-    // append group to user: user1 -> {group3}
-    cache.appendUserGroups(currentUser.getName(), Arrays.asList(groups.get(2)
-        .getName()));
-
-    cachedGroups = cache.getGroups(currentUser.getName());
+    // append group to user: user0 -> {group2}
+    cache.addUserToGroup(currentUser, groups[2]);
+    
+    cachedGroups = cache.getGroups(currentUser);
     assertNotNull(cachedGroups);
-    assertTrue(cachedGroups.equals(Arrays.asList(groups.get(2).getName())));
+    assertTrue(cachedGroups.equals(Arrays.asList(groups[2])));
   }
 
   @Test
-  public void testCacheEviction(){
+  public void testCacheEviction() throws Exception {
+    Configuration conf = new Configuration();
+    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.setConfiguration(conf);
+    HdfsStorageFactory.formatStorage();
+  
     final int CACHE_SIZE = 5;
-    UsersGroupsCache cache = new UsersGroupsCache(CACHE_SIZE);
-
-    List<User> users = Lists.newArrayList();
-    List<Group> groups = Lists.newArrayList();
-    List<String> groupNames = Lists.newArrayList();
-
-    for(int i=1; i<=CACHE_SIZE; i++){
-      users.add(new User(i, "user"+ i));
-      String groupName = "group" + i;
-      groups.add(new Group(i, groupName));
-      groupNames.add(groupName);
+    final int CACHE_SECS = 5;
+  
+    conf.setInt(CommonConfigurationKeys.HOPS_UG_CACHE_SIZE, CACHE_SIZE);
+    conf.setInt(CommonConfigurationKeys.HOPS_UG_CACHE_SECS, CACHE_SECS);
+    UsersGroupsCache cache = newUsersGroupsMapping(conf);
+  
+    String[] users = new String[CACHE_SIZE];
+    int[] usersIds = new int[CACHE_SIZE];
+    String[] groups = new String[CACHE_SIZE];
+  
+    for (int i = 0; i < CACHE_SIZE; i++) {
+      users[i] = "user" + i;
+      groups[i] = "group" + i;
     }
-
-    for(int i=0; i<CACHE_SIZE; i++){
-      cache.addUserGroups(users.get(i), groups.subList(i, (i==CACHE_SIZE - 1 ?
-      i + 1 : i + 2)));
+  
+    for (int i = 0; i < CACHE_SIZE; i++) {
+      cache.addUserToGroups(users[i],
+          Arrays.copyOfRange(groups, i, (i == CACHE_SIZE - 1 ?
+              i + 1 : i + 2)));
+      usersIds[i] = cache.getUserId(users[i]);
     }
-
-    for(int i=0; i<CACHE_SIZE; i++){
-      List<String> cachedGroups = cache.getGroups(users.get(i).getName());
+  
+    for (int i = 0; i < CACHE_SIZE; i++) {
+      List<String> cachedGroups = cache.getGroups(users[i]);
       assertNotNull(cachedGroups);
-      assertTrue(cachedGroups.equals(groupNames.subList(i, (i==CACHE_SIZE - 1 ?
-          i + 1 : i + 2))));
+      Collections.sort(cachedGroups);
+      assertEquals(Arrays.asList(Arrays.copyOfRange(groups, i,
+          (i == CACHE_SIZE - 1 ? i + 1 : i + 2))), cachedGroups);
     }
-
+  
     // add a new user to check eviction
-    User newUser = new User(CACHE_SIZE + 1, "newUser");
+    String newUser = "newUser";
     cache.addUser(newUser);
-
-    Integer userId = cache.getUserId(newUser.getName());
-    assertNotNull(userId);
-    assertEquals((int)userId, newUser.getId());
-
-    userId = cache.getUserId(users.get(0).getName());
-    assertNull(userId);
-    List<String> cachedGroups = cache.getGroups(users.get(0).getName());
-    assertNull(cachedGroups);
-
-    // group1 should be removed since it is associated with only user1
-    Integer groupId = cache.getGroupId(groups.get(0).getName());
-    assertNull("Cache eviction should remove " + groups.get(0)
-        .getName(), groupId);
-
-    // group2 shouldn't be removed since it is associated with user1 and user2
-    groupId = cache.getGroupId(groups.get(1).getName());
-    assertNotNull("Cache eviction shouldn't remove " + groups.get(1)
-        .getName(), groupId);
-
-
-    //add 2 new group
-    Group newGroup1 = new Group(CACHE_SIZE+1, "newgroup1");
-    Group newGroup2 = new Group(CACHE_SIZE+2, "newgroup2");
-
-    cache.addGroup(newGroup1);
-    groupId = cache.getGroupId(newGroup1.getName());
-    assertNotNull(groupId);
-    assertEquals((int) groupId, newGroup1.getId());
-
-    cache.addGroup(newGroup2);
-    groupId = cache.getGroupId(newGroup2.getName());
-    assertNotNull(groupId);
-    assertEquals((int) groupId, newGroup2.getId());
-
-    // group2 should be removed
-    groupId = cache.getGroupId(groups.get(1).getName());
-    assertNull("Cache eviction should remove " + groups.get(1)
-        .getName(), groupId);
-
-    //user2 associated with group2 should be removed
-    userId = cache.getUserId(users.get(1).getName());
-    assertNull("Cache eviction should remove all users associated with " +
-        "a removed group ", userId);
-
-    // group3 shouldn't be removed since it is associated with user2 and user3
-    groupId = cache.getGroupId(groups.get(2).getName());
-    assertNotNull("Cache eviction shouldn't remove " + groups.get(2)
-        .getName(), groupId);
-
-    //user3 shouldn't be removed
-    userId = cache.getUserId(users.get(2).getName());
-    assertNotNull("Cache eviction shouldn't remove " + users.get(2).getName()
-        +" since it wasn't associated with " + groups.get(1).getName(),
-        userId);
-
-    cachedGroups = cache.getGroups(users.get(2).getName());
+  
+    int newUserId = cache.getUserId(newUser);
+    assertNotEquals(newUserId, 0);
+    assertEquals(cache.getUserName(newUserId), newUser);
+  
+    //user 0 was evicted from cache
+    assertNull(cache.getUserIdFromCache(users[0]));
+    //however, the associated groups should be still in the cache
+    assertNotNull(cache.getGroupsFromCache(users[0]));
+  
+    //associate the new user with group0, group1, group2
+    cache.addUserToGroups(newUser, Arrays.copyOfRange(groups, 0, 3));
+  
+    //user 1 groups should be evicted, since it is the last recently used in
+    // this case
+    assertNull(cache.getGroupsFromCache(users[1]));
+    assertNotNull(cache.getGroupsFromCache(newUser));
+  
+    List<String> cachedGroups = cache.getGroups(newUser);
+    Collections.sort(cachedGroups);
+    assertEquals(Arrays.asList(Arrays.copyOfRange(groups, 0, 3)), cachedGroups);
+  
+    //repopulate the cache with user0
+    assertEquals(cache.getUserId(users[0]), usersIds[0]);
+  
+  
+    //add a new group
+    String newGroup = "newgroup";
+  
+    cache.addGroup(newGroup);
+    int newGroupId = cache.getGroupId(newGroup);
+    assertNotEquals(newGroupId, 0);
+    assertEquals(cache.getGroupName(newGroupId), newGroup);
+  
+    //group 0 should be evicted from cache
+    assertNull(cache.getGroupIdFromCache(groups[0]));
+  
+    //add the new user to the new group
+    cache.addUserToGroup(newUser, newGroup);
+    cachedGroups = cache.getGroups(newUser);
+    Collections.sort(cachedGroups);
+    assertEquals(Arrays.asList(groups[0], groups[1], groups[2],
+        newGroup), cachedGroups);
+  
+    //remove the new group from cache
+    cache.removeGroupFromCache(newGroup);
+    assertNull(cache.getGroupIdFromCache(newGroup));
+  
+    cachedGroups = cache.getGroups(newUser);
+    Collections.sort(cachedGroups);
+    assertEquals(Arrays.asList(groups[0], groups[1], groups[2]), cachedGroups);
+  
+    //wait for some time for time based eviction to happen
+    Thread.sleep(CACHE_SECS * 1000);
+  
+    //now the newUser groups should be updated to include the newGroup
+    cachedGroups = cache.getGroups(newUser);
+    Collections.sort(cachedGroups);
+    assertEquals(Arrays.asList(groups[0], groups[1], groups[2],
+        newGroup), cachedGroups);
+  
+    //retry to associate the new user to the new group
+    cache.addUserToGroup(newUser, newGroup);
+    cachedGroups = cache.getGroups(newUser);
+    Collections.sort(cachedGroups);
+    assertEquals(Arrays.asList(groups[0], groups[1], groups[2],
+        newGroup), cachedGroups);
+  
+    assertNotNull(cache.getGroupIdFromCache(newGroup));
+    assertEquals(newGroupId, (int) cache.getGroupIdFromCache(newGroup));
+  
+    //remove group0
+    cache.removeGroup(groups[0]);
+  
+    assertNull(cache.getGroupIdFromCache(groups[0]));
+    assertEquals(0, cache.getGroupId(groups[0]));
+  
+    //get groups for user0 and newUser, it shouldn't include group0
+    //user0 shouldn't have groups in the cache due to the previous timeout
+    assertNull(cache.getGroupsFromCache(users[0]));
+    assertEquals(Arrays.asList(groups[1]), cache.getGroups(users[0]));
+    assertEquals(Arrays.asList(groups[1]), cache.getGroupsFromCache(users[0]));
+  
+    cachedGroups = cache.getGroupsFromCache(newUser);
     assertNotNull(cachedGroups);
-    assertEquals(cachedGroups, Arrays.asList(groups.get(2).getName(), groups
-        .get(3).getName()));
-
-    //add another group
-    Group newGroup3 = new Group(CACHE_SIZE+3, "newgroup3");
-
-    cache.addGroup(newGroup3);
-    groupId = cache.getGroupId(newGroup1.getName());
-    assertNotNull(groupId);
-    assertEquals((int) groupId, newGroup1.getId());
-
-    //group3 should be removed
-    groupId = cache.getGroupId(groups.get(2).getName());
-    assertNull("Cache eviction should remove " + groups.get(2)
-        .getName(), groupId);
-
-    //user3 should be removed
-    userId = cache.getUserId(users.get(2).getName());
-    assertNull("Cache eviction should remove all users associated with " +
-        "a removed group ", userId);
+    Collections.sort(cachedGroups);
+    assertEquals(Arrays.asList(groups[1], groups[2],
+        newGroup), cachedGroups);
+  
+    cachedGroups = cache.getGroups(newUser);
+    Collections.sort(cachedGroups);
+    assertEquals(Arrays.asList(groups[1], groups[2],
+        newGroup), cachedGroups);
+  
+    //remove group1
+    cache.removeGroup(groups[1]);
+  
+    assertNull(cache.getGroupIdFromCache(groups[1]));
+    assertEquals(0, cache.getGroupId(groups[1]));
+  
+    assertNull(cache.getGroupsFromCache(users[0]));
+    assertNull(cache.getGroups(users[0]));
+  
+    cachedGroups = cache.getGroupsFromCache(newUser);
+    assertNotNull(cachedGroups);
+    Collections.sort(cachedGroups);
+    assertEquals(Arrays.asList(groups[2],
+        newGroup), cachedGroups);
+  
+    //remove newUser
+    cache.removeUser(newUser);
+  
+    assertNull(cache.getUserIdFromCache(newUser));
+    assertEquals(0, cache.getUserId(newUser));
+    assertNull(cache.getGroupsFromCache(newUser));
+    assertNull(cache.getGroups(newUser));
   }
 
 
+  @Test
+  public void testAddRemoveUsersGroups() throws IOException {
+    Configuration conf = new Configuration();
+    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.setConfiguration(conf);
+    HdfsStorageFactory.formatStorage();
+
+    UsersGroupsCache cache = newUsersGroupsMapping(conf);
+    
+    String user = "user";
+    
+    //add User
+    cache.addUserToGroupTx(user, null, false);
+    
+    int userId = cache.getUserId(user);
+    assertNotSame(0, userId);
+    assertEquals(user, cache.getUserName(userId));
+  
+    //add Group
+    String group = "group";
+    cache.addUserToGroupTx(null, group, false);
+    
+    int groupId = cache.getGroupId(group);
+    assertNotSame(0, groupId);
+    assertEquals(group, cache.getGroupName(groupId));
+    
+    List<String> groups = cache.getGroups(user);
+    assertNotNull(groups);
+    assertTrue(groups.isEmpty());
+    
+    // add user-group
+    cache.addUserToGroupTx(user, group, false);
+  
+    groups = cache.getGroups(user);
+    assertNotNull(groups);
+    assertEquals(Arrays.asList(group), groups);
+  
+    //Update cache only
+  
+    cache.addUserToGroupTx(user, group, true);
+    groups = cache.getGroupsFromCache(user);
+    assertNotNull(groups);
+    assertEquals(Arrays.asList(group), groups);
+    
+    
+    //removeFromCache only
+    
+    //remove user-group
+    
+    cache.removeUserFromGroupTx(user, group, true);
+    assertNull(cache.getGroupsFromCache(user));
+    assertNotNull(cache.getGroups(user));
+    assertEquals(Arrays.asList(group), cache.getGroups(user));
+  
+    //remove group
+    cache.removeUserFromGroupTx(null, group, true);
+    assertNull(cache.getGroupIdFromCache(group));
+    groupId = cache.getGroupId(group);
+    assertNotSame(0, groupId);
+    
+    //remove user
+    cache.removeUserFromGroupTx(user, null, true);
+    assertNull(cache.getUserIdFromCache(user));
+    userId = cache.getUserId(user);
+    assertNotSame(0, userId);
+  
+    //removeFromCache and DB
+  
+    //remove user - group
+    
+    cache.removeUserFromGroupTx(user, group, false);
+    assertNull(cache.getGroupsFromCache(user));
+    assertNull(cache.getGroups(user));
+    
+    //remove group
+    cache.removeUserFromGroupTx(null, group, false);
+    groupId = cache.getGroupId(group);
+    assertNull(cache.getGroupIdFromCache(group));
+    assertEquals(0, groupId);
+  
+    //remove user
+    cache.removeUserFromGroupTx(user, null, false);
+    userId = cache.getUserId(user);
+    assertNull(cache.getUserIdFromCache(user));
+    assertEquals(0, userId);
+    
+  }
+  
   @Test
   public void testUsersGroupsNotConfigurad() throws IOException {
     UsersGroups.addUserToGroups("user", new String[]{"group1", "group2"});
     assertEquals(UsersGroups.getGroupID("group1"), 0);
     assertEquals(UsersGroups.getUserID("user"), 0);
+    assertNull(UsersGroups.getGroups("user"));
   }
   
   /**
@@ -279,7 +456,7 @@ public class TestUsersGroups {
   @Test
   public void testAddUsers() throws IOException {
     Configuration conf = new Configuration();
-    conf.setInt(CommonConfigurationKeys.HOPS_GROUPS_UPDATER_ROUND, 10);
+    conf.setInt(CommonConfigurationKeys.HOPS_UG_CACHE_SECS, 10);
     HdfsStorageFactory.resetDALInitialized();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
@@ -328,9 +505,8 @@ public class TestUsersGroups {
 
     int newUserId = UsersGroups.getUserID("user");
     assertNotSame(0, userId);
-
-    //Auto incremented Ids
-    assertTrue(newUserId > userId);
+    
+    assertNotSame(userId, newUserId);
 
     UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
         "group2"});
@@ -402,9 +578,16 @@ public class TestUsersGroups {
 
 
   @Test
-  public void setOwnerMultipleTimes() throws IOException {
+  public void setOwnerMultipleTimes() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+    
+    String userName = UserGroupInformation.getCurrentUser().getShortUserName();
+    conf.set(String.format("hadoop.proxyuser.%s.hosts", userName), "*");
+    conf.set(String.format("hadoop.proxyuser.%s.users", userName), "*");
+    conf.set(String.format("hadoop.proxyuser.%s.groups", userName), "*");
+    
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(1)
         .build();
     cluster.waitActive();
 
@@ -418,8 +601,23 @@ public class TestUsersGroups {
     dfs.setOwner(base, "testUser", "testGroup");
 
     removeGroup(UsersGroups.getGroupID("testGroup"));
-    dfs.flushCacheGroup("testGroup");
-
+  
+    UserGroupInformation ugi =
+        UserGroupInformation.createProxyUserForTesting("testUser",
+            UserGroupInformation
+                .getLoginUser(), new String[]{"testGroup"});
+  
+    FileSystem fs = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+    
+      @Override
+      public FileSystem run() throws Exception {
+        return cluster.getFileSystem();
+      }
+    });
+    
+    
+    fs.mkdirs(new Path(base, "testdir"));
+    
     dfs.setOwner(base, "testUser", "testGroup");
 
     cluster.shutdown();
@@ -686,6 +884,82 @@ public class TestUsersGroups {
       assertNotEquals(userId, newUserId);
     } finally {
       cluster.shutdown();
+    }
+  }
+  
+  @Test
+  public void testSuperUserCheck() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+  
+    String userName = UserGroupInformation.getCurrentUser().getShortUserName();
+    conf.set(String.format("hadoop.proxyuser.%s.hosts", userName), "*");
+    conf.set(String.format("hadoop.proxyuser.%s.users", userName), "*");
+    conf.set(String.format("hadoop.proxyuser.%s.groups", userName), "*");
+  
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(1)
+            .build();
+    cluster.waitActive();
+  
+    String user = "testUser";
+    
+    DistributedFileSystem dfs = cluster.getFileSystem();
+    dfs.addUser(user);
+  
+    UserGroupInformation ugi =
+        UserGroupInformation.createProxyUserForTesting(user,
+            UserGroupInformation
+                .getLoginUser(), new String[]{});
+  
+    DistributedFileSystem dfsTestUser =
+        (DistributedFileSystem)
+            ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
+      public FileSystem run() throws Exception {
+        return cluster.getFileSystem();
+      }
+    });
+    
+    try{
+      dfsTestUser.addUser("user");
+      fail();
+    }catch (AccessControlException ex){
+      //only super use should be able to call
+    }
+  
+    try{
+      dfsTestUser.addGroup("group");
+      fail();
+    }catch (AccessControlException ex){
+      //only super use should be able to call
+    }
+  
+    try{
+      dfsTestUser.addUserToGroup("user","group");
+      fail();
+    }catch (AccessControlException ex){
+      //only super use should be able to call
+    }
+  
+    try{
+      dfsTestUser.removeUser("user");
+      fail();
+    }catch (AccessControlException ex){
+      //only super use should be able to call
+    }
+  
+    try{
+      dfsTestUser.removeGroup("group");
+      fail();
+    }catch (AccessControlException ex){
+      //only super use should be able to call
+    }
+  
+    try{
+      dfsTestUser.removeUserFromGroup("user","group");
+      fail();
+    }catch (AccessControlException ex){
+      //only super use should be able to call
     }
   }
 

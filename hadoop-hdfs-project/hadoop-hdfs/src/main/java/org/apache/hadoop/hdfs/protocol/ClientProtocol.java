@@ -1373,18 +1373,7 @@ public interface ClientProtocol {
   @Idempotent
   public void changeConf(List<String> props, List<String> newVals)
       throws IOException;
-
-  /**
-   * Flush the cache for a specified user/group
-   * @param userName
-   *         the user name to flush its data in the cache, could be null.
-   * @param groupName
-   *         the group name to flush its data in the cache, could be null.
-   * @throws IOException
-   */
-  @Idempotent
-  public void flushCache(String userName, String groupName) throws IOException;
-
+  
   ///////////////////////////////////////
   // Erasure coding
   ///////////////////////////////////////
@@ -1631,4 +1620,32 @@ public interface ClientProtocol {
   @Idempotent
   public BatchedEntries<CachePoolEntry> listCachePools(String prevPool)
 throws IOException;
+  
+  /**
+   * Add a user/group and/or associate a user with a group.
+   * @param userName
+   *         the user name to be added, could be null.
+   * @param groupName
+   *         the group name to be added, could be null.
+   * @param cacheOnly
+   *         enables update for the cache only.
+   * @throws IOException
+   */
+  @Idempotent
+  public void addUserGroup(String userName, String groupName,
+      boolean cacheOnly) throws IOException;
+  
+  /**
+   * Remove a user/group and/or remove the user from the group.
+   * @param userName
+   *         the user name to be removed, could be null.
+   * @param groupName
+   *         the group name to be removed, could be null.
+   * @param cacheOnly
+   *         enables removal on the cache only.
+   * @throws IOException
+   */
+  @Idempotent
+  public void removeUserGroup(String userName, String groupName,
+      boolean cacheOnly) throws IOException;
 }

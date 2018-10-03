@@ -1471,44 +1471,7 @@ public class DistributedFileSystem extends FileSystem {
           throws IOException {
     dfs.revokeEncoding(filePath, replication);
   }
-
-
-  /**
-   * Flush the users/groups cache in all Namenodes
-   */
-  public void flushCacheAll() throws IOException {
-    flushCache(null, null);
-  }
-
-  /**
-   * Flush all user related cache data in all Namenodes
-   * @param user
-   *    the user name
-   * @throws IOException
-   */
-  public void flushCacheUser(String user) throws IOException {
-    flushCache(user, null);
-  }
-
-  /**
-   * Flush all group related cache data in all Namenodes
-   * @param group
-   * @throws IOException
-   */
-  public void flushCacheGroup(String group) throws IOException {
-    flushCache(null, group);
-  }
-
-  /**
-   * Flush all user and group related cache data in all Namenodes
-   * @param user
-   * @param group
-   * @throws IOException
-   */
-  public void flushCache(String user, String group) throws IOException {
-    dfs.flushCache(user, group);
-  }
-
+  
   public void enableMemcached() throws IOException {
     changeConf(DFSConfigKeys.DFS_RESOLVING_CACHE_ENABLED, String.valueOf(true));
   }
@@ -1850,5 +1813,69 @@ public class DistributedFileSystem extends FileSystem {
    */
   public RemoteIterator<CachePoolEntry> listCachePools() throws IOException {
     return dfs.listCachePools();
+  }
+  
+  /**
+   * Add a user.
+   * @param userName
+   *            Name of the user to add.
+   * @throws IOException
+   */
+  public void addUser(String userName) throws IOException{
+    dfs.addUserGroup(userName, null);
+  }
+  
+  /**
+   * Add a group.
+   * @param groupName
+   *            Name of the group to add.
+   * @throws IOException
+   */
+  public void addGroup(String groupName) throws IOException{
+    dfs.addUserGroup(null, groupName);
+  }
+  
+  /**
+   * Add a user to a group.
+   * @param userName
+   *            Name of the user.
+   * @param groupName
+   *            Name of the group.
+   * @throws IOException
+   */
+  public void addUserToGroup(String userName, String groupName) throws IOException{
+    dfs.addUserGroup(userName, groupName);
+  }
+  
+  /**
+   * Remove a user.
+   * @param userName
+   *            Name of the user to remove.
+   * @throws IOException
+   */
+  public void removeUser(String userName) throws IOException{
+    dfs.removeUserGroup(userName, null);
+  }
+  
+  /**
+   * Remove a group.
+   * @param groupName
+   *            Name of the group to remove.
+   * @throws IOException
+   */
+  public void removeGroup(String groupName) throws IOException{
+    dfs.removeUserGroup(null, groupName);
+  }
+  
+  /**
+   * Remove a user from group.
+   * @param userName
+   *            Name of the user.
+   * @param groupName
+   *            Name of the group.
+   * @throws IOException
+   */
+  public void removeUserFromGroup(String userName, String groupName) throws IOException{
+    dfs.removeUserGroup(userName, groupName);
   }
 }

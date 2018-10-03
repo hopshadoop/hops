@@ -30,7 +30,7 @@ import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
-import io.hops.security.Users;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -900,7 +900,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       throw new FileNotFoundException("File does not exist: " + src);
     }
 
-    Users.addUserToGroup(username, groupname);
+    UsersGroups.addUserToGroup(username, groupname);
 
     if (username != null) {
       inode.setUser(username);

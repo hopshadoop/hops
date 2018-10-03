@@ -22,38 +22,33 @@ import io.hops.common.IDsMonitor;
 import io.hops.exception.StorageException;
 import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.metadata.HdfsStorageFactory;
-import io.hops.security.Users;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
-import static org.apache.hadoop.hdfs.server.common.Util.fileAsURI;
-import static org.apache.hadoop.util.Time.now;
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Collections;
-
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.FSLimitException.MaxDirectoryItemsExceededException;
 import org.apache.hadoop.hdfs.protocol.FSLimitException.PathComponentTooLongException;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.Collections;
+
+import static org.apache.hadoop.util.Time.now;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class TestFsLimits {
   static Configuration conf;
@@ -79,7 +74,7 @@ public class TestFsLimits {
   private void initFS() throws StorageException, IOException {
     HdfsStorageFactory.setConfiguration(conf);
     assert (HdfsStorageFactory.formatStorage());
-    Users.addUserToGroup(perms.getUserName(), perms.getGroupName());
+    UsersGroups.addUserToGroup(perms.getUserName(), perms.getGroupName());
     IDsMonitor.getInstance().start();
     NameNode.initMetrics(conf, NamenodeRole.NAMENODE);
     fs = null;

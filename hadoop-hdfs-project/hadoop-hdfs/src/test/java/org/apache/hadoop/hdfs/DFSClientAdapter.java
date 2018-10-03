@@ -17,10 +17,13 @@
  */
 package org.apache.hadoop.hdfs;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 
 import java.io.IOException;
+import java.util.Collection;
+
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 
 public class DFSClientAdapter {
@@ -61,5 +64,14 @@ public class DFSClientAdapter {
 
   public static long getFileId(DFSOutputStream out) {
     return out.getFileId();
+  }
+  
+  public static DistributedFileSystem newDistributedFileSystem(
+      Configuration conf, ClientProtocol namenode, Collection<ClientProtocol> allNamenodes)
+      throws IOException {
+    DistributedFileSystem dfs = new DistributedFileSystem();
+    dfs.dfs = new DFSClient(null, namenode, conf, null);
+    dfs.dfs.setNamenodes(allNamenodes);
+    return dfs;
   }
 }
