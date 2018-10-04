@@ -186,6 +186,10 @@ public class LockFactory {
     return new INodeLock(lockType, resolveType, paths);
   }
 
+  public INodeLock getINodeLock(TransactionLockTypes.INodeLockType lockType,
+                                TransactionLockTypes.INodeResolveType resolveType, long inodeId) {
+    return new INodeLock(lockType, resolveType, inodeId);
+  }
 
   public INodeLock getRenameINodeLock(TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType, String src, String dst) {
@@ -367,6 +371,10 @@ public class LockFactory {
     return new LastTwoBlocksLock(src);
   }
 
+  public Lock getLastTwoBlocksLock(long fileId){
+    return new LastTwoBlocksLock(fileId);
+  }
+  
   public Lock getAcesLock(){
     return new AcesLock();
   }

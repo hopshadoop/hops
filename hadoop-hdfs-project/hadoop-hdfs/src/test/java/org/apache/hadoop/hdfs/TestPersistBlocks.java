@@ -33,6 +33,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Random;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -150,12 +151,13 @@ public class TestPersistBlocks {
       // Abandon the last block
       DFSClient dfsclient =
           DFSClientAdapter.getDFSClient((DistributedFileSystem) fs);
+      HdfsFileStatus fileStatus = dfsclient.getNamenode().getFileInfo(FILE_NAME);
       LocatedBlocks blocks = dfsclient.getNamenode()
           .getBlockLocations(FILE_NAME, 0, BLOCK_SIZE * NUM_BLOCKS);
       assertEquals(NUM_BLOCKS, blocks.getLocatedBlocks().size());
       LocatedBlock b = blocks.getLastLocatedBlock();
-      dfsclient.getNamenode()
-          .abandonBlock(b.getBlock(), FILE_NAME, dfsclient.clientName);
+      dfsclient.getNamenode().abandonBlock(b.getBlock(), fileStatus.getFileId(),
+          FILE_NAME, dfsclient.clientName);
       
       // explicitly do NOT close the file.
       cluster.restartNameNode();

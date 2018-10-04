@@ -189,22 +189,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       ".resolvingcache.enabled";
   public static final boolean DFS_RESOLVING_CACHE_ENABLED_DEFAULT = true;
   
-  public static final String DFS_MEMCACHE_SERVER =
-      "dfs.resolvingcache.memcache.server.address";
-  public static final String DFS_MEMCACHE_SERVER_DEFAULT = "127.0.0.1:11212";
-  
-  public static final String DFS_MEMCACHE_CONNECTION_POOL_SIZE =
-      "dfs.resolvingcache.memcache.connectionpool.size";
-  public static final int DFS_MEMCACHE_CONNECTION_POOL_SIZE_DEFAULT = 10;
-  
-  public static final String DFS_MEMCACHE_KEY_PREFIX =
-      "dfs.resolvingcache.memcache.key.prefix";
-  public static final String DFS_MEMCACHE_KEY_PREFIX_DEFAULT = "p:";
-  
-  public static final String DFS_MEMCACHE_KEY_EXPIRY_IN_SECONDS =
-      "dfs.resolvingcache.memcache.key.expiry";
-  public static final int DFS_MEMCACHE_KEY_EXPIRY_IN_SECONDS_DEFAULT = 0;
-
   public static final String DFS_RESOLVING_CACHE_TYPE = "dfs.resolvingcache" +
       ".type";
 

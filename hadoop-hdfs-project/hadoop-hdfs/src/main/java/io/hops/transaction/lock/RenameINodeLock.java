@@ -64,7 +64,7 @@ final class RenameINodeLock extends INodeLock {
     String src = paths[0];
     String dst = paths[1];
     Arrays.sort(paths, PATH_COMPARTOR);
-    acquireINodeLocks();
+    acquirePathsINodeLocks();
 
     if (legacyRename) // In deprecated rename, it allows to move a dir to an existing destination.
     {

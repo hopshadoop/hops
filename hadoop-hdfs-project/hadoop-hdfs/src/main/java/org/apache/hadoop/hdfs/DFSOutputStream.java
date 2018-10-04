@@ -1106,7 +1106,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
       //get a new datanode
       final DatanodeInfo[] original = nodes;
-      final LocatedBlock lb = dfsClient.getAdditionalDatanode(src, block, nodes, storageIDs,
+      final LocatedBlock lb = dfsClient.getAdditionalDatanode(src, fileId, block, nodes, storageIDs,
           failed.toArray(new DatanodeInfo[failed.size()]), 1,
           dfsClient.clientName);
       setPipeline(lb);
@@ -1463,7 +1463,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
         if (!success) {
           DFSClient.LOG.info("Abandoning " + block);
-          dfsClient.namenode.abandonBlock(block, src, dfsClient.clientName);
+          dfsClient.namenode.abandonBlock(block, fileId, src, dfsClient.clientName);
           block = null;
           DFSClient.LOG.info("Excluding datanode " + nodes[errorIndex]);
           excludedNodes.put(nodes[errorIndex], nodes[errorIndex]);
@@ -2263,7 +2263,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       // namenode.
       if (persistBlocks.getAndSet(false) || updateLength) {
         try {
-          dfsClient.namenode.fsync(src, dfsClient.clientName, lastBlockLength);
+          dfsClient.namenode.fsync(src, fileId, dfsClient.clientName, lastBlockLength);
         } catch (IOException ioe) {
           DFSClient.LOG
                   .warn("Unable to persist blocks in hflush for " + src, ioe);
@@ -2388,7 +2388,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     streamer.setLastException(new IOException("Lease timeout of "
         + (dfsClient.getHdfsTimeout()/1000) + " seconds expired."));
     closeThreads(true);
-    dfsClient.endFileLease(src);
+    dfsClient.endFileLease(fileId);
   }
 
   // shutdown datastreamer and responseprocessor threads.
@@ -2463,7 +2463,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     ExtendedBlock lastBlock = streamer.getBlock();
     completeFile(lastBlock);
     closeThreads(false);
-    dfsClient.endFileLease(src);
+    dfsClient.endFileLease(fileId);
   }
 
   // should be called holding (this) lock since setTestFilename() may 
@@ -2661,7 +2661,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   }
 
   @VisibleForTesting
-  long getFileId() {
+  public long getFileId() {
     return fileId;
   }
 }

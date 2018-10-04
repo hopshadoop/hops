@@ -60,6 +60,7 @@ public class TestRenameWhileOpen {
         1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, TestFileCreation.blockSize);
 
     // create cluster
     System.out.println("Test 1*****************************");
@@ -67,7 +68,7 @@ public class TestRenameWhileOpen {
     FileSystem fs = null;
     try {
       cluster.waitActive();
-      fs = cluster.getFileSystem();
+      fs = cluster.getFileSystem();      
       final int nnport = cluster.getNameNodePort();
 
       // create file1.
@@ -95,17 +96,17 @@ public class TestRenameWhileOpen {
 
       // create file3
       Path file3 = new Path(dir3, "file3");
-      FSDataOutputStream stm3 = TestFileCreation.createFile(fs, file3, 1);
-      TestFileCreation.writeFile(stm3);
-      // rename file3 to some bad name
-      try {
-        fs.rename(file3, new Path(dir3, "$ "));
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
-      
-      // restart cluster with the same namenode port as before.
-      // This ensures that leases are persisted in fsimage.
+      FSDataOutputStream stm3 = fs.create(file3);
+      fs.rename(file3, new Path(dir3, "bozo"));
+      // Get a new block for the file.
+      TestFileCreation.writeFile(stm3, TestFileCreation.blockSize + 1);
+      stm3.hflush();
+      // Stop the NameNode before closing the files.
+      // This will ensure that the write leases are still active and present
+      // in the edit log.  Simiarly, there should be a pending ADD_BLOCK_OP
+      // for file3, since we just added a block to that file.
+      cluster.getNameNode().stop();
+      // Restart cluster with the same namenode port as before.
       cluster.shutdown();
       try {
         Thread.sleep(2 * MAX_IDLE_TIME);
@@ -117,7 +118,7 @@ public class TestRenameWhileOpen {
       cluster.waitActive();
 
       // restart cluster yet again. This triggers the code to read in
-      // persistent leases from fsimage.
+      // persistent leases.
       cluster.shutdown();
       try {
         Thread.sleep(5000);
