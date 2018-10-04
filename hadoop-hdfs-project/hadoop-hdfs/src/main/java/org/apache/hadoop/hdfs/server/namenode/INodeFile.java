@@ -32,7 +32,6 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
@@ -49,18 +48,27 @@ import java.util.List;
 @InterfaceAudience.Private
 public class INodeFile extends INodeWithAdditionalFields implements BlockCollection {
   
-  /**
-   * Cast INode to INodeFile.
-   */
-  public static INodeFile valueOf(INode inode, String path) throws FileNotFoundException {
+  /** The same as valueOf(inode, path, false). */
+  public static INodeFile valueOf(INode inode, String path
+      ) throws FileNotFoundException, StorageException, TransactionContextException {
+    return valueOf(inode, path, false);
+  }
+
+  /** Cast INode to INodeFile. */
+  public static INodeFile valueOf(INode inode, String path, boolean acceptNull)
+      throws FileNotFoundException, StorageException, TransactionContextException {
     if (inode == null) {
-      throw new FileNotFoundException("File does not exist: " + path);
+      if (acceptNull) {
+        return null;
+      } else {
+        throw new FileNotFoundException("File does not exist: " + path);
+      }
     }
-    if (!(inode instanceof INodeFile)) {
+    if (!inode.isFile()) {
       throw new FileNotFoundException("Path is not a file: " + path);
     }
-    return (INodeFile) inode;
-  }
+    return inode.asFile();
+}
 
   private int generationStamp = (int) GenerationStamp.LAST_RESERVED_STAMP;
   private long size = 0;
