@@ -2419,4 +2419,35 @@
     </description>
   </property>
 
+  <!-- Hops Users Groups -->
+  <property>
+  <name>hops.ug.cache.secs</name>
+  <value>120</value>
+  <description>
+    This is the config controlling the validity of the entries in the
+    Hops users-groups cache containing the user->group, user->Id, and
+    group->Id mappings. When this duration has expired, then the cache is
+    invoked to get the groups of the user, user/group ids from the database
+    and then cached back.
+  </description>
+</property>
+
+  <property>
+    <name>hops.ug.cache.size</name>
+    <value>10000</value>
+    <description>
+      This is the config controlling the number of entries that can be cached
+      in Hops users-groups. When the cache reach this size, it will evict the
+      least recently used mappings.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.client.copy.from.local.parallel.threads</name>
+    <value>10</value>
+    <description>
+        Number of threads to use for copying directories 
+        using the -copyFromLocal command
+    </description>
+  </property>
 </configuration>

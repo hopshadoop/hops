@@ -395,4 +395,7 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String IO_ERASURECODE_CODEC_XOR_RAWCODER_DEFAULT =
       XORRawErasureCoderFactory.class.getCanonicalName();
 
+  public static final String DFS_CLIENT_COPY_FROM_LOCAL_PARALLEL_THREADS =
+          "dfs.client.copy.from.local.parallel.threads";
+  public static final int DFS_CLIENT_COPY_FROM_LOCAL_PARALLEL_THREADS_DEFAULT = 10;
 }
