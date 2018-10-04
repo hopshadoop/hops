@@ -2256,13 +2256,15 @@ public class FSNamesystem
       IOException {
 
     // Verify that the destination does not exist as a directory already.
-    boolean pathExists = dir.exists(src);
-    if (pathExists && dir.isDir(src)) {
+    final INodesInPath iip = dir.getINodesInPath4Write(src);
+    final INode inode = iip.getLastINode();
+    if (inode != null && inode.isDirectory()) {
       throw new FileAlreadyExistsException(src +
           " already exists as a directory");
     }
+    final INodeFile myFile = INodeFile.valueOf(inode, src,  true);
     if (isPermissionEnabled) {
-      if (overwrite && pathExists) {
+      if (overwrite && myFile != null) {
         checkPathAccess(pc, src, FsAction.WRITE);
       } else {
         checkAncestorAccess(pc, src, FsAction.WRITE);
@@ -2274,9 +2276,8 @@ public class FSNamesystem
     }
 
     try {
-      final INode inode = dir.getINode(src);
       
-      if (inode == null) {
+      if (myFile == null) {
         if (!create) {
           throw new FileNotFoundException("Can't overwrite non-existent " +
               src + " for client " + clientMachine);
@@ -2291,7 +2292,6 @@ public class FSNamesystem
           }
         } else {
           // If lease soft limit time is expired, recover the lease
-          final INodeFile myFile = INodeFile.valueOf(dir.getINode(src), src);
           recoverLeaseInternal(myFile, src, holder, clientMachine, false);
           throw new FileAlreadyExistsException(src + " for client " +
               clientMachine + " already exists");
@@ -2339,9 +2339,9 @@ public class FSNamesystem
   private LocatedBlock appendFileInternal(FSPermissionChecker pc, String src,
       String holder, String clientMachine) throws AccessControlException,
       UnresolvedLinkException, FileNotFoundException, IOException {
-    // Verify that the destination does not exist as a directory already.
-    boolean pathExists = dir.exists(src);
-    if (pathExists && dir.isDir(src)) {
+    final INodesInPath iip = dir.getINodesInPath4Write(src);
+    final INode inode = iip.getLastINode();
+    if (inode != null && inode.isDirectory()) {
       throw new FileAlreadyExistsException("Cannot append to directory " + src
           + "; already exists as a directory.");
     }
@@ -2350,12 +2350,11 @@ public class FSNamesystem
     }
 
     try {
-      final INode inode = dir.getINode(src);
       if (inode == null) {
         throw new FileNotFoundException("failed to append to non-existent file "
           + src + " for client " + clientMachine);
       }
-      final INodeFile myFile = INodeFile.valueOf(inode, src);
+      INodeFile myFile = INodeFile.valueOf(inode, src, true);
 
       final BlockInfo lastBlock = myFile.getLastBlock();
       // Check that the block has at least minimum replication.
@@ -2366,6 +2365,11 @@ public class FSNamesystem
 
       // Opening an existing file for write - may need to recover lease.
       recoverLeaseInternal(myFile, src, holder, clientMachine, false);
+
+      // recoverLeaseInternal may create a new InodeFile via 
+      // finalizeINodeFileUnderConstruction so we need to refresh 
+      // the referenced file.  
+      myFile = INodeFile.valueOf(dir.getINode(src), src, true);
 
       final DatanodeDescriptor clientNode =
           blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);

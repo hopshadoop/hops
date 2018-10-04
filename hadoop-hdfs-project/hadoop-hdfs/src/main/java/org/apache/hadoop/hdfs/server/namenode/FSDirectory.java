@@ -862,16 +862,6 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return INodeFile.valueOf(getNode(path, false), path).getPreferredBlockSize();
   }
 
-  boolean exists(String src) throws UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    src = normalizePath(src);
-    INode inode = getNode(src, false);
-    if (inode == null) {
-      return false;
-    }
-    return !inode.isFile() || ((INodeFile)inode).getBlocks() != null;
-  }
-
   void setPermission(String src, FsPermission permission)
       throws FileNotFoundException, UnresolvedLinkException, StorageException,
       TransactionContextException {
@@ -1214,16 +1204,6 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
   }
 
-  /**
-   * Get the blocks associated with the file.
-   */
-  Block[] getFileBlocks(String src)
-      throws UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    INode i = getNode(src, false);
-    return i != null && i.isFile()? ((INodeFile)i).getBlocks(): null;
-  }
-
   INodesInPath getExistingPathINodes(byte[][] components)
       throws UnresolvedLinkException, StorageException, TransactionContextException {
     return INodesInPath.resolve(getRootDir(), components);
@@ -1270,13 +1250,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
     String srcs = normalizePath(src);
-    if (srcs.startsWith("/") &&
-        !srcs.endsWith("/") &&
-        getNode(srcs, false) == null) {
-      return true;
-    } else {
-      return false;
-    }
+    return srcs.startsWith("/") && !srcs.endsWith("/")
+        && getINode4Write(srcs, false) == null;
   }
 
   /**
@@ -1509,7 +1484,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
 
     // create directories beginning from the first null index
     for (; i < inodes.length; i++) {
-      pathbuilder.append(Path.SEPARATOR + names[i]);
+      pathbuilder.append(Path.SEPARATOR).append(names[i]);
       String cur = pathbuilder.toString();
       unprotectedMkdir(IDsGeneratorFactory.getInstance().getUniqueINodeID(), inodesInPath, i, components[i],
           (i < lastInodeIndex) ? parentPermissions : permissions, now);
@@ -2592,7 +2567,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       return src;
     }
     final String inodeId = DFSUtil.bytes2String(pathComponents[3]);
-    int id = 0;
+    final int id;
     try {
       id = Integer.valueOf(inodeId);
     } catch (NumberFormatException e) {
