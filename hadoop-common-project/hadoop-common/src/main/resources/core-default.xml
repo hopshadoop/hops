@@ -2442,5 +2442,12 @@
     </description>
   </property>
 
-
+  <property>
+    <name>dfs.client.copy.from.local.parallel.threads</name>
+    <value>10</value>
+    <description>
+        Number of threads to use for copying directories 
+        using the -copyFromLocal command
+    </description>
+  </property>
 </configuration>
