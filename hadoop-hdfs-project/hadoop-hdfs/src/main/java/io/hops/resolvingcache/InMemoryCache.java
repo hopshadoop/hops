@@ -18,6 +18,7 @@
 package io.hops.resolvingcache;
 
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.server.namenode.INode;
@@ -29,7 +30,9 @@ import java.util.List;
 
 public class InMemoryCache extends Cache{
 
-  private ConcurrentLinkedHashMap<String, Long> cache;
+  private ConcurrentLinkedHashMap<String, Long> pathCache;
+  //store INodeIdentifier instead of INode to save memory and avoid risk of modifying the INode object by accident
+  private ConcurrentLinkedHashMap<Long, INodeIdentifier> inodeIdCache; 
   private int CACHE_MAXIMUM_SIZE;
 
   @Override
@@ -41,7 +44,9 @@ public class InMemoryCache extends Cache{
 
   @Override
   protected void startInternal() throws IOException {
-    cache = new ConcurrentLinkedHashMap.Builder().maximumWeightedCapacity
+    pathCache = new ConcurrentLinkedHashMap.Builder().maximumWeightedCapacity
+        (CACHE_MAXIMUM_SIZE).build();
+    inodeIdCache = new ConcurrentLinkedHashMap.Builder().maximumWeightedCapacity
         (CACHE_MAXIMUM_SIZE).build();
   }
 
@@ -51,13 +56,24 @@ public class InMemoryCache extends Cache{
 
   @Override
   protected void setInternal(String path, List<INode> inodes) {
-    for(INode iNode : inodes){
-      if(iNode != null) {
-        cache.put(iNode.nameParentKey(), iNode.getId());
+    for (INode inode : inodes) {
+      if (inode != null) {
+        pathCache.put(inode.nameParentKey(), inode.getId());
+        inodeIdCache.put(inode.getId(), new INodeIdentifier(inode.getId(), inode.getParentId(), inode.getLocalName(),
+            inode.getPartitionId()));
       }
     }
   }
 
+  @Override
+  protected void setInternal(INode inode) {
+    if (inode != null) {
+      inodeIdCache.put(inode.getId(), new INodeIdentifier(inode.getId(), inode.getParentId(), inode.getLocalName(),
+            inode.getPartitionId()));
+    }
+
+  }
+  
   @Override
   protected long[] getInternal(String path) throws IOException {
     String[] pathComponents = INode.getPathNames(path);
@@ -66,7 +82,7 @@ public class InMemoryCache extends Cache{
     int index = 0;
     while(index <pathComponents.length){
       String cmp = pathComponents[index];
-      Long inodeId = cache.get(INode.nameParentKey(parentId, cmp));
+      Long inodeId = pathCache.get(INode.nameParentKey(parentId, cmp));
       if(inodeId != null){
         parentId = inodeId;
         inodeIds[index] = inodeId;
@@ -82,10 +98,10 @@ public class InMemoryCache extends Cache{
 
     return Arrays.copyOf(inodeIds, index);
   }
-
+  
   @Override
-  protected void setInternal(INode inode) {
-    throw new UnsupportedOperationException();
+  protected INodeIdentifier getInternal(long inodeId) throws IOException {
+    return inodeIdCache.get(inodeId);
   }
 
   @Override
@@ -95,12 +111,19 @@ public class InMemoryCache extends Cache{
 
   @Override
   protected void deleteInternal(INode inode) {
-    cache.remove(inode.nameParentKey());
+    pathCache.remove(inode.nameParentKey());
+    inodeIdCache.remove(inode.getId());
   }
-
+  
+   @Override
+  protected void deleteInternal(INodeIdentifier inode) {
+    inodeIdCache.remove(inode.getInodeId());
+  }
+  
   @Override
   protected void flushInternal() {
-    cache.clear();
+    pathCache.clear();
+    inodeIdCache.clear();;
   }
 
   @Override

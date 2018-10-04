@@ -213,7 +213,7 @@ public class TestUsersGroupsMultiNamenode {
     }
     
     @Override
-    public void abandonBlock(ExtendedBlock b, String src, String holder)
+    public void abandonBlock(ExtendedBlock b, long fileId, String src, String holder)
         throws AccessControlException, FileNotFoundException,
         UnresolvedLinkException, IOException {
       
@@ -230,7 +230,7 @@ public class TestUsersGroupsMultiNamenode {
     }
     
     @Override
-    public LocatedBlock getAdditionalDatanode(String src,
+    public LocatedBlock getAdditionalDatanode(String src,final long fileId,
         ExtendedBlock blk, DatanodeInfo[] existings,
         String[] existingStorageIDs, DatanodeInfo[] excludes,
         int numAdditionalNodes, String clientName)
@@ -395,7 +395,7 @@ public class TestUsersGroupsMultiNamenode {
     }
     
     @Override
-    public void fsync(String src, String client, long lastBlockLength)
+    public void fsync(String src, long inodeId, String client, long lastBlockLength)
         throws AccessControlException, FileNotFoundException,
         UnresolvedLinkException, IOException {
       

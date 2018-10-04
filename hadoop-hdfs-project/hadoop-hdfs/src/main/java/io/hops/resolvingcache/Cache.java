@@ -17,6 +17,7 @@
  */
 package io.hops.resolvingcache;
 
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.context.TransactionsStats;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -33,7 +34,7 @@ public abstract class Cache {
 
   private static Cache instance = null;
 
-  protected static final Log LOG = LogFactory.getLog(PathMemcache.class);
+  protected static final Log LOG = LogFactory.getLog(Cache.class);
 
   private boolean isStarted;
   private boolean isEnabled;
@@ -45,14 +46,8 @@ public abstract class Cache {
     if (instance == null) {
       String  memType = conf.get(DFSConfigKeys.DFS_RESOLVING_CACHE_TYPE,
           DFSConfigKeys.DFS_RESOLVING_CACHE_TYPE_DEFAULT).toLowerCase();
-      if(memType.equals("inode")){
-        instance = new INodeMemcache();
-      }else if(memType.equals("path")) {
-        instance = new PathMemcache();
-      }else if(memType.equals("inmemory")){
+      if(memType.equals("inmemory")){
         instance = new InMemoryCache();
-      }else if(memType.equals("optimal")){
-        instance = new OptimalMemcache();
       }else {
         throw new IllegalArgumentException("Cache has only two " +
             "Memcache implementations, Inode based and Path based: wrong " +
@@ -126,7 +121,12 @@ public abstract class Cache {
 
   public final void set(final INode inode){
     if(isStarted){
-
+      setInternal(inode);
+      if(TransactionsStats.getInstance().isEnabled()){
+        TransactionsStats.getInstance().pushResolvingCacheStats(
+            new ResolvingCacheStat(
+                ResolvingCacheStat.Op.SET, 0,1));
+      }
     }
   }
 
@@ -149,6 +149,21 @@ public abstract class Cache {
     return null;
   }
 
+  public final INodeIdentifier get(final long inodeId) throws IOException {
+    if (isStarted) {
+      final long startTime = System.currentTimeMillis();
+      INodeIdentifier result = getInternal(inodeId);
+      final long elapsed = (System.currentTimeMillis() - startTime);
+      LOG.debug("GET for inodeId (" + inodeId + ")  got value = " + result + " in " + elapsed + " " + "msec");
+      if (TransactionsStats.getInstance().isEnabled()) {
+        TransactionsStats.getInstance().pushResolvingCacheStats(
+            new ResolvingCacheStat(ResolvingCacheStat.Op.GET, elapsed, 1));
+      }
+      return result;
+    }
+    return null;
+  }
+
   public final void delete(final String path){
     if(isStarted){
       deleteInternal(path);
@@ -157,6 +172,12 @@ public abstract class Cache {
 
   public final void delete(final INode inode){
     if(isStarted){
+      deleteInternal(inode);
+    }
+  }
+
+  public final void delete(final INodeIdentifier inode) {
+    if (isStarted) {
       deleteInternal(inode);
     }
   }
@@ -175,10 +196,12 @@ public abstract class Cache {
       inodes);
 
   protected abstract void setInternal(final INode inode);
-
+  
   protected abstract long[] getInternal(final String path) throws IOException;
+  protected abstract INodeIdentifier getInternal(final long inodeId) throws IOException;
   protected abstract void deleteInternal(final String path);
   protected abstract void deleteInternal(final INode inode);
+  protected abstract void deleteInternal(final INodeIdentifier inode);
   protected abstract void flushInternal();
 
   protected abstract int getRoundTrips(String path);

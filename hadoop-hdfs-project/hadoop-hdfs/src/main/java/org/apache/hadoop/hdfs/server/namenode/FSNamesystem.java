@@ -2762,14 +2762,25 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
-                    .setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-            locks.add(il)
-                    .add(lf.getLeaseLock(LockType.READ, clientName))
-                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
-                    .add(lf.getLastTwoBlocksLock(src))
-                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC));
+            if (fileId == INode.ROOT_PARENT_ID) {
+              // Older clients may not have given us an inode ID to work with.
+              // In this case, we have to try to resolve the path and hope it
+              // hasn't changed or been deleted since the file was opened for write.
+              INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+              locks.add(il)
+                  .add(lf.getLastTwoBlocksLock(src));
+            } else {
+              INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, fileId)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+              locks.add(il)
+                  .add(lf.getLastTwoBlocksLock(fileId));
+            }
+            locks.add(lf.getLeaseLock(LockType.READ, clientName))
+                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC));
           }
 
           @Override
@@ -2785,15 +2796,8 @@ public class FSNamesystem
 
             // Part I. Analyze the state of the file with respect to the input data.
             LocatedBlock[] onRetryBlock = new LocatedBlock[1];
-            final INodesInPath inodesInPath;
-            try {
-              inodesInPath = analyzeFileState(src, fileId, clientName,
-                previous, onRetryBlock);
-            } catch(IOException e) {
-              throw e;
-            }
-            INode[] inodes = inodesInPath.getINodes();
-            final INodeFile pendingFile = inodes[inodes.length - 1].asFile();
+            INodeFile pendingFile = analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
+            String src2 = pendingFile.getFullPathName();
 
             if (onRetryBlock[0] != null && onRetryBlock[0].getLocations().length > 0) {
               // This is a retry. Just return the last block if having locations.
@@ -2819,7 +2823,7 @@ public class FSNamesystem
 
             // choose targets for the new block to be allocated.
             final DatanodeStorageInfo targets[] = getBlockManager().chooseTarget4NewBlock(
-                src, replication, clientNode, excludedNodes, blockSize,
+                src2, replication, clientNode, excludedNodes, blockSize,
                 favoredNodes, storagePolicyID);
 
             // Part II.
@@ -2827,10 +2831,8 @@ public class FSNamesystem
             Block newBlock;
             long offset;
             onRetryBlock = new LocatedBlock[1];
-            INodesInPath iNodesInPath2 =
-                analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
-            INode[] inodes2 = iNodesInPath2.getINodes();
-            final INodeFile pendingFile2 = inodes2[inodes2.length - 1].asFile();
+            pendingFile =
+                analyzeFileState(src2, fileId, clientName, previous, onRetryBlock);
 
             if (onRetryBlock[0] != null) {
               if (onRetryBlock[0].getLocations().length > 0) {
@@ -2847,19 +2849,20 @@ public class FSNamesystem
             }
 
             // commit the last block and complete it if it has minimum replicas
-            commitOrCompleteLastBlock(pendingFile2,
+            commitOrCompleteLastBlock(pendingFile,
                 ExtendedBlock.getLocalBlock(previous));
 
             // allocate new block, record block locations in INode.
-            newBlock = createNewBlock(pendingFile2);
-            saveAllocatedBlock(src, iNodesInPath2, newBlock, targets);
+            newBlock = createNewBlock(pendingFile);
+            INodesInPath inodesInPath = INodesInPath.fromINode(pendingFile);
+            saveAllocatedBlock(src2, inodesInPath, newBlock, targets);
 
 
-            dir.persistNewBlock(src, pendingFile2);
-            offset = pendingFile2.computeFileSize(true);
+            dir.persistNewBlock(src2, pendingFile);
+            offset = pendingFile.computeFileSize(true);
 
             Lease lease = leaseManager.getLease(clientName);
-            lease.updateLastTwoBlocksInLeasePath(src, newBlock,
+            lease.updateLastTwoBlocksInLeasePath(src2, newBlock,
                 ExtendedBlock.getLocalBlock(previous));
 
 
@@ -2884,7 +2887,7 @@ public class FSNamesystem
     return (LocatedBlock) additionalBlockHandler.handle(this);
   }
 
-  private INodesInPath analyzeFileState(String src, long fileId, String clientName,
+  private INodeFile analyzeFileState(String src, long fileId, String clientName,
       ExtendedBlock previous, LocatedBlock[] onRetryBlock)
       throws IOException {
 
@@ -2896,11 +2899,20 @@ public class FSNamesystem
     checkFsObjectLimit();
 
     Block previousBlock = ExtendedBlock.getLocalBlock(previous);
-    final INodesInPath inodesInPath = dir.getINodesInPath4Write(src);
-    final INode[] inodes = inodesInPath.getINodes();
-    
-    final INodeFile pendingFile =
-        checkLease(src, fileId, clientName, inodes[inodes.length - 1]);
+    INode inode;
+    if (fileId == INode.ROOT_PARENT_ID) {
+      // Older clients may not have given us an inode ID to work with.
+      // In this case, we have to try to resolve the path and hope it
+      // hasn't changed or been deleted since the file was opened for write.
+      final INodesInPath iip = dir.getINodesInPath4Write(src);
+      inode = iip.getLastINode();
+    } else {
+      // Newer clients pass the inode ID, so we can just get the inode
+      // directly.
+      inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
+      if (inode != null) src = inode.getFullPathName();
+    }
+    final INodeFile pendingFile = checkLease(src, clientName, inode, fileId, true);
     BlockInfo lastBlockInFile = pendingFile.getLastBlock();
     if (!Block.matchingIdAndGenStamp(previousBlock, lastBlockInFile)) {
       // The block that the client claims is the current last block
@@ -2960,7 +2972,7 @@ public class FSNamesystem
             ((BlockInfoUnderConstruction) lastBlockInFile).getExpectedStorageLocations(
                 getBlockManager().getDatanodeManager()),
             offset);
-        return inodesInPath;
+        return pendingFile;
       } else {
         // Case 3
         throw new IOException("Cannot allocate block in " + src + ": " +
@@ -2974,7 +2986,7 @@ public class FSNamesystem
       throw new NotReplicatedYetException("Not replicated yet: " + src +
               " block " + pendingFile.getPenultimateBlock());
     }
-    return inodesInPath;
+    return pendingFile;
   }
 
   private LocatedBlock makeLocatedBlock(Block blk, DatanodeStorageInfo[] locs, long offset)
@@ -2989,7 +3001,7 @@ public class FSNamesystem
   /**
    * @see ClientProtocol#getAdditionalDatanode(String, ExtendedBlock, DatanodeInfo[], String[], DatanodeInfo[], int, String)
    */
-  LocatedBlock getAdditionalDatanode(final String src1, final ExtendedBlock blk,
+  LocatedBlock getAdditionalDatanode(final String src1, final long fileId, final ExtendedBlock blk,
       final DatanodeInfo[] existings, final String[] storageIDs,
       final HashSet<Node> excludes, final int numAdditionalNodes,
       final String clientName) throws IOException {
@@ -3001,10 +3013,22 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
-                    .setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-            locks.add(il).add(lf.getLeaseLock(LockType.READ, clientName));
+            if (fileId == INode.ROOT_PARENT_ID) {
+              // Older clients may not have given us an inode ID to work with.
+              // In this case, we have to try to resolve the path and hope it
+              // hasn't changed or been deleted since the file was opened for write.
+              INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+              locks.add(il);
+            } else {
+              INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, fileId)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+              locks.add(il);
+            }
+
+            locks.add(lf.getLeaseLock(LockType.READ, clientName));
           }
 
           @Override
@@ -3017,10 +3041,21 @@ public class FSNamesystem
             final List<DatanodeStorageInfo> chosen;
             //check safe mode
             checkNameNodeSafeMode("Cannot add datanode; src=" + src + ", blk=" + blk);
-
+            String src2=src;
             //check lease
-            final INodeFile file = checkLease(src,
-                clientName, false);
+            final INode inode;
+            if (fileId == INode.ROOT_PARENT_ID) {
+              // Older clients may not have given us an inode ID to work with.
+              // In this case, we have to try to resolve the path and hope it
+              // hasn't changed or been deleted since the file was opened for write.
+              inode = dir.getINode(src);
+            } else {
+              inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
+              if (inode != null) {
+                src2 = inode.getFullPathName();
+              }
+            }
+            final INodeFile file = checkLease(src2, clientName, inode, fileId, false);
             //clientNode = file.getClientNode(); HOP
             clientNode = file.getFileUnderConstructionFeature().getClientNode() == null ? null :
                 getBlockManager().getDatanodeManager()
@@ -3035,7 +3070,7 @@ public class FSNamesystem
 
             // choose new datanodes.
             final DatanodeStorageInfo[] targets = blockManager.chooseTarget4AdditionalDatanode(
-                src, numAdditionalNodes, clientNode, chosen,
+                src2, numAdditionalNodes, clientNode, chosen,
                 excludes, preferredBlockSize, storagePolicyID);
 
             final LocatedBlock lb = new LocatedBlock(blk, targets);
@@ -3049,7 +3084,7 @@ public class FSNamesystem
   /**
    * The client would like to let go of the given block
    */
-  boolean abandonBlock(final ExtendedBlock b, final String src1,
+  boolean abandonBlock(final ExtendedBlock b, final long fileId, final String src1,
       final String holder) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
@@ -3060,10 +3095,21 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
-                    .setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-            locks.add(il).add(lf.getLeaseLock(LockType.READ))
+            if (fileId == INode.ROOT_PARENT_ID) {
+              // Older clients may not have given us an inode ID to work with.
+              // In this case, we have to try to resolve the path and hope it
+              // hasn't changed or been deleted since the file was opened for write.
+              INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+              locks.add(il);
+            } else {
+              INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, fileId)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+              locks.add(il);
+            }
+            locks.add(lf.getLeaseLock(LockType.READ))
                     .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src))
                     .add(lf.getBlockLock())
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR));
@@ -3078,13 +3124,27 @@ public class FSNamesystem
               NameNode.stateChangeLog.debug(
                   "BLOCK* NameSystem.abandonBlock: " + b + "of file " + src);
             }
-            checkNameNodeSafeMode("Cannot abandon block " + b + " for fle" + src);
-            INodeFile file = checkLease(src, holder, false);
-            boolean removed = dir.removeBlock(src, file, ExtendedBlock.getLocalBlock(b));
+            checkNameNodeSafeMode("Cannot abandon block " + b + " for file" + src);
+            String src2 = src;
+            final INode inode;
+            if (fileId == INode.ROOT_PARENT_ID) {
+              // Older clients may not have given us an inode ID to work with.
+              // In this case, we have to try to resolve the path and hope it
+              // hasn't changed or been deleted since the file was opened for write.
+              inode = dir.getINode(src);
+            } else {
+              inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
+              if (inode != null) {
+                src2 = inode.getFullPathName();
+              }
+            }
+            final INodeFile file = checkLease(src2, holder, inode, fileId, false);
+
+            boolean removed = dir.removeBlock(src2, file, ExtendedBlock.getLocalBlock(b));
             if (!removed) {
               return true;
             }
-            leaseManager.getLease(holder).updateLastTwoBlocksInLeasePath(src,
+            leaseManager.getLease(holder).updateLastTwoBlocksInLeasePath(src2,
                 file.getLastBlock(), file.getPenultimateBlock());
 
             if (NameNode.stateChangeLog.isDebugEnabled()) {
@@ -3092,7 +3152,7 @@ public class FSNamesystem
                   "BLOCK* NameSystem.abandonBlock: " + b +
                       " is removed from pendingCreates");
             }
-            dir.persistBlocks(src, file);
+            dir.persistBlocks(src2, file);
             file.recomputeFileSize();
 
             return true;
@@ -3101,63 +3161,42 @@ public class FSNamesystem
     return (Boolean) abandonBlockHandler.handle(this);
   }
 
-  // make sure that we still have the lease on this file.
-  private INodeFile checkLease(String src, String holder)
-      throws LeaseExpiredException, UnresolvedLinkException, StorageException,
-      TransactionContextException, FileNotFoundException {
-    return checkLease(src, INodeDirectory.ROOT_PARENT_ID, holder, true);
-  }
-
   private INodeFile checkLease(String src, String holder,
-      boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
-      UnresolvedLinkException, StorageException,
-      TransactionContextException, FileNotFoundException {
-    return checkLease(src, INodeDirectory.ROOT_PARENT_ID, holder, updateLastTwoBlocksInFile);
-  }
-
-  private INodeFile checkLease(String src, long fileId, String holder,
-      boolean updateLastTwoBlocksInFile) throws LeaseExpiredException,
-      UnresolvedLinkException, StorageException,
-      TransactionContextException, FileNotFoundException {
-    return checkLease(src, fileId, holder, dir.getINode(src), updateLastTwoBlocksInFile);
-  }
-
-  private INodeFile checkLease(String src, long fileId, String holder,
-      INode file) throws LeaseExpiredException, StorageException,
-      TransactionContextException, FileNotFoundException {
-    return checkLease(src, fileId, holder, file, true);
-  }
-
-  private INodeFile checkLease(String src, long fileId, String holder,
-      INode inode, boolean updateLastTwoBlocksInFile) throws
+      INode inode, long fileId, boolean updateLastTwoBlocksInFile) throws
       LeaseExpiredException, StorageException,
       TransactionContextException, FileNotFoundException {
-    final INodeFile file = inode.asFile();
-    if (file == null || !(file instanceof INodeFile)) {
+    final String ident = src + " (inode " + fileId + ")";
+    if (inode == null) {
       Lease lease = leaseManager.getLease(holder);
       throw new LeaseExpiredException(
-          "No lease on " + src + ": File does not exist. " +
+          "No lease on " + ident + ": File does not exist. " +
               (lease != null ? lease.toString() :
                   "Holder " + holder + " does not have any open files."));
     }
+    if (!inode.isFile()) {
+      Lease lease = leaseManager.getLease(holder);
+      throw new LeaseExpiredException(
+          "No lease on " + ident + ": INode is not a regular file. "
+          + (lease != null ? lease.toString()
+              : "Holder " + holder + " does not have any open files."));
+    }
+    final INodeFile file = inode.asFile();
     if (!file.isUnderConstruction()) {
       Lease lease = leaseManager.getLease(holder);
       throw new LeaseExpiredException(
-          "No lease on " + src + ": File is not open for writing. " +
+          "No lease on " + ident + ": File is not open for writing. " +
               (lease != null ? lease.toString() :
                   "Holder " + holder + " does not have any open files."));
     }
     String clientName = file.getFileUnderConstructionFeature().getClientName();
     if (holder != null && !clientName.equals(holder)) {
-      throw new LeaseExpiredException(
-          "Lease mismatch on " + src + " owned by " +
-              clientName + " but is accessed by " + holder);
+            throw new LeaseExpiredException("Lease mismatch on " + ident +
+          " owned by " + clientName + " but is accessed by " + holder);
     }
 
     if(updateLastTwoBlocksInFile) {
       file.getFileUnderConstructionFeature().updateLastTwoBlocks(leaseManager.getLease(holder), src);
     }
-    INode.checkId(fileId, file);
     return file;
   }
 
@@ -3178,14 +3217,25 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            INodeLock il = lf.getINodeLock( INodeLockType.WRITE, INodeResolveType.PATH, src)
-                    .setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-            locks.add(il)
-                    .add(lf.getLeaseLock(LockType.WRITE, holder))
-                    .add(lf.getLeasePathLock(LockType.WRITE))
-                    .add(lf.getBlockLock());
+            if (fileId == INode.ROOT_PARENT_ID) {
+              // Older clients may not have given us an inode ID to work with.
+              // In this case, we have to try to resolve the path and hope it
+              // hasn't changed or been deleted since the file was opened for write.
+              INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                  .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+              locks.add(il);
+            } else {
+              INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, fileId)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+                  .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+              locks.add(il);
+            }
+            locks.add(lf.getLeaseLock(LockType.WRITE, holder))
+                .add(lf.getLeasePathLock(LockType.WRITE))
+                .add(lf.getBlockLock());
 
             if (data == null) { // the data is stored on the datanodes.
               locks.add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV));
@@ -3227,10 +3277,22 @@ public class FSNamesystem
   private boolean completeFileStoredOnDataNodes(String src, String holder,
       Block last, long fileId)
       throws IOException {
-    final INodesInPath iip = dir.getLastINodeInPath(src);
     INodeFile pendingFile;
     try {
-      pendingFile = checkLease(src,fileId, holder, iip.getINode(0));
+      final INode inode;
+      if (fileId == INode.ROOT_PARENT_ID) {
+        // Older clients may not have given us an inode ID to work with.
+        // In this case, we have to try to resolve the path and hope it
+        // hasn't changed or been deleted since the file was opened for write.
+        final INodesInPath iip = dir.getLastINodeInPath(src);
+        inode = iip.getINode(0);
+      } else {
+        inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
+        if (inode != null) {
+          src = inode.getFullPathName();
+        }
+      }
+      pendingFile = checkLease(src, holder, inode, fileId, true);
     } catch (LeaseExpiredException lee) {
       final INode inode = dir.getINode(src);
       if (inode != null && inode instanceof INodeFile &&
@@ -3244,9 +3306,9 @@ public class FSNamesystem
         final Block realLastBlock = ((INodeFile) inode).getLastBlock();
         if (Block.matchingIdAndGenStamp(last, realLastBlock)) {
           NameNode.stateChangeLog.info("DIR* completeFile: " +
-              "request from " + holder + " to complete " + src +
-              " which is already closed. But, it appears to be an RPC " +
-              "retry. Returning success");
+              "request from " + holder + " to complete inode " + fileId +
+              "(" + src + ") which is already closed. But, it appears to be " +
+              "an RPC retry. Returning success");
           return true;
         }
       }
@@ -3277,8 +3339,20 @@ public class FSNamesystem
       final byte[] data)
       throws IOException {
     INodeFile pendingFile;
-    final INodesInPath iip = dir.getLastINodeInPath(src);
-    pendingFile = checkLease(src,fileId, holder, iip.getINode(0));
+    final INode inode;
+        if (fileId == INode.ROOT_PARENT_ID) {
+          // Older clients may not have given us an inode ID to work with.
+          // In this case, we have to try to resolve the path and hope it
+          // hasn't changed or been deleted since the file was opened for write.
+          inode = dir.getINode(src);
+        } else {
+          inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
+          if (inode != null) {
+            src = inode.getFullPathName();
+          }
+        }
+        
+    pendingFile = checkLease(src, holder, inode, fileId, true);
 
     //in case of appending to small files. we might have to migrate the file from
     //in-memory to on disk
@@ -3778,6 +3852,8 @@ public class FSNamesystem
    *
    * @param src
    *     The string representation of the path
+   * @param fileId The inode ID that we're fsyncing.  Older clients will pass
+   *               INodeId.GRANDFATHER_INODE_ID here.
    * @param clientName
    *     The string representation of the client
    * @param lastBlockLength
@@ -3786,16 +3862,27 @@ public class FSNamesystem
    * @throws IOException
    *     if path does not exist
    */
-  void fsync(final String src, final String clientName,
+  void fsync(final String src, final long fileId, final String clientName,
       final long lastBlockLength) throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.FSYNC, src) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-        locks.add(il).add(lf.getLeaseLock(LockType.READ, clientName))
+        if (fileId == INode.ROOT_PARENT_ID) {
+          // Older clients may not have given us an inode ID to work with.
+          // In this case, we have to try to resolve the path and hope it
+          // hasn't changed or been deleted since the file was opened for write.
+          INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+              .setNameNodeID(nameNode.getId())
+              .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+          locks.add(il);
+        } else {
+          INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, fileId)
+              .setNameNodeID(nameNode.getId())
+              .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+          locks.add(il);
+        }
+        locks.add(lf.getLeaseLock(LockType.READ, clientName))
             .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
             .add(lf.getBlockLock());
       }
@@ -3805,11 +3892,24 @@ public class FSNamesystem
         NameNode.stateChangeLog
             .info("BLOCK* fsync: " + src + " for " + clientName);
         checkNameNodeSafeMode("Cannot fsync file " + src);
-        INodeFile pendingFile = checkLease(src, clientName);
+        final INode inode;
+        String src2 = src;
+        if (fileId == INode.ROOT_PARENT_ID) {
+          // Older clients may not have given us an inode ID to work with.
+          // In this case, we have to try to resolve the path and hope it
+          // hasn't changed or been deleted since the file was opened for write.
+          inode = dir.getINode(src);
+        } else {
+          inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
+          if (inode != null) {
+            src2 = inode.getFullPathName();
+          }
+        }
+        final INodeFile pendingFile = checkLease(src2, clientName, inode, fileId, true);
         if (lastBlockLength > 0) {
           pendingFile.getFileUnderConstructionFeature().updateLengthOfLastBlock(pendingFile, lastBlockLength);
         }
-        dir.persistBlocks(src, pendingFile);
+        dir.persistBlocks(src2, pendingFile);
         pendingFile.recomputeFileSize();
         return null;
       }

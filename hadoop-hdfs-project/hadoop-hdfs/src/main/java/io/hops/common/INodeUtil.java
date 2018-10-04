@@ -85,6 +85,16 @@ public class INodeUtil {
     }
   }
 
+  public static INode getNode(long inodeId, boolean transactional)
+      throws StorageException, TransactionContextException {
+    if (transactional) {
+      return EntityManager
+          .find(INode.Finder.ByINodeIdFTIS, inodeId);
+    } else {
+      return findINodeWithNoTransaction(inodeId);
+    }
+  }
+  
   private static INode findINodeWithNoTransaction(String name, long parentId, long partitionId)
       throws StorageException {
     LOG.debug(String
@@ -93,6 +103,14 @@ public class INodeUtil {
     INodeDataAccess<INode> da = (INodeDataAccess) HdfsStorageFactory
         .getDataAccess(INodeDataAccess.class);
     return da.findInodeByNameParentIdAndPartitionIdPK(name, parentId, partitionId);
+  }
+  
+  private static INode findINodeWithNoTransaction(long inodeId)
+      throws StorageException {
+    LOG.debug(String.format("Read inode with no transaction by inodeId=%d", inodeId));
+    INodeDataAccess<INode> da = (INodeDataAccess) HdfsStorageFactory
+        .getDataAccess(INodeDataAccess.class);
+    return da.findInodeByIdFTIS(inodeId);
   }
 
   public static boolean resolvePathWithNoTransaction(String path,

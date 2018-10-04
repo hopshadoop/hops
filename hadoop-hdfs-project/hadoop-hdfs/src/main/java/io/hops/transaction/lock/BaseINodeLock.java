@@ -167,10 +167,6 @@ public abstract class BaseINodeLock extends Lock {
     Cache.getInstance().set(path, iNodes);
   }
 
-  void updateResolvingCache(INode inode){
-    Cache.getInstance().set(inode);
-  }
-
   void addPathINodes(String path, List<INode> iNodes) {
     resolvedINodesMap.putPathINodes(path, iNodes);
   }
