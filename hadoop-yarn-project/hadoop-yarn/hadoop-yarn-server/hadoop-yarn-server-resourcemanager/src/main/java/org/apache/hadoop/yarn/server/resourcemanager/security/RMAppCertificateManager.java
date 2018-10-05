@@ -342,10 +342,10 @@ public class RMAppCertificateManager extends AbstractService
         LOG.debug("Renewing certificate for application " + appId);
         KeyPair keyPair = generateKeyPair();
         PKCS10CertificationRequest csr = generateCSR(appId, appUser, keyPair, ++currentCryptoVersion);
-        X509Certificate signedCertificate = sendCSRAndGetSigned(csr);
-        long expiration = signedCertificate.getNotAfter().getTime();
+        CertificateBundle certificateBundle = sendCSRAndGetSigned(csr);
+        long expiration = certificateBundle.certificate.getNotAfter().getTime();
         
-        KeyStoresWrapper keyStoresWrapper = createApplicationStores(signedCertificate, keyPair.getPrivate(), appUser,
+        KeyStoresWrapper keyStoresWrapper = createApplicationStores(certificateBundle, keyPair.getPrivate(), appUser,
             appId);
         byte[] rawProtectedKeyStore = keyStoresWrapper.getRawKeyStore(TYPE.KEYSTORE);
         byte[] rawTrustStore = keyStoresWrapper.getRawKeyStore(TYPE.TRUSTSTORE);
@@ -384,10 +384,10 @@ public class RMAppCertificateManager extends AbstractService
       if (isRPCTLSEnabled()) {
         KeyPair keyPair = generateKeyPair();
         PKCS10CertificationRequest csr = generateCSR(appId, appUser, keyPair, cryptoMaterialVersion);
-        X509Certificate signedCertificate = sendCSRAndGetSigned(csr);
-        long expirationEpoch = signedCertificate.getNotAfter().getTime();
+        CertificateBundle certificateBundle = sendCSRAndGetSigned(csr);
+        long expirationEpoch = certificateBundle.certificate.getNotAfter().getTime();
         
-        KeyStoresWrapper keyStoresWrapper = createApplicationStores(signedCertificate, keyPair.getPrivate(), appUser,
+        KeyStoresWrapper keyStoresWrapper = createApplicationStores(certificateBundle, keyPair.getPrivate(), appUser,
             appId);
         byte[] rawProtectedKeyStore = keyStoresWrapper.getRawKeyStore(TYPE.KEYSTORE);
         byte[] rawTrustStore = keyStoresWrapper.getRawKeyStore(TYPE.TRUSTSTORE);
@@ -412,7 +412,7 @@ public class RMAppCertificateManager extends AbstractService
   
   @InterfaceAudience.Private
   @VisibleForTesting
-  protected X509Certificate sendCSRAndGetSigned(PKCS10CertificationRequest csr)
+  protected CertificateBundle sendCSRAndGetSigned(PKCS10CertificationRequest csr)
       throws URISyntaxException, IOException, GeneralSecurityException {
     return rmAppCertificateActions.sign(csr);
   }
@@ -456,15 +456,16 @@ public class RMAppCertificateManager extends AbstractService
   
   @InterfaceAudience.Private
   @VisibleForTesting
-  protected KeyStoresWrapper createApplicationStores(X509Certificate certificate, PrivateKey privateKey,
+  protected KeyStoresWrapper createApplicationStores(CertificateBundle certificateBundle, PrivateKey privateKey,
       String appUser, ApplicationId appId)
       throws GeneralSecurityException, IOException {
     char[] password = generateRandomPassword();
     
     KeyStore keyStore = KeyStore.getInstance("JKS");
     keyStore.load(null, null);
-    X509Certificate[] chain = new X509Certificate[1];
-    chain[0] = certificate;
+    X509Certificate[] chain = new X509Certificate[2];
+    chain[0] = certificateBundle.certificate;
+    chain[1] = certificateBundle.issuer;
     keyStore.setKeyEntry(appUser, privateKey, password, chain);
     
     KeyStore systemTrustStore = loadSystemTrustStore(conf);
@@ -574,6 +575,24 @@ public class RMAppCertificateManager extends AbstractService
   
   public static String getCertificateIdentifier(ApplicationId appId, String user, Integer cryptoMaterialVersion) {
     return user + "__" + appId.toString() + "__" + cryptoMaterialVersion;
+  }
+  
+  protected static class CertificateBundle {
+    private final X509Certificate certificate;
+    private final X509Certificate issuer;
+    
+    protected CertificateBundle(X509Certificate certificate, X509Certificate issuer) {
+      this.certificate = certificate;
+      this.issuer = issuer;
+    }
+  
+    public X509Certificate getCertificate() {
+      return certificate;
+    }
+  
+    public X509Certificate getIssuer() {
+      return issuer;
+    }
   }
   
   protected class KeyStoresWrapper {
