@@ -2870,13 +2870,13 @@
   <property>
     <description>Hopworks REST endpoint for agent to send application CSR</description>
     <name>hops.hopsworks.sign.endpoint</name>
-    <value>hopsworks-ca/ca/agentservice/sign/app</value>
+    <value>hopsworks-ca/v2/certificate/app</value>
   </property>
 
   <property>
     <description>Hopsworks REST endpoint for agent to send certificate revocation request</description>
     <name>hops.hopsworks.revoke.endpoint</name>
-    <value>hopsworks-ca/ca/agentservice/revoke</value>
+    <value>hopsworks-ca/v2/certificate/app?</value>
   </property>
 
   <property>
