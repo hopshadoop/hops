@@ -132,7 +132,7 @@ public class TestRMAppCertificateManager {
   @Before
   public void beforeTest() throws Exception {
     conf = new Configuration();
-    conf.set(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY, "https://bbc3.sics.se:33473");
+    conf.set(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY, "https://bbc3.sics.se:33478");
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "5s");
     RMAppCertificateActionsFactory.getInstance().clear();
     RMStorageFactory.setConfiguration(conf);
@@ -339,6 +339,7 @@ public class TestRMAppCertificateManager {
         appId, username, cryptoMaterialVersion, RMAppCertificateManagerEventType.REVOKE_CERTIFICATE));
     
     dispatcher.await();
+    
     Mockito.verify(manager)
         .revokeCertificate(appId, username, cryptoMaterialVersion);
     Mockito.verify(manager)
@@ -751,20 +752,22 @@ public class TestRMAppCertificateManager {
         assertEquals(String.valueOf(cryptoMaterialVersion), HopsUtil.extractOUFromSubject(csr.getSubject().toString()));
         
         // Sign CSR
-        X509Certificate signedCertificate = sendCSRAndGetSigned(csr);
-        signedCertificate.checkValidity();
-        long expiration = signedCertificate.getNotAfter().getTime();
+        CertificateBundle certificateBundle = sendCSRAndGetSigned(csr);
+        certificateBundle.getCertificate().checkValidity();
+        long expiration = certificateBundle.getCertificate().getNotAfter().getTime();
         long epochNow = Instant.now().toEpochMilli();
         assertTrue(expiration >= epochNow);
+        assertNotNull(certificateBundle.getIssuer());
         
         RMAppCertificateActions actor = getRmAppCertificateActions();
         
         if (actor instanceof TestingRMAppCertificateActions) {
           X509Certificate caCert = ((TestingRMAppCertificateActions) actor).getCaCert();
-          signedCertificate.verify(caCert.getPublicKey(), "BC");
+          certificateBundle.getCertificate().verify(caCert.getPublicKey(), "BC");
         }
+        certificateBundle.getCertificate().verify(certificateBundle.getIssuer().getPublicKey(), "BC");
         
-        KeyStoresWrapper appKeystoreWrapper = createApplicationStores(signedCertificate, keyPair.getPrivate(),
+        KeyStoresWrapper appKeystoreWrapper = createApplicationStores(certificateBundle, keyPair.getPrivate(),
             appUser, applicationId);
         X509Certificate extractedCert = (X509Certificate) appKeystoreWrapper.getKeystore().getCertificate(appUser);
         byte[] rawKeystore = appKeystoreWrapper.getRawKeyStore(TYPE.KEYSTORE);
@@ -819,6 +822,7 @@ public class TestRMAppCertificateManager {
     @Override
     public void revokeCertificate(ApplicationId appId, String applicationUser, Integer cryptoMaterialVersion) {
       try {
+        deregisterFromCertificateRenewer(appId);
         putToQueue(appId, applicationUser, cryptoMaterialVersion);
         waitForQueueToDrain();
       } catch (InterruptedException ex) {
@@ -903,14 +907,14 @@ public class TestRMAppCertificateManager {
             LOG.error("Crypto version of new certificate is wrong: " + newCryptoVersion);
             renewalException = true;
           }
-          X509Certificate signedCertificate = sendCSRAndGetSigned(csr);
-          long newCertificateExpiration = signedCertificate.getNotAfter().getTime();
+          CertificateBundle certificateBundle = sendCSRAndGetSigned(csr);
+          long newCertificateExpiration = certificateBundle.getCertificate().getNotAfter().getTime();
           if (newCertificateExpiration <= oldCertificateExpiration) {
             LOG.error("New certificate expiration time is older than old certificate");
             renewalException = true;
           }
   
-          KeyStoresWrapper keyStoresWrapper = createApplicationStores(signedCertificate, keyPair.getPrivate(), appUser,
+          KeyStoresWrapper keyStoresWrapper = createApplicationStores(certificateBundle, keyPair.getPrivate(), appUser,
               appId);
           byte[] rawProtectedKeyStore = keyStoresWrapper.getRawKeyStore(TYPE.KEYSTORE);
           byte[] rawTrustStore = keyStoresWrapper.getRawKeyStore(TYPE.TRUSTSTORE);

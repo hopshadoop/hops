@@ -27,14 +27,18 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.http.HttpHeaders;
+import org.apache.http.NameValuePair;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.bouncycastle.openssl.jcajce.JcaMiscPEMGenerator;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -51,12 +55,15 @@ import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class HopsworksRMAppCertificateActions implements RMAppCertificateActions, Configurable {
   public static final String HOPSWORKS_USER_KEY = "hops.hopsworks.user";
   public static final String HOPSWORKS_PASSWORD_KEY = "hops.hopsworks.password";
+  public static final String REVOKE_CERT_ID_PARAM = "certId";
   
   private static final Log LOG = LogFactory.getLog(HopsworksRMAppCertificateActions.class);
   private static final Set<Integer> ACCEPTABLE_HTTP_RESPONSES = new HashSet<>(2);
@@ -64,10 +71,11 @@ public class HopsworksRMAppCertificateActions implements RMAppCertificateActions
   private Configuration conf;
   private Configuration sslConf;
   private URL hopsworksHost;
-  private  URL loginEndpoint;
-  private  URL signEndpoint;
-  private  URL revokeEndpoint;
-  private  CertificateFactory certificateFactory;
+  private URL loginEndpoint;
+  private URL signEndpoint;
+  private URL revokeEndpoint;
+  private String revokePath;
+  private CertificateFactory certificateFactory;
   
   public HopsworksRMAppCertificateActions() throws MalformedURLException, GeneralSecurityException {
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_OK);
@@ -94,16 +102,21 @@ public class HopsworksRMAppCertificateActions implements RMAppCertificateActions
     signEndpoint = new URL(hopsworksHost,
         conf.get(YarnConfiguration.HOPS_HOPSWORKS_SIGN_ENDPOINT_KEY,
             YarnConfiguration.DEFAULT_HOPS_HOPSWORKS_SIGN_ENDPOINT));
-    revokeEndpoint = new URL(hopsworksHost,
-        conf.get(YarnConfiguration.HOPS_HOPSWORKS_REVOKE_ENDPOINT_KEY,
-            YarnConfiguration.DEFAULT_HOPS_HOPSWORKS_REVOKE_ENDPOINT));
+    revokePath = conf.get(YarnConfiguration.HOPS_HOPSWORKS_REVOKE_ENDPOINT_KEY,
+        YarnConfiguration.DEFAULT_HOPS_HOPSWORKS_REVOKE_ENDPOINT);
+    if (revokePath.startsWith("/")) {
+      revokePath = "%s" + revokePath;
+    } else {
+      revokePath = "%s/" + revokePath;
+    }
     certificateFactory = CertificateFactory.getInstance("X.509", "BC");
     sslConf = new Configuration(false);
     sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
   }
   
   @Override
-  public X509Certificate sign(PKCS10CertificationRequest csr) throws URISyntaxException, IOException, GeneralSecurityException {
+  public RMAppCertificateManager.CertificateBundle sign(PKCS10CertificationRequest csr)
+      throws URISyntaxException, IOException, GeneralSecurityException {
     CloseableHttpClient httpClient = null;
     try {
       httpClient = createHttpClient();
@@ -118,8 +131,11 @@ public class HopsworksRMAppCertificateActions implements RMAppCertificateActions
       
       String signResponseEntity = EntityUtils.toString(signResponse.getEntity());
       JsonObject jsonResponse = new JsonParser().parse(signResponseEntity).getAsJsonObject();
-      String signedCert = jsonResponse.get("pubAgentCert").getAsString();
-      return parseCertificate(signedCert);
+      String signedCert = jsonResponse.get("signedCert").getAsString();
+      X509Certificate certificate = parseCertificate(signedCert);
+      String intermediateCaCert = jsonResponse.get("intermediateCaCert").getAsString();
+      X509Certificate issuer = parseCertificate(intermediateCaCert);
+      return new RMAppCertificateManager.CertificateBundle(certificate, issuer);
     } finally {
       if (httpClient != null) {
         httpClient.close();
@@ -134,10 +150,10 @@ public class HopsworksRMAppCertificateActions implements RMAppCertificateActions
       httpClient = createHttpClient();
       login(httpClient);
       
-      JsonObject json = new JsonObject();
-      json.addProperty("identifier", certificateIdentifier);
+      String queryParams = buildQueryParams(new BasicNameValuePair(REVOKE_CERT_ID_PARAM, certificateIdentifier));
+      URL revokeUrl = buildUrl(revokePath, queryParams);
       
-      CloseableHttpResponse response = post(httpClient, json, revokeEndpoint.toURI(),
+      CloseableHttpResponse response = delete(httpClient, revokeUrl.toURI(),
           "Hopsworks CA could not revoke certificate " + certificateIdentifier);
       return response.getStatusLine().getStatusCode();
     } finally {
@@ -171,6 +187,30 @@ public class HopsworksRMAppCertificateActions implements RMAppCertificateActions
     CloseableHttpResponse response = httpClient.execute(request);
     checkHTTPResponseCode(response.getStatusLine().getStatusCode(), errorMessage);
     return response;
+  }
+  
+  private CloseableHttpResponse delete(CloseableHttpClient httpClient, URI target, String errorMessage)
+      throws IOException {
+    HttpDelete request = new HttpDelete(target);
+    request.addHeader(HttpHeaders.CONTENT_TYPE, "text/plain");
+    CloseableHttpResponse response = httpClient.execute(request);
+    checkHTTPResponseCode(response.getStatusLine().getStatusCode(), errorMessage);
+    return response;
+  }
+  
+  private URL buildUrl(String apiUrl, String queryParams) throws MalformedURLException {
+    String lala = String.format(apiUrl, hopsworksHost.toString()) + queryParams;
+    return new URL(lala);
+  }
+  
+  private String buildQueryParams(NameValuePair... params) {
+    List<NameValuePair> qparams = new ArrayList<>();
+    for (NameValuePair p : params) {
+      if (p.getValue() != null) {
+        qparams.add(p);
+      }
+    }
+    return URLEncodedUtils.format(qparams, "UTF-8");
   }
   
   private X509Certificate parseCertificate(String certificateStr) throws IOException, GeneralSecurityException {

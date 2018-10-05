@@ -2641,11 +2641,11 @@ public class YarnConfiguration extends Configuration {
   private static String HOPSWORKS_PREFIX = "hops.hopsworks";
   public static final String HOPS_HOPSWORKS_HOST_KEY = HOPSWORKS_PREFIX + ".host";
   public static final String HOPS_HOPSWORKS_LOGIN_ENDPOINT_KEY = HOPSWORKS_PREFIX + ".login.endpoint";
-  public static String DEFAULT_HOPS_HOPSWORKS_LOGIN_ENDPOINT = "hopsworks-api/api/auth/login";
+  public static String DEFAULT_HOPS_HOPSWORKS_LOGIN_ENDPOINT = "/hopsworks-api/api/auth/login";
   public static final String HOPS_HOPSWORKS_SIGN_ENDPOINT_KEY = HOPSWORKS_PREFIX + ".sign.endpoint";
-  public static String DEFAULT_HOPS_HOPSWORKS_SIGN_ENDPOINT = "hopsworks-ca/ca/agentservice/sign/app";
+  public static String DEFAULT_HOPS_HOPSWORKS_SIGN_ENDPOINT = "/hopsworks-ca/v2/certificate/app";
   public static final String HOPS_HOPSWORKS_REVOKE_ENDPOINT_KEY = HOPSWORKS_PREFIX + ".revoke.endpoint";
-  public static String DEFAULT_HOPS_HOPSWORKS_REVOKE_ENDPOINT = "hopsworks-ca/ca/agentservice/revoke";
+  public static String DEFAULT_HOPS_HOPSWORKS_REVOKE_ENDPOINT = "/hopsworks-ca/v2/certificate/app?";
   public static final String RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD =
       RM_PREFIX + "certificate.expiration-safety-period";
   public static String DEFAULT_RM_APP_CERTIFICATE_RENEWER_DELAY = "2d";

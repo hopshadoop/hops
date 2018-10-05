@@ -27,6 +27,6 @@ import java.security.cert.X509Certificate;
 
 public interface RMAppCertificateActions {
   void init() throws MalformedURLException, GeneralSecurityException;
-  X509Certificate sign(PKCS10CertificationRequest csr) throws URISyntaxException, IOException, GeneralSecurityException;
+  RMAppCertificateManager.CertificateBundle sign(PKCS10CertificationRequest csr) throws URISyntaxException, IOException, GeneralSecurityException;
   int revoke(String certificateIdentifier) throws URISyntaxException, IOException, GeneralSecurityException;
 }
