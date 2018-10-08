@@ -1661,35 +1661,30 @@
   </property>
 
   <property>
-    <name>dfs.block.report.load.balancing.time.window.size</name>
-    <value>60000</value>
-    <description>
-      Window of time to compute NN threashold for block reporting
-    </description>
-  </property>
-  
-  <property>
     <name>dfs.block.report.load.balancing.db.var.update.threashold</name>
     <value>60000</value>
     <description>
-      Number of blocks that can be reported to a NN during the load balancing 
-      window.
+        Update frequency of the variable indicating the number of concurrent
+        block reports processed by the namenodes (for online update purpose).
     </description>
   </property>
   
   <property>
-    <name>dfs.cache.report.load.balancing.time.window.size</name>
-    <value>60000</value>
+    <name>dfs.block.report.load.balancer.max.concurrent.block.reports</name>
+    <value>5</value>
     <description>
-      Window of time to compute NN threashold for cache reporting
+        Number of concurrent block reports that the namenodes can process
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.block.report.load.balancing.max.block.report.processing.time</name>
+    <value>3600000</value>
+    <description>
+        Max expected processing time of a block report. Dead datanodes may fail before the 
+        block report is fully processed. After dfs.block.report.load.balancing.max.block.report.processing.time 
+        the block reprot is considered completed/failed.
     </description>
   </property>
   
-  <property>
-    <name>dfs.cache.report.load.balancing.db.var.update.threashold</name>
-    <value>60000</value>
-    <description>
-      Number of cache blocks that can be reported to a NN during the load balancing window.
-    </description>
-  </property>
 </configuration>
