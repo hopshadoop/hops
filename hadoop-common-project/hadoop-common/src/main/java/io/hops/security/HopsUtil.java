@@ -85,7 +85,7 @@ public class HopsUtil {
           "password could not be found");
     }
     
-    return FileUtils.readFileToString(passwdFile);
+    return FileUtils.readFileToString(passwdFile).trim();
   }
   
   /**
