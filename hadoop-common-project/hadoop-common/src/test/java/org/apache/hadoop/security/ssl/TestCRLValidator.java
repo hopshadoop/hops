@@ -278,7 +278,8 @@ public class TestCRLValidator {
         makeEchoRequest(clientUGI, server.getListenerAddress(), conf, message);
       } catch (Exception ex) {
         if (ex.getCause().getCause() instanceof RemoteException) {
-          if (ex.getCause().getCause().getMessage().contains("SunCertPathBuilderException")) {
+          if (ex.getCause().getCause().getMessage().contains("HopsCRLValidator: Certificate " + testCryptoMaterial
+              .clientCertificate.getSubjectDN() + " has been revoked by " + crl.getIssuerX500Principal())) {
             // Exception here is normal
             exceptionRaised = true;
           } else {

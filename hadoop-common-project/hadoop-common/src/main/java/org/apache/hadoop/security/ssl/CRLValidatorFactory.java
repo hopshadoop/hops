@@ -72,8 +72,6 @@ public class CRLValidatorFactory {
         CRLValidator testingValidator = new CRLValidator(conf, sslConf);
         testingValidator.setReloadTimeunit(TimeUnit.SECONDS);
         testingValidator.setReloadInterval(1);
-        testingValidator.setCertPathBuilder(CertPathBuilder.getInstance("PKIX", "BC"));
-        testingValidator.setCertPathValidator(CertPathValidator.getInstance("PKIX", "BC"));
         testingValidator.setCertificateFactory(CertificateFactory.getInstance("X.509", "BC"));
         testingValidator.startReloadingThread();
         validatorInstances.putIfAbsent(TYPE.TESTING, testingValidator);
