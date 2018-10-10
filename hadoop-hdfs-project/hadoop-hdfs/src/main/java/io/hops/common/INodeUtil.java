@@ -57,6 +57,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import static org.apache.hadoop.hdfs.server.namenode.INode.EMPTY_LIST;
 
 public class INodeUtil {
   private final static Log LOG = LogFactory.getLog(INodeUtil.class);
@@ -422,5 +423,33 @@ public class INodeUtil {
     List<Ace> acesByPKBatched = aceDataAccess.getAcesByPKBatched(child.getId(), aceIndices);
     return INodeAclHelper.convert(acesByPKBatched);
     
+  }
+  
+  /**
+   * @return an empty list if the children list is null;
+   * otherwise, return the children list.
+   * The returned list should not be modified.
+   */
+  static public List<INode> getChildrenListNotTransactional(long inodeId, int depth)
+      throws StorageException, TransactionContextException {
+    List<INode> children = getChildrenNotTransactional(inodeId, depth);
+    return children == null ? EMPTY_LIST : children;
+  }
+
+  /**
+   * @return the children list which is possibly null.
+   */
+  static private List<INode> getChildrenNotTransactional(long inodeId, int depth)
+      throws StorageException, TransactionContextException {
+
+    INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory.getDataAccess(INodeDataAccess.class);
+    short childrenDepth = ((short) (depth + 1));
+    if (INode.isTreeLevelRandomPartitioned(childrenDepth)) {
+      return (List<INode>) da.findInodesByParentIdFTIS(inodeId);
+    } else {
+      return (List<INode>) da.findInodesByParentIdAndPartitionIdPPIS(inodeId, inodeId/*
+       * partition id for all the childred is the parent id
+       */);
+    }
   }
 }

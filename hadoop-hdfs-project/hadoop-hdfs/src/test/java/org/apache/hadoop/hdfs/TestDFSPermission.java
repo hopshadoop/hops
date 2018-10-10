@@ -532,6 +532,7 @@ public class TestDFSPermission {
       short[] ancestorPermission, short[] parentPermission,
       short[] filePermission, Path[] parentDirs, Path[] files, Path[] dirs)
       throws Exception {
+    boolean[] isDirEmpty = new boolean[NUM_TEST_PERMISSIONS];
     login(SUPERUSER);
     for (int i = 0; i < NUM_TEST_PERMISSIONS; i++) {
       create(OpType.CREATE, files[i]);
@@ -544,6 +545,8 @@ public class TestDFSPermission {
       FsPermission fsPermission = new FsPermission(filePermission[i]);
       fs.setPermission(files[i], fsPermission);
       fs.setPermission(dirs[i], fsPermission);
+      
+      isDirEmpty[i] = (fs.listStatus(dirs[i]).length == 0);
     }
 
     login(ugi);
@@ -565,7 +568,7 @@ public class TestDFSPermission {
           parentPermission[next]);
       testDeleteFile(ugi, files[i], ancestorPermission[i], parentPermission[i]);
       testDeleteDir(ugi, dirs[i], ancestorPermission[i], parentPermission[i],
-          filePermission[i], null);
+          filePermission[i], null, isDirEmpty[i]);
     }
     
     // test non existent file
@@ -1078,6 +1081,17 @@ public class TestDFSPermission {
     }
   }
 
+  /* A class that verifies the permission checking is correct for
+   * empty-directory deletion
+   */
+  private class DeleteEmptyDirPermissionVerifier extends DeleteDirPermissionVerifier {
+    @Override
+    void setOpPermission() {
+      this.opParentPermission = SEARCH_MASK | WRITE_MASK;
+      this.opPermission = NULL_MASK;
+    }
+  }
+
   DeletePermissionVerifier fileDeletionVerifier =
       new DeletePermissionVerifier();
 
@@ -1091,14 +1105,19 @@ public class TestDFSPermission {
   DeleteDirPermissionVerifier dirDeletionVerifier =
       new DeleteDirPermissionVerifier();
 
+  final DeleteEmptyDirPermissionVerifier emptyDirDeletionVerifier =
+      new DeleteEmptyDirPermissionVerifier();
+    
   /* test if the permission checking of directory deletion is correct */
   private void testDeleteDir(UserGroupInformation ugi, Path path,
       short ancestorPermission, short parentPermission, short permission,
-      short[] childPermissions) throws Exception {
-    dirDeletionVerifier
-        .set(path, ancestorPermission, parentPermission, permission,
-            childPermissions);
-    dirDeletionVerifier.verifyPermission(ugi);
+            short[] childPermissions,
+      final boolean isDirEmpty) throws Exception {
+    DeleteDirPermissionVerifier ddpv = isDirEmpty?
+        emptyDirDeletionVerifier : dirDeletionVerifier;
+    ddpv.set(path, ancestorPermission, parentPermission, permission,
+        childPermissions);
+    ddpv.verifyPermission(ugi);
 
   }
 

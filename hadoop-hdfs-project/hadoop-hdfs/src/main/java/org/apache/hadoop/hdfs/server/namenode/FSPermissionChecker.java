@@ -20,12 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.Stack;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,8 +30,6 @@ import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.permission.AclEntryType;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
@@ -161,13 +154,6 @@ class FSPermissionChecker {
     }
   }
   
-  void checkPermission(String path, FSDirectory dir, boolean doCheckOwner,
-      FsAction ancestorAccess, FsAction parentAccess, FsAction access,
-      FsAction subAccess) throws AccessControlException, UnresolvedLinkException, StorageException,
-      TransactionContextException, IOException {
-    checkPermission(path, dir, doCheckOwner, ancestorAccess, parentAccess, access, subAccess, false);
-  }
-  
   /**
    * Check whether current user have permissions to access the path.
    * Traverse is always checked.
@@ -206,12 +192,14 @@ class FSPermissionChecker {
    */
   void checkPermission(String path, FSDirectory dir, boolean doCheckOwner,
       FsAction ancestorAccess, FsAction parentAccess, FsAction access,
-      FsAction subAccess, boolean resolveLink) throws AccessControlException, UnresolvedLinkException, StorageException,
+      FsAction subAccess, boolean ignoreEmptyDir, boolean resolveLink) throws AccessControlException,
+      UnresolvedLinkException, StorageException,
       TransactionContextException, IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("ACCESS CHECK: " + this + ", doCheckOwner=" + doCheckOwner +
           ", ancestorAccess=" + ancestorAccess + ", parentAccess=" +
-          parentAccess + ", access=" + access + ", subAccess=" + subAccess + ", resolveLink=" + resolveLink);
+          parentAccess + ", access=" + access + ", subAccess=" + subAccess + ", ignoreEmptyDir="
+          + ignoreEmptyDir + ", resolveLink=" + resolveLink);
     }
     // check if (parentAccess != null) && file exists, then check sb
     // If resolveLink, the check is performed on the link target.
@@ -236,13 +224,33 @@ class FSPermissionChecker {
         check(last, access);
       }
       if (subAccess != null) {
-        checkSubAccess(last, subAccess);
+        checkSubAccess(last, subAccess, ignoreEmptyDir);
       }
       if (doCheckOwner) {
         checkOwner(last);
       }
   }
 
+  void checkPermission(INode subtreeRoot, boolean doCheckOwner, FsAction access, FsAction subAccess,
+      boolean ignoreEmptyDir) throws AccessControlException, UnresolvedLinkException, StorageException,
+      TransactionContextException, IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("ACCESS CHECK: " + this + ", doCheckOwner=" + doCheckOwner +
+          ", access=" + access + ", subAccess=" + subAccess + ", ignoreEmptyDir="
+          + ignoreEmptyDir);
+    }
+    
+      if (access != null) {
+        check(subtreeRoot, access);
+      }
+      if (subAccess != null) {
+        checkSubAccess(subtreeRoot, subAccess, ignoreEmptyDir);
+      }
+      if (doCheckOwner) {
+        checkOwner(subtreeRoot);
+      }
+  }
+  
   /**
    * Guarded by {@link FSNamesystem#readLock()}
    */
@@ -267,7 +275,7 @@ class FSPermissionChecker {
   /**
    * Guarded by {@link FSNamesystem#readLock()}
    */
-  private void checkSubAccess(INode inode, FsAction access)
+  private void checkSubAccess(INode inode, FsAction access, boolean ignoreEmptyDir)
       throws IOException {
     if (inode == null || !inode.isDirectory()) {
       return;
@@ -276,9 +284,12 @@ class FSPermissionChecker {
     Stack<INodeDirectory> directories = new Stack<>();
     for (directories.push(inode.asDirectory()); !directories.isEmpty(); ) {
       INodeDirectory d = directories.pop();
-      check(d, access);
+      List<INode> cList = d.getChildrenList();
+      if (!(cList.isEmpty() && ignoreEmptyDir)) {
+        check(d, access);
+      }
 
-      for (INode child : d.getChildrenList()) {
+      for (INode child : cList) {
         if (child.isDirectory()) {
           directories.push(child.asDirectory());
         }

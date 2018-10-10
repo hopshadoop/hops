@@ -483,7 +483,7 @@ public class TestFSPermissionChecker {
       public Object performTask() throws IOException {
         FSDirectory dir = cluster.getNamesystem().getFSDirectory();
         new FSPermissionChecker(SUPERUSER, SUPERGROUP, user).checkPermission(path,
-            dir, false, null, null, access, null);
+            dir, false, null, null, access, null, false, true);
         return null;
       }
     }.handle();
@@ -506,7 +506,7 @@ public class TestFSPermissionChecker {
         public Object performTask() throws IOException {
           FSDirectory dir = cluster.getNamesystem().getFSDirectory();
           new FSPermissionChecker(SUPERUSER, SUPERGROUP, user).checkPermission(path,
-              dir, false, null, null, access, null);
+              dir, false, null, null, access, null, false, true);
           return null;
         }
       }.handle();
