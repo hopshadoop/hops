@@ -34,22 +34,13 @@ import java.nio.file.StandardOpenOption;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.Security;
-import java.security.cert.CRL;
 import java.security.cert.CRLException;
-import java.security.cert.CertPathBuilder;
-import java.security.cert.CertPathBuilderResult;
-import java.security.cert.CertPathValidator;
-import java.security.cert.CertStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
-import java.security.cert.CollectionCertStoreParameters;
-import java.security.cert.PKIXBuilderParameters;
-import java.security.cert.X509CertSelector;
+import java.security.cert.X509CRL;
+import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -64,11 +55,9 @@ public class CRLValidator {
   private final Configuration sslConf;
   private final Path crl;
   private final File trustStoreLocation;
-  private final AtomicReference<Collection<? extends CRL>> crlReference;
+  private final AtomicReference<X509CRL> crlReference;
   private final AtomicReference<KeyStore> trustStoreReference;
   
-  private CertPathBuilder certPathBuilder;
-  private CertPathValidator certPathValidator;
   private CertificateFactory certificateFactory;
   
   private TimeUnit reloadTimeunit;
@@ -76,7 +65,7 @@ public class CRLValidator {
   private long crlLastLoadedTimestamp = 0L;
   private long trustStoreLastLoadedTimestamp = 0L;
   private Thread reloaderThread;
-  private final RetryAction<Collection<? extends CRL>> loadCRLWithRetry;
+  private final RetryAction<X509CRL> loadCRLWithRetry;
   private final RetryAction<KeyStore> loadTruststoreWithRetry;
   
   CRLValidator(Configuration conf) throws IOException, GeneralSecurityException {
@@ -93,20 +82,18 @@ public class CRLValidator {
     Security.setProperty("ocsp.enable", "false");
     // That is to check the crlDistributionPoint of X.509 certificate
     System.setProperty("com.sun.security.enableCRLDP", "false");
-    certPathBuilder = CertPathBuilder.getInstance("PKIX");
-    certPathValidator = CertPathValidator.getInstance("PKIX");
     certificateFactory = CertificateFactory.getInstance("X.509");
     
-    loadCRLWithRetry = new RetryAction<Collection<? extends CRL>>() {
+    loadCRLWithRetry = new RetryAction<X509CRL>() {
       @Override
-      Collection<? extends CRL> operationToPerform() throws GeneralSecurityException, IOException {
+      X509CRL operationToPerform() throws GeneralSecurityException, IOException {
         return loadCRL();
       }
     };
     
     crl = Paths.get(conf.get(CommonConfigurationKeys.HOPS_CRL_OUTPUT_FILE_KEY, CommonConfigurationKeys
         .HOPS_CRL_OUTPUT_FILE_DEFAULT));
-    crlReference = new AtomicReference<Collection<? extends CRL>>(loadCRLWithRetry.retry());
+    crlReference = new AtomicReference<>(loadCRLWithRetry.retry());
     
     loadTruststoreWithRetry = new RetryAction<KeyStore>() {
       @Override
@@ -151,16 +138,6 @@ public class CRLValidator {
   }
   
   @VisibleForTesting
-  public void setCertPathBuilder(CertPathBuilder certPathBuilder) {
-    this.certPathBuilder = certPathBuilder;
-  }
-  
-  @VisibleForTesting
-  public void setCertPathValidator(CertPathValidator certPathValidator) {
-    this.certPathValidator = certPathValidator;
-  }
-  
-  @VisibleForTesting
   public void setCertificateFactory(CertificateFactory certificateFactory) {
     this.certificateFactory = certificateFactory;
   }
@@ -181,38 +158,23 @@ public class CRLValidator {
    * @throws CertificateException In case client's certificate has been revoked
    */
   public void validate(Certificate[] certificateChain) throws CertificateException {
-    try {
-      List<X509Certificate> certificateList = new ArrayList<>(certificateChain.length);
-      for (Certificate cert : certificateChain) {
-        if (!(cert instanceof X509Certificate)) {
-          throw new IllegalStateException("Certificate type in chain is not X.509");
-        }
-        certificateList.add((X509Certificate) cert);
+    X509CRL crl = crlReference.get();
+    for (Certificate certificate : certificateChain) {
+      if (!(certificate instanceof X509Certificate)) {
+        throw new CertificateException("Certificate is not X.509");
       }
-      
-      if (certificateList.isEmpty()) {
-        throw new IllegalStateException("Certificate chain is empty");
+      X509Certificate x509Certificate = (X509Certificate) certificate;
+      X509CRLEntry crlEntry = crl.getRevokedCertificate(x509Certificate);
+      if (crlEntry != null) {
+        String revocationReason = crlEntry.getRevocationReason() != null
+            ? " REASON: " + crlEntry.getRevocationReason().toString() : "";
+        throw new CertificateException("HopsCRLValidator: Certificate " + x509Certificate.getSubjectDN().toString()
+            + " has been revoked by " + crl.getIssuerX500Principal().getName()
+            + revocationReason);
       }
-  
-      X509CertSelector certificateSelector = new X509CertSelector();
-      // First certificate in the certificate chain is always the client's certificate
-      certificateSelector.setCertificate(certificateList.get(0));
-  
-      PKIXBuilderParameters params = new PKIXBuilderParameters(trustStoreReference.get(), certificateSelector);
-      params.addCertStore(CertStore.getInstance("Collection", new CollectionCertStoreParameters(certificateList)));
-      params.setMaxPathLength(-1);
-      params.setRevocationEnabled(true);
-      params.addCertStore(CertStore.getInstance("Collection", new CollectionCertStoreParameters(crlReference.get())));
-  
-      LOG.debug("Validating certificate " + certificateSelector.getCertificate());
-      CertPathBuilderResult builderResult = certPathBuilder.build(params);
-      
-      certPathValidator.validate(builderResult.getCertPath(), params);
-      LOG.debug("Certificate " + certificateSelector.getCertificate() + " is valid");
-    } catch (GeneralSecurityException gse) {
-      LOG.debug("Could not validate certificate against CRL", gse);
-      throw new CertificateException(gse);
     }
+  
+    LOG.debug("Certificate " + certificateChain[0] + " is valid");
   }
   
   private Configuration readSSLConfiguration() {
@@ -237,10 +199,10 @@ public class CRLValidator {
     return trustStore;
   }
   
-  private Collection<? extends CRL> loadCRL() throws IOException, CertificateException, CRLException {
+  private X509CRL loadCRL() throws IOException, CertificateException, CRLException {
     try (InputStream in = Files.newInputStream(crl, StandardOpenOption.READ)) {
       crlLastLoadedTimestamp = crl.toFile().lastModified();
-      return certificateFactory.generateCRLs(in);
+      return (X509CRL) certificateFactory.generateCRL(in);
     }
   }
   
