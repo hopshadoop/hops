@@ -18,12 +18,14 @@
 package org.apache.hadoop.hdfs.web.resources;
 
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -342,5 +344,15 @@ public class TestParam {
     assertNotNull(userParam.getValue());
 
     UserParam.setUserPatternDomain(oldDomain);
+  }
+  
+  @Test
+  public void testRenameOptionSetParam() {
+    final RenameOptionSetParam p = new RenameOptionSetParam(
+        Options.Rename.OVERWRITE, Options.Rename.NONE);
+    final RenameOptionSetParam p1 = new RenameOptionSetParam(
+        p.getValueString());
+    Assert.assertEquals(p1.getValue(), EnumSet.of(
+        Options.Rename.OVERWRITE, Options.Rename.NONE));
   }
 }
