@@ -65,6 +65,7 @@ abstract class AbstractFileTree {
   }
 
   private final FsAction subAccess;
+  private final boolean ignoreEmptyDir;
   private volatile IOException exception;
   private List<AclEntry> subtreeRootDefaultEntries;
   
@@ -112,14 +113,16 @@ abstract class AbstractFileTree {
 
               Map<ProjectedINode, List<AclEntry>> acls = new HashMap<>();
               for (ProjectedINode child : children) {
-                if (namesystem.isPermissionEnabled() && subAccess != null) {
+                if (namesystem.isPermissionEnabled() && subAccess != null && child.isDirectory()) {
                   List<AclEntry> inodeAclNoTransaction = INodeUtil.getInodeOwnAclNoTransaction(child);
                   acls.put(child, inodeAclNoTransaction);
-
-                  if (inodeAclNoTransaction.isEmpty()){
-                    checkAccess(child, subAccess, asAccessEntries(inheritedDefaultsAsAccess));
-                  } else {
-                    checkAccess(child, subAccess, inodeAclNoTransaction);
+                  List<INode> cList = INodeUtil.getChildrenListNotTransactional(child.getId(), depth+1);
+                  if (!(cList.isEmpty() && ignoreEmptyDir)) {
+                    if (inodeAclNoTransaction.isEmpty()) {
+                      checkAccess(child, subAccess, asAccessEntries(inheritedDefaultsAsAccess));
+                    } else {
+                      checkAccess(child, subAccess, inodeAclNoTransaction);
+                    }
                   }
                 }
                 addChildNode(parent, level, child);
@@ -203,15 +206,16 @@ abstract class AbstractFileTree {
   
   public AbstractFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
       throws AccessControlException {
-    this(namesystem, subtreeRootId, null, null);
+    this(namesystem, subtreeRootId, null, false, null);
   }
   
   public AbstractFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-      FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
+      FsAction subAccess, boolean ignoreEmptyDir, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
     this.namesystem = namesystem;
     this.fsPermissionChecker = namesystem.getPermissionChecker();
     this.subtreeRootId = subtreeRootId;
     this.subAccess = subAccess;
+    this.ignoreEmptyDir = ignoreEmptyDir;
     this.subtreeRootDefaultEntries = subtreeRootDefaultEntries;
   }
   
@@ -295,12 +299,14 @@ abstract class AbstractFileTree {
         }
   
         List<AclEntry> inodeOwnAclNoTransaction = INodeUtil.getInodeOwnAclNoTransaction(subtreeRoot);
-        if (namesystem.isPermissionEnabled() && subAccess != null) {
-          if (inodeOwnAclNoTransaction.isEmpty()){
-            
-            checkAccess(subtreeRoot, subAccess, asAccessEntries(subtreeRootDefaultEntries));
-          } else {
-            checkAccess(subtreeRoot, subAccess, inodeOwnAclNoTransaction);
+        if (namesystem.isPermissionEnabled() && subAccess != null && subtreeRoot.isDirectory()) {
+          List<INode> cList = INodeUtil.getChildrenListNotTransactional(subtreeRoot.getId(), subtreeRootId.getDepth());
+          if (!(cList.isEmpty() && ignoreEmptyDir)) {
+            if (inodeOwnAclNoTransaction.isEmpty()) {
+              checkAccess(subtreeRoot, subAccess, asAccessEntries(subtreeRootDefaultEntries));
+            } else {
+              checkAccess(subtreeRoot, subAccess, inodeOwnAclNoTransaction);
+            }
           }
         }
   
@@ -359,8 +365,8 @@ abstract class AbstractFileTree {
     }
     
     public CountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-        FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
-      super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
+        FsAction subAccess, boolean ignoreEmptyDir, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
+      super(namesystem, subtreeRootId, subAccess, ignoreEmptyDir, subtreeRootDefaultEntries);
     }
     
     @Override
@@ -414,11 +420,6 @@ abstract class AbstractFileTree {
     public QuotaCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
         throws AccessControlException {
       super(namesystem, subtreeRootId);
-    }
-  
-    public QuotaCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-        FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
-      super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
     }
   
     @Override
@@ -481,15 +482,6 @@ abstract class AbstractFileTree {
           FSNamesystem namesystem, INodeIdentifier subtreeRootId, INode srcDataset,
           INode dstDataset) throws AccessControlException {
         super(namesystem, subtreeRootId);
-        this.srcDataset = srcDataset;
-        this.dstDataset = dstDataset;
-      }
-      
-      public LoggingQuotaCountingFileTree(
-          FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-          FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries, INode srcDataset,
-          INode dstDataset) throws AccessControlException {
-        super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
         this.srcDataset = srcDataset;
         this.dstDataset = dstDataset;
       }
@@ -557,12 +549,12 @@ abstract class AbstractFileTree {
       
       public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
           throws AccessControlException {
-        this(namesystem, subtreeRootId, null, null);
+        this(namesystem, subtreeRootId, null, false, null);
       }
       
       public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
-          FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
-        super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
+          FsAction subAccess, boolean ignoreEmptyDir, List<AclEntry> subtreeRootDefaultEntries) throws AccessControlException {
+        super(namesystem, subtreeRootId, subAccess, ignoreEmptyDir, subtreeRootDefaultEntries);
         HashMultimap<Long, ProjectedINode> parentMap = HashMultimap.create();
         inodesByParent = Multimaps.synchronizedSetMultimap(parentMap);
         HashMultimap<Integer, ProjectedINode> levelMap = HashMultimap.create();
@@ -654,12 +646,6 @@ abstract class AbstractFileTree {
       public IdCollectingCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
           throws AccessControlException {
         super(namesystem, subtreeRootId);
-      }
-      
-      public IdCollectingCountingFileTree(FSNamesystem namesystem,
-          INodeIdentifier subtreeRootId, FsAction subAccess, List<AclEntry> subtreeRootDefaultEntries) throws
-          AccessControlException {
-        super(namesystem, subtreeRootId, subAccess, subtreeRootDefaultEntries);
       }
       
       @Override

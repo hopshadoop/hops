@@ -52,6 +52,7 @@ public class TestSubtreeLockACL extends TestCase{
   Path level1folder2 = new Path(subtree1, "level1folder2");
   Path level2folder1 = new Path(level1folder1, "level2folder1");
   Path level2file1 = new Path(level1folder1, "level2file1");
+  Path level3file1 = new Path(level2folder1, "level2file1");
   
   Path subtree2 = new Path(subtrees, "subtree2");
   
@@ -73,6 +74,7 @@ public class TestSubtreeLockACL extends TestCase{
   }
   
   public void teardown(){
+    if(cluster!=null)
     cluster.shutdown();
   }
 
@@ -301,13 +303,16 @@ public class TestSubtreeLockACL extends TestCase{
     superFs.setPermission(level2folder1, defaultPerm);
     DFSTestUtil.createFile(superFs, level2file1, 1000, (short) 1, 0);
     superFs.setPermission(level2file1, defaultPerm);
+    DFSTestUtil.createFile(superFs, level3file1, 1000, (short) 1, 0);
+    superFs.setPermission(level3file1, defaultPerm);
 
     superFs.setOwner(subtree1, user1.getShortUserName(), sharedGroup);
     superFs.setOwner(level1folder1, user1.getShortUserName(), sharedGroup);
     superFs.setOwner(level1folder2, user1.getShortUserName(), sharedGroup);
     superFs.setOwner(level2folder1, user1.getShortUserName(), sharedGroup);
     superFs.setOwner(level2file1, user1.getShortUserName(), sharedGroup);
-
+    superFs.setOwner(level3file1, user1.getShortUserName(), sharedGroup);
+    
     //subtree2
     superFs.mkdirs(subtree2);
     superFs.setPermission(subtree2, defaultPerm);

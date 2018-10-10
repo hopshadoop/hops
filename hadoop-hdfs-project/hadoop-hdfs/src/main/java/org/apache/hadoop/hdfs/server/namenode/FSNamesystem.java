@@ -188,6 +188,7 @@ import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.DirectoryListingStartAfterNotFoundException;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
@@ -1039,8 +1040,9 @@ public class FSNamesystem
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     boolean txFailed = true;
-    final INodeIdentifier inode = lockSubtreeAndCheckPathPermission(src, true,
-            null, null, null, null, SubTreeOperation.Type.SET_PERMISSION_STO);
+    //we just want to lock the subtree the permission are checked in setPermissionSTOInt
+    final INodeIdentifier inode = lockSubtreeAndCheckOwnerAndParentPermission(src, true,
+             null, SubTreeOperation.Type.SET_PERMISSION_STO);
     final boolean isSTO = inode != null;
     try {
       new HopsTransactionalRequestHandler(HDFSOperationType.SUBTREE_SETPERMISSION, src) {
@@ -1162,8 +1164,9 @@ public class FSNamesystem
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     boolean txFailed = true;
-    final INodeIdentifier inode =  lockSubtreeAndCheckPathPermission(src, true,
-            null, null, null, null, SubTreeOperation.Type.SET_OWNER_STO);
+    //we just want to lock the subtree the permission are checked in setOwnerSTOInt
+    final INodeIdentifier inode =  lockSubtreeAndCheckOwnerAndParentPermission(src, true,
+             null, SubTreeOperation.Type.SET_OWNER_STO);
     final boolean isSTO = inode != null;
     try{
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_OWNER_SUBTREE, src) {
@@ -1936,6 +1939,7 @@ public class FSNamesystem
       throws IOException {
     INodeIdentifier stoRootINode = null;
     try {
+      //we just want to lock the subtree, the access check is done in the perform task.
       stoRootINode = lockSubtree(src, SubTreeOperation.Type.META_ENABLE_STO);
       final AbstractFileTree.FileTree fileTree = buildTreeForLogging(stoRootINode,
           metaEnabled);
@@ -1956,6 +1960,8 @@ public class FSNamesystem
         @Override
         public Object performTask() throws IOException {
           try {
+            FSPermissionChecker pc = getPermissionChecker();
+            checkPathAccess(pc, src, FsAction.WRITE);
             if(metaEnabled) {
               logMetadataEvents(fileTree, MetadataLogEntry.Operation.ADD);
             }
@@ -3497,10 +3503,10 @@ public class FSNamesystem
     FSPermissionChecker pc = getPermissionChecker();
     checkNameNodeSafeMode("Cannot delete " + src);
     if (!recursive && dir.isNonEmptyDirectory(src)) {
-      throw new IOException(src + " is non empty");
+       throw new PathIsNotEmptyDirectoryException(src + " is non empty");
     }
     if (enforcePermission && isPermissionEnabled) {
-      checkPermission(pc, src, false, null, FsAction.WRITE, null, FsAction.ALL, false);
+      checkPermission(pc, src, false, null, FsAction.WRITE, null, FsAction.ALL, true, false);
     }
     // Unlink the target directory from directory tree
     if (!dir.delete(src, collectedBlocks)) {
@@ -3612,7 +3618,7 @@ public class FSNamesystem
             try {
               boolean isSuperUser = true;
               if (isPermissionEnabled) {
-                checkPermission(pc, src, false, null, null, null, null, resolveLink);
+                checkPermission(pc, src, false, null, null, null, null, false, resolveLink);
                 isSuperUser = pc.isSuperUser();
               }
               stat = dir.getFileInfo(src, resolveLink, isSuperUser);
@@ -5623,7 +5629,7 @@ public class FSNamesystem
       boolean doCheckOwner, FsAction ancestorAccess, FsAction parentAccess,
       FsAction access, FsAction subAccess)throws AccessControlException, UnresolvedLinkException, IOException{
     checkPermission(pc, path, doCheckOwner, ancestorAccess,
-        parentAccess, access, subAccess, true);
+        parentAccess, access, subAccess, false, true);
   }
 
   /**
@@ -5633,12 +5639,12 @@ public class FSNamesystem
    */
   private void checkPermission(FSPermissionChecker pc,
       String path, boolean doCheckOwner, FsAction ancestorAccess,
-      FsAction parentAccess, FsAction access, FsAction subAccess,
+      FsAction parentAccess, FsAction access, FsAction subAccess, boolean ignoreEmptyDir, 
       boolean resolveLink) throws AccessControlException, UnresolvedLinkException, TransactionContextException,
       IOException {
     if (!pc.isSuperUser()) {
       pc.checkPermission(path, dir, doCheckOwner, ancestorAccess,
-          parentAccess, access, subAccess, resolveLink);
+          parentAccess, access, subAccess, ignoreEmptyDir, resolveLink);
     }
   }
 
@@ -7570,6 +7576,7 @@ public class FSNamesystem
         // path = "/"
         subtreeRoot = INodeDirectory.getRootIdentifier();
       }else{
+        //this can only be called by super user we just want to lock the tree, not check needed
         subtreeRoot = lockSubtree(path, SubTreeOperation.Type.QUOTA_STO);
         if(subtreeRoot == null){
           // in the mean while the dir has been deleted by someone
@@ -7662,8 +7669,12 @@ public class FSNamesystem
     //Calcualte subtree root default ACLs to be inherited in the tree.
     List<AclEntry> nearestDefaultsForSubtree = calculateNearestDefaultAclForSubtree(pathInfo);
 
-    final AbstractFileTree.CountingFileTree fileTree =
-            new AbstractFileTree.CountingFileTree(this, subtreeRootIdentifier, FsAction.READ_EXECUTE, nearestDefaultsForSubtree);
+    //we do not lock the subtree and we do not need to check parent access and owner, but we need to check children access
+    //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:null, 
+    //access:null, subAccess:FsAction.READ_EXECUTE, ignoreEmptyDir:true
+    final AbstractFileTree.CountingFileTree fileTree
+        = new AbstractFileTree.CountingFileTree(this, subtreeRootIdentifier, FsAction.READ_EXECUTE, true,
+            nearestDefaultsForSubtree);
     fileTree.buildUp();
 
     return new ContentSummary(fileTree.getFileSizeSummary(),
@@ -7841,8 +7852,11 @@ public class FSNamesystem
     try {
       if (isUsingSubTreeLocks) {
         LOG.debug("Rename src: " + src + " dst: " + dst + " requires sub-tree locking mechanism");
-        srcSubTreeRoot = lockSubtreeAndCheckPathPermission(src, false, null,
-            FsAction.WRITE, null, null, SubTreeOperation.Type.RENAME_STO);
+        //checkin parentAccess is enough for this operation, no need to pass access argument to QuotaCountingFileTree
+        //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:FsAction.WRITE, 
+        //access:null, subAccess:null, ignoreEmptyDir:false
+        srcSubTreeRoot = lockSubtreeAndCheckOwnerAndParentPermission(src, false, 
+            FsAction.WRITE, SubTreeOperation.Type.RENAME_STO);
 
         if (srcSubTreeRoot != null) {
           AbstractFileTree.QuotaCountingFileTree srcFileTree;
@@ -8118,8 +8132,11 @@ public class FSNamesystem
     try {
       if (isUsingSubTreeLocks) {
         LOG.debug("Rename src: "+src+" dst: "+dst+" requires sub-tree locking mechanism");
-        srcSubTreeRoot = lockSubtreeAndCheckPathPermission(src, false, null,
-            FsAction.WRITE, null, null, SubTreeOperation.Type.RENAME_STO);
+        //checkin parentAccess is enough for this operation, no need to pass access argument to QuotaCountingFileTree
+        //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:FsAction.WRITE, 
+        //access:null, subAccess:null, ignoreEmptyDir:false
+        srcSubTreeRoot = lockSubtreeAndCheckOwnerAndParentPermission(src, false, 
+            FsAction.WRITE, SubTreeOperation.Type.RENAME_STO);
 
         if (srcSubTreeRoot != null) {
           AbstractFileTree.QuotaCountingFileTree srcFileTree;
@@ -8351,12 +8368,14 @@ public class FSNamesystem
 
         //sub tree operation
         try {
-          subtreeRoot = lockSubtreeAndCheckPathPermission(path, false, null,
-              FsAction.WRITE, null, null,
-              SubTreeOperation.Type.DELETE_STO);
+          //once subtree is locked we still need to check all subAccess in AbstractFileTree.FileTree
+          //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:FsAction.WRITE, 
+          //access:null, subAccess:FsAction.ALL, ignoreEmptyDir:true
+          subtreeRoot = lockSubtreeAndCheckOwnerAndParentPermission(path, false, 
+              FsAction.WRITE, SubTreeOperation.Type.DELETE_STO);
 
           List<AclEntry> nearestDefaultsForSubtree = calculateNearestDefaultAclForSubtree(pathInfo);
-          AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(this, subtreeRoot, FsAction.ALL,
+          AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(this, subtreeRoot, FsAction.ALL, true,
               nearestDefaultsForSubtree);
           fileTree.buildUp();
           delayAfterBbuildingTree("Built tree for "+path1+" for delete op");
@@ -8501,9 +8520,9 @@ public class FSNamesystem
    * @throws IOException
    */
   @VisibleForTesting
-  INodeIdentifier lockSubtree(final String path, SubTreeOperation.Type stoType) throws IOException {
-    return lockSubtreeAndCheckPathPermission(path, false, null, null, null,
-        null, stoType);
+  INodeIdentifier lockSubtree(final String path, SubTreeOperation.Type stoType) throws
+      IOException {
+    return lockSubtreeAndCheckOwnerAndParentPermission(path, false, null, stoType);
   }
 
   /**
@@ -8528,10 +8547,9 @@ public class FSNamesystem
    * @throws IOException
    */
   @VisibleForTesting
-  private INodeIdentifier lockSubtreeAndCheckPathPermission(final String path,
-      final boolean doCheckOwner, final FsAction ancestorAccess,
-      final FsAction parentAccess, final FsAction access,
-      final FsAction subAccess,
+  private INodeIdentifier lockSubtreeAndCheckOwnerAndParentPermission(final String path,
+      final boolean doCheckOwner, 
+      final FsAction parentAccess,
       final SubTreeOperation.Type stoType) throws IOException {
 
     if(path.compareTo("/")==0){
@@ -8569,7 +8587,7 @@ public class FSNamesystem
         FSPermissionChecker pc = getPermissionChecker();
         if (isPermissionEnabled && !pc.isSuperUser()) {
           pc.checkPermission(path, dir, doCheckOwner,
-              ancestorAccess, parentAccess, access, subAccess, true);
+              null, parentAccess, null, null, true, true);
         }
 
         INodesInPath inodesInPath = dir.getINodesInPath(path, false);
@@ -9451,7 +9469,7 @@ public class FSNamesystem
             FSPermissionChecker pc = getPermissionChecker();
             if (isPermissionEnabled && !pc.isSuperUser()) {
               pc.checkPermission(path, dir, doCheckOwner,
-                  ancestorAccess, parentAccess, access, subAccess, true);
+                  ancestorAccess, parentAccess, access, subAccess, false, true);
             }
 
             byte[][] pathComponents = INode.getPathComponents(path);
