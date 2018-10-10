@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -46,12 +45,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.nio.channels.ClosedChannelException;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
@@ -225,17 +220,5 @@ public class TestDiskError {
     long lastDiskErrorCheck = dataNode.getLastDiskErrorCheck();
     assertTrue("Disk Error check is not performed within  " + dataNode.checkDiskErrorInterval +  "  ms", ((
         Time.monotonicNow()-lastDiskErrorCheck) < (dataNode.checkDiskErrorInterval + slackTime)));
-  }
-  
-  @Test
-  public void testNetworkErrorsIgnored() {
-    DataNode dn = cluster.getDataNodes().iterator().next();
-    
-    assertTrue(dn.isNetworkRelatedException(new SocketException()));
-    assertTrue(dn.isNetworkRelatedException(new SocketTimeoutException()));
-    assertTrue(dn.isNetworkRelatedException(new ClosedChannelException()));
-    assertTrue(dn.isNetworkRelatedException(new Exception("Broken pipe foo bar")));
-    assertFalse(dn.isNetworkRelatedException(new Exception()));
-    assertFalse(dn.isNetworkRelatedException(new Exception("random problem")));
   }
 }

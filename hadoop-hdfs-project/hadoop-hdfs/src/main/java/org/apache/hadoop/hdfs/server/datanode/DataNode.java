@@ -160,13 +160,6 @@ import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.net.unix.DomainSocket;
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * *******************************************************
@@ -292,8 +285,7 @@ public class DataNode extends Configured
   private boolean connectToDnViaHostname;
   ReadaheadPool readaheadPool;
   private final boolean getHdfsBlockLocationsEnabled;
-  private ObjectName dataNodeInfoBeanName;
-
+  private ObjectName dataNodeInfoBeanName;  
   private Thread checkDiskErrorThread = null;
   protected final int checkDiskErrorInterval = 5*1000;
   private boolean checkDiskErrorFlag = false;
@@ -1501,7 +1493,7 @@ public class DataNode extends Configured
       notifyAll();
     }
   }
-  
+
   
   /**
    * Check if there is no space in disk
@@ -1516,14 +1508,14 @@ public class DataNode extends Configured
       LOG.info("Not checking disk as checkDiskError was called on a network" +
       		" related exception");	
       return;
-    }
+      }
     if (e.getMessage() != null &&
         e.getMessage().startsWith("No space left on device")) {
       throw new DiskOutOfSpaceException("No space left on device");
     } else {
       checkDiskError();
+      }
     }
-  }
   
   /**
    * Check if the provided exception looks like it's from a network error
@@ -1537,7 +1529,7 @@ public class DataNode extends Configured
         || e instanceof ClosedChannelException
         || e instanceof ClosedByInterruptException) {
       return true;
-    }
+}
 
     String msg = e.getMessage();
 
