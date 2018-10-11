@@ -32,6 +32,7 @@ import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.util.Slicer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
@@ -250,37 +251,63 @@ public class INodeUtil {
     }
   }
   
-  public static Map<Long, List<Long>> getINodeIdsForBlockIds(final long[] blockIds)
-      throws StorageException {
-    Map<Long, List<Long>> inodeIds;
-    LightWeightRequestHandler handler = new LightWeightRequestHandler(
-        HDFSOperationType.RESOLVE_INODES_FROM_BLOCKIDS) {
-      @Override
-      public Object performTask() throws IOException {
-        boolean transactionActive = connector.isTransactionActive();
-        try {
+  public static Map<Long, List<Long>> getINodeIdsForBlockIds(final List<Long> blockIds, int batchSize, int nbThreads)
+      throws IOException {
+    final Map<Long, List<Long>> inodeIds = new HashMap<>();
 
-          Map<INodeIdentifier, List<Long>> result = new HashMap<>();
-          if (!transactionActive) {
-            connector.beginTransaction();
+    try {
+      Slicer.slice(blockIds.size(), batchSize, nbThreads,
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex) throws Exception {
+          List<Long> ids = blockIds.subList(startIndex, endIndex);
+          final long[] array = new long[ids.size()];
+          int i = 0;
+          for (long blockId : ids) {
+            array[i] = blockId;
+            i++;
           }
-          BlockLookUpDataAccess<BlockLookUp> da = (BlockLookUpDataAccess) HdfsStorageFactory
-              .getDataAccess(BlockLookUpDataAccess.class);
-          Map<Long, List<Long>> inodeIds = da.getINodeIdsForBlockIds(blockIds);
-          return inodeIds;
+          LightWeightRequestHandler handler = new LightWeightRequestHandler(
+              HDFSOperationType.RESOLVE_INODES_FROM_BLOCKIDS) {
+            @Override
+            public Object performTask() throws IOException {
+              boolean transactionActive = connector.isTransactionActive();
+              try {
 
-        } finally {
-          if (!transactionActive) {
-            connector.commit();
+                if (!transactionActive) {
+                  connector.beginTransaction();
+                }
+                BlockLookUpDataAccess<BlockLookUp> da = (BlockLookUpDataAccess) HdfsStorageFactory
+                    .getDataAccess(BlockLookUpDataAccess.class);
+                Map<Long, List<Long>> inodeIds = da.getINodeIdsForBlockIds(array);
+                return inodeIds;
+              } finally {
+                if (!transactionActive) {
+                  connector.commit();
+                }
+              }
+            }
+          };
+          try {
+            Map<Long, List<Long>> map = (Map<Long, List<Long>>) handler.handle();
+            synchronized(inodeIds){
+              for(long inodeId: map.keySet()){
+                List<Long> blockIds = inodeIds.get(inodeId);
+                if(blockIds==null){
+                  blockIds= new ArrayList<>();
+                  inodeIds.put(inodeId, blockIds);
+                }
+                blockIds.addAll(map.get(inodeId));
+              }
+            }
+          } catch (IOException ex) {
+            LOG.error("Could not resolve iNode from blockId (blockid=" + Arrays.toString(array) + ")");
+            throw new StorageException(ex.getMessage());
           }
         }
-      }
-    };
-    try {
-      inodeIds = (Map<Long, List<Long>>) handler.handle();
-    } catch (IOException ex) {
-      LOG.error("Could not resolve iNode from blockId (blockid=" + Arrays.toString(blockIds) + ")");
-      throw new StorageException(ex.getMessage());
+      });
+    } catch (Exception ex) {
+      throw new IOException(ex);
     }
     return inodeIds;
   }
