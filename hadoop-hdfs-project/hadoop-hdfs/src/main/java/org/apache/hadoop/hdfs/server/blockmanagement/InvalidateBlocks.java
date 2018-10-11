@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -30,20 +31,20 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.util.Time;
 
 /**
  * Keeps a Collection for every storage containing blocks
@@ -57,10 +58,29 @@ class InvalidateBlocks {
 
   private final DatanodeManager datanodeManager;
 
-  InvalidateBlocks(final DatanodeManager datanodeManager) {
+  /**
+   * The period of pending time for block invalidation since the NameNode
+   * startup
+   */
+  private final long pendingPeriodInMs;
+  /** the startup time */
+  private final long startupTime = Time.monotonicNow();
+  InvalidateBlocks(final DatanodeManager datanodeManager, long pendingPeriodInMs) {
     this.datanodeManager = datanodeManager;
+    this.pendingPeriodInMs = pendingPeriodInMs;
+    printBlockDeletionTime(BlockManager.LOG);
   }
 
+  private void printBlockDeletionTime(final Log log) {
+    log.info(DFSConfigKeys.DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_MS_KEY
+        + " is set to " + pendingPeriodInMs + " ms.");
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy MMM dd HH:mm:ss");
+    Calendar calendar = new GregorianCalendar();
+    calendar.add(Calendar.SECOND, (int) (this.pendingPeriodInMs / 1000));
+    log.info("The block deletion will start around "
+        + sdf.format(calendar.getTime()));
+  }
+  
   /**
    * @return the number of blocks to be invalidated .
    */
@@ -170,9 +190,26 @@ class InvalidateBlocks {
   }
 
   /**
+   * @return the remianing pending time
+   */
+  @VisibleForTesting
+  long getInvalidationDelay() {
+    return pendingPeriodInMs - (Time.monotonicNow() - startupTime);
+  }
+  
+  /**
    * Invalidate work for the datanode.
    */
   List<Block> invalidateWork(DatanodeDescriptor dn) throws IOException {
+    final long delay = getInvalidationDelay();
+    if (delay > 0) {
+      if (BlockManager.LOG.isDebugEnabled()) {
+        BlockManager.LOG
+            .debug("Block deletion is delayed during NameNode startup. "
+                + "The deletion will start after " + delay + " ms.");
+      }
+      return null;
+    }
     final List<InvalidatedBlock> invBlocks = new ArrayList<InvalidatedBlock>();
 
     for(DatanodeStorageInfo storage : dn.getStorageInfos()) {
