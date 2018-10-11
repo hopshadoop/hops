@@ -2313,20 +2313,16 @@ public class BlockManager {
     }
     addToInvalidates(toInvalidate, storage);
 
-    removeBlocks(toRemove, storage.getDatanodeDescriptor());
+    removeBlocks(new ArrayList<Long>(toRemove), storage.getDatanodeDescriptor());
 
     return reportStatistics;
   }
   
   @VisibleForTesting
-  public void removeBlocks(Collection<Long> allBlockIds, final DatanodeDescriptor node) throws IOException {
-    long[] array = new long[allBlockIds.size()];
-    int i = 0;
-    for (long blockId : allBlockIds) {
-      array[i] = blockId;
-      i++;
-    }
-    final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(array);
+  public void removeBlocks(List<Long> allBlockIds, final DatanodeDescriptor node) throws IOException {
+
+    final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(allBlockIds,
+        removalBatchSize, removalNoThreads);
     final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
@@ -2345,13 +2341,8 @@ public class BlockManager {
   }
   
   private void removeBlocks(List<Long> allBlockIds, final int sid) throws IOException {
-    long[] array = new long[allBlockIds.size()];
-    int i = 0;
-    for (long blockId : allBlockIds) {
-      array[i] = blockId;
-      i++;
-    }
-    final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(array);
+    final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(allBlockIds,
+        removalBatchSize, removalNoThreads);
     final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
@@ -3948,12 +3939,13 @@ public class BlockManager {
       List<INodeIdentifier> inodeIdentifiers;
 
       @Override
-      public void setUp() throws StorageException {
-        long[] blockIds = new long[blocks.size()];
-        for(int i=0; i<blocks.size(); i++){
-          blockIds[i] = blocks.get(i).getBlockId();
+      public void setUp() throws StorageException, IOException {
+        List<Long> blockIds = new ArrayList<>(blocks.size());
+        for(Block block: blocks){
+          blockIds.add(block.getBlockId());
         }
-        List<Long> inodeIds = new ArrayList<>(INodeUtil.getINodeIdsForBlockIds(blockIds).keySet());
+        List<Long> inodeIds = new ArrayList<>(INodeUtil.getINodeIdsForBlockIds(blockIds, removalBatchSize,
+            removalNoThreads).keySet());
         inodeIdentifiers = INodeUtil.resolveINodesFromIds(inodeIds);
       }
 
