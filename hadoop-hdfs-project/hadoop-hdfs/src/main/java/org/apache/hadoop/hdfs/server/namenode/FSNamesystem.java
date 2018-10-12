@@ -9751,14 +9751,14 @@ public class FSNamesystem
 
     @Override
     public void run() {
-      try {
-        int numRun = 0;
-        while (fsRunning && shouldCacheCleanerRun) {
+      int numRun = 0;
+      while (fsRunning && shouldCacheCleanerRun) {
+        try {
           final List<CacheEntry> toRemove = new ArrayList<>();
           int num = retryCache.getToRemove().drainTo(toRemove);
           if (num > 0) {
-            HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler
-                    (HDFSOperationType.CLEAN_RETRY_CACHE) {
+            HopsTransactionalRequestHandler rh
+                = new HopsTransactionalRequestHandler(HDFSOperationType.CLEAN_RETRY_CACHE) {
               @Override
               public void acquireLock(TransactionLocks locks) throws IOException {
                 LockFactory lf = getInstance();
@@ -9768,7 +9768,10 @@ public class FSNamesystem
               @Override
               public Object performTask() throws IOException {
                 for (CacheEntry entry : toRemove) {
-                  EntityManager.remove(new RetryCacheEntry(entry.getClientId(), entry.getCallId()));
+                  if (EntityManager.find(RetryCacheEntry.Finder.ByClientIdAndCallId, entry.getClientId(), entry.
+                      getCallId()) != null) {
+                    EntityManager.remove(new RetryCacheEntry(entry.getClientId(), entry.getCallId()));
+                  }
                 }
                 return null;
               }
@@ -9784,7 +9787,7 @@ public class FSNamesystem
 
                 RetryCacheEntryDataAccess da = (RetryCacheEntryDataAccess) HdfsStorageFactory
                     .getDataAccess(RetryCacheEntryDataAccess.class);
-                da.removeOlds(timer.now()- entryExpiryMillis);
+                da.removeOlds(timer.now() - entryExpiryMillis);
                 return null;
               }
             }.handle();
@@ -9792,9 +9795,9 @@ public class FSNamesystem
 
           Thread.sleep(1000);
           numRun++;
+        } catch (Exception e) {
+          FSNamesystem.LOG.error("Exception in RetryCacheCleaner: ", e);
         }
-      } catch (Exception e) {
-        FSNamesystem.LOG.error("Exception in RetryCacheCleaner: ", e);
       }
     }
 
