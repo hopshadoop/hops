@@ -50,6 +50,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
+import io.hops.exception.StorageException;
+import org.apache.hadoop.hdfs.protocol.FsAclPermission;
 
 /**
  * Tests NameNode interaction for all ACL modification APIs.  This test suite
@@ -124,7 +126,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, READ_EXECUTE),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0750);
+    assertPermission((short)010750);
     assertAclFeature(true);
   }
 
@@ -146,7 +148,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", READ_EXECUTE),
       aclEntry(ACCESS, GROUP, READ_EXECUTE) }, returned);
-    assertPermission((short)0750);
+    assertPermission((short)010750);
     assertAclFeature(true);
   }
 
@@ -167,7 +169,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE) }, returned);
 //      aclEntry(DEFAULT, MASK, READ_EXECUTE),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0750);
+    assertPermission((short)010750);
     assertAclFeature(true);
   }
 
@@ -183,7 +185,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", READ_WRITE),
       aclEntry(ACCESS, GROUP, READ) }, returned);
-    assertPermission((short)0660);
+    assertPermission((short)010660);
     assertAclFeature(true);
   }
 
@@ -201,7 +203,7 @@ public abstract class FSAclBaseTest {
 //      aclEntry(DEFAULT, USER, ALL),
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0750);
+    assertPermission((short)010750);
     assertAclFeature(true);
   }
 
@@ -218,7 +220,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", ALL),
       aclEntry(ACCESS, GROUP, READ) }, returned);
-    assertPermission((short)0600);
+    assertPermission((short)010600);
     assertAclFeature(true);
   }
 
@@ -246,7 +248,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, READ_EXECUTE),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)01750);
+    assertPermission((short)011750);
     assertAclFeature(true);
   }
 
@@ -292,7 +294,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, READ_EXECUTE),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0750);
+    assertPermission((short)010750);
     assertAclFeature(true);
   }
 
@@ -315,7 +317,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "bar", READ_WRITE),
       aclEntry(ACCESS, GROUP, READ_WRITE) }, returned);
-    assertPermission((short)0760);
+    assertPermission((short)010760);
     assertAclFeature(true);
   }
 
@@ -340,7 +342,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, READ_EXECUTE),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0750);
+    assertPermission((short)010750);
     assertAclFeature(true);
   }
 
@@ -388,7 +390,7 @@ public abstract class FSAclBaseTest {
 //      aclEntry(DEFAULT, USER, ALL),
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0750);
+    assertPermission((short)010750);
     assertAclFeature(true);
   }
 
@@ -414,7 +416,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, READ_EXECUTE),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)01750);
+    assertPermission((short)011750);
     assertAclFeature(true);
   }
 
@@ -442,7 +444,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", ALL),
       aclEntry(ACCESS, GROUP, READ_EXECUTE) }, returned);
-    assertPermission((short)0770);
+    assertPermission((short)010770);
     assertAclFeature(true);
   }
 
@@ -462,7 +464,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", ALL),
       aclEntry(ACCESS, GROUP, READ_EXECUTE) }, returned);
-    assertPermission((short)0770);
+    assertPermission((short)010770);
     assertAclFeature(true);
   }
 
@@ -507,7 +509,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", ALL),
       aclEntry(ACCESS, GROUP, READ_EXECUTE) }, returned);
-    assertPermission((short)01770);
+    assertPermission((short)011770);
     assertAclFeature(true);
   }
 
@@ -608,7 +610,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, ALL),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0770);
+    assertPermission((short)010770);
     assertAclFeature(true);
   }
 
@@ -627,7 +629,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", READ),
       aclEntry(ACCESS, GROUP, READ) }, returned);
-    assertPermission((short)0640);
+    assertPermission((short)010640);
     assertAclFeature(true);
   }
 
@@ -645,7 +647,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, ALL),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0750);
+    assertPermission((short)010750);
     assertAclFeature(true);
   }
 
@@ -685,7 +687,7 @@ public abstract class FSAclBaseTest {
 //      aclEntry(DEFAULT, USER, ALL),
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0750);
+    assertPermission((short)010750);
     assertAclFeature(true);
   }
 
@@ -705,7 +707,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", READ),
       aclEntry(ACCESS, GROUP, READ) }, returned);
-    assertPermission((short)0670);
+    assertPermission((short)010670);
     assertAclFeature(true);
   }
 
@@ -729,7 +731,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, ALL),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)01770);
+    assertPermission((short)011770);
     assertAclFeature(true);
   }
 
@@ -774,7 +776,7 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, ALL),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0700);
+    assertPermission((short)010700);
     assertAclFeature(true);
   }
 
@@ -794,7 +796,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", READ),
       aclEntry(ACCESS, GROUP, READ) }, returned);
-    assertPermission((short)0600);
+    assertPermission((short)010600);
     assertAclFeature(true);
   }
 
@@ -816,10 +818,46 @@ public abstract class FSAclBaseTest {
       aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, ALL),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission((short)0700);
+    assertPermission((short)010700);
     assertAclFeature(true);
   }
 
+  @Test
+  public void testSetPermissionCannotSetAclBit() throws IOException {
+    FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short)0750));
+    fs.setPermission(path, FsPermission.createImmutable((short)0700));
+    assertPermission((short)0700);
+    fs.setPermission(path,
+      new FsAclPermission(FsPermission.createImmutable((short)0755)));
+    INode inode = getInode();
+    assertNotNull(inode);
+    FsPermission perm = inode.getFsPermission();
+    assertNotNull(perm);
+    assertEquals(0755, perm.toShort());
+    assertEquals(0755, perm.toExtendedShort());
+    assertAclFeature(false);
+  }
+  
+  private INode getInode() throws IOException {
+    return (INode) new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE,
+            TransactionLockTypes.INodeResolveType.PATH, path.toUri().getPath())
+            .setNameNodeID(cluster.getNameNode().getId()).setActiveNameNodes(cluster.getNameNode().
+            getActiveNameNodes().getActiveNodes());
+        locks.add(il)
+            .add(lf.getBlockLock());
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        return cluster.getNamesystem().getFSDirectory().getNode(path.toUri().getPath(), false);
+      }
+    }.handle();
+  }
+  
   @Test
   public void testDefaultAclNewFile() throws Exception {
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short)0750));
@@ -833,7 +871,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", ALL),
       aclEntry(ACCESS, GROUP, READ_EXECUTE) }, returned);
-    assertPermission(filePath, (short)0644); //HOP file permissions are unaffected by inherited acls.
+    assertPermission(filePath, (short)010644); //HOP file permissions are unaffected by inherited acls.
     assertAclFeature(filePath, true);
   }
 
@@ -865,7 +903,7 @@ public abstract class FSAclBaseTest {
     AclStatus s = fs.getAclStatus(filePath);
     AclEntry[] returned = s.getEntries().toArray(new AclEntry[0]);
     assertArrayEquals(new AclEntry[] { aclEntry(ACCESS, GROUP, READ_EXECUTE) }, returned);
-    assertPermission(filePath, (short)0644); //HOP file permissions are unaffected by inherited acls.
+    assertPermission(filePath, (short)010644); //HOP file permissions are unaffected by inherited acls.
     assertAclFeature(filePath, true); //HOP inherited group permission is stored in extended acl.
   }
 
@@ -887,7 +925,7 @@ public abstract class FSAclBaseTest {
 //      aclEntry(DEFAULT, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, MASK, ALL),
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission(dirPath, (short)0755);
+    assertPermission(dirPath, (short)010755);
     assertAclFeature(dirPath, true);
   }
 
@@ -923,7 +961,7 @@ public abstract class FSAclBaseTest {
 //      aclEntry(DEFAULT, USER, ALL),
       aclEntry(ACCESS, GROUP, READ_EXECUTE)}, returned);
 //      aclEntry(DEFAULT, OTHER, NONE) }, returned);
-    assertPermission(dirPath, (short)0755); //HOP file permissions unaffected by inherited acl.
+    assertPermission(dirPath, (short)010755); //HOP file permissions unaffected by inherited acl.
     assertAclFeature(dirPath, true);
   }
 
@@ -948,7 +986,7 @@ public abstract class FSAclBaseTest {
     AclStatus s = fs.getAclStatus(dirPath);
     AclEntry[] returned = s.getEntries().toArray(new AclEntry[0]);
     assertArrayEquals(expected, returned);
-    assertPermission(dirPath, (short)0750);
+    assertPermission(dirPath, (short)010750);
     assertAclFeature(dirPath, true);
     expected = new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", ALL),
@@ -956,7 +994,7 @@ public abstract class FSAclBaseTest {
     s = fs.getAclStatus(filePath);
     returned = s.getEntries().toArray(new AclEntry[0]);
     assertArrayEquals(expected, returned);
-    assertPermission(filePath, (short)0644); //HOP file permissions are unaffected by inherited acls.
+    assertPermission(filePath, (short)010644); //HOP file permissions are unaffected by inherited acls.
     assertAclFeature(filePath, true);
   }
 
@@ -980,12 +1018,12 @@ public abstract class FSAclBaseTest {
     AclStatus s = fs.getAclStatus(dirPath);
     AclEntry[] returned = s.getEntries().toArray(new AclEntry[0]);
     assertArrayEquals(expected, returned);
-    assertPermission(dirPath, (short)0755); //HOP file permission unaffected by inherited acl
+    assertPermission(dirPath, (short)010755); //HOP file permission unaffected by inherited acl
     assertAclFeature(dirPath, true);
     s = fs.getAclStatus(subdirPath);
     returned = s.getEntries().toArray(new AclEntry[0]);
     assertArrayEquals(expected, returned);
-    assertPermission(subdirPath, (short)0755); //HOP file permission unaffected by inherited acl
+    assertPermission(subdirPath, (short)010755); //HOP file permission unaffected by inherited acl
     assertAclFeature(subdirPath, true);
   }
 
@@ -1023,7 +1061,7 @@ public abstract class FSAclBaseTest {
     s = fs.getAclStatus(filePath);
     returned = s.getEntries().toArray(new AclEntry[0]);
     assertArrayEquals(expected, returned);
-    assertPermission(filePath, (short)0640);
+    assertPermission(filePath, (short)010640);
     assertAclFeature(filePath, false);
   }
 
@@ -1045,7 +1083,7 @@ public abstract class FSAclBaseTest {
     assertArrayEquals(new AclEntry[] {
       aclEntry(ACCESS, USER, "foo", ALL),
       aclEntry(ACCESS, GROUP, READ_EXECUTE) }, returned);
-    assertPermission(filePath, (short)0740);
+    assertPermission(filePath, (short)010740);
     assertAclFeature(filePath, true);
   }
 
@@ -1067,7 +1105,7 @@ public abstract class FSAclBaseTest {
 //      aclEntry(DEFAULT, GROUP, READ_EXECUTE),
 //      aclEntry(DEFAULT, MASK, ALL),
 //      aclEntry(DEFAULT, OTHER, READ_EXECUTE) }, returned);
-    assertPermission(dirPath, (short)0740);
+    assertPermission(dirPath, (short)010740);
     assertAclFeature(dirPath, true);
   }
 

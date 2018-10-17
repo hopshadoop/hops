@@ -91,7 +91,7 @@
         <tbody>
           {#FileStatus}
           <tr>
-            <td>{#helper_to_permission/}</td>
+            <td>{type|helper_to_directory}{permission|helper_to_permission}{aclBit|helper_to_acl_bit}</td>
             <td>{owner}</td>
             <td>{group}</td>
             <td>{length|fmt_bytes}</td>
@@ -123,7 +123,7 @@
     </script><script type="text/javascript" src="/static/bootstrap-3.0.2/js/bootstrap.min.js">
     </script><script type="text/javascript" src="/static/dust-full-2.0.0.min.js">
     </script><script type="text/javascript" src="/static/dust-helpers-1.1.1.min.js">
-    </script><script type="text/javascript" src="dfs-dust.js">
+    </script><script type="text/javascript" src="/static/dfs-dust.js">
     </script><script type="text/javascript" src="explorer.js">
     </script>
     <hr />
