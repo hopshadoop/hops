@@ -87,6 +87,8 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.protocol.AclException;
+import org.apache.hadoop.hdfs.protocol.FsAclPermission;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
 import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
@@ -2258,7 +2260,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         blocksize,
         node.getModificationTime(),
         node.getAccessTime(),
-        node.getFsPermission(),
+        getPermissionForFileStatus(node),
         node.getUserName(),
         node.getGroupName(),
         node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null,
@@ -2322,6 +2324,23 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       }
     }
     return status;
+  }
+  
+  /**
+   * Returns an inode's FsPermission for use in an outbound FileStatus.  If the
+   * inode has an ACL, then this method will convert to a FsAclPermission.
+   *
+   * @param node INode to check
+   * @param snapshot int snapshot ID
+   * @return FsPermission from inode, with ACL bit on if the inode has an ACL
+   */
+  private static FsPermission getPermissionForFileStatus(INode node) throws TransactionContextException,
+      StorageException, AclException {
+    FsPermission perm = node.getFsPermission();
+    if (node.getAclFeature() != null) {
+      perm = new FsAclPermission(perm);
+    }
+    return perm;
   }
 
   /**

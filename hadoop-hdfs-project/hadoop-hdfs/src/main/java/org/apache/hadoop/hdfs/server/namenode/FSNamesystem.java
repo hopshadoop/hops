@@ -1057,6 +1057,7 @@ public class FSNamesystem
             il.setIgnoredSTOInodes(inode.getInodeId());
           }
           locks.add(il).add(lf.getBlockLock());
+          locks.add(lf.getAcesLock());
         }
 
         @Override

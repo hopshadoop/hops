@@ -194,6 +194,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import org.apache.hadoop.hdfs.protocol.FsAclPermission;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 
 /**
@@ -1231,17 +1232,11 @@ public class PBHelper {
   }
 
   public static FsPermissionProto convert(FsPermission p) {
-    if (p == null) {
-      return null;
-    }
-    return FsPermissionProto.newBuilder().setPerm(p.toShort()).build();
+    return FsPermissionProto.newBuilder().setPerm(p.toExtendedShort()).build();
   }
 
   public static FsPermission convert(FsPermissionProto p) {
-    if (p == null) {
-      return null;
-    }
-    return new FsPermission((short) p.getPerm());
+    return new FsAclPermission((short)p.getPerm());
   }
 
 
