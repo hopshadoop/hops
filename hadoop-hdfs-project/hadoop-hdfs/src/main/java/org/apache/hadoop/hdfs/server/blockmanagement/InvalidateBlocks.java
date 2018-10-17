@@ -56,7 +56,7 @@ class InvalidateBlocks {
 
   private static final Log LOG = LogFactory.getLog(InvalidateBlocks.class);;
 
-  private final DatanodeManager datanodeManager;
+    private final int blockInvalidateLimit;
 
   /**
    * The period of pending time for block invalidation since the NameNode
@@ -65,8 +65,8 @@ class InvalidateBlocks {
   private final long pendingPeriodInMs;
   /** the startup time */
   private final long startupTime = Time.monotonicNow();
-  InvalidateBlocks(final DatanodeManager datanodeManager, long pendingPeriodInMs) {
-    this.datanodeManager = datanodeManager;
+  InvalidateBlocks(final int blockInvalidateLimit, long pendingPeriodInMs) {
+    this.blockInvalidateLimit = blockInvalidateLimit;
     this.pendingPeriodInMs = pendingPeriodInMs;
     printBlockDeletionTime(BlockManager.LOG);
   }
@@ -220,7 +220,7 @@ class InvalidateBlocks {
       return null;
     }
     // # blocks that can be sent in one message is limited
-    final int limit = datanodeManager.blockInvalidateLimit;
+    final int limit = blockInvalidateLimit;
     final List<Block> toInvalidate = new ArrayList<>(limit);
     final List<InvalidatedBlock> toInvblks = new ArrayList<>();
     final Iterator<InvalidatedBlock> it = invBlocks.iterator();

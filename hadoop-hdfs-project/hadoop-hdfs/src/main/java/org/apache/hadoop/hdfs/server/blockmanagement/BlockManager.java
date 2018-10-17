@@ -347,7 +347,7 @@ public class BlockManager {
     final long pendingPeriod = conf.getLong(
         DFSConfigKeys.DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_MS_KEY,
         DFSConfigKeys.DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_MS_DEFAULT);
-    invalidateBlocks = new InvalidateBlocks(datanodeManager, pendingPeriod);
+    invalidateBlocks = new InvalidateBlocks(datanodeManager.blockInvalidateLimit, pendingPeriod);
     excessReplicateMap = new ExcessReplicasMap(datanodeManager);
 
     blocksMap = new BlocksMap(datanodeManager);
