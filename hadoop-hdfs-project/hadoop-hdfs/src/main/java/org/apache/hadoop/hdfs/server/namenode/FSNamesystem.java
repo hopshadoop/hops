@@ -7066,15 +7066,17 @@ public class FSNamesystem
         }
         boolean success = false;
         
+        String effectiveDirectiveStr = null;
         Long result = null;
         try {
           
           CacheDirectiveInfo effectiveDirective = cacheManager.addDirective(directive, pc, flags, id);
           result = effectiveDirective.getId();
+          effectiveDirectiveStr = effectiveDirective.toString();
           success = true;
         } finally {
           if (isAuditEnabled() && isExternalInvocation()) {
-            logAuditEvent(success, "addCacheDirective", null, null, null);
+            logAuditEvent(success, "addCacheDirective", effectiveDirectiveStr, null, null);
           }
           RetryCacheDistributed.setState(cacheEntry, success, PBHelper.longToBytes(result));
         }
@@ -7145,7 +7147,8 @@ public class FSNamesystem
           success = true;
         } finally {
           if (isAuditEnabled() && isExternalInvocation()) {
-            logAuditEvent(success, "modifyCacheDirective", null, null, null);
+            String idStr = "{id: " + directive.getId().toString() + "}";
+            logAuditEvent(success, "modifyCacheDirective", idStr, directive.toString(), null);
           }
           RetryCacheDistributed.setState(cacheEntry, success);
         }
@@ -7182,7 +7185,8 @@ public class FSNamesystem
           success = true;
         } finally {
           if (isAuditEnabled() && isExternalInvocation()) {
-            logAuditEvent(success, "removeCacheDirective", null, null,
+            String idStr = "{id: " + id.toString() + "}";
+            logAuditEvent(success, "removeCacheDirective", idStr, null,
                 null);
           }
           RetryCacheDistributed.setState(cacheEntry, success);
@@ -7205,7 +7209,7 @@ public class FSNamesystem
       success = true;
     } finally {
       if (isAuditEnabled() && isExternalInvocation()) {
-        logAuditEvent(success, "listCacheDirectives", null, null,
+        logAuditEvent(success, "listCacheDirectives", filter.toString(), null,
             null);
       }
     }
@@ -7231,6 +7235,7 @@ public class FSNamesystem
           return null; // Return previous response
         }
         boolean success = false;
+        String poolInfoStr = null;
         try {
           if (isInSafeMode()) {
             throw new SafeModeException(
@@ -7240,12 +7245,13 @@ public class FSNamesystem
             pc.checkSuperuserPrivilege();
           }
           CachePoolInfo info = cacheManager.addCachePool(req);
+          poolInfoStr = info.toString();
 
           success = true;
         } finally {
 
           if (isAuditEnabled() && isExternalInvocation()) {
-            logAuditEvent(success, "addCachePool", req.getPoolName(), null, null);
+            logAuditEvent(success, "addCachePool", poolInfoStr, null, null);
           }
           RetryCacheDistributed.setState(cacheEntry, success);
         }
@@ -7286,7 +7292,8 @@ public class FSNamesystem
           success = true;
         } finally {
           if (isAuditEnabled() && isExternalInvocation()) {
-            logAuditEvent(success, "modifyCachePool", req.getPoolName(), null, null);
+            String poolNameStr = "{poolName: " + req.getPoolName() + "}";
+            logAuditEvent(success, "modifyCachePool", poolNameStr, req.toString(), null);
           }
           RetryCacheDistributed.setState(cacheEntry, success);
         }
@@ -7327,7 +7334,8 @@ public class FSNamesystem
           success = true;
         } finally {
           if (isAuditEnabled() && isExternalInvocation()) {
-            logAuditEvent(success, "removeCachePool", cachePoolName, null, null);
+            String poolNameStr = "{poolName: " + cachePoolName + "}";
+            logAuditEvent(success, "removeCachePool", poolNameStr, null, null);
           }
         }
         return null;
