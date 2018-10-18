@@ -610,22 +610,28 @@ public final class CacheManager {
   }
 
   public BatchedListEntries<CacheDirectiveEntry>
-      listCacheDirectives(final long prevId,
+      listCacheDirectives(long prevId1,
           final CacheDirectiveInfo filter,
           final FSPermissionChecker pc) throws IOException {
     final int NUM_PRE_ALLOCATED_ENTRIES = 16;
     final String filterPath[] = new String[1];
-    if (filter.getId() != null) {
-      throw new IOException("Filtering by ID is unsupported.");
-    }
     if (filter.getPath() != null) {
       filterPath[0] = validatePath(filter);
     }
     if (filter.getReplication() != null) {
-      throw new IOException("Filtering by replication is unsupported.");
+      throw new InvalidRequestException(
+          "Filtering by replication is unsupported.");
     }
     final ArrayList<CacheDirectiveEntry> replies = new ArrayList<CacheDirectiveEntry>(NUM_PRE_ALLOCATED_ENTRIES);
-
+    
+    // Querying for a single ID
+    final Long id = filter.getId();
+    if (id != null) {
+      // Since we use a tailMap on directivesById, setting prev to id-1 gets
+      // us the directive with the id (if present)
+      prevId1 = id - 1;
+    }
+    final long prevId = prevId1;
     HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.LIST_CACHE_DIRECTIVE) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -636,6 +642,12 @@ public final class CacheManager {
 
       @Override
       public Object performTask() throws IOException {
+       
+        if (id != null) {
+          if (EntityManager.find(CacheDirective.Finder.ById,id)==null) {
+            throw new InvalidRequestException("Did not find requested id " + id);
+          }
+        }
 
         int numReplies = 0;
         Map<Long, CacheDirective> tailMap = getDirectivesByIdPathAndPool(prevId + 1, filterPath[0], filter.getPool(), maxListCacheDirectivesNumResponses+1);
@@ -645,6 +657,13 @@ public final class CacheManager {
           }
           CacheDirective curDirective = cur.getValue();
           CacheDirectiveInfo info = cur.getValue().toInfo();
+          
+          // If the requested ID is present, it should be the first item.
+          // Hitting this case means the ID is not present, or we're on the second
+          // item and should break out.
+          if (id != null && !(info.getId().equals(id))) {
+            break;
+          }
           if (filter.getPool() != null && !info.getPool().equals(filter.getPool())) {
             continue;
           }
