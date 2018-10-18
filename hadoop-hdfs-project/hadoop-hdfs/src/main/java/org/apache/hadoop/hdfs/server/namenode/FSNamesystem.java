@@ -2417,6 +2417,11 @@ public class FSNamesystem
       return blockManager.createPhantomLocatedBlocks(cons,cons.getFileDataInDB(),true,false).getLocatedBlocks().get(0);
     } else {
       LocatedBlock ret = blockManager.convertLastBlockToUnderConstruction(cons);
+      if (ret != null && dir.isQuotaEnabled()) {
+        // update the quota: use the preferred block size for UC block
+        final long diff = file.getPreferredBlockSize() - ret.getBlockSize();
+        dir.updateSpaceConsumed(src, 0, diff * file.getBlockReplication());
+      }
       lease.updateLastTwoBlocksInLeasePath(src, file.getLastBlock(), file.getPenultimateBlock());
       return ret;
     }
@@ -5928,12 +5933,6 @@ public class FSNamesystem
             locatedBlock = new LocatedBlock(block, new DatanodeInfo[0]);
             blockManager.setBlockToken(locatedBlock, AccessMode.WRITE);
 
-            if(dir.isQuotaEnabled()){
-              long diff = pendingFile.getPreferredBlockSize() - block
-                  .getNumBytes();
-              dir.updateSpaceConsumed(pendingFile.getFullPathName(), 0, diff
-                  * pendingFile.getBlockReplication());
-            }
             return locatedBlock;
           }
         };
