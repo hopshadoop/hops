@@ -136,6 +136,7 @@ public class CacheDirectiveContext extends BaseEntityContext<Long, CacheDirectiv
       fetchedCacheDirectivesById = true;
       for(CacheDirective directive: results){
         cacheDirectivesById.put(directive.getId(), directive);
+        gotFromDB(directive);
       }
       miss(hbFinder, results, "id", id, "poolName", poolName, "path", path);
     }
