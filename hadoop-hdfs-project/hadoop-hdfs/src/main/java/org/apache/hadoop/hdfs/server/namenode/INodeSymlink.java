@@ -108,4 +108,21 @@ public class INodeSymlink extends INodeWithAdditionalFields {
   public INode cloneInode () throws IOException{
     return new INodeSymlink(this);
   }
+  
+  /**
+   * getAclFeature is not overridden because it is needed for resolving
+   * symlinks.
+  @Override
+  final AclFeature getAclFeature(int snapshotId) {
+    throw new UnsupportedOperationException("ACLs are not supported on symlinks");
+  }
+  */
+  @Override
+  public void removeAclFeature() {
+    throw new UnsupportedOperationException("ACLs are not supported on symlinks");
+  }
+  @Override
+  public void addAclFeature(AclFeature f) {
+    throw new UnsupportedOperationException("ACLs are not supported on symlinks");
+  }
 }
