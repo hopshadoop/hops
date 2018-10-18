@@ -2363,13 +2363,6 @@ public class FSNamesystem
       }
       INodeFile myFile = INodeFile.valueOf(inode, src, true);
 
-      final BlockInfo lastBlock = myFile.getLastBlock();
-      // Check that the block has at least minimum replication.
-      if (lastBlock != null && lastBlock.isComplete() && !getBlockManager().isSufficientlyReplicated(lastBlock)) {
-        throw new IOException("append: lastBlock=" + lastBlock + " of src=" + src
-            + " is not sufficiently replicated yet.");
-      }
-
       // Opening an existing file for write - may need to recover lease.
       recoverLeaseInternal(myFile, src, holder, clientMachine, false);
 
@@ -2377,7 +2370,13 @@ public class FSNamesystem
       // finalizeINodeFileUnderConstruction so we need to refresh 
       // the referenced file.  
       myFile = INodeFile.valueOf(dir.getINode(src), src, true);
-
+      final BlockInfo lastBlock = myFile.getLastBlock();
+      // Check that the block has at least minimum replication.
+      if (lastBlock != null && lastBlock.isComplete() && !getBlockManager().isSufficientlyReplicated(lastBlock)) {
+        throw new IOException("append: lastBlock=" + lastBlock + " of src=" + src
+            + " is not sufficiently replicated yet.");
+      }
+      
       final DatanodeDescriptor clientNode =
           blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
       return prepareFileForWrite(src, myFile, holder, clientMachine, clientNode);
