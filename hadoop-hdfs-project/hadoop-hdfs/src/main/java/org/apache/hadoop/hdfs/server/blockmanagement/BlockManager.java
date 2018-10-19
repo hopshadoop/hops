@@ -1322,7 +1322,10 @@ public class BlockManager {
    */
   void addToInvalidates(final Block block, final DatanodeInfo datanode)
       throws StorageException, TransactionContextException,
-      UnregisteredNodeException {
+      UnregisteredNodeException, IOException {
+    if (!namesystem.isPopulatingReplQueues()) {
+      return;
+    }
     DatanodeDescriptor dn = datanodeManager.getDatanode(datanode);
     DatanodeStorageInfo storage = getBlockInfo(block).getStorageOnNode(dn);
     if(storage!=null){
@@ -1331,7 +1334,10 @@ public class BlockManager {
   }
    
   void addToInvalidates(Block block, DatanodeStorageInfo storage)
-      throws TransactionContextException, StorageException {
+      throws TransactionContextException, StorageException, IOException {
+    if (!namesystem.isPopulatingReplQueues()) {
+      return;
+    }
     BlockInfo temp = getBlockInfo(block);
     invalidateBlocks.add(temp, storage, true);
   }
@@ -1341,7 +1347,10 @@ public class BlockManager {
    * datanodes.
    */
   private void addToInvalidates(Block b)
-      throws StorageException, TransactionContextException {
+      throws StorageException, TransactionContextException, IOException {
+    if (!namesystem.isPopulatingReplQueues()) {
+      return;
+    }
     StringBuilder datanodes = new StringBuilder();
     BlockInfo block = getBlockInfo(b);
 
@@ -3671,7 +3680,7 @@ public class BlockManager {
   private void chooseExcessReplicates(final Collection<DatanodeStorageInfo> nonExcess,
       Block b, short replication, DatanodeDescriptor addedNode,
       DatanodeDescriptor delNodeHint, BlockPlacementPolicy replicator)
-      throws StorageException, TransactionContextException {
+      throws StorageException, TransactionContextException, IOException {
 
     // first form a rack to datanodes map and
     BlockCollection bc = getBlockCollection(b);
@@ -4492,7 +4501,7 @@ public class BlockManager {
   }
 
   public void removeBlock(Block block)
-      throws StorageException, TransactionContextException {
+      throws StorageException, TransactionContextException, IOException {
     // No need to ACK blocks that are being removed entirely
     // from the namespace, since the removal of the associated
     // file already removes them from the block map below.
