@@ -123,7 +123,7 @@ public class TestComputeInvalidateWork {
   
     void addToInvalidates(final Block block, final DatanodeInfo datanode, BlockManager bm)
       throws StorageException, TransactionContextException,
-      UnregisteredNodeException {
+      UnregisteredNodeException, IOException {
         
     DatanodeDescriptor dn = bm.getDatanodeManager().getDatanode(datanode);
     DatanodeStorageInfo storage = dn.getStorageInfos()[0];

@@ -3611,7 +3611,7 @@ public class FSNamesystem
    *          of blocks that need to be removed from blocksMap
    */
   private void removeBlocks(BlocksMapUpdateInfo blocks)
-      throws StorageException, TransactionContextException {
+      throws StorageException, TransactionContextException, IOException {
     List<Block> toDeleteList = blocks.getToDeleteList();
     Iterator<Block> iter = toDeleteList.iterator();
     while (iter.hasNext()) {
