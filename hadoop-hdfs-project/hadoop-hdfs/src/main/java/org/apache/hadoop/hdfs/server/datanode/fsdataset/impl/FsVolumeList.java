@@ -111,7 +111,7 @@ class FsVolumeList {
   }
 
   void getAllVolumesMap(final String bpid, final ReplicaMap volumeMap) throws IOException {
-    long totalStartTime = System.currentTimeMillis();
+    long totalStartTime = Time.monotonicNow();
     final List<IOException> exceptions = Collections.synchronizedList(
         new ArrayList<IOException>());
     List<Thread> replicaAddingThreads = new ArrayList<Thread>();
