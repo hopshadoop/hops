@@ -54,17 +54,17 @@ public class TestNetworkTopologyWithNodeGroup {
 
   @Test
   public void testNumOfChildren() throws Exception {
-    assertEquals(cluster.getNumOfLeaves(), dataNodes.length);
+    assertEquals(dataNodes.length, cluster.getNumOfLeaves());
   }
 
   @Test
   public void testNumOfRacks() throws Exception {
-    assertEquals(cluster.getNumOfRacks(), 3);
+    assertEquals(3, cluster.getNumOfRacks());
   }
 
   @Test
   public void testRacks() throws Exception {
-    assertEquals(cluster.getNumOfRacks(), 3);
+    assertEquals(3, cluster.getNumOfRacks());
     assertTrue(cluster.isOnSameRack(dataNodes[0], dataNodes[1]));
     assertTrue(cluster.isOnSameRack(dataNodes[1], dataNodes[2]));
     assertFalse(cluster.isOnSameRack(dataNodes[2], dataNodes[3]));
@@ -76,7 +76,7 @@ public class TestNetworkTopologyWithNodeGroup {
 
   @Test
   public void testNodeGroups() throws Exception {
-    assertEquals(cluster.getNumOfRacks(), 3);
+    assertEquals(3, cluster.getNumOfRacks());
     assertTrue(cluster.isOnSameNodeGroup(dataNodes[0], dataNodes[1]));
     assertFalse(cluster.isOnSameNodeGroup(dataNodes[1], dataNodes[2]));
     assertFalse(cluster.isOnSameNodeGroup(dataNodes[2], dataNodes[3]));
@@ -88,15 +88,15 @@ public class TestNetworkTopologyWithNodeGroup {
 
   @Test
   public void testGetDistance() throws Exception {
-    assertEquals(cluster.getDistance(dataNodes[0], dataNodes[0]), 0);
-    assertEquals(cluster.getDistance(dataNodes[0], dataNodes[1]), 2);
-    assertEquals(cluster.getDistance(dataNodes[0], dataNodes[2]), 4);
-    assertEquals(cluster.getDistance(dataNodes[0], dataNodes[3]), 6);
-    assertEquals(cluster.getDistance(dataNodes[0], dataNodes[6]), 8);
+    assertEquals(0, cluster.getDistance(dataNodes[0], dataNodes[0]));
+    assertEquals(2, cluster.getDistance(dataNodes[0], dataNodes[1]));
+    assertEquals(4, cluster.getDistance(dataNodes[0], dataNodes[2]));
+    assertEquals(6, cluster.getDistance(dataNodes[0], dataNodes[3]));
+    assertEquals(8, cluster.getDistance(dataNodes[0], dataNodes[6]));
   }
 
   @Test
-  public void testPseudoSortByDistance() throws Exception {
+  public void testSortByDistance() throws Exception {
     NodeBase[] testNodes = new NodeBase[4];
 
     // array contains both local node, local node group & local rack node
@@ -104,7 +104,7 @@ public class TestNetworkTopologyWithNodeGroup {
     testNodes[1] = dataNodes[2];
     testNodes[2] = dataNodes[3];
     testNodes[3] = dataNodes[0];
-    cluster.pseudoSortByDistance(dataNodes[0], testNodes );
+    cluster.sortByDistance(dataNodes[0], testNodes, 0xDEADBEEF);
     assertTrue(testNodes[0] == dataNodes[0]);
     assertTrue(testNodes[1] == dataNodes[1]);
     assertTrue(testNodes[2] == dataNodes[2]);
@@ -115,7 +115,7 @@ public class TestNetworkTopologyWithNodeGroup {
     testNodes[1] = dataNodes[4];
     testNodes[2] = dataNodes[1];
     testNodes[3] = dataNodes[0];
-    cluster.pseudoSortByDistance(dataNodes[0], testNodes );
+    cluster.sortByDistance(dataNodes[0], testNodes, 0xDEADBEEF);
     assertTrue(testNodes[0] == dataNodes[0]);
     assertTrue(testNodes[1] == dataNodes[1]);
 
@@ -124,7 +124,7 @@ public class TestNetworkTopologyWithNodeGroup {
     testNodes[1] = dataNodes[3];
     testNodes[2] = dataNodes[2];
     testNodes[3] = dataNodes[0];
-    cluster.pseudoSortByDistance(dataNodes[0], testNodes );
+    cluster.sortByDistance(dataNodes[0], testNodes, 0xDEADBEEF);
     assertTrue(testNodes[0] == dataNodes[0]);
     assertTrue(testNodes[1] == dataNodes[2]);
 
@@ -133,7 +133,7 @@ public class TestNetworkTopologyWithNodeGroup {
     testNodes[1] = dataNodes[7];
     testNodes[2] = dataNodes[2];
     testNodes[3] = dataNodes[0];
-    cluster.pseudoSortByDistance(computeNode, testNodes );
+    cluster.sortByDistance(computeNode, testNodes, 0xDEADBEEF);
     assertTrue(testNodes[0] == dataNodes[0]);
     assertTrue(testNodes[1] == dataNodes[2]);
   }
@@ -178,7 +178,7 @@ public class TestNetworkTopologyWithNodeGroup {
       assertTrue(frequency.get(key) > 0 || key == dataNodes[0]);
     }
   }
-
+  
   @Test
   public void testNodeGroup() throws Exception {
     String res = cluster.getNodeGroup("");
