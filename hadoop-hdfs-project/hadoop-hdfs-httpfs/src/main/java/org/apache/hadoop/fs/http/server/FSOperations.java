@@ -26,7 +26,10 @@ import org.apache.hadoop.fs.GlobFilter;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.lib.service.FileSystemAccess;
 import org.json.simple.JSONArray;
@@ -36,6 +39,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -44,40 +48,170 @@ import java.util.Map;
 @InterfaceAudience.Private
 public class FSOperations {
 
-  @SuppressWarnings({"unchecked", "deprecation"})
-  private static Map fileStatusToJSONRaw(FileStatus status,
-      boolean emptyPathSuffix) {
-    Map json = new LinkedHashMap();
-    json.put(HttpFSFileSystem.PATH_SUFFIX_JSON,
-        (emptyPathSuffix) ? "" : status.getPath().getName());
-    json.put(HttpFSFileSystem.TYPE_JSON,
-        HttpFSFileSystem.FILE_TYPE.getType(status).toString());
-    json.put(HttpFSFileSystem.LENGTH_JSON, status.getLen());
-    json.put(HttpFSFileSystem.OWNER_JSON, status.getOwner());
-    json.put(HttpFSFileSystem.GROUP_JSON, status.getGroup());
-    json.put(HttpFSFileSystem.PERMISSION_JSON,
-        HttpFSFileSystem.permissionToString(status.getPermission()));
-    json.put(HttpFSFileSystem.ACCESS_TIME_JSON, status.getAccessTime());
-    json.put(HttpFSFileSystem.MODIFICATION_TIME_JSON,
-        status.getModificationTime());
-    json.put(HttpFSFileSystem.BLOCK_SIZE_JSON, status.getBlockSize());
-    json.put(HttpFSFileSystem.REPLICATION_JSON, status.getReplication());
-    return json;
+  /**
+   * This class is used to group a FileStatus and an AclStatus together.
+   * It's needed for the GETFILESTATUS and LISTSTATUS calls, which take
+   * most info from the FileStatus and a wee bit from the AclStatus.
+   */
+  private static class StatusPair {
+    private FileStatus fileStatus;
+    private AclStatus aclStatus;
+
+    /**
+     * Simple constructor
+     * @param fileStatus Existing FileStatus object
+     * @param aclStatus Existing AclStatus object
+     */
+    public StatusPair(FileStatus fileStatus, AclStatus aclStatus) {
+      this.fileStatus = fileStatus;
+      this.aclStatus = aclStatus;
+    }
+
+    /**
+     * Create one StatusPair by performing the underlying calls to
+     * fs.getFileStatus and fs.getAclStatus
+     * @param fs The FileSystem where 'path' lives
+     * @param path The file/directory to query
+     * @throws IOException
+     */
+    public StatusPair(FileSystem fs, Path path) throws IOException {
+      fileStatus = fs.getFileStatus(path);
+      aclStatus = null;
+      try {
+        aclStatus = fs.getAclStatus(path);
+      } catch (AclException e) {
+        /*
+         * The cause is almost certainly an "ACLS aren't enabled"
+         * exception, so leave aclStatus at null and carry on.
+         */
+      } catch (UnsupportedOperationException e) {
+        /* Ditto above - this is the case for a local file system */
+      }
+    }
+
+    /**
+     * Return a Map suitable for conversion into JSON format
+     * @return The JSONish Map
+     */
+    public Map<String,Object> toJson() {
+      Map<String,Object> json = new LinkedHashMap<String,Object>();
+      json.put(HttpFSFileSystem.FILE_STATUS_JSON, toJsonInner(true));
+      return json;
+    }
+
+    /**
+     * Return in inner part of the JSON for the status - used by both the
+     * GETFILESTATUS and LISTSTATUS calls.
+     * @param emptyPathSuffix Whether or not to include PATH_SUFFIX_JSON
+     * @return The JSONish Map
+     */
+    public Map<String,Object> toJsonInner(boolean emptyPathSuffix) {
+      Map<String,Object> json = new LinkedHashMap<String,Object>();
+      json.put(HttpFSFileSystem.PATH_SUFFIX_JSON,
+              (emptyPathSuffix) ? "" : fileStatus.getPath().getName());
+      json.put(HttpFSFileSystem.TYPE_JSON,
+              HttpFSFileSystem.FILE_TYPE.getType(fileStatus).toString());
+      json.put(HttpFSFileSystem.LENGTH_JSON, fileStatus.getLen());
+      json.put(HttpFSFileSystem.OWNER_JSON, fileStatus.getOwner());
+      json.put(HttpFSFileSystem.GROUP_JSON, fileStatus.getGroup());
+      json.put(HttpFSFileSystem.PERMISSION_JSON,
+              HttpFSFileSystem.permissionToString(fileStatus.getPermission()));
+      json.put(HttpFSFileSystem.ACCESS_TIME_JSON, fileStatus.getAccessTime());
+      json.put(HttpFSFileSystem.MODIFICATION_TIME_JSON,
+              fileStatus.getModificationTime());
+      json.put(HttpFSFileSystem.BLOCK_SIZE_JSON, fileStatus.getBlockSize());
+      json.put(HttpFSFileSystem.REPLICATION_JSON, fileStatus.getReplication());
+      if ( (aclStatus != null) && !(aclStatus.getEntries().isEmpty()) ) {
+        json.put(HttpFSFileSystem.ACL_BIT_JSON,true);
+      }
+      return json;
+    }
   }
 
   /**
-   * Converts a FileSystemAccess <code>FileStatus</code> object into a JSON
-   * object.
-   *
-   * @param status
-   *     FileSystemAccess file status.
-   * @return The JSON representation of the file status.
+   * Simple class used to contain and operate upon a list of StatusPair
+   * objects.  Used by LISTSTATUS.
    */
-  @SuppressWarnings({"unchecked", "deprecation"})
-  private static Map fileStatusToJSON(FileStatus status) {
-    Map json = new LinkedHashMap();
-    json.put(HttpFSFileSystem.FILE_STATUS_JSON,
-        fileStatusToJSONRaw(status, true));
+  private static class StatusPairs {
+    private StatusPair[] statusPairs;
+
+    /**
+     * Construct a list of StatusPair objects
+     * @param fs The FileSystem where 'path' lives
+     * @param path The directory to query
+     * @param filter A possible filter for entries in the directory
+     * @throws IOException
+     */
+    public StatusPairs(FileSystem fs, Path path, PathFilter filter)
+            throws IOException {
+      /* Grab all the file statuses at once in an array */
+      FileStatus[] fileStatuses = fs.listStatus(path, filter);
+
+      /* We'll have an array of StatusPairs of the same length */
+      AclStatus aclStatus = null;
+      statusPairs = new StatusPair[fileStatuses.length];
+
+      /*
+       * For each FileStatus, attempt to acquire an AclStatus.  If the
+       * getAclStatus throws an exception, we assume that ACLs are turned
+       * off entirely and abandon the attempt.
+       */
+      boolean useAcls = true;   // Assume ACLs work until proven otherwise
+      for (int i = 0; i < fileStatuses.length; i++) {
+        if (useAcls) {
+          try {
+            aclStatus = fs.getAclStatus(fileStatuses[i].getPath());
+          } catch (AclException e) {
+            /* Almost certainly due to an "ACLs not enabled" exception */
+            aclStatus = null;
+            useAcls = false;
+          } catch (UnsupportedOperationException e) {
+            /* Ditto above - this is the case for a local file system */
+            aclStatus = null;
+            useAcls = false;
+          }
+        }
+        statusPairs[i] = new StatusPair(fileStatuses[i], aclStatus);
+      }
+    }
+
+    /**
+     * Return a Map suitable for conversion into JSON.
+     * @return A JSONish Map
+     */
+    @SuppressWarnings({"unchecked"})
+    public Map<String,Object> toJson() {
+      Map<String,Object> json = new LinkedHashMap<String,Object>();
+      Map<String,Object> inner = new LinkedHashMap<String,Object>();
+      JSONArray statuses = new JSONArray();
+      for (StatusPair s : statusPairs) {
+        statuses.add(s.toJsonInner(false));
+      }
+      inner.put(HttpFSFileSystem.FILE_STATUS_JSON, statuses);
+      json.put(HttpFSFileSystem.FILE_STATUSES_JSON, inner);
+      return json;
+    }
+  }
+
+  /** Converts an <code>AclStatus</code> object into a JSON object.
+   *
+   * @param aclStatus AclStatus object
+   *
+   * @return The JSON representation of the ACLs for the file
+   */
+  @SuppressWarnings({"unchecked"})
+  private static Map<String,Object> aclStatusToJSON(AclStatus aclStatus) {
+    Map<String,Object> json = new LinkedHashMap<String,Object>();
+    Map<String,Object> inner = new LinkedHashMap<String,Object>();
+    JSONArray entriesArray = new JSONArray();
+    inner.put(HttpFSFileSystem.OWNER_JSON, aclStatus.getOwner());
+    inner.put(HttpFSFileSystem.GROUP_JSON, aclStatus.getGroup());
+    inner.put(HttpFSFileSystem.ACL_STICKY_BIT_JSON, aclStatus.isStickyBit());
+    for ( AclEntry e : aclStatus.getEntries() ) {
+      entriesArray.add(e.toString());
+    }
+    inner.put(HttpFSFileSystem.ACL_ENTRIES_JSON, entriesArray);
+    json.put(HttpFSFileSystem.ACL_STATUS_JSON, inner);
     return json;
   }
 
@@ -85,18 +219,16 @@ public class FSOperations {
    * Converts a <code>FileChecksum</code> object into a JSON array
    * object.
    *
-   * @param checksum
-   *     file checksum.
+   * @param checksum file checksum.
+   *
    * @return The JSON representation of the file checksum.
    */
   @SuppressWarnings({"unchecked"})
   private static Map fileChecksumToJSON(FileChecksum checksum) {
     Map json = new LinkedHashMap();
-    json.put(HttpFSFileSystem.CHECKSUM_ALGORITHM_JSON,
-        checksum.getAlgorithmName());
+    json.put(HttpFSFileSystem.CHECKSUM_ALGORITHM_JSON, checksum.getAlgorithmName());
     json.put(HttpFSFileSystem.CHECKSUM_BYTES_JSON,
-        org.apache.hadoop.util.StringUtils
-            .byteToHexString(checksum.getBytes()));
+             org.apache.hadoop.util.StringUtils.byteToHexString(checksum.getBytes()));
     json.put(HttpFSFileSystem.CHECKSUM_LENGTH_JSON, checksum.getLength());
     Map response = new LinkedHashMap();
     response.put(HttpFSFileSystem.FILE_CHECKSUM_JSON, json);
@@ -107,52 +239,21 @@ public class FSOperations {
    * Converts a <code>ContentSummary</code> object into a JSON array
    * object.
    *
-   * @param contentSummary
-   *     the content summary
+   * @param contentSummary the content summary
+   *
    * @return The JSON representation of the content summary.
    */
   @SuppressWarnings({"unchecked"})
   private static Map contentSummaryToJSON(ContentSummary contentSummary) {
     Map json = new LinkedHashMap();
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_DIRECTORY_COUNT_JSON,
-        contentSummary.getDirectoryCount());
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_FILE_COUNT_JSON,
-        contentSummary.getFileCount());
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_LENGTH_JSON,
-        contentSummary.getLength());
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_QUOTA_JSON,
-        contentSummary.getQuota());
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_SPACE_CONSUMED_JSON,
-        contentSummary.getSpaceConsumed());
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_SPACE_QUOTA_JSON,
-        contentSummary.getSpaceQuota());
+    json.put(HttpFSFileSystem.CONTENT_SUMMARY_DIRECTORY_COUNT_JSON, contentSummary.getDirectoryCount());
+    json.put(HttpFSFileSystem.CONTENT_SUMMARY_FILE_COUNT_JSON, contentSummary.getFileCount());
+    json.put(HttpFSFileSystem.CONTENT_SUMMARY_LENGTH_JSON, contentSummary.getLength());
+    json.put(HttpFSFileSystem.CONTENT_SUMMARY_QUOTA_JSON, contentSummary.getQuota());
+    json.put(HttpFSFileSystem.CONTENT_SUMMARY_SPACE_CONSUMED_JSON, contentSummary.getSpaceConsumed());
+    json.put(HttpFSFileSystem.CONTENT_SUMMARY_SPACE_QUOTA_JSON, contentSummary.getSpaceQuota());
     Map response = new LinkedHashMap();
     response.put(HttpFSFileSystem.CONTENT_SUMMARY_JSON, json);
-    return response;
-  }
-
-  /**
-   * Converts a FileSystemAccess <code>FileStatus</code> array into a JSON
-   * array
-   * object.
-   *
-   * @param status
-   *     FileSystemAccess file status array.
-   *     <code>SCHEME://HOST:PORT</code> in the file status.
-   * @return The JSON representation of the file status array.
-   */
-  @SuppressWarnings("unchecked")
-  private static Map fileStatusToJSON(FileStatus[] status) {
-    JSONArray json = new JSONArray();
-    if (status != null) {
-      for (FileStatus s : status) {
-        json.add(fileStatusToJSONRaw(s, false));
-      }
-    }
-    Map response = new LinkedHashMap();
-    Map temp = new LinkedHashMap();
-    temp.put(HttpFSFileSystem.FILE_STATUS_JSON, json);
-    response.put(HttpFSFileSystem.FILE_STATUSES_JSON, temp);
     return response;
   }
 
@@ -162,10 +263,9 @@ public class FSOperations {
    * It assumes the given value is either a JSON primitive type or a
    * <code>JsonAware</code> instance.
    *
-   * @param name
-   *     name for the key of the entry.
-   * @param value
-   *     for the value of the entry.
+   * @param name name for the key of the entry.
+   * @param value for the value of the entry.
+   *
    * @return the JSON representation of the key-value pair.
    */
   @SuppressWarnings("unchecked")
@@ -179,18 +279,15 @@ public class FSOperations {
    * Executor that performs an append FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSAppend
-      implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSAppend implements FileSystemAccess.FileSystemExecutor<Void> {
     private InputStream is;
     private Path path;
 
     /**
      * Creates an Append executor.
      *
-     * @param is
-     *     input stream to append.
-     * @param path
-     *     path of the file to append.
+     * @param is input stream to append.
+     * @param path path of the file to append.
      */
     public FSAppend(InputStream is, String path) {
       this.is = is;
@@ -200,11 +297,11 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return void.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public Void execute(FileSystem fs) throws IOException {
@@ -221,23 +318,20 @@ public class FSOperations {
    * Executor that performs an append FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSConcat
-      implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSConcat implements FileSystemAccess.FileSystemExecutor<Void> {
     private Path path;
     private Path[] sources;
 
     /**
      * Creates a Concat executor.
      *
-     * @param path
-     *     target path to concat to.
-     * @param sources
-     *     comma seperated absolute paths to use as sources.
+     * @param path target path to concat to.
+     * @param sources comma seperated absolute paths to use as sources.
      */
     public FSConcat(String path, String[] sources) {
       this.sources = new Path[sources.length];
 
-      for (int i = 0; i < sources.length; i++) {
+      for(int i = 0; i < sources.length; i++) {
         this.sources[i] = new Path(sources[i]);
       }
 
@@ -247,11 +341,11 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return void.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public Void execute(FileSystem fs) throws IOException {
@@ -262,19 +356,16 @@ public class FSOperations {
   }
 
   /**
-   * Executor that performs a content-summary FileSystemAccess files system
-   * operation.
+   * Executor that performs a content-summary FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSContentSummary
-      implements FileSystemAccess.FileSystemExecutor<Map> {
+  public static class FSContentSummary implements FileSystemAccess.FileSystemExecutor<Map> {
     private Path path;
 
     /**
      * Creates a content-summary executor.
      *
-     * @param path
-     *     the path to retrieve the content-summary.
+     * @param path the path to retrieve the content-summary.
      */
     public FSContentSummary(String path) {
       this.path = new Path(path);
@@ -283,11 +374,11 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return a Map object (JSON friendly) with the content-summary.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public Map execute(FileSystem fs) throws IOException {
@@ -301,8 +392,7 @@ public class FSOperations {
    * Executor that performs a create FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSCreate
-      implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSCreate implements FileSystemAccess.FileSystemExecutor<Void> {
     private InputStream is;
     private Path path;
     private short permission;
@@ -313,21 +403,15 @@ public class FSOperations {
     /**
      * Creates a Create executor.
      *
-     * @param is
-     *     input stream to for the file to create.
-     * @param path
-     *     path of the file to create.
-     * @param perm
-     *     permission for the file.
-     * @param override
-     *     if the file should be overriden if it already exist.
-     * @param repl
-     *     the replication factor for the file.
-     * @param blockSize
-     *     the block size for the file.
+     * @param is input stream to for the file to create.
+     * @param path path of the file to create.
+     * @param perm permission for the file.
+     * @param override if the file should be overriden if it already exist.
+     * @param repl the replication factor for the file.
+     * @param blockSize the block size for the file.
      */
     public FSCreate(InputStream is, String path, short perm, boolean override,
-        short repl, long blockSize) {
+                    short repl, long blockSize) {
       this.is = is;
       this.path = new Path(path);
       this.permission = perm;
@@ -339,11 +423,11 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return The URI of the created file.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public Void execute(FileSystem fs) throws IOException {
@@ -355,9 +439,7 @@ public class FSOperations {
       }
       FsPermission fsPermission = new FsPermission(permission);
       int bufferSize = fs.getConf().getInt("httpfs.buffer.size", 4096);
-      OutputStream os =
-          fs.create(path, fsPermission, override, bufferSize, replication,
-              blockSize, null);
+      OutputStream os = fs.create(path, fsPermission, override, bufferSize, replication, blockSize, null);
       IOUtils.copyBytes(is, os, bufferSize, true);
       os.close();
       return null;
@@ -369,18 +451,15 @@ public class FSOperations {
    * Executor that performs a delete FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSDelete
-      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSDelete implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private boolean recursive;
 
     /**
      * Creates a Delete executor.
      *
-     * @param path
-     *     path to delete.
-     * @param recursive
-     *     if the delete should be recursive or not.
+     * @param path path to delete.
+     * @param recursive if the delete should be recursive or not.
      */
     public FSDelete(String path, boolean recursive) {
       this.path = new Path(path);
@@ -390,12 +469,12 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return <code>true</code> if the delete operation was successful,
-     * <code>false</code> otherwise.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *         <code>false</code> otherwise.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public JSONObject execute(FileSystem fs) throws IOException {
@@ -406,19 +485,16 @@ public class FSOperations {
   }
 
   /**
-   * Executor that performs a file-checksum FileSystemAccess files system
-   * operation.
+   * Executor that performs a file-checksum FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSFileChecksum
-      implements FileSystemAccess.FileSystemExecutor<Map> {
+  public static class FSFileChecksum implements FileSystemAccess.FileSystemExecutor<Map> {
     private Path path;
 
     /**
      * Creates a file-checksum executor.
      *
-     * @param path
-     *     the path to retrieve the checksum.
+     * @param path the path to retrieve the checksum.
      */
     public FSFileChecksum(String path) {
       this.path = new Path(path);
@@ -427,11 +503,11 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return a Map object (JSON friendly) with the file checksum.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public Map execute(FileSystem fs) throws IOException {
@@ -442,37 +518,35 @@ public class FSOperations {
   }
 
   /**
-   * Executor that performs a file-status FileSystemAccess files system
-   * operation.
+   * Executor that performs a file-status FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSFileStatus
-      implements FileSystemAccess.FileSystemExecutor<Map> {
+  public static class FSFileStatus implements FileSystemAccess.FileSystemExecutor<Map> {
     private Path path;
 
     /**
      * Creates a file-status executor.
      *
-     * @param path
-     *     the path to retrieve the status.
+     * @param path the path to retrieve the status.
      */
     public FSFileStatus(String path) {
       this.path = new Path(path);
     }
 
     /**
-     * Executes the filesystem operation.
+     * Executes the filesystem getFileStatus operation and returns the
+     * result in a JSONish Map.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return a Map object (JSON friendly) with the file status.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occurred.
      */
     @Override
     public Map execute(FileSystem fs) throws IOException {
-      FileStatus status = fs.getFileStatus(path);
-      return fileStatusToJSON(status);
+      StatusPair sp = new StatusPair(fs, path);
+      return sp.toJson();
     }
 
   }
@@ -481,17 +555,16 @@ public class FSOperations {
    * Executor that performs a home-dir FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSHomeDir
-      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSHomeDir implements FileSystemAccess.FileSystemExecutor<JSONObject> {
 
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return a JSON object with the user home directory.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     @SuppressWarnings("unchecked")
@@ -505,24 +578,20 @@ public class FSOperations {
   }
 
   /**
-   * Executor that performs a list-status FileSystemAccess files system
-   * operation.
+   * Executor that performs a list-status FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSListStatus
-      implements FileSystemAccess.FileSystemExecutor<Map>, PathFilter {
+  public static class FSListStatus implements FileSystemAccess.FileSystemExecutor<Map>, PathFilter {
     private Path path;
     private PathFilter filter;
 
     /**
      * Creates a list-status executor.
      *
-     * @param path
-     *     the directory to retrieve the status of its contents.
-     * @param filter
-     *     glob filter to use.
-     * @throws IOException
-     *     thrown if the filter expression is incorrect.
+     * @param path the directory to retrieve the status of its contents.
+     * @param filter glob filter to use.
+     *
+     * @throws IOException thrown if the filter expression is incorrect.
      */
     public FSListStatus(String path, String filter) throws IOException {
       this.path = new Path(path);
@@ -530,19 +599,20 @@ public class FSOperations {
     }
 
     /**
-     * Executes the filesystem operation.
+     * Returns data for a JSON Map containing the information for
+     * the set of files in 'path' that match 'filter'.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return a Map with the file status of the directory
-     * contents.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *         contents that match the filter
+     *
+     * @throws IOException thrown if an IO error occurred.
      */
     @Override
     public Map execute(FileSystem fs) throws IOException {
-      FileStatus[] status = fs.listStatus(path, filter);
-      return fileStatusToJSON(status);
+      StatusPairs sp = new StatusPairs(fs, path, filter);
+      return sp.toJson();
     }
 
     @Override
@@ -556,8 +626,7 @@ public class FSOperations {
    * Executor that performs a mkdirs FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSMkdirs
-      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSMkdirs implements FileSystemAccess.FileSystemExecutor<JSONObject> {
 
     private Path path;
     private short permission;
@@ -565,10 +634,8 @@ public class FSOperations {
     /**
      * Creates a mkdirs executor.
      *
-     * @param path
-     *     directory path to create.
-     * @param permission
-     *     permission to use.
+     * @param path directory path to create.
+     * @param permission permission to use.
      */
     public FSMkdirs(String path, short permission) {
       this.path = new Path(path);
@@ -578,12 +645,12 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return <code>true</code> if the mkdirs operation was successful,
-     * <code>false</code> otherwise.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *         <code>false</code> otherwise.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public JSONObject execute(FileSystem fs) throws IOException {
@@ -598,15 +665,13 @@ public class FSOperations {
    * Executor that performs a open FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSOpen
-      implements FileSystemAccess.FileSystemExecutor<InputStream> {
+  public static class FSOpen implements FileSystemAccess.FileSystemExecutor<InputStream> {
     private Path path;
 
     /**
      * Creates a open executor.
      *
-     * @param path
-     *     file to open.
+     * @param path file to open.
      */
     public FSOpen(String path) {
       this.path = new Path(path);
@@ -615,16 +680,15 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return The inputstream of the file.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public InputStream execute(FileSystem fs) throws IOException {
-      int bufferSize = HttpFSServerWebApp.get().getConfig()
-          .getInt("httpfs.buffer.size", 4096);
+      int bufferSize = HttpFSServerWebApp.get().getConfig().getInt("httpfs.buffer.size", 4096);
       return fs.open(path, bufferSize);
     }
 
@@ -634,18 +698,15 @@ public class FSOperations {
    * Executor that performs a rename FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSRename
-      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSRename implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private Path toPath;
 
     /**
      * Creates a rename executor.
      *
-     * @param path
-     *     path to rename.
-     * @param toPath
-     *     new name.
+     * @param path path to rename.
+     * @param toPath new name.
      */
     public FSRename(String path, String toPath) {
       this.path = new Path(path);
@@ -655,12 +716,12 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return <code>true</code> if the rename operation was successful,
-     * <code>false</code> otherwise.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *         <code>false</code> otherwise.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public JSONObject execute(FileSystem fs) throws IOException {
@@ -671,12 +732,10 @@ public class FSOperations {
   }
 
   /**
-   * Executor that performs a set-owner FileSystemAccess files system
-   * operation.
+   * Executor that performs a set-owner FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSSetOwner
-      implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSSetOwner implements FileSystemAccess.FileSystemExecutor<Void> {
     private Path path;
     private String owner;
     private String group;
@@ -684,12 +743,9 @@ public class FSOperations {
     /**
      * Creates a set-owner executor.
      *
-     * @param path
-     *     the path to set the owner.
-     * @param owner
-     *     owner to set.
-     * @param group
-     *     group to set.
+     * @param path the path to set the owner.
+     * @param owner owner to set.
+     * @param group group to set.
      */
     public FSSetOwner(String path, String owner, String group) {
       this.path = new Path(path);
@@ -700,11 +756,11 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return void.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public Void execute(FileSystem fs) throws IOException {
@@ -715,12 +771,10 @@ public class FSOperations {
   }
 
   /**
-   * Executor that performs a set-permission FileSystemAccess files system
-   * operation.
+   * Executor that performs a set-permission FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSSetPermission
-      implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSSetPermission implements FileSystemAccess.FileSystemExecutor<Void> {
 
     private Path path;
     private short permission;
@@ -728,10 +782,8 @@ public class FSOperations {
     /**
      * Creates a set-permission executor.
      *
-     * @param path
-     *     path to set the permission.
-     * @param permission
-     *     permission to set.
+     * @param path path to set the permission.
+     * @param permission permission to set.
      */
     public FSSetPermission(String path, short permission) {
       this.path = new Path(path);
@@ -741,11 +793,11 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return void.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public Void execute(FileSystem fs) throws IOException {
@@ -757,22 +809,230 @@ public class FSOperations {
   }
 
   /**
-   * Executor that performs a set-replication FileSystemAccess files system
-   * operation.
+   * Executor that sets the acl for a file in a FileSystem
    */
   @InterfaceAudience.Private
-  public static class FSSetReplication
-      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSSetAcl implements FileSystemAccess.FileSystemExecutor<Void> {
+
+    private Path path;
+    private List<AclEntry> aclEntries;
+
+    /**
+     * Creates a set-acl executor.
+     *
+     * @param path path to set the acl.
+     * @param aclSpec acl to set.
+     */
+    public FSSetAcl(String path, String aclSpec) {
+      this.path = new Path(path);
+      this.aclEntries = AclEntry.parseAclSpec(aclSpec, true);
+    }
+
+    /**
+     * Executes the filesystem operation.
+     *
+     * @param fs filesystem instance to use.
+     *
+     * @return void.
+     *
+     * @throws IOException thrown if an IO error occurred.
+     */
+    @Override
+    public Void execute(FileSystem fs) throws IOException {
+      fs.setAcl(path, aclEntries);
+      return null;
+    }
+
+  }
+
+  /**
+   * Executor that removes all acls from a file in a FileSystem
+   */
+  @InterfaceAudience.Private
+  public static class FSRemoveAcl implements FileSystemAccess.FileSystemExecutor<Void> {
+
+    private Path path;
+
+    /**
+     * Creates a remove-acl executor.
+     *
+     * @param path path from which to remove the acl.
+     */
+    public FSRemoveAcl(String path) {
+      this.path = new Path(path);
+    }
+
+    /**
+     * Executes the filesystem operation.
+     *
+     * @param fs filesystem instance to use.
+     *
+     * @return void.
+     *
+     * @throws IOException thrown if an IO error occurred.
+     */
+    @Override
+    public Void execute(FileSystem fs) throws IOException {
+      fs.removeAcl(path);
+      return null;
+    }
+
+  }
+
+  /**
+   * Executor that modifies acl entries for a file in a FileSystem
+   */
+  @InterfaceAudience.Private
+  public static class FSModifyAclEntries implements FileSystemAccess.FileSystemExecutor<Void> {
+
+    private Path path;
+    private List<AclEntry> aclEntries;
+
+    /**
+     * Creates a modify-acl executor.
+     *
+     * @param path path to set the acl.
+     * @param aclSpec acl to set.
+     */
+    public FSModifyAclEntries(String path, String aclSpec) {
+      this.path = new Path(path);
+      this.aclEntries = AclEntry.parseAclSpec(aclSpec, true);
+    }
+
+    /**
+     * Executes the filesystem operation.
+     *
+     * @param fs filesystem instance to use.
+     *
+     * @return void.
+     *
+     * @throws IOException thrown if an IO error occurred.
+     */
+    @Override
+    public Void execute(FileSystem fs) throws IOException {
+      fs.modifyAclEntries(path, aclEntries);
+      return null;
+    }
+
+  }
+
+  /**
+   * Executor that removes acl entries from a file in a FileSystem
+   */
+  @InterfaceAudience.Private
+  public static class FSRemoveAclEntries implements FileSystemAccess.FileSystemExecutor<Void> {
+
+    private Path path;
+    private List<AclEntry> aclEntries;
+
+    /**
+     * Creates a remove acl entry executor.
+     *
+     * @param path path to set the acl.
+     * @param aclSpec acl parts to remove.
+     */
+    public FSRemoveAclEntries(String path, String aclSpec) {
+      this.path = new Path(path);
+      this.aclEntries = AclEntry.parseAclSpec(aclSpec, true);
+    }
+
+    /**
+     * Executes the filesystem operation.
+     *
+     * @param fs filesystem instance to use.
+     *
+     * @return void.
+     *
+     * @throws IOException thrown if an IO error occurred.
+     */
+    @Override
+    public Void execute(FileSystem fs) throws IOException {
+      fs.removeAclEntries(path, aclEntries);
+      return null;
+    }
+
+  }
+
+  /**
+   * Executor that removes the default acl from a directory in a FileSystem
+   */
+  @InterfaceAudience.Private
+  public static class FSRemoveDefaultAcl implements FileSystemAccess.FileSystemExecutor<Void> {
+
+    private Path path;
+
+    /**
+     * Creates an executor for removing the default acl.
+     *
+     * @param path path to set the acl.
+     */
+    public FSRemoveDefaultAcl(String path) {
+      this.path = new Path(path);
+    }
+
+    /**
+     * Executes the filesystem operation.
+     *
+     * @param fs filesystem instance to use.
+     *
+     * @return void.
+     *
+     * @throws IOException thrown if an IO error occurred.
+     */
+    @Override
+    public Void execute(FileSystem fs) throws IOException {
+      fs.removeDefaultAcl(path);
+      return null;
+    }
+
+  }
+
+  /**
+   * Executor that gets the ACL information for a given file.
+   */
+  @InterfaceAudience.Private
+  public static class FSAclStatus implements FileSystemAccess.FileSystemExecutor<Map> {
+    private Path path;
+
+    /**
+     * Creates an executor for getting the ACLs for a file.
+     *
+     * @param path the path to retrieve the ACLs.
+     */
+    public FSAclStatus(String path) {
+      this.path = new Path(path);
+    }
+
+    /**
+     * Executes the filesystem operation.
+     *
+     * @param fs filesystem instance to use.
+     *
+     * @return a Map object (JSON friendly) with the file status.
+     *
+     * @throws IOException thrown if an IO error occurred.
+     */
+    @Override
+    public Map execute(FileSystem fs) throws IOException {
+      AclStatus status = fs.getAclStatus(path);
+      return aclStatusToJSON(status);
+    }
+
+  }
+
+  /**
+   * Executor that performs a set-replication FileSystemAccess files system operation.
+   */
+  @InterfaceAudience.Private
+  public static class FSSetReplication implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private short replication;
 
     /**
      * Creates a set-replication executor.
      *
-     * @param path
-     *     path to set the replication factor.
-     * @param replication
-     *     replication factor to set.
+     * @param path path to set the replication factor.
+     * @param replication replication factor to set.
      */
     public FSSetReplication(String path, short replication) {
       this.path = new Path(path);
@@ -782,12 +1042,12 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return <code>true</code> if the replication value was set,
-     * <code>false</code> otherwise.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *         <code>false</code> otherwise.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     @SuppressWarnings("unchecked")
@@ -801,12 +1061,10 @@ public class FSOperations {
   }
 
   /**
-   * Executor that performs a set-times FileSystemAccess files system
-   * operation.
+   * Executor that performs a set-times FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSSetTimes
-      implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSSetTimes implements FileSystemAccess.FileSystemExecutor<Void> {
     private Path path;
     private long mTime;
     private long aTime;
@@ -814,12 +1072,9 @@ public class FSOperations {
     /**
      * Creates a set-times executor.
      *
-     * @param path
-     *     path to set the times.
-     * @param mTime
-     *     modified time to set.
-     * @param aTime
-     *     access time to set.
+     * @param path path to set the times.
+     * @param mTime modified time to set.
+     * @param aTime access time to set.
      */
     public FSSetTimes(String path, long mTime, long aTime) {
       this.path = new Path(path);
@@ -830,11 +1085,11 @@ public class FSOperations {
     /**
      * Executes the filesystem operation.
      *
-     * @param fs
-     *     filesystem instance to use.
+     * @param fs filesystem instance to use.
+     *
      * @return void.
-     * @throws IOException
-     *     thrown if an IO error occured.
+     *
+     * @throws IOException thrown if an IO error occured.
      */
     @Override
     public Void execute(FileSystem fs) throws IOException {
