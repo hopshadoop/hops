@@ -16444,8 +16444,7 @@
       </comparators>
     </test>
     
-    <!-- DFS tests
-        Must come before moveFromLocal tests until HDFS-6471 is fixed -->
+    <!-- DFS tests -->
     <test>
       <description>appendToFile</description>
       <test-commands>
