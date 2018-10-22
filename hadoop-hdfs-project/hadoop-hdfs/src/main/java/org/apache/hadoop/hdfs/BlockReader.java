@@ -50,6 +50,7 @@ public interface BlockReader extends ByteBufferReadable {
    * Returns an estimate of the number of bytes that can be read
    * (or skipped over) from this input stream without performing
    * network I/O.
+   * This may return more than what is actually present in the block.
    */
   int available() throws IOException;
 
