@@ -210,12 +210,6 @@ public class FSDirectory implements Closeable {
     ready = flag;
   }
 
-  private void incrDeletedFileCount(int count) {
-    if (getFSNamesystem() != null) {
-      NameNode.getNameNodeMetrics().incrFilesDeleted(count);
-    }
-  }
-
   /**
    * Shutdown the filestore
    */
@@ -306,53 +300,6 @@ public class FSDirectory implements Closeable {
   }
 
   /**
-   * Persist the block list for the inode.
-   */
-  void persistBlocks(String path, INodeFile file)
-      throws StorageException, TransactionContextException {
-    Preconditions.checkArgument(file.isUnderConstruction());
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug(
-          "DIR* FSDirectory.persistBlocks: " + path + " with " +
-              file.getBlocks().length +
-              " blocks is persisted to the file system");
-    }
-  }
-  
-  /**
-   * Persist the new block (the last block of the given file).
-   */
-  void persistNewBlock(String path, INodeFile file) throws IOException {
-    Preconditions.checkArgument(file.isUnderConstruction());
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      String block ="";
-      if(file.getLastBlock()!=null){
-        block = file.getLastBlock().toString();
-      }
-      NameNode.stateChangeLog.debug("DIR* FSDirectory.persistNewBlock: "
-          + path + " with new block " + block
-          + ", current total block count is " + file.getBlocks().length);
-    }
-  }
-
-  /**
-   * Close file.
-   */
-  void closeFile(String path, INodeFile file)
-      throws StorageException, TransactionContextException {
-    long now = now();
-    // file is closed
-    file.setModificationTimeForce(now);
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug(
-          "DIR* FSDirectory.closeFile: " + path + " with " +
-              file.getBlocks().length +
-              " blocks is persisted to the file system");
-    }
-    file.logMetadataEvent(MetadataLogEntry.Operation.ADD);
-  }
-
-  /**
    * Remove a block from the file.
    * @return Whether the block exists in the corresponding file
    */
@@ -392,19 +339,19 @@ public class FSDirectory implements Closeable {
    * @deprecated Use {@link #renameTo(String, String, Rename...)} instead.
    */
   @Deprecated
-  boolean renameTo(String src, String dst, INode.DirCounts srcCounts, INode.DirCounts dstCounts)
+  boolean renameTo(String src, String dst, long mtime, INode.DirCounts srcCounts, INode.DirCounts dstCounts)
       throws IOException {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog
           .debug("DIR* FSDirectory.renameTo: " + src + " to " + dst);
     }
-    return unprotectedRenameTo(src, dst, now(), srcCounts, dstCounts);
+    return unprotectedRenameTo(src, dst, mtime, srcCounts, dstCounts);
   }
 
   /**
    * @see #unprotectedRenameTo(String, String, long, Options.Rename...)
    */
-  void renameTo(String src, String dst, INode.DirCounts srcCounts, INode.DirCounts dstCounts, Options.Rename... options)
+  void renameTo(String src, String dst, long mtime, INode.DirCounts srcCounts, INode.DirCounts dstCounts, Options.Rename... options)
       throws FileAlreadyExistsException, FileNotFoundException,
       ParentNotDirectoryException, QuotaExceededException,
       UnresolvedLinkException, IOException, StorageException {
@@ -412,8 +359,8 @@ public class FSDirectory implements Closeable {
       NameNode.stateChangeLog
           .debug("DIR* FSDirectory.renameTo: " + src + " to " + dst);
     }
-    if (unprotectedRenameTo(src, dst, now(), srcCounts, dstCounts, options)) {
-      incrDeletedFileCount(1);
+    if (unprotectedRenameTo(src, dst, mtime, srcCounts, dstCounts, options)) {
+      namesystem.incrDeletedFileCount(1);
     }
   }
 
@@ -805,9 +752,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   Block[] setReplication(String src, short replication, short[] oldReplication)
       throws QuotaExceededException, UnresolvedLinkException, StorageException,
       TransactionContextException {
-    Block[] fileBlocks = null;
-    fileBlocks = unprotectedSetReplication(src, replication, oldReplication);
-    return fileBlocks;
+    return unprotectedSetReplication(src, replication, oldReplication);
   }
 
   Block[] unprotectedSetReplication(String src, short replication,
@@ -907,10 +852,9 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   /**
    * Concat all the blocks from srcs to trg and delete the srcs files
    */
-  public void concat(String target, String[] srcs)
+  public void concat(String target, String[] srcs, long timestamp)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
-    long timestamp = now();
     unprotectedConcat(target, srcs, timestamp);
   }
   
@@ -995,22 +939,14 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    *     Blocks under the deleted directory
    * @return true on successful deletion; else false
    */
-  boolean delete(String src, BlocksMapUpdateInfo collectedBlocks)
+  long delete(String src, BlocksMapUpdateInfo collectedBlocks, long mtime)
       throws UnresolvedLinkException, StorageException, IOException {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug("DIR* FSDirectory.delete: " + src);
     }
-    long now = now();
-    int filesRemoved = unprotectedDelete(src, collectedBlocks, now);
+    int filesRemoved = unprotectedDelete(src, collectedBlocks, mtime);
 
-    if (filesRemoved <= 0) {
-      return false;
-    }
-    incrDeletedFileCount(filesRemoved);
-    // Blocks will be deleted later by the caller of this method
-    getFSNamesystem().removePathAndBlocks(src, null);
-
-    return true;
+    return filesRemoved;
   }
   
   /**
@@ -1075,13 +1011,13 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
             "DIR* FSDirectory.unprotectedDelete: " + "failed to remove " + src +
                 " because it does not exist");
       }
-      return 0;
+      return -1;
     }
     if (inodes.length == 1) { // src is the root
       NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedDelete: " +
           "failed to remove " + src +
           " because the root is not allowed to be deleted");
-      return 0;
+      return -1;
     }
 
     // Add metadata log entry for all deleted childred.
@@ -1090,7 +1026,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     // Remove the node from the namespace
     targetNode = removeLastINode(inodesInPath);
     if (targetNode == null) {
-      return 0;
+      return -1;
     }
     // set the parent's modification time
     inodes[inodes.length - 2].setModificationTime(mtime);
@@ -2069,23 +2005,20 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   
   /**
    * See {@link ClientProtocol#setQuota(String, long, long)} for the contract.
+   * @return INodeDirectory if any of the quotas have changed. null otherwise.
    *
    * @see #unprotectedSetQuota(String, long, long)
    */
-  void setQuota(String src, long nsQuota, long dsQuota, long nsCount,
+  INodeDirectory setQuota(String src, long nsQuota, long dsQuota, long nsCount,
       long dsCount) throws FileNotFoundException, PathIsNotDirectoryException,
       QuotaExceededException, UnresolvedLinkException, IOException {
-    INodeDirectory dir =
-        unprotectedSetQuota(src, nsQuota, dsQuota, nsCount, dsCount);
-    if (dir != null) {
-      // Some audit log code is missing here
-    }
+    return unprotectedSetQuota(src, nsQuota, dsQuota, nsCount, dsCount);
   }
 
     /**
    * See {@link ClientProtocol#setQuota(String, long, long)} for the contract.
    * Sets quota for for a directory.
-   * @returns INodeDirectory if any of the quotas have changed. null other wise.
+   * @returns INodeDirectory if any of the quotas have changed. null otherwise.
    * @throws FileNotFoundException if the path does not exist.
    * @throws PathIsNotDirectoryException if the path is not a directory.
    * @throws QuotaExceededException
@@ -2157,10 +2090,10 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * Sets the access time on the file/directory. Logs it in the transaction
    * log.
    */
-  void setTimes(String src, INode inode, long mtime, long atime, boolean force)
+  boolean setTimes(INode inode, long mtime, long atime, boolean force)
       throws StorageException, TransactionContextException,
       AccessControlException {
-    unprotectedSetTimes(inode, mtime, atime, force);
+    return unprotectedSetTimes(inode, mtime, atime, force);
   }
 
   boolean unprotectedSetTimes(String src, long mtime, long atime, boolean force)
@@ -2384,8 +2317,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return addINode(path, symlink)? symlink: null;
   }
 
-  void modifyAclEntries(String src, List<AclEntry> aclSpec) throws IOException {
-    unprotectedModifyAclEntries(src, aclSpec);
+  List<AclEntry> modifyAclEntries(String src, List<AclEntry> aclSpec) throws IOException {
+    return unprotectedModifyAclEntries(src, aclSpec);
   }
 
   private List<AclEntry> unprotectedModifyAclEntries(String src,
@@ -2416,8 +2349,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return newAcl;
   }
 
-  void removeAclEntries(String src, List<AclEntry> aclSpec) throws IOException {
-    unprotectedRemoveAclEntries(src, aclSpec);
+  List<AclEntry> removeAclEntries(String src, List<AclEntry> aclSpec) throws IOException {
+    return unprotectedRemoveAclEntries(src, aclSpec);
   }
 
   private List<AclEntry> unprotectedRemoveAclEntries(String src,
@@ -2440,8 +2373,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return newAcl;
   }
 
-  void removeDefaultAcl(String src) throws IOException {
-    unprotectedRemoveDefaultAcl(src);
+  List<AclEntry> removeDefaultAcl(String src) throws IOException {
+    return unprotectedRemoveDefaultAcl(src);
   }
 
   private List<AclEntry> unprotectedRemoveDefaultAcl(String src)
@@ -2474,8 +2407,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     AclStorage.removeINodeAcl(inode);
   }
 
-  void setAcl(String src, List<AclEntry> aclSpec) throws IOException {
-    unprotectedSetAcl(src, aclSpec);
+  List<AclEntry> setAcl(String src, List<AclEntry> aclSpec) throws IOException {
+    return unprotectedSetAcl(src, aclSpec);
   }
 
   List<AclEntry> unprotectedSetAcl(String src, List<AclEntry> aclSpec)

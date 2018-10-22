@@ -89,8 +89,6 @@ public class TestCommitBlockSynchronization {
     doReturn("").when(namesystemSpy).closeFileCommitBlocks(
         any(INodeFile.class),
         any(BlockInfo.class));
-    doReturn("").when(namesystemSpy).persistBlocks(
-        any(INodeFile.class));
 
     return namesystemSpy;
   }
