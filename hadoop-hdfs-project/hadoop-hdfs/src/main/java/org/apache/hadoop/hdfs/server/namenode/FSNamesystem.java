@@ -1487,7 +1487,7 @@ public class FSNamesystem
             continue;
           }
         }
-        dir.setTimes(src, inode, -1, now, false);
+        dir.setTimes(inode, -1, now, false);
       }
 
       return blockManager
@@ -1511,7 +1511,7 @@ public class FSNamesystem
       long now = now();
       final INodeFile inode = INodeFile.valueOf(dir.getINode(src), src);
       if (doAccessTime && isAccessTimeSupported()) {
-        dir.setTimes(src, inode, -1, now, false);
+        dir.setTimes(inode, -1, now, false);
       }
       final long fileSize = inode.computeFileSizeNotIncludingLastUcBlock();
       boolean isUc = inode.isUnderConstruction();
@@ -1727,8 +1727,8 @@ public class FSNamesystem
       NameNode.stateChangeLog.debug("DIR* NameSystem.concat: " +
           Arrays.toString(srcs) + " to " + target);
     }
-
-    dir.concat(target, srcs);
+    long timestamp = now();
+    dir.concat(target, srcs, timestamp);
   }
 
   /**
@@ -1779,7 +1779,7 @@ public class FSNamesystem
     }
     INode inode = dir.getINode(src);
     if (inode != null) {
-      dir.setTimes(src, inode, mtime, atime, true);
+      dir.setTimes(inode, mtime, atime, true);
       resultingStat = getAuditFileInfo(src, false);
     } else {
       throw new FileNotFoundException(
@@ -2873,7 +2873,7 @@ public class FSNamesystem
             saveAllocatedBlock(src2, inodesInPath, newBlock, targets);
 
 
-            dir.persistNewBlock(src2, pendingFile);
+            persistNewBlock(src2, pendingFile);
             offset = pendingFile.computeFileSize(true);
 
             Lease lease = leaseManager.getLease(clientName);
@@ -3167,7 +3167,7 @@ public class FSNamesystem
                   "BLOCK* NameSystem.abandonBlock: " + b +
                       " is removed from pendingCreates");
             }
-            dir.persistBlocks(src2, file);
+            persistBlocks(src2, file);
             file.recomputeFileSize();
 
             return true;
@@ -3597,11 +3597,15 @@ public class FSNamesystem
     if (enforcePermission && isPermissionEnabled) {
       checkPermission(pc, src, false, null, FsAction.WRITE, null, FsAction.ALL, true, false);
     }
+    long mtime = now();
     // Unlink the target directory from directory tree
-    if (!dir.delete(src, collectedBlocks)) {
+    long filesRemoved = dir.delete(src, collectedBlocks,mtime);
+    if (filesRemoved < 0) {      
       return false;
     }
-
+    incrDeletedFileCount(filesRemoved);
+    // Blocks/INodes will be handled later
+    removePathAndBlocks(src, null);
     removeBlocks(collectedBlocks); // Incremental deletion of blocks
     collectedBlocks.clear();
     if (NameNode.stateChangeLog.isDebugEnabled()) {
@@ -3924,7 +3928,7 @@ public class FSNamesystem
         if (lastBlockLength > 0) {
           pendingFile.getFileUnderConstructionFeature().updateLengthOfLastBlock(pendingFile, lastBlockLength);
         }
-        dir.persistBlocks(src2, pendingFile);
+        persistBlocks(src2, pendingFile);
         pendingFile.recomputeFileSize();
         return null;
       }
@@ -4124,7 +4128,7 @@ public class FSNamesystem
     
     // close file and persist block allocations for this file
     INodeFile newFile = pendingFile.toCompleteFile(now());
-    dir.closeFile(src, newFile);
+    closeFile(src, newFile);
 
     if (!skipReplicationChecks) {
       blockManager.checkReplication(newFile);
@@ -4249,7 +4253,8 @@ public class FSNamesystem
           src = closeFileCommitBlocks(iFile, storedBlock);
         } else {
           // If this commit does not want to close the file, persist blocks
-          src = persistBlocks(iFile);
+          src = iFile.getFullPathName();
+          persistBlocks(src, iFile);
         }
         if (closeFile) {
           LOG.info(
@@ -4287,21 +4292,6 @@ public class FSNamesystem
     //remove lease, close file
     finalizeINodeFileUnderConstruction(src, pendingFile);
 
-    return src;
-  }
-
-  /**
-   * Persist the block list for the given file.
-   *
-   * @param pendingFile
-   * @return Path to the given file.
-   * @throws IOException
-   */
-  @VisibleForTesting
-  String persistBlocks(INodeFile pendingFile)
-      throws IOException {
-    String src = pendingFile.getFullPathName();
-    dir.persistBlocks(src, pendingFile);
     return src;
   }
 
@@ -4499,6 +4489,39 @@ public class FSNamesystem
     //TODO check if the database has resources left.
     return hasResourcesAvailable;
   }
+  
+  /**
+   * Persist the block list for the inode.
+   * @param path
+   * @param file
+   * @param logRetryCache
+   */
+  private void persistBlocks(String path, INodeFile file) throws IOException {
+    Preconditions.checkArgument(file.isUnderConstruction());
+    if(NameNode.stateChangeLog.isDebugEnabled()) {
+      NameNode.stateChangeLog.debug("persistBlocks: " + path
+              + " with " + file.getBlocks().length + " blocks is persisted to" +
+              " the file system");
+    }
+  }
+  void incrDeletedFileCount(long count) {
+    NameNode.getNameNodeMetrics().incrFilesDeleted(count);
+  }
+  /**
+   * Close file.
+   * @param path
+   * @param file
+   */
+  private void closeFile(String path, INodeFile file) throws IOException {
+    // file is closed
+    if (NameNode.stateChangeLog.isDebugEnabled()) {
+      NameNode.stateChangeLog.debug("closeFile: "
+              +path+" with "+ file.getBlocks().length
+              +" blocks is persisted to the file system");
+    }
+    file.logMetadataEvent(MetadataLogEntry.Operation.ADD);
+  }
+
 
   /**
    * Periodically calls hasAvailableResources of NameNodeResourceChecker, and
@@ -4667,6 +4690,20 @@ public class FSNamesystem
   void setBalancerBandwidth(long bandwidth) throws IOException {
     checkSuperuserPrivilege();
     getBlockManager().getDatanodeManager().setBalancerBandwidth(bandwidth);
+  }
+  
+  /**
+   * Persist the new block (the last block of the given file).
+   * @param path
+   * @param file
+   */
+  private void persistNewBlock(String path, INodeFile file) throws IOException {
+    Preconditions.checkArgument(file.isUnderConstruction());
+    if (NameNode.stateChangeLog.isDebugEnabled()) {
+      NameNode.stateChangeLog.debug("persistNewBlock: "
+              + path + " with new block " + file.getLastBlock().toString()
+              + ", current total block count is " + file.getBlocks().length);
+    }
   }
 
   /**
@@ -8130,8 +8167,8 @@ public class FSNamesystem
 
         removeSubTreeLocksForRenameInternal(src, isUsingSubTreeLocks,
             subTreeLockDst);
-
-        dir.renameTo(src, dst, srcCounts, dstCounts,
+        long mtime = now();
+        dir.renameTo(src, dst, mtime, srcCounts, dstCounts,
             options);
         return null;
       }
@@ -8407,8 +8444,9 @@ public class FSNamesystem
 
             AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime
                 (logEntries);
-
-            return dir.renameTo(src, dst, srcCounts, dstCounts);
+            
+            long mtime = now();
+            return dir.renameTo(src, dst, mtime, srcCounts, dstCounts);
           }
         };
     return (Boolean) renameToHandler.handle(this);

@@ -285,7 +285,7 @@ public class TestFsLimits {
       public Object performTask() throws IOException {
         Class<?> generated = null;
         try {
-          fs.renameTo(src, dst, new INode.DirCounts(), new INode.DirCounts(), new Rename[]{});
+          fs.renameTo(src, dst, now(), new INode.DirCounts(), new INode.DirCounts(), new Rename[]{});
         } catch (Throwable e) {
           LOG.error(e,e);
           generated = e.getClass();
@@ -316,7 +316,7 @@ public class TestFsLimits {
       public Object performTask() throws IOException {
         Class<?> generated = null;
         try {
-          fs.renameTo(src, dst, new INode.DirCounts(), new INode.DirCounts());
+          fs.renameTo(src, dst, now(), new INode.DirCounts(), new INode.DirCounts());
         } catch (Throwable e) {
           generated = e.getClass();
         }
