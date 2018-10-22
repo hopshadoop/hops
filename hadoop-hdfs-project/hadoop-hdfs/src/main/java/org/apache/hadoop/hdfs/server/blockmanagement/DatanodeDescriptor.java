@@ -120,9 +120,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
       @Override
       public Object performTask() throws IOException {
 //        return getPendingCached(datanodeManager);
-  Collection<io.hops.metadata.hdfs.entity.CachedBlock> tmp = EntityManager.findList(io.hops.metadata.hdfs.entity.CachedBlock.Finder.ByDatanodeAndTypes, dnId.getDatanodeUuid(),
-        Type.PENDING_CACHED);
-  return CachedBlock.toHops(tmp, datanodeManager);
+        Collection<io.hops.metadata.hdfs.entity.CachedBlock> tmp = EntityManager.findList(
+            io.hops.metadata.hdfs.entity.CachedBlock.Finder.ByDatanodeAndTypes, dnId.getDatanodeUuid(),
+            Type.PENDING_CACHED);
+        return CachedBlock.toHops(tmp, datanodeManager);
       }
     }.handle();
   }
