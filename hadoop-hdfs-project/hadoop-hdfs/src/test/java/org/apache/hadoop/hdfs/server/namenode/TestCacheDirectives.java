@@ -93,6 +93,8 @@ import io.hops.exception.TransactionContextException;
 import java.util.Set;
 import org.apache.hadoop.hdfs.BlockReaderTestUtil;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveIteratorForTesting;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 
 public class TestCacheDirectives {
   static final Log LOG = LogFactory.getLog(TestCacheDirectives.class);
@@ -1366,6 +1368,19 @@ public class TestCacheDirectives {
         .build());
   }
 
+  /**
+   * Check that the NameNode is not attempting to cache anything.
+   */
+  private void checkPendingCachedEmpty(MiniDFSCluster cluster)
+      throws Exception {
+    final DatanodeManager datanodeManager =
+        cluster.getNamesystem().getBlockManager().getDatanodeManager();
+    for (DataNode dn : cluster.getDataNodes()) {
+      DatanodeDescriptor descriptor =
+          datanodeManager.getDatanode(dn.getDatanodeId());
+      Assert.assertTrue(descriptor.getPendingCachedTX(datanodeManager).isEmpty());
+    }
+  }
   
   //Given that the NN use the datanode cacheUsed value and the pendingCached one to allocated cached blocks and
   //that the first one is updated by the heartbeat while the second is updated by the cache report I don't see how 
@@ -1387,21 +1402,16 @@ public class TestCacheDirectives {
         .setPath(fileName).setReplication((short) 1).build());
     waitForCachedBlocks(namenode, -1, numCachedReplicas,
         "testExceeds:1");
-    // Check that no DNs saw an excess CACHE message
-    int lines = appender.countLinesWithMessage(
-        "more bytes in the cache: " +
-        DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY);
-    assertEquals("Namenode should not send extra CACHE commands", 0, lines);
+    checkPendingCachedEmpty(cluster);
+    Thread.sleep(1000);
+    checkPendingCachedEmpty(cluster);
+    
     // Try creating a file with giant-sized blocks that exceed cache capacity
     dfs.delete(fileName, false);
     DFSTestUtil.createFile(dfs, fileName, 4096, fileLen, CACHE_CAPACITY * 2,
         (short) 1, 0xFADED);
-    // Nothing will get cached, so just force sleep for a bit
-    Thread.sleep(4000);
-    // Still should not see any excess commands
-    lines = appender.countLinesWithMessage(
-        "more bytes in the cache: " +
-        DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY);
-    assertEquals("Namenode should not send extra CACHE commands", 0, lines);
+    checkPendingCachedEmpty(cluster);
+    Thread.sleep(1000);
+    checkPendingCachedEmpty(cluster);
   }
 }
