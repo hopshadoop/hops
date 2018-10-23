@@ -103,7 +103,7 @@ public class InMemoryCache extends Cache{
   protected INodeIdentifier getInternal(long inodeId) throws IOException {
     return inodeIdCache.get(inodeId);
   }
-
+  
   @Override
   protected void deleteInternal(String path) {
     throw new UnsupportedOperationException();

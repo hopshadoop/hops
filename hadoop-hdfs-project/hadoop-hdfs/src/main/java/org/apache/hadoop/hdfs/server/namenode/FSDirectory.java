@@ -230,19 +230,8 @@ public class FSDirectory implements Closeable {
       String clientMachine, DatanodeDescriptor clientNode)
       throws IOException {
 
-    // Always do an implicit mkdirs for parent directory tree.
     long modTime = now();
     
-    Path parent = new Path(path).getParent();
-    if (parent == null) {
-      // Trying to add "/" as a file - this path has no
-      // parent -- avoids an NPE below.
-      return null;
-    }
-    
-    if (!mkdirs(parent.toString(), permissions, true, modTime)) {
-      return null;
-    }
     INodeFile newNode = new INodeFile(IDsGeneratorFactory.getInstance().getUniqueINodeID(), permissions,
         BlockInfo.EMPTY_ARRAY, replication, modTime, modTime, preferredBlockSize, (byte) 0);
     newNode.toUnderConstruction(clientName, clientMachine, clientNode);
@@ -1346,102 +1335,6 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
     return getFullPathName(inodes, depth - 1);
   }
-  
-  /**
-   * Create a directory
-   * If ancestor directories do not exist, automatically create them.
-   *
-   * @param src
-   *     string representation of the path to the directory
-   * @param permissions
-   *     the permission of the directory
-   * @param now
-   *     creation time
-   * @return true if the operation succeeds false otherwise
-   * @throws FileNotFoundException
-   *     if an ancestor or itself is a file
-   * @throws QuotaExceededException
-   *     if directory creation violates
-   *     any quota limit
-   * @throws UnresolvedLinkException
-   *     if a symlink is encountered in src.
-   */
-  boolean mkdirs(String src, PermissionStatus permissions,
-      boolean inheritPermission, long now)
-      throws IOException {
-    src = normalizePath(src);
-    String[] names = INode.getPathNames(src);
-    byte[][] components = INode.getPathComponents(names);
-    final int lastInodeIndex = components.length - 1;
-
-    INodesInPath inodesInPath = getExistingPathINodes(components);
-    INode[] inodes = inodesInPath.getINodes();
-
-    // find the index of the first null in inodes[]
-    StringBuilder pathbuilder = new StringBuilder();
-    int i = 1;
-    for (; i < inodes.length && inodes[i] != null; i++) {
-      pathbuilder.append(Path.SEPARATOR + names[i]);
-      if (!inodes[i].isDirectory()) {
-        throw new FileAlreadyExistsException(
-            "Parent path is not a directory: " + pathbuilder + " " +
-                inodes[i].getLocalName());
-      }
-    }
-
-    // default to creating parent dirs with the given perms
-    PermissionStatus parentPermissions = permissions;
-
-    // if not inheriting and it's the last inode, there's no use in
-    // computing perms that won't be used
-    if (inheritPermission || (i < lastInodeIndex)) {
-      // if inheriting (ie. creating a file or symlink), use the parent dir,
-      // else the supplied permissions
-      // NOTE: the permissions of the auto-created directories violate posix
-      FsPermission parentFsPerm =
-          inheritPermission ? inodes[i - 1].getFsPermission() :
-              permissions.getPermission();
-
-      // ensure that the permissions allow user write+execute
-      if (!parentFsPerm.getUserAction().implies(FsAction.WRITE_EXECUTE)) {
-        parentFsPerm = new FsPermission(
-            parentFsPerm.getUserAction().or(FsAction.WRITE_EXECUTE),
-            parentFsPerm.getGroupAction(), parentFsPerm.getOtherAction());
-      }
-
-      if (!parentPermissions.getPermission().equals(parentFsPerm)) {
-        parentPermissions =
-            new PermissionStatus(parentPermissions.getUserName(),
-                parentPermissions.getGroupName(), parentFsPerm);
-        // when inheriting, use same perms for entire path
-        if (inheritPermission) {
-          permissions = parentPermissions;
-        }
-      }
-    }
-
-    // create directories beginning from the first null index
-    for (; i < inodes.length; i++) {
-      pathbuilder.append(Path.SEPARATOR).append(names[i]);
-      String cur = pathbuilder.toString();
-      unprotectedMkdir(IDsGeneratorFactory.getInstance().getUniqueINodeID(), inodesInPath, i, components[i],
-          (i < lastInodeIndex) ? parentPermissions : permissions, now);
-      if (inodes[i] == null) {
-        return false;
-      }
-      // Directory creation also count towards FilesCreated
-      // to match count of FilesDeleted metric.
-      if (getFSNamesystem() != null) {
-        NameNode.getNameNodeMetrics().incrFilesCreated();
-      }
-
-      if (NameNode.stateChangeLog.isDebugEnabled()) {
-        NameNode.stateChangeLog
-            .debug("DIR* FSDirectory.mkdirs: created directory " + cur);
-      }
-    }
-    return true;
-  }
 
   INode unprotectedMkdir(int inodeId, String src, PermissionStatus permissions,
       long timestamp)
@@ -1459,7 +1352,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * The parent path to the directory is at [0, pos-1].
    * All ancestors exist. Newly created one stored at index pos.
    */
-  private void unprotectedMkdir(long inodeId, INodesInPath inodesInPath, int pos, byte[] name,
+  void unprotectedMkdir(long inodeId, INodesInPath inodesInPath, int pos, byte[] name,
       PermissionStatus permission, long timestamp)
       throws IOException {
     final INodeDirectory dir = new INodeDirectory(inodeId, name, permission, timestamp);
@@ -1886,7 +1779,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   
   /**
    */
-  String normalizePath(String src) {
+  static String normalizePath(String src) {
     if (src.length() > 1 && src.endsWith("/")) {
       src = src.substring(0, src.length() - 1);
     }
@@ -2277,39 +2170,14 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   }
 
   /**
-   * Add the given symbolic link to the fs. Record it in the edits log.
+   * Add the specified path into the namespace.
    */
-  INodeSymlink addSymlink(String path, String target, PermissionStatus dirPerms,
-      boolean createParent)
-      throws IOException {
-    final long modTime = now();
-    if (createParent) {
-      final String parent = new Path(path).getParent().toString();
-      if (!mkdirs(parent, dirPerms, true, modTime)) {
-        return null;
-      }
-    }
-    final String userName = dirPerms.getUserName();
-    long id = IDsGeneratorFactory.getInstance().getUniqueINodeID();
-    INodeSymlink newNode = unprotectedAddSymlink(id, path, target, modTime, modTime,
-        new PermissionStatus(userName, null, FsPermission.getDefault()));
-
-    if (newNode == null) {
-      NameNode.stateChangeLog.info("DIR* addSymlink: failed to add " + path);
-      return null;
-    }
-
-    
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* addSymlink: " + path + " is added");
-    }
-    return newNode;
+  INodeSymlink addSymlink(long id, String path, String target,
+                          long mtime, long atime, PermissionStatus perm)
+          throws UnresolvedLinkException, QuotaExceededException, IOException {
+    return unprotectedAddSymlink(id, path, target, mtime, atime, perm);
   }
 
-  /**
-   * Add the specified path into the namespace. Invoked from edit log
-   * processing.
-   */
   INodeSymlink unprotectedAddSymlink(long id, String path, String target, long mtime,
       long atime, PermissionStatus perm)
       throws IOException {

@@ -253,6 +253,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_KEY;
+import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.CacheDirective;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
@@ -1870,7 +1871,7 @@ public class FSNamesystem
     checkFsObjectLimit();
 
     // add symbolic link to namespace
-    dir.addSymlink(link, target, dirPerms, createParent);
+    addSymlink(link, target, dirPerms, createParent);
   }
 
   /**
@@ -2318,8 +2319,15 @@ public class FSNamesystem
       checkFsObjectLimit();
       final DatanodeDescriptor clientNode = blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
       
-      INodeFile newNode = dir.addFile(src, permissions, replication, blockSize,
-          holder, clientMachine, clientNode);
+      INodeFile newNode = null;
+      // Always do an implicit mkdirs for parent directory tree.
+      Path parent = new Path(src).getParent();
+      if (parent != null && mkdirsRecursively(parent.toString(),
+              permissions, true, now())) {
+        newNode = dir.addFile(src, permissions, replication, blockSize,
+                holder, clientMachine, clientNode);
+      }
+      
       if (newNode == null) {
         throw new IOException("Unable to add " + src +  " to namespace");
       }
@@ -3854,8 +3862,95 @@ public class FSNamesystem
     // create multiple inodes.
     checkFsObjectLimit();
 
-    if (!dir.mkdirs(src, permissions, false, now())) {
+    if (!mkdirsRecursively(src, permissions, false, now())) {
       throw new IOException("Failed to create directory: " + src);
+    }
+    return true;
+  }
+
+    /**
+   * Create a directory
+   * If ancestor directories do not exist, automatically create them.
+   * @param src string representation of the path to the directory
+   * @param permissions the permission of the directory
+   * @param inheritPermission if the permission of the directory should inherit
+   *                          from its parent or not. u+wx is implicitly added to
+   *                          the automatically created directories, and to the
+   *                          given directory if inheritPermission is true
+   * @param now creation time
+   * @return true if the operation succeeds false otherwise
+   * @throws QuotaExceededException if directory creation violates
+   *                                any quota limit
+   * @throws UnresolvedLinkException if a symlink is encountered in src.
+   */
+  private boolean mkdirsRecursively(String src, PermissionStatus permissions,
+      boolean inheritPermission, long now)
+      throws FileAlreadyExistsException, QuotaExceededException,
+      UnresolvedLinkException, IOException,
+      AclException {
+    src = FSDirectory.normalizePath(src);
+    String[] names = INode.getPathNames(src);
+    byte[][] components = INode.getPathComponents(names);
+    final int lastInodeIndex = components.length - 1;
+    INodesInPath iip = dir.getExistingPathINodes(components);
+    INode[] inodes = iip.getINodes();
+    // find the index of the first null in inodes[]
+    StringBuilder pathbuilder = new StringBuilder();
+    int i = 1;
+    for (; i < inodes.length && inodes[i] != null; i++) {
+      pathbuilder.append(Path.SEPARATOR).append(names[i]);
+      if (!inodes[i].isDirectory()) {
+        throw new FileAlreadyExistsException(
+            "Parent path is not a directory: "
+            + pathbuilder + " " + inodes[i].getLocalName());
+      }
+    }
+    // default to creating parent dirs with the given perms
+    PermissionStatus parentPermissions = permissions;
+    // if not inheriting and it's the last inode, there's no use in
+    // computing perms that won't be used
+    if (inheritPermission || (i < lastInodeIndex)) {
+      // if inheriting (ie. creating a file or symlink), use the parent dir,
+      // else the supplied permissions
+      // NOTE: the permissions of the auto-created directories violate posix
+      FsPermission parentFsPerm = inheritPermission
+          ? inodes[i - 1].getFsPermission() : permissions.getPermission();
+      // ensure that the permissions allow user write+execute
+      if (!parentFsPerm.getUserAction().implies(FsAction.WRITE_EXECUTE)) {
+        parentFsPerm = new FsPermission(
+            parentFsPerm.getUserAction().or(FsAction.WRITE_EXECUTE),
+            parentFsPerm.getGroupAction(),
+            parentFsPerm.getOtherAction()
+        );
+      }
+      if (!parentPermissions.getPermission().equals(parentFsPerm)) {
+        parentPermissions = new PermissionStatus(
+            parentPermissions.getUserName(),
+            parentPermissions.getGroupName(),
+            parentFsPerm
+        );
+        // when inheriting, use same perms for entire path
+        if (inheritPermission) {
+          permissions = parentPermissions;
+        }
+      }
+    }
+    // create directories beginning from the first null index
+    for (; i < inodes.length; i++) {
+      pathbuilder.append(Path.SEPARATOR).append(names[i]);
+      dir.unprotectedMkdir(IDsGeneratorFactory.getInstance().getUniqueINodeID(), iip, i, components[i],
+          (i < lastInodeIndex) ? parentPermissions : permissions, now);
+      if (inodes[i] == null) {
+        return false;
+      }
+      // Directory creation also count towards FilesCreated
+      // to match count of FilesDeleted metric.
+      NameNode.getNameNodeMetrics().incrFilesCreated();
+      final String cur = pathbuilder.toString();
+      if (NameNode.stateChangeLog.isDebugEnabled()) {
+        NameNode.stateChangeLog.debug(
+            "mkdirs: created directory " + cur);
+      }
     }
     return true;
   }
@@ -4522,7 +4617,40 @@ public class FSNamesystem
     file.logMetadataEvent(MetadataLogEntry.Operation.ADD);
   }
 
-
+  /**
+   * Add the given symbolic link to the fs. Record it in the edits log.
+   * @param path
+   * @param target
+   * @param dirPerms
+   * @param createParent
+   * @param dir
+   */
+  private INodeSymlink addSymlink(String path, String target,
+                                  PermissionStatus dirPerms,
+                                  boolean createParent)
+      throws UnresolvedLinkException, FileAlreadyExistsException,
+      QuotaExceededException, AclException, IOException {
+    final long modTime = now();
+    if (createParent) {
+      final String parent = new Path(path).getParent().toString();
+      if (!mkdirsRecursively(parent, dirPerms, true, modTime)) {
+        return null;
+      }
+    }
+    final String userName = dirPerms.getUserName();
+    long id = IDsGeneratorFactory.getInstance().getUniqueINodeID();
+    INodeSymlink newNode = dir.addSymlink(id, path, target, modTime, modTime,
+            new PermissionStatus(userName, null, FsPermission.getDefault()));
+    if (newNode == null) {
+      NameNode.stateChangeLog.info("addSymlink: failed to add " + path);
+      return null;
+    }
+    if(NameNode.stateChangeLog.isDebugEnabled()) {
+      NameNode.stateChangeLog.debug("addSymlink: " + path + " is added");
+    }
+    return newNode;
+  }
+  
   /**
    * Periodically calls hasAvailableResources of NameNodeResourceChecker, and
    * if
@@ -8085,7 +8213,7 @@ public class FSNamesystem
     return null;
   }
 
-  private void renameTo(final String src1, final long srcINodeID, final String dst1,
+  void renameTo(final String src1, final long srcINodeID, final String dst1,
                         final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
                         final boolean isUsingSubTreeLocks, final String subTreeLockDst,
                         final Collection<MetadataLogEntry> logEntries,
