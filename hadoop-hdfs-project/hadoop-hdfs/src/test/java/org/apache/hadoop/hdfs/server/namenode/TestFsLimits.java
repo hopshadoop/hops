@@ -22,13 +22,8 @@ import io.hops.common.IDsMonitor;
 import io.hops.exception.StorageException;
 import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.security.UsersGroups;
-import io.hops.transaction.handler.HDFSOperationType;
-import io.hops.transaction.handler.HopsTransactionalRequestHandler;
-import io.hops.transaction.lock.INodeLock;
-import io.hops.transaction.lock.LockFactory;
-import io.hops.transaction.lock.TransactionLockTypes;
-import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -42,51 +37,41 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
-
-import static org.apache.hadoop.util.Time.now;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class TestFsLimits {
   static Configuration conf;
-  static INode[] inodes;
-  static FSDirectory fs;
+  static FSNamesystem fs;
   static boolean fsIsReady;
   
   static PermissionStatus perms =
       new PermissionStatus("admin", "admin", FsPermission.getDefault());
 
   
-  static private FSNamesystem getMockNamesystem() {
-    FSNamesystem fsn = mock(FSNamesystem.class);
-    when(fsn.createFsOwnerPermissions((FsPermission) anyObject())).thenReturn(
-        new PermissionStatus("root", "wheel", FsPermission.getDefault()));
+  static private FSNamesystem getMockNamesystem() throws IOException {
     NameNode nn = mock(NameNode.class);
     when(nn.getActiveNameNodes())
         .thenReturn(new SortedActiveNodeListPBImpl(Collections.EMPTY_LIST));
-    when(fsn.getNameNode()).thenReturn(nn);
+    FSNamesystem fsn = new FSNamesystem(conf,nn);
+    fsn.getFSDirectory().setReady(fsIsReady);
+    //needed to create the root inode
+    FSDirectory fsd = new FSDirectory(fsn, conf);
     return fsn;
   }
   
   private void initFS() throws StorageException, IOException {
     HdfsStorageFactory.setConfiguration(conf);
     assert (HdfsStorageFactory.formatStorage());
+    NameNode.format(conf);
     UsersGroups.addUserToGroup(perms.getUserName(), perms.getGroupName());
     IDsMonitor.getInstance().start();
     NameNode.initMetrics(conf, NamenodeRole.NAMENODE);
     fs = null;
     fsIsReady = true;
-  }
-
-  private static class MockFSDirectory extends FSDirectory {
-    public MockFSDirectory() throws IOException {
-      super(getMockNamesystem(), conf);
-      setReady(fsIsReady);
-    }
-    
   }
 
   @Before
@@ -194,142 +179,51 @@ public class TestFsLimits {
 
   private static long id = 1 + INodeDirectory.ROOT_INODE_ID;
 
-//  private void mkdirs(String name, Class<?> expected)
-//      throws Exception {
-//    HopsTransactionalRequestHandler handler =
-//        new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
-//
-//          @Override
-//          public void acquireLock(TransactionLocks locks) throws IOException {
-//            LockFactory lf = LockFactory.getInstance();
-//            INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-//                    TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, "/", "/" + name)
-//                    .setNameNodeID(getMockNamesystem().getNameNode().getId()).setActiveNameNodes(getMockNamesystem().getNameNode().getActiveNameNodes().getActiveNodes());
-//            locks.add(il);
-//          }
-//
-//          @Override
-//          public Object performTask() throws StorageException, IOException {
-//            // have to create after the caller has had a chance to set conf values
-//            if (fs == null) {
-//              fs = new MockFSDirectory();
-//            }
-//
-//            INode child = new INodeDirectory(id++, name, perms, true);
-//            child.setLocalName(name);
-//            child.setPartitionIdNoPersistance(INodeDirectory.ROOT_INODE_ID);
-//
-//            Class<?> generated = null;
-//            try {
-//              fs.verifyFsLimits(inodes, 1, child);
-//              INodeDirectory.getRootDir().addChild(child, false);
-//            } catch (QuotaExceededException e) {
-//              generated = e.getClass();
-//            }
-//            assertEquals(expected, generated);
-//            return null;
-//          }
-//        };
-//
-//    handler.handle();
-//    
-//  }
   
   private void mkdirs(final String name, final Class<?> expected)
       throws Exception {
     lazyInitFSDirectory();
-    HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
-
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getINodeLock( TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT, TransactionLockTypes.INodeResolveType.PATH, name)
-                    .setNameNodeID(getMockNamesystem().getNameNode().getId())
-                    .setActiveNameNodes(getMockNamesystem().getNameNode().getActiveNameNodes().getActiveNodes());
-            locks.add(il);
-            locks.add(lf.getAcesLock());
-      }
-
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        Class<?> generated = null;
-        try {
-          fs.mkdirs(name, perms, false, now());
-        } catch (Throwable e) {
-          generated = e.getClass();
-        }
-        assertEquals(expected, generated);
-        return null;
-      }
-    };
-
-    handler.handle();
+    Class<?> generated = null;
+    try {
+      fs.mkdirs(name, perms, false);
+    } catch (Throwable e) {
+      generated = e.getClass();
+    }
+    assertEquals(expected, generated);
   }
 
   private void rename(final String src, final String dst, final Class<?> expected)
       throws Exception {
     lazyInitFSDirectory();
-    new HopsTransactionalRequestHandler(HDFSOperationType.RENAME, src) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getRenameINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-            TransactionLockTypes.INodeResolveType.PATH, src, dst)
-            .setNameNodeID(getMockNamesystem().getNameNode().getId())
-            .setActiveNameNodes(getMockNamesystem().getNameNode().getActiveNameNodes().getActiveNodes());
-        locks.add(il);
-        locks.add(lf.getAcesLock());
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        Class<?> generated = null;
-        try {
-          fs.renameTo(src, dst, now(), new INode.DirCounts(), new INode.DirCounts(), new Rename[]{});
-        } catch (Throwable e) {
-          LOG.error(e,e);
-          generated = e.getClass();
-        }
-        assertEquals(expected, generated);
-        return null;
-      }
-    }.handle();
+    Class<?> generated = null;
+    try {
+      Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
+      fs.renameTo(src, 0L, dst, new INode.DirCounts(),
+          new INode.DirCounts(), false, null, logEntries, new Rename[]{});
+    } catch (Throwable e) {
+      generated = e.getClass();
+    }
+    assertEquals(expected, generated);
   }
 
   @SuppressWarnings("deprecation")
   private void deprecatedRename(final String src, final String dst, final Class<?> expected)
       throws Exception {
     lazyInitFSDirectory();
-    new HopsTransactionalRequestHandler(HDFSOperationType.RENAME, src) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getRenameINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-            TransactionLockTypes.INodeResolveType.PATH, src, dst)
-            .setNameNodeID(getMockNamesystem().getNameNode().getId())
-            .setActiveNameNodes(getMockNamesystem().getNameNode().getActiveNameNodes().getActiveNodes());
-        locks.add(il);
-        locks.add(lf.getAcesLock());
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        Class<?> generated = null;
-        try {
-          fs.renameTo(src, dst, now(), new INode.DirCounts(), new INode.DirCounts());
-        } catch (Throwable e) {
-          generated = e.getClass();
-        }
-        assertEquals(expected, generated);
-        return null;
-      }
-    }.handle();
+    Class<?> generated = null;
+    try {
+      Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
+      fs.renameTo(src, 0L, dst, new INode.DirCounts(), new INode.DirCounts(), false, null, logEntries);
+    } catch (Throwable e) {
+      generated = e.getClass();
+    }
+    assertEquals(expected, generated);
   }
 
   private static void lazyInitFSDirectory() throws IOException {
     // have to create after the caller has had a chance to set conf values
     if (fs == null) {
-      fs = new MockFSDirectory();
+      fs = getMockNamesystem();
     }
   }
 }
