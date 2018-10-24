@@ -469,6 +469,8 @@ public class FSNamesystem
    */
   private volatile boolean startingActiveService = false;
 
+  private volatile boolean imageLoaded = false;
+  
   private final AclConfigFlag aclConfigFlag;
 
   private final RetryCacheDistributed retryCache;
@@ -480,12 +482,36 @@ public class FSNamesystem
   long delayAfterBuildingTree=0;
 
   /**
+   * Notify that loading of this FSDirectory is complete, and
+   * it is imageLoaded for use
+   */
+  void imageLoadComplete() {
+    Preconditions.checkState(!imageLoaded, "FSDirectory already loaded");
+    setImageLoaded();
+  }
+  void setImageLoaded() {
+    if(imageLoaded) return;
+      setImageLoaded(true);
+      dir.markNameCacheInitialized();
+  }
+  //This is for testing purposes only
+  @VisibleForTesting
+  boolean isImageLoaded() {
+    return imageLoaded;
+  }
+  // exposed for unit tests
+  protected void setImageLoaded(boolean flag) {
+    imageLoaded = flag;
+  }
+  
+  /**
    * Clear all loaded data
    */
   void clear() throws IOException {
     dir.reset();
     dtSecretManager.reset();
     leaseManager.removeAllLeases();
+    setImageLoaded(false);
   }
 
   @VisibleForTesting
@@ -525,8 +551,7 @@ public class FSNamesystem
     default:
       // just load the image
     }
-    namesystem.dir
-        .imageLoadComplete();     //HOP: this function was called inside the  namesystem.loadFSImage(...) which is commented out
+    namesystem.imageLoadComplete();     //HOP: this function was called inside the  namesystem.loadFSImage(...) which is commented out
 
     long timeTakenToLoadFSImage = now() - loadStart;
     LOG.info(
@@ -1614,7 +1639,6 @@ public class FSNamesystem
     // write permission for the target
     if (isPermissionEnabled) {
       checkPathAccess(pc, target, FsAction.WRITE);
-
       // and srcs
       for (String aSrc : srcs) {
         checkPathAccess(pc, aSrc, FsAction.READ); // read the file
@@ -2239,7 +2263,7 @@ public class FSNamesystem
 
     boolean create = flag.contains(CreateFlag.CREATE);
     boolean overwrite = flag.contains(CreateFlag.OVERWRITE);
-
+    
     startFileInternal(pc, src, permissions, holder, clientMachine, create, overwrite,
         createParent, replication, blockSize);
     final HdfsFileStatus stat = dir.getFileInfo(src, false, true);

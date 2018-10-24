@@ -57,7 +57,7 @@ public class TestFsLimits {
     when(nn.getActiveNameNodes())
         .thenReturn(new SortedActiveNodeListPBImpl(Collections.EMPTY_LIST));
     FSNamesystem fsn = new FSNamesystem(conf,nn);
-    fsn.getFSDirectory().setReady(fsIsReady);
+    fsn.setImageLoaded(fsIsReady);
     //needed to create the root inode
     FSDirectory fsd = new FSDirectory(fsn, conf);
     return fsn;
