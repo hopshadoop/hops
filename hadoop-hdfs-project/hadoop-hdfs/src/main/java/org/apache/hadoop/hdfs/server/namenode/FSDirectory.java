@@ -95,16 +95,12 @@ import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
 import static org.apache.hadoop.util.Time.now;
 
 /**
- * **********************************************
- * FSDirectory stores the filesystem directory state.
- * It handles writing/loading values to disk, and logging
- * changes as we go.
- * <p/>
- * It keeps the filename->blockset mapping always-current
- * and logged to disk.
- * <p/>
- * ***********************************************
- */
+ * Both FSDirectory and FSNamesystem manage the state of the namespace.
+ * FSDirectory is a pure in-memory data structure, all of whose operations
+ * happen entirely in memory. In contrast, FSNamesystem persists the operations
+ * to the disk.
+ * @see org.apache.hadoop.hdfs.server.namenode.FSNamesystem
+ **/
 public class FSDirectory implements Closeable {
 
   @VisibleForTesting
@@ -118,7 +114,6 @@ public class FSDirectory implements Closeable {
   public final static byte[] DOT_INODES = 
       DFSUtil.string2Bytes(DOT_INODES_STRING);
   private final FSNamesystem namesystem;
-  private volatile boolean ready = false;
   private final int maxComponentLength;
   private final int maxDirItems;
   private final int lsLimit;  // max list limit
@@ -183,34 +178,6 @@ public class FSDirectory implements Closeable {
   }
 
   /**
-   * Notify that loading of this FSDirectory is complete, and
-   * it is ready for use
-   */
-  void imageLoadComplete() {
-    Preconditions.checkState(!ready, "FSDirectory already loaded");
-    setReady();
-  }
-
-  void setReady() {
-    if (ready) {
-      return;
-    }
-    setReady(true);
-    this.nameCache.initialized();
-  }
-  
-  //This is for testing purposes only
-  @VisibleForTesting
-  boolean isReady() {
-    return ready;
-  }
-
-  // exposed for unit tests
-  protected void setReady(boolean flag) {
-    ready = flag;
-  }
-
-  /**
    * Shutdown the filestore
    */
   @Override
@@ -218,6 +185,10 @@ public class FSDirectory implements Closeable {
 
   }
 
+  void markNameCacheInitialized() {
+    nameCache.initialized();
+  }
+  
   /**
    * Add the given filename to the fs.
    *
@@ -1242,7 +1213,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       return;
     }
     
-    if (!ready) {
+    if (!namesystem.isImageLoaded()) {
       //still initializing. do not check or update quotas.
       return;
     }
@@ -1398,7 +1369,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   private void verifyQuota(INode[] inodes, int pos, long nsDelta, long dsDelta,
       INode commonAncestor) throws QuotaExceededException, StorageException,
       TransactionContextException {
-    if (!ready) {
+    if (!namesystem.isImageLoaded()) {
       // Do not check quota if edits log is still being processed
       return;
     }
@@ -1449,7 +1420,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       return;
     }
 
-    if (!ready) {
+    if (!namesystem.isImageLoaded()) {
       // Do not check quota if edits log is still being processed
       return;
     }
@@ -1509,7 +1480,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
           : (String) parentPath;
       final PathComponentTooLongException e = new PathComponentTooLongException(
           maxComponentLength, length, p, DFSUtil.bytes2String(childName));
-      if (ready) {
+      if (namesystem.isImageLoaded()) {
         throw e;
       } else {
         // Do not throw if edits log is still being processed
@@ -1533,7 +1504,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     if (count >= maxDirItems) {
       final MaxDirectoryItemsExceededException e
           = new MaxDirectoryItemsExceededException(maxDirItems, count);
-      if (ready) {
+      if (namesystem.isImageLoaded()) {
         e.setPathName(getFullPathName(pathComponents, pos - 1));
         throw e;
       } else {
@@ -1580,7 +1551,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       }
       e.setPathName(badPath);
       // Do not throw if edits log is still being processed
-      if (ready) {
+      if (namesystem.isImageLoaded()) {
         throw (e);
       }
       // log pre-existing paths that exceed limits
@@ -2025,7 +1996,6 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * Reset the entire namespace tree.
    */
   void reset() throws IOException {
-    setReady(false);
     createRoot(
         namesystem.createFsOwnerPermissions(new FsPermission((short) 0755)),
         true);

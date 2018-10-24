@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
+import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -32,13 +33,17 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Collections;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.After;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import org.mockito.Mockito;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import org.mockito.stubbing.Answer;
 
 public class TestFSNamesystem {
@@ -133,5 +138,21 @@ public class TestFSNamesystem {
     assertTrue("FSNamesystem didn't enter safemode", fsn.isInSafeMode());
     assertTrue("Replication queues weren't being populated after entering "
         + "safemode 2nd time", fsn.isPopulatingReplQueues());
+  }
+  
+  @Test
+  public void testReset() throws Exception {
+    Configuration conf = new Configuration();
+    DFSTestUtil.formatNameNode(conf);
+    NameNode nn = mock(NameNode.class);
+    when(nn.getActiveNameNodes())
+        .thenReturn(new SortedActiveNodeListPBImpl(Collections.EMPTY_LIST));
+    FSNamesystem fsn = new FSNamesystem(conf, nn);
+    fsn.imageLoadComplete();
+    assertTrue(fsn.isImageLoaded());
+    fsn.clear();
+    assertFalse(fsn.isImageLoaded());
+    fsn.imageLoadComplete();
+    assertTrue(fsn.isImageLoaded());
   }
 }
