@@ -2366,7 +2366,11 @@ public class BlockManager {
       LOG.error(e);
       throw new IOException(e);
     } catch (ExecutionException e) {
+      if(e.getCause() instanceof IOException){
         throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e.getCause());
+      }
     }
   
   
