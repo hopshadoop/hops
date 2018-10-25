@@ -486,7 +486,7 @@ public class DatanodeManager {
    * @param nodeInfo
    *     datanode descriptor.
    */
-  private void removeDatanode(DatanodeDescriptor nodeInfo) throws IOException {
+  private void removeDatanode(DatanodeDescriptor nodeInfo, boolean async) throws IOException {
     heartbeatManager.removeDatanode(nodeInfo);
     if (namesystem.isLeader()) {
       NameNode.stateChangeLog.info(
@@ -494,7 +494,7 @@ public class DatanodeManager {
               " datanode " + nodeInfo +
               " StorageID " + nodeInfo.getDatanodeUuid() +
               " index " + nodeInfo.getHostName());
-      blockManager.datanodeRemoved(nodeInfo);
+      blockManager.datanodeRemoved(nodeInfo, async);
 
     }
     networktopology.remove(nodeInfo);
@@ -511,12 +511,11 @@ public class DatanodeManager {
    *
    * @throws UnregisteredNodeException
    */
-  public void removeDatanode(final DatanodeID node
-      //Called my NameNodeRpcServer
-  ) throws UnregisteredNodeException, IOException {
+  public void removeDatanode(final DatanodeID node, //Called my NameNodeRpcServer
+    boolean async) throws UnregisteredNodeException, IOException {
     final DatanodeDescriptor descriptor = getDatanode(node);
     if (descriptor != null) {
-      removeDatanode(descriptor);
+      removeDatanode(descriptor, async);
     } else {
       NameNode.stateChangeLog
           .warn("BLOCK* removeDatanode: " + node + " does not exist");
@@ -544,7 +543,7 @@ public class DatanodeManager {
     }
     //HOP removeDatanode might take verylong time. taking it out of the synchronized section.
     if (removeDatanode) {
-      removeDatanode(d);
+      removeDatanode(d, true);
     }
   }
 
@@ -806,7 +805,7 @@ public class DatanodeManager {
       NameNode.LOG.info("BLOCK* registerDatanode: " + nodeN);
       // nodeN previously served a different data storage,
       // which is not served by anybody anymore.
-      removeDatanode(nodeN);
+      removeDatanode(nodeN, false);
       // physically remove node from datanodeMap
       wipeDatanode(nodeN);
       nodeN = null;

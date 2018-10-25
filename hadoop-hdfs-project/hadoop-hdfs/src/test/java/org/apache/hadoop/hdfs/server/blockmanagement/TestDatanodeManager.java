@@ -83,7 +83,7 @@ public class TestDatanodeManager {
         toRemove.getXferAddr() + " version : " + toRemove.getSoftwareVersion());
 
         //Remove that random node
-        dm.removeDatanode(toRemove);
+        dm.removeDatanode(toRemove, false);
         it.remove();
       }
 
