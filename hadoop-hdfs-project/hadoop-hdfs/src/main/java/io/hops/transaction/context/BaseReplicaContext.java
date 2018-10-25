@@ -222,13 +222,13 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
         Key toBeAddedKey = getKey(toBeAdded);
 
         remove(toBeDeleted);
-        if(isLogDebugEnabled()) {
+        if(isLogTraceEnabled()) {
           log("snapshot-maintenance-removed-replica", "bid",
                   toBeDeletedKey.getBlockId(), "inodeId",
                   toBeDeletedKey.getInodeId());
         }
         add(toBeAdded);
-        if(isLogDebugEnabled()) {
+        if(isLogTraceEnabled()) {
           log("snapshot-maintenance-added-replica", "bid",
                   toBeAddedKey.getBlockId(), "inodeId", toBeAddedKey.getInodeId());
         }

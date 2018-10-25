@@ -43,7 +43,7 @@ public class ExcessReplicaContext
   public void update(ExcessReplica hopExcessReplica)
       throws TransactionContextException {
     super.update(hopExcessReplica);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("added-excess", "bid", hopExcessReplica.getBlockId(), "sid",
               hopExcessReplica.getStorageId());
     }
@@ -53,7 +53,7 @@ public class ExcessReplicaContext
   public void remove(ExcessReplica hopExcessReplica)
       throws TransactionContextException {
     super.remove(hopExcessReplica);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("removed-excess", "bid", hopExcessReplica.getBlockId(), "sid",
               hopExcessReplica.getStorageId());
     }

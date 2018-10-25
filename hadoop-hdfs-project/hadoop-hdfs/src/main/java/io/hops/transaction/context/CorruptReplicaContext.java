@@ -44,7 +44,7 @@ public class CorruptReplicaContext
   public void update(CorruptReplica hopCorruptReplica)
       throws TransactionContextException {
     super.update(hopCorruptReplica);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("added-corrupt", "bid", hopCorruptReplica.getBlockId(), "sid",
               hopCorruptReplica.getStorageId());
     }
@@ -54,7 +54,7 @@ public class CorruptReplicaContext
   public void remove(CorruptReplica hopCorruptReplica)
       throws TransactionContextException {
     super.remove(hopCorruptReplica);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("removed-corrupt", "bid", hopCorruptReplica.getBlockId(), "sid",
               hopCorruptReplica.getStorageId());
     }

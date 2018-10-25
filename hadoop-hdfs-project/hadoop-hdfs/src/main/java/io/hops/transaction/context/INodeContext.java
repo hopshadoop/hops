@@ -102,7 +102,7 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
   public void remove(INode iNode) throws TransactionContextException {
     super.remove(iNode);
     inodesNameParentIndex.remove(iNode.nameParentKey());
-    if (isLogDebugEnabled()) {
+    if (isLogTraceEnabled()) {
       log("removed-inode", "id", iNode.getId(), "name", iNode.getLocalName(), "parent_id", iNode.getParentId(),
               "partition_id", iNode.getPartitionId());
     }
@@ -112,7 +112,7 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
   public void update(INode iNode) throws TransactionContextException {
     super.update(iNode);
     inodesNameParentIndex.put(iNode.nameParentKey(), iNode);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("updated-inode", "id", iNode.getId(), "name", iNode.getLocalName(), "parent_id", iNode.getParentId(),
               "partition_id", iNode.getPartitionId());
     }
@@ -185,7 +185,7 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
           throw new TransactionContextException(e);
         }
         renamedInodes.add(inodeAfterChange);
-        if (isLogDebugEnabled()) {
+        if (isLogTraceEnabled()) {
           log("removed-inode-snapshot-maintenance", "id", inodeBeforeChange.getId(), "name",
                   inodeBeforeChange.getLocalName(), "parent_id", inodeBeforeChange.getParentId(), "partition_id", inodeBeforeChange
                           .getPartitionId());

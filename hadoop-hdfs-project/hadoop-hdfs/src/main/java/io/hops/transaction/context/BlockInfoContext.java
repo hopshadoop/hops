@@ -69,7 +69,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     super.update(blockInfo);
     //only called in update not add
     updateInodeBlocks(blockInfo);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("updated-blockinfo", "bid", blockInfo.getBlockId(), "inodeId",
               blockInfo.getInodeId(), "blk index", blockInfo.getBlockIndex());
     }
@@ -80,7 +80,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   public void remove(BlockInfo blockInfo) throws TransactionContextException {
     super.remove(blockInfo);
     removeBlockFromInodeBlocks(blockInfo);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("removed-blockinfo", "bid", blockInfo.getBlockId());
     }
   }
@@ -376,7 +376,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       if (deleteINodes.contains(pk)) {
         //remove the block
         concatRemovedBlks.add(bInfo);
-        if(isLogDebugEnabled()) {
+        if(isLogTraceEnabled()) {
           log("snapshot-maintenance-removed-blockinfo", "bid", bInfo.getBlockId(),
                   "inodeId", bInfo.getInodeId());
         }
