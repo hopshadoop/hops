@@ -45,7 +45,7 @@ public class PendingBlockContext
   public void update(PendingBlockInfo pendingBlockInfo)
       throws TransactionContextException {
     super.update(pendingBlockInfo);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("added-pending", "bid", pendingBlockInfo.getBlockId(), "numInProgress",
               pendingBlockInfo.getNumReplicas());
     }
@@ -55,7 +55,7 @@ public class PendingBlockContext
   public void remove(PendingBlockInfo pendingBlockInfo)
       throws TransactionContextException {
     super.remove(pendingBlockInfo);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("removed-pending", "bid", pendingBlockInfo.getBlockId());
     }
   }

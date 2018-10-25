@@ -43,7 +43,7 @@ public class ReplicaUnderConstructionContext
   public void update(ReplicaUnderConstruction replica)
       throws TransactionContextException {
     super.update(replica);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("added-replicauc", "bid", replica.getBlockId(), "sid",
               replica.getStorageId(), "state", replica.getState().name());
     }
@@ -53,7 +53,7 @@ public class ReplicaUnderConstructionContext
   public void remove(ReplicaUnderConstruction replica)
       throws TransactionContextException {
     super.remove(replica);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("removed-replicauc", "bid", replica.getBlockId(), "sid",
               replica.getStorageId(), "state", replica.getState().name());
     }

@@ -45,7 +45,7 @@ public class InvalidatedBlockContext
   public void update(InvalidatedBlock hopInvalidatedBlock)
       throws TransactionContextException {
     super.update(hopInvalidatedBlock);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("added-invblock", "bid", hopInvalidatedBlock.getBlockId(), "sid",
          hopInvalidatedBlock.getStorageId());
     }
@@ -55,7 +55,7 @@ public class InvalidatedBlockContext
   public void remove(InvalidatedBlock hopInvalidatedBlock)
       throws TransactionContextException {
     super.remove(hopInvalidatedBlock);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("removed-invblock", "bid", hopInvalidatedBlock.getBlockId(), "sid",
         hopInvalidatedBlock.getStorageId());
     }
