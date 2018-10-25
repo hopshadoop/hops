@@ -1003,7 +1003,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       LOG.warn("Disk error on " + dnName + ": " + msg);
     } else if (errorCode == DatanodeProtocol.FATAL_DISK_ERROR) {
       LOG.warn("Fatal disk error on " + dnName + ": " + msg);
-      namesystem.getBlockManager().getDatanodeManager().removeDatanode(nodeReg);
+      namesystem.getBlockManager().getDatanodeManager().removeDatanode(nodeReg, false);
     } else {
       LOG.info("Error report from " + dnName + ": " + msg);
     }

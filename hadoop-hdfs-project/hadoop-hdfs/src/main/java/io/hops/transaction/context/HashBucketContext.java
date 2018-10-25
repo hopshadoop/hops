@@ -25,11 +25,16 @@ import io.hops.metadata.hdfs.dal.HashBucketDataAccess;
 import io.hops.metadata.hdfs.entity.HashBucket;
 import io.hops.metadata.hdfs.entity.HashBucket.PrimaryKey;
 import io.hops.transaction.lock.TransactionLocks;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class HashBucketContext
     extends BaseEntityContext<PrimaryKey, HashBucket> {
   
   private HashBucketDataAccess dataAccess;
+  private Map<Integer,Collection<HashBucket>> lockedBuckets = new HashMap<>();
   
   public HashBucketContext(HashBucketDataAccess hashBucketDataAccess) {
     this.dataAccess = hashBucketDataAccess;
@@ -42,6 +47,18 @@ public class HashBucketContext
     switch (hbFinder){
       case ByStorageIdAndBucketId:
         return findByPrimaryKey(hbFinder, params);
+      default:
+        throw new RuntimeException(UNSUPPORTED_FINDER);
+    }
+  }
+  
+  @Override
+  public Collection<HashBucket> findList(FinderType<HashBucket> finder, Object... params)
+      throws TransactionContextException, StorageException {
+    HashBucket.Finder hbFinder = (HashBucket.Finder) finder;
+    switch (hbFinder){
+      case ByStorageId:
+        return findByStorageId(hbFinder, params);
       default:
         throw new RuntimeException(UNSUPPORTED_FINDER);
     }
@@ -62,6 +79,25 @@ public class HashBucketContext
       result = (HashBucket) dataAccess.findBucket(storageId, bucketId);
       gotFromDB(pk, result);
       miss(hbFinder, result, "sid", storageId, "bucketId", bucketId);
+    }
+    
+    return result;
+  }
+  
+  private Collection<HashBucket> findByStorageId(HashBucket.Finder hbFinder, Object[] params)
+      throws StorageException, StorageCallPreventedException {
+    int storageId = (Integer) params[0];
+    
+    Collection<HashBucket> result;
+    if (lockedBuckets.containsKey(storageId)){
+      result = lockedBuckets.get(storageId);
+      hit(hbFinder, result, "sid", storageId);
+    } else {
+      aboutToAccessStorage(hbFinder, params);
+      result = dataAccess.findBucketsByStorageId(storageId);
+      gotFromDB(result);
+      lockedBuckets.put(storageId, result);
+      miss(hbFinder, result, "sid", storageId);
     }
     
     return result;

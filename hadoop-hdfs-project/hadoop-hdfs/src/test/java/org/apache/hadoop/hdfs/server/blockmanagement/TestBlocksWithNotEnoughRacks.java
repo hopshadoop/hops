@@ -307,7 +307,7 @@ public class TestBlocksWithNotEnoughRacks {
       DataNode dataNode = datanodes.get(idx);
       DatanodeID dnId = dataNode.getDatanodeId();
       cluster.stopDataNode(idx);
-      dm.removeDatanode(dnId);
+      dm.removeDatanode(dnId, false);
 
       // The block should still have sufficient # replicas, across racks.
       // The last node may not have contained a replica, but if it did
@@ -321,7 +321,7 @@ public class TestBlocksWithNotEnoughRacks {
       dataNode = datanodes.get(idx);
       dnId = dataNode.getDatanodeId();
       cluster.stopDataNode(idx);
-      dm.removeDatanode(dnId);
+      dm.removeDatanode(dnId, false);
 
       // Make sure we have enough live replicas even though we are
       // short one rack and therefore need one replica
@@ -363,7 +363,7 @@ public class TestBlocksWithNotEnoughRacks {
       DataNode dataNode = datanodes.get(2);
       DatanodeID dnId = dataNode.getDatanodeId();
       cluster.stopDataNode(2);
-      dm.removeDatanode(dnId);
+      dm.removeDatanode(dnId, false);
 
       // The block gets re-replicated to another datanode so it has a 
       // sufficient # replicas, but not across racks, so there should

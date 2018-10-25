@@ -554,7 +554,7 @@ public class TestFileCreation {
 
       // wait for the lease to expire
       try {
-        Thread.sleep(5 * leasePeriod);
+        Thread.sleep(6 * leasePeriod);
       } catch (InterruptedException e) {
       }
 
