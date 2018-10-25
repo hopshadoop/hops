@@ -1067,7 +1067,7 @@ public class NameNode implements NameNodeStatusMXBean {
         return null;
       }
       case SET_BLOCK_REPORT_PROCESS_SIZE:
-        HdfsVariables.setBrLbMasBlkPerMin(startOpt.getMaxBlkRptProcessSize());
+        HdfsVariables.setBrLbMasBlkPerMin(startOpt.getMaxBlkRptProcessSize(), conf);
         LOG.info("Set block processing size to "+startOpt.getMaxBlkRptProcessSize());
         return null;
       case FORMAT: {
