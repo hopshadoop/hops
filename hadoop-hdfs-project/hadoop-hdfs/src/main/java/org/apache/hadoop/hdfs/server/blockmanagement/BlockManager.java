@@ -2255,7 +2255,14 @@ public class BlockManager {
     int numBlocksLogged = 0;
     for (final BlockInfo b : toAdd) {
       if (firstBlockReport) {
-        addStoredBlockImmediateTx(b, storage, numBlocksLogged < maxNumBlocksToLog);
+        final boolean logIt =  numBlocksLogged < maxNumBlocksToLog;
+        addTasks.add(new Callable<Object>() {
+          @Override
+          public Object call() throws Exception {
+            addStoredBlockImmediateTx(b, storage, logIt);
+            return null;
+          }
+        });
       } else {
         final boolean logIt =  numBlocksLogged < maxNumBlocksToLog;
         addTasks.add(new Callable<Object>() {
