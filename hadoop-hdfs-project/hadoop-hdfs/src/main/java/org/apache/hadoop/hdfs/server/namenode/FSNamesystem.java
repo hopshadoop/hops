@@ -188,6 +188,8 @@ import java.util.concurrent.*;
 import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.util.Slicer;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
 import org.apache.hadoop.fs.CacheFlag;
@@ -481,6 +483,8 @@ public class FSNamesystem
   long delayBeforeSTOFlag = 0; //This parameter can not be more than TxInactiveTimeout: 1.2 sec
   long delayAfterBuildingTree=0;
 
+  int slicerBatchSize;
+  int slicerNbThreads;
   /**
    * Clear all loaded data
    */
@@ -678,6 +682,12 @@ public class FSNamesystem
           auditLoggers.get(0) instanceof DefaultAuditLogger;
       this.aclConfigFlag = new AclConfigFlag(conf);
       this.retryCache = ignoreRetryCache ? null : initRetryCache(conf);
+      this.slicerBatchSize = conf.getInt(DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE,
+          DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE_DEFAULT);
+
+      this.slicerNbThreads = conf.getInt(
+          DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS,
+          DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT);
     } catch (IOException | RuntimeException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
       close();
@@ -5173,7 +5183,7 @@ public class FSNamesystem
 
     private void adjustSafeBlocks(Set<Long> safeBlocks) throws IOException {
       int lastSafeBlockSize = blockSafe();
-      addSafeBlocks(safeBlocks);
+      addSafeBlocks(new ArrayList<Long>(safeBlocks));
       int newSafeBlockSize = blockSafe();
       if (LOG.isDebugEnabled()) {
         long blockTotal = blockTotal();
@@ -7423,7 +7433,7 @@ public class FSNamesystem
    * @throws IOException
    */
   private void addSafeBlock(final Long safeBlock) throws IOException {
-    Set<Long> safeBlocks = new HashSet<>();
+    List<Long> safeBlocks = new ArrayList();
     safeBlocks.add(safeBlock);
     addSafeBlocks(safeBlocks);
   }
@@ -7452,16 +7462,37 @@ public class FSNamesystem
    *      list of blocks to be added to safe blocks
    * @throws IOException
    */
-  private void addSafeBlocks(final Set<Long> safeBlocks) throws IOException {
-    new LightWeightRequestHandler(HDFSOperationType.ADD_SAFE_BLOCKS) {
-      @Override
-      public Object performTask() throws IOException {
-        SafeBlocksDataAccess da = (SafeBlocksDataAccess) HdfsStorageFactory
-            .getDataAccess(SafeBlocksDataAccess.class);
-        da.insert(safeBlocks);
-        return null;
+  private void addSafeBlocks(final List<Long> safeBlocks) throws IOException {
+    try {
+      Slicer.slice(safeBlocks.size(), slicerBatchSize, slicerNbThreads,
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex) throws Exception {
+          final List<Long> ids = safeBlocks.subList(startIndex, endIndex);
+          new LightWeightRequestHandler(HDFSOperationType.ADD_SAFE_BLOCKS) {
+            @Override
+            public Object performTask() throws IOException {
+              boolean inTransaction = connector.isTransactionActive();
+              if (!inTransaction) {
+                connector.beginTransaction();
+              }
+              SafeBlocksDataAccess da = (SafeBlocksDataAccess) HdfsStorageFactory
+                  .getDataAccess(SafeBlocksDataAccess.class);
+              da.insert(ids);
+              if(!inTransaction){
+                connector.commit();
+              }
+              return null;
+            }
+          }.handle();
+        }
+      });
+    } catch (Exception e) {
+      if (e instanceof IOException) {
+        throw (IOException) e;
       }
-    }.handle();
+      throw new IOException(e);
+    }
   }
 
   /**
