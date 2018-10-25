@@ -341,18 +341,23 @@ public class BlockInfo extends Block {
    * @return
    */
   boolean isReplicatedOnDatanode(DatanodeDescriptor dn)
-      throws StorageException {
+      throws StorageException, TransactionContextException {
     DatanodeStorageInfo[] storages = dn.getStorageInfos();
-    List<Integer> sids = new ArrayList<Integer>();
-    for(DatanodeStorageInfo s : storages) {
+    Set<Integer> sids = new HashSet<>();
+    for (DatanodeStorageInfo s : storages) {
       sids.add(s.getSid());
     }
 
-    BlockInfoDataAccess da =
-        (BlockInfoDataAccess) HdfsStorageFactory
-            .getDataAccess(BlockInfoDataAccess.class);
-
-    return da.existsOnAnyStorage(getInodeId(), getBlockId(), sids);
+    List<Replica> list = (List<Replica>) EntityManager.findList(Replica.Finder.ByBlockIdAndINodeId, getBlockId(),
+        getInodeId());
+    if (list != null) {
+      for (Replica replica : list) {
+        if (sids.contains(replica.getStorageId())) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
   
   boolean isReplicatedOnStorage(DatanodeStorageInfo storage)
