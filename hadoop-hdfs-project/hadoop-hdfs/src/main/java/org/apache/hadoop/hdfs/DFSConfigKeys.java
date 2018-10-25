@@ -924,6 +924,12 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.blockreport.numbuckets";
   public static final int DFS_NUM_BUCKETS_DEFAULT = 1000;
   
+  public static final String DFS_BLOCK_FETCHER_NB_THREADS = "dfs.block.fetcher.nb.threads";
+  public static final int DFS_BLOCK_FETCHER_NB_THREADS_DEFAULT = 10;
+  
+  public static final String DFS_BLOCK_FETCHER_BUCKETS_PER_THREAD = "dfs.block.fetcher.buckets.per.thread";
+  public static final int DFS_BLOCK_FETCHER_BUCKETS_PER_THREADS_DEFAULT = 1;
+  
   // Handling unresolved DN topology mapping
   public static final String  DFS_REJECT_UNRESOLVED_DN_TOPOLOGY_MAPPING_KEY = 
       "dfs.namenode.reject-unresolved-dn-topology-mapping";
