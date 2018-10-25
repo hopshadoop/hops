@@ -582,10 +582,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
     private int index = 0;
     private final List<Iterator<BlockInfo>> iterators;
 
-    private BlockIterator(boolean all, final DatanodeStorageInfo... storages) throws IOException {
+    private BlockIterator(final DatanodeStorageInfo... storages) throws IOException {
       List<Iterator<BlockInfo>> iterators = new ArrayList<Iterator<BlockInfo>>();
       for (DatanodeStorageInfo e : storages) {
-        iterators.add(e.getBlockIterator(all));
+        iterators.add(e.getBlockIterator());
       }
       this.iterators = Collections.unmodifiableList(iterators);
     }
@@ -614,12 +614,20 @@ public class DatanodeDescriptor extends DatanodeInfo {
     }
   }
 
-  public Iterator<BlockInfo> getBlockIterator(boolean all) throws IOException {
-    return new BlockIterator(all, getStorageInfos());
+  public Iterator<BlockInfo> getBlockIterator() throws IOException {
+    return new BlockIterator(getStorageInfos());
   }
 
-  Iterator<BlockInfo> getBlockIterator(final String storageID, boolean all) throws IOException {
-    return new BlockIterator(all, getStorageInfo(storageID));
+  Iterator<BlockInfo> getBlockIterator(final String storageID) throws IOException {
+    return new BlockIterator(getStorageInfo(storageID));
+  }
+  
+  public Map<Long,Integer> getAllStorageReplicas(int numBuckets, int nbThreads, int BucketsPerThread) throws IOException {
+    Map<Long, Integer> result = new HashMap<>();
+    for(DatanodeStorageInfo storageInfo: getStorageInfos()){
+      result.putAll(storageInfo.getAllStorageReplicas(numBuckets, nbThreads, BucketsPerThread));
+    }
+    return result;
   }
   
   void incrementPendingReplicationWithoutTargets() {
