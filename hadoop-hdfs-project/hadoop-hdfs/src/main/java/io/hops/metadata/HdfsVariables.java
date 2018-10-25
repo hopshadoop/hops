@@ -81,7 +81,7 @@ public class HdfsVariables {
       Object response = handler.handle(vd);
       return response;
     }finally {
-      if(!insideActiveTransaction){
+      if(!insideActiveTransaction && HdfsStorageFactory.getConnector().isTransactionActive()){
         HdfsStorageFactory.getConnector().commit();
       }else{
         HdfsStorageFactory.getConnector().readCommitted();
@@ -298,7 +298,10 @@ public class HdfsVariables {
     }.handle();
   }
   
-  public static void setMaxConcurrentBrs(final long value) throws IOException {
+  public static void setMaxConcurrentBrs(final long value, Configuration conf) throws IOException {
+    if(conf!=null){
+      HdfsStorageFactory.setConfiguration(conf);
+    }
     new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_CONCURRENT_BRS) {
       @Override
       public Object performTask() throws IOException {
