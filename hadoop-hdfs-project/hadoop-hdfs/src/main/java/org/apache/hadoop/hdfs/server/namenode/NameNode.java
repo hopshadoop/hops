@@ -564,7 +564,7 @@ public class NameNode implements NameNodeStatusMXBean {
     if(isLeader()){ //if the newly started namenode is the leader then it means
       //that is cluster was restarted and we can reset the number of default
       // concurrent block reports
-      HdfsVariables.setMaxConcurrentBrs(maxConcurrentBRs);
+      HdfsVariables.setMaxConcurrentBrs(maxConcurrentBRs, null);
     }
   }
 
@@ -1084,7 +1084,7 @@ public class NameNode implements NameNodeStatusMXBean {
         return null;
       }
       case NO_OF_CONCURRENT_BLOCK_REPORTS:
-        HdfsVariables.setMaxConcurrentBrs(startOpt.getMaxConcurrentBlkReports());
+        HdfsVariables.setMaxConcurrentBrs(startOpt.getMaxConcurrentBlkReports(), conf);
         LOG.info("Setting concurrent block reports processing to "+startOpt
                 .getMaxConcurrentBlkReports());
         return null;
