@@ -21,9 +21,12 @@ import com.google.common.base.Preconditions;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -43,6 +46,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class BlockManagerTestUtil {
   public static void setNodeReplicationLimit(final BlockManager blockManager,
@@ -218,8 +225,31 @@ public class BlockManagerTestUtil {
       theDND.setLastUpdate(0);
       hbm.heartbeatCheck();
     }
+    
+    //wait until the asynchronous removal of blocks is done.
+    for(Integer sid : theDND.getSidsOnNode()){
+      int retry = 0;
+      while(!getReplicas(sid).isEmpty() && retry<10){
+        try {
+          Thread.sleep(1000);
+          retry ++;
+        } catch (InterruptedException ex) {
+          Logger.getLogger(BlockManagerTestUtil.class.getName()).log(Level.SEVERE, null, ex);
+        }
+      }
+      Assert.assertNotEquals(retry, 10);
+    }
   }
   
+  private static Map<Long, Long> getReplicas(final int sid) throws IOException{
+    return (Map<Long, Long>) new LightWeightRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory.getDataAccess(ReplicaDataAccess.class);
+        return da.findBlockAndInodeIdsByStorageId(sid);
+      }
+    }.handle();
+  }
   /**
    * Change whether the block placement policy will prefer the writer's
    * local Datanode or not.

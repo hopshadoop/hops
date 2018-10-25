@@ -172,7 +172,7 @@ public class TestBlockManager {
   private void removeNode(DatanodeDescriptor deadNode) throws IOException {
     NetworkTopology cluster = bm.getDatanodeManager().getNetworkTopology();
     cluster.remove(deadNode);
-    bm.datanodeRemoved(deadNode);
+    bm.datanodeRemoved(deadNode, false);
   }
 
 
@@ -781,7 +781,7 @@ public class TestBlockManager {
     assertEquals(1, ds.getBlockReportCount());
 
     // re-register as if node restarted, should update existing node
-    bm.getDatanodeManager().removeDatanode(node);
+    bm.getDatanodeManager().removeDatanode(node, false);
     reset(node);
     bm.getDatanodeManager().registerDatanode(nodeReg);
     verify(node).updateRegInfo(nodeReg);

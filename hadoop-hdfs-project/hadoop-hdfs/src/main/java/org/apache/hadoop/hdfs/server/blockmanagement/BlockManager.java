@@ -117,6 +117,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -144,6 +146,8 @@ public class BlockManager {
   private AtomicLong excessBlocksCount = new AtomicLong(0L);
   private AtomicLong postponedMisreplicatedBlocksCount = new AtomicLong(0L);
   
+  private  ExecutorService datanodeRemover = Executors.newSingleThreadExecutor();
+
   /**
    * Used by metrics
    */
@@ -1244,58 +1248,130 @@ public class BlockManager {
 
   /**
    * Remove the blocks associated to the given datanode.
+   * Removing blocks in the database can take a lot of time. To avoid the all NN hanging on this function we make it
+   * asynchronous. If the node is reconnected while this function is running, some block may be reported and then removed
+   * this will result in these block being wrongly seen as under replicated. Which in the worse case will result in the 
+   * blocks being replicated and detected as over replicated the next time the node does a block report. This is not
+   * ideal for disk usage, but this will not result in any data lost.
    */
-  void datanodeRemoved(final DatanodeDescriptor node)
+  void datanodeRemoved(final DatanodeDescriptor node, boolean async)
       throws IOException {
-    Map<Long, Long> allBlocksAndInodesIds = node.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
+    Future future = datanodeRemover.submit(new Callable<Object>() {
+      @Override
+      public Object call() throws Exception {
+        try {
+          Map<Long, Long> allBlocksAndInodesIds = node.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
         blockFetcherBucketsPerThread);
 
-    removeBlocks(allBlocksAndInodesIds, node);
+          removeBlocks(allBlocksAndInodesIds, node);
 
+          DatanodeStorageInfo[] storageInfos = node.getStorageInfos();
+          for (DatanodeStorageInfo storageInfo : storageInfos) {
+            HashBuckets.getInstance().resetBuckets(storageInfo.getSid());
+          }
+
+          // If the DN hasn't block-reported since the most recent
+          // failover, then we may have been holding up on processing
+          // over-replicated blocks because of it. But we can now
+          // process those blocks.
+          boolean stale = false;
+          for (DatanodeStorageInfo storage : node.getStorageInfos()) {
+            if (storage.areBlockContentsStale()) {
+              stale = true;
+              break;
+            }
+          }
+          if (stale) {
+            rescanPostponedMisreplicatedBlocks();
+          }
+          return null;
+        } catch (Throwable t) {
+          LOG.error(t);
+          throw t;
+        }
+      }
+    });
+    
     node.resetBlocks();
     List<Integer> sids = datanodeManager.getSidsOnDatanode(node.getDatanodeUuid());
     invalidateBlocks.remove(sids);
 
-    // If the DN hasn't block-reported since the most recent
-    // failover, then we may have been holding up on processing
-    // over-replicated blocks because of it. But we can now
-    // process those blocks.
-    boolean stale = false;
-    for (DatanodeStorageInfo storage : node.getStorageInfos()) {
-      if (storage.areBlockContentsStale()) {
-        stale = true;
-        break;
+    if (!async) {
+      try {
+        future.get();
+      } catch (Exception e) {
+        if (e instanceof IOException) {
+          throw (IOException) e;
+        } else {
+          throw new IOException(e);
+        }
       }
     }
-    if (stale) {
-      rescanPostponedMisreplicatedBlocks();
-    }
   }
 
-  /** Remove the blocks associated to the given DatanodeStorageInfo. */
+  /** Remove the blocks associated to the given DatanodeStorageInfo. 
+   * Removing blocks in the database can take a lot of time. To avoid the all NN hanging on this function we make it
+   * asynchronous. If the node is reconnected while this function is running, some block may be reported and then removed
+   * this will result in these block being wrongly seen as under replicated. Which in the worse case will result in the 
+   * blocks being replicated and detected as over replicated the next time the node does a block report. This is not
+   * ideal for disk usage, but this will not result in any data lost.
+   */
   void removeBlocksAssociatedTo(final DatanodeStorageInfo storageInfo)
       throws IOException {
-    Map<Long, Long> allBlocksAndInodesIds = storageInfo.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
+    datanodeRemover.submit(new Callable<Object>() {
+      @Override
+      public Object call() throws Exception {
+        try {
+          Map<Long, Long> allBlocksAndInodesIds = storageInfo.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
         blockFetcherBucketsPerThread);
-    final DatanodeDescriptor node = storageInfo.getDatanodeDescriptor();
+          final DatanodeDescriptor node = storageInfo.getDatanodeDescriptor();
 
-    removeBlocks(allBlocksAndInodesIds, node);
+          removeBlocks(allBlocksAndInodesIds, node);
 
+          HashBuckets.getInstance().resetBuckets(storageInfo.getSid());
+              
+          namesystem.checkSafeMode();          
+          return null;
+
+        } catch (Throwable t) {
+          LOG.error(t);
+          throw t;
+        }
+      }
+    });
     invalidateBlocks.remove(storageInfo.getSid());
-
-    namesystem.checkSafeMode();
   }
 
+  /*
+   * Removing blocks in the database can take a lot of time. To avoid the all NN hanging on this function we make it
+   * asynchronous. If the node is reconnected while this function is running, some block may be reported and then removed
+   * this will result in these block being wrongly seen as under replicated. Which in the worse case will result in the 
+   * blocks being replicated and detected as over replicated the next time the node does a block report. This is not
+   * ideal for disk usage, but this will not result in any data lost.
+   */
   void removeBlocksAssociatedTo(final int sid)
       throws IOException {
-    Map<Long, Long> allBlocksAndInodesIds = DatanodeStorageInfo.getAllStorageReplicas(numBuckets, sid,
-        blockFetcherNBThreads, blockFetcherBucketsPerThread);
+    datanodeRemover.submit(new Callable<Object>() {
+      @Override
+      public Object call() throws Exception {
+        try {
+          Map<Long, Long> allBlocksAndInodesIds = DatanodeStorageInfo.getAllStorageReplicas(numBuckets, sid,
+              blockFetcherNBThreads, blockFetcherBucketsPerThread);
+          
+          removeBlocks(allBlocksAndInodesIds, sid);
+          
+          HashBuckets.getInstance().resetBuckets(sid);
 
-    removeBlocks(allBlocksAndInodesIds, sid);
+          namesystem.checkSafeMode();
+          return null;
 
+        } catch (Throwable t) {
+          LOG.error(t);
+          throw t;
+        }
+      }
+    });
     invalidateBlocks.remove(sid);
-
-    namesystem.checkSafeMode();
   }
       
   /**
@@ -5308,6 +5384,9 @@ public class BlockManager {
   }
  
   public void shutdown() {
+    if(datanodeRemover!=null){
+      datanodeRemover.shutdown();
+    }
     stopReplicationInitializer();
   }
 }

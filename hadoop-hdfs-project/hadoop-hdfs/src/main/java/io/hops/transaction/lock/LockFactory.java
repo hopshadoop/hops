@@ -290,6 +290,10 @@ public class LockFactory {
     return new IndividualHashBucketLock(storageId, bucketId);
   }
   
+  public Lock getHashBucketLock(int storageId) {
+    return new HashBucketLock(storageId);
+  }
+  
   public Lock getLastBlockHashBucketsLock(){
     return new LastBlockReplicasHashBucketLock();
   }
