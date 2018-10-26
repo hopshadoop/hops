@@ -2834,11 +2834,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     }
   }
 
-
   public int getNameNodesCount() throws IOException {
-//    return namenodeSelector.getNameNodesCount();
-    throw new UnsupportedOptionsException("Not Implemented Yet");
-
+    return namenode.getActiveNamenodesForClient().size();
   }
 
   /**
