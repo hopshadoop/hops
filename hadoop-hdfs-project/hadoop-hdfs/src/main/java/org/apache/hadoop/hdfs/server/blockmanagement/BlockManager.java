@@ -2226,7 +2226,9 @@ public class BlockManager {
         metrics.addBlockReport((int) (endTime - startTime));
       }
       blockLog.info("BLOCK* processReport success: from " + nodeID + " storage: " + storage + ", blocks: " + newReport.
-          getNumberOfBlocks() + ", processing time: " + (endTime - startTime) + " ms. " + reportStatistics);
+          getNumberOfBlocks()
+          + ", hasStaleStorages: " + node.hasStaleStorages()
+          + ", processing time: " + (endTime - startTime) + " ms. " + reportStatistics);
       return !node.hasStaleStorages();
     } catch (Throwable t) {
       final long endTime = Time.now();
