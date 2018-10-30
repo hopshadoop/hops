@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import io.hops.security.HopsUtil;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -29,7 +28,6 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
-import org.apache.hadoop.util.ExponentialBackOff;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -57,33 +55,21 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppCertificateGeneratedEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppSecurityMaterialGeneratedEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -91,7 +77,6 @@ import java.io.Writer;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
-import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.Security;
 import java.security.cert.Certificate;
@@ -100,7 +85,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -109,11 +93,18 @@ import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class TestRMAppCertificateManager {
-  private static final Log LOG = LogFactory.getLog(TestRMAppCertificateManager.class);
+import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+
+public class TestX509SecurityHandler {
+  private static final Log LOG = LogFactory.getLog(TestX509SecurityHandler.class);
   private static final String BASE_DIR = Paths.get(System.getProperty("test.build.dir",
       Paths.get("target", "test-dir").toString()),
-      TestRMAppCertificateManager.class.getSimpleName()).toString();
+      TestX509SecurityHandler.class.getSimpleName()).toString();
   private static final File BASE_DIR_FILE = new File(BASE_DIR);
   private static String classPath;
   
@@ -126,7 +117,7 @@ public class TestRMAppCertificateManager {
   public static void beforeClass() throws Exception {
     Security.addProvider(new BouncyCastleProvider());
     BASE_DIR_FILE.mkdirs();
-    classPath = KeyStoreTestUtil.getClasspathDir(TestRMAppCertificateManager.class);
+    classPath = KeyStoreTestUtil.getClasspathDir(TestX509SecurityHandler.class);
   }
   
   @Before
@@ -134,7 +125,7 @@ public class TestRMAppCertificateManager {
     conf = new Configuration();
     conf.set(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY, "https://bbc3.sics.se:33478");
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "5s");
-    RMAppCertificateActionsFactory.getInstance().clear();
+    RMAppSecurityActionsFactory.getInstance().clear();
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
@@ -144,11 +135,11 @@ public class TestRMAppCertificateManager {
     dispatcher.init(conf);
     dispatcher.start();
   
-    String sslConfFileName = TestRMAppCertificateManager.class.getSimpleName() + ".ssl-server.xml";
+    String sslConfFileName = TestX509SecurityHandler.class.getSimpleName() + ".ssl-server.xml";
     sslServerFile = Paths.get(classPath, sslConfFileName).toFile();
     Configuration sslServer = new Configuration(false);
-    sslServer.set(HopsworksRMAppCertificateActions.HOPSWORKS_USER_KEY, "agent-user");
-    sslServer.set(HopsworksRMAppCertificateActions.HOPSWORKS_PASSWORD_KEY, "agent-password");
+    sslServer.set(HopsworksRMAppSecurityActions.HOPSWORKS_USER_KEY, "agent-user");
+    sslServer.set(HopsworksRMAppSecurityActions.HOPSWORKS_PASSWORD_KEY, "agent-password");
     KeyStoreTestUtil.saveConfig(sslServerFile, sslServer);
     conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFileName);
   }
@@ -169,27 +160,26 @@ public class TestRMAppCertificateManager {
       FileUtils.deleteDirectory(BASE_DIR_FILE);
     }
     
-    RMAppCertificateActionsFactory.getInstance().clear();
+    RMAppSecurityActionsFactory.getInstance().clear();
   }
   
   @Test
   public void testSuccessfulCertificateCreationTesting() throws Exception {
     File testSpecificSSLServerFile = null;
     try {
-      conf.set(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
-          "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions");
+      conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+          "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
   
-      RMAppCertificateActions testActor = RMAppCertificateActionsFactory.getInstance().getActor(conf);
+      RMAppSecurityActions testActor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
       String trustStore = Paths.get(BASE_DIR, "trustStore.jks").toString();
-      X509Certificate caCert = ((TestingRMAppCertificateActions) testActor).getCaCert();
+      X509Certificate caCert = ((TestingRMAppSecurityActions) testActor).getCaCert();
       String principal = caCert.getIssuerX500Principal().getName();
       // Principal should be CN=RootCA
       String alias = principal.split("=")[1];
       String password = "password";
   
-      String sslServer = TestRMAppCertificateManager.class.getSimpleName() + "-testSuccessfulCertificateCreationTesting.ssl-server.xml";
-      testSpecificSSLServerFile = Paths.get(classPath, sslServer)
-          .toFile();
+      String sslServer = TestX509SecurityHandler.class.getSimpleName() + "-testSuccessfulCertificateCreationTesting.ssl-server.xml";
+      testSpecificSSLServerFile = Paths.get(classPath, sslServer).toFile();
   
       conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslServer);
   
@@ -197,20 +187,28 @@ public class TestRMAppCertificateManager {
       Configuration sslServerConf = createSSLConfig("", "", "", trustStore, password, "");
       saveConfig(testSpecificSSLServerFile.getAbsoluteFile(), sslServerConf);
   
-      MockRMAppEventHandler eventHandler = new MockRMAppEventHandler(RMAppEventType.CERTS_GENERATED);
+      MockRMAppEventHandler eventHandler = new MockRMAppEventHandler(RMAppEventType.SECURITY_MATERIAL_GENERATED);
       rmContext.getDispatcher().register(RMAppEventType.class, eventHandler);
-  
-      MockRMAppCertificateManager manager = new MockRMAppCertificateManager(true, rmContext);
-      manager.init(conf);
-      manager.start();
-      manager.handle(new RMAppCertificateManagerEvent(
-          ApplicationId.newInstance(System.currentTimeMillis(), 1),
-          "userA", 1,
-          RMAppCertificateManagerEventType.GENERATE_CERTIFICATE));
+      
+      RMAppSecurityManager rmAppSecurityManager = new RMAppSecurityManager(rmContext);
+      X509SecurityHandler x509SecurityHandler = new MockX509SecurityHandler(rmContext, rmAppSecurityManager, true);
+      rmAppSecurityManager.registerRMAppSecurityHandler(x509SecurityHandler);
+      rmAppSecurityManager.init(conf);
+      rmAppSecurityManager.start();
+      ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
+      X509SecurityHandler.X509MaterialParameter x509Param =
+          new X509SecurityHandler.X509MaterialParameter(
+              appId,"Dorothy", 1);
+      RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
+      securityMaterial.addMaterial(x509Param);
+      RMAppSecurityManagerEvent genSecurityMaterialEvent = new RMAppSecurityManagerEvent(appId,
+          securityMaterial, RMAppSecurityManagerEventType.GENERATE_SECURITY_MATERIAL);
+      
+      rmAppSecurityManager.handle(genSecurityMaterialEvent);
   
       dispatcher.await();
       eventHandler.verifyEvent();
-      manager.stop();
+      rmAppSecurityManager.stop();
     } finally {
       if (testSpecificSSLServerFile != null) {
         testSpecificSSLServerFile.delete();
@@ -220,18 +218,24 @@ public class TestRMAppCertificateManager {
   
   @Test
   public void testCertificateRenewal() throws Exception {
-    conf.set(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
-        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions");
-    MockRMAppCertificateManager certificateManager = new MockRMAppCertificateManager(false, rmContext);
-    certificateManager.init(conf);
-    certificateManager.start();
+    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
+    RMAppSecurityManager rmAppSecurityManager = new RMAppSecurityManager(rmContext);
+    MockX509SecurityHandler x509SecurityHandler = new MockX509SecurityHandler(rmContext, rmAppSecurityManager, false);
+    rmAppSecurityManager.registerRMAppSecurityHandler(x509SecurityHandler);
+    rmAppSecurityManager.init(conf);
+    rmAppSecurityManager.start();
+    
     Instant now = Instant.now();
     Instant expiration = now.plus(10, ChronoUnit.SECONDS);
     ApplicationId appId = ApplicationId.newInstance(now.toEpochMilli(), 1);
-    certificateManager.setOldCertificateExpiration(expiration.toEpochMilli());
-    
-    certificateManager.registerWithCertificateRenewer(appId, "Dolores", 1, expiration.toEpochMilli());
-    Map<ApplicationId, ScheduledFuture> tasks = certificateManager.getRenewalTasks();
+    x509SecurityHandler.setOldCertificateExpiration(expiration.toEpochMilli());
+  
+    X509SecurityHandler.X509MaterialParameter x509Param =
+        new X509SecurityHandler.X509MaterialParameter(appId, "Dolores", 1);
+    x509Param.setExpiration(expiration.toEpochMilli());
+    x509SecurityHandler.registerRenewer(x509Param);
+    Map<ApplicationId, ScheduledFuture> tasks = x509SecurityHandler.getRenewalTasks();
     ScheduledFuture renewalTask = tasks.get(appId);
     assertFalse(renewalTask.isCancelled());
     assertFalse(renewalTask.isDone());
@@ -239,89 +243,103 @@ public class TestRMAppCertificateManager {
     // Wait until the scheduled task is executed
     TimeUnit.SECONDS.sleep(10);
     assertTrue(renewalTask.isDone());
-    assertFalse(certificateManager.getRenewalException());
+    assertFalse(x509SecurityHandler.getRenewalException());
     assertTrue(tasks.isEmpty());
-    certificateManager.stop();
+    rmAppSecurityManager.stop();
   }
   
   @Test(timeout = 12000)
   public void testFailedCertificateRenewal() throws Exception {
-    conf.set(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
-        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions");
-    MockFailingRMAppCertificateManager certificateManager = new MockFailingRMAppCertificateManager(Integer.MAX_VALUE);
-    certificateManager.init(conf);
-    certificateManager.start();
+    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
+    RMAppSecurityManager securityManager = new RMAppSecurityManager(rmContext);
+    MockX509SecurityHandler.MockFailingX509SecurityHandler x509Handler =
+        new MockX509SecurityHandler.MockFailingX509SecurityHandler(rmContext, securityManager, Integer.MAX_VALUE);
+    securityManager.registerRMAppSecurityHandlerWithType(x509Handler, X509SecurityHandler.class);
+    securityManager.init(conf);
+    securityManager.start();
   
     Instant now = Instant.now();
     Instant expiration = now.plus(10, ChronoUnit.SECONDS);
     ApplicationId appId = ApplicationId.newInstance(now.toEpochMilli(), 1);
-    certificateManager.registerWithCertificateRenewer(appId, "Dolores", 1, expiration.toEpochMilli());
-    Map<ApplicationId, ScheduledFuture> tasks = certificateManager.getRenewalTasks();
+    X509SecurityHandler.X509MaterialParameter x509Param =
+        new X509SecurityHandler.X509MaterialParameter(appId, "Dolores", 1);
+    x509Param.setExpiration(expiration.toEpochMilli());
+    x509Handler.registerRenewer(x509Param);
+    
+    
+    Map<ApplicationId, ScheduledFuture> tasks = x509Handler.getRenewalTasks();
     // There should be a scheduled task
     ScheduledFuture task = tasks.get(appId);
     assertFalse(task.isCancelled());
     assertFalse(task.isDone());
-    assertFalse(certificateManager.hasRenewalFailed());
-    assertEquals(0, certificateManager.getNumberOfRenewalFailures());
+    assertFalse(x509Handler.hasRenewalFailed());
+    assertEquals(0, x509Handler.getNumberOfRenewalFailures());
     
     TimeUnit.SECONDS.sleep(10);
     assertTrue(tasks.isEmpty());
-    assertEquals(4, certificateManager.getNumberOfRenewalFailures());
-    assertTrue(certificateManager.hasRenewalFailed());
-    certificateManager.stop();
+    assertEquals(4, x509Handler.getNumberOfRenewalFailures());
+    assertTrue(x509Handler.hasRenewalFailed());
+    securityManager.stop();
   }
   
   @Test(timeout = 12000)
   public void testRetryCertificateRenewal() throws Exception {
-    conf.set(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
-        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions");
-    MockFailingRMAppCertificateManager certificateManager = new MockFailingRMAppCertificateManager(2);
-    certificateManager.init(conf);
-    certificateManager.start();
-  
+    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
+    RMAppSecurityManager securityManager = new RMAppSecurityManager(rmContext);
+    MockX509SecurityHandler.MockFailingX509SecurityHandler x509Handler =
+        new MockX509SecurityHandler.MockFailingX509SecurityHandler(rmContext, securityManager, 2);
+    securityManager.registerRMAppSecurityHandlerWithType(x509Handler, X509SecurityHandler.class);
+    securityManager.init(conf);
+    securityManager.start();
+    
     Instant now = Instant.now();
     Instant expiration = now.plus(10, ChronoUnit.SECONDS);
     ApplicationId appId = ApplicationId.newInstance(now.toEpochMilli(), 1);
-    certificateManager.registerWithCertificateRenewer(appId, "Dolores", 1, expiration.toEpochMilli());
+    X509SecurityHandler.X509MaterialParameter x509Param =
+        new X509SecurityHandler.X509MaterialParameter(appId, "Dolores", 1);
+    x509Param.setExpiration(expiration.toEpochMilli());
+    x509Handler.registerRenewer(x509Param);
     TimeUnit.SECONDS.sleep(10);
-    assertEquals(2, certificateManager.getNumberOfRenewalFailures());
-    assertFalse(certificateManager.hasRenewalFailed());
-    assertTrue(certificateManager.getRenewalTasks().isEmpty());
-    certificateManager.stop();
+    assertEquals(2, x509Handler.getNumberOfRenewalFailures());
+    assertFalse(x509Handler.hasRenewalFailed());
+    assertTrue(x509Handler.getRenewalTasks().isEmpty());
+    securityManager.stop();
   }
   
-  // This test makes a REST call to Hopsworks using HopsworksRMAppCertificateActions actor class
+  // This test makes a REST call to Hopsworks using HopsworksRMAppSecurityActions actor class
   // Normally it should be ignored as it requires Hopsworks instance to be running
-  @Test
+  /*@Test
   @Ignore
   public void testSuccessfulCertificateCreationRemote() throws Exception {
-    DevHopsworksRMAppCertificateActions mockRemoteActions = Mockito.spy(new DevHopsworksRMAppCertificateActions());
+    DevHopsworksRMAppSecurityActions mockRemoteActions = Mockito.spy(new DevHopsworksRMAppSecurityActions());
     mockRemoteActions.setConf(conf);
     mockRemoteActions.init();
-    RMAppCertificateActionsFactory.getInstance().register(mockRemoteActions);
+    RMAppSecurityActionsFactory.getInstance().register(mockRemoteActions);
     MockRMAppCertificateManager manager = new MockRMAppCertificateManager(false, rmContext);
     manager.init(conf);
     manager.start();
-    manager.handle(new RMAppCertificateManagerEvent(
+    manager.handle(new RMAppSecurityManagerEvent(
         ApplicationId.newInstance(System.currentTimeMillis(), 1),
         "userA", 1,
-        RMAppCertificateManagerEventType.GENERATE_CERTIFICATE));
+        RMAppSecurityManagerEventType.GENERATE_SECURITY_MATERIAL));
     
     dispatcher.await();
     manager.stop();
   }
   
-  // This test makes a REST call to Hopsworks using HopsworksRMAppCertificateActions actor class
+  // This test makes a REST call to Hopsworks using HopsworksRMAppSecurityActions actor class
   // Normally it should be ignored as it requires Hopsworks instance to be running
   @Test
   @Ignore
   public void testCertificateRevocationRemote() throws Exception {
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
     
-    DevHopsworksRMAppCertificateActions mockRemoteActions = Mockito.spy(new DevHopsworksRMAppCertificateActions());
+    DevHopsworksRMAppSecurityActions mockRemoteActions = Mockito.spy(new DevHopsworksRMAppSecurityActions());
     mockRemoteActions.setConf(conf);
     mockRemoteActions.init();
-    RMAppCertificateActionsFactory.getInstance().register(mockRemoteActions);
+    RMAppSecurityActionsFactory.getInstance().register(mockRemoteActions);
     
     MockRMAppCertificateManager manager = Mockito.spy(new MockRMAppCertificateManager(false, rmContext));
     manager.init(conf);
@@ -329,14 +347,14 @@ public class TestRMAppCertificateManager {
     String username = "Alice";
     Integer cryptoMaterialVersion = 1;
     ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
-    manager.handle(new RMAppCertificateManagerEvent(
-        appId, username, cryptoMaterialVersion, RMAppCertificateManagerEventType.GENERATE_CERTIFICATE));
+    manager.handle(new RMAppSecurityManagerEvent(
+        appId, username, cryptoMaterialVersion, RMAppSecurityManagerEventType.GENERATE_SECURITY_MATERIAL));
   
     dispatcher.await();
     Mockito.verify(mockRemoteActions).sign(Mockito.any(PKCS10CertificationRequest.class));
     
-    manager.handle(new RMAppCertificateManagerEvent(
-        appId, username, cryptoMaterialVersion, RMAppCertificateManagerEventType.REVOKE_CERTIFICATE));
+    manager.handle(new RMAppSecurityManagerEvent(
+        appId, username, cryptoMaterialVersion, RMAppSecurityManagerEventType.REVOKE_SECURITY_MATERIAL));
     
     dispatcher.await();
     
@@ -352,33 +370,40 @@ public class TestRMAppCertificateManager {
         .revoke(Mockito.eq(certificateIdentifier));
     
     manager.stop();
-  }
+  }*/
   
   @Test
   public void testFailingCertificateCreationLocal() throws Exception {
-    conf.set(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
-        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions");
+    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
     
     MockRMAppEventHandler eventHandler = new MockRMAppEventHandler(RMAppEventType.KILL);
     rmContext.getDispatcher().register(RMAppEventType.class, eventHandler);
+    RMAppSecurityManager securityManager = new RMAppSecurityManager(rmContext);
+    MockX509SecurityHandler.MockFailingX509SecurityHandler x509Handler =
+        new MockX509SecurityHandler.MockFailingX509SecurityHandler(rmContext, securityManager, Integer.MAX_VALUE);
+    securityManager.registerRMAppSecurityHandlerWithType(x509Handler, X509SecurityHandler.class);
+    securityManager.init(conf);
+    securityManager.start();
     
-    MockFailingRMAppCertificateManager manager = new MockFailingRMAppCertificateManager(Integer.MAX_VALUE);
-    manager.init(conf);
-    manager.start();
-    manager.handle(new RMAppCertificateManagerEvent(
-        ApplicationId.newInstance(System.currentTimeMillis(), 1),
-        "userA", 1,
-        RMAppCertificateManagerEventType.GENERATE_CERTIFICATE));
+    ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
+    X509SecurityHandler.X509MaterialParameter x509Param =
+        new X509SecurityHandler.X509MaterialParameter(appId, "Dolores", 1);
+    RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
+    securityMaterial.addMaterial(x509Param);
+    securityManager.handle(new RMAppSecurityManagerEvent(appId, securityMaterial,
+        RMAppSecurityManagerEventType.GENERATE_SECURITY_MATERIAL));
+    
     dispatcher.await();
     eventHandler.verifyEvent();
-    manager.stop();
+    securityManager.stop();
   }
   
   @Test(timeout = 20000)
   public void testCertificateRevocationMonitor() throws Exception {
-    RMAppCertificateActions actor = Mockito.spy(new TestingRMAppCertificateActions());
+    RMAppSecurityActions actor = Mockito.spy(new TestingRMAppSecurityActions());
     actor.init();
-    RMAppCertificateActionsFactory.getInstance().register(actor);
+    RMAppSecurityActionsFactory.getInstance().register(actor);
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "40s");
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL, "3s");
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
@@ -407,21 +432,21 @@ public class TestRMAppCertificateManager {
     TimeUnit.SECONDS.sleep(6);
     assertFalse(application.isAppRotatingCryptoMaterial());
     assertEquals(-1L, application.getMaterialRotationStartTime());
-    String certId = RMAppCertificateManager.getCertificateIdentifier(application.getApplicationId(),
+    String certId = X509SecurityHandler.getCertificateIdentifier(application.getApplicationId(),
         application.getUser(), application.getCryptoMaterialVersion() - 1);
     Mockito.verify(actor).revoke(Mockito.eq(certId));
     
-    // Since NM didn't respond acknowledging the crypto update, revokeCertificate on RMAppCertificateManager
+    // Since NM didn't respond acknowledging the crypto update, revokeSecurityMaterial on RMAppSecurityManager
     // should not have been called. The revocation has been handled by the the revocation monitor
-    Mockito.verify(rm.getRMContext().getRMAppCertificateManager(), Mockito.never())
-        .revokeCertificate(Mockito.any(ApplicationId.class), Mockito.anyString(), Mockito.anyInt(), Mockito.anyBoolean());
+    Mockito.verify(rm.getRMContext().getRMAppSecurityManager(), Mockito.never())
+        .revokeSecurityMaterial(Mockito.any(RMAppSecurityManagerEvent.class));
     rm.stop();
   }
   
   @Test
   public void testApplicationSubmission() throws Exception {
-    conf.set(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
-        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions");
+    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.set(YarnConfiguration.RM_STORE, DBRMStateStore.class.getName());
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "45s");
@@ -456,7 +481,7 @@ public class TestRMAppCertificateManager {
     
     // NOTE: The part below is very sensitive to timing issues
     
-    // Expiration time for testing TestingRMAppCertificateActions is now + 50 seconds
+    // Expiration time for testing TestingRMAppSecurityActions is now + 50 seconds
     TimeUnit.SECONDS.sleep(5);
     // Certificate renewal should have happened by now
     byte[] newKeyStore = application.getKeyStore();
@@ -503,13 +528,18 @@ public class TestRMAppCertificateManager {
     assertFalse(appState.isDuringMaterialRotation());
     assertEquals(-1L, appState.getMaterialRotationStartTime());
     // Application should still be registered with the certificate renewer
-    assertTrue(rm.getRMContext().getRMAppCertificateManager().getRenewalTasks().containsKey(application.getApplicationId()));
+    X509SecurityHandler x509SecurityHandler = (X509SecurityHandler) rm.getRMContext().getRMAppSecurityManager()
+        .getSecurityHandler(X509SecurityHandler.class);
+    assertTrue(x509SecurityHandler.getRenewalTasks().containsKey(application.getApplicationId()));
     
     TimeUnit.MILLISECONDS.sleep(100);
+  
+    X509SecurityHandler.X509MaterialParameter x509Param =
+        new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
+            application.getCryptoMaterialVersion() - 1, true);
     
-    Mockito.verify(rm.getRMContext().getRMAppCertificateManager())
-        .revokeCertificate(Mockito.eq(application.getApplicationId()), Mockito.eq(application.getUser()),
-            Mockito.eq(application.getCryptoMaterialVersion() - 1), Mockito.eq(true));
+    Mockito.verify(x509SecurityHandler).revokeMaterial(Mockito.eq(x509Param), Mockito.eq(false));
+    
     rm.stop();
     
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "2d");
@@ -524,19 +554,20 @@ public class TestRMAppCertificateManager {
     // RMApp should not recover in material rotation phase
     assertFalse(appState.isDuringMaterialRotation());
     assertEquals(-1L, appState.getMaterialRotationStartTime());
-    assertTrue(rm2.getRMContext().getRMAppCertificateManager().getRenewalTasks()
-        .containsKey(application.getApplicationId()));
+    x509SecurityHandler = (X509SecurityHandler) rm2.getRMContext().getRMAppSecurityManager()
+        .getSecurityHandler(X509SecurityHandler.class);
+    assertTrue(x509SecurityHandler.getRenewalTasks().containsKey(application.getApplicationId()));
     
     rm2.killApp(application.getApplicationId());
     rm2.waitForState(application.getApplicationId(), RMAppState.KILLED);
-    assertTrue(rm2.getRMContext().getRMAppCertificateManager().getRenewalTasks().isEmpty());
+    assertTrue(x509SecurityHandler.getRenewalTasks().isEmpty());
     rm2.stop();
   }
   
   @Test
   public void testContainerAllocationDuringMaterialRotation() throws Exception {
-    conf.set(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
-        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions");
+    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.set(YarnConfiguration.RM_STORE, DBRMStateStore.class.getName());
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "40s");
@@ -643,8 +674,8 @@ public class TestRMAppCertificateManager {
         assertionFailure = true;
       } else if (!expectedEventType.equals(event.getType())) {
         assertionFailure = true;
-      } else if (event.getType().equals(RMAppEventType.CERTS_GENERATED)) {
-        if (!(event instanceof RMAppCertificateGeneratedEvent)) {
+      } else if (event.getType().equals(RMAppEventType.SECURITY_MATERIAL_GENERATED)) {
+        if (!(event instanceof RMAppSecurityMaterialGeneratedEvent)) {
           assertionFailure = true;
         }
       }
@@ -711,295 +742,20 @@ public class TestRMAppCertificateManager {
     }
   
     @Override
-    protected RMAppCertificateManager createRMAppCertificateManager() throws Exception {
-      MockRMAppCertificateManager spyCertManager = Mockito.spy(new MockRMAppCertificateManager(false, rmContext));
-      return spyCertManager;
+    protected RMAppSecurityManager createRMAppSecurityManager() throws Exception {
+      RMAppSecurityManager rmAppSecurityManager = Mockito.spy(new RMAppSecurityManager(rmContext));
+      rmAppSecurityManager.registerRMAppSecurityHandlerWithType(createX509SecurityHandler(rmAppSecurityManager),
+          X509SecurityHandler.class);
+      return rmAppSecurityManager;
+    }
+  
+    @Override
+    protected RMAppSecurityHandler createX509SecurityHandler(RMAppSecurityManager rmAppSecurityManager) {
+      RMAppSecurityHandler<X509SecurityHandler.X509SecurityManagerMaterial, X509SecurityHandler.X509MaterialParameter>
+          x509SecurityHandler = Mockito.spy(new MockX509SecurityHandler(rmContext, rmAppSecurityManager, false));
+      return x509SecurityHandler;
     }
   }
-  
-  private class MockRMAppCertificateManager extends RMAppCertificateManager {
-    private final boolean loadTrustStore;
-    private final String systemTMP;
-    private long oldCertificateExpiration;
-  
-    public MockRMAppCertificateManager(boolean loadTrustStore, RMContext rmContext) throws Exception {
-      super(rmContext);
-      this.loadTrustStore = loadTrustStore;
-      systemTMP = System.getProperty("java.io.tmpdir");
-    }
-  
-    @Override
-    public KeyStore loadSystemTrustStore(Configuration conf) throws GeneralSecurityException, IOException {
-      if (loadTrustStore) {
-        return super.loadSystemTrustStore(conf);
-      }
-      KeyStore emptyTrustStore = KeyStore.getInstance("JKS");
-      emptyTrustStore.load(null, null);
-      return emptyTrustStore;
-    }
-  
-    @Override
-    public void generateCertificate(ApplicationId applicationId, String appUser, Integer cryptoMaterialVersion) {
-      boolean exceptionThrown = false;
-      ByteArrayInputStream bio = null;
-      try {
-        KeyPair keyPair = generateKeyPair();
-        // Generate CSR
-        PKCS10CertificationRequest csr = generateCSR(applicationId, appUser, keyPair, cryptoMaterialVersion);
-        
-        assertEquals(appUser, HopsUtil.extractCNFromSubject(csr.getSubject().toString()));
-        assertEquals(applicationId.toString(), HopsUtil.extractOFromSubject(csr.getSubject().toString()));
-        assertEquals(String.valueOf(cryptoMaterialVersion), HopsUtil.extractOUFromSubject(csr.getSubject().toString()));
-        
-        // Sign CSR
-        CertificateBundle certificateBundle = sendCSRAndGetSigned(csr);
-        certificateBundle.getCertificate().checkValidity();
-        long expiration = certificateBundle.getCertificate().getNotAfter().getTime();
-        long epochNow = Instant.now().toEpochMilli();
-        assertTrue(expiration >= epochNow);
-        assertNotNull(certificateBundle.getIssuer());
-        
-        RMAppCertificateActions actor = getRmAppCertificateActions();
-        
-        if (actor instanceof TestingRMAppCertificateActions) {
-          X509Certificate caCert = ((TestingRMAppCertificateActions) actor).getCaCert();
-          certificateBundle.getCertificate().verify(caCert.getPublicKey(), "BC");
-        }
-        certificateBundle.getCertificate().verify(certificateBundle.getIssuer().getPublicKey(), "BC");
-        
-        KeyStoresWrapper appKeystoreWrapper = createApplicationStores(certificateBundle, keyPair.getPrivate(),
-            appUser, applicationId);
-        X509Certificate extractedCert = (X509Certificate) appKeystoreWrapper.getKeystore().getCertificate(appUser);
-        byte[] rawKeystore = appKeystoreWrapper.getRawKeyStore(TYPE.KEYSTORE);
-        assertNotNull(rawKeystore);
-        assertNotEquals(0, rawKeystore.length);
-        
-        File keystoreFile = Paths.get(systemTMP, appUser + "-" + applicationId.toString() + "_kstore.jks").toFile();
-        // Keystore should have been deleted
-        assertFalse(keystoreFile.exists());
-        char[] keyStorePassword = appKeystoreWrapper.getKeyStorePassword();
-        assertNotNull(keyStorePassword);
-        assertNotEquals(0, keyStorePassword.length);
-        
-        byte[] rawTrustStore = appKeystoreWrapper.getRawKeyStore(TYPE.TRUSTSTORE);
-        File trustStoreFile = Paths.get(systemTMP, appUser + "-" + applicationId.toString() + "_tstore.jks").toFile();
-        // Truststore should have been deleted
-        assertFalse(trustStoreFile.exists());
-        char[] trustStorePassword = appKeystoreWrapper.getTrustStorePassword();
-        assertNotNull(trustStorePassword);
-        assertNotEquals(0, trustStorePassword.length);
-        
-        verifyContentOfAppTrustStore(rawTrustStore, trustStorePassword, appUser, applicationId);
-        
-        if (actor instanceof TestingRMAppCertificateActions) {
-          X509Certificate caCert = ((TestingRMAppCertificateActions) actor).getCaCert();
-          extractedCert.verify(caCert.getPublicKey(), "BC");
-        }
-        assertEquals(appUser, HopsUtil.extractCNFromSubject(extractedCert.getSubjectX500Principal().getName()));
-        assertEquals(applicationId.toString(), HopsUtil.extractOFromSubject(
-            extractedCert.getSubjectX500Principal().getName()));
-        assertEquals(String.valueOf(cryptoMaterialVersion),
-            HopsUtil.extractOUFromSubject(extractedCert.getSubjectX500Principal().getName()));
-  
-        RMAppCertificateGeneratedEvent startEvent = new RMAppCertificateGeneratedEvent(applicationId,
-            rawKeystore, keyStorePassword, rawTrustStore, trustStorePassword, expiration, RMAppEventType.CERTS_GENERATED);
-        getRmContext().getDispatcher().getEventHandler().handle(startEvent);
-      } catch (Exception ex) {
-        LOG.error(ex, ex);
-        exceptionThrown = true;
-      } finally {
-        if (bio != null) {
-          try {
-            bio.close();
-          } catch (IOException ex) {
-            // Ignore
-          }
-        }
-      }
-      assertFalse(exceptionThrown);
-    }
-    
-    @Override
-    public void revokeCertificate(ApplicationId appId, String applicationUser, Integer cryptoMaterialVersion) {
-      try {
-        deregisterFromCertificateRenewer(appId);
-        putToQueue(appId, applicationUser, cryptoMaterialVersion);
-        waitForQueueToDrain();
-      } catch (InterruptedException ex) {
-        LOG.error(ex, ex);
-        fail("Exception should not be thrown here");
-      }
-    }
-    
-    @Override
-    public boolean isRPCTLSEnabled() {
-      return true;
-    }
-    
-    private void verifyContentOfAppTrustStore(byte[] appTrustStore, char[] password, String appUser,
-        ApplicationId appId)
-        throws GeneralSecurityException, IOException {
-      File trustStoreFile = Paths.get(systemTMP, appUser + "-" + appId.toString() + "_tstore.jks").toFile();
-      boolean certificateMissing = false;
-      
-      try {
-        KeyStore systemTrustStore = loadSystemTrustStore(conf);
-        FileUtils.writeByteArrayToFile(trustStoreFile, appTrustStore, false);
-        KeyStore ts = KeyStore.getInstance("JKS");
-        try (FileInputStream fis = new FileInputStream(trustStoreFile)) {
-          ts.load(fis, password);
-        }
-  
-        Enumeration<String> sysAliases = systemTrustStore.aliases();
-        while (sysAliases.hasMoreElements()) {
-          String alias = sysAliases.nextElement();
-          
-          X509Certificate appCert = (X509Certificate) ts.getCertificate(alias);
-          if (appCert == null) {
-            certificateMissing = true;
-            break;
-          }
-          
-          X509Certificate sysCert = (X509Certificate) systemTrustStore.getCertificate(alias);
-          if (!Arrays.equals(sysCert.getSignature(), appCert.getSignature())) {
-            certificateMissing = true;
-            break;
-          }
-        }
-      } finally {
-        FileUtils.deleteQuietly(trustStoreFile);
-        assertFalse(certificateMissing);
-      }
-    }
-  
-    public void setOldCertificateExpiration(long oldCertificateExpiration) {
-      this.oldCertificateExpiration = oldCertificateExpiration;
-    }
-  
-    @Override
-    public Runnable createCertificateRenewerTask(ApplicationId appId, String appuser, Integer currentCryptoVersion) {
-      return new MockCertificateRenewer(appId, appuser, currentCryptoVersion, 1);
-    }
-  
-    private boolean renewalException = false;
-    
-    public boolean getRenewalException() {
-      return renewalException;
-    }
-    
-    public class MockCertificateRenewer extends CertificateRenewer {
-      private final long oldCertificateExpiration;
-      
-      public MockCertificateRenewer(ApplicationId appId, String appUser, Integer currentCryptoVersion, long oldCertificateExpiration) {
-        super(appId, appUser, currentCryptoVersion);
-        this.oldCertificateExpiration = oldCertificateExpiration;
-      }
-      
-      @Override
-      public void run() {
-        try {
-          LOG.info("Renewing certificate for application " + appId);
-          KeyPair keyPair = generateKeyPair();
-          int oldCryptoVersion = currentCryptoVersion;
-          PKCS10CertificationRequest csr = generateCSR(appId, appUser, keyPair, ++currentCryptoVersion);
-          int newCryptoVersion = Integer.parseInt(HopsUtil.extractOUFromSubject(csr.getSubject().toString()));
-          if (++oldCryptoVersion != newCryptoVersion) {
-            LOG.error("Crypto version of new certificate is wrong: " + newCryptoVersion);
-            renewalException = true;
-          }
-          CertificateBundle certificateBundle = sendCSRAndGetSigned(csr);
-          long newCertificateExpiration = certificateBundle.getCertificate().getNotAfter().getTime();
-          if (newCertificateExpiration <= oldCertificateExpiration) {
-            LOG.error("New certificate expiration time is older than old certificate");
-            renewalException = true;
-          }
-  
-          KeyStoresWrapper keyStoresWrapper = createApplicationStores(certificateBundle, keyPair.getPrivate(), appUser,
-              appId);
-          byte[] rawProtectedKeyStore = keyStoresWrapper.getRawKeyStore(TYPE.KEYSTORE);
-          byte[] rawTrustStore = keyStoresWrapper.getRawKeyStore(TYPE.TRUSTSTORE);
-  
-          getRenewalTasks().remove(appId);
-          
-          getRmContext().getDispatcher().getEventHandler().handle(new RMAppCertificateGeneratedEvent(appId,
-              rawProtectedKeyStore, keyStoresWrapper.getKeyStorePassword(), rawTrustStore, keyStoresWrapper
-              .getTrustStorePassword(), newCertificateExpiration, RMAppEventType.CERTS_RENEWED));
-          LOG.info("Renewed certificate for application " + appId);
-        } catch (Exception ex) {
-          LOG.error("Exception while renewing certificate. This should not have happened here", ex);
-          renewalException = true;
-        }
-      }
-    }
-  }
-  
-  private class MockFailingRMAppCertificateManager extends RMAppCertificateManager {
-    private int numberOfRenewalFailures = 0;
-    private boolean renewalFailed = false;
-    private final Integer succeedAfterRetries;
-    
-    public MockFailingRMAppCertificateManager(Integer succeedAfterRetries) {
-      super(rmContext);
-      this.succeedAfterRetries = succeedAfterRetries;
-    }
-  
-    public int getNumberOfRenewalFailures() {
-      return numberOfRenewalFailures;
-    }
-  
-    public boolean hasRenewalFailed() {
-      return renewalFailed;
-    }
-    
-    @Override
-    public boolean isRPCTLSEnabled() {
-      return true;
-    }
-    
-    @Override
-    public void generateCertificate(ApplicationId appId, String appUser, Integer cryptoMaterialVersion) {
-      getRmContext().getDispatcher().getEventHandler().handle(new RMAppEvent(appId, RMAppEventType.KILL));
-    }
-    
-    @Override
-    public Runnable createCertificateRenewerTask(ApplicationId appId, String appUser, Integer currentCryptoVersion) {
-      return new MockFailingCertificateRenewer(appId, appUser, currentCryptoVersion, succeedAfterRetries);
-    }
-    
-    public class MockFailingCertificateRenewer extends CertificateRenewer {
-  
-      private final Integer succeedAfterRetries;
-      public MockFailingCertificateRenewer(ApplicationId appId, String appUser, Integer currentCryptoVersion,
-          Integer succeedAfterRetries) {
-        super(appId, appUser, currentCryptoVersion);
-        this.succeedAfterRetries = succeedAfterRetries;
-      }
-      
-      @Override
-      public void run() {
-        try {
-          if (((ExponentialBackOff)backOff).getNumberOfRetries() < succeedAfterRetries) {
-            throw new Exception("Ooops something went wrong");
-          }
-          getRenewalTasks().remove(appId);
-          LOG.info("Renewed certificate for application " + appId);
-        } catch (Exception ex) {
-          getRenewalTasks().remove(appId);
-          backOffTime = backOff.getBackOffInMillis();
-          if (backOffTime != -1) {
-            numberOfRenewalFailures++;
-            LOG.warn("Failed to renew certificate for application " + appId + ". Retrying in " + backOffTime + " ms");
-            ScheduledFuture task = getScheduler().schedule(this, backOffTime, TimeUnit.MILLISECONDS);
-            getRenewalTasks().put(appId, task);
-          } else {
-            LOG.error("Failed to renew certificate for application " + appId + " Failed more than 4 times, giving up");
-            renewalFailed = true;
-          }
-        }
-      }
-    }
-  }
-  
   
   // These methods were taken from KeyStoreTestUtil
   // Cannot use KeyStoreTestUtil because of BouncyCastle version mismatch

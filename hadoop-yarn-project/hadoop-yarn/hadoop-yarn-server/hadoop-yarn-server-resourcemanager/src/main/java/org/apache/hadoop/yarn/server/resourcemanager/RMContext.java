@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -163,7 +163,7 @@ public interface RMContext {
   
   public String getUserFolderHashAlgo();
   
-  RMAppCertificateManager getRMAppCertificateManager();
+  RMAppSecurityManager getRMAppSecurityManager();
   
-  void setRMAppCertificateManager(RMAppCertificateManager rmAppCertificateManager);
+  void setRMAppSecurityManager(RMAppSecurityManager rmAppSecurityManager);
 }

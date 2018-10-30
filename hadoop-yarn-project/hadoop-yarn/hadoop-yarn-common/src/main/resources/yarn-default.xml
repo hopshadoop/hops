@@ -2852,8 +2852,8 @@
     <description>
       Fully-qualified name of the class used to perform X.509 certificate actions
     </description>
-    <name>hops.rm.certificate.actor.class</name>
-    <value>org.apache.hadoop.yarn.server.resourcemanager.security.HopsworksRMAppCertificateActions</value>
+    <name>hops.rm.security.actor.class</name>
+    <value>org.apache.hadoop.yarn.server.resourcemanager.security.HopsworksRMAppSecurityActions</value>
   </property>
 
   <property>

@@ -176,7 +176,7 @@ public class Application {
         new RMAppEvent(this.applicationId, RMAppEventType.APP_NEW_SAVED);
     resourceManager.getRMContext().getRMApps().get(applicationId).handle(event);
     event =
-        new RMAppEvent(this.applicationId, RMAppEventType.CERTS_GENERATED);
+        new RMAppEvent(this.applicationId, RMAppEventType.SECURITY_MATERIAL_GENERATED);
     resourceManager.getRMContext().getRMApps().get(applicationId).handle(event);
     event =
         new RMAppEvent(this.applicationId, RMAppEventType.APP_ACCEPTED);

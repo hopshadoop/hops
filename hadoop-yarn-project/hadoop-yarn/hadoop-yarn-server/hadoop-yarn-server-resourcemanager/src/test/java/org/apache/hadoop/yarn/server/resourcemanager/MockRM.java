@@ -95,10 +95,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateActionsFactory;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityActionsFactory;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
-import org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions;
+import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 import org.apache.log4j.Level;
@@ -168,11 +169,21 @@ public class MockRM extends ResourceManager {
   }
   
   @Override
-  protected RMAppCertificateManager createRMAppCertificateManager() throws Exception {
-    getConfig().set(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
-        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppCertificateActions");
-    RMAppCertificateActionsFactory.getInstance().clear();
-    return new TestingRMAppCertificateManager();
+  protected RMAppSecurityManager createRMAppSecurityManager() throws Exception {
+    getConfig().set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
+    RMAppSecurityActionsFactory.getInstance().clear();
+    RMAppSecurityManager rmAppSecurityManager = new RMAppSecurityManager(this.rmContext);
+    rmAppSecurityManager.registerRMAppSecurityHandlerWithType(createX509SecurityHandler(rmAppSecurityManager),
+        X509SecurityHandler.class);
+    return rmAppSecurityManager;
+  }
+  
+  @Override
+  protected RMAppSecurityHandler createX509SecurityHandler(RMAppSecurityManager rmAppSecurityManager) {
+    RMAppSecurityHandler<X509SecurityHandler.X509SecurityManagerMaterial, X509SecurityHandler.X509MaterialParameter>
+        x509SecurityHandler = new TestingX509SecurityHandler(rmAppSecurityManager);
+    return x509SecurityHandler;
   }
   
   @Override
@@ -1042,10 +1053,9 @@ public class MockRM extends ResourceManager {
     LOG.info("app is removed from scheduler, " + appId);
   }
   
-  private class TestingRMAppCertificateManager extends RMAppCertificateManager {
-    
-    private TestingRMAppCertificateManager() {
-      super(rmContext);
+  private class TestingX509SecurityHandler extends X509SecurityHandler {
+    private TestingX509SecurityHandler(RMAppSecurityManager rmAppSecurityManager) {
+      super(rmContext, rmAppSecurityManager);
     }
   
     @Override

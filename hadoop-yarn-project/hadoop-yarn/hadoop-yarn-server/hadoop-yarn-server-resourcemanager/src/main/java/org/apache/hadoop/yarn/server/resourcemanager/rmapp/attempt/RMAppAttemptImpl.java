@@ -102,8 +102,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityMaterial;
+import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.apache.hadoop.yarn.server.webproxy.ProxyUriUtils;
 import org.apache.hadoop.yarn.state.InvalidStateTransitionException;
 import org.apache.hadoop.yarn.state.MultipleArcTransition;
@@ -1325,7 +1327,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
     rmStore.updateApplicationAttemptState(attemptState);
   }
 
-  private static final EnumSet<RMAppAttemptState> STATES_THAT_SHOULD_REVOKE_CERTS = EnumSet.of(
+  private static final EnumSet<RMAppAttemptState> STATES_THAT_SHOULD_REVOKE_SECURITY_MATERIAL = EnumSet.of(
       RMAppAttemptState.NEW,
       RMAppAttemptState.SUBMITTED,
       RMAppAttemptState.SCHEDULED,
@@ -1345,8 +1347,8 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
 
     @Override
     public void transition(RMAppAttemptImpl appAttempt, RMAppAttemptEvent event) {
-      if (STATES_THAT_SHOULD_REVOKE_CERTS.contains(appAttempt.getState())) {
-        appAttempt.sendCertificateRevocationEvent();
+      if (STATES_THAT_SHOULD_REVOKE_SECURITY_MATERIAL.contains(appAttempt.getState())) {
+        appAttempt.sendSecurityMaterialRevocationEvent();
       }
       // For cases Killed/Failed, targetedFinalState is the same as the state to
       // be stored
@@ -1713,18 +1715,22 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
             AMLauncherEventType.CLEANUP, appAttempt));
       } else {
         // Tell RMAppCertificateManager to revoke the certificate and remove it from local cache
-        appAttempt.sendCertificateRevocationEvent();
+        appAttempt.sendSecurityMaterialRevocationEvent();
       }
     }
   }
 
-  private void sendCertificateRevocationEvent() {
+  private void sendSecurityMaterialRevocationEvent() {
     ApplicationId applicationId = applicationAttemptId.getApplicationId();
     RMApp application = rmContext.getRMApps().get(applicationId);
     String user = application.getUser();
     Integer cryptoMaterialVersion = application.getCryptoMaterialVersion();
-    eventHandler.handle(new RMAppCertificateManagerEvent(
-        applicationId, user, cryptoMaterialVersion, RMAppCertificateManagerEventType.REVOKE_CERTIFICATE));
+    X509SecurityHandler.X509MaterialParameter x509Param =
+        new X509SecurityHandler.X509MaterialParameter(applicationId, user, cryptoMaterialVersion);
+    RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
+    securityMaterial.addMaterial(x509Param);
+    eventHandler.handle(new RMAppSecurityManagerEvent(applicationId, securityMaterial,
+        RMAppSecurityManagerEventType.REVOKE_SECURITY_MATERIAL));
   }
   
   private static class ExpiredTransition extends FinalTransition {

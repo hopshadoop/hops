@@ -29,7 +29,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.mockito.Mockito;
 
 import java.net.InetSocketAddress;
@@ -57,9 +59,15 @@ public class MockRMWithCustomAMLauncher extends MockRM {
   
   
   @Override
-  protected RMAppCertificateManager createRMAppCertificateManager() throws Exception {
-    return mockRMAppCertificateManager ? Mockito.spy(new RMAppCertificateManager(rmContext)) :
-        super.createRMAppCertificateManager();
+  protected RMAppSecurityManager createRMAppSecurityManager() throws Exception {
+    if (mockRMAppCertificateManager) {
+      RMAppSecurityManager rmAppSecurityManager = Mockito.spy(new RMAppSecurityManager(rmContext));
+      RMAppSecurityHandler<X509SecurityHandler.X509SecurityManagerMaterial, X509SecurityHandler.X509MaterialParameter>
+          x509SecurityHandler = Mockito.spy(new X509SecurityHandler(rmContext, rmAppSecurityManager));
+      rmAppSecurityManager.registerRMAppSecurityHandlerWithType(x509SecurityHandler, X509SecurityHandler.class);
+      return rmAppSecurityManager;
+    }
+    return super.createRMAppSecurityManager();
   }
   
   @Override

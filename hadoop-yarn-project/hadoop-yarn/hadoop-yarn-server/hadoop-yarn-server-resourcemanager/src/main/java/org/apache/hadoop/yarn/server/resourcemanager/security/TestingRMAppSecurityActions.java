@@ -49,8 +49,8 @@ import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 
-public class TestingRMAppCertificateActions implements RMAppCertificateActions, Configurable {
-  private final static Logger LOG = LogManager.getLogger(TestingRMAppCertificateActions.class);
+public class TestingRMAppSecurityActions implements RMAppSecurityActions, Configurable {
+  private final static Logger LOG = LogManager.getLogger(TestingRMAppSecurityActions.class);
   
   private final static String KEY_ALGORITHM = "RSA";
   private final static String SIGNATURE_ALGORITHM = "SHA256withRSA";
@@ -61,7 +61,7 @@ public class TestingRMAppCertificateActions implements RMAppCertificateActions, 
   private ContentSigner sigGen;
   private Configuration conf;
   
-  public TestingRMAppCertificateActions() {
+  public TestingRMAppSecurityActions() {
   }
   
   public X509Certificate getCaCert() {
@@ -105,7 +105,7 @@ public class TestingRMAppCertificateActions implements RMAppCertificateActions, 
   }
   
   @Override
-  public RMAppCertificateManager.CertificateBundle sign(PKCS10CertificationRequest csr)
+  public X509SecurityHandler.CertificateBundle sign(PKCS10CertificationRequest csr)
       throws URISyntaxException, IOException, GeneralSecurityException {
     JcaPKCS10CertificationRequest jcaRequest = new JcaPKCS10CertificationRequest(csr);
     X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(caCert,
@@ -123,7 +123,7 @@ public class TestingRMAppCertificateActions implements RMAppCertificateActions, 
         .addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
     X509Certificate certificate = new JcaX509CertificateConverter().setProvider("BC")
         .getCertificate(certBuilder.build(sigGen));
-    return new RMAppCertificateManager.CertificateBundle(certificate, caCert);
+    return new X509SecurityHandler.CertificateBundle(certificate, caCert);
   }
   
   @Override

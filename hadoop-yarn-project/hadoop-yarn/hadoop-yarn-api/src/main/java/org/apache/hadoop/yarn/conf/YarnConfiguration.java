@@ -2631,9 +2631,9 @@ public class YarnConfiguration extends Configuration {
    * Actor class for signing and revoking application certificates
    * Loaded by RMAppCertificateManager
    */
-  public static final String HOPS_RM_CERTIFICATE_ACTOR_KEY = "hops.rm.certificate.actor.class";
-  public static String HOPS_RM_CERTIFICATE_ACTOR_DEFAULT = "org.apache.hadoop.yarn.server.resourcemanager" +
-      ".security.HopsworksRMAppCertificateActions";
+  public static final String HOPS_RM_SECURITY_ACTOR_KEY = "hops.rm.security.actor.class";
+  public static String HOPS_RM_SECURITY_ACTOR_DEFAULT = "org.apache.hadoop.yarn.server.resourcemanager" +
+      ".security.HopsworksRMAppSecurityActions";
   
   /**
    * RMAppCertificateManager remote actions configuration
