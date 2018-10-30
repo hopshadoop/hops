@@ -17,16 +17,13 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.apache.hadoop.conf.Configuration;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.security.GeneralSecurityException;
-import java.security.cert.X509Certificate;
-
-public interface RMAppCertificateActions {
-  void init() throws MalformedURLException, GeneralSecurityException;
-  RMAppCertificateManager.CertificateBundle sign(PKCS10CertificationRequest csr) throws URISyntaxException, IOException, GeneralSecurityException;
-  int revoke(String certificateIdentifier) throws URISyntaxException, IOException, GeneralSecurityException;
+public interface RMAppSecurityHandler<R extends RMAppSecurityManager.SecurityManagerMaterial, P> {
+  void init(Configuration config) throws Exception;
+  void start() throws Exception;
+  void stop() throws Exception;
+  R generateMaterial(P parameter) throws Exception;
+  void registerRenewer(P parameter);
+  boolean revokeMaterial(P parameter, Boolean blocking);
 }

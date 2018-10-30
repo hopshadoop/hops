@@ -36,8 +36,8 @@ import java.security.cert.X509Certificate;
  *
  * NOTE: Use it ONLY for development or use it wisely
  */
-public class DevHopsworksRMAppCertificateActions extends HopsworksRMAppCertificateActions {
-  public DevHopsworksRMAppCertificateActions() throws MalformedURLException, GeneralSecurityException {
+public class DevHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityActions {
+  public DevHopsworksRMAppSecurityActions() throws MalformedURLException, GeneralSecurityException {
   }
   
   @Override

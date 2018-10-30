@@ -60,12 +60,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class HopsworksRMAppCertificateActions implements RMAppCertificateActions, Configurable {
+public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Configurable {
   public static final String HOPSWORKS_USER_KEY = "hops.hopsworks.user";
   public static final String HOPSWORKS_PASSWORD_KEY = "hops.hopsworks.password";
   public static final String REVOKE_CERT_ID_PARAM = "certId";
   
-  private static final Log LOG = LogFactory.getLog(HopsworksRMAppCertificateActions.class);
+  private static final Log LOG = LogFactory.getLog(HopsworksRMAppSecurityActions.class);
   private static final Set<Integer> ACCEPTABLE_HTTP_RESPONSES = new HashSet<>(2);
   
   private Configuration conf;
@@ -77,7 +77,7 @@ public class HopsworksRMAppCertificateActions implements RMAppCertificateActions
   private String revokePath;
   private CertificateFactory certificateFactory;
   
-  public HopsworksRMAppCertificateActions() throws MalformedURLException, GeneralSecurityException {
+  public HopsworksRMAppSecurityActions() throws MalformedURLException, GeneralSecurityException {
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_OK);
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_NO_CONTENT);
   }
@@ -115,7 +115,7 @@ public class HopsworksRMAppCertificateActions implements RMAppCertificateActions
   }
   
   @Override
-  public RMAppCertificateManager.CertificateBundle sign(PKCS10CertificationRequest csr)
+  public X509SecurityHandler.CertificateBundle sign(PKCS10CertificationRequest csr)
       throws URISyntaxException, IOException, GeneralSecurityException {
     CloseableHttpClient httpClient = null;
     try {
@@ -135,7 +135,7 @@ public class HopsworksRMAppCertificateActions implements RMAppCertificateActions
       X509Certificate certificate = parseCertificate(signedCert);
       String intermediateCaCert = jsonResponse.get("intermediateCaCert").getAsString();
       X509Certificate issuer = parseCertificate(intermediateCaCert);
-      return new RMAppCertificateManager.CertificateBundle(certificate, issuer);
+      return new X509SecurityHandler.CertificateBundle(certificate, issuer);
     } finally {
       if (httpClient != null) {
         httpClient.close();

@@ -111,8 +111,8 @@ message ContainerReportProto {
 
 enum YarnApplicationStateProto {
   NEW = 1;
-  GENERATING_CERTS = 2;
-  NEW_SAVING = 3;
+  NEW_SAVING = 2;
+  GENERATING_SECURITY_MATERIAL = 3;
   SUBMITTED = 4;
   ACCEPTED = 5;
   RUNNING = 6;

@@ -22,33 +22,33 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
-public final class RMAppCertificateActionsFactory {
+public final class RMAppSecurityActionsFactory {
   
-  private static volatile RMAppCertificateActionsFactory _INSTANCE;
-  private RMAppCertificateActions actor = null;
+  private static volatile RMAppSecurityActionsFactory _INSTANCE;
+  private RMAppSecurityActions actor = null;
   
-  private RMAppCertificateActionsFactory() {
+  private RMAppSecurityActionsFactory() {
   }
   
-  public static RMAppCertificateActionsFactory getInstance() {
+  public static RMAppSecurityActionsFactory getInstance() {
     if (_INSTANCE == null) {
-      synchronized (RMAppCertificateActionsFactory.class) {
+      synchronized (RMAppSecurityActionsFactory.class) {
         if (_INSTANCE == null) {
-          _INSTANCE = new RMAppCertificateActionsFactory();
+          _INSTANCE = new RMAppSecurityActionsFactory();
         }
       }
     }
     return _INSTANCE;
   }
   
-  public synchronized RMAppCertificateActions getActor(Configuration conf) throws Exception {
+  public synchronized RMAppSecurityActions getActor(Configuration conf) throws Exception {
     if (actor != null) {
       return actor;
     }
-    String actorClass = conf.get(YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_KEY,
-        YarnConfiguration.HOPS_RM_CERTIFICATE_ACTOR_DEFAULT);
+    String actorClass = conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT);
     Class<?> clazz = conf.getClassByName(actorClass);
-    actor = (RMAppCertificateActions) ReflectionUtils.newInstance(clazz, conf);
+    actor = (RMAppSecurityActions) ReflectionUtils.newInstance(clazz, conf);
     actor.init();
     return actor;
   }
@@ -59,7 +59,7 @@ public final class RMAppCertificateActionsFactory {
   }
   
   @VisibleForTesting
-  public void register(RMAppCertificateActions actor) {
+  public void register(RMAppSecurityActions actor) {
     this.actor = actor;
   }
 }

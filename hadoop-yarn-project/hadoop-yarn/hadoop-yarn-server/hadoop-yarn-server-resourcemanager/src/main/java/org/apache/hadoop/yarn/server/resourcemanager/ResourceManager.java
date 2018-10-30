@@ -43,8 +43,10 @@ import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHa
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hadoop.security.ssl.RevocationListFetcherService;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManager;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.service.CompositeService;
@@ -184,7 +186,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected NMLivelinessMonitor nmLivelinessMonitor;
   protected NodesListManager nodesListManager;
   protected RMAppManager rmAppManager;
-  protected RMAppCertificateManager rmAppCertificateManager;
+  protected RMAppSecurityManager rmAppSecurityManager;
   protected ApplicationACLsManager applicationACLsManager;
   protected QueueACLsManager queueACLsManager;
   private WebApp webApp;
@@ -513,8 +515,16 @@ public class ResourceManager extends CompositeService implements Recoverable {
       this.applicationACLsManager, this.conf);
   }
   
-  protected RMAppCertificateManager createRMAppCertificateManager() throws Exception {
-    return new RMAppCertificateManager(this.rmContext);
+  protected RMAppSecurityManager createRMAppSecurityManager() throws Exception {
+    RMAppSecurityManager rmAppSecurityManager = new RMAppSecurityManager(this.rmContext);
+    rmAppSecurityManager.registerRMAppSecurityHandler(createX509SecurityHandler(rmAppSecurityManager));
+    return rmAppSecurityManager;
+  }
+  
+  protected RMAppSecurityHandler createX509SecurityHandler(RMAppSecurityManager rmAppSecurityManager) {
+    RMAppSecurityHandler<X509SecurityHandler.X509SecurityManagerMaterial, X509SecurityHandler.X509MaterialParameter>
+        x509SecurityHandler = new X509SecurityHandler(this.rmContext, rmAppSecurityManager);
+    return x509SecurityHandler;
   }
 
   protected RMApplicationHistoryWriter createRMApplicationHistoryWriter() {
@@ -791,10 +801,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
       // Register event handler for RMAppManagerEvents
       rmDispatcher.register(RMAppManagerEventType.class, rmAppManager);
 
-      rmAppCertificateManager = createRMAppCertificateManager();
-      rmDispatcher.register(RMAppCertificateManagerEventType.class, rmAppCertificateManager);
-      addService(rmAppCertificateManager);
-      rmContext.setRMAppCertificateManager(rmAppCertificateManager);
+      rmAppSecurityManager = createRMAppSecurityManager();
+      rmDispatcher.register(RMAppSecurityManagerEventType.class, rmAppSecurityManager);
+      addService(rmAppSecurityManager);
+      rmContext.setRMAppSecurityManager(rmAppSecurityManager);
       
       clientRM = createClientRMService();
       addService(clientRM);

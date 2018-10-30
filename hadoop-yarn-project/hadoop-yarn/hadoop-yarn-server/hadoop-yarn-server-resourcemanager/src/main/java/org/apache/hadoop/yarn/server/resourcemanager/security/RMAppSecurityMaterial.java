@@ -17,9 +17,27 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-public enum RMAppCertificateManagerEventType {
-  GENERATE_CERTIFICATE,
-  REVOKE_CERTIFICATE,
-  REVOKE_GENERATE_CERTIFICATE,
-  REVOKE_CERTIFICATE_AFTER_ROTATION
+import java.util.HashMap;
+import java.util.Map;
+
+public class RMAppSecurityMaterial<T extends RMAppSecurityManager.SecurityManagerMaterial> {
+  private final Map<Class, T> securityMaterial;
+  
+  public RMAppSecurityMaterial() {
+    securityMaterial = new HashMap<>();
+  }
+  
+  public void addMaterial(T material) {
+    if (material != null && !securityMaterial.containsKey(material.getClass())) {
+      securityMaterial.put(material.getClass(), material);
+    }
+  }
+  
+  public T getMaterial(Class type) {
+    return securityMaterial.<T>get(type);
+  }
+  
+  public boolean isEmpty() {
+    return securityMaterial.isEmpty();
+  }
 }
