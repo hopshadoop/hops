@@ -230,8 +230,6 @@ public class INodeDALAdaptor
         if (inode.isUnderConstruction()) {
           hopINode.setClientName(((INodeFile) inode).getFileUnderConstructionFeature().getClientName());
           hopINode.setClientMachine(((INodeFile) inode).getFileUnderConstructionFeature().getClientMachine());
-          DatanodeID clientNode = ((INodeFile) inode).getFileUnderConstructionFeature().getClientNode();
-          hopINode.setClientNode(clientNode != null ? clientNode.getXferAddr() : null);
         }
         hopINode.setUnderConstruction(inode.isUnderConstruction());
         hopINode.setDirWithQuota(false);
@@ -283,10 +281,8 @@ public class INodeDALAdaptor
               hopINode.getModificationTime(), hopINode.getAccessTime(), hopINode.isFileStoredInDB(),
               hopINode.getStoragePolicy(), true);
           if (hopINode.isUnderConstruction()) {
-            DatanodeID dnID = (hopINode.getClientNode() == null || hopINode.getClientNode().isEmpty()) ? null
-                : new DatanodeID(hopINode.getClientNode());
             FileUnderConstructionFeature ucf = new FileUnderConstructionFeature(hopINode.getClientName(),
-                hopINode.getClientMachine(), dnID, inode);
+                hopINode.getClientMachine(), inode);
             ((INodeFile) inode).addFeature(ucf);
           }
           ((INodeFile) inode).setGenerationStampNoPersistence(

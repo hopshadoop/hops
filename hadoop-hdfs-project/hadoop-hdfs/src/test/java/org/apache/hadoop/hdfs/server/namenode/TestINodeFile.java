@@ -33,10 +33,8 @@ import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.io.IOUtils;
-import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -1219,8 +1217,7 @@ public class TestINodeFile {
       @Override
       public Object performTask() throws IOException {
         file.setPartitionId(1L);
-        final DatanodeID dnID = new DatanodeID("127.0.0.1:1337");
-        file.toUnderConstruction(clientName, clientMachine, dnID);
+        file.toUnderConstruction(clientName, clientMachine);
         return null;
       }
     };
@@ -1230,7 +1227,6 @@ public class TestINodeFile {
     FileUnderConstructionFeature uc = file.getFileUnderConstructionFeature();
     assertEquals(clientName, uc.getClientName());
     assertEquals(clientMachine, uc.getClientMachine());
-    Assert.assertNotNull(uc.getClientNode());
     
     handler = new HopsTransactionalRequestHandler(HDFSOperationType.ADD_INODE) {
       @Override

@@ -27,7 +27,6 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
@@ -496,9 +495,9 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     save();
   }
   
-  public INodeFile toUnderConstruction(String clientName, String clientMachine, DatanodeID clientNode)
+  public INodeFile toUnderConstruction(String clientName, String clientMachine)
     throws IOException {
-    FileUnderConstructionFeature uc = new FileUnderConstructionFeature(clientName, clientMachine, clientNode, this);
+    FileUnderConstructionFeature uc = new FileUnderConstructionFeature(clientName, clientMachine, this);
     addFeature(uc);
     save();
     return this;
