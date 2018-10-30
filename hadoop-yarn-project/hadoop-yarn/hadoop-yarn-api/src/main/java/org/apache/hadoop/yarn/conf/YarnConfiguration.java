@@ -2628,28 +2628,74 @@ public class YarnConfiguration extends Configuration {
   public static String DEFAULT_USER_FOLDER_ALGO = "SHA-256";
   
   /**
+   * RMAppCertificateManager remote actions configuration
+   */
+  private static String RM_APP_SECURITY_MANAGER_PREFIX = "rmappsecurity.";
+  
+  /**
    * Actor class for signing and revoking application certificates
    * Loaded by RMAppCertificateManager
    */
-  public static final String HOPS_RM_CERTIFICATE_ACTOR_KEY = "hops.rm.certificate.actor.class";
-  public static String HOPS_RM_CERTIFICATE_ACTOR_DEFAULT = "org.apache.hadoop.yarn.server.resourcemanager" +
-      ".security.HopsworksRMAppCertificateActions";
+  public static final String HOPS_RM_SECURITY_ACTOR_KEY = RM_PREFIX + RM_APP_SECURITY_MANAGER_PREFIX
+      + "actor-class";
+  public static String HOPS_RM_SECURITY_ACTOR_DEFAULT = "org.apache.hadoop.yarn.server.resourcemanager" +
+      ".security.HopsworksRMAppSecurityActions";
+  
+  public static final String HOPS_HOPSWORKS_HOST_KEY = RM_PREFIX + RM_APP_SECURITY_MANAGER_PREFIX
+      + "actions-host";
+  
+  private static String X509_PREFIX = RM_APP_SECURITY_MANAGER_PREFIX + "x509.";
+  
+  public static final String HOPS_HOPSWORKS_SIGN_ENDPOINT_KEY = RM_PREFIX + X509_PREFIX
+      + "sign-path";
+  public static String DEFAULT_HOPS_HOPSWORKS_SIGN_ENDPOINT = "/hopsworks-ca/v2/certificate/app";
+  
+  public static final String HOPS_HOPSWORKS_REVOKE_ENDPOINT_KEY = RM_PREFIX + X509_PREFIX
+      + "revoke-path";
+  public static String DEFAULT_HOPS_HOPSWORKS_REVOKE_ENDPOINT = "/hopsworks-ca/v2/certificate/app?";
+  
+  public static final String RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD = RM_PREFIX + X509_PREFIX
+      + "expiration-safety-period";
+  public static String DEFAULT_RM_APP_CERTIFICATE_RENEWER_DELAY = "2d";
+  
+  public static final String RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL = RM_PREFIX + X509_PREFIX
+      + "revocation-monitor-interval";
+  public static String DEFAULT_RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL = "10h";
   
   /**
-   * RMAppCertificateManager remote actions configuration
+   * Application JWT configuration
    */
-  private static String HOPSWORKS_PREFIX = "hops.hopsworks";
-  public static final String HOPS_HOPSWORKS_HOST_KEY = HOPSWORKS_PREFIX + ".host";
-  public static final String HOPS_HOPSWORKS_LOGIN_ENDPOINT_KEY = HOPSWORKS_PREFIX + ".login.endpoint";
-  public static String DEFAULT_HOPS_HOPSWORKS_LOGIN_ENDPOINT = "/hopsworks-api/api/auth/login";
-  public static final String HOPS_HOPSWORKS_SIGN_ENDPOINT_KEY = HOPSWORKS_PREFIX + ".sign.endpoint";
-  public static String DEFAULT_HOPS_HOPSWORKS_SIGN_ENDPOINT = "/hopsworks-ca/v2/certificate/app";
-  public static final String HOPS_HOPSWORKS_REVOKE_ENDPOINT_KEY = HOPSWORKS_PREFIX + ".revoke.endpoint";
-  public static String DEFAULT_HOPS_HOPSWORKS_REVOKE_ENDPOINT = "/hopsworks-ca/v2/certificate/app?";
-  public static final String RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD =
-      RM_PREFIX + "certificate.expiration-safety-period";
-  public static String DEFAULT_RM_APP_CERTIFICATE_RENEWER_DELAY = "2d";
-  public static final String RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL =
-      RM_PREFIX + "certificate.revocation-monitor-interval";
-  public static String DEFAULT_RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL = "10h";
+  private static String JWT_PREFIX = RM_APP_SECURITY_MANAGER_PREFIX + "jwt.";
+  
+  public static boolean DEFAULT_RM_JWT_ENABLED = false;
+  public static final String RM_JWT_ENABLED = RM_PREFIX + JWT_PREFIX + "enabled";
+  
+  public static String DEFAULT_RM_JWT_VALIDITY_PERIOD = "30m";
+  public static final String RM_JWT_VALIDITY_PERIOD = RM_PREFIX + JWT_PREFIX + "validity";
+  
+  public static String DEFAULT_RM_JWT_EXPIRATION_LEEWAY = "30m";
+  public static final String RM_JWT_EXPIRATION_LEEWAY = RM_PREFIX + JWT_PREFIX + "expiration-leeway";
+  
+  public static String DEFAULT_RM_JWT_AUDIENCE = "job";
+  public static final String RM_JWT_AUDIENCE = RM_PREFIX + JWT_PREFIX + "audience";
+  
+  public static String DEFAULT_RM_JWT_GENERATE_PATH = "/hopsworks-api/api/jwt/create";
+  public static final String RM_JWT_GENERATE_PATH = RM_PREFIX + JWT_PREFIX
+      + "generate-path";
+  
+  public static String DEFAULT_RM_JWT_INVALIDATE_PATH = "/hopsworks-api/api/jwt/remove/";
+  public static final String RM_JWT_INVALIDATE_PATH = RM_PREFIX + JWT_PREFIX
+      + "invalidate-path";
+  
+  public static String DEFAULT_RM_JWT_RENEW_PATH = "/hopsworks-api/api/jwt/renew/";
+  public static final String RM_JWT_RENEW_PATH = RM_PREFIX + JWT_PREFIX
+      + "renew-path";
+  
+  public static String DEFAULT_RM_JWT_ALIVE_PATH = "/hopsworks-ca/v2/token";
+  public static final String RM_JWT_ALIVE_PATH = RM_PREFIX + JWT_PREFIX + "alive-path";
+  
+  public static final String RM_JWT_TOKEN = RM_PREFIX + JWT_PREFIX + "token";
+  
+  public static long DEFAULT_RM_JWT_ALIVE_INTERVAL = 1800;
+  public static final String RM_JWT_ALIVE_INTERVAL = RM_PREFIX + JWT_PREFIX + "alive-interval";
 }

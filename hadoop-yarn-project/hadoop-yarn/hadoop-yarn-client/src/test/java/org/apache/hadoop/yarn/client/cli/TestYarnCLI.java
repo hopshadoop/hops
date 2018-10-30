@@ -1792,9 +1792,9 @@ public class TestYarnCLI {
     pw.println("                                 based on input comma-separated list of");
     pw.println("                                 application states. The valid application");
     pw.println("                                 state can be one of the following:");
-    pw.println("                                 ALL,NEW,GENERATING_CERTS,NEW_SAVING,SUBMI");
-    pw.println("                                 TTED,ACCEPTED,RUNNING,FINISHED,FAILED,KIL");
-    pw.println("                                 LED");
+    pw.println("                                 ALL,NEW,GENERATING_SECURITY_MATERIAL,NEW_");
+    pw.println("                                 SAVING,SUBMITTED,ACCEPTED,RUNNING,FINISHE");
+    pw.println("                                 D,FAILED,KILLED");
     pw.println(" -appTypes <Types>               Works with -list to filter applications");
     pw.println("                                 based on input comma-separated list of");
     pw.println("                                 application types.");

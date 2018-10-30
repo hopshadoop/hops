@@ -273,7 +273,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
       CertificateLocalization certificateLocalization = CertificateLocalizationCtx.getInstance()
           .getCertificateLocalization();
-      String certFolder = certificateLocalization.getMaterialLocation(user, appId).getCertFolder().toString();
+      String certFolder = certificateLocalization.getX509MaterialLocation(user, appId).getCertFolder().toString();
 
       environment = new HashMap<>();
       environment.put(HopsSSLSocketFactory.CRYPTO_MATERIAL_ENV_VAR, certFolder);

@@ -25,9 +25,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
-import org.apache.hadoop.security.ssl.CryptoMaterial;
+import org.apache.hadoop.security.ssl.SecurityMaterial;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
+import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
 import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -59,6 +61,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class CertificateLocalizationService extends AbstractService
     implements CertificateLocalization, CertificateLocalizationMBean {
   
+  
   private final Logger LOG = LogManager.getLogger
       (CertificateLocalizationService.class);
   
@@ -72,7 +75,7 @@ public class CertificateLocalizationService extends AbstractService
   private String superTrustStoreLocation;
   private String superTruststorePass;
 
-  private final Map<StorageKey, CryptoMaterial> materialLocation =
+  private final Map<StorageKey, SecurityMaterial> materialLocation =
       new ConcurrentHashMap<>();
   private ObjectName mbeanObjectName;
   private final ServiceType service;
@@ -245,11 +248,11 @@ public class CertificateLocalizationService extends AbstractService
       ByteBuffer keyStore, String keyStorePassword,
       ByteBuffer trustStore, String trustStorePassword) throws InterruptedException {
     
-    StorageKey key = new StorageKey(username, applicationId);
+    StorageKey key = StorageKey.newX509Instance(username, applicationId);
     
     try {
       lock.lock();
-      CryptoMaterial material = materialLocation.get(key);
+      SecurityMaterial material = materialLocation.get(key);
       if (material != null) {
         material.incrementRequestedApplications();
         LOG.debug("Incrementing requested application to " + material.getRequestedApplications() + " for key " + key);
@@ -268,7 +271,7 @@ public class CertificateLocalizationService extends AbstractService
         Path passwdPath = Paths.get(appDirPath.toFile().getAbsolutePath(), username + HopsSSLSocketFactory
             .PASSWD_FILE_SUFFIX);
         
-        CryptoMaterial cryptoMaterial = new CryptoMaterial(appDirPath, keyStorePath, trustStorePath, passwdPath,
+        SecurityMaterial cryptoMaterial = new X509SecurityMaterial(appDirPath, keyStorePath, trustStorePath, passwdPath,
             keyStore, keyStorePassword, trustStore, trustStorePassword);
         materialLocation.put(key, cryptoMaterial);
         MaterializeEvent event = new MaterializeEvent(key, cryptoMaterial);
@@ -280,7 +283,38 @@ public class CertificateLocalizationService extends AbstractService
     }
   }
   
-  private void writeToLocalFS(ByteBuffer keyStore, File keyStoreLocation, ByteBuffer trustStore, File
+  @Override
+  public void materializeJWT(String username, String applicationId, String userFolder, String jwt)
+    throws InterruptedException {
+    StorageKey key = StorageKey.newJWTInstance(username, applicationId);
+    try {
+      lock.lock();
+      SecurityMaterial material = materialLocation.get(key);
+      if (material != null) {
+        material.incrementRequestedApplications();
+        LOG.debug("Incrementing requested application to " + material.getRequestedApplications() + " for key " + key);
+      } else {
+        Path appDirPath;
+        if (applicationId != null) {
+          appDirPath = Paths.get(materializeDir.toString(), userFolder, applicationId);
+        } else {
+          appDirPath = Paths.get(materializeDir.toString(), userFolder);
+        }
+        
+        Path jwtPath = Paths.get(appDirPath.toFile().getAbsolutePath(), username + JWTSecurityMaterial
+            .JWT_FILE_SUFFIX);
+        material = new JWTSecurityMaterial(appDirPath, jwtPath, jwt);
+        materialLocation.put(key, material);
+        MaterializeEvent event = new MaterializeEvent(key, material);
+        dispatchEvent(event);
+        LOG.debug("Dispatch materialize event for key " + key);
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  private void writeX509ToLocalFS(ByteBuffer keyStore, File keyStoreLocation, ByteBuffer trustStore, File
       trustStoreLocation, String password, File passwordFileLocation) throws IOException {
     FileChannel keyStoreChannel = new FileOutputStream(keyStoreLocation, false).getChannel();
     keyStoreChannel.write(keyStore);
@@ -299,11 +333,11 @@ public class CertificateLocalizationService extends AbstractService
     synchronized (event.cryptoMaterial) {
       if (event.cryptoMaterial.hasBeenCanceled()) {
         LOG.debug("Tried to materialize " + event.key + " but it has already been canceled, ignoring...");
-        event.cryptoMaterial.changeState(CryptoMaterial.STATE.FINISHED);
+        event.cryptoMaterial.changeState(SecurityMaterial.STATE.FINISHED);
         event.cryptoMaterial.notifyAll();
         return false;
       }
-      event.cryptoMaterial.changeState(CryptoMaterial.STATE.ONGOING);
+      event.cryptoMaterial.changeState(SecurityMaterial.STATE.ONGOING);
     }
     LOG.debug("Materializing internal for " + event.key);
     File appDirFile = event.cryptoMaterial.getCertFolder().toFile();
@@ -312,24 +346,14 @@ public class CertificateLocalizationService extends AbstractService
     }
     
     try {
-      writeToLocalFS(event.cryptoMaterial.getKeyStoreMem(), event.cryptoMaterial.getKeyStoreLocation().toFile(),
-          event.cryptoMaterial.getTrustStoreMem(), event.cryptoMaterial.getTrustStoreLocation().toFile(),
-          event.cryptoMaterial.getKeyStorePass(), event.cryptoMaterial.getPasswdLocation().toFile());
-  
-      if (service == ServiceType.NM) {
-        Set<PosixFilePermission> materialPermissions =
-            EnumSet
-                .of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
-                    PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_EXECUTE);
-    
-        Files.setPosixFilePermissions(event.cryptoMaterial.getCertFolder(), materialPermissions);
-        Files.setPosixFilePermissions(event.cryptoMaterial.getKeyStoreLocation(), materialPermissions);
-        Files.setPosixFilePermissions(event.cryptoMaterial.getTrustStoreLocation(), materialPermissions);
-        Files.setPosixFilePermissions(event.cryptoMaterial.getPasswdLocation(), materialPermissions);
+      if (event.cryptoMaterial instanceof X509SecurityMaterial) {
+        materializeInternalX509((X509SecurityMaterial) event.cryptoMaterial);
+      } else if (event.cryptoMaterial instanceof JWTSecurityMaterial) {
+        materializeInternalJWT((JWTSecurityMaterial) event.cryptoMaterial);
       }
       
       synchronized (event.cryptoMaterial) {
-        event.cryptoMaterial.changeState(CryptoMaterial.STATE.FINISHED);
+        event.cryptoMaterial.changeState(SecurityMaterial.STATE.FINISHED);
         event.cryptoMaterial.notifyAll();
       }
       LOG.debug("Finished materialization for " + event.key);
@@ -341,7 +365,7 @@ public class CertificateLocalizationService extends AbstractService
         materialLocation.remove(event.key);
         FileUtils.deleteQuietly(event.cryptoMaterial.getCertFolder().toFile());
         synchronized (event.cryptoMaterial) {
-          event.cryptoMaterial.changeState(CryptoMaterial.STATE.FINISHED);
+          event.cryptoMaterial.changeState(SecurityMaterial.STATE.FINISHED);
           event.cryptoMaterial.notifyAll();
         }
         return false;
@@ -351,27 +375,69 @@ public class CertificateLocalizationService extends AbstractService
     }
   }
   
+  private void materializeInternalX509(X509SecurityMaterial material) throws IOException {
+    writeX509ToLocalFS(material.getKeyStoreMem(), material.getKeyStoreLocation().toFile(),
+        material.getTrustStoreMem(), material.getTrustStoreLocation().toFile(),
+        material.getKeyStorePass(), material.getPasswdLocation().toFile());
+  
+    if (service == ServiceType.NM) {
+      Set<PosixFilePermission> materialPermissions =
+          EnumSet
+              .of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
+                  PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_EXECUTE);
+    
+      Files.setPosixFilePermissions(material.getCertFolder(), materialPermissions);
+      Files.setPosixFilePermissions(material.getKeyStoreLocation(), materialPermissions);
+      Files.setPosixFilePermissions(material.getTrustStoreLocation(), materialPermissions);
+      Files.setPosixFilePermissions(material.getPasswdLocation(), materialPermissions);
+    }
+  }
+  
+  private void materializeInternalJWT(JWTSecurityMaterial material) throws IOException {
+    FileUtils.writeStringToFile(material.getTokenLocation().toFile(), material.getToken());
+    if (service == ServiceType.NM) {
+      Set<PosixFilePermission> materialPermissions =
+          EnumSet
+              .of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
+                  PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_EXECUTE);
+    
+      Files.setPosixFilePermissions(material.getCertFolder(), materialPermissions);
+      Files.setPosixFilePermissions(material.getTokenLocation(), materialPermissions);
+    }
+  }
+  
   private void dispatchEvent(LocalizationEvent event) throws InterruptedException {
     localizationEventsQ.put(event);
   }
   
   @Override
-  public void removeMaterial(String username) throws InterruptedException {
-    removeMaterial(username, null);
+  public void removeX509Material(String username) throws InterruptedException {
+    removeX509Material(username, null);
   }
   
   @Override
-  public void removeMaterial(String username, String applicationId) throws InterruptedException {
-    StorageKey key = new StorageKey(username, applicationId);
+  public void removeX509Material(String username, String applicationId) throws InterruptedException {
+    StorageKey key = StorageKey.newX509Instance(username, applicationId);
     
+    checkAndRemoveAsync(key);
+  }
+  
+  @Override
+  public void removeJWTMaterial(String username, String applicationId) throws InterruptedException {
+    StorageKey key = StorageKey.newJWTInstance(username, applicationId);
+    checkAndRemoveAsync(key);
+  }
+  
+  private void checkAndRemoveAsync(StorageKey key) throws InterruptedException {
     try {
       lock.lock();
-      CryptoMaterial material = materialLocation.get(key);
+      SecurityMaterial material = materialLocation.get(key);
       if (material != null) {
         material.decrementRequestedApplications();
         LOG.debug("Decrementing requested applications to " + material.getRequestedApplications() + " for key " + key);
         if (material.isSafeToRemove()) {
-          RemoveEvent event = new RemoveEvent(material.getCertFolder());
+          material.changeState(SecurityMaterial.STATE.ONGOING);
+          RemoveEvent event = new RemoveEvent(material);
           materialLocation.remove(key);
           dispatchEvent(event);
           LOG.debug("Dispatching remove event for key " + key);
@@ -385,34 +451,77 @@ public class CertificateLocalizationService extends AbstractService
   @InterfaceAudience.Private
   @VisibleForTesting
   protected void removeInternal(RemoveEvent event) {
-    LOG.debug("Purging directory " + event.certificatesDirectory);
-    FileUtils.deleteQuietly(event.certificatesDirectory.toFile());
+    if (event.cryptoMaterial instanceof X509SecurityMaterial) {
+      removeInternalX509((X509SecurityMaterial) event.cryptoMaterial);
+    } else if (event.cryptoMaterial instanceof JWTSecurityMaterial) {
+      removeInternalJWT((JWTSecurityMaterial) event.cryptoMaterial);
+    }
+  }
+  
+  private void removeInternalX509(X509SecurityMaterial material) {
+    FileUtils.deleteQuietly(material.getKeyStoreLocation().toFile());
+    LOG.debug("Deleted " + material.getKeyStoreLocation());
+  
+    FileUtils.deleteQuietly(material.getTrustStoreLocation().toFile());
+    LOG.debug("Deleted " + material.getTrustStoreLocation());
+    
+    FileUtils.deleteQuietly(material.getPasswdLocation().toFile());
+    LOG.debug("Deleted " + material.getPasswdLocation());
+    
+    deleteAppDirectoryIfEmpty(material.getCertFolder().toFile());
+  }
+  
+  private void removeInternalJWT(JWTSecurityMaterial material) {
+    FileUtils.deleteQuietly(material.getTokenLocation().toFile());
+    LOG.debug("Deleted " + material.getTokenLocation());
+    
+    deleteAppDirectoryIfEmpty(material.getCertFolder().toFile());
+  }
+  
+  private void deleteAppDirectoryIfEmpty(File appDirectory) {
+    String[] content = appDirectory.list();
+    if (content != null && content.length == 0) {
+      FileUtils.deleteQuietly(appDirectory);
+      LOG.debug("Deleted app directory " + appDirectory);
+    }
   }
   
   @Override
-  public CryptoMaterial getMaterialLocation(String username)
+  public X509SecurityMaterial getX509MaterialLocation(String username)
       throws FileNotFoundException, InterruptedException {
-    return getMaterialLocation(username, null);
+    return getX509MaterialLocation(username, null);
   }
   
   @Override
-  public CryptoMaterial getMaterialLocation(String username, String applicationId)
+  public X509SecurityMaterial getX509MaterialLocation(String username, String applicationId)
       throws FileNotFoundException, InterruptedException {
-    StorageKey key = new StorageKey(username, applicationId);
+    StorageKey key = StorageKey.newX509Instance(username, applicationId);
     
-    CryptoMaterial material = materialLocation.get(key);
+    return (X509SecurityMaterial) getSecurityMaterialInternal(key);
+  }
+  
+  @Override
+  public JWTSecurityMaterial getJWTMaterialLocation(String username, String applicationId)
+    throws FileNotFoundException, InterruptedException {
+    StorageKey key = StorageKey.newJWTInstance(username, applicationId);
     
+    return (JWTSecurityMaterial) getSecurityMaterialInternal(key);
+  }
+  
+  private SecurityMaterial getSecurityMaterialInternal(StorageKey key)
+      throws FileNotFoundException, InterruptedException {
+    SecurityMaterial material = materialLocation.get(key);
     LOG.debug("Trying to get material for key " + key);
     if (material == null) {
       throw new FileNotFoundException("Materialized crypto material could not be found for user " + key);
     }
-    
+  
     synchronized (material) {
-      while (!material.getState().equals(CryptoMaterial.STATE.FINISHED)) {
+      while (!material.getState().equals(SecurityMaterial.STATE.FINISHED)) {
         LOG.debug("Waiting to get notified for key " + key);
         material.wait();
       }
-      
+  
       LOG.debug("Notified for key " + key);
       // In case materializer could not materialize certificate, it will remove it from the local cache
       // so if the material does not exist after being notified, it means something went wrong
@@ -420,27 +529,26 @@ public class CertificateLocalizationService extends AbstractService
       if (material == null) {
         throw new FileNotFoundException("Materializer could not materialize certificate for " + key);
       }
-      
       return material;
     }
   }
   
   @Override
-  public void updateCryptoMaterial(String username, String applicationId, ByteBuffer keyStore,
+  public void updateX509(String username, String applicationId, ByteBuffer keyStore,
       String keyStorePassword, ByteBuffer trustStore, String trustStorePassword)
       throws IOException, InterruptedException {
-    StorageKey key = new StorageKey(username, applicationId);
-    CryptoMaterial material = materialLocation.get(key);
+    StorageKey key = StorageKey.newX509Instance(username, applicationId);
+    SecurityMaterial material = materialLocation.get(key);
     if (material == null) {
-      LOG.warn("Requested to update crypto material for " + key + " but material is missing");
+      LOG.warn("Requested X.509 update for key " + key + " but material is missing");
       return;
     }
     
     synchronized (material) {
-      while (!material.getState().equals(CryptoMaterial.STATE.FINISHED)) {
+      while (!material.getState().equals(SecurityMaterial.STATE.FINISHED)) {
         material.wait();
       }
-      material.changeState(CryptoMaterial.STATE.ONGOING);
+      material.changeState(SecurityMaterial.STATE.ONGOING);
     }
     
     try {
@@ -452,18 +560,55 @@ public class CertificateLocalizationService extends AbstractService
         return;
       }
       
-      writeToLocalFS(keyStore.asReadOnlyBuffer(), material.getKeyStoreLocation().toFile(),
-          trustStore.asReadOnlyBuffer(), material.getTrustStoreLocation().toFile(),
-          keyStorePassword, material.getPasswdLocation().toFile());
+      X509SecurityMaterial x509Material = (X509SecurityMaterial) material;
+      writeX509ToLocalFS(keyStore.asReadOnlyBuffer(), x509Material.getKeyStoreLocation().toFile(),
+          trustStore.asReadOnlyBuffer(), x509Material.getTrustStoreLocation().toFile(),
+          keyStorePassword, x509Material.getPasswdLocation().toFile());
       
-      material.updateKeyStoreMem(keyStore);
-      material.updateKeyStorePass(keyStorePassword);
-      material.updateTrustStoreMem(trustStore);
-      material.updateTrustStorePass(trustStorePassword);
+      x509Material.updateKeyStoreMem(keyStore);
+      x509Material.updateKeyStorePass(keyStorePassword);
+      x509Material.updateTrustStoreMem(trustStore);
+      x509Material.updateTrustStorePass(trustStorePassword);
     } finally {
       if (material != null) {
         synchronized (material) {
-          material.changeState(CryptoMaterial.STATE.FINISHED);
+          material.changeState(SecurityMaterial.STATE.FINISHED);
+          material.notifyAll();
+        }
+      }
+      lock.unlock();
+    }
+  }
+  
+  @Override
+  public void updateJWT(String username, String applicationId, String jwt) throws InterruptedException, IOException {
+    StorageKey key = StorageKey.newJWTInstance(username, applicationId);
+    SecurityMaterial material = materialLocation.get(key);
+    if (material == null) {
+      LOG.warn("Requested JWT update for key " + key + " but material is missing");
+      return;
+    }
+    
+    synchronized (material) {
+      while (!material.getState().equals(SecurityMaterial.STATE.FINISHED)) {
+        material.wait();
+      }
+      material.changeState(SecurityMaterial.STATE.ONGOING);
+    }
+    try {
+      lock.lock();
+      material = materialLocation.get(key);
+      if (material == null) {
+        // OOps material has been removed while waiting
+        return;
+      }
+      JWTSecurityMaterial jwtMaterial = (JWTSecurityMaterial) material;
+      FileUtils.writeStringToFile(jwtMaterial.getTokenLocation().toFile(), jwt);
+      jwtMaterial.updateToken(jwt);
+    } finally {
+      if (material != null) {
+        synchronized (material) {
+          material.changeState(SecurityMaterial.STATE.FINISHED);
           material.notifyAll();
         }
       }
@@ -491,7 +636,7 @@ public class CertificateLocalizationService extends AbstractService
    */
   @Override
   public String getState() {
-    ImmutableMap<StorageKey, CryptoMaterial> state;
+    ImmutableMap<StorageKey, SecurityMaterial> state;
     try {
       lock.lock();
       state = ImmutableMap.copyOf(materialLocation);
@@ -502,8 +647,8 @@ public class CertificateLocalizationService extends AbstractService
     ReturnState<String, String> returnState = new ReturnState<>();
     
     ReturnState<String, Integer> internalState = new ReturnState<>();
-    for (Map.Entry<StorageKey, CryptoMaterial> entry : state.entrySet()) {
-      internalState.put(entry.getKey().username, entry.getValue().getRequestedApplications());
+    for (Map.Entry<StorageKey, SecurityMaterial> entry : state.entrySet()) {
+      internalState.put(entry.getKey().compactToString(), entry.getValue().getRequestedApplications());
     }
     returnState.put(JMX_MATERIALIZED_KEY, JSON.toString(internalState));
     
@@ -540,8 +685,8 @@ public class CertificateLocalizationService extends AbstractService
   @Override
   public boolean forceRemoveMaterial(String username, String applicationId)
       throws InterruptedException, ExecutionException {
-    StorageKey key = new StorageKey(username, applicationId);
-    CryptoMaterial material = materialLocation.remove(key);
+    StorageKey key = StorageKey.newX509Instance(username, applicationId);
+    SecurityMaterial material = materialLocation.remove(key);
     if (material != null) {
       boolean managedToCancel;
       synchronized (material) {
@@ -553,7 +698,7 @@ public class CertificateLocalizationService extends AbstractService
       } else {
         // Materialization has already been started, wait to finish
         synchronized (material) {
-          while (!material.getState().equals(CryptoMaterial.STATE.FINISHED)) {
+          while (!material.getState().equals(SecurityMaterial.STATE.FINISHED)) {
             material.wait();
           }
           FileUtils.deleteQuietly(material.getCertFolder().toFile());
@@ -569,13 +714,28 @@ public class CertificateLocalizationService extends AbstractService
    * End of JMX section
    */
   
-  private class StorageKey {
+  enum STORAGE_KEY_TYPE {
+    X509,
+    JWT
+  }
+  
+  private static class StorageKey {
     private final String username;
     private final String applicationId;
+    private final STORAGE_KEY_TYPE type;
     
-    public StorageKey(String username, String applicationId) {
+    private static StorageKey newX509Instance(String username, String applicationId) {
+      return new StorageKey(username, applicationId, STORAGE_KEY_TYPE.X509);
+    }
+    
+    private static StorageKey newJWTInstance(String username, String applicationId) {
+      return new StorageKey(username, applicationId, STORAGE_KEY_TYPE.JWT);
+    }
+    
+    public StorageKey(String username, String applicationId, STORAGE_KEY_TYPE type) {
       this.username = username;
       this.applicationId = applicationId;
+      this.type = type;
     }
     
     @Override
@@ -590,7 +750,8 @@ public class CertificateLocalizationService extends AbstractService
       
       if (applicationId != null) {
         return username.equals(((StorageKey) other).username)
-            && applicationId.equals(((StorageKey) other).applicationId);
+            && applicationId.equals(((StorageKey) other).applicationId)
+            && type.equals(((StorageKey) other).type);
       }
       
       return username.equals(((StorageKey) other).username);
@@ -603,13 +764,20 @@ public class CertificateLocalizationService extends AbstractService
       if (applicationId != null) {
         result = 31 * result + applicationId.hashCode();
       }
+      result =31 * result + type.ordinal();
+      
       return result;
     }
     
     @Override
     public String toString() {
       String appId = applicationId != null ? applicationId : "unknown";
-      return "CryptoKey <" + username + ", " + appId + ">";
+      return "CryptoKey <" + username + ", " + appId + ", " + type + ">";
+    }
+    
+    public String compactToString() {
+      String appId = applicationId != null ? applicationId : "unknown";
+      return username + "/" + appId + "/" + type;
     }
   }
   
@@ -617,9 +785,9 @@ public class CertificateLocalizationService extends AbstractService
   @VisibleForTesting
   protected class MaterializeEvent implements LocalizationEvent {
     private final StorageKey key;
-    private final CryptoMaterial cryptoMaterial;
+    private final SecurityMaterial cryptoMaterial;
     
-    private MaterializeEvent(StorageKey key, CryptoMaterial cryptoMaterial) {
+    private MaterializeEvent(StorageKey key, SecurityMaterial cryptoMaterial) {
       this.key = key;
       this.cryptoMaterial = cryptoMaterial;
     }
@@ -628,10 +796,10 @@ public class CertificateLocalizationService extends AbstractService
   @InterfaceAudience.Private
   @VisibleForTesting
   protected class RemoveEvent implements LocalizationEvent {
-    private final Path certificatesDirectory;
+    private final SecurityMaterial cryptoMaterial;
     
-    private RemoveEvent(Path certificatesDirectory) {
-      this.certificatesDirectory = certificatesDirectory;
+    private RemoveEvent(SecurityMaterial cryptoMaterial) {
+      this.cryptoMaterial = cryptoMaterial;
     }
   }
   

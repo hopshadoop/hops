@@ -393,6 +393,40 @@ public class ApplicationStateDataPBImpl extends ApplicationStateData {
     builder.setMaterialRotationStart(materialRotationStartTime);
   }
   
+  @Override
+  public String getJWT() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasJwt()) {
+      return null;
+    }
+    return p.getJwt();
+  }
+  
+  @Override
+  public void setJWT(String jwt) {
+    maybeInitBuilder();
+    if (jwt == null) {
+      builder.clearJwt();
+      return;
+    }
+    builder.setJwt(jwt);
+  }
+  
+  @Override
+  public long getJWTExpiration() {
+    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasJwtExpiration()) {
+      return -1L;
+    }
+    return p.getJwtExpiration();
+  }
+  
+  @Override
+  public void setJWTExpiration(long jwtExpiration) {
+    maybeInitBuilder();
+    builder.setJwtExpiration(jwtExpiration);
+  }
+  
   private static String RM_APP_PREFIX = "RMAPP_";
   public static RMAppStateProto convertToProtoFormat(RMAppState e) {
     return RMAppStateProto.valueOf(RM_APP_PREFIX + e.name());

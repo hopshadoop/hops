@@ -76,6 +76,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateS
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.security.DelegationTokenRenewer;
+import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
@@ -926,11 +927,15 @@ public class TestRMNodeTransitions {
     char[] keyStorePassword = "keyStorePassword".toCharArray();
     byte[] trustStore = "trustStore".getBytes();
     char[] trustStorePassword = "trustStorePassword".toCharArray();
-    RMNodeUpdateCryptoMaterialForAppEvent updateEvent = new RMNodeUpdateCryptoMaterialForAppEvent(
-        node.getNodeID(), appId, keyStore, keyStorePassword, trustStore, trustStorePassword, 0);
+    X509SecurityHandler.X509SecurityManagerMaterial x509Material = new X509SecurityHandler.X509SecurityManagerMaterial(
+        appId, keyStore, keyStorePassword,
+        trustStore, trustStorePassword, null);
+    x509Material.setCryptoMaterialVersion(0);
+    RMNodeUpdateCryptoMaterialForAppEvent<X509SecurityHandler.X509SecurityManagerMaterial> updateEvent =
+        new RMNodeUpdateCryptoMaterialForAppEvent<>(node.getNodeID(), x509Material);
     node.handle(updateEvent);
-    assertEquals(1, node.getAppCryptoMaterialToUpdate().size());
-    UpdatedCryptoForApp cryptoToUpdate = node.getAppCryptoMaterialToUpdate().get(appId);
+    assertEquals(1, node.getAppX509ToUpdate().size());
+    UpdatedCryptoForApp cryptoToUpdate = node.getAppX509ToUpdate().get(appId);
     assertNotNull(cryptoToUpdate);
     assertTrue(ByteBuffer.wrap(keyStore).equals(cryptoToUpdate.getKeyStore()));
     assertTrue(Arrays.equals(keyStorePassword, cryptoToUpdate.getKeyStorePassword()));

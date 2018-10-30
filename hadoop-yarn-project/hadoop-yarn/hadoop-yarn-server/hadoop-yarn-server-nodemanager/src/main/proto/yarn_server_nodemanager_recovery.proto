@@ -36,6 +36,8 @@ message ContainerManagerApplicationProto {
   optional bytes trust_store = 9;
   optional string trust_store_password = 10;
   optional int32 crypto_version = 11;
+  optional string jwt = 12;
+  optional int64 jwt_expiration = 13;
 }
 
 message DeletionServiceDeleteTaskProto {

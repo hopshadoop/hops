@@ -36,8 +36,10 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEventType;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEventType;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.util.StringUtils;
@@ -66,6 +68,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityMaterial;
+import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -123,12 +127,15 @@ public class AMLauncher implements Runnable {
     list.add(scRequest);
     StartContainersRequest allRequests =
         StartContainersRequest.newInstance(list);
-    
+  
+    RMApp rmApp = rmContext.getRMApps().get(application.getAppAttemptId().getApplicationId());
     if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      RMApp application = rmContext.getRMApps().get(masterContainerID
-          .getApplicationAttemptId().getApplicationId());
-      setupCryptoMaterial(allRequests, application);
+      setupX509Material(allRequests, rmApp);
+    }
+    
+    if (conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED, YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
+      setupJWTMaterial(allRequests, rmApp);
     }
     
     StartContainersResponse response =
@@ -146,11 +153,17 @@ public class AMLauncher implements Runnable {
   
   @Private
   @VisibleForTesting
-  protected void setupCryptoMaterial(StartContainersRequest request, RMApp application) {
+  protected void setupX509Material(StartContainersRequest request, RMApp application) {
     request.setKeyStore(ByteBuffer.wrap(application.getKeyStore()));
     request.setKeyStorePassword(String.valueOf(application.getKeyStorePassword()));
     request.setTrustStore(ByteBuffer.wrap(application.getTrustStore()));
     request.setTrustStorePassword(String.valueOf(application.getTrustStorePassword()));
+  }
+  
+  @Private
+  @VisibleForTesting
+  protected void setupJWTMaterial(StartContainersRequest request, RMApp application) {
+    request.setJWT(application.getJWT());
   }
   
   private void cleanup() throws IOException, YarnException {
@@ -172,10 +185,18 @@ public class AMLauncher implements Runnable {
     } finally {
       RMApp application = rmContext.getRMApps().get(
           this.application.getAppAttemptId().getApplicationId());
-      RMAppCertificateManagerEvent certsCleanup = new RMAppCertificateManagerEvent(
-          application.getApplicationId(), application.getUser(), application.getCryptoMaterialVersion(),
-          RMAppCertificateManagerEventType.REVOKE_CERTIFICATE);
-      handler.handle(certsCleanup);
+      X509SecurityHandler.X509MaterialParameter x509Param =
+          new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
+              application.getCryptoMaterialVersion());
+      JWTSecurityHandler.JWTMaterialParameter jwtParam =
+          new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+      
+      RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
+      securityMaterial.addMaterial(x509Param);
+      securityMaterial.addMaterial(jwtParam);
+      RMAppSecurityManagerEvent securityMaterialCleanup = new RMAppSecurityManagerEvent(application.getApplicationId(),
+          securityMaterial, RMAppSecurityManagerEventType.REVOKE_SECURITY_MATERIAL);
+      handler.handle(securityMaterialCleanup);
     }
   }
   
