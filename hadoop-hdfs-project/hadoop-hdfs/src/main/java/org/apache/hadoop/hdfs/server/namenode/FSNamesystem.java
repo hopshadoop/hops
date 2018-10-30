@@ -2547,8 +2547,7 @@ public class FSNamesystem
       //
       if (!force && lease != null) {
         Lease leaseFile = leaseManager.getLeaseByPath(src);
-        if ((leaseFile != null && leaseFile.equals(lease)) ||
-            lease.getHolder().equals(holder)) {
+        if (leaseFile != null && leaseFile.equals(lease)) {
           throw new AlreadyBeingCreatedException(
               "failed to create file " + src + " for " + holder +
                   " for client " + clientMachine +
