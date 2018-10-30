@@ -19,8 +19,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
-import io.hops.transaction.handler.LightWeightRequestHandler;
-import io.hops.transaction.handler.TransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import static io.hops.transaction.lock.LockFactory.getInstance;
@@ -28,10 +26,12 @@ import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import java.io.IOException;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.EnumSet;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -47,7 +47,9 @@ import org.junit.Test;
 public class TestDiskspaceQuotaUpdate {
 
   private static final int BLOCKSIZE = 1024;
-  private static final short REPLICATION = 1;
+  private static final short REPLICATION = 4;
+  static final long seed = 0L;
+  private static final Path dir = new Path("/TestQuotaUpdate");
 
   private Configuration conf;
   private MiniDFSCluster cluster;
@@ -72,34 +74,57 @@ public class TestDiskspaceQuotaUpdate {
       cluster.shutdown();
     }
   }
+  
+  /**
+   * Test if the quota can be correctly updated for create file
+   */
+  @Test (timeout=60000)
+  public void testQuotaUpdateWithFileCreate() throws Exception  {
+    final Path foo = new Path(dir, "foo");
+    Path createdFile = new Path(foo, "created_file.data");
+    dfs.mkdirs(foo);
+    dfs.setQuota(foo, Long.MAX_VALUE-1, Long.MAX_VALUE-1);
+    long fileLen = BLOCKSIZE * 2 + BLOCKSIZE / 2;
+    DFSTestUtil.createFile(dfs, createdFile, BLOCKSIZE / 16,
+        fileLen, BLOCKSIZE, REPLICATION, seed);
+    //let time to the quota manager to update the quota
+    Thread.sleep(1000);
+    Quota.Counts cnt = getSpaceConsumed(foo);
+    assertEquals(2, cnt.get(Quota.NAMESPACE));
+    assertEquals(fileLen * REPLICATION, cnt.get(Quota.DISKSPACE));
+  }
+
 
   /**
    * Test if the quota can be correctly updated for append
    */
-  @Test
+  @Test (timeout=60000)
   public void testUpdateQuotaForAppend() throws Exception {
-    final Path foo = new Path("/foo");
+    final Path foo = new Path(dir ,"foo");
     final Path bar = new Path(foo, "bar");
-    DFSTestUtil.createFile(dfs, bar, BLOCKSIZE, REPLICATION, 0L);
+    long currentFileLen = BLOCKSIZE;
+    DFSTestUtil.createFile(dfs, bar, currentFileLen, REPLICATION, seed);
     dfs.setQuota(foo, Long.MAX_VALUE - 1, Long.MAX_VALUE - 1);
 
-    // append half of the block data
+    // append half of the block data, the previous file length is at block
+    // boundary
     DFSTestUtil.appendFile(dfs, bar, BLOCKSIZE / 2);
+    currentFileLen += (BLOCKSIZE / 2);
     
     //let time to the quota manager to update the quota
     Thread.sleep(1000);
 
-//    INodeDirectory fooNode = getINode4Write(foo);
     Quota.Counts quota = getSpaceConsumed(foo);
-//        fooNode.getDirectoryWithQuotaFeature()
-//        .getSpaceConsumed(fooNode);
     long ns = quota.get(Quota.NAMESPACE);
     long ds = quota.get(Quota.DISKSPACE);
     assertEquals(2, ns); // foo and bar
-    assertEquals((BLOCKSIZE + BLOCKSIZE / 2) * REPLICATION, ds);
+    assertEquals(currentFileLen * REPLICATION, ds);
+    ContentSummary c = dfs.getContentSummary(foo);
+    assertEquals(c.getSpaceConsumed(), ds);
 
-    // append another block
+    // append another block, the previous file length is not at block boundary
     DFSTestUtil.appendFile(dfs, bar, BLOCKSIZE);
+    currentFileLen += BLOCKSIZE;
 
     //let time to the quota manager to update the quota
     Thread.sleep(1000);
@@ -108,14 +133,28 @@ public class TestDiskspaceQuotaUpdate {
     ns = quota.get(Quota.NAMESPACE);
     ds = quota.get(Quota.DISKSPACE);
     assertEquals(2, ns); // foo and bar
-    assertEquals((BLOCKSIZE * 2 + BLOCKSIZE / 2) * REPLICATION, ds);
+    assertEquals(currentFileLen * REPLICATION, ds);
+    c = dfs.getContentSummary(foo);
+    assertEquals(c.getSpaceConsumed(), ds);
+    // append several blocks
+    DFSTestUtil.appendFile(dfs, bar, BLOCKSIZE * 3 + BLOCKSIZE / 8);
+    currentFileLen += (BLOCKSIZE * 3 + BLOCKSIZE / 8);
+    //let time to the quota manager to update the quota
+    Thread.sleep(1000);
+    quota = getSpaceConsumed(foo);
+    ns = quota.get(Quota.NAMESPACE);
+    ds = quota.get(Quota.DISKSPACE);
+    assertEquals(2, ns); // foo and bar
+    assertEquals(currentFileLen * REPLICATION, ds);
+    c = dfs.getContentSummary(foo);
+    assertEquals(c.getSpaceConsumed(), ds);
   }
 
   /**
    * Test if the quota can be correctly updated when file length is updated
    * through fsync
    */
-  @Test
+  @Test (timeout=60000)
   public void testUpdateQuotaForFSync() throws Exception {
     final Path foo = new Path("/foo");
     final Path bar = new Path(foo, "bar");
@@ -182,6 +221,7 @@ public class TestDiskspaceQuotaUpdate {
       @Override
       public Object performTask() throws IOException {
         INodeDirectory fooNode = fsdir.getINode4Write(foo.toString()).asDirectory();
+        assertTrue(fooNode.isQuotaSet());
         return fooNode.getDirectoryWithQuotaFeature().getSpaceConsumed(fooNode);
       }
     };
