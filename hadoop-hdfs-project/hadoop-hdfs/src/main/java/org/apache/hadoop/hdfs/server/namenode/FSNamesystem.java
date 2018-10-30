@@ -2341,7 +2341,6 @@ public class FSNamesystem
       }
 
       checkFsObjectLimit();
-      final DatanodeDescriptor clientNode = blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
       
       INodeFile newNode = null;
       // Always do an implicit mkdirs for parent directory tree.
@@ -2349,7 +2348,7 @@ public class FSNamesystem
       if (parent != null && mkdirsRecursively(parent.toString(),
               permissions, true, now())) {
         newNode = dir.addFile(src, permissions, replication, blockSize,
-                holder, clientMachine, clientNode);
+                holder, clientMachine);
       }
       
       if (newNode == null) {
@@ -2419,9 +2418,7 @@ public class FSNamesystem
             + " is not sufficiently replicated yet.");
       }
       
-      final DatanodeDescriptor clientNode =
-          blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
-      return prepareFileForWrite(src, myFile, holder, clientMachine, clientNode);
+      return prepareFileForWrite(src, myFile, holder, clientMachine);
     } catch (IOException ie) {
       NameNode.stateChangeLog.warn("DIR* NameSystem.append: " +ie.getMessage());
       throw ie;
@@ -2440,17 +2437,15 @@ public class FSNamesystem
    *     identifier of the lease holder on this file
    * @param clientMachine
    *     identifier of the client machine
-   * @param clientNode
-   *     if the client is collocated with a DN, that DN's descriptor
    * @return the last block locations if the block is partial or null otherwise
    * @throws UnresolvedLinkException
    * @throws IOException
    */
   private LocatedBlock prepareFileForWrite(String src, INodeFile file,
-      String leaseHolder, String clientMachine, DatanodeDescriptor clientNode)
+      String leaseHolder, String clientMachine)
       throws IOException {
     INodeFile cons =
-        file.toUnderConstruction(leaseHolder, clientMachine, clientNode);
+        file.toUnderConstruction(leaseHolder, clientMachine);
     Lease lease = leaseManager.addLease(cons.getFileUnderConstructionFeature()
         .getClientName(), src);
     if(cons.isFileStoredInDB()){
@@ -2858,9 +2853,8 @@ public class FSNamesystem
             }
             blockSize = pendingFile.getPreferredBlockSize();
             
-            clientNode = pendingFile.getFileUnderConstructionFeature().getClientNode() == null ? null :
-                getBlockManager().getDatanodeManager()
-                    .getDatanode(pendingFile.getFileUnderConstructionFeature().getClientNode());
+            clientNode = blockManager.getDatanodeManager().getDatanodeByHost(
+              pendingFile.getFileUnderConstructionFeature().getClientMachine());
 
             replication = pendingFile.getBlockReplication();
 
@@ -3102,10 +3096,9 @@ public class FSNamesystem
               }
             }
             final INodeFile file = checkLease(src2, clientName, inode, fileId, false);
-            //clientNode = file.getClientNode(); HOP
-            clientNode = file.getFileUnderConstructionFeature().getClientNode() == null ? null :
-                getBlockManager().getDatanodeManager()
-                    .getDatanode(file.getFileUnderConstructionFeature().getClientNode());
+            String clientMachine = file.getFileUnderConstructionFeature()
+              .getClientMachine();
+            clientNode = blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
             preferredBlockSize = file.getPreferredBlockSize();
 
             byte storagePolicyID = file.getStoragePolicyID();

@@ -23,7 +23,6 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.LeasePath;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
@@ -35,20 +34,14 @@ import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
 public class FileUnderConstructionFeature implements INode.Feature {
   private String clientName; // lease holder
   private final String clientMachine;
-  // if client is a cluster node too.
-  private final DatanodeID clientNode;
   private final INode inode;
   
   private long lastBlockId = -1;
   private long penultimateBlockId = -1;
 
-  public FileUnderConstructionFeature(final String clientName,
-      final String clientMachine,
-      final DatanodeID clientNode,
-      final INode inode) {
+  public FileUnderConstructionFeature(final String clientName, final String clientMachine, final INode inode) {
     this.clientName = clientName;
     this.clientMachine = clientMachine;
-    this.clientNode = clientNode;
     this.inode = inode;
   }
 
@@ -62,10 +55,6 @@ public class FileUnderConstructionFeature implements INode.Feature {
 
   public String getClientMachine() {
     return clientMachine;
-  }
-
-  public DatanodeID getClientNode() {
-    return clientNode;
   }
 
   /**
