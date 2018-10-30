@@ -268,7 +268,6 @@ public class NamenodeWebHdfsMethods {
     Text kind = request.getScheme().equals("http") ? WebHdfsFileSystem.TOKEN_KIND
         : SWebHdfsFileSystem.TOKEN_KIND;
     t.setKind(kind);
-    SecurityUtil.setTokenService(t, namenode.getHttpAddress());
     return t;
   }
 
