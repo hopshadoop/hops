@@ -115,13 +115,15 @@ public class DataNodeMetrics {
   @Metric
   MutableRate sendDataPacketTransferNanos;
   MutableQuantiles[] sendDataPacketTransferNanosQuantiles;
-  
 
   final MetricsRegistry registry = new MetricsRegistry("datanode");
   final String name;
+  
+  JvmMetrics jvmMetrics = null;
 
-  public DataNodeMetrics(String name, String sessionId, int[] intervals) {
+  public DataNodeMetrics(String name, String sessionId, int[] intervals,  final JvmMetrics jvmMetrics) {
     this.name = name;
+    this.jvmMetrics = jvmMetrics;
     registry.tag(SessionId, sessionId);
     
     final int len = intervals.length;
@@ -156,7 +158,7 @@ public class DataNodeMetrics {
   public static DataNodeMetrics create(Configuration conf, String dnName) {
     String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY);
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    JvmMetrics.create("DataNode", sessionId, ms);
+    JvmMetrics jm = JvmMetrics.create("DataNode", sessionId, ms);
     String name = "DataNodeActivity-" + (dnName.isEmpty() ?
         "UndefinedDataNodeName" + DFSUtil.getRandom().nextInt() :
         dnName.replace(':', '-'));
@@ -166,13 +168,17 @@ public class DataNodeMetrics {
         conf.getInts(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY);
     
     return ms
-        .register(name, null, new DataNodeMetrics(name, sessionId, intervals));
+        .register(name, null, new DataNodeMetrics(name, sessionId, intervals, jm));
   }
 
   public String name() {
     return name;
   }
 
+  public JvmMetrics getJvmMetrics() {
+    return jvmMetrics;
+  }
+    
   public void addHeartbeat(long latency) {
     heartbeats.add(latency);
   }
