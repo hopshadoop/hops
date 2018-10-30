@@ -3839,7 +3839,7 @@ public class FSNamesystem
     FSPermissionChecker pc = getPermissionChecker();
     status = mkdirsInternal(pc, src, permissions, createParent);
     if (status) {
-      resultingStat = dir.getFileInfo(src, false, false);
+      resultingStat = getAuditFileInfo(src, false);
     }
 
     if (status) {
