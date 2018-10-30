@@ -38,9 +38,11 @@ public class TestRegisterNodeManagerRequest {
   public void testRegisterNodeManagerRequest() {
     ApplicationId appId1 = ApplicationId.newInstance(1234L, 1);
     ApplicationId appId2 = ApplicationId.newInstance(1234L, 2);
-    Map<ApplicationId, Integer> runningApplications = new HashMap<>(2);
-    runningApplications.put(appId1, 0);
-    runningApplications.put(appId2, 2);
+    Map<ApplicationId, UpdatedCryptoForApp> runningApplications = new HashMap<>(2);
+    UpdatedCryptoForApp upc1 = UpdatedCryptoForApp.newInstance(1, 1L);
+    UpdatedCryptoForApp upc2 = UpdatedCryptoForApp.newInstance(2, 2L);
+    runningApplications.put(appId1, upc1);
+    runningApplications.put(appId2, upc2);
     RegisterNodeManagerRequest request =
         RegisterNodeManagerRequest.newInstance(
           NodeId.newInstance("host", 1234), 1234, Resource.newInstance(0, 0),

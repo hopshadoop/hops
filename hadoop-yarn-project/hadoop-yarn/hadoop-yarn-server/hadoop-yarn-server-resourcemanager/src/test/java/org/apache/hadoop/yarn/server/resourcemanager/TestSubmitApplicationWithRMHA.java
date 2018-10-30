@@ -72,7 +72,7 @@ public class TestSubmitApplicationWithRMHA extends RMHATestBase{
           rm.getApplicationReport(app.getApplicationId())
               .getYarnApplicationState();
       if (!state.equals(YarnApplicationState.NEW) &&
-          !state.equals(YarnApplicationState.GENERATING_CERTS) &&
+          !state.equals(YarnApplicationState.GENERATING_SECURITY_MATERIAL) &&
           !state.equals(YarnApplicationState.NEW_SAVING)) {
         break;
       }

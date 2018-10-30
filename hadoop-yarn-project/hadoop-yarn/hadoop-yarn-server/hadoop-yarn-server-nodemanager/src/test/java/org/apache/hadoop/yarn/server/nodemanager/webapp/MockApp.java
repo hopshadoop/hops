@@ -40,7 +40,8 @@ public class MockApp implements Application {
   Map<ContainerId, Container> containers = new HashMap<ContainerId, Container>();
   ApplicationState appState;
   Application app;
-  int cryptoMaterialVersion;
+  int x509Version;
+  long jwtExpiration;
 
   public MockApp(int uniqId) {
     this("mockUser", 1234, uniqId, "mockUserFolder");
@@ -56,7 +57,8 @@ public class MockApp implements Application {
     this.appId = BuilderUtils.newApplicationId(recordFactory, clusterTimeStamp,
         uniqId);
     appState = ApplicationState.NEW;
-    this.cryptoMaterialVersion = 0;
+    this.x509Version = 0;
+    this.jwtExpiration = -1L;
   }
 
   public void setState(ApplicationState state) {
@@ -84,13 +86,23 @@ public class MockApp implements Application {
   }
 
   @Override
-  public int getCryptoMaterialVersion() {
-    return cryptoMaterialVersion;
+  public int getX509Version() {
+    return x509Version;
   }
   
   @Override
-  public void setCryptoMaterialVersion(int cryptoMaterialVersion) {
-    this.cryptoMaterialVersion = cryptoMaterialVersion;
+  public void setX509Version(int x509Version) {
+    this.x509Version = x509Version;
+  }
+  
+  @Override
+  public long getJWTExpiration() {
+    return jwtExpiration;
+  }
+  
+  @Override
+  public void setJWTExpiration(long jwtExpiration) {
+    this.jwtExpiration = jwtExpiration;
   }
   
   public void handle(ApplicationEvent event) {}

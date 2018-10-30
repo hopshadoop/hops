@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.applicationsmanager;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -235,6 +236,16 @@ public abstract class MockAsm extends MockApps {
   
     @Override
     public char[] getTrustStorePassword() {
+      throw new UnsupportedOperationException("Not supported yet.");
+    }
+    
+    @Override
+    public String getJWT() {
+      throw new UnsupportedOperationException("Not supported yet.");
+    }
+    
+    @Override
+    public Instant getJWTExpiration() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
     

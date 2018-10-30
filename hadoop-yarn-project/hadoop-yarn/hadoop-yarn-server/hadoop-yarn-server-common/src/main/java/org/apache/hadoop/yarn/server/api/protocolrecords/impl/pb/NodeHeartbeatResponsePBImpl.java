@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.SignalContainerRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -146,16 +147,24 @@ public class NodeHeartbeatResponsePBImpl extends
     }
     
     for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : updatedCryptoForApps.entrySet()) {
-      builder.addUpdatedCryptoForApps(YarnServerCommonServiceProtos.UpdatedCryptoForAppsProto.newBuilder()
-        .setAppId(convertToProtoFormat(entry.getKey()))
-        .setUpdatedCryptoForApp(
-            YarnServerCommonServiceProtos.UpdatedCryptoForAppProto.newBuilder()
-            .setKeyStore(ProtoUtils.convertToProtoFormat(entry.getValue().getKeyStore().duplicate()))
+      YarnServerCommonServiceProtos.UpdatedCryptoForAppProto.Builder cryptoForAppBuilder =
+          YarnServerCommonServiceProtos.UpdatedCryptoForAppProto.newBuilder();
+      if (entry.getValue().getKeyStore() != null) {
+        // Assume that also other X.509 material is not null
+        cryptoForAppBuilder.setKeyStore(ProtoUtils.convertToProtoFormat(entry.getValue().getKeyStore().duplicate()))
             .setKeyStorePassword(String.valueOf(entry.getValue().getKeyStorePassword()))
             .setTrustStore(ProtoUtils.convertToProtoFormat(entry.getValue().getTrustStore().duplicate()))
             .setTrustStorePassword(String.valueOf(entry.getValue().getTrustStorePassword()))
-            .setVersion(entry.getValue().getVersion())
-        ));
+            .setVersion(entry.getValue().getVersion());
+      }
+      
+      if (entry.getValue().getJWT() != null) {
+        cryptoForAppBuilder.setJwt(entry.getValue().getJWT())
+            .setJwtExpiration(entry.getValue().getJWTExpiration());
+      }
+      builder.addUpdatedCryptoForApps(YarnServerCommonServiceProtos.UpdatedCryptoForAppsProto.newBuilder()
+        .setAppId(convertToProtoFormat(entry.getKey()))
+        .setUpdatedCryptoForApp(cryptoForAppBuilder));
     }
   }
   

@@ -201,14 +201,14 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
   }
 
   @Override
-  public void testContainerUpdateCryptoMaterial() throws Exception {
+  public void testSecurityMaterialContainerUpdate() throws Exception {
     // Don't run the test if the binary is not available.
     if (!shouldRunTest()) {
       LOG.info("LCE binary path is not passed. Not running the test");
       return;
     }
     LOG.info("Running testContainerUpdateCryptoMaterial");
-    super.testContainerUpdateCryptoMaterial();
+    super.testSecurityMaterialContainerUpdate();
   }
   
   @Override

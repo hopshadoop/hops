@@ -219,6 +219,25 @@ public class StartContainersRequestPBImpl extends StartContainersRequest {
     builder.setTrustStorePassword(password);
   }
   
+  @Override
+  public String getJWT() {
+    StartContainersRequestProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasJwt()) {
+      return null;
+    }
+    return p.getJwt();
+  }
+  
+  @Override
+  public void setJWT(String jwt) {
+    maybeInitBuilder();
+    if (jwt == null) {
+      builder.clearJwt();
+      return;
+    }
+    builder.setJwt(jwt);
+  }
+  
   private ByteBuffer convertFromProtoFormat(ByteString byteString) {
     return ProtoUtils.convertFromProtoFormat(byteString);
   }
