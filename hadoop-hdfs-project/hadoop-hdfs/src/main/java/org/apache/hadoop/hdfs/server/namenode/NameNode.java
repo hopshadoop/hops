@@ -82,6 +82,7 @@ import java.util.List;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import org.apache.hadoop.util.JvmPauseMonitor;
 
 /**
  * ********************************************************
@@ -230,6 +231,7 @@ public class NameNode implements NameNodeStatusMXBean {
 
   private NameNodeRpcServer rpcServer;
 
+  private JvmPauseMonitor pauseMonitor;
 
   protected LeaderElection leaderElection;
   
@@ -559,6 +561,11 @@ public class NameNode implements NameNodeStatusMXBean {
     tokenServiceName = NetUtils.getHostPortString(rpcServer.getRpcAddress());
     httpServer.setNameNodeAddress(getNameNodeAddress());
 
+    pauseMonitor = new JvmPauseMonitor(conf);
+    pauseMonitor.start();
+
+    metrics.getJvmMetrics().setPauseMonitor(pauseMonitor);
+    
     startCommonServices(conf);
 
     if(isLeader()){ //if the newly started namenode is the leader then it means
@@ -637,6 +644,7 @@ public class NameNode implements NameNodeStatusMXBean {
     if (namesystem != null) {
       namesystem.close();
     }
+    if (pauseMonitor != null) pauseMonitor.stop();
     if (leaderElection != null && leaderElection.isRunning()) {
       leaderElection.stopElectionThread();
     }

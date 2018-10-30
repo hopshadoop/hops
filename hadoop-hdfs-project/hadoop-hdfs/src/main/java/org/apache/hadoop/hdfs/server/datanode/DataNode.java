@@ -160,6 +160,7 @@ import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.net.unix.DomainSocket;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import org.apache.hadoop.util.JvmPauseMonitor;
 
 /**
  * *******************************************************
@@ -274,6 +275,8 @@ public class DataNode extends Configured
   
   // For InterDataNodeProtocol
   public RPC.Server ipcServer;
+  
+  private JvmPauseMonitor pauseMonitor;
 
   private SecureResources secureResources = null;
   private AbstractList<StorageLocation> dataDirs;
@@ -850,12 +853,16 @@ public class DataNode extends Configured
     registerMXBean();
     initDataXceiver(conf);
     startInfoServer(conf);
-
+    pauseMonitor = new JvmPauseMonitor(conf);
+    pauseMonitor.start();
+  
     // BlockPoolTokenSecretManager is required to create ipc server.
     this.blockPoolTokenSecretManager = new BlockPoolTokenSecretManager();
     initIpcServer(conf);
 
     metrics = DataNodeMetrics.create(conf, getDisplayName());
+    
+    metrics.getJvmMetrics().setPauseMonitor(pauseMonitor);
 
     blockPoolManager = new BlockPoolManager(this);
     blockPoolManager.refreshNamenodes(conf);
@@ -1396,6 +1403,10 @@ public class DataNode extends Configured
       }
     }
     
+    if (pauseMonitor != null) {
+      pauseMonitor.stop();
+    }
+     
     // Interrupt the checkDiskErrorThread and terminate it.
     if(this.checkDiskErrorThread != null) {
       this.checkDiskErrorThread.interrupt();
