@@ -310,8 +310,6 @@ public class WebHdfsFileSystem extends FileSystem
    */
   private synchronized void resetStateToFailOver() {
     currentNNAddrIndex = (currentNNAddrIndex + 1) % nnAddrs.length;
-    delegationToken = null;
-    tokenAspect.reset();
   }
   
   /**
