@@ -289,6 +289,7 @@ public class TestPread {
         numHedgedReadPoolThreads);
     conf.setLong(DFSConfigKeys.DFS_DFSCLIENT_HEDGED_READ_THRESHOLD_MILLIS,
         hedgedReadTimeoutMillis);
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 0);
     // Set up the InjectionHandler
     DFSClientFaultInjector.instance = Mockito
         .mock(DFSClientFaultInjector.class);
@@ -333,6 +334,7 @@ public class TestPread {
     } catch (BlockMissingException e) {
       assertTrue(false);
     } finally {
+      Mockito.reset(injector);
       IOUtils.cleanup(null, input);
       IOUtils.cleanup(null, output);
       fileSys.close();
@@ -427,6 +429,8 @@ private void dfsPreadTest(Configuration conf, boolean disableTransferTo, boolean
       throws IOException {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 4096);
     conf.setLong(DFSConfigKeys.DFS_CLIENT_READ_PREFETCH_SIZE_KEY, 4096);
+    // Set short retry timeouts so this test runs faster
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 0);
     if (simulatedStorage) {
       SimulatedFSDataset.setFactory(conf);
     }
