@@ -113,7 +113,7 @@ public class ShortCircuitCache implements Closeable {
         Long evictionTimeNs = Long.valueOf(0);
         while (true) {
           Entry<Long, ShortCircuitReplica> entry = 
-              evictableMmapped.ceilingEntry(evictionTimeNs);
+              evictable.ceilingEntry(evictionTimeNs);
           if (entry == null) break;
           evictionTimeNs = entry.getKey();
           long evictionTimeMs = 
@@ -384,10 +384,6 @@ public class ShortCircuitCache implements Closeable {
       }
     }
     this.shmManager = shmManager;
-  }
-
-  public long getMmapRetryTimeoutMs() {
-    return mmapRetryTimeoutMs;
   }
 
   public long getStaleThresholdMs() {
@@ -850,7 +846,7 @@ public class ShortCircuitCache implements Closeable {
         } else if (replica.mmapData instanceof Long) {
           long lastAttemptTimeMs = (Long)replica.mmapData;
           long delta = Time.monotonicNow() - lastAttemptTimeMs;
-          if (delta < staleThresholdMs) {
+          if (delta < mmapRetryTimeoutMs) {
             if (LOG.isTraceEnabled()) {
               LOG.trace(this + ": can't create client mmap for " +
                   replica + " because we failed to " +
