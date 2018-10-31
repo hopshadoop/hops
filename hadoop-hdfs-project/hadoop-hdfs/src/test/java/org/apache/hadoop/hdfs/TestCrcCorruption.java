@@ -85,6 +85,8 @@ public class TestCrcCorruption {
   @Test(timeout = 50000)
   public void testCorruptionDuringWrt() throws Exception {
     Configuration conf = new HdfsConfiguration();
+    // Set short retry timeouts so this test runs faster
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
     MiniDFSCluster cluster = null;
 
     try {
@@ -151,6 +153,8 @@ public class TestCrcCorruption {
     short replFactor = 2;
     Random random = new Random();
 
+    // Set short retry timeouts so this test runs faster
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
     try {
       cluster =
           new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
@@ -340,6 +344,8 @@ public class TestCrcCorruption {
     short replFactor = (short) numDataNodes;
     Configuration conf = new Configuration();
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, numDataNodes);
+    // Set short retry timeouts so this test runs faster
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
     MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
 
