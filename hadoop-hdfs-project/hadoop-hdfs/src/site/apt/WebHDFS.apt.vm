@@ -375,7 +375,7 @@ Hello, webhdfs user!
   * Submit a HTTP PUT request.
 
 +---------------------------------
-curl -i -X PUT "http://<HOST>:<PORT>/<PATH>?op=MKDIRS[&permission=<OCTAL>]"
+curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=MKDIRS[&permission=<OCTAL>]"
 +---------------------------------
 
   The client receives a response with a {{{Boolean JSON Schema}<<<boolean>>> JSON object}}:
@@ -400,7 +400,7 @@ Transfer-Encoding: chunked
   * Submit a HTTP PUT request.
 
 +---------------------------------
-curl -i -X PUT "http://<HOST>:<PORT>/<PATH>?op=CREATESYMLINK
+curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=CREATESYMLINK
                               &destination=<PATH>[&createParent=<true|false>]"
 +---------------------------------
 
