@@ -286,7 +286,7 @@ public abstract class INodeWithAdditionalFields extends INode {
   
   public final void setHasBlocksNoPersistance(boolean hasBlocks)
     throws StorageException, TransactionContextException {
-    header = HeaderFormat.combineHasBlocksNoPersistance(header, hasBlocks);
+    header = HeaderFormat.HAS_BLOCKS.BITS.combine((hasBlocks) ? 1 : 0, header);
   }
   
   public boolean hasBlocks() {
