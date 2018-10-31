@@ -2837,8 +2837,9 @@ public class FSNamesystem
 
             // Part I. Analyze the state of the file with respect to the input data.
             LocatedBlock[] onRetryBlock = new LocatedBlock[1];
-            INodeFile pendingFile = analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
-            String src2 = pendingFile.getFullPathName();
+            FileState fileState = analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
+            INodeFile pendingFile = fileState.inode;
+            String src2 = fileState.path;
 
             if (onRetryBlock[0] != null && onRetryBlock[0].getLocations().length > 0) {
               // This is a retry. Just return the last block if having locations.
@@ -2871,9 +2872,10 @@ public class FSNamesystem
             Block newBlock;
             long offset;
             onRetryBlock = new LocatedBlock[1];
-            pendingFile =
+            fileState =
                 analyzeFileState(src2, fileId, clientName, previous, onRetryBlock);
-
+            pendingFile = fileState.inode;
+            src2 = fileState.path;
             if (onRetryBlock[0] != null) {
               if (onRetryBlock[0].getLocations().length > 0) {
                 // This is a retry. Just return the last block if having locations.
@@ -2927,7 +2929,17 @@ public class FSNamesystem
     return (LocatedBlock) additionalBlockHandler.handle(this);
   }
 
-  private INodeFile analyzeFileState(String src, long fileId, String clientName,
+  static class FileState {
+    public final INodeFile inode;
+    public final String path;
+  
+    public FileState(INodeFile inode, String fullPath) {
+      this.inode = inode;
+      this.path = fullPath;
+    }
+  }
+
+  FileState analyzeFileState(String src, long fileId, String clientName,
       ExtendedBlock previous, LocatedBlock[] onRetryBlock)
       throws IOException {
 
@@ -3012,7 +3024,7 @@ public class FSNamesystem
             ((BlockInfoUnderConstruction) lastBlockInFile).getExpectedStorageLocations(
                 getBlockManager().getDatanodeManager()),
             offset);
-        return pendingFile;
+        return new FileState(pendingFile, src);
       } else {
         // Case 3
         throw new IOException("Cannot allocate block in " + src + ": " +
@@ -3026,7 +3038,7 @@ public class FSNamesystem
       throw new NotReplicatedYetException("Not replicated yet: " + src +
               " block " + pendingFile.getPenultimateBlock());
     }
-    return pendingFile;
+    return new FileState(pendingFile, src);
   }
 
   private LocatedBlock makeLocatedBlock(Block blk, DatanodeStorageInfo[] locs, long offset)
