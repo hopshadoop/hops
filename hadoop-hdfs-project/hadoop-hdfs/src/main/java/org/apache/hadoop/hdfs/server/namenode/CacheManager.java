@@ -35,12 +35,9 @@ import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.SortedMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
@@ -64,19 +61,15 @@ import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock.Type;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.util.GSet;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.primitives.Longs;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
-import io.hops.metadata.hdfs.dal.CacheDirectiveDataAccess;
 import io.hops.metadata.hdfs.dal.CachePoolDataAccess;
-import io.hops.metadata.hdfs.dal.CachedBlockDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -85,15 +78,15 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.fs.permission.FsPermission;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
-import static io.hops.transaction.lock.LockFactory.BLK;
 import java.util.TreeMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The Cache Manager handles caching on DataNodes.
@@ -106,7 +99,7 @@ import java.util.TreeMap;
 @InterfaceAudience.LimitedPrivate({"HDFS"})
 public final class CacheManager {
 
-  public static final Log LOG = LogFactory.getLog(CacheManager.class);
+  public static final Logger LOG = LoggerFactory.getLogger(CacheManager.class);
 
   private static final float MIN_CACHED_BLOCKS_PERCENT = 0.001f;
 
@@ -163,8 +156,8 @@ public final class CacheManager {
         DFS_NAMENODE_PATH_BASED_CACHE_BLOCK_MAP_ALLOCATION_PERCENT,
         DFS_NAMENODE_PATH_BASED_CACHE_BLOCK_MAP_ALLOCATION_PERCENT_DEFAULT);
     if (cachedBlocksPercent < MIN_CACHED_BLOCKS_PERCENT) {
-      LOG.info("Using minimum value " + MIN_CACHED_BLOCKS_PERCENT + " for "
-          + DFS_NAMENODE_PATH_BASED_CACHE_BLOCK_MAP_ALLOCATION_PERCENT);
+      LOG.info("Using minimum value {} for {}", MIN_CACHED_BLOCKS_PERCENT,
+          DFS_NAMENODE_PATH_BASED_CACHE_BLOCK_MAP_ALLOCATION_PERCENT);
       cachedBlocksPercent = MIN_CACHED_BLOCKS_PERCENT;
     }
 
@@ -332,10 +325,8 @@ public final class CacheManager {
    */
   private static long validateExpiryTime(CacheDirectiveInfo info,
       long maxRelativeExpiryTime) throws InvalidRequestException {
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Validating directive " + info
-          + " pool maxRelativeExpiryTime " + maxRelativeExpiryTime);
-    }
+    LOG.trace("Validating directive {} pool maxRelativeExpiryTime {}", info,
+        maxRelativeExpiryTime);
     final long now = new Date().getTime();
     final long maxAbsoluteExpiryTime = now + maxRelativeExpiryTime;
     if (info == null || info.getExpiration() == null) {
@@ -503,7 +494,7 @@ public final class CacheManager {
       LOG.warn("addDirective of " + info + " failed: ", e);
       throw e;
     }
-    LOG.info("addDirective of " + info + " successful.");
+    LOG.info("addDirective of {} successful.", info);
     return directive.toInfo();
   }
 
@@ -580,7 +571,7 @@ public final class CacheManager {
       LOG.warn("modifyDirective of " + idString + " failed: ", e);
       throw e;
     }
-    LOG.info("modifyDirective of " + idString + " successfully applied " + info + ".");
+    LOG.info("modifyDirective of {} successfully applied {}.", idString, info);
   }
 
   private void removeInternal(CacheDirective directive)
@@ -726,7 +717,7 @@ public final class CacheManager {
       LOG.info("addCachePool of " + info + " failed: ", e);
       throw e;
     }
-    LOG.info("addCachePool of " + info + " successful.");
+    LOG.info("addCachePool of {} successful.", info);
     return pool.getInfo(true);
   }
 
@@ -789,8 +780,8 @@ public final class CacheManager {
       LOG.info("modifyCachePool of " + info + " failed: ", e);
       throw e;
     }
-    LOG.info("modifyCachePool of " + info.getPoolName() + " successful; "
-        + bld.toString());
+    LOG.info("modifyCachePool of {} successful; {}", info.getPoolName(), 
+        bld.toString());
   }
 
   /**
@@ -907,11 +898,8 @@ public final class CacheManager {
     if (metrics != null) {
       metrics.addCacheBlockReport((int) (endTime - startTime));
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Processed cache report from "
-          + datanodeID + ", blocks: " + blockIds.size()
-          + ", processing time: " + (endTime - startTime) + " msecs");
-    }
+    LOG.debug("Processed cache report from {}, blocks: {}, " + "processing time: {} msecs", datanodeID, blockIds.size(),
+        (endTime - startTime));
   }
 
   private void processCacheReportImpl(final DatanodeDescriptor datanode,
@@ -922,6 +910,8 @@ public final class CacheManager {
     Set<CachedBlock> cached = new HashSet<>();
     for (Iterator<Long> iter = blockIds.iterator(); iter.hasNext();) {
       long blockId = iter.next();
+      LOG.trace("Cache report from datanode {} has block {}", datanode,
+          blockId);
       INodeIdentifier inode = INodeUtil.resolveINodeFromBlockID(blockId);
       long inodeId = -1;
       if(inode!=null){
@@ -935,6 +925,7 @@ public final class CacheManager {
       if (prevCachedBlock != null) {
         cachedBlock = prevCachedBlock;
         cachedBlock.switchPendingCachedToCached(datanode);
+        LOG.trace("Added block {} to CACHED list.", cachedBlock);
       }
       cached.add(cachedBlock);
       if(pendingUncache.contains(cachedBlock)){

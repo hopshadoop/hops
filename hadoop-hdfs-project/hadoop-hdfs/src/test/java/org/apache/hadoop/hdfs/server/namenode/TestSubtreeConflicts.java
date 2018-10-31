@@ -30,9 +30,12 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 public class TestSubtreeConflicts extends TestCase {
-
+  static final Log LOG = LogFactory.getLog(TestSubtreeConflicts.class);
+  
   static boolean fail=false;
   static String failMessage="";
 
