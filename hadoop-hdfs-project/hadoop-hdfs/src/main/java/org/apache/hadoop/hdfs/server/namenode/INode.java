@@ -18,27 +18,19 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import com.google.common.primitives.SignedBytes;
 import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
-import io.hops.metadata.hdfs.entity.Ace;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
-import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import java.io.FileNotFoundException;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.AclEntry;
-import org.apache.hadoop.fs.permission.AclEntryScope;
-import org.apache.hadoop.fs.permission.AclEntryType;
-import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -51,8 +43,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -61,6 +51,7 @@ import java.util.logging.Logger;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.util.ChunkedArrayList;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
+import org.apache.hadoop.hdfs.util.LongBitFormat;
 
 /**
  * We keep an in-memory representation of the file/block hierarchy.
@@ -150,61 +141,37 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   }
   
   
-  public static class HeaderFormat {
-
-    /**
-     * Number of bits for Block size
-     */
-    static final int BLOCKBITS = 48;
-    //Number of bits for Block size
-    final static short REPLICATION_BITS = 8;
-    final static short BOOLEAN_BITS = 8;
-    final static short HAS_BLKS_BITS = 1; // this is out of the 8 bits for the storing booleans
-    //Header mask 64-bit representation
-    //Format:[8 bits for flags][8 bits for replication degree][48 bits for PreferredBlockSize]
-    final static long MAX_BLOCK_SIZE = 0x0000FFFFFFFFFFFFL;
-    final static long REPLICATION_MASK = 0x00FF000000000000L;
-    final static long FLAGS_MASK = 0xFF00000000000000L;
-    final static long HAS_BLKS_MASK = 0x0100000000000000L;
-    //[8 bits for flags]
-    //0 bit : 1 if the file has blocks. 0 blocks
-    //remaining bits are not yet used
-
-    static public short getReplication(long header) {
-      return (short) ((header & REPLICATION_MASK) >> BLOCKBITS);
+   static enum HeaderFormat {
+    PREFERRED_BLOCK_SIZE(null, 48, 1),
+    REPLICATION(PREFERRED_BLOCK_SIZE.BITS, 8, 1),
+    HAS_BLOCKS(REPLICATION.BITS, 8, 0);
+    
+    public final LongBitFormat BITS;
+   
+    private HeaderFormat(LongBitFormat previous, int length, long min) {
+      BITS = new LongBitFormat(name(), previous, length, min);
     }
 
-    static long combineReplication(long header, short replication) {
-      if (replication <= 0 || replication > (Math.pow(2, REPLICATION_BITS) - 1)) {
-        throw new IllegalArgumentException("Unexpected value for the " + "replication [" + replication
-            + "]. Expected [1:" + (Math.pow(2, REPLICATION_BITS) - 1) + "]");
-      }
-      return ((long) replication << BLOCKBITS) | (header & ~REPLICATION_MASK);
+    static short getReplication(long header) {
+      return (short)REPLICATION.BITS.retrieve(header);
     }
 
     static public long getPreferredBlockSize(long header) {
-      return header & MAX_BLOCK_SIZE;
+      return PREFERRED_BLOCK_SIZE.BITS.retrieve(header);
     }
 
-    static long combinePreferredBlockSize(long header, long blockSize) {
-      if ((blockSize < 0) || (blockSize > (Math.pow(2, BLOCKBITS) - 1))) {
-        throw new IllegalArgumentException("Unexpected value for the block " + "size [" + blockSize + "]. Expected [1:"
-            + (Math.pow(2, BLOCKBITS) - 1) + "]");
-      }
-      return (header & ~MAX_BLOCK_SIZE) | (blockSize & MAX_BLOCK_SIZE);
-    }
-
-    static long combineHasBlocksNoPersistance(long header, boolean hasBlocks) {
-      long val = (hasBlocks) ? 1 : 0;
-      return ((long) val << (BLOCKBITS + REPLICATION_BITS)) | (header & ~HAS_BLKS_MASK);
+    static long toLong(long preferredBlockSize, short replication) {
+      long h = 0;
+      h = PREFERRED_BLOCK_SIZE.BITS.combine(preferredBlockSize, h);
+      h = REPLICATION.BITS.combine(replication, h);
+      return h;
     }
 
     static public boolean hasBlocks(long header) {
-      long val = (header & HAS_BLKS_MASK);
-      long val2 = val >> (BLOCKBITS + REPLICATION_BITS);
-      if (val2 == 1) {
+      long val = HAS_BLOCKS.BITS.retrieve(header);
+      if (val == 1) {
         return true;
-      } else if (val2 == 0) {
+      } else if (val == 0) {
         return false;
       } else {
         throw new IllegalStateException("Flags in the inode header are messed up");

@@ -92,7 +92,7 @@ public class TestINodeFile {
   private static final PermissionStatus perm = new PermissionStatus(
       "userName", null, FsPermission.getDefault());
   private short replication;
-  private long preferredBlockSize;
+  private long preferredBlockSize = 1024;
 
   @Before
   public void setup() throws IOException{
@@ -406,7 +406,7 @@ public class TestINodeFile {
 
     {
       final INode from = new INodeFile(0, perm, BlockInfo.EMPTY_ARRAY,
-          replication, 0L, 0L, 0L, (byte) 0);
+          replication, 0L, 0L, preferredBlockSize, (byte) 0);
       
       //cast to INodeFile, should success
       final INodeFile f = INodeFile.valueOf(from, path);

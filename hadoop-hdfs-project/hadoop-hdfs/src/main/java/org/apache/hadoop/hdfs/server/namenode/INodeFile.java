@@ -99,8 +99,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
       short replication, long modificationTime, long atime,
       long preferredBlockSize, byte storagePolicyID, boolean inTree) throws IOException {
     super(id, permissions, modificationTime, atime, inTree);
-    header = HeaderFormat.combineReplication(header, replication);
-    header = HeaderFormat.combinePreferredBlockSize(header, preferredBlockSize);
+    header = HeaderFormat.toLong(preferredBlockSize, replication);
     this.setFileStoredInDBNoPersistence(false); // it is set when the data is stored in the database
     this.setBlockStoragePolicyIDNoPersistance(storagePolicyID);
   }
@@ -491,7 +490,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
 
   void setReplication(short replication)
       throws StorageException, TransactionContextException {
-    header = HeaderFormat.combineReplication(header, replication);
+    header = HeaderFormat.REPLICATION.BITS.combine(replication, header);
     save();
   }
   
