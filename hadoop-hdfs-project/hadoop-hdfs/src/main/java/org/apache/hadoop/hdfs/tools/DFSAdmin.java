@@ -963,6 +963,12 @@ public class DFSAdmin extends FsShell {
     } else if ("-setBalancerBandwidth".equals(cmd)) {
       System.err.println("Usage: java DFSAdmin" +
           " [-setBalancerBandwidth <bandwidth in bytes per second>]");
+    } else if ("-shutdownDatanode".equals(cmd)) {
+      System.err.println("Usage: java DFSAdmin"
+          + " [-shutdownDatanode <datanode_host:ipc_port> [upgrade]]");
+    } else if ("-getDatanodeInfo".equals(cmd)) {
+      System.err.println("Usage: java DFSAdmin"
+          + " [-getDatanodeInfo <datanode_host:ipc_port>]");
     } else if ("-setStoragePolicy".equals(cmd)) {
       System.err.println("Usage: java DFSAdmin"
           + " [-setStoragePolicy path policyName]");
