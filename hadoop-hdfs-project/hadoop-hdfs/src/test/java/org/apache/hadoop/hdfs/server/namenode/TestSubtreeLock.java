@@ -46,10 +46,13 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import static org.apache.hadoop.hdfs.TestFileCreation.*;
 
 public class TestSubtreeLock extends TestCase {
+  static final Log LOG = LogFactory.getLog(TestSubtreeLock.class);
 
   @Test
   public void testSubtreeLocking() throws IOException {

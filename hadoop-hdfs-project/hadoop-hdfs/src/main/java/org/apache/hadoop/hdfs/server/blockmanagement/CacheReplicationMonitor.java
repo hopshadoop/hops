@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -33,10 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.CacheDirective;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
@@ -44,25 +40,18 @@ import org.apache.hadoop.hdfs.server.namenode.CacheManager;
 import org.apache.hadoop.hdfs.server.namenode.CachePool;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock.Type;
-import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
-import org.apache.hadoop.util.GSet;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
-import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.hdfs.dal.CacheDirectiveDataAccess;
-import io.hops.metadata.hdfs.dal.CachedBlockDataAccess;
-import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -72,9 +61,9 @@ import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import static io.hops.transaction.lock.LockFactory.BLK;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -86,7 +75,7 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 @InterfaceAudience.LimitedPrivate({"HDFS"})
 public class CacheReplicationMonitor extends Thread implements Closeable {
 
-  private static final Log LOG = LogFactory.getLog(CacheReplicationMonitor.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CacheReplicationMonitor.class);
 
   private final FSNamesystem namesystem;
 
@@ -221,7 +210,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
       LOG.info("Shutting down CacheReplicationMonitor.");
       return;
     } catch (Throwable t) {
-      LOG.fatal("Thread exiting", t);
+      LOG.error("Thread exiting", t);
       terminate(1, t);
     }
   }
@@ -364,10 +353,8 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
           directive.resetStatistics();
           // Skip processing this entry if it has expired
           if (directive.getExpiryTime() > 0 && directive.getExpiryTime() <= now) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Directive " + directive.getId() + ": the directive " + "expired at " + directive.
-                  getExpiryTime() + " (now = " + now + ")");
-            }
+            LOG.debug("Directive {}: the directive expired at {} (now = {})",
+              directive.getId(), directive.getExpiryTime(), now);
             return null;
           }
           final String path = directive.getPath();
@@ -375,14 +362,12 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
           INode node = namesystem.getINode(directive.getPath());
 
           if (node == null) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Directive " + directive.getId() + ": No inode found at " + path);
-            }
+            LOG.debug("Directive {}: No inode found at {}", directive.getId(), path);
           } else if (node.isSymlink()) {
             // We don't cache through symlinks
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Directive " + directive.getId() + ": got UnresolvedLinkException while resolving path " + path);
-            }
+            LOG.debug("Directive {}: got UnresolvedLinkException while resolving "
+                + "path {}", directive.getId(), path
+            );
             return null;
           } else if (node.isDirectory()) {
             INodeDirectory dir = node.asDirectory();
@@ -394,8 +379,9 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
             }
           } else if (node.isFile()) {
             rescanFile(directive, node.asFile());
-          } else if (LOG.isDebugEnabled()) {
-            LOG.debug("Directive " + directive.getId() + ": ignoring non-directive, non-file inode " + node);
+          } else {
+            LOG.debug("Directive {}: ignoring non-directive, non-file inode {} ",
+              directive.getId(), node);
           }
           return null;
 
@@ -437,15 +423,13 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
     // do not cache this file.
     CachePool pool = directive.getPool();
     if (pool.getBytesNeeded() > pool.getLimit()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Directive %d: not scanning file %s because "
-            + "bytesNeeded for pool %s is %d, but the pool's limit is %d",
-            directive.getId(),
-            file.getFullPathName(),
-            pool.getPoolName(),
-            pool.getBytesNeeded(),
-            pool.getLimit()));
-      }
+      LOG.debug("Directive {}: not scanning file {} because " +
+          "bytesNeeded for pool {} is {}, but the pool's limit is {}",
+          directive.getId(),
+          file.getFullPathName(),
+          pool.getPoolName(),
+          pool.getBytesNeeded(),
+          pool.getLimit());
       return;
     }
 
@@ -453,10 +437,10 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
     for (BlockInfo blockInfo : blockInfos) {
       if (!blockInfo.getBlockUCState().equals(BlockUCState.COMPLETE)) {
         // We don't try to cache blocks that are under construction.
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Directive " + directive.getId() + ": can't cache " + "block " + blockInfo
-              + " because it is in state " + blockInfo.getBlockUCState() + ", not COMPLETE.");
-        }
+        LOG.trace("Directive {}: can't cache block {} because it is in state "
+                + "{}, not COMPLETE.", directive.getId(), blockInfo,
+            blockInfo.getBlockUCState()
+        );
         continue;
       }
       Block block = new Block(blockInfo.getBlockId());
@@ -470,7 +454,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
         // Update bytesUsed using the current replication levels.
         // Assumptions: we assume that all the blocks are the same length
         // on each datanode.  We can assume this because we're only caching
-        // blocks in state COMMITTED.
+        // blocks in state COMPLETE.
         // Note that if two directives are caching the same block(s), they will
         // both get them added to their bytesCached.
         List<DatanodeDescriptor> cachedOn = ocblock.getDatanodes(Type.CACHED);
@@ -495,20 +479,16 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
           ocblock.save();
         }
       }
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Directive " + directive.getId() + ": setting replication " +
-                "for block " + blockInfo + " to " + ocblock.getReplication());
-      }
+      LOG.trace("Directive {}: setting replication for block {} to {}",
+          directive.getId(), blockInfo, ocblock.getReplication());
     }
     // Increment the "cached" statistics
     directive.addBytesCached(cachedTotal);
     if (cachedTotal == neededTotal) {
       directive.addFilesCached(1);
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Directive " + directive.getId() + ": caching " + file.getFullPathName() + ": " + cachedTotal + "/"
-          + neededTotal + " bytes");
-    }
+    LOG.debug("Directive {}: caching {}: {}/{} bytes", directive.getId(),
+        file.getFullPathName(), cachedTotal, neededTotal);
   }
 
   private String findReasonForNotCaching(CachedBlock cblock,
@@ -580,9 +560,8 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
           String reason = findReasonForNotCaching(cblock, blockInfo);
           int neededCached = 0;
           if (reason != null) {
-            if (LOG.isTraceEnabled()) {
-              LOG.trace("Block " + cblock.getBlockId() + ": can't cache " + "block because it is " + reason);
-            }
+            LOG.trace("Block {}: can't cache block because it is {}",
+              cblock.getBlockId(), reason);
           } else {
             neededCached = cblock.getReplication();
           }
@@ -594,11 +573,11 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
               DatanodeDescriptor datanode = iter.next();
               cblock.removePending(datanode);
               iter.remove();
-              if (LOG.isTraceEnabled()) {
-                LOG.trace("Block " + cblock.getBlockId() + ": removing from " + "PENDING_CACHED for node " + datanode.
-                    getDatanodeUuid() + "because we already have " + numCached + " cached "
-                    + "replicas and we only need " + neededCached);
-              }
+              LOG.trace("Block {}: removing from PENDING_CACHED for node {}"
+                  + "because we already have {} cached replicas and we only" + " need {}",
+                  cblock.getBlockId(), datanode.getDatanodeUuid(), numCached,
+                  neededCached
+              );
             }
           }
           if (numCached < neededCached) {
@@ -608,11 +587,11 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
               DatanodeDescriptor datanode = iter.next();
               cblock.switchPendingUncachedToCached(datanode);
               iter.remove();
-              if (LOG.isTraceEnabled()) {
-                LOG.trace("Block " + cblock.getBlockId() + ": removing from " + "PENDING_UNCACHED for node " + datanode.
-                    getDatanodeUuid() + "because we only have " + numCached + " cached replicas " + "and we need "
-                    + neededCached);
-              }
+              LOG.trace("Block {}: removing from PENDING_UNCACHED for node {} "
+                  + "because we only have {} cached replicas and we need " + "{}", cblock.getBlockId(), datanode.
+                  getDatanodeUuid(),
+                  numCached, neededCached
+              );
             }
           }
           int neededUncached = numCached - (pendingUncached.size() + neededCached);
@@ -628,10 +607,9 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
           }
           if ((neededCached == 0) && pendingUncached.isEmpty() && pendingCached.isEmpty()) {
             // we have nothing more to do with this block.
-            if (LOG.isTraceEnabled()) {
-              LOG.trace("Block " + cblock.getBlockId() + ": removing from "
-                  + "cachedBlocks, since neededCached == 0, and " + "pendingUncached and pendingCached are empty.");
-            }
+            LOG.trace("Block {}: removing from cachedBlocks, since neededCached "
+                + "== 0, and pendingUncached and pendingCached are empty.",
+                cblock.getBlockId());
             cblock.remove();
           }
         }
@@ -690,16 +668,14 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
         getStoredBlock(new Block(cachedBlock.getBlockId()));
     if (blockInfo == null) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Block " + cachedBlock.getBlockId() + ": can't add new "
-            + "cached replicas, because there is no record of this block " + "on the NameNode.");
+        LOG.debug("Block {}: can't add new cached replicas," + " because there is no record of this block "
+            + "on the NameNode.", cachedBlock.getBlockId());
       }
       return;
     }
     if (!blockInfo.isComplete()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Block " + cachedBlock.getBlockId() + ": can't cache this " +
-            "block, because it is not yet complete.");
-      }
+      LOG.debug("Block {}: can't cache this block, because it is not yet"
+          + " complete.", cachedBlock.getBlockId());
       return;
     }
     // Filter the list of replicas to only the valid targets
@@ -722,14 +698,14 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
       if (pendingCached.contains(datanode) || cached.contains(datanode)) {
         continue;
       }
-      long pendingCapacity = datanode.getCacheRemaining();
+      long pendingBytes = 0;
       // Subtract pending cached blocks from effective capacity
       Iterator<CachedBlock> it = datanode.getPendingCached(blockManager.getDatanodeManager()).iterator();
       while (it.hasNext()) {
         CachedBlock cBlock = it.next();
         BlockInfo info = blockManager.getStoredBlock(new Block(cBlock.getBlockId()));
         if (info != null) {
-          pendingCapacity -= info.getNumBytes();
+          pendingBytes -= info.getNumBytes();
         }
       }
       it = datanode.getPendingUncached(blockManager.getDatanodeManager()).iterator();
@@ -738,17 +714,17 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
         CachedBlock cBlock = it.next();
         BlockInfo info = blockManager.getStoredBlock(new Block(cBlock.getBlockId()));
         if (info != null) {
-          pendingCapacity += info.getNumBytes();
+          pendingBytes += info.getNumBytes();
         }
       }
+      long pendingCapacity = pendingBytes + datanode.getCacheRemaining();
       if (pendingCapacity < blockInfo.getNumBytes()) {
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Block " + blockInfo.getBlockId() + ": DataNode " +
-              datanode.getDatanodeUuid() + " is not a valid possibility " +
-              "because the block has size " + blockInfo.getNumBytes() + ", but " +
-              "the DataNode only has " + datanode.getCacheRemaining() + " " +
-              "bytes of cache remaining.");
-        }
+        LOG.trace("Block {}: DataNode {} is not a valid possibility "
+            + "because the block has size {}, but the DataNode only has {}"
+            + "bytes of cache remaining ({} pending bytes, {} already cached.",
+            blockInfo.getBlockId(), datanode.getDatanodeUuid(),
+            blockInfo.getNumBytes(), pendingCapacity, pendingBytes,
+            datanode.getCacheRemaining());
         outOfCapacity++;
         continue;
       } else {
@@ -764,21 +740,19 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
     List<DatanodeDescriptor> chosen = chooseDatanodesForCaching(possibilities,
         neededCached, blockManager.getDatanodeManager().getStaleInterval(), blockInfo.getBlockId());
     for (DatanodeDescriptor datanode : chosen) {
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Block " + blockInfo.getBlockId() + ": added to " + "PENDING_CACHED on DataNode " + datanode.
-            getDatanodeUuid());
-      }
+      LOG.trace("Block {}: added to PENDING_CACHED on DataNode {}",
+          blockInfo.getBlockId(), datanode.getDatanodeUuid());
       pendingCached.add(datanode);
       boolean added = cachedBlock.addPendingCached(datanode);
       assert added;
     }
     // We were unable to satisfy the requested replication factor
     if (neededCached > chosen.size()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Block " + blockInfo.getBlockId() + ": we only have " + (cachedBlock.getReplication() - neededCached
-            + chosen.size()) + " of " + cachedBlock.getReplication() + " cached replicas.  " + outOfCapacity
-            + " DataNodes have insufficient cache capacity.");
-      }
+      LOG.debug("Block {}: we only have {} of {} cached replicas."
+          + " {} DataNodes have insufficient cache capacity.",
+          blockInfo.getBlockId(),
+          (cachedBlock.getReplication() - neededCached + chosen.size()),
+          cachedBlock.getReplication(), outOfCapacity);
     }
   }
 

@@ -57,19 +57,16 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo.Expiration;
-import org.apache.hadoop.hdfs.protocol.CacheDirectiveIterator;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveStats;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolStats;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
-import org.apache.hadoop.hdfs.server.blockmanagement.CacheReplicationMonitor;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.io.nativeio.NativeIO;
@@ -78,18 +75,13 @@ import org.apache.hadoop.io.nativeio.NativeIO.POSIX.NoMlockCacheManipulator;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.GSet;
-import org.apache.log4j.Level;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.google.common.base.Supplier;
-import io.hops.exception.StorageException;
-import io.hops.exception.TransactionContextException;
+import java.util.Arrays;
 import java.util.Set;
 import org.apache.hadoop.hdfs.BlockReaderTestUtil;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveIteratorForTesting;
@@ -645,13 +637,15 @@ public class TestCacheDirectives {
               numCachedReplicas += cachedBlock.getDatanodes(CachedBlock.Type.CACHED).size();
             }
           }
+          LOG.info(logString + " cached blocks: have " + numCachedBlocks +
+            " / " + expectedCachedBlocks + ".  " +
+            "cached replicas: have " + numCachedReplicas +
+            " / " + expectedCachedReplicas);
           if (expectedCachedBlocks == -1 || numCachedBlocks == expectedCachedBlocks) {
             if (expectedCachedReplicas == -1 || numCachedReplicas == expectedCachedReplicas) {
               return true;
             }
           }
-          LOG.info(logString + " cached blocks: have " + numCachedBlocks + " / " + expectedCachedBlocks + ".  "
-              + "cached replicas: have " + numCachedReplicas + " / " + expectedCachedReplicas);
           return false;
         } catch (IOException ex) {
           LOG.error(ex, ex);
@@ -1378,7 +1372,9 @@ public class TestCacheDirectives {
     for (DataNode dn : cluster.getDataNodes()) {
       DatanodeDescriptor descriptor =
           datanodeManager.getDatanode(dn.getDatanodeId());
-      Assert.assertTrue(descriptor.getPendingCachedTX(datanodeManager).isEmpty());
+      Assert.assertTrue("Pending cached list of " + descriptor + " is not empty, "
+          + Arrays.toString(descriptor.getPendingCachedTX(datanodeManager).toArray()),
+          descriptor.getPendingCachedTX(datanodeManager).isEmpty());
     }
   }
   
@@ -1393,10 +1389,6 @@ public class TestCacheDirectives {
     int numCachedReplicas = (int) ((CACHE_CAPACITY*NUM_DATANODES)/BLOCK_SIZE);
     DFSTestUtil.createFile(dfs, fileName, fileLen, (short) NUM_DATANODES,
         0xFADED);
-    // Set up a log appender watcher
-    final LogVerificationAppender appender = new LogVerificationAppender();
-    final Logger logger = Logger.getRootLogger();
-    logger.addAppender(appender);
     dfs.addCachePool(new CachePoolInfo("pool"));
     dfs.addCacheDirective(new CacheDirectiveInfo.Builder().setPool("pool")
         .setPath(fileName).setReplication((short) 1).build());
