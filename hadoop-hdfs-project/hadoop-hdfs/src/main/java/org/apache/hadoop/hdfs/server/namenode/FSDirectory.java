@@ -342,51 +342,21 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       throws FileAlreadyExistsException, FileNotFoundException,
       ParentNotDirectoryException, QuotaExceededException,
       UnresolvedLinkException, IOException, StorageException {
-    boolean overwrite = false;
-    if (null != options) {
-      for (Rename option : options) {
-        if (option == Rename.OVERWRITE) {
-          overwrite = true;
-        }
-      }
-    }
+    boolean overwrite = options != null && Arrays.asList(options).contains(Rename.OVERWRITE);
+    
     String error = null;
     final INodesInPath srcInodesInPath = getINodesInPath4Write(src, false);
     final INode[] srcInodes = srcInodesInPath.getINodes();
     final INode srcInode = srcInodes[srcInodes.length - 1];
-    // validate source
-    if (srcInode == null) {
-      error = "rename source " + src + " is not found.";
-      NameNode.stateChangeLog
-          .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-      throw new FileNotFoundException(error);
-    }
-    if (srcInodes.length == 1) {
-      error = "rename source cannot be the root";
-      NameNode.stateChangeLog
-          .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-      throw new IOException(error);
-    }
+    validateRenameSource(src, srcInodes);
 
     // validate the destination
     if (dst.equals(src)) {
       throw new FileAlreadyExistsException(
           "The source " + src + " and destination " + dst + " are the same");
     }
-    if (srcInode.isSymlink() &&
-        dst.equals(((INodeSymlink) srcInode).getSymlinkString())) {
-      throw new FileAlreadyExistsException(
-          "Cannot rename symlink " + src + " to its target " + dst);
-    }
-    // dst cannot be a directory or a file under src
-    if (dst.startsWith(src) &&
-        dst.charAt(src.length()) == Path.SEPARATOR_CHAR) {
-      error = "Rename destination " + dst +
-          " is a directory or file under source " + src;
-      NameNode.stateChangeLog
-          .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-      throw new IOException(error);
-    }
+    validateRenameDestination(src, dst, srcInode);
+    
     final byte[][] dstComponents = INode.getPathComponents(dst);
     INodesInPath dstInodesInPath = getExistingPathINodes(dstComponents);
     final INode[] dstInodes = dstInodesInPath.getINodes();
@@ -398,35 +368,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       throw new IOException(error);
     }
     if (dstInode != null) { // Destination exists
-      // It's OK to rename a file to a symlink and vice versa
-      if (dstInode.isDirectory() != srcInode.isDirectory()) {
-        error = "Source " + src + " and destination " + dst +
-            " must both be directories";
-        NameNode.stateChangeLog
-            .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-        throw new IOException(error);
-      }
-      if (!overwrite) { // If destination exists, overwrite flag must be true
-        error = "rename destination " + dst + " already exists";
-        NameNode.stateChangeLog
-            .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-        throw new FileAlreadyExistsException(error);
-      }
-      if (dstInode.isDirectory()) {
-        //[S] this a hack. handle this in the acquire lock phase
-        INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
-
-        Short depth = dstInode.myDepth();
-        boolean areChildrenRandomlyPartitioned = INode.isTreeLevelRandomPartitioned((short) (depth+1));
-        if (ida.hasChildren(dstInode.getId(), areChildrenRandomlyPartitioned)) {
-          error =
-                  "rename cannot overwrite non empty destination directory " + dst;
-          NameNode.stateChangeLog
-                  .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-          throw new IOException(error);
-        }
-      }
+      validateRenameOverwrite(src, dst, overwrite, srcInode, dstInode);
     }
     if (dstInodes[dstInodes.length - 2] == null) {
       error = "rename destination parent " + dst + " not found.";
@@ -444,6 +386,9 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     // Ensure dst has quota to accommodate rename
     verifyFsLimitsForRename(srcInodesInPath, dstInodesInPath, dstComponents[dstComponents.length-1]);
     verifyQuotaForRename(srcInodes, dstInodes, srcCounts,  dstCounts);
+    
+    RenameOperation tx = new RenameOperation(src, dst, srcInodesInPath, dstInodesInPath, srcCounts);
+    
     INode removedSrc = removeLastINodeForRename(srcInodesInPath, srcCounts);
     if (removedSrc == null) {
       error = "Failed to rename " + src + " to " + dst +
@@ -467,22 +412,16 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         restoreDst = true;
       }
 
-      removedSrc.setLocalNameNoPersistance(dstComponents[dstInodes.length - 1]);
       // add src as dst to complete rename
 
-      if (addLastINodeNoQuotaCheck(dstInodesInPath, removedSrc, srcCounts)) {
+      if (tx.addSourceToDestination()) {
         restoreSrc = false;
         if (NameNode.stateChangeLog.isDebugEnabled()) {
           NameNode.stateChangeLog.debug(
               "DIR* FSDirectory.unprotectedRenameTo: " + src +
                   " is renamed to " + dst);
         }
-        srcInodes[srcInodes.length - 2].setModificationTime(timestamp);
-        srcInodes[srcInodes.length - 2].asDirectory().decreaseChildrenNum();
-        dstInodes[dstInodes.length - 2].setModificationTime(timestamp);
-        srcInodes[srcInodes.length - 2].asDirectory().increaseChildrenNum();
-        // update moved lease with new filename
-        getFSNamesystem().unprotectedChangeLease(src, dst);
+        tx.updateMtimeAndLease(timestamp);
 
         // Collect the blocks and remove the lease for previous dst
         int filesDeleted = 0;
@@ -512,13 +451,12 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
             HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
             removedSrc);
         
+        tx.updateQuotasInSourceTree();
         return filesDeleted > 0;
       }
     } finally {
       if (restoreSrc) {
-        // Rename failed - restore src
-        removedSrc.setLocalNameNoPersistance(srcChildName);
-        addLastINodeNoQuotaCheck(srcInodesInPath, removedSrc, srcCounts);
+        tx.restoreSource();
       }
       if (restoreDst) {
         // Rename failed - restore dst
@@ -553,40 +491,22 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     final INodesInPath srcInodesInPath = getINodesInPath4Write(src, false);
     final INode[] srcInodes = srcInodesInPath.getINodes();
     INode srcInode = srcInodes[srcInodes.length - 1];
-
-    // check the validation of the source
-    if (srcInode == null) {
-      NameNode.stateChangeLog.warn(
-          "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
-              " to " + dst + " because source does not exist");
-      return false;
-    }
-    if (srcInodes.length == 1) {
-      NameNode.stateChangeLog.warn(
-          "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
-              " to " + dst + " because source is the root");
+    try {
+      validateRenameSource(src, srcInodes);
+    } catch (IOException ignored) {
       return false;
     }
     if (isDir(dst)) {
       dst += Path.SEPARATOR + new Path(src).getName();
     }
 
-    // check the validity of the destination
+    // validate the destination
     if (dst.equals(src)) {
       return true;
     }
-    if (srcInode.isSymlink() &&
-        dst.equals(((INodeSymlink) srcInode).getSymlinkString())) {
-      throw new FileAlreadyExistsException(
-          "Cannot rename symlink " + src + " to its target " + dst);
-    }
-
-    // dst cannot be directory or a file under src
-    if (dst.startsWith(src) &&
-        dst.charAt(src.length()) == Path.SEPARATOR_CHAR) {
-      NameNode.stateChangeLog.warn(
-          "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
-              " to " + dst + " because destination starts with src");
+    try {
+      validateRenameDestination(src, dst, srcInode);
+    } catch (IOException ignored) {
       return false;
     }
     
@@ -613,6 +533,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     verifyFsLimitsForRename(srcInodesInPath, dstInodesInPath, dstComponents[dstComponents.length-1]);
     verifyQuotaForRename(srcInodes, dstInodes, srcCounts, dstCounts);
 
+    RenameOperation tx = new RenameOperation(src, dst, srcInodesInPath, dstInodesInPath, srcCounts);
+    
     boolean added = false;
     INode srcChild = null;
     String srcChildName = null;
@@ -634,20 +556,16 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       srcChild.setLocalNameNoPersistance(dstComponents[dstInodes.length - 1]);
 
       // add src to the destination
-      added = addLastINodeNoQuotaCheck(dstInodesInPath, srcChild, srcCounts);
+      added = tx.addSourceToDestination();
       if (added) {
         if (NameNode.stateChangeLog.isDebugEnabled()) {
           NameNode.stateChangeLog.debug(
               "DIR* FSDirectory.unprotectedRenameTo: " + src +
                   " is renamed to " + dst);
         }
-        // update modification time of dst and the parent of src
-        srcInodes[srcInodes.length - 2].setModificationTime(timestamp);
-        srcInodes[srcInodes.length - 2].asDirectory().decreaseChildrenNum();
-        dstInodes[dstInodes.length - 2].setModificationTime(timestamp);
-        srcInodes[srcInodes.length - 2].asDirectory().increaseChildrenNum();
-        // update moved leases with new filename
-        getFSNamesystem().unprotectedChangeLease(src, dst);
+        
+        tx.updateMtimeAndLease(timestamp);
+        tx.updateQuotasInSourceTree();
         
         logMetadataEventForRename(srcClone, srcChild);
         
@@ -659,9 +577,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       }
     } finally {
       if (!added && srcChild != null) {
-        // put it back
-        srcChild.setLocalNameNoPersistance(srcChildName);
-        addLastINodeNoQuotaCheck(srcInodesInPath, srcChild, srcCounts);
+        tx.restoreSource();
       }
     }
     NameNode.stateChangeLog.warn(
@@ -695,6 +611,139 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       }
     }
   }
+  
+  private static void validateRenameOverwrite(String src, String dst,
+                                              boolean overwrite,
+                                              INode srcInode, INode dstInode)
+          throws IOException {
+    String error;// It's OK to rename a file to a symlink and vice versa
+    if (dstInode.isDirectory() != srcInode.isDirectory()) {
+      error = "Source " + src + " and destination " + dst
+          + " must both be directories";
+      NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedRenameTo: "
+          + error);
+      throw new IOException(error);
+    }
+    if (!overwrite) { // If destination exists, overwrite flag must be true
+      error = "rename destination " + dst + " already exists";
+      NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedRenameTo: "
+          + error);
+      throw new FileAlreadyExistsException(error);
+    }
+    if (dstInode.isDirectory()) {
+      //[S] this a hack. handle this in the acquire lock phase
+        INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
+                .getDataAccess(INodeDataAccess.class);
+
+        Short depth = dstInode.myDepth();
+        boolean areChildrenRandomlyPartitioned = INode.isTreeLevelRandomPartitioned((short) (depth+1));
+        if (ida.hasChildren(dstInode.getId(), areChildrenRandomlyPartitioned)) {
+        error = "rename destination directory is not empty: " + dst;
+        NameNode.stateChangeLog.warn(
+            "DIR* FSDirectory.unprotectedRenameTo: " + error);
+        throw new IOException(error);
+      }
+    }
+  }
+  
+  private static void validateRenameDestination(String src, String dst, INode srcInode)
+          throws IOException {
+    String error;
+    if (srcInode.isSymlink() &&
+        dst.equals(srcInode.asSymlink().getSymlinkString())) {
+      throw new FileAlreadyExistsException(
+          "Cannot rename symlink "+src+" to its target "+dst);
+    }
+    // dst cannot be a directory or a file under src
+    if (dst.startsWith(src) &&
+        dst.charAt(src.length()) == Path.SEPARATOR_CHAR) {
+      error = "Rename destination " + dst
+          + " is a directory or file under source " + src;
+      NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedRenameTo: "
+          + error);
+      throw new IOException(error);
+    }
+  }
+  
+  private static void validateRenameSource(String src, INode[] srcInodes)
+          throws IOException {
+    String error;
+    final INode srcInode = srcInodes[srcInodes.length - 1];
+    // validate source
+    if (srcInode == null) {
+      error = "rename source " + src + " is not found.";
+      NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedRenameTo: "
+          + error);
+      throw new FileNotFoundException(error);
+    }
+    if (srcInodes.length == 1) {
+      error = "rename source cannot be the root";
+      NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedRenameTo: "
+          + error);
+      throw new IOException(error);
+    }
+  }
+  
+  private class RenameOperation {
+    private final INodesInPath srcIIP;
+    private final INodesInPath dstIIP;
+    private final String src;
+    private final String dst;
+    private INode srcChild;
+    private final INodeDirectory srcParent;
+    private final byte[] srcChildName;
+    private final Quota.Counts oldSrcCounts;
+    private final INode.DirCounts srcCounts;
+    
+    private RenameOperation(String src, String dst, INodesInPath srcIIP, INodesInPath dstIIP, INode.DirCounts srcCounts)
+            throws QuotaExceededException, StorageException, TransactionContextException {
+      this.srcIIP = srcIIP;
+      this.dstIIP = dstIIP;
+      this.src = src;
+      this.dst = dst;
+      srcChild = srcIIP.getLastINode();
+      srcChildName = srcChild.getLocalNameBytes();
+      srcParent = srcIIP.getINode(-2).asDirectory();
+      // Record the snapshot on srcChild. After the rename, before any new
+      // snapshot is taken on the dst tree, changes will be recorded in the latest
+      // snapshot of the src tree.
+      // check srcChild for reference
+      oldSrcCounts = Quota.Counts.newInstance();
+      this.srcCounts = srcCounts;
+    }
+    
+    boolean addSourceToDestination() throws IOException {
+      final INode dstParent = dstIIP.getINode(-2);
+      srcChild = srcIIP.getLastINode();
+      final byte[] dstChildName = dstIIP.getLastLocalName();
+      final INode toDst;
+      srcChild.setLocalNameNoPersistance(dstChildName);
+      toDst = srcChild;
+      return addLastINodeNoQuotaCheck(dstIIP, toDst, srcCounts);
+    }
+    
+    void updateMtimeAndLease(long timestamp) throws QuotaExceededException, StorageException, TransactionContextException {
+      srcParent.updateModificationTime(timestamp);
+      srcParent.decreaseChildrenNum();
+      final INode dstParent = dstIIP.getINode(-2);
+      dstParent.updateModificationTime(timestamp);
+      // update moved lease with new filename
+      getFSNamesystem().unprotectedChangeLease(src, dst);
+    }
+    
+    void restoreSource() throws IOException {
+      // Rename failed - restore src
+      // put it back
+      srcChild.setLocalNameNoPersistance(srcChildName);
+      // srcParent is not an INodeDirectoryWithSnapshot, we only need to add
+      // the srcChild back
+      addLastINodeNoQuotaCheck(srcIIP, srcChild, srcCounts);
+    }
+    
+    void updateQuotasInSourceTree() throws QuotaExceededException {
+    }
+  }
+  
   /**
    * Set file replication
    *

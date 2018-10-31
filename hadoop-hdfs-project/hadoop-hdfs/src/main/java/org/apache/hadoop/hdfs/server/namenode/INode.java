@@ -58,6 +58,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.util.ChunkedArrayList;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
 
@@ -522,6 +523,10 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    */
   public abstract long getModificationTime();
 
+  /** Update modification time if it is larger than the current value. */
+  public abstract void updateModificationTime(long mtime)
+      throws QuotaExceededException, StorageException, TransactionContextException;
+  
   /**
    * Set last modification time of inode.
    */
