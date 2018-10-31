@@ -44,6 +44,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -72,8 +73,8 @@ class InvalidateBlocks {
   }
 
   private void printBlockDeletionTime(final Log log) {
-    log.info(DFSConfigKeys.DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_MS_KEY
-        + " is set to " + pendingPeriodInMs + " ms.");
+    log.info(DFSConfigKeys.DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_SEC_KEY
+        + " is set to " + DFSUtil.durationToString(pendingPeriodInMs));
     SimpleDateFormat sdf = new SimpleDateFormat("yyyy MMM dd HH:mm:ss");
     Calendar calendar = new GregorianCalendar();
     calendar.add(Calendar.SECOND, (int) (this.pendingPeriodInMs / 1000));
