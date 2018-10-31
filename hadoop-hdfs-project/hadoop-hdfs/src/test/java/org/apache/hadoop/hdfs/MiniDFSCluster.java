@@ -567,78 +567,84 @@ public class MiniDFSCluster {
       Configuration[] dnConfOverlays,
       boolean skipFsyncForTesting)
       throws IOException {
-    ExitUtil.disableSystemExit();
-
-    // Re-enable symlinks for tests, see HADOOP-10020 and HADOOP-10052
-    FileSystem.enableSymlinks();
-
-    synchronized (MiniDFSCluster.class) {
-      instanceId = instanceCount++;
-    }
-
-    this.conf = conf;
-    base_dir = new File(determineDfsBaseDir());
-    data_dir = new File(base_dir, "data");
-    this.waitSafeMode = waitSafeMode;
-    this.checkExitOnShutdown = checkExitOnShutdown;
-    
-    int replication = conf.getInt(DFS_REPLICATION_KEY, 3);
-    conf.setInt(DFS_REPLICATION_KEY, Math.min(replication, numDataNodes));
-    int safemodeExtension =
-        conf.getInt(DFS_NAMENODE_SAFEMODE_EXTENSION_TESTING_KEY, 0);
-    conf.setInt(DFS_NAMENODE_SAFEMODE_EXTENSION_KEY, safemodeExtension);
-    conf.setInt(DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY, 3); // 3 second
-    conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-        StaticMapping.class, DNSToSwitchMapping.class);
-    if (conf.get(DFSConfigKeys.ENCODING_MANAGER_CLASSNAME_KEY) == null) {
-      conf.set(DFSConfigKeys.ENCODING_MANAGER_CLASSNAME_KEY,
-          MockEncodingManager.class.getName());
-    }
-    if (conf.get(DFSConfigKeys.BLOCK_REPAIR_MANAGER_CLASSNAME_KEY) == null) {
-      conf.set(DFSConfigKeys.BLOCK_REPAIR_MANAGER_CLASSNAME_KEY,
-          MockRepairManager.class.getName());
-    }
-
-    // Setting the configuration for Storage
-    conf.set(DFSConfigKeys.DFS_NDC_ENABLED_KEY, "true");
-    HdfsStorageFactory.resetDALInitialized();
-    HdfsStorageFactory.setConfiguration(conf);
-    if (format) {
-      try {
-        // this should be done before creating namenodes
-        LOG.debug("MiniDFSClustring Formatting the Cluster");
-        assert (HdfsStorageFactory.formatStorage());
-      } catch (StorageException ex) {
-        throw new IOException(ex);
-      }
-      if (data_dir.exists() && !FileUtil.fullyDelete(data_dir)) {
-        throw new IOException("Cannot remove data directory: " + data_dir);
-      }
-    }
-
+    boolean success = false;
     try {
-      createNameNodesAndSetConf(
-          nnTopology, manageNameDfsDirs, manageNameDfsSharedDirs,
-          enableManagedDfsDirsRedundancy,
-          format, startOpt, clusterId, conf);
-    } catch (IOException ioe) {
-      LOG.error("IOE creating namenodes. Permissions dump:\n" +
-          createPermissionsDiagnosisString(data_dir));
-      throw ioe;
-    }
+      ExitUtil.disableSystemExit();
 
-    if (startOpt == StartupOption.RECOVER) {
-      return;
-    }
+      // Re-enable symlinks for tests, see HADOOP-10020 and HADOOP-10052
+      FileSystem.enableSymlinks();
 
-    // Start the DataNodes
-    startDataNodes(conf, numDataNodes, storageTypes, manageDataDfsDirs,
-        dnStartOpt != null ? dnStartOpt : startOpt,
-        racks, hosts, storageCapacities, simulatedCapacities, setupHostsFile,
-        checkDataNodeAddrConfig, checkDataNodeHostConfig, dnConfOverlays);
-    waitClusterUp();
-    //make sure ProxyUsers uses the latest conf
-    ProxyUsers.refreshSuperUserGroupsConfiguration(conf);
+      synchronized (MiniDFSCluster.class) {
+        instanceId = instanceCount++;
+      }
+
+      this.conf = conf;
+      base_dir = new File(determineDfsBaseDir());
+      data_dir = new File(base_dir, "data");
+      this.waitSafeMode = waitSafeMode;
+      this.checkExitOnShutdown = checkExitOnShutdown;
+
+      int replication = conf.getInt(DFS_REPLICATION_KEY, 3);
+      conf.setInt(DFS_REPLICATION_KEY, Math.min(replication, numDataNodes));
+      int safemodeExtension = conf.getInt(DFS_NAMENODE_SAFEMODE_EXTENSION_TESTING_KEY, 0);
+      conf.setInt(DFS_NAMENODE_SAFEMODE_EXTENSION_KEY, safemodeExtension);
+      conf.setInt(DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY, 3); // 3 second
+      conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+          StaticMapping.class, DNSToSwitchMapping.class);
+      if (conf.get(DFSConfigKeys.ENCODING_MANAGER_CLASSNAME_KEY) == null) {
+        conf.set(DFSConfigKeys.ENCODING_MANAGER_CLASSNAME_KEY,
+            MockEncodingManager.class.getName());
+      }
+      if (conf.get(DFSConfigKeys.BLOCK_REPAIR_MANAGER_CLASSNAME_KEY) == null) {
+        conf.set(DFSConfigKeys.BLOCK_REPAIR_MANAGER_CLASSNAME_KEY,
+            MockRepairManager.class.getName());
+      }
+
+      // Setting the configuration for Storage
+      conf.set(DFSConfigKeys.DFS_NDC_ENABLED_KEY, "true");
+      HdfsStorageFactory.resetDALInitialized();
+      HdfsStorageFactory.setConfiguration(conf);
+      if (format) {
+        try {
+          // this should be done before creating namenodes
+          LOG.debug("MiniDFSClustring Formatting the Cluster");
+          assert (HdfsStorageFactory.formatStorage());
+        } catch (StorageException ex) {
+          throw new IOException(ex);
+        }
+        if (data_dir.exists() && !FileUtil.fullyDelete(data_dir)) {
+          throw new IOException("Cannot remove data directory: " + data_dir);
+        }
+      }
+
+      try {
+        createNameNodesAndSetConf(
+            nnTopology, manageNameDfsDirs, manageNameDfsSharedDirs,
+            enableManagedDfsDirsRedundancy,
+            format, startOpt, clusterId, conf);
+      } catch (IOException ioe) {
+        LOG.error("IOE creating namenodes. Permissions dump:\n" + createPermissionsDiagnosisString(data_dir));
+        throw ioe;
+      }
+
+      if (startOpt == StartupOption.RECOVER) {
+        return;
+      }
+
+      // Start the DataNodes
+      startDataNodes(conf, numDataNodes, storageTypes, manageDataDfsDirs,
+          dnStartOpt != null ? dnStartOpt : startOpt,
+          racks, hosts, storageCapacities, simulatedCapacities, setupHostsFile,
+          checkDataNodeAddrConfig, checkDataNodeHostConfig, dnConfOverlays);
+      waitClusterUp();
+      //make sure ProxyUsers uses the latest conf
+      ProxyUsers.refreshSuperUserGroupsConfiguration(conf);
+      success = true;
+    } finally {
+      if (!success) {
+        shutdown();
+      }
+    }
   }
   
   /**
