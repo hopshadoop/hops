@@ -182,7 +182,6 @@ import com.google.common.net.InetAddresses;
 import java.net.ConnectException;
 import org.apache.hadoop.hdfs.shortcircuit.DomainSocketFactory;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.tukaani.xz.UnsupportedOptionsException;
 
 /********************************************************
  * DFSClient can connect to a Hadoop Filesystem and
@@ -1049,33 +1048,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     }
     localAddrMap.put(addr.getHostAddress(), local);
     return local;
-  }
-
-  /**
-   * Should the block access token be refetched on an exception
-   *
-   * @param ex Exception received
-   * @param targetAddr Target datanode address from where exception was received
-   * @return true if block access token has expired or invalid and it should be
-   *         refetched
-   */
-  private static boolean tokenRefetchNeeded(IOException ex,
-      InetSocketAddress targetAddr) {
-    /*
-     * Get a new access token and retry. Retry is needed in 2 cases. 1) When
-     * both NN and DN re-started while DFSClient holding a cached access token.
-     * 2) In the case that NN fails to update its access key at pre-set interval
-     * (by a wide margin) and subsequently restarts. In this case, DN
-     * re-registers itself with NN and receives a new access key, but DN will
-     * delete the old access key from its memory since it's considered expired
-     * based on the estimated expiration date.
-     */
-    if (ex instanceof InvalidBlockTokenException || ex instanceof InvalidToken) {
-      LOG.info("Access token was invalid when connecting to " + targetAddr
-          + " : " + ex);
-      return true;
-    }
-    return false;
   }
 
   /**
