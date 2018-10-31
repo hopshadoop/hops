@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs.server.datanode;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
@@ -40,7 +39,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.HdfsBlockLocation;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -81,6 +79,7 @@ import com.google.common.primitives.Ints;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.BlockReaderTestUtil;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
+import org.apache.hadoop.io.IOUtils;
 
 public class TestFsDatasetCache {
   private static final Log LOG = LogFactory.getLog(TestFsDatasetCache.class);
@@ -109,7 +108,6 @@ public class TestFsDatasetCache {
 
   @Before
   public void setUp() throws Exception {
-    assumeTrue(!Path.WINDOWS);
     conf = new HdfsConfiguration();
     conf.setLong(
         DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS, 100);
@@ -137,6 +135,9 @@ public class TestFsDatasetCache {
 
   @After
   public void tearDown() throws Exception {
+    // Verify that each test uncached whatever it cached.  This cleanup is
+    // required so that file descriptors are not leaked across tests.
+    DFSTestUtil.verifyExpectedCacheUsage(0, 0, fsd);
     if (fs != null) {
       fs.close();
     }
@@ -197,9 +198,16 @@ public class TestFsDatasetCache {
       String bpid = loc.getLocatedBlock().getBlock().getBlockPoolId();
       Block block = loc.getLocatedBlock().getBlock().getLocalBlock();
       ExtendedBlock extBlock = new ExtendedBlock(bpid, block);
-      FileChannel blockChannel =
-          ((FileInputStream)fsd.getBlockInputStream(extBlock, 0)).getChannel();
-      sizes[i] = blockChannel.size();
+      FileInputStream blockInputStream = null;
+      FileChannel blockChannel = null;
+      try {
+        blockInputStream =
+          (FileInputStream)fsd.getBlockInputStream(extBlock, 0);
+        blockChannel = blockInputStream.getChannel();
+        sizes[i] = blockChannel.size();
+      } finally {
+        IOUtils.cleanup(LOG, blockChannel, blockInputStream);
+      }
     }
     return sizes;
   }
@@ -562,5 +570,7 @@ public class TestFsDatasetCache {
         return true;
       }
     }, 1000, 30000);
+    
+    dfs.removeCacheDirective(shortCacheDirectiveId);
   }
 }
