@@ -182,6 +182,7 @@ import com.google.common.net.InetAddresses;
 import java.net.ConnectException;
 import org.apache.hadoop.hdfs.shortcircuit.DomainSocketFactory;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
 
 /********************************************************
  * DFSClient can connect to a Hadoop Filesystem and
@@ -221,6 +222,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
   private Random r = new Random();
   private SocketAddress[] localInterfaceAddrs;
   private DataEncryptionKey encryptionKey;
+  final TrustedChannelResolver trustedChannelResolver;
   private boolean shouldUseLegacyBlockReaderLocal;
   private final CachingStrategy defaultReadCachingStrategy;
   private final CachingStrategy defaultWriteCachingStrategy;
@@ -668,6 +670,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     if (numThreads > 0) {
       this.initThreadsNumForHedgedReads(numThreads);
     }
+    this.trustedChannelResolver = TrustedChannelResolver.getInstance(getConfiguration());
   }
   
   /**
