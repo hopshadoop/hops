@@ -77,6 +77,7 @@ import java.util.ArrayList;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.web.resources.FsActionParam;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.token.TokenSelector;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSelector;
 
@@ -147,7 +148,7 @@ public class WebHdfsFileSystem extends FileSystem
 
     // In non-HA case, the code needs to call getCanonicalUri() in order to
     // handle the case where no port is specified in the URI
-    this.tokenServiceName = new Text(this.uri.getAuthority());
+    this.tokenServiceName = SecurityUtil.buildTokenService(getCanonicalUri());
     
     this.nnAddrs = resolveNNAddr();
     
@@ -217,8 +218,10 @@ public class WebHdfsFileSystem extends FileSystem
   }
   
   @Override
-  protected int getDefaultPort() {
-    return DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT;
+  @VisibleForTesting
+  public int getDefaultPort() {
+    return getConf().getInt(DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_KEY,
+        DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT);
   }
 
   @Override
