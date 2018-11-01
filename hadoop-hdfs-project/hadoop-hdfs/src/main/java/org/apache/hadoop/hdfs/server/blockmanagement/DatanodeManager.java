@@ -404,7 +404,7 @@ public class DatanodeManager {
    * Sort the located blocks by the distance to the target host.
    */
   public void sortLocatedBlocks(final String targethost,
-      final List<LocatedBlock> locatedblocks) {
+      final List<LocatedBlock> locatedblocks, boolean randomizeBlockLocationsPerBlock) {
     //sort the blocks
     final DatanodeDescriptor client = getDatanodeByHost(targethost);
     
@@ -423,7 +423,7 @@ public class DatanodeManager {
       }
       int activeLen = lastActiveIndex + 1;      
       networktopology.sortByDistance(client, b.getLocations(), activeLen,
-          b.getBlock().getBlockId());
+          b.getBlock().getBlockId(), randomizeBlockLocationsPerBlock);
     }
   }
   
