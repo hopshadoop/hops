@@ -45,7 +45,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Daemon;
 
 import java.io.Closeable;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -58,13 +57,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactory;
 
 /**
  * The class provides utilities for {@link Balancer} to access a NameNode
  */
 @InterfaceAudience.Private
-public class NameNodeConnector implements Closeable {
+public class NameNodeConnector implements Closeable, DataEncryptionKeyFactory {
   private static final Log LOG = Balancer.LOG;
   private static final Path BALANCER_ID_PATH = new Path("/system/balancer.id");
   private static final int MAX_NOT_CHANGED_ITERATIONS = 5;
@@ -121,7 +120,6 @@ public class NameNodeConnector implements Closeable {
   private BlockTokenSecretManager blockTokenSecretManager;
   private Daemon keyupdaterthread; // AccessKeyUpdater thread
   private DataEncryptionKey encryptionKey;
-  private final TrustedChannelResolver trustedChannelResolver;
 
 
   NameNodeConnector(URI nameNodeUri, List<Path> targetPaths, Configuration conf) throws IOException {
@@ -168,7 +166,6 @@ public class NameNodeConnector implements Closeable {
     if (out == null) {
       throw new IOException("Another balancer is running");
     }
-    this.trustedChannelResolver = TrustedChannelResolver.getInstance(conf);
   }
 
   /**
@@ -238,8 +235,9 @@ public class NameNodeConnector implements Closeable {
     return true;
   }
 
-  DataEncryptionKey getDataEncryptionKey() throws IOException {
-    if (encryptDataTransfer && !this.trustedChannelResolver.isTrusted()) {
+  @Override
+  public DataEncryptionKey newDataEncryptionKey() throws IOException {
+    if (encryptDataTransfer) {
       synchronized (this) {
         if (encryptionKey == null) {
           encryptionKey = blockTokenSecretManager.generateDataEncryptionKey();

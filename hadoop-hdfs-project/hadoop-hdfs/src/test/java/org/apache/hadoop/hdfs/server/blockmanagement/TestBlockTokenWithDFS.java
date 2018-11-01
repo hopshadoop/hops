@@ -61,6 +61,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.junit.Assert;
 
 import javax.net.SocketFactory;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -169,7 +170,8 @@ public class TestBlockTokenWithDFS {
             }
   
             @Override
-            public Peer newConnectedPeer(InetSocketAddress addr)
+            public Peer newConnectedPeer(InetSocketAddress addr,
+                Token<BlockTokenIdentifier> blockToken, DatanodeID datanodeId)
                 throws IOException {
               Peer peer = null;
               Socket sock = getSocketFactory(conf).createSocket();
