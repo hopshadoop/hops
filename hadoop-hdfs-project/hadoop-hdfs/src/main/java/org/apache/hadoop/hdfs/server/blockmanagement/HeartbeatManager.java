@@ -199,7 +199,7 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   synchronized void register(final DatanodeDescriptor d) {
-    if (!datanodes.contains(d)) {
+    if (!d.isAlive) {
       addDatanode(d);
 
       //update its timestamp

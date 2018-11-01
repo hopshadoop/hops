@@ -402,6 +402,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     buffer.append("Cache Used%: "+percent2String(cacheUsedPercent) + "\n");
     buffer.append("Cache Remaining%: "+percent2String(cacheRemainingPercent) + "\n");
 
+    buffer.append("Xceivers: "+getXceiverCount()+"\n");
     buffer.append("Last contact: " + new Date(lastUpdate) + "\n");
     return buffer.toString();
   }
