@@ -104,7 +104,7 @@ public class DatanodeProtocolClientSideTranslatorPB
     RPC.setProtocolEngine(conf, DatanodeProtocolPB.class,
         ProtobufRpcEngine.class);
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    rpcProxy = createNamenodeWithRetry(createNamenode(nameNodeAddr, conf, ugi));
+    rpcProxy = createNamenode(nameNodeAddr, conf, ugi);
   }
 
   private static DatanodeProtocolPB createNamenode(
@@ -114,37 +114,6 @@ public class DatanodeProtocolClientSideTranslatorPB
         RPC.getProtocolVersion(DatanodeProtocolPB.class), nameNodeAddr, ugi,
         conf, NetUtils.getSocketFactory(conf, DatanodeProtocolPB.class),
         org.apache.hadoop.ipc.Client.getPingInterval(conf), null).getProxy();
-  }
-
-  /**
-   * Create a {@link NameNode} proxy
-   */
-  static DatanodeProtocolPB createNamenodeWithRetry(
-      DatanodeProtocolPB rpcNamenode) {
-    RetryPolicy createPolicy = RetryPolicies
-        .retryUpToMaximumCountWithFixedSleep(5,
-            HdfsConstants.LEASE_SOFTLIMIT_PERIOD, TimeUnit.MILLISECONDS);
-
-    Map<Class<? extends Exception>, RetryPolicy> remoteExceptionToPolicyMap =
-        new HashMap<>();
-    remoteExceptionToPolicyMap
-        .put(AlreadyBeingCreatedException.class, createPolicy);
-
-    Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap =
-        new HashMap<>();
-    exceptionToPolicyMap.put(RemoteException.class, RetryPolicies
-        .retryByRemoteException(RetryPolicies.TRY_ONCE_THEN_FAIL,
-            remoteExceptionToPolicyMap));
-    RetryPolicy methodPolicy = RetryPolicies
-        .retryByException(RetryPolicies.TRY_ONCE_THEN_FAIL,
-            exceptionToPolicyMap);
-    Map<String, RetryPolicy> methodNameToPolicyMap =
-        new HashMap<>();
-
-    methodNameToPolicyMap.put("create", methodPolicy);
-
-    return (DatanodeProtocolPB) RetryProxy
-        .create(DatanodeProtocolPB.class, rpcNamenode, methodNameToPolicyMap);
   }
 
   @Override
