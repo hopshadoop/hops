@@ -1126,7 +1126,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
         OutputStream unbufOut = NetUtils.getOutputStream(sock, writeTimeout);
         InputStream unbufIn = NetUtils.getInputStream(sock);
-        if (dfsClient.shouldEncryptData()) {
+        if (dfsClient.shouldEncryptData() && 
+            !dfsClient.trustedChannelResolver.isTrusted(sock.getInetAddress())) {
           IOStreamPair encryptedStreams = DataTransferEncryptor
                   .getEncryptedStreams(unbufOut, unbufIn,
                           dfsClient.getDataEncryptionKey());
@@ -1507,7 +1508,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
           OutputStream unbufOut = NetUtils.getOutputStream(s, writeTimeout);
           InputStream unbufIn = NetUtils.getInputStream(s);
-          if (dfsClient.shouldEncryptData()) {
+          if (dfsClient.shouldEncryptData()  && 
+              !dfsClient.trustedChannelResolver.isTrusted(s.getInetAddress())) {
             IOStreamPair encryptedStreams = DataTransferEncryptor
                     .getEncryptedStreams(unbufOut, unbufIn,
                             dfsClient.getDataEncryptionKey());

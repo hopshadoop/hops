@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import com.google.common.net.InetAddresses;
 import com.google.protobuf.ByteString;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.hdfs.StorageType;
@@ -63,6 +64,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
@@ -174,7 +176,8 @@ class DataXceiver extends Receiver implements Runnable {
       dataXceiverServer.addPeer(peer, Thread.currentThread());
       peer.setWriteTimeout(datanode.getDnConf().socketWriteTimeout);
       InputStream input = socketIn;
-      if ((!peer.hasSecureChannel()) && dnConf.encryptDataTransfer) {
+      if ((!peer.hasSecureChannel()) && dnConf.encryptDataTransfer &&
+          !dnConf.trustedChannelResolver.isTrusted(getClientAddress(peer))){
         IOStreamPair encryptedStreams = null;
         try {
           encryptedStreams = DataTransferEncryptor
@@ -263,6 +266,19 @@ class DataXceiver extends Receiver implements Runnable {
         IOUtils.closeStream(in);
       }
     }
+  }
+  
+  /**
+   * Returns InetAddress from peer
+   * The getRemoteAddressString is the form  /ip-address:port
+   * The ip-address is extracted from peer and InetAddress is formed
+   * @param peer
+   * @return
+   * @throws UnknownHostException
+   */
+  private static InetAddress getClientAddress(Peer peer) {
+    return InetAddresses.forString(
+        peer.getRemoteAddressString().split(":")[0].substring(1));
   }
 
   @Override
@@ -643,7 +659,8 @@ class DataXceiver extends Receiver implements Runnable {
           OutputStream unbufMirrorOut =
               NetUtils.getOutputStream(mirrorSock, writeTimeout);
           InputStream unbufMirrorIn = NetUtils.getInputStream(mirrorSock);
-          if (dnConf.encryptDataTransfer) {
+          if (dnConf.encryptDataTransfer &&
+              !dnConf.trustedChannelResolver.isTrusted(mirrorSock.getInetAddress())) {
             IOStreamPair encryptedStreams = DataTransferEncryptor
                 .getEncryptedStreams(unbufMirrorOut, unbufMirrorIn,
                     datanode.blockPoolTokenSecretManager
@@ -964,7 +981,9 @@ class DataXceiver extends Receiver implements Runnable {
       OutputStream unbufProxyOut =
           NetUtils.getOutputStream(proxySock, dnConf.socketWriteTimeout);
       InputStream unbufProxyIn = NetUtils.getInputStream(proxySock);
-      if (dnConf.encryptDataTransfer) {
+      if (dnConf.encryptDataTransfer && 
+          !dnConf.trustedChannelResolver.isTrusted(
+              proxySock.getInetAddress())) {
         IOStreamPair encryptedStreams = DataTransferEncryptor
             .getEncryptedStreams(unbufProxyOut, unbufProxyIn,
                 datanode.blockPoolTokenSecretManager

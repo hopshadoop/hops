@@ -58,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
 
 /**
  * The class provides utilities for {@link Balancer} to access a NameNode
@@ -120,6 +121,8 @@ public class NameNodeConnector implements Closeable {
   private BlockTokenSecretManager blockTokenSecretManager;
   private Daemon keyupdaterthread; // AccessKeyUpdater thread
   private DataEncryptionKey encryptionKey;
+  private final TrustedChannelResolver trustedChannelResolver;
+
 
   NameNodeConnector(URI nameNodeUri, List<Path> targetPaths, Configuration conf) throws IOException {
     this.nameNodeUri = nameNodeUri;
@@ -165,6 +168,7 @@ public class NameNodeConnector implements Closeable {
     if (out == null) {
       throw new IOException("Another balancer is running");
     }
+    this.trustedChannelResolver = TrustedChannelResolver.getInstance(conf);
   }
 
   /**
@@ -235,7 +239,7 @@ public class NameNodeConnector implements Closeable {
   }
 
   DataEncryptionKey getDataEncryptionKey() throws IOException {
-    if (encryptDataTransfer) {
+    if (encryptDataTransfer && !this.trustedChannelResolver.isTrusted()) {
       synchronized (this) {
         if (encryptionKey == null) {
           encryptionKey = blockTokenSecretManager.generateDataEncryptionKey();
