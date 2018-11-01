@@ -40,6 +40,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdfs.TestBlockStoragePolicy;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -94,6 +95,7 @@ public class TestReplicationPolicyConsiderLoad {
     }
   }
 
+  private final double EPSILON = 0.0001;
   /**
    * Tests that chooseTarget with considerLoad set to true correctly calculates
    * load with decommissioned nodes.
@@ -119,12 +121,21 @@ public class TestReplicationPolicyConsiderLoad {
           dataNodes[5].getCacheRemaining(),
           4, 0, 0);
 
+      // value in the above heartbeats
+      final int load = 2 + 4 + 4;
+      
+      FSNamesystem fsn = namenode.getNamesystem();
+      assertEquals((double)load/6, fsn.getInServiceXceiverAverage(), EPSILON);
+      
+      // Decommission DNs so BlockPlacementPolicyDefault.isGoodTarget()
+      // returns false
       for (int i = 0; i < 3; i++) {
         DatanodeDescriptor d = dnManager.getDatanode(dnrList.get(i));
         dnManager.startDecommission(d);
         d.setDecommissioned();
       }
-     
+      assertEquals((double)load/3, fsn.getInServiceXceiverAverage(), EPSILON);
+  
       // update references of writer DN to update the de-commissioned state
       List<DatanodeDescriptor> liveNodes = new ArrayList<DatanodeDescriptor>();
       dnManager.fetchDatanodes(liveNodes, null, false);
