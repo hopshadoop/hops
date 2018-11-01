@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY;
+
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
@@ -74,6 +77,14 @@ import org.apache.hadoop.hdfs.server.blockmanagement.NumberReplicas;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 import javax.net.SocketFactory;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactory;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
+import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
+import org.apache.hadoop.security.token.Token;
 
 /**
  * This class provides rudimentary checking of DFS volumes for errors and
@@ -98,7 +109,7 @@ import javax.net.SocketFactory;
  * factors of each file.
  */
 @InterfaceAudience.Private
-public class NamenodeFsck {
+public class NamenodeFsck implements DataEncryptionKeyFactory {
   public static final Log LOG = LogFactory.getLog(NameNode.class.getName());
   
   // return string marking fsck status
@@ -155,6 +166,7 @@ public class NamenodeFsck {
   private final PrintWriter out;
 
   private BlockPlacementPolicy bpPolicy;
+  private final SaslDataTransferClient saslClient;
   
   /**
    * Filesystem checker.
@@ -189,7 +201,13 @@ public class NamenodeFsck {
     this.bpPolicy = BlockPlacementPolicy.getInstance(conf, null,
         networktopology, namenode.getNamesystem().getBlockManager().getDatanodeManager()
           .getHost2DatanodeMap());
-    
+    this.saslClient = new SaslDataTransferClient(
+        DataTransferSaslUtil.getSaslPropertiesResolver(conf),
+        TrustedChannelResolver.getInstance(conf),
+      conf.getBoolean(
+        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY,
+        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT));
+        
     for (String key : pmap.keySet()) {
       if (key.equals("path")) {
         this.path = pmap.get("path")[0];
@@ -674,15 +692,16 @@ public class NamenodeFsck {
               }
   
               @Override
-              public Peer newConnectedPeer(InetSocketAddress addr)
+              public Peer newConnectedPeer(InetSocketAddress addr,
+                  Token<BlockTokenIdentifier> blockToken, DatanodeID datanodeId)
                   throws IOException {
                 Peer peer = null;
                 Socket s = getSocketFactory(namenode.conf).createSocket();
                 try {
                   s.connect(addr, HdfsServerConstants.READ_TIMEOUT);
                   s.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
-                  peer = TcpPeerServer.peerFromSocketAndKey(s, namenode.getRpcServer().
-                        getDataEncryptionKey());
+                  peer = TcpPeerServer.peerFromSocketAndKey(saslClient, s,
+                        NamenodeFsck.this, blockToken, datanodeId);
                 } finally {
                   if (peer == null) {
                     IOUtils.closeQuietly(s);
@@ -720,6 +739,11 @@ public class NamenodeFsck {
     if (!success) {
       throw new Exception("Could not copy block data for " + lblock.getBlock());
     }
+  }
+
+  @Override
+  public DataEncryptionKey newDataEncryptionKey() throws IOException {
+    return namenode.getRpcServer().getDataEncryptionKey();
   }
 
   /*

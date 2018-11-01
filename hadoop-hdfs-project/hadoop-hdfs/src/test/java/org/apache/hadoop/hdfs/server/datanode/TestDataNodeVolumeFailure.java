@@ -60,6 +60,9 @@ import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.io.IOUtils;
 
 import javax.net.SocketFactory;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.security.token.Token;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -372,7 +375,8 @@ public class TestDataNodeVolumeFailure {
         }
   
         @Override
-        public Peer newConnectedPeer(InetSocketAddress addr)
+        public Peer newConnectedPeer(InetSocketAddress addr,
+            Token<BlockTokenIdentifier> blockToken, DatanodeID datanodeId)
             throws IOException {
           Peer peer = null;
           Socket sock = getSocketFactory(conf).createSocket();

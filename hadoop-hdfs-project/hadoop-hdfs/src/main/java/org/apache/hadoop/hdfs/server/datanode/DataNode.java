@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -48,7 +50,6 @@ import org.apache.hadoop.hdfs.protocol.HdfsBlocksMetadata;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.datatransfer.BlockConstructionStage;
-import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferEncryptor;
 import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
@@ -155,6 +156,10 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import org.apache.hadoop.hdfs.net.DomainPeerServer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.DatanodeLocalInfo;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactory;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferServer;
+import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.io.nativeio.NativeIO;
@@ -287,6 +292,8 @@ public class DataNode extends Configured
   private final List<String> usersWithLocalPathAccess;
   private boolean connectToDnViaHostname;
   ReadaheadPool readaheadPool;
+  SaslDataTransferClient saslClient;
+  SaslDataTransferServer saslServer;
   private final boolean getHdfsBlockLocationsEnabled;
   private ObjectName dataNodeInfoBeanName;  
   private Thread checkDiskErrorThread = null;
@@ -804,14 +811,9 @@ public class DataNode extends Configured
    * @throws IOException
    */
   void startDataNode(Configuration conf, AbstractList<StorageLocation> dataDirs,
-      // DatanodeProtocol namenode,
       SecureResources resources) throws IOException {
-    if (UserGroupInformation.isSecurityEnabled() && resources == null) {
-      if (!conf.getBoolean("ignore.secure.ports.for.testing", false)) {
-        throw new RuntimeException(
-            "Cannot start secure cluster without " + "privileged resources.");
-      }
-    }
+    
+    checkSecureConfig(conf, resources);
 
     // settings global for all BPs in the Data Node
     this.secureResources = resources;
@@ -874,6 +876,55 @@ public class DataNode extends Configured
     // Create the ReadaheadPool from the DataNode context so we can
     // exit without having to explicitly shutdown its thread pool.
     readaheadPool = ReadaheadPool.getInstance();
+    saslClient = new SaslDataTransferClient(dnConf.saslPropsResolver,
+      dnConf.trustedChannelResolver,
+      conf.getBoolean(
+        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY,
+        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT));
+    saslServer = new SaslDataTransferServer(dnConf, blockPoolTokenSecretManager);
+  }
+  
+  /**
+   * Checks if the DataNode has a secure configuration if security is enabled.
+   * There are 2 possible configurations that are considered secure:
+   * 1. The server has bound to privileged ports for RPC and HTTP via
+   *   SecureDataNodeStarter.
+   * 2. The configuration enables SASL on DataTransferProtocol and HTTPS (no
+   *   plain HTTP) for the HTTP server.  The SASL handshake guarantees
+   *   authentication of the RPC server before a client transmits a secret, such
+   *   as a block access token.  Similarly, SSL guarantees authentication of the
+   *   HTTP server before a client transmits a secret, such as a delegation
+   *   token.
+   * It is not possible to run with both privileged ports and SASL on
+   * DataTransferProtocol.  For backwards-compatibility, the connection logic
+   * must check if the target port is a privileged port, and if so, skip the
+   * SASL handshake.
+   *
+   * @param conf Configuration to check
+   * @param resources SecuredResources obtained for DataNode
+   * @throws RuntimeException if security enabled, but configuration is insecure
+   */
+  private static void checkSecureConfig(Configuration conf,
+      SecureResources resources) throws RuntimeException {
+    if (!UserGroupInformation.isSecurityEnabled()) {
+      return;
+    }
+    String dataTransferProtection = conf.get(DFS_DATA_TRANSFER_PROTECTION_KEY);
+    if (resources != null && dataTransferProtection == null) {
+      return;
+    }
+    if (conf.getBoolean("ignore.secure.ports.for.testing", false)) {
+      return;
+    }
+    if (dataTransferProtection != null &&
+        DFSUtil.getHttpPolicy(conf) == HttpConfig.Policy.HTTPS_ONLY &&
+        resources == null) {
+      return;
+    }
+    throw new RuntimeException("Cannot start secure DataNode without " +
+      "configuring either privileged resources or SASL RPC data transfer " +
+      "protection and SSL for HTTP.  Using privileged resources in " +
+      "combination with SASL RPC data transfer protection is not supported.");
   }
   
   private void createAndStartCRLFetcherService(Configuration conf) throws Exception {
@@ -1873,19 +1924,25 @@ public class DataNode extends Configured
         NetUtils.connect(sock, curTarget, dnConf.socketTimeout);
         sock.setSoTimeout(targets.length * dnConf.socketTimeout);
 
+        //
+        // Header info
+        //
+        Token<BlockTokenIdentifier> accessToken = BlockTokenSecretManager.DUMMY_TOKEN;
+        if (isBlockTokenEnabled) {
+          accessToken = blockPoolTokenSecretManager.generateToken(b, 
+              EnumSet.of(BlockTokenSecretManager.AccessMode.WRITE));
+        }
+        
         long writeTimeout = dnConf.socketWriteTimeout +
             HdfsServerConstants.WRITE_TIMEOUT_EXTENSION * (targets.length - 1);
         OutputStream unbufOut = NetUtils.getOutputStream(sock, writeTimeout);
         InputStream unbufIn = NetUtils.getInputStream(sock);
-        if (dnConf.encryptDataTransfer && 
-            !dnConf.trustedChannelResolver.isTrusted(sock.getInetAddress())) {
-          IOStreamPair encryptedStreams = DataTransferEncryptor
-              .getEncryptedStreams(unbufOut, unbufIn,
-                  blockPoolTokenSecretManager
-                      .generateDataEncryptionKey(b.getBlockPoolId()));
-          unbufOut = encryptedStreams.out;
-          unbufIn = encryptedStreams.in;
-        }
+        DataEncryptionKeyFactory keyFactory =
+          getDataEncryptionKeyFactoryForBlock(b);
+        IOStreamPair saslStreams = saslClient.socketSend(sock, unbufOut,
+          unbufIn, keyFactory, accessToken, bpReg);
+        unbufOut = saslStreams.out;
+        unbufIn = saslStreams.in;
         
         out = new DataOutputStream(new BufferedOutputStream(unbufOut,
             HdfsConstants.SMALL_BUFFER_SIZE));
@@ -1893,16 +1950,6 @@ public class DataNode extends Configured
         blockSender = new BlockSender(b, 0, b.getNumBytes(), false, false, true,
             DataNode.this, null, cachingStrategy);
         DatanodeInfo srcNode = new DatanodeInfo(bpReg);
-
-        //
-        // Header info
-        //
-        Token<BlockTokenIdentifier> accessToken =
-            BlockTokenSecretManager.DUMMY_TOKEN;
-        if (isBlockTokenEnabled) {
-          accessToken = blockPoolTokenSecretManager.generateToken(b,
-              EnumSet.of(BlockTokenSecretManager.AccessMode.WRITE));
-        }
 
         new Sender(out)
             .writeBlock(b, targetStorageTypes[0], accessToken, clientname,
@@ -1949,6 +1996,25 @@ public class DataNode extends Configured
         IOUtils.closeSocket(sock);
       }
     }
+  }
+  
+  /**
+   * Returns a new DataEncryptionKeyFactory that generates a key from the
+   * BlockPoolTokenSecretManager, using the block pool ID of the given block.
+   *
+   * @param block for which the factory needs to create a key
+   * @return DataEncryptionKeyFactory for block's block pool ID
+   */
+  DataEncryptionKeyFactory getDataEncryptionKeyFactoryForBlock(
+      final ExtendedBlock block) {
+    return new DataEncryptionKeyFactory() {
+      @Override
+      public DataEncryptionKey newDataEncryptionKey() throws IOException {
+        return dnConf.encryptDataTransfer ?
+          blockPoolTokenSecretManager.generateDataEncryptionKey(
+            block.getBlockPoolId()) : null;
+      }
+    };
   }
   
   /**

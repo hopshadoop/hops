@@ -25,6 +25,8 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil;
+import org.apache.hadoop.security.SaslPropertiesResolver;
 
 /**
  * Simple class encapsulating all of the configuration that the DataNode
@@ -57,6 +59,7 @@ public class DNConf {
   final String minimumNameNodeVersion;
   final String encryptionAlgorithm;
   final TrustedChannelResolver trustedChannelResolver;
+  final SaslPropertiesResolver saslPropsResolver;
   
   final long xceiverStopTimeout;
   final long restartReplicaExpiry;
@@ -133,6 +136,9 @@ public class DNConf {
     this.encryptionAlgorithm = conf.get(DFS_DATA_ENCRYPTION_ALGORITHM_KEY);
     this.trustedChannelResolver = TrustedChannelResolver.getInstance(conf);
 
+    this.saslPropsResolver = DataTransferSaslUtil.getSaslPropertiesResolver(
+      conf);
+        
     this.xceiverStopTimeout = conf.getLong(
         DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_KEY,
         DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
@@ -154,11 +160,48 @@ public class DNConf {
     return this.minimumNameNodeVersion;
   }
   
+  /**
+   * Returns true if encryption enabled for DataTransferProtocol.
+   *
+   * @return boolean true if encryption enabled for DataTransferProtocol
+   */
+  public boolean getEncryptDataTransfer() {
+    return encryptDataTransfer;
+  }
+  /**
+   * Returns encryption algorithm configured for DataTransferProtocol, or null
+   * if not configured.
+   *
+   * @return encryption algorithm configured for DataTransferProtocol
+   */
+  public String getEncryptionAlgorithm() {
+    return encryptionAlgorithm;
+  }
+  
   public long getXceiverStopTimeout() {
     return xceiverStopTimeout;
   }
   
   public long getMaxLockedMemory() {
     return maxLockedMemory;
+  }
+  
+  /**
+   * Returns the SaslPropertiesResolver configured for use with
+   * DataTransferProtocol, or null if not configured.
+   *
+   * @return SaslPropertiesResolver configured for use with DataTransferProtocol
+   */
+  public SaslPropertiesResolver getSaslPropsResolver() {
+    return saslPropsResolver;
+  }
+  /**
+   * Returns the TrustedChannelResolver configured for use with
+   * DataTransferProtocol, or null if not configured.
+   *
+   * @return TrustedChannelResolver configured for use with DataTransferProtocol
+   */
+  public TrustedChannelResolver getTrustedChannelResolver() {
+    return trustedChannelResolver;
   }
 }

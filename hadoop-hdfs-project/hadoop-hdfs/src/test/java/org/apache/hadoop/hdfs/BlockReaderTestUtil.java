@@ -53,6 +53,9 @@ import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 
 import javax.net.SocketFactory;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.security.token.Token;
 
 /**
  * A helper class to setup the cluster, and get to BlockReader and DataNode for a block.
@@ -200,7 +203,8 @@ public class BlockReaderTestUtil {
         }
   
         @Override
-        public Peer newConnectedPeer(InetSocketAddress addr)
+        public Peer newConnectedPeer(InetSocketAddress addr,
+            Token<BlockTokenIdentifier> blockToken, DatanodeID datanodeId)
             throws IOException {
           Peer peer = null;
           Socket sock = getSocketFactory(fs.getConf()).createSocket();

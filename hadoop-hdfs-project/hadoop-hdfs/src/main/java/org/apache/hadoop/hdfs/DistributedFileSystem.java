@@ -1252,7 +1252,7 @@ public class DistributedFileSystem extends FileSystem {
       @Override
       public FileChecksum doCall(final Path p)
           throws IOException, UnresolvedLinkException {
-        return dfs.getFileChecksum(getPathName(p));
+        return dfs.getFileChecksum(getPathName(p), Long.MAX_VALUE);
       }
 
       @Override
