@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdfs.web;
 
+import static org.junit.Assert.fail;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -41,9 +43,13 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
+import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Ignore;
+import org.mockito.internal.util.reflection.Whitebox;
 
 /**
  * Test WebHDFS
@@ -292,5 +298,37 @@ public class TestWebHDFS {
     Configuration conf = new HdfsConfiguration();
     Assert.assertTrue(conf.getBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY,
         false));
+  }
+  
+  /**
+   * Make sure a RetriableException is thrown when rpcServer is null in
+   * NamenodeWebHdfsMethods.
+   */
+  @Test
+  public void testRaceWhileNNStartup() throws Exception {
+    MiniDFSCluster cluster = null;
+    final Configuration conf = WebHdfsTestUtil.createConf();
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+      cluster.waitActive();
+      final NameNode namenode = cluster.getNameNode();
+      final NamenodeProtocols rpcServer = namenode.getRpcServer();
+      Whitebox.setInternalState(namenode, "rpcServer", null);
+      final Path foo = new Path("/foo");
+      final FileSystem webHdfs = WebHdfsTestUtil.getWebHdfsFileSystem(conf,
+          WebHdfsFileSystem.SCHEME);
+      try {
+        webHdfs.mkdirs(foo);
+        fail("Expected RetriableException");
+      } catch (RetriableException e) {
+        GenericTestUtils.assertExceptionContains("Namenode is in startup mode",
+            e);
+      }
+      Whitebox.setInternalState(namenode, "rpcServer", rpcServer);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
   }
 }

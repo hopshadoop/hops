@@ -120,6 +120,7 @@ import java.util.Set;
 import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
 import org.apache.hadoop.hdfs.web.resources.ExcludeDatanodesParam;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.util.StringUtils;
 
@@ -195,7 +196,7 @@ public class NamenodeWebHdfsMethods {
       throws IOException {
      final NamenodeProtocols np = namenode.getRpcServer();
      if (np == null) {
-       throw new IOException("Namenode is in startup mode");
+       throw new RetriableException("Namenode is in startup mode");
      }
      return np;
   }
