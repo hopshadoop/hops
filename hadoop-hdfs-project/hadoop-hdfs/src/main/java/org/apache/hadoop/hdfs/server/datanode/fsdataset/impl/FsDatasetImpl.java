@@ -88,6 +88,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import org.apache.hadoop.hdfs.ExtendedBlockId;
 import org.apache.hadoop.io.IOUtils;
 
 /**
@@ -1282,8 +1283,14 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
         volumeMap.remove(bpid, invalidBlk);
       }
     
+      // If a DFSClient has the replica in its cache of short-circuit file
+      // descriptors (and the client is using ShortCircuitShm), invalidate it.
+      datanode.getShortCircuitRegistry().processBlockInvalidation(
+                new ExtendedBlockId(invalidBlk.getBlockId(), bpid));
+      
       // If the block is cached, start uncaching it.
       cacheManager.uncacheBlock(bpid, invalidBlk.getBlockId());
+      
       // Delete the block asynchronously to make sure we can do it fast enough.
       // It's ok to unlink the block file before the uncache operation
       // finishes.
