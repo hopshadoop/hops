@@ -306,7 +306,7 @@ public class BlockPoolSliceStorage extends Storage {
     throw new IOException(
         "Datanode state: LV = " + this.getLayoutVersion() + " CTime = " +
             this.getCTime() + " is newer than the namespace state: LV = " +
-            nsInfo.getLayoutVersion() + " CTime = " + nsInfo.getCTime());
+            HdfsConstants.DATANODE_LAYOUT_VERSION + " CTime = " + nsInfo.getCTime());
   }
  
   /**
