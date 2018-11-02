@@ -64,6 +64,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 
@@ -116,6 +119,24 @@ class BPOfferService implements Runnable {
    */
   private long lastActiveClaimTxId = -1;
 
+  private final ReentrantReadWriteLock mReadWriteLock =
+      new ReentrantReadWriteLock();
+  private final Lock mReadLock  = mReadWriteLock.readLock();
+  private final Lock mWriteLock = mReadWriteLock.writeLock();
+  // utility methods to acquire and release read lock and write lock
+  void readLock() {
+    mReadLock.lock();
+  }
+  void readUnlock() {
+    mReadLock.unlock();
+  }
+  void writeLock() {
+    mWriteLock.lock();
+  }
+  void writeUnlock() {
+    mWriteLock.unlock();
+  }
+  
   private final DNConf dnConf;
   // IBR = Incremental Block Report. If this flag is set then an IBR will be
   // sent immediately by the actor thread without waiting for the IBR timer
@@ -135,9 +156,9 @@ class BPOfferService implements Runnable {
   private List<ActiveNode> nnList = Collections.synchronizedList(new ArrayList<ActiveNode>());
   private List<InetSocketAddress> blackListNN = Collections.synchronizedList(new ArrayList<InetSocketAddress>());
 //  private Object nnListSync = new Object();
-  private volatile int rpcRoundRobinIndex = 0;
+  private AtomicInteger rpcRoundRobinIndex = new AtomicInteger(0);
   // you have bunch of NNs, which one to send the incremental block report
-  private volatile int refreshNNRoundRobinIndex = 0;
+  private AtomicInteger refreshNNRoundRobinIndex = new AtomicInteger(0);
   final int maxNumIncrementalReportThreads;
   private final ExecutorService incrementalBRExecutor;
   private final ExecutorService brDispatcher;
@@ -232,13 +253,18 @@ class BPOfferService implements Runnable {
     return false;
   }
 
-  synchronized String getBlockPoolId() {
-    if (bpNSInfo != null) {
-      return bpNSInfo.getBlockPoolID();
-    } else {
-      LOG.warn("Block pool ID needed, but service not yet registered with NN",
-          new Exception("trace"));
-      return null;
+  String getBlockPoolId() {
+    readLock();
+    try {
+      if (bpNSInfo != null) {
+        return bpNSInfo.getBlockPoolID();
+      } else {
+        LOG.warn("Block pool ID needed, but service not yet registered with NN",
+            new Exception("trace"));
+        return null;
+      }
+    } finally {
+      readUnlock();
     }
   }
 
@@ -246,25 +272,36 @@ class BPOfferService implements Runnable {
     return getNamespaceInfo() != null;
   }
     
-  synchronized NamespaceInfo getNamespaceInfo() {
-    return bpNSInfo;
+    NamespaceInfo getNamespaceInfo() {
+    readLock();
+    try {
+      return bpNSInfo;
+    } finally {
+      readUnlock();
+    }
   }
 
   @Override
-  public synchronized String toString() {
-    if (bpNSInfo == null) {
-      // If we haven't yet connected to our NN, we don't yet know our
-      // own block pool ID.
-      // If _none_ of the block pools have connected yet, we don't even
-      // know the DatanodeID ID of this DN.
-      String datanodeUuid = dn.getDatanodeUuid();
-      if (datanodeUuid == null || datanodeUuid.isEmpty()) {
-        datanodeUuid = "unassigned";
+  public String toString() {
+    readLock();
+    try {
+      if (bpNSInfo == null) {
+        // If we haven't yet connected to our NN, we don't yet know our
+        // own block pool ID.
+        // If _none_ of the block pools have connected yet, we don't even
+        // know the DatanodeID ID of this DN.
+        String datanodeUuid = dn.getDatanodeUuid();
+        if (datanodeUuid == null || datanodeUuid.isEmpty()) {
+          datanodeUuid = "unassigned";
+        }
+        return "Block pool <registering> (Datanode Uuid " + datanodeUuid + ")";
+      } else {
+        return "Block pool " + getBlockPoolId() +
+            " (Datanode Uuid " + dn.getDatanodeUuid() +
+            ")";
       }
-      return "Block pool <registering> (Datanode Uuid " + datanodeUuid + ")";
-    } else {
-      return "Block pool " + getBlockPoolId()
-          + " (Datanode Uuid " + dn.getDatanodeUuid() + ")";
+    } finally {
+      readUnlock();
     }
   }
 
@@ -379,33 +416,36 @@ class BPOfferService implements Runnable {
    * (eg to prevent a misconfiguration where a StandbyNode from a different
    * cluster is specified)
    */
-  synchronized void verifyAndSetNamespaceInfo(NamespaceInfo nsInfo)
-      throws IOException {
-    if (this.bpNSInfo == null) {
-      this.bpNSInfo = nsInfo;
-      boolean success = false;
-      
-      // Now that we know the namespace ID, etc, we can pass this to the DN.
-      // The DN can now initialize its local storage if we are the
-      // first BP to handshake, etc.
-      try {
-        dn.initBlockPool(this);
-        success = true;
-      } finally {
-        if (!success) {
-          // The datanode failed to initialize the BP. We need to reset
-          // the namespace info so that other BPService actors still have
-          // a chance to set it, and re-initialize the datanode.
-          this.bpNSInfo = null;
+  void verifyAndSetNamespaceInfo(NamespaceInfo nsInfo) throws IOException {
+    writeLock();
+    try {
+      if (this.bpNSInfo == null) {
+        this.bpNSInfo = nsInfo;
+        boolean success = false;
+        // Now that we know the namespace ID, etc, we can pass this to the DN.
+        // The DN can now initialize its local storage if we are the
+        // first BP to handshake, etc.
+        try {
+          dn.initBlockPool(this);
+          success = true;
+        } finally {
+          if (!success) {
+            // The datanode failed to initialize the BP. We need to reset
+            // the namespace info so that other BPService actors still have
+            // a chance to set it, and re-initialize the datanode.
+            this.bpNSInfo = null;
+          }
         }
+      } else {
+        checkNSEquality(bpNSInfo.getBlockPoolID(), nsInfo.getBlockPoolID(),
+            "Blockpool ID");
+        checkNSEquality(bpNSInfo.getNamespaceID(), nsInfo.getNamespaceID(),
+            "Namespace ID");
+        checkNSEquality(bpNSInfo.getClusterID(), nsInfo.getClusterID(),
+            "Cluster ID");
       }
-    } else {
-      checkNSEquality(bpNSInfo.getBlockPoolID(), nsInfo.getBlockPoolID(),
-          "Blockpool ID");
-      checkNSEquality(bpNSInfo.getNamespaceID(), nsInfo.getNamespaceID(),
-          "Namespace ID");
-      checkNSEquality(bpNSInfo.getClusterID(), nsInfo.getClusterID(),
-          "Cluster ID");
+    } finally {
+      writeUnlock();
     }
   }
 
@@ -414,22 +454,26 @@ class BPOfferService implements Runnable {
    * calls this function to verify that the NN it connected to is consistent
    * with other NNs serving the block-pool.
    */
-  synchronized void registrationSucceeded(BPServiceActor bpServiceActor,
+  void registrationSucceeded(BPServiceActor bpServiceActor,
       DatanodeRegistration reg) throws IOException {
-    if (bpRegistration != null) {
-      checkNSEquality(bpRegistration.getStorageInfo().getNamespaceID(),
-          reg.getStorageInfo().getNamespaceID(), "namespace ID");
-      checkNSEquality(bpRegistration.getStorageInfo().getClusterID(),
-          reg.getStorageInfo().getClusterID(), "cluster ID");
-    } else {
-      bpRegistration = reg;
-    }
-
-    dn.bpRegistrationSucceeded(bpRegistration, getBlockPoolId());
-    // Add the initial block token secret keys to the DN's secret manager.
-    if (dn.isBlockTokenEnabled) {
-      dn.blockPoolTokenSecretManager
-          .addKeys(getBlockPoolId(), reg.getExportedKeys());
+    writeLock();
+    try {
+      if (bpRegistration != null) {
+        checkNSEquality(bpRegistration.getStorageInfo().getNamespaceID(),
+            reg.getStorageInfo().getNamespaceID(), "namespace ID");
+        checkNSEquality(bpRegistration.getStorageInfo().getClusterID(),
+            reg.getStorageInfo().getClusterID(), "cluster ID");
+      } else {
+        bpRegistration = reg;
+      }
+      dn.bpRegistrationSucceeded(bpRegistration, getBlockPoolId());
+      // Add the initial block token secret keys to the DN's secret manager.
+      if (dn.isBlockTokenEnabled) {
+        dn.blockPoolTokenSecretManager.addKeys(getBlockPoolId(),
+            reg.getExportedKeys());
+      }
+    } finally {
+      writeUnlock();
     }
   }
 
@@ -447,33 +491,43 @@ class BPOfferService implements Runnable {
     }
   }
 
-  synchronized DatanodeRegistration createRegistration() {
-    Preconditions.checkState(bpNSInfo != null,
-        "getRegistration() can only be called after initial handshake");
-    return dn.createBPRegistration(bpNSInfo);
+  DatanodeRegistration createRegistration() {
+    writeLock();
+    try {
+      Preconditions.checkState(bpNSInfo != null,
+          "getRegistration() can only be called after initial handshake");
+      return dn.createBPRegistration(bpNSInfo);
+    } finally {
+      writeUnlock();
+    }
   }
 
   /**
    * Called when an actor shuts down. If this is the last actor to shut down,
    * shuts down the whole blockpool in the DN.
    */
-  synchronized void shutdownActor(BPServiceActor actor) {
-    if (bpServiceToActive == actor) {
-      bpServiceToActive = null;
-    }
-
-    bpServices.remove(actor);
-
-    // remove from nnList
-    for (ActiveNode ann : nnList) {
-      if (ann.getRpcServerAddressForDatanodes().equals(actor.getNNSocketAddress())) {
-          nnList.remove(ann);
-        break;
+  void shutdownActor(BPServiceActor actor) {
+    writeLock();
+    try {
+      if (bpServiceToActive == actor) {
+        bpServiceToActive = null;
       }
-    }
 
-    if (bpServices.isEmpty()) {
-      dn.shutdownBlockPool(this);
+      bpServices.remove(actor);
+
+      // remove from nnList
+      for (ActiveNode ann : nnList) {
+        if (ann.getRpcServerAddressForDatanodes().equals(actor.getNNSocketAddress())) {
+          nnList.remove(ann);
+          break;
+        }
+      }
+
+      if (bpServices.isEmpty()) {
+        dn.shutdownBlockPool(this);
+      }
+    } finally {
+      writeUnlock();
     }
   }
 
@@ -512,11 +566,16 @@ class BPOfferService implements Runnable {
    * @return a proxy to the active NN, or null if the BPOS has not acknowledged
    * any NN as active yet.
    */
-  synchronized DatanodeProtocolClientSideTranslatorPB getActiveNN() {
-    if (bpServiceToActive != null) {
-      return bpServiceToActive.bpNamenode;
-    } else {
-      return null;
+   DatanodeProtocolClientSideTranslatorPB getActiveNN() {
+    readLock();
+    try {
+      if (bpServiceToActive != null) {
+        return bpServiceToActive.bpNamenode;
+      } else {
+        return null;
+      }
+    } finally {
+      readUnlock();
     }
   }
 
@@ -599,8 +658,11 @@ class BPOfferService implements Runnable {
       return true;
     }
     
-    synchronized (this) {
+    writeLock();
+    try{
       return processCommandFromActive(cmd, actor);
+    } finally {
+      writeUnlock();
     }
   }
 
@@ -1186,38 +1248,48 @@ public class IncrementalBRTask implements Callable{
     return sendImmediateIBR;
   }
 
-  synchronized void updateNNList(SortedActiveNodeList list) throws IOException {
-    ArrayList<InetSocketAddress> nnAddresses =
-        new ArrayList<InetSocketAddress>();
-    for (ActiveNode ann : list.getActiveNodes()) {
-      nnAddresses.add(ann.getRpcServerAddressForDatanodes());
-    }
+   void updateNNList(SortedActiveNodeList list) throws IOException {
+    writeLock();
+    try {
+      ArrayList<InetSocketAddress> nnAddresses = new ArrayList<InetSocketAddress>();
+      for (ActiveNode ann : list.getActiveNodes()) {
+        nnAddresses.add(ann.getRpcServerAddressForDatanodes());
+      }
 
-    refreshNNList(nnAddresses);
+      refreshNNList(nnAddresses);
 
-    if (list.getLeader() != null) {
-      bpServiceToActive = getAnActor(list.getLeader().getRpcServerAddressForDatanodes());
-    }
+      if (list.getLeader() != null) {
+        bpServiceToActive = getAnActor(list.getLeader().getRpcServerAddressForDatanodes());
+      }
 
       nnList.clear();
       nnList.addAll(list.getActiveNodes());
       blackListNN.clear();
+    } finally {
+      writeUnlock();
+    }
   }
 
 
   long nnListLastUpdate = System.currentTimeMillis();
-  synchronized boolean canUpdateNNList() {
-    if (nnList == null || nnList.size() == 0) {
-      return true; // for edge case, any one can update. after that actors will take trun in updating the nnlist
-    }
 
-    if( (System.currentTimeMillis() - nnListLastUpdate ) > 5000 ){
-      nnListLastUpdate = System.currentTimeMillis();
-      return  true;
-    }else{
+  boolean canUpdateNNList() {
+    writeLock();
+    try {
+      if (nnList == null || nnList.size() == 0) {
+        return true; // for edge case, any one can update. after that actors will take trun in updating the nnlist
+      }
+
+      if ((System.currentTimeMillis() - nnListLastUpdate) > 5000) {
+        nnListLastUpdate = System.currentTimeMillis();
+        return true;
+      } else {
         return false;
       }
+    } finally {
+      writeUnlock();
     }
+  }
 
   public void startWhirlingSufiThread() {
     if (blockReportThread == null || !blockReportThread.isAlive()) {
@@ -1348,15 +1420,17 @@ public class IncrementalBRTask implements Callable{
     return null;
   }
 
-  private synchronized BPServiceActor nextNNForNonBlkReportRPC() {
+  private  BPServiceActor nextNNForNonBlkReportRPC() {
+    readLock();
+    try{
     if (nnList == null || nnList.isEmpty()) {
       return null;
     }
 
       for (int i = 0; i < 10; i++) {
         try {
-          rpcRoundRobinIndex = ++rpcRoundRobinIndex % nnList.size();
-          ActiveNode ann = nnList.get(rpcRoundRobinIndex);
+          rpcRoundRobinIndex.incrementAndGet();
+          ActiveNode ann = nnList.get(Math.abs(rpcRoundRobinIndex.get())% nnList.size());
         if (!this.blackListNN.contains(ann.getRpcServerAddressForDatanodes())) {
           BPServiceActor actor = getAnActor(ann.getRpcServerAddressForDatanodes());
             if (actor != null) {
@@ -1369,6 +1443,9 @@ public class IncrementalBRTask implements Callable{
         }
       }
     return null;
+    }finally{
+      readUnlock();
+    }
   }
 
   private ActiveNode nextNNForBlkReport(long noOfBlks) throws IOException {
@@ -1418,19 +1495,24 @@ public class IncrementalBRTask implements Callable{
   }
 
   private synchronized void forwardRRIndex() {
+    readLock();
+    try {
       if (nnList != null && !nnList.isEmpty()) {
         // watch out for black listed NN
         for (int i = 0; i < 10; i++) {
-          refreshNNRoundRobinIndex = ++refreshNNRoundRobinIndex % nnList.size();
-          ActiveNode ann = nnList.get(refreshNNRoundRobinIndex);
-        if (!this.blackListNN.contains(ann.getRpcServerAddressForDatanodes())) {
+          refreshNNRoundRobinIndex.incrementAndGet();
+          ActiveNode ann = nnList.get(Math.abs(refreshNNRoundRobinIndex.get()) % nnList.size());
+          if (!this.blackListNN.contains(ann.getRpcServerAddressForDatanodes())) {
             return;
           }
         }
       } else {
-        refreshNNRoundRobinIndex = -1;
+        refreshNNRoundRobinIndex.set(-1);
       }
+    } finally {
+      readUnlock();
     }
+  }
 
   private static class PerStoragePendingIncrementalBR {
     private Map<Long, ReceivedDeletedBlockInfo> pendingIncrementalBR =
