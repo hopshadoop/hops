@@ -3777,9 +3777,11 @@ public class FSNamesystem
   /**
    * Returns true if the file is closed
    */
-  boolean isFileClosed(final String src)
+  boolean isFileClosed(final String src1)
       throws AccessControlException, UnresolvedLinkException,
       StandbyException, IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler isFileClosedHandler = new HopsTransactionalRequestHandler(
         HDFSOperationType.GET_FILE_INFO,
         src) {
@@ -9671,8 +9673,10 @@ public class FSNamesystem
 
   }
 
-  AclStatus getAclStatus(final String src) throws IOException {
+  AclStatus getAclStatus(final String src1) throws IOException {
     aclConfigFlag.checkForApiCall();
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     return (AclStatus) new HopsTransactionalRequestHandler(HDFSOperationType.GET_ACL_STATUS) {
 
       @Override
