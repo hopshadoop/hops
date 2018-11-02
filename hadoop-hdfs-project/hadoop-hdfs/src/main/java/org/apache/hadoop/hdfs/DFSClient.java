@@ -188,6 +188,7 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactor
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 
 /********************************************************
  * DFSClient can connect to a Hadoop Filesystem and
@@ -2248,6 +2249,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     return namenode.getDatanodeReport(type);
   }
 
+  public DatanodeStorageReport[] getDatanodeStorageReport(
+      DatanodeReportType type) throws IOException {
+    return namenode.getDatanodeStorageReport(type);
+  }
+    
   /**
    * Enter, leave or get safe mode.
    *

@@ -791,7 +791,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
       throws IOException {
     DatanodeInfo results[] = namesystem.datanodeReport(type);
     if (results == null) {
-      throw new IOException("Cannot find datanode report");
+      throw new IOException("Failed to get datanode report for " + type
+          + " datanodes.");
     }
     return results;
   }
