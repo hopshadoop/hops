@@ -51,23 +51,34 @@ import org.junit.Test;
 
 import com.google.common.collect.Lists;
 import io.hops.exception.StorageException;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.FsAclPermission;
+import org.apache.hadoop.security.AccessControlException;
+import org.junit.After;
 
 /**
  * Tests NameNode interaction for all ACL modification APIs.  This test suite
  * also covers interaction of setPermission with inodes that have ACLs.
  */
 public abstract class FSAclBaseTest {
+  private static final UserGroupInformation BRUCE =
+    UserGroupInformation.createUserForTesting("bruce", new String[] { });
+  private static final UserGroupInformation DIANA =
+    UserGroupInformation.createUserForTesting("diana", new String[] { });
+  private static final UserGroupInformation SUPERGROUP_MEMBER =
+    UserGroupInformation.createUserForTesting("super", new String[] {
+        DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT });
 
   protected static MiniDFSCluster cluster;
-  protected static FileSystem fs;
   protected static Configuration conf;
   private static int pathCount = 0;
   private static Path path;
 
+  private FileSystem fs, fsAsBruce, fsAsDiana, fsAsSupergroupMember;
+  
   @AfterClass
   public static void shutdown() throws Exception {
-    IOUtils.cleanup(null, fs);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -75,9 +86,15 @@ public abstract class FSAclBaseTest {
 
   @Before
   public void setUp() throws Exception {
-    fs = createFileSystem();
     pathCount += 1;
     path = new Path("/p" + pathCount);
+    initFileSystems();
+  }
+  
+  @After
+  public void destroyFileSystems() {
+    IOUtils.cleanup(null, fs, fsAsBruce, fsAsDiana, fsAsSupergroupMember);
+    fs = fsAsBruce = fsAsDiana = fsAsSupergroupMember = null;
   }
   
   /**
@@ -1109,6 +1126,32 @@ public abstract class FSAclBaseTest {
     assertAclFeature(dirPath, true);
   }
 
+  @Test
+  public void testAccess() throws IOException, InterruptedException {
+    Path p1 = new Path("/p1");
+    fs.mkdirs(p1);
+    fs.setOwner(p1, BRUCE.getShortUserName(), "groupX");
+    fsAsBruce.setAcl(p1, Lists.newArrayList(
+        aclEntry(ACCESS, USER, READ),
+        aclEntry(ACCESS, USER, "bruce", READ),
+        aclEntry(ACCESS, GROUP, NONE),
+        aclEntry(ACCESS, OTHER, NONE)));
+    fsAsBruce.access(p1, FsAction.READ);
+    try {
+      fsAsBruce.access(p1, FsAction.WRITE);
+      fail("The access call should have failed.");
+    } catch (AccessControlException e) {
+      // expected
+    }
+    Path badPath = new Path("/bad/bad");
+    try {
+      fsAsBruce.access(badPath, FsAction.READ);
+      fail("The access call should have failed");
+    } catch (FileNotFoundException e) {
+      // expected
+    }
+  }
+  
   /**
    * Asserts whether or not the inode for the test path has an AclFeature.
    *
@@ -1160,13 +1203,26 @@ public abstract class FSAclBaseTest {
     }.handle();
   }
 
+  
+  /**
+   * Initializes all FileSystem instances used in the tests.
+   *
+   * @throws Exception if initialization fails
+   */
+  private void initFileSystems() throws Exception {
+    fs = createFileSystem();
+    fsAsBruce = createFileSystem(BRUCE);
+    fsAsDiana = createFileSystem(DIANA);
+    fsAsSupergroupMember = createFileSystem(SUPERGROUP_MEMBER);
+  }
+  
   /**
    * Asserts the value of the FsPermission bits on the inode of the test path.
    *
    * @param perm short expected permission bits
    * @throws IOException thrown if there is an I/O error
    */
-  private static void assertPermission(short perm) throws IOException {
+  private void assertPermission(short perm) throws IOException {
     assertPermission(path, perm);
   }
 
@@ -1177,7 +1233,7 @@ public abstract class FSAclBaseTest {
    * @param perm short expected permission bits
    * @throws IOException thrown if there is an I/O error
    */
-  private static void assertPermission(Path pathToCheck, short perm)
+  private void assertPermission(Path pathToCheck, short perm)
       throws IOException {
     AclTestHelpers.assertPermission(fs, pathToCheck, perm);
   }

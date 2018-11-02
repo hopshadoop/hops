@@ -57,6 +57,7 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
@@ -658,6 +659,7 @@ public class TestINodeFile {
       {
         fs.isFileClosed(testFileInodePath);
         fs.getAclStatus(testFileInodePath);
+        fs.access(testFileInodePath, FsAction.READ_WRITE);
       }
       
       // symbolic link related tests

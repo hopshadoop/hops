@@ -726,7 +726,7 @@ public class NamenodeWebHdfsMethods {
       final ExcludeDatanodesParam excludeDatanodes)
       throws IOException, InterruptedException {
     return get(ugi, delegation, username, doAsUser, ROOT, op, offset, length,
-        renewer, bufferSize, fsAction, excludeDatanodes);
+        renewer, bufferSize, excludeDatanodes, fsAction);
   }
 
   /**
@@ -764,15 +764,15 @@ public class NamenodeWebHdfsMethods {
       @QueryParam(BufferSizeParam.NAME)
       @DefaultValue(BufferSizeParam.DEFAULT)
       final BufferSizeParam bufferSize,
+      @QueryParam(ExcludeDatanodesParam.NAME) @DefaultValue(ExcludeDatanodesParam.DEFAULT)
+      final ExcludeDatanodesParam excludeDatanodes,
       @QueryParam(FsActionParam.NAME)
       @DefaultValue(FsActionParam.DEFAULT)
-      final FsActionParam fsAction,
-      @QueryParam(ExcludeDatanodesParam.NAME) @DefaultValue(ExcludeDatanodesParam.DEFAULT)
-      final ExcludeDatanodesParam excludeDatanodes)
+      final FsActionParam fsAction)
       throws IOException, InterruptedException {
 
     init(ugi, delegation, username, doAsUser, path, op, offset, length, renewer,
-        bufferSize, fsAction, excludeDatanodes);
+        bufferSize, excludeDatanodes, fsAction);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
@@ -780,7 +780,7 @@ public class NamenodeWebHdfsMethods {
         try {
           return get(ugi, delegation, username, doAsUser,
               path.getAbsolutePath(), op, offset, length, renewer,
-              bufferSize, fsAction, excludeDatanodes);
+              bufferSize, excludeDatanodes, fsAction);
         } finally {
           reset();
         }
@@ -792,8 +792,8 @@ public class NamenodeWebHdfsMethods {
       final DelegationParam delegation, final UserParam username,
       final DoAsParam doAsUser, final String fullpath, final GetOpParam op,
       final OffsetParam offset, final LengthParam length,
-      final RenewerParam renewer, final BufferSizeParam bufferSize, final
-      FsActionParam fsAction, final ExcludeDatanodesParam excludeDatanodes)
+      final RenewerParam renewer, final BufferSizeParam bufferSize,
+      final ExcludeDatanodesParam excludeDatanodes, final FsActionParam fsAction)
       throws IOException, URISyntaxException {
     final NameNode namenode = (NameNode) context.getAttribute("name.node");
     final NamenodeProtocols np = getRPCServer(namenode);
