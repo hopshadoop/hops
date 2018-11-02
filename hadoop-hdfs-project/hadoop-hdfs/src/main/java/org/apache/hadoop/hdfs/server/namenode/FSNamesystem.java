@@ -1226,7 +1226,7 @@ public class FSNamesystem
         if (isSTO){
           il.setIgnoredSTOInodes(inode.getInodeId());
         }
-        locks.add(il).add(lf.getBlockLock());
+        locks.add(il).add(lf.getBlockLock()).add(lf.getAcesLock());
       }
 
         @Override
@@ -9979,8 +9979,9 @@ public class FSNamesystem
   }
 
 
-  void checkAccess(final String src, final FsAction mode) throws IOException {
-
+  void checkAccess(final String src1, final FsAction mode) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
+    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler checkAccessHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.CHECK_ACCESS,
             src) {
@@ -9992,6 +9993,7 @@ public class FSNamesystem
                     .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
                     .skipReadingQuotaAttr(true/*skip quota*/);
             locks.add(il);
+            locks.add(lf.getAcesLock());
           }
 
           @Override
