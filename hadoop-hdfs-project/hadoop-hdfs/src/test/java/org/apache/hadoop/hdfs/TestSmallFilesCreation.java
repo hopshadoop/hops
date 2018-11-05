@@ -1339,7 +1339,6 @@ public class TestSmallFilesCreation {
       int i = 0;
       try{
         for(i = 0; i < count; i++){
-          LOG.info("GAUTIER write file " + i);
           writeFile(dfs, "/file"+i, MAX_SMALL_FILE_SIZE);
         }
       } catch( Exception e){
@@ -1349,7 +1348,6 @@ public class TestSmallFilesCreation {
 
       try{
         for(i = 0; i < count; i++){
-          LOG.info("GAUTIER verify file " + i);
           verifyFile(dfs, "/file"+i, MAX_SMALL_FILE_SIZE);
         }
       } catch( Exception e){
