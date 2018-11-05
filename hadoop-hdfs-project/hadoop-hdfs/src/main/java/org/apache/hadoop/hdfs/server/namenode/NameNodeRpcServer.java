@@ -148,6 +148,7 @@ import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.BRLoadBalancingOverloadException;
 
 /**
  * This class is responsible for handling all of the RPC calls to the NameNode.
@@ -335,7 +336,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
         DSQuotaExceededException.class,
         AclException.class,
         FSLimitException.PathComponentTooLongException.class,
-        FSLimitException.MaxDirectoryItemsExceededException.class);
+        FSLimitException.MaxDirectoryItemsExceededException.class,
+        BRLoadBalancingOverloadException.class);
   }
   
   /** Allow access to the client RPC server for testing */
