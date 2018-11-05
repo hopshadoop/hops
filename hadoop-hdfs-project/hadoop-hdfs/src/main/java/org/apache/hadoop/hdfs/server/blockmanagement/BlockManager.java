@@ -3307,6 +3307,7 @@ public class BlockManager {
       //this would only result in these block getting transiantly over replicated
       HdfsVariables.resetMisReplicatedIndex();
       neededReplications.clear();
+      excessReplicateMap.clear();
     }
     replicationQueuesInitializer = new Daemon() {
       
