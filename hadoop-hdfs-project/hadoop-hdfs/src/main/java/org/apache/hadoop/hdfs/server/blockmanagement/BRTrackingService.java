@@ -111,14 +111,14 @@ public class BRTrackingService {
     String msg = "Work (" + noOfBlks + " blks) could not be assigned. " +
             "System is fully loaded now. At most " + getBrLbMaxConcurrentBRs()
             + " concurrent block reports can be processed.";
-    LOG.info(msg);
+    LOG.debug(msg);
     throw new BRLoadBalancingOverloadException(msg);
   }
 
 
   public synchronized void blockReportCompleted( String dnAddress) throws IOException {
     ActiveBlockReport abr = new ActiveBlockReport(dnAddress, 0, 0, 0);
-    LOG.info("Block report from "+dnAddress+" has completed");
+    LOG.debug("Block report from "+dnAddress+" has completed");
     removeActiveBlockReport(abr);
   }
 
