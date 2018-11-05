@@ -3474,7 +3474,10 @@ public class BlockManager {
     final int filesToProcess = processMisReplicatedBatchSize * processMisReplicatedNoOfBatchs;
 
     addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), -1));
-    
+    long maxInodeId = 0;
+    if(LOG.isInfoEnabled()){
+      maxInodeId = blocksMap.getMaxInodeId();
+    }
     while (namesystem.isRunning() && !Thread.currentThread().isInterrupted()) {
       long filesToProcessEndIndex;
       long filesToProcessStartIndex;
@@ -3488,7 +3491,7 @@ public class BlockManager {
       addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), filesToProcessStartIndex));
 
       processMissreplicatedInt(filesToProcessStartIndex, filesToProcessEndIndex, filesToProcess, nrInvalid,
-          nrOverReplicated, nrUnderReplicated, nrPostponed, nrUnderConstruction, totalProcessed);
+          nrOverReplicated, nrUnderReplicated, nrPostponed, nrUnderConstruction, totalProcessed, maxInodeId);
 
       addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), -1));
 
@@ -3506,7 +3509,7 @@ public class BlockManager {
             long startIndex = range.getStartIndex();
             if (startIndex > 0) {
               processMissreplicatedInt(startIndex, startIndex + filesToProcess, filesToProcess,nrInvalid,
-                  nrOverReplicated, nrUnderReplicated, nrPostponed, nrUnderConstruction, totalProcessed);
+                  nrOverReplicated, nrUnderReplicated, nrPostponed, nrUnderConstruction, totalProcessed, maxInodeId);
             }
           }
         }
@@ -3531,12 +3534,13 @@ public class BlockManager {
   
   private void processMissreplicatedInt(long filesToProcessStartIndex, long filesToProcessEndIndex, int filesToProcess,
       final AtomicLong nrInvalid, final AtomicLong nrOverReplicated, final AtomicLong nrUnderReplicated,
-      final AtomicLong nrPostponed, final AtomicLong nrUnderConstruction, final AtomicLong totalProcessed)
-      throws IOException {
+      final AtomicLong nrPostponed, final AtomicLong nrUnderConstruction, final AtomicLong totalProcessed,
+      long maxInodeId) throws IOException {
     final List<INodeIdentifier> allINodes = blocksMap
         .getAllINodeFiles(filesToProcessStartIndex, filesToProcessEndIndex);
     LOG.info("processMisReplicated read  " + allINodes.size() + "/" + filesToProcess + " in the Ids range ["
-        + filesToProcessStartIndex + " - " + filesToProcessEndIndex + "]");
+        + filesToProcessStartIndex + " - " + filesToProcessEndIndex + "] (max inodeId when the process started: " + 
+        maxInodeId + ")");
 
     try {
       Slicer.slice(allINodes.size(), processMisReplicatedBatchSize, processMisReplicatedNoThreads, 

@@ -279,6 +279,18 @@ class BlocksMap {
     }.handle();
   }
 
+  long getMaxInodeId() throws IOException {
+    return (Long) new LightWeightRequestHandler(
+        HDFSOperationType.GET_MAX_INODE_ID) {
+      @Override
+      public Object performTask() throws IOException {
+        INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
+            .getDataAccess(INodeDataAccess.class);
+        return ida.getMaxId();
+      }
+    }.handle();
+  }
+  
   long getMinFileId() throws IOException {
     return (Long) new LightWeightRequestHandler(
         HDFSOperationType.GET_MIN_FILE_ID) {

@@ -308,4 +308,9 @@ public class INodeDALAdaptor
       throw new StorageException(ex);
     }
   }
+  
+  @Override
+  public long getMaxId() throws StorageException{
+    return dataAccess.getMaxId();
+  }
 }
