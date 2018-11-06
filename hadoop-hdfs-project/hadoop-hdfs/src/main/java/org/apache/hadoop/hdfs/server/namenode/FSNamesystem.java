@@ -478,7 +478,8 @@ public class FSNamesystem
   private final AclConfigFlag aclConfigFlag;
 
   private final RetryCacheDistributed retryCache;
-
+  private final boolean isRetryCacheEnabled;
+  
   //Add delay for file system operations. Used only for testing
   private boolean isTestingSTO = false;
   private ThreadLocal<Times> delays = new ThreadLocal<Times>();
@@ -713,6 +714,8 @@ public class FSNamesystem
       this.isDefaultAuditLogger = auditLoggers.size() == 1 &&
           auditLoggers.get(0) instanceof DefaultAuditLogger;
       this.aclConfigFlag = new AclConfigFlag(conf);
+      this.isRetryCacheEnabled = conf.getBoolean(DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY,
+          DFS_NAMENODE_ENABLE_RETRY_CACHE_DEFAULT);
       this.retryCache = ignoreRetryCache ? null : initRetryCache(conf);
       this.slicerBatchSize = conf.getInt(DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE,
           DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE_DEFAULT);
@@ -902,8 +905,10 @@ public class FSNamesystem
       this.nnrmthread = new Daemon(new NameNodeResourceMonitor());
       nnrmthread.start();
 
-      this.retryCacheCleanerThread = new Daemon(new RetryCacheCleaner());
-      retryCacheCleanerThread.start();
+      if(isRetryCacheEnabled) {
+        this.retryCacheCleanerThread = new Daemon(new RetryCacheCleaner());
+        retryCacheCleanerThread.start();
+      }
 
       if (erasureCodingEnabled) {
         erasureCodingManager.activate();
@@ -1584,8 +1589,11 @@ public class FSNamesystem
                 .setNameNodeID(nameNode.getId())
                 .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock()).add(
-            lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.PE, BLK.UC, BLK.IV))
-            .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+            lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.PE, BLK.UC, BLK.IV));
+        if(isRetryCacheEnabled) {
+            locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+                Server.getCallId()));
+        }
         if (erasureCodingEnabled) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, srcs));
         }
@@ -1838,8 +1846,11 @@ public class FSNamesystem
         INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH,  link)
                 .setNameNodeID(nameNode.getId())
                 .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-        locks.add(il).add(lf.getAcesLock())
-                .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+        locks.add(il).add(lf.getAcesLock());
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
       }
 
       @Override
@@ -2221,8 +2232,12 @@ public class FSNamesystem
                   .add(lf.getBlockLock())
                   .add(lf.getLeaseLock(LockType.WRITE, holder))
                   .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
-                  lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE, BLK.IV))
-                  .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+                  lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
+                      BLK.PE, BLK.IV));
+          if(isRetryCacheEnabled) {
+            locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+                Server.getCallId()));
+          }
 
         if (flag.contains(CreateFlag.OVERWRITE) && dir.isQuotaEnabled()) {
           locks.add(lf.getQuotaUpdateLock(src));
@@ -2683,7 +2698,10 @@ public class FSNamesystem
                     .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV, BLK.PE))
                     .add(lf.getLastBlockHashBucketsLock());
-            locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+            if(isRetryCacheEnabled) {
+              locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+                  Server.getCallId()));
+            }
             // Always needs to be read. Erasure coding might have been
             // enabled earlier and we don't want to end up in an inconsistent
             // state.
@@ -3558,8 +3576,12 @@ public class FSNamesystem
                     .skipReadingQuotaAttr(!dir.isQuotaEnabled());
             locks.add(il).add(lf.getLeaseLock(LockType.WRITE))
                     .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
-                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE, BLK.IV))
-                    .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR,
+                        BLK.PE, BLK.IV));
+            if(isRetryCacheEnabled) {
+              locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+                  Server.getCallId()));
+            }
             if (dir.isQuotaEnabled()) {
               locks.add(lf.getQuotaUpdateLock(true, src));
             }
@@ -6287,8 +6309,11 @@ public class FSNamesystem
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                 .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
                 .add(lf.getBlockRelated(BLK.UC))
-                .add(lf.getLastBlockHashBucketsLock())
-                .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+                .add(lf.getLastBlockHashBucketsLock());
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
       }
 
       @Override
@@ -7255,8 +7280,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
-            add(lf.getCachePoolLock(directive.getPool()));
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
+        locks.add(lf.getCachePoolLock(directive.getPool()));
         INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, path)
             .setNameNodeID(nameNode.getId())
             .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
@@ -7329,8 +7357,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
-            add(lf.getCacheDirectiveLock(directive.getId())).
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
+        locks.add(lf.getCacheDirectiveLock(directive.getId())).
             add(lf.getCachePoolsLock(pools));
          INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, path)
             .setNameNodeID(nameNode.getId())
@@ -7375,8 +7406,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
-            add(lf.getCacheDirectiveLock(id)).
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
+        locks.add(lf.getCacheDirectiveLock(id)).
             add(lf.getCachePoolLock(LockType.WRITE));
       }
 
@@ -7435,8 +7469,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
-            add(lf.getCachePoolLock(poolName));
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
+        locks.add(lf.getCachePoolLock(poolName));
       }
 
       @Override
@@ -7480,8 +7517,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
-            add(lf.getCachePoolLock(poolName));
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
+        locks.add(lf.getCachePoolLock(poolName));
       }
 
       @Override
@@ -7521,8 +7561,11 @@ public class FSNamesystem
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId())).
-            add(lf.getCachePoolLock(cachePoolName)).
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
+        locks.add(lf.getCachePoolLock(cachePoolName)).
             add(lf.getCacheDirectiveLock(cachePoolName));
       }
 
@@ -9192,8 +9235,11 @@ public class FSNamesystem
                 .setNameNodeID(nameNode.getId())
                 .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
         locks.add(il);
-        locks.add(lf.getEncodingStatusLock(LockType.WRITE, sourcePath))
-                .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+        locks.add(lf.getEncodingStatusLock(LockType.WRITE, sourcePath));
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
       }
 
       @Override
@@ -10068,6 +10114,9 @@ public class FSNamesystem
   }
 
   private CacheEntry retryCacheWaitForCompletionTransactional() throws IOException {
+    if(!isRetryCacheEnabled){
+      return null;
+    }
     HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType
             .RETRY_CACHE) {
       @Override
@@ -10085,6 +10134,9 @@ public class FSNamesystem
   }
 
   private CacheEntry retryCacheSetStateTransactional(final CacheEntry cacheEntry, final boolean ret) throws IOException {
+    if(!isRetryCacheEnabled){
+      return null;
+    }
     HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType
             .RETRY_CACHE) {
       @Override
