@@ -422,7 +422,6 @@ public class FSNamesystem
 
   private Daemon retryCacheCleanerThread = null;
 
-  private volatile boolean hasResourcesAvailable = true; //HOP. yes we have huge namespace
   private volatile boolean fsRunning = true;
 
   /**
@@ -491,6 +490,11 @@ public class FSNamesystem
   
   private boolean randomizeBlockLocationsPerBlock;
   
+  private volatile boolean forceReadTheSafeModeFromDB = false;
+  private volatile boolean inSafeMode = true;
+  
+  private final double databaseResourcesThreshold;
+  private final double databaseResourcesPreThreshold;
   /**
    * Notify that loading of this FSDirectory is complete, and
    * it is imageLoaded for use
@@ -723,6 +727,14 @@ public class FSNamesystem
       this.slicerNbThreads = conf.getInt(
           DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS,
           DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT);
+      
+      this.databaseResourcesThreshold =
+          conf.getDouble(DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD,
+              DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD_DEFAULT);
+      this.databaseResourcesPreThreshold =
+          conf.getDouble(DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_PRETHRESHOLD,
+              DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_PRETHRESHOLD_DEFAULT);
+      
     } catch (IOException | RuntimeException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
       close();
@@ -4641,9 +4653,8 @@ public class FSNamesystem
    *
    * @return true if there were sufficient resources available, false otherwise.
    */
-  private boolean nameNodeHasResourcesAvailable() {
-    //TODO check if the database has resources left.
-    return hasResourcesAvailable;
+  private boolean nameNodeHasResourcesAvailable() throws StorageException {
+    return HdfsStorageFactory.hasResources(databaseResourcesThreshold);
   }
   
   /**
@@ -4726,8 +4737,20 @@ public class FSNamesystem
     public void run() {
       try {
         while (fsRunning && shouldNNRmRun) {
+          if(HdfsStorageFactory.hasResources(databaseResourcesPreThreshold)){
+            continue;
+          }
+          //Database resources are in between preThreshold and Threshold
+          //that means that soon enough we will hit the resources threshold
+          //therefore, we enable reading the safemode variable from the
+          //database, since at any point from now on, the leader will go to
+          //safe mode.
+  
+          forceReadTheSafeModeFromDB = true;
+          
           if (isLeader() && !nameNodeHasResourcesAvailable()) {
-            String lowResourcesMsg = "NameNode low on available disk space. ";
+            String lowResourcesMsg = "NameNode's database low on available " +
+                "resources.";
             if (!isInSafeMode()) {
               FSNamesystem.LOG.warn(lowResourcesMsg + "Entering safe mode.");
             } else {
@@ -5101,6 +5124,9 @@ public class FSNamesystem
       leaveInternal();
 
       clearSafeBlocks();
+      
+      forceReadTheSafeModeFromDB = false;
+      inSafeMode = false;
     }
 
     private void leaveInternal() throws IOException {
@@ -5656,12 +5682,19 @@ public class FSNamesystem
   }
 
   private SafeModeInfo safeMode() throws IOException{
-    List<Object> vals = HdfsVariables.getSafeModeFromDB();
-    if(vals==null || vals.isEmpty()){
+    if(!inSafeMode && !forceReadTheSafeModeFromDB){
       return null;
     }
-    return new FSNamesystem.SafeModeInfo((double) vals.get(0), (int) vals.get(1), (int) vals.get(2), (int) vals.get(3),
-        (double) vals.get(4), (int) vals.get(5) == 0 ? true : false);
+    
+    List<Object> vals = HdfsVariables.getSafeModeFromDB();
+    if(vals == null || vals.isEmpty()){
+      inSafeMode = false;
+      return null;
+    }
+    return new FSNamesystem.SafeModeInfo((double) vals.get(0),
+        (int) vals.get(1), (int) vals.get(2),
+        (int) vals.get(3), (double) vals.get(4),
+        (int) vals.get(5) == 0 ? true : false);
   }
   
   @Override
@@ -5850,6 +5883,9 @@ public class FSNamesystem
    * @throws IOException
    */
   void enterSafeMode(boolean resourcesLow) throws IOException {
+    
+    forceReadTheSafeModeFromDB = true;
+    
     if(!isLeader()){
       return;
     }
@@ -5884,6 +5920,8 @@ public class FSNamesystem
    * @throws IOException
    */
   void leaveSafeMode() throws IOException {
+    forceReadTheSafeModeFromDB = false;
+    
     if (!isInSafeMode()) {
       NameNode.stateChangeLog.info("STATE* Safe mode is already OFF");
       return;
