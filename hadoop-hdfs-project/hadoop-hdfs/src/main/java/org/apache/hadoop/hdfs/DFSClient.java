@@ -864,10 +864,14 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
   }
 
   /**
-   * Close connections the Namenode.
+   * Close connections the Namenodes.
    */
-  void closeConnectionToNamenode() {
+  void closeConnectionToNamenodes() {
     RPC.stopProxy(namenode);
+    RPC.stopProxy(leaderNN);
+    for(ClientProtocol nn : allNNs){
+      RPC.stopProxy(nn);
+    }
   }
 
   /** Abort and release resources held.  Ignore all errors. */
@@ -881,7 +885,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     } catch (IOException ioe) {
        LOG.info("Exception occurred while aborting the client " + ioe);
     }
-    closeConnectionToNamenode();
+    closeConnectionToNamenodes();
   }
 
   /** Close/abort all files being written. */
@@ -921,8 +925,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
       closeAllFilesBeingWritten(false);
       clientRunning = false;
       getLeaseRenewer().closeClient(this);
-      // close connections to the namenode
-      closeConnectionToNamenode();
+      // close connections to the namenodes
+      closeConnectionToNamenodes();
     }
   }
 
