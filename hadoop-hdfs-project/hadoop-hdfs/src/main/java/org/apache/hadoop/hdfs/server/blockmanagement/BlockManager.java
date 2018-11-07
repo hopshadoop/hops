@@ -119,6 +119,7 @@ import static io.hops.transaction.lock.LockFactory.BLK;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -2446,7 +2447,6 @@ public class BlockManager {
         @Override
         public void handle(int startIndex, int endIndex)
             throws Exception {
-          LOG.info("Remove blocks from " + node.getName());
           List<Long> ids = inodeIds.subList(startIndex, endIndex);
           removeStoredBlocksTx(ids, inodeIdsToBlockMap, node);
         }
@@ -4453,51 +4453,75 @@ public class BlockManager {
     if (!namesystem.isPopulatingReplQueues()) {
       return;
     }
-    final int[] numOverReplicated = {0};    
+    final int[] numOverReplicated = {0};
     Map<Long, Long> blocksOnNode = srcNode.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
         blockFetcherBucketsPerThread, ((FSNamesystem) namesystem).getFSOperationsExecutor());
-    HopsTransactionalRequestHandler processBlockHandler =
-        new HopsTransactionalRequestHandler(
-            HDFSOperationType.PROCESS_OVER_REPLICATED_BLOCKS_ON_RECOMMISSION) {
-          INodeIdentifier inodeIdentifier;
 
-          @Override
-          public void setUp() throws StorageException {
-            Map.Entry<Long, Long> param = (Map.Entry<Long, Long>) getParams()[0];
-            inodeIdentifier = INodeUtil.resolveINodeFromBlockID(param.getKey());
-          }
+    final Map<Long, List<Long>> inodeIdsToBlockMap = new HashMap<>();
+    for (Map.Entry<Long, Long> entry : blocksOnNode.entrySet()) {
+      List<Long> list = inodeIdsToBlockMap.get(entry.getValue());
+      if (list == null) {
+        list = new ArrayList<>();
+        inodeIdsToBlockMap.put(entry.getValue(), list);
+      }
+      list.add(entry.getKey());
+    }
 
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = LockFactory.getInstance();
-            Map.Entry<Long, Long> param = (Map.Entry<Long, Long>) getParams()[0];
-            locks.add(
-                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
-                .add(lf.getIndividualBlockLock(param.getKey(), inodeIdentifier))
-                .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.UR, BLK.IV));
-          }
+    final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
-          @Override
-          public Object performTask() throws IOException {
-            Map.Entry<Long, Long> param = (Map.Entry<Long, Long>) getParams()[0];
-            Block block = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, param.getKey(), param.getValue());
-            BlockCollection bc = blocksMap.getBlockCollection(block);
-            short expectedReplication = bc.getBlockReplication();
-            NumberReplicas num = countNodes(block);
-            int numCurrentReplica = num.liveReplicas();
-            if (numCurrentReplica > expectedReplication) {
-              // over-replicated block
-              processOverReplicatedBlock(block, expectedReplication, null,
-                  null);
-              numOverReplicated[0]++;
+    try {
+      Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads, 
+          ((FSNamesystem) namesystem).getFSOperationsExecutor(),
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex)
+            throws Exception {
+          final List<Long> ids = inodeIds.subList(startIndex, endIndex);
+          
+          new HopsTransactionalRequestHandler(
+              HDFSOperationType.PROCESS_OVER_REPLICATED_BLOCKS_ON_RECOMMISSION) {
+            List<INodeIdentifier> inodeIdentifiers;
+
+            @Override
+            public void setUp() throws StorageException {
+              inodeIdentifiers = INodeUtil.resolveINodesFromIds(ids);
             }
-            return null;
-          }
-        };
 
-    for (Map.Entry<Long, Long> entry: blocksOnNode.entrySet()) {
-      processBlockHandler.setParams(entry).handle(namesystem);
+            @Override
+            public void acquireLock(TransactionLocks locks) throws IOException {
+              LockFactory lf = LockFactory.getInstance();
+              locks.add(
+                  lf.getBatchedINodesLock(inodeIdentifiers))
+                  .add(lf.getSqlBatchedBlocksLock()).add(
+                  lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
+                      BLK.ER));
+            }
 
+            @Override
+            public Object performTask() throws IOException {
+              for (INodeIdentifier identifier : inodeIdentifiers) {
+                for (long blockId : inodeIdsToBlockMap.get(identifier.getInodeId())) {
+                  BlockInfo block = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, blockId);
+                  BlockCollection bc = blocksMap.getBlockCollection(block);
+                  short expectedReplication = bc.getBlockReplication();
+                  NumberReplicas num = countNodes(block);
+                  int numCurrentReplica = num.liveReplicas();
+                  if (numCurrentReplica > expectedReplication) {
+                    // over-replicated block
+                    processOverReplicatedBlock(block, expectedReplication, null,
+                        null);
+                    numOverReplicated[0]++;
+                  }
+                }
+              }
+              return null;
+            }
+          }.handle();
+          
+        }
+      });
+    } catch (Exception ex) {
+      throw new IOException(ex);
     }
     LOG.info(
         "Invalidated " + numOverReplicated[0] + " over-replicated blocks on " +
@@ -4510,99 +4534,119 @@ public class BlockManager {
    */
   boolean isReplicationInProgress(final DatanodeDescriptor srcNode)
       throws IOException {
-    final boolean[] status = new boolean[]{false};
-    final boolean[] firstReplicationLog = new boolean[]{true};
-    final int[] underReplicatedBlocks = new int[]{0};
-    final int[] decommissionOnlyReplicas = new int[]{0};
-    final int[] underReplicatedInOpenFiles = new int[]{0};
+    final AtomicBoolean status = new AtomicBoolean(false);
+    final AtomicBoolean firstReplicationLog = new AtomicBoolean(true);
+    final AtomicInteger underReplicatedBlocks = new AtomicInteger(0);
+    final AtomicInteger decommissionOnlyReplicas = new AtomicInteger(0);
+    final AtomicInteger underReplicatedInOpenFiles = new AtomicInteger(0);
 
     Map<Long, Long> blocksOnNode = srcNode.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
         blockFetcherBucketsPerThread, ((FSNamesystem) namesystem).getFSOperationsExecutor());
 
-    HopsTransactionalRequestHandler checkReplicationHandler =
-        new HopsTransactionalRequestHandler(
-            HDFSOperationType.CHECK_REPLICATION_IN_PROGRESS) {
-          INodeIdentifier inodeIdentifier;
+     final Map<Long, List<Long>> inodeIdsToBlockMap = new HashMap<>();
+    for (Map.Entry<Long, Long> entry : blocksOnNode.entrySet()) {
+      List<Long> list = inodeIdsToBlockMap.get(entry.getValue());
+      if (list == null) {
+        list = new ArrayList<>();
+        inodeIdsToBlockMap.put(entry.getValue(), list);
+      }
+      list.add(entry.getKey());
+    }
 
-          @Override
-          public void setUp() throws StorageException {
-            Map.Entry<Long, Long> param = (Map.Entry<Long, Long>) getParams()[0];
-            inodeIdentifier = INodeUtil.resolveINodeFromBlockID(param.getKey());
+    final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
-          }
+    try {
+      Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads,
+          ((FSNamesystem) namesystem).getFSOperationsExecutor(),
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex)
+            throws Exception {
+          final List<Long> ids = inodeIds.subList(startIndex, endIndex);
+          HopsTransactionalRequestHandler checkReplicationHandler = new HopsTransactionalRequestHandler(
+              HDFSOperationType.CHECK_REPLICATION_IN_PROGRESS) {
+            List<INodeIdentifier> inodeIdentifiers;
 
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = LockFactory.getInstance();
-            locks.add(
-                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
-                .add(lf.getBlockLock()).add(
-                lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR, BLK.PE));
-          }
+            @Override
+            public void setUp() throws StorageException {
+              inodeIdentifiers = INodeUtil.resolveINodesFromIds(ids);
 
-          @Override
-          public Object performTask() throws IOException {
-            Map.Entry<Long, Long> param = (Map.Entry<Long, Long>) getParams()[0];
-            Block block = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, param.getKey(), param.getValue());
-            BlockCollection bc = blocksMap.getBlockCollection(block);
+            }
 
-            if (bc != null) {
-              NumberReplicas num = countNodes(block);
-              int curReplicas = num.liveReplicas();
-              int curExpectedReplicas = getReplication(block);
-              if (isNeededReplication(block, curExpectedReplicas,
-                  curReplicas)) {
-                if (curExpectedReplicas > curReplicas) {
-                  if (bc.isUnderConstruction()) {
-                    if (block.equals(bc.getLastBlock()) && curReplicas > minReplication) {
-                      return null;
+            @Override
+            public void acquireLock(TransactionLocks locks) throws IOException {
+              LockFactory lf = LockFactory.getInstance();
+              locks.add(
+                  lf.getBatchedINodesLock(inodeIdentifiers))
+                  .add(lf.getSqlBatchedBlocksLock()).add(
+                  lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR, BLK.PE));
+            }
+
+            @Override
+            public Object performTask() throws IOException {
+              for (INodeIdentifier identifier : inodeIdentifiers) {
+                for (long blockId : inodeIdsToBlockMap.get(identifier.getInodeId())) {
+                  BlockInfo block = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, blockId);
+                  BlockCollection bc = blocksMap.getBlockCollection(block);
+
+                  if (bc != null) {
+                    NumberReplicas num = countNodes(block);
+                    int curReplicas = num.liveReplicas();
+                    int curExpectedReplicas = getReplication(block);
+                    if (isNeededReplication(block, curExpectedReplicas,
+                        curReplicas)) {
+                      if (curExpectedReplicas > curReplicas) {
+                        if (bc.isUnderConstruction()) {
+                          if (block.equals(bc.getLastBlock()) && curReplicas > minReplication) {
+                            continue;
+                          }
+                          underReplicatedInOpenFiles.incrementAndGet();
+                        }
+
+                        //Log info about one block for this node which needs replication
+                        if (!status.get()) {
+                          if (firstReplicationLog.getAndSet(false)) {
+                            logBlockReplicationInfo(block, srcNode, num);
+                          }
+                        }
+                        // Allowing decommission as long as default replication is met
+                        if (curReplicas < defaultReplication) {
+                          status.set(true);
+                        }
+
+
+                        underReplicatedBlocks.incrementAndGet();
+                        if ((curReplicas == 0) && (num.decommissionedReplicas() > 0)) {
+                          decommissionOnlyReplicas.incrementAndGet();
+                        }
+                      }
+                      if (!neededReplications.contains(getBlockInfo(block)) && pendingReplications.getNumReplicas(
+                          getBlockInfo(block)) == 0 && namesystem.isPopulatingReplQueues()) {
+                        //
+                        // These blocks have been reported from the datanode
+                        // after the startDecommission method has been executed. These
+                        // blocks were in flight when the decommissioning was started.
+                        // Process these blocks only when active NN is out of safe mode.
+                        //
+                        neededReplications.add(getBlockInfo(block), curReplicas,
+                            num.decommissionedReplicas(), curExpectedReplicas);
+                      }
                     }
-                    underReplicatedInOpenFiles[0]++;
                   }
-
-                  //Log info about one block for this node which needs replication
-                  if (!status[0]) {
-                    status[0] = true;
-                    if (firstReplicationLog[0]) {
-                      logBlockReplicationInfo(block, srcNode, num);
-                    }
-                    // Allowing decommission as long as default replication is met
-                    if (curReplicas >= defaultReplication) {
-                      status[0] = false;
-                      firstReplicationLog[0] = false;
-                    }
-                  }
-                  underReplicatedBlocks[0]++;
-                  if ((curReplicas == 0) &&
-                      (num.decommissionedReplicas() > 0)) {
-                    decommissionOnlyReplicas[0]++;
-                  }
-                }
-                if (!neededReplications.contains(getBlockInfo(block)) && pendingReplications.getNumReplicas(
-                    getBlockInfo(block)) == 0 && namesystem.isPopulatingReplQueues()) {
-                  //
-                  // These blocks have been reported from the datanode
-                  // after the startDecommission method has been executed. These
-                  // blocks were in flight when the decommissioning was started.
-                  // Process these blocks only when active NN is out of safe mode.
-                  //
-                  neededReplications.add(getBlockInfo(block), curReplicas,
-                      num.decommissionedReplicas(), curExpectedReplicas);
                 }
               }
+              return null;
             }
-            return null;
-          }
-        };
-
-    for (Map.Entry<Long, Long> entry: blocksOnNode.entrySet()) {
-      checkReplicationHandler.setParams(entry);
-      checkReplicationHandler.handle(namesystem);
+          };
+          checkReplicationHandler.handle(namesystem);
+        }
+      });
+    } catch (Exception ex) {
+      throw new IOException(ex);
     }
     srcNode.decommissioningStatus
-        .set(underReplicatedBlocks[0], decommissionOnlyReplicas[0],
-            underReplicatedInOpenFiles[0]);
-    return status[0];
+        .set(underReplicatedBlocks.get(), decommissionOnlyReplicas.get(), underReplicatedInOpenFiles.get());
+    return status.get();
   }
 
   public int getActiveBlockCount() throws IOException {

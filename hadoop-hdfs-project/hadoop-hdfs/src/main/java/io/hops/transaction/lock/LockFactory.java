@@ -353,7 +353,7 @@ public class LockFactory {
           list.add(getSqlBatchedInvalidatedBlocksLock());
           break;
         case PE:
-          list.add(getSqlBatchedInvalidatedBlocksLock());
+          list.add(getSqlBatchedPendingBlocksLock());
           break;
         case UC:
           list.add(getSqlBatchedReplicasUnderConstructionLock());
