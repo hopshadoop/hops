@@ -2675,10 +2675,10 @@ public class FSNamesystem
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV, BLK.PE))
                     .add(lf.getLastBlockHashBucketsLock());
             locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
-            // Always needs to be read. Erasure coding might have been
-            // enabled earlier and we don't want to end up in an inconsistent
-            // state.
-            locks.add(lf.getEncodingStatusLock(LockType.READ_COMMITTED, src));
+            
+            if(erasureCodingEnabled) {
+              locks.add(lf.getEncodingStatusLock(LockType.READ_COMMITTED, src));
+            }
             locks.add(lf.getAcesLock());
           }
 
