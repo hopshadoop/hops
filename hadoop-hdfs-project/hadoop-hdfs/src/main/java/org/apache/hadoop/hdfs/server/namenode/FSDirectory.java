@@ -843,13 +843,13 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     if (inode == null) {
       throw new FileNotFoundException("File does not exist: " + src);
     }
-
-    UsersGroups.addUserToGroup(username, groupname);
-
+    
     if (username != null) {
+      UsersGroups.addUser(username);
       inode.setUser(username);
     }
     if (groupname != null) {
+      UsersGroups.addGroup(groupname);
       inode.setGroup(groupname);
     }
     

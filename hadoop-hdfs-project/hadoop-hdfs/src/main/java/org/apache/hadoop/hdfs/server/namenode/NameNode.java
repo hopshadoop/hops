@@ -542,7 +542,7 @@ public class NameNode implements NameNodeStatusMXBean {
     String superGroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
         DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
 
-    UsersGroups.addUserToGroupTx(fsOwnerShortUserName, superGroup);
+    UsersGroups.addUserGroupTx(fsOwnerShortUserName, superGroup);
   
     try {
       createAndStartCRLFetcherService(conf);
