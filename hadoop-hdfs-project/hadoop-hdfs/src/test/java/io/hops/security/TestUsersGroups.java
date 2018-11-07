@@ -119,7 +119,7 @@ public class TestUsersGroups {
     assertEquals(cache.getUserId(currentUser), 0);
     
     //user0 -> {group0, group1}
-    cache.addUserToGroups(currentUser,
+    cache.addUserGroups(currentUser,
         Arrays.copyOfRange(groups, 0, 2));
 
     int userId = cache.getUserId(currentUser);
@@ -198,7 +198,7 @@ public class TestUsersGroups {
     }
   
     for (int i = 0; i < CACHE_SIZE; i++) {
-      cache.addUserToGroups(users[i],
+      cache.addUserGroups(users[i],
           Arrays.copyOfRange(groups, i, (i == CACHE_SIZE - 1 ?
               i + 1 : i + 2)));
       usersIds[i] = cache.getUserId(users[i]);
@@ -226,7 +226,7 @@ public class TestUsersGroups {
     assertNotNull(cache.getGroupsFromCache(users[0]));
   
     //associate the new user with group0, group1, group2
-    cache.addUserToGroups(newUser, Arrays.copyOfRange(groups, 0, 3));
+    cache.addUserGroups(newUser, Arrays.copyOfRange(groups, 0, 3));
   
     //user 1 groups should be evicted, since it is the last recently used in
     // this case
@@ -346,7 +346,7 @@ public class TestUsersGroups {
     String user = "user";
     
     //add User
-    cache.addUserToGroupTx(user, null, false);
+    cache.addUserGroupTx(user, null, false);
     
     int userId = cache.getUserId(user);
     assertNotSame(0, userId);
@@ -354,18 +354,17 @@ public class TestUsersGroups {
   
     //add Group
     String group = "group";
-    cache.addUserToGroupTx(null, group, false);
+    cache.addUserGroupTx(null, group, false);
     
     int groupId = cache.getGroupId(group);
     assertNotSame(0, groupId);
     assertEquals(group, cache.getGroupName(groupId));
     
     List<String> groups = cache.getGroups(user);
-    assertNotNull(groups);
-    assertTrue(groups.isEmpty());
+    assertNull(groups);
     
     // add user-group
-    cache.addUserToGroupTx(user, group, false);
+    cache.addUserGroupTx(user, group, false);
   
     groups = cache.getGroups(user);
     assertNotNull(groups);
@@ -373,7 +372,7 @@ public class TestUsersGroups {
   
     //Update cache only
   
-    cache.addUserToGroupTx(user, group, true);
+    cache.addUserGroupTx(user, group, true);
     groups = cache.getGroupsFromCache(user);
     assertNotNull(groups);
     assertEquals(Arrays.asList(group), groups);
@@ -383,19 +382,19 @@ public class TestUsersGroups {
     
     //remove user-group
     
-    cache.removeUserFromGroupTx(user, group, true);
+    cache.removeUserGroupTx(user, group, true);
     assertNull(cache.getGroupsFromCache(user));
     assertNotNull(cache.getGroups(user));
     assertEquals(Arrays.asList(group), cache.getGroups(user));
   
     //remove group
-    cache.removeUserFromGroupTx(null, group, true);
+    cache.removeUserGroupTx(null, group, true);
     assertNull(cache.getGroupIdFromCache(group));
     groupId = cache.getGroupId(group);
     assertNotSame(0, groupId);
     
     //remove user
-    cache.removeUserFromGroupTx(user, null, true);
+    cache.removeUserGroupTx(user, null, true);
     assertNull(cache.getUserIdFromCache(user));
     userId = cache.getUserId(user);
     assertNotSame(0, userId);
@@ -404,18 +403,18 @@ public class TestUsersGroups {
   
     //remove user - group
     
-    cache.removeUserFromGroupTx(user, group, false);
+    cache.removeUserGroupTx(user, group, false);
     assertNull(cache.getGroupsFromCache(user));
     assertNull(cache.getGroups(user));
     
     //remove group
-    cache.removeUserFromGroupTx(null, group, false);
+    cache.removeUserGroupTx(null, group, false);
     groupId = cache.getGroupId(group);
     assertNull(cache.getGroupIdFromCache(group));
     assertEquals(0, groupId);
   
     //remove user
-    cache.removeUserFromGroupTx(user, null, false);
+    cache.removeUserGroupTx(user, null, false);
     userId = cache.getUserId(user);
     assertNull(cache.getUserIdFromCache(user));
     assertEquals(0, userId);
@@ -424,7 +423,7 @@ public class TestUsersGroups {
   
   @Test
   public void testUsersGroupsNotConfigurad() throws IOException {
-    UsersGroups.addUserToGroups("user", new String[]{"group1", "group2"});
+    UsersGroups.addUserToGroup("user", "group1");
     assertEquals(UsersGroups.getGroupID("group1"), 0);
     assertEquals(UsersGroups.getUserID("user"), 0);
     assertNull(UsersGroups.getGroups("user"));
@@ -447,7 +446,7 @@ public class TestUsersGroups {
     List<String> loginUserGroups = jniGroupsMapping.getGroups(ugi.getUserName());
     assertFalse(loginUserGroups.isEmpty());
     
-    UsersGroups.addUserToGroupsTx(ugi.getUserName(), new String[]{});
+    UsersGroups.addUserGroupsTx(ugi.getUserName(), new String[]{});
     List<String> ugiGroups = ugi.getGroups();
     assertFalse(ugiGroups.isEmpty());
     assertThat(ugiGroups, Matchers.equalTo(loginUserGroups));
@@ -461,7 +460,7 @@ public class TestUsersGroups {
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
 
-    UsersGroups.addUserToGroupsTx("user", new String[]{"group1", "group2"});
+    UsersGroups.addUserGroupsTx("user", new String[]{"group1", "group2"});
 
     int userId = UsersGroups.getUserID("user");
     assertNotSame(0, userId);
@@ -490,7 +489,7 @@ public class TestUsersGroups {
     assertEquals(0, userId);
     assertNull(UsersGroups.getGroups("user"));
 
-    UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
+    UsersGroups.addUserGroupsTx("user", new String[]{"group1",
         "group2"});
 
     userId = UsersGroups.getUserID("user");
@@ -501,14 +500,14 @@ public class TestUsersGroups {
     
     removeUser(userId);
 
-    UsersGroups.addUserToGroupsTx("user", new String[]{"group3"});
+    UsersGroups.addUserGroupsTx("user", new String[]{"group3"});
 
     int newUserId = UsersGroups.getUserID("user");
     assertNotSame(0, userId);
     
     assertNotSame(userId, newUserId);
 
-    UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
+    UsersGroups.addUserGroupsTx("user", new String[]{"group1",
         "group2"});
     
     assertThat(UsersGroups.getGroups("user"), Matchers.containsInAnyOrder
@@ -524,7 +523,7 @@ public class TestUsersGroups {
 
     cluster.getNameNode().getRpcServer().refreshUserToGroupsMappings();
 
-    UsersGroups.addUserToGroupsTx("user", new String[]{"group1", "group2"});
+    UsersGroups.addUserGroupsTx("user", new String[]{"group1", "group2"});
 
     int userId = UsersGroups.getUserID("user");
     assertNotSame(0, userId);
@@ -548,7 +547,7 @@ public class TestUsersGroups {
     assertEquals(0, userId);
     assertNull(UsersGroups.getGroups("user"));
 
-    UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
+    UsersGroups.addUserGroupsTx("user", new String[]{"group1",
         "group2"});
 
     userId = UsersGroups.getUserID("user");
@@ -559,7 +558,7 @@ public class TestUsersGroups {
 
     removeUser(userId);
 
-    UsersGroups.addUserToGroupsTx("user", new String[]{"group3"});
+    UsersGroups.addUserGroupsTx("user", new String[]{"group3"});
 
     int newUserId = UsersGroups.getUserID("user");
     assertNotSame(0, userId);
@@ -567,7 +566,7 @@ public class TestUsersGroups {
     //Auto incremented Ids
     assertTrue(newUserId > userId);
 
-    UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
+    UsersGroups.addUserGroupsTx("user", new String[]{"group1",
         "group2"});
     
     assertThat(UsersGroups.getGroups("user"), Matchers.containsInAnyOrder
@@ -702,9 +701,9 @@ public class TestUsersGroups {
     @Override
     public Integer call() throws Exception {
       if(useTransaction) {
-        UsersGroups.addUserToGroupsTx(userName, null);
+        UsersGroups.addUserGroupsTx(userName, null);
       }else {
-        UsersGroups.addUserToGroups(userName, null);
+        UsersGroups.addUser(userName);
       }
       return UsersGroups.getUserID(userName);
     }
@@ -844,11 +843,16 @@ public class TestUsersGroups {
     }
     cluster.shutdown();
   }
+  
 
-
+  // With the new changes introduced in HOPS-676, the user addition and removal
+  // happen in the DistributedFileSystem which should take care of informing
+  // other namenodes caches about the addition/removal.
   @Test
   public void testSetOwnerOnOutdatedCache() throws Exception{
+    final int TIME_TO_EVICT = 5;
     Configuration conf = new HdfsConfiguration();
+    conf.setInt(CommonConfigurationKeys.HOPS_UG_CACHE_SECS, TIME_TO_EVICT);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
         .build();
     try {
@@ -871,7 +875,9 @@ public class TestUsersGroups {
       int userId = UsersGroups.getUserID(username);
 
       removeUser(userId);
-
+      
+      Thread.sleep(TIME_TO_EVICT * 1000);
+      
       dfs.setOwner(base, username, newgroupname);
 
       fileStatus = dfs.getFileStatus(base);
@@ -961,6 +967,29 @@ public class TestUsersGroups {
     }catch (AccessControlException ex){
       //only super use should be able to call
     }
+  }
+  
+  @Test
+  public void testSetOwnerDontAddUserToGroup() throws Exception{
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .build();
+    cluster.waitActive();
+    
+    DistributedFileSystem dfs = cluster.getFileSystem();
+    Path base = new Path("/base");
+    dfs.mkdirs(base);
+    
+    final String userName = "user";
+    final String groupName = "group";
+    
+    dfs.setOwner(base, userName, groupName);
+    
+    assertNull(UsersGroups.getGroups(userName));
+    assertNotSame(0, UsersGroups.getUserID(userName));
+    assertNotSame(0, UsersGroups.getGroupID(groupName));
+    
+    cluster.shutdown();
   }
 
 }

@@ -185,7 +185,6 @@ import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.util.Slicer;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
 import org.apache.hadoop.fs.CacheFlag;
@@ -10322,14 +10321,14 @@ public class FSNamesystem
   public void addUserGroup(String userName, String groupName, boolean cacheOnly)
       throws IOException {
     checkSuperuserPrivilege();
-    UsersGroups.addUserToGroupTx(userName, groupName, cacheOnly);
+    UsersGroups.addUserGroupTx(userName, groupName, cacheOnly);
   }
   
   
   public void removeUserGroup(String userName, String groupName,
       boolean cacheOnly) throws IOException {
     checkSuperuserPrivilege();
-    UsersGroups.removeUserFromGroupTx(userName, groupName, cacheOnly);
+    UsersGroups.removeUserGroupTx(userName, groupName, cacheOnly);
   }
 }
 

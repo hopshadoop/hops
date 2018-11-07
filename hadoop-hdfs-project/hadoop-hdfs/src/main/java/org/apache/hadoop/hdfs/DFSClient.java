@@ -2192,7 +2192,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     checkOpen();
     try {
       namenode.setOwner(src, username, groupname);
-      updateUserGroupCacheOnOtherNamenode(username, groupname);
     } catch(RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
                                      FileNotFoundException.class,
@@ -2978,12 +2977,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     }catch (RemoteException re){
       throw re.unwrapRemoteException();
     }
-    
-    updateUserGroupCacheOnOtherNamenode(userName, groupName);
-  }
   
-  private void updateUserGroupCacheOnOtherNamenode(final String userName, final String groupName)
-      throws IOException {
     if(userName != null && groupName != null){
       for(ClientProtocol nn : allNNs) {
         try{

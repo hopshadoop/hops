@@ -301,6 +301,19 @@ class UsersGroupsCache {
         && userGroupDataAccess != null && groupDataAccess != null;
   }
   
+  Integer addUserIfNotInCache(String userName) throws IOException{
+    if(!isConfigured)
+      return null;
+    
+    Integer userId = usersToIds.getIfPresent(userName);
+    if(userId != null){
+      LOG.debug("User " + userName + " is already in cache with id=" + userId);
+      return userId;
+    }
+    addUser(userName);
+    return getUserIdFromCache(userName);
+  }
+  
   void addUser(String userName) throws IOException {
     if(!isConfigured)
       return;
@@ -380,6 +393,19 @@ class UsersGroupsCache {
     }
   }
   
+  
+  Integer addGroupIfNotInCache(String groupName) throws IOException{
+    if(!isConfigured)
+      return null;
+    
+    Integer groupId = groupsToIds.getIfPresent(groupName);
+    if(groupId != null){
+      LOG.debug("Group " + groupName + " is already in cache with id=" + groupId);
+      return groupId;
+    }
+    addGroup(groupName);
+    return getGroupIdFromCache(groupName);
+  }
   
   void addGroup(String groupName) throws IOException {
     if(!isConfigured)
@@ -499,7 +525,7 @@ class UsersGroupsCache {
   }
   
   
-  void removeUserFromGroupTx(String user, String group, boolean cacheOnly) throws IOException{
+  void removeUserGroupTx(String user, String group, boolean cacheOnly) throws IOException{
     if(cacheOnly){
       if(user != null && group == null){
         removeUserFromCache(user);
@@ -519,53 +545,60 @@ class UsersGroupsCache {
     }
   }
   
-  void addUserToGroupTx(String user, String group, boolean cacheOnly) throws IOException{
+  void addUserGroupTx(String user, String group, boolean cacheOnly) throws IOException{
     if(cacheOnly){
       if(user != null && group != null){
         addUserToGroupsInCache(user, Arrays.asList(group));
       }
     }else{
-      addUserToGroupTx(user, group);
+      addUserGroupTx(user, group);
     }
   }
   
-  void addUserToGroupTx(String user, String group) throws IOException {
-    addUserToGroupsTx(user, new String[]{group});
+  void addUserGroupTx(String user, String group) throws IOException {
+    addUserGroupsTx(user, new String[]{group});
   }
   
   void addUserToGroup(String user, String group) throws IOException {
-    addUserToGroups(user, new String[]{group});
+    addUserGroups(user, new String[]{group});
   }
   
-  void addUserToGroupsTx(String user, String[] groups) throws IOException {
+  void addUserGroupsTx(String user, String[] groups) throws IOException {
     if(!isConfigured)
       return;
     
     try {
-      addUserToGroupsInternalTx(user, groups);
+      addUserGroupsInternalTx(user, groups);
     } catch (ForeignKeyConstraintViolationException ex) {
       removeUserFromCache(user);
       for (String group : groups) {
         removeGroupFromCache(group);
       }
-      addUserToGroupsInternalTx(user, groups);
+      addUserGroupsInternalTx(user, groups);
     } catch (UniqueKeyConstraintViolationException ex){
       LOG.debug("User/Group was already added: " + ex);
     }
   }
   
-  private void addUserToGroupsInternalTx(final String user, final
+  private void addUserGroupsInternalTx(final String user, final
   String[] grps) throws IOException {
     new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.ADD_USER_GROUPS) {
       @Override
       public Object performTask() throws StorageException, IOException {
-        addUserToGroups(user, grps);
+        addUserGroups(user, grps);
         return null;
       }
     }.handle();
   }
   
-  void addUserToGroups(String user,
+  /**
+   * Adds the user, and the groups if they don't exist in the cache to the
+   * database. Also, add the user to these groups.
+   * @param user
+   * @param grps
+   * @throws IOException
+   */
+  void addUserGroups(String user,
       String[] grps) throws IOException {
     
     if(!isConfigured)
@@ -583,7 +616,7 @@ class UsersGroupsCache {
     Integer userId = null;
     if(user != null){
       List<String> availableGroups = usersToGroups.getIfPresent(user);
-      if (availableGroups != null && groups != null) {
+      if (availableGroups != null && groups != null && !groups.isEmpty()) {
         if (availableGroups.containsAll(groups)) {
           LOG.debug("Groups (" + grps + ") already available in the cache for" +
               " user (" + user + ")");
@@ -591,22 +624,14 @@ class UsersGroupsCache {
         }
       }
   
-      userId = usersToIds.getIfPresent(user);
-      if(userId == null){
-        addUser(user);
-        userId = getUserId(user);
-      }
+      userId = addUserIfNotInCache(user);
     }
     
-    if (groups != null) {
+    if (groups != null && !groups.isEmpty()) {
       List<Integer> groupIds = Lists.newArrayList();
       
       for (String group : groups) {
-        Integer groupId = groupsToIds.getIfPresent(group);
-        if(groupId == null){
-          addGroup(group);
-          groupId = getGroupId(group);
-        }
+        Integer groupId = addGroupIfNotInCache(group);
         groupIds.add(groupId);
       }
   

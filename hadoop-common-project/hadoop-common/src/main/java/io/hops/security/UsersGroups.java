@@ -82,39 +82,55 @@ public final class UsersGroups {
     return usersGroupsMapping.getGroupName(groupId);
   }
   
-  public static void removeUserFromGroupTx(String user, String group,
+  public static void removeUserGroupTx(String user, String group,
       boolean cacheOnly) throws IOException {
     if(usersGroupsMapping == null){
       LOG.warn("UsersGroups was not initialized.");
       return;
     }
-    usersGroupsMapping.removeUserFromGroupTx(user, group, cacheOnly);
+    usersGroupsMapping.removeUserGroupTx(user, group, cacheOnly);
   }
   
-  public static void addUserToGroupTx(String user, String group,
+  public static void addUserGroupTx(String user, String group,
    boolean cacheOnly) throws IOException {
     if(usersGroupsMapping == null){
       LOG.warn("UsersGroups was not initialized.");
       return;
     }
-    usersGroupsMapping.addUserToGroupTx(user, group, cacheOnly);
+    usersGroupsMapping.addUserGroupTx(user, group, cacheOnly);
   }
   
-  public static void addUserToGroupTx(String user, String group) throws IOException {
+  public static void addUserGroupTx(String user, String group) throws IOException {
     if(usersGroupsMapping == null){
       LOG.warn("UsersGroups was not initialized.");
       return;
     }
-    usersGroupsMapping.addUserToGroupTx(user, group);
+    usersGroupsMapping.addUserGroupTx(user, group);
   }
   
-  public static void addUserToGroupsTx(String user, String[]
+  public static void addUserGroupsTx(String user, String[]
       groups) throws IOException {
     if(usersGroupsMapping == null){
       LOG.warn("UsersGroups was not initialized.");
       return;
     }
-    usersGroupsMapping.addUserToGroupsTx(user, groups);
+    usersGroupsMapping.addUserGroupsTx(user, groups);
+  }
+  
+  public static void addUser(String user) throws IOException {
+    if(usersGroupsMapping == null){
+      LOG.warn("UsersGroups was not initialized.");
+      return;
+    }
+    usersGroupsMapping.addUserIfNotInCache(user);
+  }
+  
+  public static void addGroup(String group) throws IOException {
+    if(usersGroupsMapping == null){
+      LOG.warn("UsersGroups was not initialized.");
+      return;
+    }
+    usersGroupsMapping.addGroupIfNotInCache(group);
   }
   
   public static void addUserToGroup(String user, String group) throws IOException {
@@ -125,31 +141,6 @@ public final class UsersGroups {
     usersGroupsMapping.addUserToGroup(user, group);
   }
   
-  public static void addUserToGroups(String user, String[]
-      groups) throws IOException {
-    if(usersGroupsMapping == null){
-      LOG.warn("UsersGroups was not initialized.");
-      return;
-    }
-    usersGroupsMapping.addUserToGroups(user, groups);
-  }
-  
-  public static void removeUserFromCache(String userName){
-    if(usersGroupsMapping == null){
-      LOG.warn("UsersGroups was not initialized.");
-      return;
-    }
-    usersGroupsMapping.removeUserFromCache(userName);
-  }
-
-  public static void removeGroupFromCache(String groupName){
-    if(usersGroupsMapping == null){
-      LOG.warn("UsersGroups was not initialized.");
-      return;
-    }
-    usersGroupsMapping.removeGroupFromCache(groupName);
-  }
-
   public static void clearCache(){
     if(usersGroupsMapping == null){
       LOG.warn("UsersGroups was not initialized.");
