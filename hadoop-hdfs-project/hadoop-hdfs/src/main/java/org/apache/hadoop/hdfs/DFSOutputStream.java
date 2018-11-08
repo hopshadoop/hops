@@ -2415,15 +2415,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       closeInternal();
       // get last block before destroying the streamer
     } catch (ClosedChannelException e) {
-    } catch (RemoteException e ) {
-      IOException outOfDBExtents =
-              e.unwrapRemoteException(OutOfDBExtentsException.class);
-      if (outOfDBExtents == e) {
+    } catch (OutOfDBExtentsException e ) {
         currentPacket = null;
         forwardSmallFilesPacketsToDataNodes(); // try to store the file on
         bytesCurBlock=0;
         closeInternal();
-      }
     }
     finally {
       closed = true;
