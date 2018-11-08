@@ -122,7 +122,7 @@ public class TestBlockManager {
         conf.getInt(DFS_SUBTREE_EXECUTOR_LIMIT_KEY,
             DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT));
     fsn = Mockito.mock(FSNamesystem.class);
-    Mockito.doReturn(subTreeOpsPool).when(fsn).getSubtreeOperationsExecutor();
+    Mockito.doReturn(subTreeOpsPool).when(fsn).getFSOperationsExecutor();
     formatStorage();
 
     bm = new BlockManager(fsn, fsn, conf);

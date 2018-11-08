@@ -451,7 +451,7 @@ public class FSNamesystem
   private final Configuration conf;
   private final QuotaUpdateManager quotaUpdateManager;
 
-  private final ExecutorService subtreeOperationsExecutor;
+  private final ExecutorService fsOperationsExecutor;
   private final boolean erasureCodingEnabled;
   private final ErasureCodingManager erasureCodingManager;
 
@@ -645,7 +645,7 @@ public class FSNamesystem
       blockManager.setBlockPoolId(blockPoolId);
       hopSpecificInitialization(conf);
       this.quotaUpdateManager = new QuotaUpdateManager(this, conf);
-      subtreeOperationsExecutor = Executors.newFixedThreadPool(
+      fsOperationsExecutor = Executors.newFixedThreadPool(
           conf.getInt(DFS_SUBTREE_EXECUTOR_LIMIT_KEY,
               DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT));
       BIGGEST_DELETABLE_DIR = conf.getLong(DFS_DIR_DELETE_BATCH_SIZE,
@@ -1038,7 +1038,7 @@ public class FSNamesystem
       if (smmthread != null) {
         smmthread.interrupt();
       }
-      subtreeOperationsExecutor.shutdownNow();
+      fsOperationsExecutor.shutdownNow();
     } finally {
       // using finally to ensure we also wait for lease daemon
       try {
@@ -7835,7 +7835,7 @@ public class FSNamesystem
    */
   private void addSafeBlocks(final List<Long> safeBlocks) throws IOException {
     try {
-      Slicer.slice(safeBlocks.size(), slicerBatchSize, slicerNbThreads,
+      Slicer.slice(safeBlocks.size(), slicerBatchSize, slicerNbThreads, fsOperationsExecutor,
           new Slicer.OperationHandler() {
         @Override
         public void handle(int startIndex, int endIndex) throws Exception {
@@ -7903,8 +7903,8 @@ public class FSNamesystem
     return isPermissionEnabled;
   }
 
-  public ExecutorService getSubtreeOperationsExecutor() {
-    return subtreeOperationsExecutor;
+  public ExecutorService getFSOperationsExecutor() {
+    return fsOperationsExecutor;
   }
 
   /**
@@ -8845,7 +8845,7 @@ public class FSNamesystem
           throws StorageException, TransactionContextException, IOException {
    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
    final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
-   return  subtreeOperationsExecutor.submit(new Callable<Boolean>() {
+   return  fsOperationsExecutor.submit(new Callable<Boolean>() {
         @Override
         public Boolean call() throws Exception {
           HopsTransactionalRequestHandler deleteHandler =
