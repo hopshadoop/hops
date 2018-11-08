@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock.Type;
 
@@ -622,10 +623,11 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return new BlockIterator(getStorageInfo(storageID));
   }
   
-  public Map<Long,Integer> getAllStorageReplicas(int numBuckets, int nbThreads, int BucketsPerThread) throws IOException {
+  public Map<Long,Integer> getAllStorageReplicas(int numBuckets, int nbThreads, int BucketsPerThread,
+      ExecutorService executor) throws IOException {
     Map<Long, Integer> result = new HashMap<>();
     for(DatanodeStorageInfo storageInfo: getStorageInfos()){
-      result.putAll(storageInfo.getAllStorageReplicas(numBuckets, nbThreads, BucketsPerThread));
+      result.putAll(storageInfo.getAllStorageReplicas(numBuckets, nbThreads, BucketsPerThread, executor));
     }
     return result;
   }
