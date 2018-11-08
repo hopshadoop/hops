@@ -36,6 +36,7 @@ import io.hops.util.Slicer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.StorageType;
@@ -408,16 +409,18 @@ public class DatanodeStorageInfo {
         false, capacity, dfsUsed, remaining, blockPoolUsed);
   }
 
-  public Map<Long, Long> getAllStorageReplicas(int numBuckets, int nbThreads, int bucketPerThread) throws IOException {
-    return DatanodeStorageInfo.getAllStorageReplicas(numBuckets, sid, nbThreads, bucketPerThread);
+  public Map<Long, Long> getAllStorageReplicas(int numBuckets, int nbThreads, int bucketPerThread,
+      ExecutorService executor) throws IOException {
+    return DatanodeStorageInfo.getAllStorageReplicas(numBuckets, sid, nbThreads, bucketPerThread, executor);
   }
   
-  public static Map<Long, Long> getAllStorageReplicas(int numBuckets, final int sid, int nbThreads, int bucketPerThread)
-      throws IOException {
+  public static Map<Long, Long> getAllStorageReplicas(int numBuckets, final int sid, int nbThreads, int bucketPerThread,
+      ExecutorService executor) throws IOException {
     final Map<Long, Long> result = new ConcurrentHashMap<>();
 
     try {
-      Slicer.slice(numBuckets, bucketPerThread, nbThreads, new Slicer.OperationHandler() {
+      Slicer.slice(numBuckets, bucketPerThread, nbThreads, executor,
+          new Slicer.OperationHandler() {
 
         @Override
         public void handle(final int startIndex, final int endIndex) throws Exception {

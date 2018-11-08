@@ -1261,7 +1261,7 @@ public class BlockManager {
       public Object call() throws Exception {
         try {
           Map<Long, Long> allBlocksAndInodesIds = node.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
-        blockFetcherBucketsPerThread);
+              blockFetcherBucketsPerThread, ((FSNamesystem) namesystem).getFSOperationsExecutor());
 
           removeBlocks(allBlocksAndInodesIds, node);
 
@@ -1323,7 +1323,7 @@ public class BlockManager {
       public Object call() throws Exception {
         try {
           Map<Long, Long> allBlocksAndInodesIds = storageInfo.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
-        blockFetcherBucketsPerThread);
+        blockFetcherBucketsPerThread, ((FSNamesystem) namesystem).getFSOperationsExecutor());
           final DatanodeDescriptor node = storageInfo.getDatanodeDescriptor();
 
           removeBlocks(allBlocksAndInodesIds, node);
@@ -1356,7 +1356,8 @@ public class BlockManager {
       public Object call() throws Exception {
         try {
           Map<Long, Long> allBlocksAndInodesIds = DatanodeStorageInfo.getAllStorageReplicas(numBuckets, sid,
-              blockFetcherNBThreads, blockFetcherBucketsPerThread);
+              blockFetcherNBThreads, blockFetcherBucketsPerThread, 
+              ((FSNamesystem) namesystem).getFSOperationsExecutor());
           
           removeBlocks(allBlocksAndInodesIds, sid);
           
@@ -2368,7 +2369,7 @@ public class BlockManager {
           + " of " + numBlocksLogged + " reported.");
     }
     try {
-      List<Future<Object>> futures = ((FSNamesystem) namesystem).getSubtreeOperationsExecutor().invokeAll(addTasks);
+      List<Future<Object>> futures = ((FSNamesystem) namesystem).getFSOperationsExecutor().invokeAll(addTasks);
       //Check for exceptions
       for (Future<Object> maybeException : futures){
         maybeException.get();
@@ -2405,11 +2406,12 @@ public class BlockManager {
   public void removeBlocks(List<Long> allBlockIds, final DatanodeDescriptor node) throws IOException {
 
     final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(allBlockIds,
-        removalBatchSize, removalNoThreads);
+        removalBatchSize, removalNoThreads, ((FSNamesystem) namesystem).getFSOperationsExecutor());
     final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
-      Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads,
+      Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads, 
+          ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
         public void handle(int startIndex, int endIndex)
@@ -2439,6 +2441,7 @@ public class BlockManager {
 
     try {
       Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads,
+          ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
         public void handle(int startIndex, int endIndex)
@@ -2468,6 +2471,7 @@ public class BlockManager {
 
     try {
       Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads,
+          ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
         public void handle(int startIndex, int endIndex)
@@ -2608,7 +2612,7 @@ public class BlockManager {
     }
 
     try {
-      List<Future<Void>> futures = ((FSNamesystem) namesystem).getSubtreeOperationsExecutor().invokeAll(subTasks);
+      List<Future<Void>> futures = ((FSNamesystem) namesystem).getFSOperationsExecutor().invokeAll(subTasks);
       for (Future<Void> maybeException : futures){
         maybeException.get();
       }
@@ -3534,7 +3538,8 @@ public class BlockManager {
         + filesToProcessStartIndex + " - " + filesToProcessEndIndex + "]");
 
     try {
-      Slicer.slice(allINodes.size(), processMisReplicatedBatchSize, processMisReplicatedNoThreads,
+      Slicer.slice(allINodes.size(), processMisReplicatedBatchSize, processMisReplicatedNoThreads, 
+          ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
         public void handle(int startIndex, int endIndex)
@@ -4066,7 +4071,7 @@ public class BlockManager {
           blockIds.add(block.getBlockId());
         }
         List<Long> inodeIds = new ArrayList<>(INodeUtil.getINodeIdsForBlockIds(blockIds, removalBatchSize,
-            removalNoThreads).keySet());
+            removalNoThreads, ((FSNamesystem) namesystem).getFSOperationsExecutor()).keySet());
         inodeIdentifiers = INodeUtil.resolveINodesFromIds(inodeIds);
       }
 
@@ -4449,7 +4454,7 @@ public class BlockManager {
     }
     final int[] numOverReplicated = {0};    
     Map<Long, Long> blocksOnNode = srcNode.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
-        blockFetcherBucketsPerThread);
+        blockFetcherBucketsPerThread, ((FSNamesystem) namesystem).getFSOperationsExecutor());
     HopsTransactionalRequestHandler processBlockHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.PROCESS_OVER_REPLICATED_BLOCKS_ON_RECOMMISSION) {
@@ -4511,7 +4516,7 @@ public class BlockManager {
     final int[] underReplicatedInOpenFiles = new int[]{0};
 
     Map<Long, Long> blocksOnNode = srcNode.getAllStorageReplicas(numBuckets, blockFetcherNBThreads,
-        blockFetcherBucketsPerThread);
+        blockFetcherBucketsPerThread, ((FSNamesystem) namesystem).getFSOperationsExecutor());
 
     HopsTransactionalRequestHandler checkReplicationHandler =
         new HopsTransactionalRequestHandler(
