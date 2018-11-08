@@ -36,10 +36,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+
 /**
  * A FailoverProxyProvider implementation which allows one to configure two URIs
  * to connect to during fail-over. The first configured address is tried first,
@@ -56,7 +54,7 @@ public class HopsRandomStickyFailoverProxyProvider<T> implements
           new ArrayList<AddressRpcProxyPair<T>>();
   private final UserGroupInformation ugi;
   private final Class<T> xface;
-  private final Random rand = new Random(System.currentTimeMillis());
+  private final Random rand = new Random((UUID.randomUUID()).hashCode());
   private final URI uri;
 
   protected String name = this.getClass().getSimpleName()+" ("+this.hashCode()+") ";
