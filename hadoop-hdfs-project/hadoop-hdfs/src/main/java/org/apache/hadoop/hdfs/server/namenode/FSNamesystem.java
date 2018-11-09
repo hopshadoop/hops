@@ -185,6 +185,7 @@ import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.util.Slicer;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
 import org.apache.hadoop.fs.CacheFlag;
@@ -5280,7 +5281,7 @@ public class FSNamesystem
      */
     private void incrementSafeBlockCount(short replication, Block blk) throws IOException {
       if (replication == safeReplication) {
-        addSafeBlock(blk.getBlockId());
+        int added = addSafeBlock(blk.getBlockId());
 
         // Report startup progress only if we haven't completed startup yet.
         //todo this will not work with multiple NN
@@ -5290,7 +5291,7 @@ public class FSNamesystem
             this.awaitingReportedBlocksCounter = prog.getCounter(Phase.SAFEMODE,
                 STEP_AWAITING_REPORTED_BLOCKS);
           }
-          this.awaitingReportedBlocksCounter.increment();
+          this.awaitingReportedBlocksCounter.add(added);
         }
 
         setSafeModePendingOperation(true);
@@ -5505,13 +5506,10 @@ public class FSNamesystem
     }
 
     private void adjustSafeBlocks(Set<Long> safeBlocks) throws IOException {
-      int lastSafeBlockSize = blockSafe();
-      addSafeBlocks(new ArrayList<Long>(safeBlocks));
-      int newSafeBlockSize = blockSafe();
+      int added = addSafeBlocks(new ArrayList<Long>(safeBlocks));
       if (LOG.isDebugEnabled()) {
         long blockTotal = blockTotal();
-        LOG.debug("Adjusting safe blocks from " + lastSafeBlockSize + "/" +
-            blockTotal + " to " + newSafeBlockSize + "/" + blockTotal);
+        LOG.debug("Adjusting safe blocks, added " + added +" blocks");
       }
       
       StartupProgress prog = NameNode.getStartupProgress();
@@ -5520,7 +5518,7 @@ public class FSNamesystem
             this.awaitingReportedBlocksCounter = prog.getCounter(Phase.SAFEMODE,
               STEP_AWAITING_REPORTED_BLOCKS);
           }
-          this.awaitingReportedBlocksCounter.add(newSafeBlockSize-lastSafeBlockSize);
+          this.awaitingReportedBlocksCounter.add(added);
         }
 
       setSafeModePendingOperation(true);
@@ -7802,10 +7800,10 @@ public class FSNamesystem
    *      block to be added to safe blocks
    * @throws IOException
    */
-  private void addSafeBlock(final Long safeBlock) throws IOException {
+  private int addSafeBlock(final Long safeBlock) throws IOException {
     List<Long> safeBlocks = new ArrayList();
     safeBlocks.add(safeBlock);
-    addSafeBlocks(safeBlocks);
+    return addSafeBlocks(safeBlocks);
   }
 
   /**
@@ -7832,7 +7830,8 @@ public class FSNamesystem
    *      list of blocks to be added to safe blocks
    * @throws IOException
    */
-  private void addSafeBlocks(final List<Long> safeBlocks) throws IOException {
+  private int addSafeBlocks(final List<Long> safeBlocks) throws IOException {
+    final AtomicInteger added = new AtomicInteger(0);
     try {
       Slicer.slice(safeBlocks.size(), slicerBatchSize, slicerNbThreads, fsOperationsExecutor,
           new Slicer.OperationHandler() {
@@ -7845,10 +7844,15 @@ public class FSNamesystem
               boolean inTransaction = connector.isTransactionActive();
               if (!inTransaction) {
                 connector.beginTransaction();
+                connector.writeLock();
               }
               SafeBlocksDataAccess da = (SafeBlocksDataAccess) HdfsStorageFactory
                   .getDataAccess(SafeBlocksDataAccess.class);
+              int before = da.countAll();
               da.insert(ids);
+              connector.flush();
+              int after = da.countAll();
+              added.addAndGet(after-before);
               if(!inTransaction){
                 connector.commit();
               }
@@ -7863,6 +7867,7 @@ public class FSNamesystem
       }
       throw new IOException(e);
     }
+    return added.get();
   }
 
   /**
