@@ -189,6 +189,7 @@ import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.util.Slicer;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
@@ -439,6 +440,8 @@ public class FSNamesystem
   private final boolean supportAppends;
   private final ReplaceDatanodeOnFailure dtpReplaceDatanodeOnFailure;
 
+  private AtomicBoolean inSafeMode = new AtomicBoolean(false); // safe mode information
+  
   private final long maxFsObjects;          // maximum number of fs objects
 
   private final long minBlockSize;         // minimum block size
@@ -811,6 +814,7 @@ public class FSNamesystem
     RootINodeCache.start();
     if (isLeader()) {
       HdfsVariables.setSafeModeInfo(new SafeModeInfo(conf), -1);
+      inSafeMode.set(true);
       assert safeMode() != null && !isPopulatingReplQueues();
       StartupProgress prog = NameNode.getStartupProgress();
       prog.beginPhase(Phase.SAFEMODE);
@@ -4731,6 +4735,8 @@ public class FSNamesystem
       this.resourcesLow = resourcesLow;
     }
 
+    private SafeModeInfo(){};
+    
     public double getThreshold() {
       return threshold;
     }
@@ -4790,6 +4796,9 @@ public class FSNamesystem
      * startup.
      */
     private void leave() throws IOException {
+      if(!inSafeMode.getAndSet(false)){
+        return;
+      }
       // if not done yet, initialize replication queues.
       // In the standby, do not populate replication queues
       if (!isPopulatingReplQueues() && shouldPopulateReplicationQueues()) {
@@ -5342,11 +5351,15 @@ public class FSNamesystem
     // safeMode is volatile, and may be set to null at any time
     SafeModeInfo safeMode = safeMode();
     if (safeMode == null) {
+      if(inSafeMode.get()){
+        new SafeModeInfo().leave();
+      }
       return false;
     }
     if(safeMode.isOn() && !isLeader()){
       safeMode.tryToHelpToGetOut();
     }
+    inSafeMode.set(safeMode.isOn());
     return safeMode.isOn();
   }
 
@@ -5545,13 +5558,14 @@ public class FSNamesystem
    * @throws IOException
    */
   void enterSafeMode(boolean resourcesLow) throws IOException {
+    stopSecretManager();
+    shouldPopulateReplicationQueue = true;
+    inSafeMode.set(true);
+    
     if(!isLeader()){
       return;
     }
-    // Stop the secret manager, since rolling the master key would
-    // try to write to the edit log
-    stopSecretManager();
-    shouldPopulateReplicationQueue = true;
+    
     SafeModeInfo safeMode = safeMode();
     if (safeMode != null) {
       if (resourcesLow) {
