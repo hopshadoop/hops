@@ -898,11 +898,14 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMESERVICE_ID = "dfs.nameservice.id";
   public static final String DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY =
       "dfs.namenode.resource.check.interval";
-  public static final int DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT = 60000;
+  public static final int DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT = 5000;
   public static final String DFS_NAMENODE_DU_RESERVED_KEY =
       "dfs.namenode.resource.du.reserved";
-  public static final long DFS_NAMENODE_DU_RESERVED_DEFAULT = 1024 * 1024 * 100;
-      // 100 MB
+  public static final long DFS_NAMENODE_DU_RESERVED_DEFAULT = 1024 * 1024 * 100; // 100 MB
+  
+  public static final String DFS_NAMENODE_DB_CHECK_MAX_TRIES = "dfs.namenode.db.check.max.tries";
+  public static final int DFS_NAMENODE_DB_CHECK_MAX_TRIES_DEFAULT = 3;
+  
   public static final String DFS_NAMENODE_CHECKED_VOLUMES_KEY =
       "dfs.namenode.resource.checked.volumes";
   public static final String DFS_NAMENODE_CHECKED_VOLUMES_MINIMUM_KEY =

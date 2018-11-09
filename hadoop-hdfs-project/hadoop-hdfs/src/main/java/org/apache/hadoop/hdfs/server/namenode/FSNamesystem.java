@@ -281,6 +281,7 @@ import org.apache.hadoop.util.Timer;
 import org.apache.log4j.Appender;
 import org.apache.log4j.AsyncAppender;
 import org.apache.log4j.Logger;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * ************************************************
@@ -423,6 +424,7 @@ public class FSNamesystem
 
   private Daemon retryCacheCleanerThread = null;
 
+  private volatile boolean hasResourcesAvailable = true;
   private volatile boolean fsRunning = true;
 
   /**
@@ -435,6 +437,11 @@ public class FSNamesystem
    */
   private final long resourceRecheckInterval;
 
+  // The actual resource checker instance.
+  NameNodeResourceChecker nnResourceChecker;
+
+  private final int maxDBTries;
+  
   private final FsServerDefaults serverDefaults;
   private final boolean supportAppends;
   private final ReplaceDatanodeOnFailure dtpReplaceDatanodeOnFailure;
@@ -491,9 +498,6 @@ public class FSNamesystem
 
   private volatile AtomicBoolean forceReadTheSafeModeFromDB = new AtomicBoolean(true);
   
-  private final double databaseResourcesThreshold;
-  private final double databaseResourcesPreThreshold;
-
   /**
    * Clear all loaded data
    */
@@ -700,13 +704,8 @@ public class FSNamesystem
           DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS,
           DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT);
       
-      this.databaseResourcesThreshold =
-          conf.getDouble(DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD,
-              DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD_DEFAULT);
-      this.databaseResourcesPreThreshold =
-          conf.getDouble(DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_PRETHRESHOLD,
-              DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_PRETHRESHOLD_DEFAULT);
-      
+      this.maxDBTries = conf.getInt(DFSConfigKeys.DFS_NAMENODE_DB_CHECK_MAX_TRIES,
+          DFSConfigKeys.DFS_NAMENODE_DB_CHECK_MAX_TRIES_DEFAULT);
     } catch (IOException | RuntimeException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
       close();
@@ -825,6 +824,8 @@ public class FSNamesystem
     this.registerMBean(); // register the MBean for the FSNamesystemState
     IDsMonitor.getInstance().start();
     RootINodeCache.start();
+    nnResourceChecker = new NameNodeResourceChecker(conf);
+    checkAvailableResources();
     if (isLeader()) {
       HdfsVariables.setSafeModeInfo(new SafeModeInfo(conf), -1);
       inSafeMode.set(true);
@@ -4436,8 +4437,63 @@ public class FSNamesystem
    *
    * @return true if there were sufficient resources available, false otherwise.
    */
-  private boolean nameNodeHasResourcesAvailable() throws StorageException {
-    return HdfsStorageFactory.hasResources(databaseResourcesThreshold);
+  private boolean nameNodeHasResourcesAvailable() {
+    return hasResourcesAvailable;
+  }
+
+  /**
+   * Perform resource checks and cache the results.
+   */
+  void checkAvailableResources() {
+    Preconditions.checkState(nnResourceChecker != null, "nnResourceChecker not initialized");
+    int tries = 0; 
+    Throwable lastThrowable = null;
+    while (tries < maxDBTries) {
+      try {
+        SafeModeInfo safeMode = safeMode();
+        if(safeMode!=null){
+          //another namenode set safeMode to true since last time we checked
+          //we need to start reading safeMode from the database for every opperation
+          //until the all cluster get out of safemode.
+          forceReadTheSafeModeFromDB.set(true);
+        }
+        if (!nnResourceChecker.hasAvailablePrimarySpace()) {
+          //Database resources are in between preThreshold and Threshold
+          //that means that soon enough we will hit the resources threshold
+          //therefore, we enable reading the safemode variable from the
+          //database, since at any point from now on, the leader will go to
+          //safe mode.
+          forceReadTheSafeModeFromDB.set(true);
+        }
+        
+        hasResourcesAvailable = nnResourceChecker.hasAvailableSpace();
+        break;
+      } catch (StorageException e) {
+        LOG.warn("StorageException in checkAvailableResources.", e);
+        if (e instanceof TransientStorageException) {
+          continue; //do not count TransientStorageException as a failled try
+        }
+        lastThrowable = e;
+        tries++;
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException ex) {
+          // Deliberately ignore
+        }
+      } catch (Throwable t) {
+        LOG.error("Runtime exception in checkAvailableResources. ", t);
+        lastThrowable = t;
+        tries++;
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException ex) {
+          // Deliberately ignore
+        }
+      }
+    }
+    if (tries > maxDBTries) {
+      terminate(1, lastThrowable);
+    }
   }
 
   /**
@@ -4454,18 +4510,8 @@ public class FSNamesystem
     public void run() {
       try {
         while (fsRunning && shouldNNRmRun) {
-          if(HdfsStorageFactory.hasResources(databaseResourcesPreThreshold)){
-            continue;
-          }
-          //Database resources are in between preThreshold and Threshold
-          //that means that soon enough we will hit the resources threshold
-          //therefore, we enable reading the safemode variable from the
-          //database, since at any point from now on, the leader will go to
-          //safe mode.
-  
-          forceReadTheSafeModeFromDB.set(true);
-          
-          if (isLeader() && !nameNodeHasResourcesAvailable()) {
+          checkAvailableResources();
+          if (!nameNodeHasResourcesAvailable()) {
             String lowResourcesMsg = "NameNode's database low on available " +
                 "resources.";
             if (!isInSafeMode()) {
@@ -5590,7 +5636,8 @@ public class FSNamesystem
     inSafeMode.set(true);    
     forceReadTheSafeModeFromDB.set(true);
     
-    if(!isLeader()){
+    //if the resource are low put the cluster in SafeMode even if not the leader.
+    if(!resourcesLow && !isLeader()){
       return;
     }
     
@@ -6803,6 +6850,11 @@ public class FSNamesystem
   @VisibleForTesting
   public SafeModeInfo getSafeModeInfoForTests() throws IOException {
     return safeMode();
+  }
+
+  @VisibleForTesting
+  public void setNNResourceChecker(NameNodeResourceChecker nnResourceChecker) {
+    this.nnResourceChecker = nnResourceChecker;
   }
 
   @Override

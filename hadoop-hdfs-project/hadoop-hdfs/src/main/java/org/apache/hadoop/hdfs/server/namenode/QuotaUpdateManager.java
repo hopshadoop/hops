@@ -131,14 +131,8 @@ public class QuotaUpdateManager {
           break;
         } catch (StorageException e) {
           LOG.warn("QuotaUpdateMonitor thread received StorageException.", e);
-          if( e instanceof TransientStorageException) {
-            continue; // do not quit thread on storage exception
-          }
-          terminate(1, e);
         } catch (Throwable t) {
-          LOG.fatal("QuotaUpdateMonitor thread received Runtime exception. ",
-              t);
-          terminate(1, t);
+          LOG.error("QuotaUpdateMonitor thread received Runtime exception. ",t);
         }
       }
     }
