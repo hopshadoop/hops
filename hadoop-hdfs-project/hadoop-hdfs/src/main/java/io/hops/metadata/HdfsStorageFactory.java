@@ -389,4 +389,8 @@ public class HdfsStorageFactory {
     Cache.getInstance().flush();
     return dStorageFactory.getConnector().formatStorage(das);
   }
+  
+  public static boolean hasResources(double threshold) throws StorageException {
+    return dStorageFactory.hasResources(threshold);
+  }
 }
