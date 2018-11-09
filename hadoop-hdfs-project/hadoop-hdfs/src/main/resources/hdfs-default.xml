@@ -1758,4 +1758,25 @@
     </description>
   </property>
 
+  <property>
+    <name>dfs.namenode.resource.check.threshold</name>
+    <value>0.9</value>
+    <description>The threshold on the memory resources for the database. By
+      default the leader namenode will go into safemode if the database
+      resources are 90% (0.9) used.
+    </description>
+  </property>
+
+
+  <property>
+    <name>dfs.namenode.resource.check.prethreshold</name>
+    <value>0.8</value>
+    <description>The prethreshold on the memory resources for the database. By
+      default all the namenodes will start reading the safemode variable from
+      the database once the database resources are 80% (0.8) used. This is
+      an optimization parameter to avoid overloading the database while reading
+      the safemode status at every request.
+    </description>
+  </property>
+
 </configuration>

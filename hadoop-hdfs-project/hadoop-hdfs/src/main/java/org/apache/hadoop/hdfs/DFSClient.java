@@ -2277,6 +2277,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     if(leaderNN==null){
       throw new IOException("no leader namenode availlable");
     }
+    for(ClientProtocol nn : allNNs) {
+      if(!nn.equals(leaderNN)) {
+        nn.setSafeMode(action, isChecked);
+      }
+    }
     return leaderNN.setSafeMode(action, isChecked);
   }
 

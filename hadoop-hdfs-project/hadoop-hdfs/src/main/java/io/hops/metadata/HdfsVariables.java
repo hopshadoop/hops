@@ -273,7 +273,7 @@ public class HdfsVariables {
               throws StorageException {
             LongVariable var =
                 (LongVariable) vd.getVariable(Variable.Finder.SafeModeReached);
-            return var.getValue();
+            return var.getValue() == null ? 0 : var.getValue();
           }
         });
       }
