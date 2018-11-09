@@ -1778,5 +1778,15 @@
       the safemode status at every request.
     </description>
   </property>
-
+  
+  <property>
+    <name>dfs.namenode.db.check.max.tries</name>
+    <value>3</value>
+    <description>When checking the health of the database it may happen that the
+      database return an error that has an error code that does not match any
+      transient exception but that it still in fact transient. In order not to
+      kill the NN as soon as such an error occure we should allow it to retry
+      the opperation a few times.
+    </description>
+  </property>  
 </configuration>
