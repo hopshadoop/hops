@@ -889,7 +889,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMESERVICE_ID = "dfs.nameservice.id";
   public static final String DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY =
       "dfs.namenode.resource.check.interval";
-  public static final int DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT = 5000;
+  public static final int DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT = 60000;
   public static final String DFS_NAMENODE_DU_RESERVED_KEY =
       "dfs.namenode.resource.du.reserved";
   public static final long DFS_NAMENODE_DU_RESERVED_DEFAULT = 1024 * 1024 * 100;
@@ -899,6 +899,17 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODE_CHECKED_VOLUMES_MINIMUM_KEY =
       "dfs.namenode.resource.checked.volumes.minimum";
   public static final int DFS_NAMENODE_CHECKED_VOLUMES_MINIMUM_DEFAULT = 1;
+  
+  public static final String DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD =
+      "dfs.namenode.resource.check.threshold";
+  public static final double DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD_DEFAULT =
+      0.9;
+  
+  public static final String DFS_NAMENODE_RESOURCE_CHECK_PRETHRESHOLD =
+      "dfs.namenode.resource.check.prethreshold";
+  public static final double DFS_NAMENODE_RESOURCE_CHECK_PRETHRESHOLD_DEFAULT =
+      DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD_DEFAULT - (DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD_DEFAULT * 0.1);
+  
   public static final String  DFS_WEB_AUTHENTICATION_SIMPLE_ANONYMOUS_ALLOWED = "dfs.web.authentication.simple.anonymous.allowed";
   public static final String DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY =
       "dfs.web.authentication.kerberos.principal";
