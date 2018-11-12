@@ -2719,10 +2719,10 @@ public class FSNamesystem
               locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
                   Server.getCallId()));
             }
-            // Always needs to be read. Erasure coding might have been
-            // enabled earlier and we don't want to end up in an inconsistent
-            // state.
-            locks.add(lf.getEncodingStatusLock(LockType.READ_COMMITTED, src));
+            
+            if(erasureCodingEnabled) {
+              locks.add(lf.getEncodingStatusLock(LockType.READ_COMMITTED, src));
+            }
             locks.add(lf.getAcesLock());
           }
 
@@ -2748,7 +2748,8 @@ public class FSNamesystem
         boolean success = false;
         try {
           INode target = getINode(src);
-          if (target != null && target instanceof INodeFile && !((INodeFile) target).isFileStoredInDB()) {
+          if (erasureCodingEnabled && 
+              target != null && target instanceof INodeFile && !((INodeFile) target).isFileStoredInDB()) {
             EncodingStatus status = EntityManager.find(EncodingStatus.Finder.ByInodeId, target.getId());
             if (status != null) {
               throw new IOException("Cannot append to erasure-coded file");
