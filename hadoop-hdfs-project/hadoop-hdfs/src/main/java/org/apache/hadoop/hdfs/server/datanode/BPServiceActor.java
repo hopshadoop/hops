@@ -599,6 +599,7 @@ class BPServiceActor implements Runnable {
 
     SortedActiveNodeList list = this.bpNamenode.getActiveNamenodes();
     bpos.updateNNList(list);
+    bpos.setLastNNListUpdateTime();
   }
 
   public void blockReceivedAndDeleted(DatanodeRegistration registration,
