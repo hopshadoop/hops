@@ -86,6 +86,7 @@ public class TestHAFileCreation extends junit.framework.TestCase {
     conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY, /*default
     45*/ 2);
     conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, /*default 10*/ 1);
+    conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY,"1000,2");
 
     cluster = new MiniDFSCluster.Builder(conf)
         .nnTopology(MiniDFSNNTopology.simpleHOPSTopology(NUM_NAMENODES))
