@@ -1281,7 +1281,6 @@ public class IncrementalBRTask implements Callable{
       }
 
       if ((System.currentTimeMillis() - nnListLastUpdate) > 5000) {
-        nnListLastUpdate = System.currentTimeMillis();
         return true;
       } else {
         return false;
@@ -1289,6 +1288,10 @@ public class IncrementalBRTask implements Callable{
     } finally {
       writeUnlock();
     }
+  }
+
+  void setLastNNListUpdateTime(){
+    nnListLastUpdate = System.currentTimeMillis();
   }
 
   public void startWhirlingSufiThread() {
