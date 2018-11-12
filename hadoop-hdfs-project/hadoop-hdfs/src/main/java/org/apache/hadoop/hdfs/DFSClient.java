@@ -635,7 +635,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
             allNNs.add(NameNodeProxies.createNonHAProxy(conf, an.getRpcServerAddressForClients(),
                     ClientProtocol.class, ugi, false).getProxy());
           }
-        } catch (ConnectException e){ //in some unit test the uri is invalid that returns NPE
+        } catch (ConnectException e){
           LOG.warn("Namenode proxy is null");
           leaderNN = null;
           allNNs.clear();
@@ -881,8 +881,23 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   /**
    * Close connections the Namenode.
    */
-  void closeConnectionToNamenode() {
-    RPC.stopProxy(namenode);
+  void closeConnectionsToNamenodes() {
+    if(leaderNN == namenode){
+      //close only one
+      stopProxy(namenode);
+    }else{
+      stopProxy(namenode);
+      stopProxy(leaderNN);
+    }
+    for(ClientProtocol nn : allNNs){
+      stopProxy(nn);
+    }
+  }
+
+  void stopProxy(ClientProtocol proxy){
+    if(proxy != null){
+      RPC.stopProxy(proxy);
+    }
   }
 
   /** Abort and release resources held.  Ignore all errors. */
@@ -896,7 +911,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     } catch (IOException ioe) {
        LOG.info("Exception occurred while aborting the client " + ioe);
     }
-    closeConnectionToNamenode();
+    closeConnectionsToNamenodes();
   }
 
   /** Close/abort all files being written. */
@@ -937,7 +952,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       clientRunning = false;
       getLeaseRenewer().closeClient(this);
       // close connections to the namenode
-      closeConnectionToNamenode();
+      closeConnectionsToNamenodes();
     }
   }
 
