@@ -20,13 +20,12 @@ import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.ipc.RetryCache;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.ipc.RetryCache;
 
 public class LockFactory {
 
@@ -297,7 +296,11 @@ public class LockFactory {
   public Lock getLastBlockHashBucketsLock(){
     return new LastBlockReplicasHashBucketLock();
   }
-  
+
+  public Lock getAllUsedHashBucketsLock() {
+    return new HashBucketsLocksAllFileBlocks();
+  }
+
   public Lock getRetryCacheEntryLock(byte[] clientId, int callId){
     return new RetryCacheEntryLock(clientId, callId);
   }

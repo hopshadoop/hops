@@ -2251,6 +2251,9 @@ public class FSNamesystem
                   .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
                   lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
                       BLK.PE, BLK.IV));
+
+          locks.add(lf.getAllUsedHashBucketsLock());
+
           if(isRetryCacheEnabled) {
             locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
                 Server.getCallId()));
@@ -3209,7 +3212,9 @@ public class FSNamesystem
                     .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src))
                     .add(lf.getBlockLock())
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR));
+            locks.add(lf.getAllUsedHashBucketsLock());
           }
+
 
           @Override
           public Object performTask() throws IOException {
@@ -3600,6 +3605,9 @@ public class FSNamesystem
               locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
                   Server.getCallId()));
             }
+
+            locks.add(lf.getAllUsedHashBucketsLock());
+
             if (dir.isQuotaEnabled()) {
               locks.add(lf.getQuotaUpdateLock(true, src));
             }
@@ -8433,6 +8441,12 @@ public class FSNamesystem
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, dst));
         }
         locks.add(lf.getAcesLock());
+
+        for (Options.Rename op : options) {
+          if (op == Rename.OVERWRITE) {
+            locks.add(lf.getAllUsedHashBucketsLock());
+          }
+        }
       }
 
       @Override
@@ -8958,14 +8972,17 @@ public class FSNamesystem
                               .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
                               .skipReadingQuotaAttr(!dir.isQuotaEnabled())
                               .setIgnoredSTOInodes(subTreeRootId);
-                      locks.add(il)
-                              .add(lf.getLeaseLock(LockType.WRITE))
+                      locks.add(il).add(lf.getLeaseLock(LockType.WRITE))
                               .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                               .add(lf.getBlockLock()).add(
                               lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE, BLK.IV));
+
+                      locks.add(lf.getAllUsedHashBucketsLock());
+
                       if (dir.isQuotaEnabled()) {
                         locks.add(lf.getQuotaUpdateLock(true, path));
                       }
+
                       if (erasureCodingEnabled) {
                         locks.add(lf.getEncodingStatusLock(true, LockType.WRITE, path));
                       }

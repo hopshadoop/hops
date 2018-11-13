@@ -4668,10 +4668,6 @@ public class BlockManager {
 
   public void removeBlock(Block block)
       throws StorageException, TransactionContextException, IOException {
-    // No need to ACK blocks that are being removed entirely
-    // from the namespace, since the removal of the associated
-    // file already removes them from the block map below.
-    block.setNumBytesNoPersistance(BlockCommand.NO_ACK);
     addToInvalidates(block);
     corruptReplicas.removeFromCorruptReplicasMap(getBlockInfo(block));
     BlockInfo storedBlock = getBlockInfo(block);
@@ -4682,6 +4678,11 @@ public class BlockManager {
     if (postponedMisreplicatedBlocks.remove(block)) {
       postponedMisreplicatedBlocksCount.decrementAndGet();
     }
+
+    // No need to ACK blocks that are being removed entirely
+    // from the namespace, since the removal of the associated
+    // file already removes them from the block map below.
+    block.setNumBytesNoPersistance(BlockCommand.NO_ACK);
   }
 
   public BlockInfo getStoredBlock(Block block)
