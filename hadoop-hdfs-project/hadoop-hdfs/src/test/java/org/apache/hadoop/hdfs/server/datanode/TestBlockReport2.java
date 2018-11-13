@@ -23,6 +23,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.*;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -292,7 +293,6 @@ public class TestBlockReport2 {
    *
    * @throws IOException
    */
-  @Ignore // Deleting a file does not trigger delete reports
   @Test
   public void blockReport_01() throws IOException, InterruptedException {
     DistributedFileSystem fs = null;
@@ -340,7 +340,7 @@ public class TestBlockReport2 {
       }
 
       //make sure that the blocks are deleted from the disk
-      Thread.sleep(20000);
+      Thread.sleep(30000);
 
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
@@ -770,7 +770,6 @@ public class TestBlockReport2 {
   }
 
 
-  @Ignore // Don't know why this doesn't work
   @Test
   public void blockReport_09() throws IOException, InterruptedException {
     concurrentWrites(1 /*threads*/,
@@ -779,7 +778,6 @@ public class TestBlockReport2 {
             0 /*threshold*/);
   }
 
-  @Ignore // Don't know why this doesn't work
   @Test
   public void blockReport_10() throws IOException, InterruptedException {
     concurrentWrites(5 /*threads*/,
@@ -823,7 +821,9 @@ public class TestBlockReport2 {
         threads[i].stopIt();
       }
 
-      Thread.sleep(5000);
+      //some blocks are deleted. wait for some time so that the
+      //blocks are all removed from the datanodes
+      Thread.sleep(30000);
       matchDNandNNState(0, numDataNodes, cluster, 0, numBuckets);
       sendAndCheckBR(0, numDataNodes, cluster, poolId, 0, numBuckets);
 
@@ -1300,5 +1300,128 @@ public class TestBlockReport2 {
     }
   }
 
+  /**
+   * test overwrite file on creation
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  @Test
+  public void blockReport_14() throws IOException, InterruptedException {
+    DistributedFileSystem fs = null;
+    MiniDFSCluster cluster = null;
+    final int NUM_DATANODES = 5;
+    final short REPLICATION = 3;
+    String poolId = null;
+    final String baseName = "/dir";
+    final int numBuckets = 5;
+    try {
+      Configuration conf = new Configuration();
+      setConfiguration(conf, numBuckets);
+      cluster = new MiniDFSCluster.Builder(conf).format
+              (true).numDataNodes(NUM_DATANODES).build();
+      fs = (DistributedFileSystem) cluster.getFileSystem();
 
+      cluster.waitActive();
+
+      final String METHOD_NAME = GenericTestUtils.getMethodName();
+      LOG.info("Running test " + METHOD_NAME);
+
+      // empty block reports should match
+      matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
+
+      int numBlocks = 1;
+      Path filePath = new Path(baseName + "/" +  "file.dat");
+      prepareForRide(cluster, filePath, REPLICATION, numBlocks);
+
+      //make sure that all incremental block reports are processed
+      Thread.sleep(10000);
+
+      matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
+
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
+
+      filePath = new Path(baseName + "/" +  "file.dat");
+      FSDataOutputStream out = fs.create(filePath, true);
+      out.write(1);
+      out.close();
+
+      //make sure that the blocks are deleted from the disk
+      Thread.sleep(30000);
+
+      matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
+
+
+    } catch (Exception e) {
+      fail(e.toString());
+      e.printStackTrace();
+    } finally {
+      fs.close();
+      cluster.shutdownDataNodes();
+      cluster.shutdown();
+    }
+  }
+
+  /**
+   * test overwrite file on rename
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  @Test
+  public void blockReport_15() throws IOException, InterruptedException {
+    DistributedFileSystem fs = null;
+    MiniDFSCluster cluster = null;
+    final int NUM_DATANODES = 5;
+    final short REPLICATION = 3;
+    String poolId = null;
+    final String baseName = "/dir";
+    final int numBuckets = 5;
+    try {
+      Configuration conf = new Configuration();
+      setConfiguration(conf, numBuckets);
+      cluster = new MiniDFSCluster.Builder(conf).format
+              (true).numDataNodes(NUM_DATANODES).build();
+      fs = (DistributedFileSystem) cluster.getFileSystem();
+
+      cluster.waitActive();
+
+      final String METHOD_NAME = GenericTestUtils.getMethodName();
+      LOG.info("Running test " + METHOD_NAME);
+
+      // empty block reports should match
+      matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
+
+      int numBlocks = 1;
+      Path filePath1 = new Path(baseName + "/" +  "file1.dat");
+      Path filePath2 = new Path(baseName + "/" +  "file2.dat");
+      prepareForRide(cluster, filePath1, REPLICATION, numBlocks);
+      prepareForRide(cluster, filePath2, REPLICATION, numBlocks);
+
+      //make sure that all incremental block reports are processed
+      Thread.sleep(10000);
+
+      matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
+
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
+
+      fs.rename(filePath1, filePath2, Options.Rename.OVERWRITE);
+
+      //make sure that the blocks are deleted from the disk
+      Thread.sleep(30000);
+
+      matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
+
+
+    } catch (Exception e) {
+      fail(e.toString());
+      e.printStackTrace();
+    } finally {
+      fs.close();
+      cluster.shutdownDataNodes();
+      cluster.shutdown();
+    }
+  }
 }
