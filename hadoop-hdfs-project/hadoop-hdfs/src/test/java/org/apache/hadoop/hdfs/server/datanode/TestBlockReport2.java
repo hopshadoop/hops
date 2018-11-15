@@ -374,7 +374,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf,numBuckets);
+      setConfiguration(conf, numBuckets);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -424,25 +424,28 @@ public class TestBlockReport2 {
 
 
   /**
-   * flush and hflush should not have any effect on the number of matching
-   * buckets
+   * flush does not have any effect on blk reporting
+   * however calling hflush invalidates the bucket. When hflush is called the
+   * datanode updates the length of the block, however the corresponding changes
+   * on the namenode side are not applied. After the block is closed there should
+   * be no difference in block hashes.
    *
    * @throws IOException
    * @throws InterruptedException
    */
-  @Ignore //Don't know what's going wrong yet
   @Test
   public void blockReport_03() throws IOException, InterruptedException {
     DistributedFileSystem fs = null;
     MiniDFSCluster cluster = null;
     final int NUM_DATANODES = 5;
     final short REPLICATION = 3;
+    final int NUM_FILES = 5;
     String poolId = null;
     final String baseName = "/dir";
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf,numBuckets);
+      setConfiguration(conf, numBuckets);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -455,14 +458,14 @@ public class TestBlockReport2 {
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
 
       FSDataOutputStream outs[] = new FSDataOutputStream[5];
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < NUM_FILES; i++) {
         Path filePath = new Path(baseName + "/" + i + ".dat");
         LOG.debug("Creating file: " + filePath);
-        outs[i] = fs.create(filePath);
+        outs[i] = fs.create(filePath, REPLICATION);
         //write half a block
         byte data[] = new byte[BLOCK_SIZE / 2];
         outs[i].write(data);
-        outs[i].flush();
+        outs[i].flush(); //does not have any impact on block reports
         LOG.debug("Flushed half a block");
       }
 
@@ -470,7 +473,7 @@ public class TestBlockReport2 {
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
 
       //write more data but do not fill the entire block
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < NUM_FILES; i++) {
         Path filePath = new Path(baseName + "/" + i + ".dat");
         byte data[] = new byte[BLOCK_SIZE / 2 - 1];
         outs[i].write(data);
@@ -478,13 +481,15 @@ public class TestBlockReport2 {
         LOG.debug("HFlushed half a block -1 ");
       }
 
-      matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
-      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
+      Thread.sleep(50000); //wait for all incremental block reports
+
+      matchDNandNNState(0, NUM_DATANODES, cluster, NUM_FILES*REPLICATION, numBuckets);
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, NUM_FILES*REPLICATION, numBuckets);
 
       //fill the block
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < NUM_FILES; i++) {
         Path filePath = new Path(baseName + "/" + i + ".dat");
-        byte data[] = new byte[1];
+        byte data[] = new byte[BLOCK_SIZE+1];
         outs[i].write(data);
         outs[i].hflush();
         outs[i].close();
@@ -494,7 +499,7 @@ public class TestBlockReport2 {
       //make sure that all incremental block reports are processed
       LOG.debug("Sleeping to make sure that all the incremental BR are " +
               "received");
-      Thread.sleep(5000);
+      Thread.sleep(10000);
 
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
@@ -815,7 +820,7 @@ public class TestBlockReport2 {
         threads[i].start();
       }
 
-      Thread.sleep(60*1000);
+      Thread.sleep(60 * 1000);
 
       for (int i = 0; i < numThreads; i++) {
         threads[i].stopIt();
@@ -841,6 +846,7 @@ public class TestBlockReport2 {
 
   /**
    * Testing BR and cluster restart
+   *
    * @throws IOException
    * @throws InterruptedException
    */
@@ -906,11 +912,12 @@ public class TestBlockReport2 {
 
   /**
    * Testing BR and cluster restart
+   *
    * @throws IOException
    * @throws InterruptedException
    */
-   @Ignore //This test doesn't make sense
-   @Test
+  @Ignore //This test doesn't make sense
+  @Test
   public void blockReport_12() throws IOException, InterruptedException {
     DistributedFileSystem fs = null;
     MiniDFSCluster cluster = null;
@@ -921,7 +928,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf,numBuckets);
+      setConfiguration(conf, numBuckets);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -948,8 +955,8 @@ public class TestBlockReport2 {
 
       corruptHashes(0, cluster);
 
-      matchDNandNNState(0, NUM_DATANODES, cluster, NUM_DATANODES*numBuckets, numBuckets);
-      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, NUM_DATANODES*numBuckets, numBuckets);
+      matchDNandNNState(0, NUM_DATANODES, cluster, NUM_DATANODES * numBuckets, numBuckets);
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, NUM_DATANODES * numBuckets, numBuckets);
 
 
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
@@ -968,11 +975,13 @@ public class TestBlockReport2 {
 
   /**
    * Testing reconfiguration
+   *
    * @throws IOException
    * @throws InterruptedException
    */
-  @Ignore // Hash buckets do not match report after sending. Either they contain non-finalized blocks
-          // or there is some logical problem with letting the full block report "reset" hashes.
+  @Ignore
+  // Hash buckets do not match report after sending. Either they contain non-finalized blocks
+  // or there is some logical problem with letting the full block report "reset" hashes.
   @Test
   public void blockReport_13() throws IOException, InterruptedException {
     DistributedFileSystem fs = null;
@@ -984,7 +993,7 @@ public class TestBlockReport2 {
     try {
       Configuration conf = new Configuration();
       int numBuckets = 5;
-      setConfiguration(conf,numBuckets);
+      setConfiguration(conf, numBuckets);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -1014,14 +1023,14 @@ public class TestBlockReport2 {
       cluster.shutdown();
       conf = new Configuration();
       numBuckets = 10;
-      setConfiguration(conf,numBuckets);
+      setConfiguration(conf, numBuckets);
       cluster = new MiniDFSCluster.Builder(conf).format
               (false).numDataNodes(NUM_DATANODES).build();
       cluster.waitActive();
       fs = (DistributedFileSystem) cluster.getFileSystem();
 
-      matchDNandNNState(0, NUM_DATANODES, cluster, NUM_DATANODES*numBuckets, numBuckets);
-      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, NUM_DATANODES*numBuckets, numBuckets);
+      matchDNandNNState(0, NUM_DATANODES, cluster, NUM_DATANODES * numBuckets, numBuckets);
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, NUM_DATANODES * numBuckets, numBuckets);
 
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
@@ -1031,14 +1040,14 @@ public class TestBlockReport2 {
       cluster.shutdown();
       conf = new Configuration();
       numBuckets = 3;
-      setConfiguration(conf,numBuckets);
+      setConfiguration(conf, numBuckets);
       cluster = new MiniDFSCluster.Builder(conf).format
               (false).numDataNodes(NUM_DATANODES).build();
       cluster.waitActive();
       fs = (DistributedFileSystem) cluster.getFileSystem();
 
-      matchDNandNNState(0, NUM_DATANODES, cluster, NUM_DATANODES*numBuckets, numBuckets);
-      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, NUM_DATANODES*numBuckets, numBuckets);
+      matchDNandNNState(0, NUM_DATANODES, cluster, NUM_DATANODES * numBuckets, numBuckets);
+      sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, NUM_DATANODES * numBuckets, numBuckets);
 
 
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
@@ -1082,20 +1091,14 @@ public class TestBlockReport2 {
 
         assertFalse("More buckets on NN than on DN. might indicate configuration issue.", storageHashes.size() > dnHashes.size());
 
-        if (storageHashes.size() != dnHashes.size()){
+        if (storageHashes.size() != dnHashes.size()) {
           LOG.debug("Number of hashes on NN doesn't match DN. This should only be the case before first report.");
         }
 
-        List<Long> nnHashes = new ArrayList<>();
+        List<Long> nnHashes = new ArrayList<>(numBuckets);
         for (HashBucket storageHash : storageHashes) {
-          nnHashes.add(storageHash.getHash());
+          nnHashes.add(storageHash.getBucketId(), storageHash.getHash());
         }
-        for (int j = 0; j < dnHashes.size() - storageHashes.size() ; j++){
-          nnHashes.add(0L); //fill with zeros unordered
-        }
-
-        Collections.sort(nnHashes);
-        Collections.sort(dnHashes);
 
         LOG.debug("DN Hash: " + Arrays.toString(dnHashes.toArray()));
         LOG.debug("NN Hash: " + Arrays.toString(nnHashes.toArray()));
@@ -1139,7 +1142,7 @@ public class TestBlockReport2 {
     }
   }
 
-  private Map<DatanodeStorage, BlockReport>getDNBR(MiniDFSCluster cluster, DataNode dn, int numBuckets) {
+  private Map<DatanodeStorage, BlockReport> getDNBR(MiniDFSCluster cluster, DataNode dn, int numBuckets) {
     String poolId = cluster.getNamesystem().getBlockPoolId();
     Map<DatanodeStorage, BlockReport> br = dn.getFSDataset().getBlockReports(poolId);
     for (BlockReport reportedBlocks : br.values()) {
@@ -1206,7 +1209,7 @@ public class TestBlockReport2 {
 
     boolean hasIncorrectStorageBucket = false;
     for (HashBucket namenodeHash : namenodeHashes) {
-      if (namenodeHash.getStorageId() != storage.getSid()){
+      if (namenodeHash.getStorageId() != storage.getSid()) {
         hasIncorrectStorageBucket = true;
         break;
       }
@@ -1285,7 +1288,7 @@ public class TestBlockReport2 {
               if (paths.size() > 0) {
                 Path path = paths.get(0);
                 cluster.getFileSystem().setReplication(path,
-                        (short) (replication+1));
+                        (short) (replication + 1));
               }
               break;
             default:
@@ -1302,6 +1305,7 @@ public class TestBlockReport2 {
 
   /**
    * test overwrite file on creation
+   *
    * @throws IOException
    * @throws InterruptedException
    */
@@ -1331,7 +1335,7 @@ public class TestBlockReport2 {
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
 
       int numBlocks = 1;
-      Path filePath = new Path(baseName + "/" +  "file.dat");
+      Path filePath = new Path(baseName + "/" + "file.dat");
       prepareForRide(cluster, filePath, REPLICATION, numBlocks);
 
       //make sure that all incremental block reports are processed
@@ -1341,7 +1345,7 @@ public class TestBlockReport2 {
 
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
 
-      filePath = new Path(baseName + "/" +  "file.dat");
+      filePath = new Path(baseName + "/" + "file.dat");
       FSDataOutputStream out = fs.create(filePath, true);
       out.write(1);
       out.close();
@@ -1365,6 +1369,7 @@ public class TestBlockReport2 {
 
   /**
    * test overwrite file on rename
+   *
    * @throws IOException
    * @throws InterruptedException
    */
@@ -1394,8 +1399,8 @@ public class TestBlockReport2 {
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
 
       int numBlocks = 1;
-      Path filePath1 = new Path(baseName + "/" +  "file1.dat");
-      Path filePath2 = new Path(baseName + "/" +  "file2.dat");
+      Path filePath1 = new Path(baseName + "/" + "file1.dat");
+      Path filePath2 = new Path(baseName + "/" + "file2.dat");
       prepareForRide(cluster, filePath1, REPLICATION, numBlocks);
       prepareForRide(cluster, filePath2, REPLICATION, numBlocks);
 

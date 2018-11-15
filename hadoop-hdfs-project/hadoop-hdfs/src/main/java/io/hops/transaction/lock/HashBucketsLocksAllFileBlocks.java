@@ -36,8 +36,9 @@ public class HashBucketsLocksAllFileBlocks extends LockWithType {
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     setLockMode(TransactionLockTypes.LockType.WRITE);
-    if (locks.containsLock(Type.Replica)) {
+    if (locks.containsLock(Type.Replica) || locks.containsLock(Type.ReplicaUnderConstruction)) {
       Collection<Object> blks = ((BlockRelatedLock) locks.getLock(Type.Replica)).getBlocks();
+      blks.addAll(((BlockRelatedLock) locks.getLock(Type.ReplicaUnderConstruction)).getBlocks());
 
       List<Replica> replicas = new ArrayList<>();
       for (Object blk : blks) {
