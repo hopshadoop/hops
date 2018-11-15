@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -57,7 +58,6 @@ import org.apache.hadoop.yarn.state.MultipleArcTransition;
 import org.apache.hadoop.yarn.state.SingleArcTransition;
 import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
@@ -738,6 +738,15 @@ public class RMContainerImpl implements RMContainer, Comparable<RMContainer> {
       container.eventHandler.handle(new RMNodeCleanContainerEvent(
           container.nodeId, container.containerId));
 
+      // If the node is dead the cleanContainerEvent may never be handled we need to make sure that the quota service
+      // get informed of the container getting killed.
+      List<io.hops.metadata.yarn.entity.ContainerStatus> containerToLog
+          = new ArrayList<>();
+      containerToLog.add(new io.hops.metadata.yarn.entity.ContainerStatus(
+          container.containerId.toString(), ContainerState.COMPLETE.name(), event.getType().name(),
+          container.getContainerExitStatus(),container.nodeId.toString()));
+      container.rmContext.getContainersLogsService().insertEvent(containerToLog);
+      
       // Inform appAttempt
       super.transition(container, event);
     }
