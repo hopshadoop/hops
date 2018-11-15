@@ -26,7 +26,7 @@ public class IndividualHashBucketLock extends Lock {
   private final int storageId;
   private final int bucketId;
   
-  IndividualHashBucketLock(int storageId, int bucketId) {
+  public IndividualHashBucketLock(int storageId, int bucketId) {
     this.storageId = storageId;
     this.bucketId = bucketId;
   }
@@ -44,6 +44,14 @@ public class IndividualHashBucketLock extends Lock {
   @Override
   protected Type getType() {
     return Type.HashBucket;
+  }
+
+  public int getStorageId() {
+    return storageId;
+  }
+
+  public int getBucketId() {
+    return bucketId;
   }
 }
 

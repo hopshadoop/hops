@@ -179,14 +179,16 @@ public class HashBuckets {
     return "(id: " + block.getBlockId() + ",#bytes: "+block.getNumBytes() +
         ",GS: " + block.getGenerationStamp()+")";
   }
+
   public void applyHash(int storageId, HdfsServerConstants.ReplicaState state,
       Block block ) throws TransactionContextException, StorageException {
     int bucketId = getBucketForBlock(block);
     HashBucket bucket = getBucket(storageId, bucketId);
-    long newHash = bucket.getHash() + BlockReport.hash(block, state);
+    long curVal = bucket.getHash();
+    long newHash = curVal  + BlockReport.hash(block, state);
     LOG.debug("Applying block:" + blockToString
-        (block) + "sid: " + storageId + "state: " + state.name() + ", hash: "
-        + BlockReport.hash(block, state));
+        (block) + "sid=" + storageId + " state=" + state.name() + ", hash ("+
+        curVal+" + "+ BlockReport.hash(block, state)+" = "+newHash+")");
     
     bucket.setHash(newHash);
   }
@@ -195,10 +197,11 @@ public class HashBuckets {
       state, Block block) throws TransactionContextException, StorageException {
     int bucketId = getBucketForBlock(block);
     HashBucket bucket = getBucket(storageId, bucketId);
-    long newHash = bucket.getHash() - BlockReport.hash(block, state);
+    long currVal = bucket.getHash();
+    long newHash = currVal - BlockReport.hash(block, state);
     LOG.debug("Undo block:" + blockToString
-        (block) + "sid: " + storageId + "state: " + state.name() + ", hash: " +
-        BlockReport.hash(block,state));
+        (block) + " sid=" + storageId + " state=" + state.name() + ", hash (" +
+        currVal+" - "+BlockReport.hash(block,state)+" = "+newHash+")");
     
     bucket.setHash(newHash);
   }
