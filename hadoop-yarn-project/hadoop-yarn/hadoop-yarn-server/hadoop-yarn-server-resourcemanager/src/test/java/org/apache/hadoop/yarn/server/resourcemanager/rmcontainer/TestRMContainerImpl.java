@@ -59,6 +59,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
+import org.apache.hadoop.yarn.server.resourcemanager.quota.ContainersLogsService;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
@@ -116,6 +117,7 @@ public class TestRMContainerImpl {
 
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     SystemMetricsPublisher publisher = mock(SystemMetricsPublisher.class);
+    ContainersLogsService containersLogsService = mock(ContainersLogsService.class);
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getDispatcher()).thenReturn(drainDispatcher);
     when(rmContext.getContainerAllocationExpirer()).thenReturn(expirer);
@@ -129,7 +131,7 @@ public class TestRMContainerImpl {
     when(rmContext.getYarnConfiguration()).thenReturn(conf);
     RMContainer rmContainer = new RMContainerImpl(container, appAttemptId,
         nodeId, "user", rmContext);
-
+    when(rmContext.getContainersLogsService()).thenReturn(containersLogsService);
     assertEquals(RMContainerState.NEW, rmContainer.getState());
     assertEquals(resource, rmContainer.getAllocatedResource());
     assertEquals(nodeId, rmContainer.getAllocatedNode());

@@ -24,6 +24,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
@@ -48,8 +49,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemoved
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeResourceUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
-import org.apache.hadoop.yarn.state.MultipleArcTransition;
-import org.apache.hadoop.yarn.state.SingleArcTransition;
 
 /**
  *
@@ -138,7 +137,7 @@ public class RMNodeImplNotDist extends RMNodeImpl {
     List<ContainerStatus> newlyLaunchedContainers
             = new ArrayList<ContainerStatus>();
     List<ContainerStatus> completedContainers = new ArrayList<ContainerStatus>();
-	List<io.hops.metadata.yarn.entity.ContainerStatus> containerToLog
+    List<io.hops.metadata.yarn.entity.ContainerStatus> containerToLog
             = new ArrayList<>();
     int numRemoteRunningContainers = 0;
     for (ContainerStatus remoteContainer : containerStatuses) {
@@ -278,6 +277,13 @@ public class RMNodeImplNotDist extends RMNodeImpl {
 
   protected void cleanUpContainerTransitionInternal(RMNodeImpl rmNode,
           RMNodeEvent event) {
+    List<io.hops.metadata.yarn.entity.ContainerStatus> containerToLog
+            = new ArrayList<>();
+    RMNodeCleanContainerEvent containerEvent = (RMNodeCleanContainerEvent) event;
+    containerToLog.add(new io.hops.metadata.yarn.entity.ContainerStatus(
+              containerEvent.getContainerId().toString(), ContainerState.COMPLETE.name(), "killed",
+              ContainerExitStatus.ABORTED, containerEvent.getNodeId().toString()));
+    context.getContainersLogsService().insertEvent(containerToLog);
     rmNode.containersToClean.add(((RMNodeCleanContainerEvent) event).
             getContainerId());
 
