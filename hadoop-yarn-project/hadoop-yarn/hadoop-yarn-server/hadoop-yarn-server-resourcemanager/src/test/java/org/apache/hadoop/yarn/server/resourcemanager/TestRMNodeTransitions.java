@@ -52,6 +52,7 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
+import org.apache.hadoop.yarn.server.resourcemanager.quota.ContainersLogsService;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer
     .AllocationExpirationInfo;
@@ -126,6 +127,8 @@ public class TestRMNodeTransitions {
     NodesListManager nodesListManager = mock(NodesListManager.class);
     HostsFileReader reader = mock(HostsFileReader.class);
     when(nodesListManager.getHostsReader()).thenReturn(reader);
+    ContainersLogsService containerLogsService = mock(ContainersLogsService.class);
+    ((RMContextImpl)rmContext).setContainersLogsService(containerLogsService);
     ((RMContextImpl) rmContext).setNodesListManager(nodesListManager);
     scheduler = mock(YarnScheduler.class);
     doAnswer(
@@ -227,7 +230,7 @@ public class TestRMNodeTransitions {
     ContainerId completedContainerId = BuilderUtils.newContainerId(
         BuilderUtils.newApplicationAttemptId(
             BuilderUtils.newApplicationId(0, 0), 0), 0);
-    node.handle(new RMNodeCleanContainerEvent(null, completedContainerId));
+    node.handle(new RMNodeCleanContainerEvent(node.getNodeID(), completedContainerId));
     Assert.assertEquals(1, node.getContainersToCleanUp().size());
     
     // Now verify that scheduler isn't notified of an expired container

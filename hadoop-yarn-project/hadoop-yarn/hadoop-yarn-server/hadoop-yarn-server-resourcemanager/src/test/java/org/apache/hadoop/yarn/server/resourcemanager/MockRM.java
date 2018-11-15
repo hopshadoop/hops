@@ -1055,4 +1055,9 @@ public class MockRM extends ResourceManager {
       return trustStore;
     }
   }
+  
+  public void expireNM(NodeId nodeId) {
+    getRMContext().getDispatcher().getEventHandler().handle(
+        new RMNodeEvent(nodeId, RMNodeEventType.EXPIRE)); 
+  }
 }

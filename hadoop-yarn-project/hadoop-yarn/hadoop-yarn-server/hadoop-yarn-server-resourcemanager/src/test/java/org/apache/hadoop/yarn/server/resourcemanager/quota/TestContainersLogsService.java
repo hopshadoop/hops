@@ -177,5 +177,204 @@ public class TestContainersLogsService {
 
     return containersLogs;
   }
+  
+  
+   /**
+   * Test if logs are removed when nm shutdown
+   *
+   * @throws Exception
+   */
+  @Test(timeout = 60000)
+  public void testNMShutdown() throws Exception {
+    int checkpointTicks = 10;
+    int monitorInterval = 1000;
+    conf.setInt(YarnConfiguration.QUOTA_CONTAINERS_LOGS_MONITOR_INTERVAL,
+            monitorInterval);
+    conf.setBoolean(
+            YarnConfiguration.QUOTA_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, true);
+    conf.setInt(YarnConfiguration.QUOTA_MIN_TICKS_CHARGE, checkpointTicks);
+    conf.setInt(YarnConfiguration.QUOTA_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
+            1);
+    MockRM rm = new MockRM(conf);
+    rm.init(conf);
+    rm.start();
+    MockNM nm1 = rm.registerNode("h1:1234", 4 * GB);
+    MockNM nm2 = rm.registerNode("h2:5678", 4 * GB);
+
+    RMApp app = rm.submitApp(1 * GB);
+    
+    nm1.nodeHeartbeat(true);
+    nm2.nodeHeartbeat(true);
+
+    RMAppAttempt attempt = app.getCurrentAppAttempt();
+    MockAM am = rm.sendAMLaunched(attempt.getAppAttemptId());
+    am.registerAppAttempt();
+
+    //request for containers
+    int request = 4;
+    am.allocate("h1", 1 * GB, request, new ArrayList<ContainerId>());
+
+    //kick the scheduler
+    List<Container> conts = am.allocate(new ArrayList<ResourceRequest>(),
+            new ArrayList<ContainerId>()).getAllocatedContainers();
+    int contReceived = conts.size();
+    while (contReceived < 4) { //only 4 containers can be allocated on node1
+      nm1.nodeHeartbeat(true);
+      nm2.nodeHeartbeat(true);
+      conts.addAll(am.allocate(new ArrayList<ResourceRequest>(),
+              new ArrayList<ContainerId>()).getAllocatedContainers());
+      contReceived = conts.size();
+      //LOG.info("Got " + contReceived + " containers. Waiting to get " + 3);
+      Thread.sleep(100);
+    }
+    Assert.assertEquals(4, conts.size());
+    
+    List<org.apache.hadoop.yarn.api.records.ContainerStatus> containersStatusNM1 = new ArrayList<>();
+    List<org.apache.hadoop.yarn.api.records.ContainerStatus> containersStatusNM2 = new ArrayList<>();
+    for(Container c: conts){
+      if(c.getNodeId().equals(nm1.getNodeId())){
+        containersStatusNM1.add(org.apache.hadoop.yarn.api.records.ContainerStatus.
+              newInstance(c.getId(), ContainerState.RUNNING, "",0));
+      }else{
+        containersStatusNM2.add(org.apache.hadoop.yarn.api.records.ContainerStatus.
+              newInstance(c.getId(), ContainerState.RUNNING, "",0));
+      }
+    }
+    Map<ApplicationId, List<org.apache.hadoop.yarn.api.records.ContainerStatus>> status = new HashMap<>();
+    status.put(am.getApplicationAttemptId().getApplicationId(), containersStatusNM1);
+    nm1.nodeHeartbeat(status, true);
+    
+    status = new HashMap<>();
+    status.put(am.getApplicationAttemptId().getApplicationId(), containersStatusNM2);
+    nm2.nodeHeartbeat(status, true);
+    
+    Thread.sleep(monitorInterval+500);
+    // Check if the containers are in containersLog
+    Map<String, ContainerLog> cl = getContainersLogs();
+    
+    for (Container c: conts) {
+      ContainerLog entry = cl.get(c.getId().toString());
+      Assert.assertNotNull(entry);
+    }
+    
+    nm2.unregisterNode();
+    
+    Thread.sleep(monitorInterval*2);
+    
+    // Check if the containers are in containersLog
+    cl = getContainersLogs();
+    
+    for (Container c: conts) {
+      ContainerLog entry = cl.get(c.getId().toString());
+      if(c.getNodeId().equals(nm1.getNodeId())){
+        Assert.assertNotNull(entry);
+        Assert.assertEquals(ContainerExitStatus.CONTAINER_RUNNING_STATE, entry.
+              getExitstatus());
+      }else{
+        if(entry!=null){
+          Assert.assertNotEquals(ContainerExitStatus.CONTAINER_RUNNING_STATE, entry.getExitStatus());
+        }
+      }
+    }
+  }
+  
+  /**
+   * Test if logs are removed when nm die
+   *
+   * @throws Exception
+   */
+  @Test(timeout = 60000)
+  public void testNMDie() throws Exception {
+    int checkpointTicks = 10;
+    int monitorInterval = 1000;
+    conf.setInt(YarnConfiguration.QUOTA_CONTAINERS_LOGS_MONITOR_INTERVAL,
+            monitorInterval);
+    conf.setBoolean(
+            YarnConfiguration.QUOTA_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, true);
+    conf.setInt(YarnConfiguration.QUOTA_MIN_TICKS_CHARGE, checkpointTicks);
+    conf.setInt(YarnConfiguration.QUOTA_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
+            1);
+    MockRM rm = new MockRM(conf);
+    rm.init(conf);
+    rm.start();
+    MockNM nm1 = rm.registerNode("h1:1234", 4 * GB);
+    MockNM nm2 = rm.registerNode("h2:5678", 4 * GB);
+
+    RMApp app = rm.submitApp(1 * GB);
+    
+    nm1.nodeHeartbeat(true);
+    nm2.nodeHeartbeat(true);
+
+    RMAppAttempt attempt = app.getCurrentAppAttempt();
+    MockAM am = rm.sendAMLaunched(attempt.getAppAttemptId());
+    am.registerAppAttempt();
+
+    //request for containers
+    int request = 4;
+    am.allocate("h1", 1 * GB, request, new ArrayList<ContainerId>());
+
+    //kick the scheduler
+    List<Container> conts = am.allocate(new ArrayList<ResourceRequest>(),
+            new ArrayList<ContainerId>()).getAllocatedContainers();
+    int contReceived = conts.size();
+    while (contReceived < 4) { //only 4 containers can be allocated on node1
+      nm1.nodeHeartbeat(true);
+      nm2.nodeHeartbeat(true);
+      conts.addAll(am.allocate(new ArrayList<ResourceRequest>(),
+              new ArrayList<ContainerId>()).getAllocatedContainers());
+      contReceived = conts.size();
+      //LOG.info("Got " + contReceived + " containers. Waiting to get " + 3);
+      Thread.sleep(100);
+    }
+    Assert.assertEquals(4, conts.size());
+    
+    List<org.apache.hadoop.yarn.api.records.ContainerStatus> containersStatusNM1 = new ArrayList<>();
+    List<org.apache.hadoop.yarn.api.records.ContainerStatus> containersStatusNM2 = new ArrayList<>();
+    for(Container c: conts){
+      if(c.getNodeId().equals(nm1.getNodeId())){
+        containersStatusNM1.add(org.apache.hadoop.yarn.api.records.ContainerStatus.
+              newInstance(c.getId(), ContainerState.RUNNING, "",0));
+      }else{
+        containersStatusNM2.add(org.apache.hadoop.yarn.api.records.ContainerStatus.
+              newInstance(c.getId(), ContainerState.RUNNING, "",0));
+      }
+    }
+    Map<ApplicationId, List<org.apache.hadoop.yarn.api.records.ContainerStatus>> status = new HashMap<>();
+    status.put(am.getApplicationAttemptId().getApplicationId(), containersStatusNM1);
+    nm1.nodeHeartbeat(status, true);
+    
+    status = new HashMap<>();
+    status.put(am.getApplicationAttemptId().getApplicationId(), containersStatusNM2);
+    nm2.nodeHeartbeat(status, true);
+    
+    Thread.sleep(monitorInterval+500);
+    // Check if the containers are in containersLog
+    Map<String, ContainerLog> cl = getContainersLogs();
+    
+    for (Container c: conts) {
+      ContainerLog entry = cl.get(c.getId().toString());
+      Assert.assertNotNull(entry);
+    }
+    
+    rm.expireNM(nm2.getNodeId());
+    
+    Thread.sleep(monitorInterval*2);
+    
+    // Check if the containers are in containersLog
+    cl = getContainersLogs();
+    
+    for (Container c: conts) {
+      ContainerLog entry = cl.get(c.getId().toString());
+      if(c.getNodeId().equals(nm1.getNodeId())){
+        Assert.assertNotNull(entry);
+        Assert.assertEquals(ContainerExitStatus.CONTAINER_RUNNING_STATE, entry.
+              getExitstatus());
+      }else{
+        if(entry!=null){
+          Assert.assertNotEquals(ContainerExitStatus.CONTAINER_RUNNING_STATE, entry.getExitStatus());
+        }
+      }
+    }
+  }
 
 }

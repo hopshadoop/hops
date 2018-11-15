@@ -35,6 +35,7 @@ import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.event.InlineDispatcher;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
+import org.apache.hadoop.yarn.server.resourcemanager.quota.ContainersLogsService;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
@@ -109,6 +110,8 @@ public class TestDistributedScheduler {
     HostsFileReader reader = mock(HostsFileReader.class);
     when(nodesListManager.getHostsReader()).thenReturn(reader);
     ((RMContextImpl) rmContext).setNodesListManager(nodesListManager);
+    ContainersLogsService containerLogsService = mock(ContainersLogsService.class);
+    ((RMContextImpl)rmContext).setContainersLogsService(containerLogsService);
     scheduler = mock(YarnScheduler.class);
     doAnswer(
         new Answer<Void>() {
