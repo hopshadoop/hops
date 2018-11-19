@@ -7902,12 +7902,15 @@ public class FSNamesystem
    *      block to be added to safe blocks
    * @throws IOException
    */
-  private int addSafeBlock(final Long safeBlock) throws IOException {
-    List<Long> safeBlocks = new ArrayList();
+  private int addSafeBlock(Long safeBlock) throws IOException {
+    final AtomicInteger added = new AtomicInteger(0);
+    List<Long> safeBlocks = new ArrayList<>();
     safeBlocks.add(safeBlock);
-    return addSafeBlocks(safeBlocks);
+    addSafeBlocksTX(safeBlocks, added);
+    
+    return added.get();
   }
-
+  
   /**
    * Remove a block that is not considered safe anymore
    * @param safeBlock
@@ -7926,6 +7929,30 @@ public class FSNamesystem
     }.handle();
   }
 
+  private void addSafeBlocksTX(final List<Long> safeBlocks, final AtomicInteger added) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.ADD_SAFE_BLOCKS) {
+      @Override
+      public Object performTask() throws IOException {
+        boolean inTransaction = connector.isTransactionActive();
+        if (!inTransaction) {
+          connector.beginTransaction();
+          connector.writeLock();
+        }
+        SafeBlocksDataAccess da = (SafeBlocksDataAccess) HdfsStorageFactory
+            .getDataAccess(SafeBlocksDataAccess.class);
+        int before = da.countAll();
+        da.insert(safeBlocks);
+        connector.flush();
+        int after = da.countAll();
+        added.addAndGet(after - before);
+        if (!inTransaction) {
+          connector.commit();
+        }
+        return null;
+      }
+    }.handle();
+  }
+  
   /**
    * Update safe blocks in the database
    * @param safeBlocks
@@ -7940,27 +7967,7 @@ public class FSNamesystem
         @Override
         public void handle(int startIndex, int endIndex) throws Exception {
           final List<Long> ids = safeBlocks.subList(startIndex, endIndex);
-          new LightWeightRequestHandler(HDFSOperationType.ADD_SAFE_BLOCKS) {
-            @Override
-            public Object performTask() throws IOException {
-              boolean inTransaction = connector.isTransactionActive();
-              if (!inTransaction) {
-                connector.beginTransaction();
-                connector.writeLock();
-              }
-              SafeBlocksDataAccess da = (SafeBlocksDataAccess) HdfsStorageFactory
-                  .getDataAccess(SafeBlocksDataAccess.class);
-              int before = da.countAll();
-              da.insert(ids);
-              connector.flush();
-              int after = da.countAll();
-              added.addAndGet(after-before);
-              if(!inTransaction){
-                connector.commit();
-              }
-              return null;
-            }
-          }.handle();
+          addSafeBlocksTX(safeBlocks, added);
         }
       });
     } catch (Exception e) {
