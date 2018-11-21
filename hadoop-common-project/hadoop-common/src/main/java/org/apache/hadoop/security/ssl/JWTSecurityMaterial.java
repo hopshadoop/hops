@@ -15,21 +15,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
+package org.apache.hadoop.security.ssl;
 
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
+import java.nio.file.Path;
 
-public class RMNodeUpdateCryptoMaterialForAppEvent<T extends RMAppSecurityManager.SecurityManagerMaterial>
-    extends RMNodeEvent {
-  private final T securityMaterial;
+public class JWTSecurityMaterial extends SecurityMaterial {
+  public static final String JWT_LOCAL_RESOURCE_FILE = "token.jwt";
+  public static final String JWT_FILE_SUFFIX = "_token.jwt";
   
-  public RMNodeUpdateCryptoMaterialForAppEvent(NodeId nodeId, T securityMaterial) {
-    super(nodeId, RMNodeEventType.UPDATE_CRYPTO_MATERIAL);
-    this.securityMaterial = securityMaterial;
+  private final Path tokenLocation;
+  private String token;
+  
+  public JWTSecurityMaterial(Path certFolder, Path tokenLocation, String token) {
+    super(certFolder);
+    this.tokenLocation = tokenLocation;
+    this.token = token;
   }
   
-  public T getSecurityMaterial() {
-    return securityMaterial;
+  public Path getTokenLocation() {
+    return tokenLocation;
+  }
+  
+  public String getToken() {
+    return token;
+  }
+  
+  public synchronized void updateToken(String token) {
+    this.token = token;
   }
 }

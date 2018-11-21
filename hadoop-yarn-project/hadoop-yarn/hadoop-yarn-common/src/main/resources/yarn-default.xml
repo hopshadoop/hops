@@ -2891,4 +2891,29 @@
     <name>yarn.resourcemanager.certificate.revocation-monitor-interval</name>
     <value>10h</value>
   </property>
+
+  <property>
+    <description>Enable JWT management for containers</description>
+    <name>yarn.resourcemanager.jwt.enabled</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <description>Validity period for application JWT</description>
+    <name>yarn.resourcemanager.jwt.validity</name>
+    <value>30m</value>
+  </property>
+
+  <property>
+    <description>Amount of time to substract from application JWT expiration date to start the renewal
+      process</description>
+    <name>yarn.resourcemanager.jwt.expiration-safety-period</name>
+    <value>10m</value>
+  </property>
+
+  <property>
+    <description>Comma separated list of application JWT audience</description>
+    <name>yarn.resourcemanager.jwt.audience</name>
+    <value>job</value>
+  </property>
 </configuration>

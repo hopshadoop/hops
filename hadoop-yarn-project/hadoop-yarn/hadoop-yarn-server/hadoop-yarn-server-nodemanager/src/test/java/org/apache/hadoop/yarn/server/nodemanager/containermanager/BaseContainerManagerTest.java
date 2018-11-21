@@ -27,7 +27,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 import org.apache.hadoop.yarn.server.nodemanager.executor.DeletionAsUserContext;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService;
+import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -87,6 +91,7 @@ public abstract class BaseContainerManagerTest {
   protected static File localLogDir;
   protected static File remoteLogDir;
   protected static File tmpDir;
+  protected CertificateLocalizationService certificateLocalizationService;
 
   protected final NodeManagerMetrics metrics = NodeManagerMetrics.create();
 
@@ -192,9 +197,13 @@ public abstract class BaseContainerManagerTest {
     nodeStatusUpdater.start();
     ((NMContext)context).setNodeStatusUpdater(nodeStatusUpdater);
   }
-
+  
+  protected ContainerManagerImpl createContainerManager(DeletionService delSrv) {
+    return createContainerManager(delSrv, context);
+  }
+  
   protected ContainerManagerImpl
-      createContainerManager(DeletionService delSrvc) {
+      createContainerManager(DeletionService delSrvc, Context context) {
     
     return new ContainerManagerImpl(context, exec, delSrvc, nodeStatusUpdater,
       metrics, dirsHandler) {
@@ -267,6 +276,10 @@ public abstract class BaseContainerManagerTest {
         .setSubDir(new Path(localDir.getAbsolutePath()))
         .setBasedirs(new Path[] {})
         .build());
+    
+    if (certificateLocalizationService != null) {
+      certificateLocalizationService.stop();
+    }
   }
 
   public static void waitForContainerState(ContainerManagementProtocol containerManager,
@@ -360,5 +373,34 @@ public abstract class BaseContainerManagerTest {
     ContainerId containerId =
         ContainerId.newContainerId(appAttemptId, cId);
     return containerId;
+  }
+  
+  protected NMContext createContext(Configuration conf, NMStateStoreService stateStore) {
+    return createContext(conf, stateStore, false, false);
+  }
+  
+  protected NMContext createContext(Configuration conf,
+      NMStateStoreService stateStore, boolean isHopsTLSEnabled, boolean isJWTEnabled) {
+    NMContext context = new NMContext(new NMContainerTokenSecretManager(
+        conf), new NMTokenSecretManagerInNM(), null,
+        new ApplicationACLsManager(conf), stateStore, isHopsTLSEnabled, isJWTEnabled){
+      public int getHttpPort() {
+        return HTTP_PORT;
+      }
+    };
+    // simulate registration with RM
+    MasterKey masterKey = new MasterKeyPBImpl();
+    masterKey.setKeyId(123);
+    masterKey.setBytes(ByteBuffer.wrap(new byte[] { new Integer(123)
+        .byteValue() }));
+    context.getContainerTokenSecretManager().setMasterKey(masterKey);
+    context.getNMTokenSecretManager().setMasterKey(masterKey);
+    if (context.isHopsTLSEnabled() || context.isJWTEnabled()) {
+      certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.NM);
+      certificateLocalizationService.init(conf);
+      certificateLocalizationService.start();
+      context.setCertificateLocalizationService(certificateLocalizationService);
+    }
+    return context;
   }
 }

@@ -15,17 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
+package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
 
-public class RMNodeUpdateCryptoMaterialForAppEvent<T extends RMAppSecurityManager.SecurityManagerMaterial>
-    extends RMNodeEvent {
+public class RMAppSecurityMaterialRenewedEvent<T extends RMAppSecurityManager.SecurityManagerMaterial>
+    extends RMAppEvent {
   private final T securityMaterial;
   
-  public RMNodeUpdateCryptoMaterialForAppEvent(NodeId nodeId, T securityMaterial) {
-    super(nodeId, RMNodeEventType.UPDATE_CRYPTO_MATERIAL);
+  public RMAppSecurityMaterialRenewedEvent(ApplicationId appId, T securityMaterial) {
+    super(appId, RMAppEventType.CERTS_RENEWED);
     this.securityMaterial = securityMaterial;
   }
   

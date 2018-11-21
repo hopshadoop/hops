@@ -72,6 +72,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMaste
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.log4j.Level;
@@ -83,6 +84,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -167,6 +169,7 @@ public class TestApplicationMasterLauncher {
   @Test(timeout = 10000)
   public void testAMLaunchWithCryptoMaterial() throws Exception {
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, false);
     AtomicBoolean testPass = new AtomicBoolean(true);
     MockRM rm = new TestCryptoMockRM(conf, testPass);
     rm.start();
@@ -242,6 +245,12 @@ public class TestApplicationMasterLauncher {
             app.getCryptoMaterialVersion());
     verify(rm.rmAppSecurityManager.getSecurityHandler(X509SecurityHandler.class))
         .revokeMaterial(Mockito.eq(x509Param), Mockito.eq(false));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(app.getApplicationId(), app.getUser());
+    jwtParam.setExpirationDate(app.getJWTExpiration());
+    verify(rm.rmAppSecurityManager.getSecurityHandler(JWTSecurityHandler.class))
+        .revokeMaterial(Mockito.eq(jwtParam), anyBoolean());
     
     rm.stop();
   }
@@ -458,13 +467,21 @@ public class TestApplicationMasterLauncher {
     }
     
     @Override
-    protected void setupCryptoMaterial(StartContainersRequest request, RMApp application) {
-      super.setupCryptoMaterial(request, application);
+    protected void setupX509Material(StartContainersRequest request, RMApp application) {
+      super.setupX509Material(request, application);
       if (request.getKeyStore() == null || request.getKeyStore().limit() == 0
           || request.getKeyStorePassword() == null
           || request.getTrustStore() == null || request.getTrustStore().limit() == 0
           || request.getTrustStorePassword() == null) {
-        testPass.compareAndSet(true, false);
+        testPass.set(false);
+      }
+    }
+    
+    @Override
+    protected void setupJWTMaterial(StartContainersRequest request, RMApp application) {
+      super.setupJWTMaterial(request, application);
+      if (request.getJWT() == null || request.getJWT().isEmpty()) {
+        testPass.set(false);
       }
     }
   }

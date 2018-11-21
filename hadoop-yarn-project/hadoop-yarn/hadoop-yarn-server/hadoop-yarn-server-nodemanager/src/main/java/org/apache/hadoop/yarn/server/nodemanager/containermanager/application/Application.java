@@ -37,7 +37,11 @@ public interface Application extends EventHandler<ApplicationEvent> {
 
   ApplicationState getApplicationState();
   
-  int getCryptoMaterialVersion();
+  int getX509Version();
   
-  void setCryptoMaterialVersion(int cryptoMaterialVersion);
+  void setX509Version(int x509Version);
+  
+  long getJWTExpiration();
+  
+  void setJWTExpiration(long jwtExpiration);
 }

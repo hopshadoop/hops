@@ -19,48 +19,15 @@ package org.apache.hadoop.yarn.server.nodemanager;
 
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
-import java.nio.ByteBuffer;
-
-public class CMgrUpdateCryptoMaterialEvent extends ContainerManagerEvent {
+public abstract class CMgrUpdateSecurityMaterialEvent extends ContainerManagerEvent {
   private final ContainerId containerId;
-  private final ByteBuffer keyStore;
-  private final char[] keyStorePassword;
-  private final ByteBuffer trustStore;
-  private final char[] trustStorePassword;
-  private final int version;
   
-  public CMgrUpdateCryptoMaterialEvent(ContainerId containerId, ByteBuffer keyStore, char[] keyStorePassword,
-      ByteBuffer trustStore, char[] trustStorePassword, int version) {
+  public CMgrUpdateSecurityMaterialEvent(ContainerId containerId) {
     super(ContainerManagerEventType.UPDATE_CRYPTO_MATERIAL);
     this.containerId = containerId;
-    this.keyStore = keyStore;
-    this.keyStorePassword = keyStorePassword;
-    this.trustStore = trustStore;
-    this.trustStorePassword = trustStorePassword;
-    this.version = version;
   }
   
   public ContainerId getContainerId() {
     return containerId;
-  }
-  
-  public ByteBuffer getKeyStore() {
-    return keyStore.asReadOnlyBuffer();
-  }
-  
-  public char[] getKeyStorePassword() {
-    return keyStorePassword;
-  }
-  
-  public ByteBuffer getTrustStore() {
-    return trustStore.asReadOnlyBuffer();
-  }
-  
-  public char[] getTrustStorePassword() {
-    return trustStorePassword;
-  }
-  
-  public int getVersion() {
-    return version;
   }
 }

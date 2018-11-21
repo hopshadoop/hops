@@ -28,4 +28,7 @@ public interface RMAppSecurityActions {
   void init() throws MalformedURLException, GeneralSecurityException;
   X509SecurityHandler.CertificateBundle sign(PKCS10CertificationRequest csr) throws URISyntaxException, IOException, GeneralSecurityException;
   int revoke(String certificateIdentifier) throws URISyntaxException, IOException, GeneralSecurityException;
+  
+  String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws URISyntaxException, IOException;
+  void invalidateJWT(String signingKeyName) throws URISyntaxException, IOException;
 }

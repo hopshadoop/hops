@@ -18,6 +18,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
 import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.LogManager;
@@ -48,6 +49,7 @@ import java.security.KeyPairGenerator;
 import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.Random;
 
 public class TestingRMAppSecurityActions implements RMAppSecurityActions, Configurable {
   private final static Logger LOG = LogManager.getLogger(TestingRMAppSecurityActions.class);
@@ -130,5 +132,17 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   public int revoke(String certificateIdentifier) throws URISyntaxException, IOException {
     LOG.info("Revoking certificate " + certificateIdentifier);
     return HttpStatus.SC_OK;
+  }
+  
+  @Override
+  public String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter)
+    throws URISyntaxException, IOException {
+    String jwt = RandomStringUtils.randomAlphanumeric(16);
+    return jwt;
+  }
+  
+  @Override
+  public void invalidateJWT(String signingKeyName) throws URISyntaxException, IOException {
+    // Nothing to do
   }
 }

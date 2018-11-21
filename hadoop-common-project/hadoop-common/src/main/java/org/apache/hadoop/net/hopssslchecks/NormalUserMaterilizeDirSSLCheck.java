@@ -24,13 +24,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
-import org.apache.hadoop.security.ssl.CryptoMaterial;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Checks for valid crypto material in Hopsworks materialize directory.
@@ -74,7 +73,7 @@ public class NormalUserMaterilizeDirSSLCheck extends AbstractHopsSSLCheck {
         String passwordFileLocation;
         if (certificateLocalization != null) {
           try {
-            CryptoMaterial material = certificateLocalization.getMaterialLocation(username);
+            X509SecurityMaterial material = certificateLocalization.getX509MaterialLocation(username);
             password = material.getKeyStorePass();
             passwordFileLocation = material.getPasswdLocation().toString();
           } catch (InterruptedException ex) {

@@ -29,6 +29,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
@@ -65,6 +66,11 @@ public class MockRMWithCustomAMLauncher extends MockRM {
       RMAppSecurityHandler<X509SecurityHandler.X509SecurityManagerMaterial, X509SecurityHandler.X509MaterialParameter>
           x509SecurityHandler = Mockito.spy(new X509SecurityHandler(rmContext, rmAppSecurityManager));
       rmAppSecurityManager.registerRMAppSecurityHandlerWithType(x509SecurityHandler, X509SecurityHandler.class);
+      
+      RMAppSecurityHandler<JWTSecurityHandler.JWTSecurityManagerMaterial, JWTSecurityHandler.JWTMaterialParameter>
+          jwtSecurityMaterial = Mockito.spy(new JWTSecurityHandler(rmContext, rmAppSecurityManager));
+      rmAppSecurityManager.registerRMAppSecurityHandlerWithType(jwtSecurityMaterial, JWTSecurityHandler.class);
+      
       return rmAppSecurityManager;
     }
     return super.createRMAppSecurityManager();

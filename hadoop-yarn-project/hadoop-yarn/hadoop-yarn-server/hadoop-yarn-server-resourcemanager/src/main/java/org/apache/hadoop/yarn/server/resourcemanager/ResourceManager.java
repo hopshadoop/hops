@@ -43,6 +43,7 @@ import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHa
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hadoop.security.ssl.RevocationListFetcherService;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEventType;
@@ -518,6 +519,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected RMAppSecurityManager createRMAppSecurityManager() throws Exception {
     RMAppSecurityManager rmAppSecurityManager = new RMAppSecurityManager(this.rmContext);
     rmAppSecurityManager.registerRMAppSecurityHandler(createX509SecurityHandler(rmAppSecurityManager));
+    rmAppSecurityManager.registerRMAppSecurityHandler(createJWTSecurityHandler(rmAppSecurityManager));
     return rmAppSecurityManager;
   }
   
@@ -525,6 +527,12 @@ public class ResourceManager extends CompositeService implements Recoverable {
     RMAppSecurityHandler<X509SecurityHandler.X509SecurityManagerMaterial, X509SecurityHandler.X509MaterialParameter>
         x509SecurityHandler = new X509SecurityHandler(this.rmContext, rmAppSecurityManager);
     return x509SecurityHandler;
+  }
+  
+  protected RMAppSecurityHandler createJWTSecurityHandler(RMAppSecurityManager rmAppSecurityManager) {
+    RMAppSecurityHandler<JWTSecurityHandler.JWTSecurityManagerMaterial, JWTSecurityHandler.JWTMaterialParameter>
+        jwtSecurityHandler = new JWTSecurityHandler(this.rmContext, rmAppSecurityManager);
+    return jwtSecurityHandler;
   }
 
   protected RMApplicationHistoryWriter createRMApplicationHistoryWriter() {
