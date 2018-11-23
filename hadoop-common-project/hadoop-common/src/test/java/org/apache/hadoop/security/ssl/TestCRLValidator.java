@@ -29,8 +29,6 @@ import org.apache.hadoop.ipc.TestRpcBase;
 import org.apache.hadoop.ipc.protobuf.TestProtos;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authorize.ProxyUsers;
-import org.apache.hadoop.util.envVars.EnvironmentVariables;
 import org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -47,20 +45,15 @@ import org.junit.rules.ExpectedException;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.GeneralSecurityException;
 import java.security.KeyPair;
-import java.security.PrivilegedExceptionAction;
 import java.security.Security;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class TestCRLValidator {
@@ -117,19 +110,33 @@ public class TestCRLValidator {
     String clientUsername = "Client_username";
     Path clientKeystore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.KEYSTORE_SUFFIX);
     Path clientTruststore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
+    Path clientPasswordLocation = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX);
     Path sslServerConfPath = Paths.get(confDir, TestCRLValidator.class.getSimpleName() + ".ssl-server.xml");
     Server server = null;
     TestRpcBase.TestRpcService proxy = null;
     
-    TestCryptoMaterial testCryptoMaterial = createCryptoMaterial(serverkeystore, serverTruststore, clientUsername,
-        clientKeystore, clientTruststore);
+    RpcTLSUtils.TLSSetup tlsSetup = new RpcTLSUtils.TLSSetup.Builder()
+        .setKeyAlgorithm(keyAlgorithm)
+        .setSignatureAlgorithm(signatureAlgorithm)
+        .setServerKstore(serverkeystore)
+        .setServerTstore(serverTruststore)
+        .setServerStorePassword(password)
+        .setClientKstore(clientKeystore)
+        .setClientTstore(clientTruststore)
+        .setClientStorePassword(password)
+        .setClientPasswordLocation(clientPasswordLocation)
+        .setClientUserName(clientUsername)
+        .setSslServerConf(sslServerConfPath)
+        .build();
+    RpcTLSUtils.TestCryptoMaterial testCryptoMaterial = RpcTLSUtils.setupTLSMaterial(conf, tlsSetup,
+        TestCRLValidator.class);
     
     // Generate empty CRL
-    X509CRL crl = KeyStoreTestUtil.generateCRL(testCryptoMaterial.serverCertificate, testCryptoMaterial.serverKeyPair
-            .getPrivate(), signatureAlgorithm, null, null);
+    X509CRL crl = KeyStoreTestUtil.generateCRL(testCryptoMaterial.getServerCertificate(),
+        testCryptoMaterial.getServerKeyPair().getPrivate(), signatureAlgorithm, null, null);
     writeCRLToFile(crl, crlPath);
     
-    configureForTLSAndCRL(conf, serverkeystore, serverTruststore, sslServerConfPath, crlPath, fetchedCrlPath);
+    configureCRL(conf, crlPath, fetchedCrlPath);
     
     // Set RPC engine
     RPC.setProtocolEngine(conf, TestRpcBase.TestRpcService.class, ProtobufRpcEngine.class);
@@ -145,7 +152,7 @@ public class TestCRLValidator {
     CRLValidatorFactory.getInstance().registerValidator(CRLValidatorFactory.TYPE.NORMAL, testingValidator);
     
     // Mock environment variables
-    MockEnvironmentVariables envs = new MockEnvironmentVariables();
+    RpcTLSUtils.MockEnvironmentVariables envs = new RpcTLSUtils.MockEnvironmentVariables();
     envs.setEnv(HopsSSLSocketFactory.CRYPTO_MATERIAL_ENV_VAR, BASE_DIR);
     EnvironmentVariablesFactory.setInstance(envs);
     
@@ -159,7 +166,8 @@ public class TestCRLValidator {
       final String message = "Hello, is it me you're looking for?";
       server = TestRpcBase.setupTestServer(serverBuilder);
       UserGroupInformation clientUGI = UserGroupInformation.createRemoteUser(clientUsername);
-      TestProtos.EchoResponseProto response = makeEchoRequest(clientUGI, server.getListenerAddress(), conf, message);
+      TestProtos.EchoResponseProto response = RpcTLSUtils.makeEchoRequest(clientUGI, server.getListenerAddress(), conf,
+          message);
       
       Assert.assertEquals(response.getMessage(), message);
       
@@ -183,24 +191,40 @@ public class TestCRLValidator {
     String clientUsername = "Client_username";
     Path clientKeystore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.KEYSTORE_SUFFIX);
     Path clientTruststore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
+    Path clientPasswordLocation = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX);
     Path sslServerConfPath = Paths.get(confDir, TestCRLValidator.class.getSimpleName() + ".ssl-server.xml");
+    
     Server server = null;
     TestRpcBase.TestRpcService proxy = null;
   
-    TestCryptoMaterial testCryptoMaterial = createCryptoMaterial(serverkeystore, serverTruststore, clientUsername,
-        clientKeystore, clientTruststore);
+    RpcTLSUtils.TLSSetup tlsSetup = new RpcTLSUtils.TLSSetup.Builder()
+        .setKeyAlgorithm(keyAlgorithm)
+        .setSignatureAlgorithm(signatureAlgorithm)
+        .setServerKstore(serverkeystore)
+        .setServerTstore(serverTruststore)
+        .setServerStorePassword(password)
+        .setClientKstore(clientKeystore)
+        .setClientTstore(clientTruststore)
+        .setClientStorePassword(password)
+        .setClientPasswordLocation(clientPasswordLocation)
+        .setClientUserName(clientUsername)
+        .setSslServerConf(sslServerConfPath)
+        .build();
+    RpcTLSUtils.TestCryptoMaterial testCryptoMaterial = RpcTLSUtils.setupTLSMaterial(conf, tlsSetup,
+        TestCRLValidator.class);
   
-    X509CRL crl = KeyStoreTestUtil.generateCRL(testCryptoMaterial.serverCertificate, testCryptoMaterial.serverKeyPair
-        .getPrivate(), signatureAlgorithm, null, testCryptoMaterial.clientCertificate.getSerialNumber());
+    X509CRL crl = KeyStoreTestUtil.generateCRL(testCryptoMaterial.getServerCertificate(),
+        testCryptoMaterial.getServerKeyPair().getPrivate(), signatureAlgorithm, null,
+        testCryptoMaterial.getClientCertificate().getSerialNumber());
     writeCRLToFile(crl, crlPath);
   
-    configureForTLSAndCRL(conf, serverkeystore, serverTruststore, sslServerConfPath, crlPath, fetchedCrlPath);
+    configureCRL(conf, crlPath, fetchedCrlPath);
   
     // Set RPC engine
     RPC.setProtocolEngine(conf, TestRpcBase.TestRpcService.class, ProtobufRpcEngine.class);
   
     // Mock environment variables
-    MockEnvironmentVariables envs = new MockEnvironmentVariables();
+    RpcTLSUtils.MockEnvironmentVariables envs = new RpcTLSUtils.MockEnvironmentVariables();
     envs.setEnv(HopsSSLSocketFactory.CRYPTO_MATERIAL_ENV_VAR, BASE_DIR);
     EnvironmentVariablesFactory.setInstance(envs);
   
@@ -231,18 +255,34 @@ public class TestCRLValidator {
     String clientUsername = "Client_username";
     Path clientKeystore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.KEYSTORE_SUFFIX);
     Path clientTruststore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
+    Path clientPasswordLocation = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX);
     Path sslServerConfPath = Paths.get(confDir, TestCRLValidator.class.getSimpleName() + ".ssl-server.xml");
     Server server = null;
     TestRpcBase.TestRpcService proxy = null;
+  
+    RpcTLSUtils.TLSSetup tlsSetup = new RpcTLSUtils.TLSSetup.Builder()
+        .setKeyAlgorithm(keyAlgorithm)
+        .setSignatureAlgorithm(signatureAlgorithm)
+        .setServerKstore(serverkeystore)
+        .setServerTstore(serverTruststore)
+        .setServerStorePassword(password)
+        .setClientKstore(clientKeystore)
+        .setClientTstore(clientTruststore)
+        .setClientStorePassword(password)
+        .setClientPasswordLocation(clientPasswordLocation)
+        .setClientUserName(clientUsername)
+        .setSslServerConf(sslServerConfPath)
+        .build();
+    RpcTLSUtils.TestCryptoMaterial testCryptoMaterial = RpcTLSUtils.setupTLSMaterial(conf, tlsSetup,
+        TestCRLValidator.class);
     
-    TestCryptoMaterial testCryptoMaterial = createCryptoMaterial(serverkeystore, serverTruststore, clientUsername,
-        clientKeystore, clientTruststore);
     
-    X509CRL crl = KeyStoreTestUtil.generateCRL(testCryptoMaterial.serverCertificate, testCryptoMaterial.serverKeyPair
-        .getPrivate(), signatureAlgorithm, null, testCryptoMaterial.clientCertificate.getSerialNumber());
+    X509CRL crl = KeyStoreTestUtil.generateCRL(testCryptoMaterial.getServerCertificate(),
+        testCryptoMaterial.getServerKeyPair().getPrivate(), signatureAlgorithm, null,
+        testCryptoMaterial.getClientCertificate().getSerialNumber());
     writeCRLToFile(crl, crlPath);
     
-    configureForTLSAndCRL(conf, serverkeystore, serverTruststore, sslServerConfPath, crlPath, fetchedCrlPath);
+    configureCRL(conf, crlPath, fetchedCrlPath);
     
     // Set RPC engine
     RPC.setProtocolEngine(conf, TestRpcBase.TestRpcService.class, ProtobufRpcEngine.class);
@@ -259,7 +299,7 @@ public class TestCRLValidator {
     CRLValidatorFactory.getInstance().registerValidator(CRLValidatorFactory.TYPE.NORMAL, testingValidator);
   
     // Mock environment variables
-    MockEnvironmentVariables envs = new MockEnvironmentVariables();
+    RpcTLSUtils.MockEnvironmentVariables envs = new RpcTLSUtils.MockEnvironmentVariables();
     envs.setEnv(HopsSSLSocketFactory.CRYPTO_MATERIAL_ENV_VAR, BASE_DIR);
     EnvironmentVariablesFactory.setInstance(envs);
     
@@ -275,11 +315,11 @@ public class TestCRLValidator {
       UserGroupInformation clientUGI = UserGroupInformation.createRemoteUser(clientUsername);
       boolean exceptionRaised = false;
       try {
-        makeEchoRequest(clientUGI, server.getListenerAddress(), conf, message);
+        RpcTLSUtils.makeEchoRequest(clientUGI, server.getListenerAddress(), conf, message);
       } catch (Exception ex) {
         if (ex.getCause().getCause() instanceof RemoteException) {
           if (ex.getCause().getCause().getMessage().contains("HopsCRLValidator: Certificate " + testCryptoMaterial
-              .clientCertificate.getSubjectDN() + " has been revoked by " + crl.getIssuerX500Principal())) {
+              .getClientCertificate().getSubjectDN() + " has been revoked by " + crl.getIssuerX500Principal())) {
             // Exception here is normal
             exceptionRaised = true;
           } else {
@@ -292,14 +332,15 @@ public class TestCRLValidator {
       LOG.info("Removing client certificate from CRL and wait for the CRL fetcher to pick it up");
       
       // Remove client certificate from CRL
-      crl = KeyStoreTestUtil.generateCRL(testCryptoMaterial.serverCertificate, testCryptoMaterial.serverKeyPair
-          .getPrivate(), signatureAlgorithm, null, null);
+      crl = KeyStoreTestUtil.generateCRL(testCryptoMaterial.getServerCertificate(),
+          testCryptoMaterial.getServerKeyPair().getPrivate(), signatureAlgorithm, null, null);
       writeCRLToFile(crl, crlPath);
       
       // Wait for the new CRL to be picked up
       TimeUnit.SECONDS.sleep(crlFetcherService.getFetcherInterval() * 2 + testingValidator.getReloadInterval() * 2);
   
-      TestProtos.EchoResponseProto response = makeEchoRequest(clientUGI, server.getListenerAddress(), conf, message);
+      TestProtos.EchoResponseProto response = RpcTLSUtils.makeEchoRequest(clientUGI, server.getListenerAddress(),
+          conf, message);
       
       Assert.assertEquals(response.getMessage(), message);
     } finally {
@@ -424,49 +465,7 @@ public class TestCRLValidator {
     }
   }
   
-  private TestCryptoMaterial createCryptoMaterial(Path serverkeystore, Path serverTruststore, String clientUsername,
-      Path clientKeystore, Path clientTruststore) throws GeneralSecurityException, IOException {
-    // Generate Server certificate
-    KeyPair serverKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
-    X509Certificate serverCert = KeyStoreTestUtil.generateCertificate("CN=Server", serverKeyPair, 60,
-        signatureAlgorithm);
-    
-    // Create server keystore and truststore
-    KeyStoreTestUtil.createKeyStore(serverkeystore.toString(), password, "server", serverKeyPair.getPrivate(),
-        serverCert);
-    KeyStoreTestUtil.createTrustStore(serverTruststore.toString(), password, "server", serverCert);
-    
-    // Generate client certificate signed by server
-    KeyPair clientKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
-    X509Certificate clientCert = KeyStoreTestUtil.generateSignedCertificate("CN=" + clientUsername, clientKeyPair, 30,
-        signatureAlgorithm, serverKeyPair.getPrivate(), serverCert);
-    
-    // Create client keystore and truststore
-    KeyStoreTestUtil.createKeyStore(clientKeystore.toString(), password, "client", clientKeyPair.getPrivate(), clientCert);
-    Map<String, X509Certificate> clientTrustedCerts = new HashMap<>(2);
-    clientTrustedCerts.put("client", clientCert);
-    clientTrustedCerts.put("server", serverCert);
-    KeyStoreTestUtil.createTrustStore(clientTruststore.toString(), password, clientTrustedCerts);
-    
-    File clientPassword = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX).toFile();
-    FileUtils.writeStringToFile(clientPassword, password);
-    
-    return new TestCryptoMaterial(serverKeyPair, serverCert, clientKeyPair, clientCert);
-  }
-  
-  private void configureForTLSAndCRL(Configuration conf, Path serverKeystore, Path serverTruststore, Path
-      sslServerConfPath, Path crlPath, Path fetchedCrlPath) throws IOException {
-    // Configure server to use TLS and CRL validation
-    conf.set(CommonConfigurationKeysPublic.HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_KEY, "org.apache.hadoop.net.HopsSSLSocketFactory");
-    conf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
-    conf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
-    String superUser = UserGroupInformation.getCurrentUser().getUserName();
-    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + superUser, "*");
-    
-    Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(serverKeystore.toString(), password,
-        password, serverTruststore.toString(), password, "");
-    KeyStoreTestUtil.saveConfig(sslServerConfPath.toFile(), sslServerConf);
-    conf.set(SSLFactory.SSL_SERVER_CONF_KEY, TestCRLValidator.class.getSimpleName() + ".ssl-server.xml");
+  private void configureCRL(Configuration conf, Path crlPath, Path fetchedCrlPath) {
     
     conf.setBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY, true);
     conf.set(CommonConfigurationKeys.HOPS_CRL_FETCHER_CLASS_KEY, "org.apache.hadoop.security.ssl.RemoteCRLFetcher");
@@ -481,72 +480,5 @@ public class TestCRLValidator {
     crlFetcherService.serviceInit(conf);
     crlFetcherService.serviceStart();
     return crlFetcherService;
-  }
-  
-  private TestProtos.EchoResponseProto makeEchoRequest(UserGroupInformation ugi, InetSocketAddress serverAddress,
-      Configuration conf, String message) throws Exception {
-    return ugi.doAs(
-        new ParameterizedPrivilegedExceptionAction<TestProtos.EchoResponseProto>(serverAddress, conf, message) {
-          @Override
-          public TestProtos.EchoResponseProto run() throws Exception {
-            TestRpcBase.TestRpcService proxy = TestRpcBase.getClient(this.serverAddress, this.conf);
-            try {
-              TestProtos.EchoRequestProto request = TestProtos.EchoRequestProto.newBuilder().setMessage(message)
-                  .build();
-              TestProtos.EchoResponseProto response = proxy.echo(null, request);
-              return response;
-            } finally {
-              if (proxy != null) {
-                RPC.stopProxy(proxy);
-              }
-            }
-          }
-        });
-  }
-  
-  private class MockEnvironmentVariables implements EnvironmentVariables {
-    
-    private final Map<String, String> envs;
-    
-    private MockEnvironmentVariables() {
-      envs = new HashMap<>();
-    }
-    
-    private void setEnv(String name, String value) {
-      envs.put(name, value);
-    }
-    
-    @Override
-    public String getEnv(String variableName) {
-      return envs.get(variableName);
-    }
-  }
-  
-  private abstract class ParameterizedPrivilegedExceptionAction<T> implements PrivilegedExceptionAction<T> {
-    public final InetSocketAddress serverAddress;
-    public final Configuration conf;
-    public final String message;
-    
-    private ParameterizedPrivilegedExceptionAction(InetSocketAddress serverAddress, Configuration conf,
-        String message) {
-      this.serverAddress = serverAddress;
-      this.conf = conf;
-      this.message = message;
-    }
-  }
-  
-  private class TestCryptoMaterial {
-    private final KeyPair serverKeyPair;
-    private final X509Certificate serverCertificate;
-    private final KeyPair clientKeyPair;
-    private final X509Certificate clientCertificate;
-  
-    public TestCryptoMaterial(KeyPair serverKeyPair, X509Certificate serverCertificate, KeyPair clientKeyPair,
-        X509Certificate clientCertificate) {
-      this.serverKeyPair = serverKeyPair;
-      this.serverCertificate = serverCertificate;
-      this.clientKeyPair = clientKeyPair;
-      this.clientCertificate = clientCertificate;
-    }
   }
 }
