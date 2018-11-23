@@ -48,7 +48,7 @@ public class ServerRpcSSLEngineImpl extends RpcSSLEngineAbstr {
             throws IOException {
         serverAppBuffer.clear();
         if (serverAppBuffer.capacity() < buffer.capacity()) {
-            LOG.error("ServerAppBuffer capacity: " + serverAppBuffer.capacity()
+            LOG.debug("ServerAppBuffer capacity: " + serverAppBuffer.capacity()
                 + " Buffer size: " + buffer.capacity());
             serverAppBuffer = ByteBuffer.allocate(Math.min(buffer.capacity(),
                 MAX_BUFFER_SIZE));

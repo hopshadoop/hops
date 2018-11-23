@@ -1662,13 +1662,39 @@ public abstract class Server {
 
     public int sslChannelWrite(WritableByteChannel channel, ByteBuffer buffer)
       throws IOException {
-      int count = rpcSSLEngine.write(channel, buffer);
+      int count = 0;
+      if (buffer.remaining() <= NIO_BUFFER_LIMIT) {
+        count = rpcSSLEngine.write(channel, buffer);
+      } else {
+        count = sslChannelWriteChunks(channel, buffer);
+      }
       if (count > 0) {
         rpcMetrics.incrSentBytes(count);
       }
       return count;
     }
-
+  
+    public int sslChannelWriteChunks(WritableByteChannel channel, ByteBuffer buffer) throws IOException {
+      int originalLimit = buffer.limit();
+      int initialRemaining = buffer.remaining();
+      int ret = 0;
+      
+      while (buffer.remaining() > 0) {
+        try {
+          int iosize = Math.min(buffer.remaining(), NIO_BUFFER_LIMIT);
+          buffer.limit(buffer.position() + iosize);
+          ret = rpcSSLEngine.write(channel, buffer);
+          if (ret < iosize) {
+            break;
+          }
+        } finally {
+          buffer.limit(originalLimit);
+        }
+      }
+      int nBytes = initialRemaining - buffer.remaining();
+      return (nBytes > 0) ? nBytes : ret;
+    }
+    
     @Override
     public String toString() {
       return getHostAddress() + ":" + remotePort; 
