@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -35,9 +36,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * This class tests commands from DFSShell.
  */
-public class TestMultithreadedCopyFromLocal {
-  private static final Log LOG = LogFactory.getLog(TestMultithreadedCopyFromLocal.class);
-  private static AtomicInteger counter = new AtomicInteger();
+public class TestMultithreadedCopyToOrFromLocal {
+  private static final Log LOG = LogFactory.getLog(TestMultithreadedCopyToOrFromLocal.class);
   private final int SUCCESS = 0;
   private final int ERROR = 1;
 
@@ -56,12 +56,20 @@ public class TestMultithreadedCopyFromLocal {
   @Test
   public void testCopyFromLocal() throws Exception {
     Configuration conf = new Configuration();
-    conf.setInt(CommonConfigurationKeys.DFS_CLIENT_COPY_FROM_LOCAL_PARALLEL_THREADS, 10);
+    conf.setInt(CommonConfigurationKeys.DFS_CLIENT_COPY_TO_OR_FROM_LOCAL_PARALLEL_THREADS, 10);
     MiniDFSCluster cluster =
             new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
     FsShell shell = null;
     FileSystem fs = null;
     final File localDir = new File(TEST_ROOT_DIR, "localDir");
+    final File copiedDir = new File(TEST_ROOT_DIR, "copiedDir");
+    if(copiedDir.exists()){
+      FileUtils.deleteDirectory(copiedDir);
+    }
+
+    if(localDir.exists()){
+      FileUtils.deleteDirectory(localDir);
+    }
 
     final String  hdfsTestDirStr = TEST_ROOT_DIR;
     final Path hdfsTestDir = new Path(hdfsTestDirStr);
@@ -73,36 +81,46 @@ public class TestMultithreadedCopyFromLocal {
       fs.mkdirs(hdfsTestDir);
       shell = new FsShell(conf);
 
+      long startTime = System.currentTimeMillis();
       String[] argv = new String[]{"-copyFromLocal", localDir.getAbsolutePath(), hdfsTestDirStr+"/copiedDir"};
       int res = ToolRunner.run(shell, argv);
       assertEquals("copyFromLocal command should have succeeded", SUCCESS, res);
+      LOG.info("Time taken copyFromLocal "+(System.currentTimeMillis() - startTime)/1000+" sec");
+
+
+      startTime = System.currentTimeMillis();
+      argv = new String[]{"-copyToLocal", hdfsTestDirStr+"/copiedDir", TEST_ROOT_DIR};
+      res = ToolRunner.run(shell, argv);
+      assertEquals("copyToLocal command should have succeeded", SUCCESS, res);
+      LOG.info("Time taken copyToLocal "+(System.currentTimeMillis() - startTime)/1000+" sec");
 
     } finally {
       if (null != shell) {
         shell.close();
       }
-
-      if (localDir.exists()) {
-        localDir.delete();
-      }
-
       cluster.shutdown();
     }
   }
 
   private void createLocalDir(File base) throws IOException {
-    int filesPerLevel=10;
+    int filesPerLevel=100;
     base.mkdir();
     for(int i = 0; i < filesPerLevel; i++){
       File localFile = new File(base, "localFile"+i);
-      localFile.createNewFile();
+//      localFile.createNewFile();
+      BufferedWriter writer = new BufferedWriter(new FileWriter(localFile));
+      writer.write(i+"");
+      writer.close();
     }
 
     final File localDir2 = new File(base, "localDirInternal");
     localDir2.mkdir();
     for(int i = 0; i < filesPerLevel; i++){
       File localFile = new File(localDir2, "localFile"+i);
-      localFile.createNewFile();
+//      localFile.createNewFile();
+      BufferedWriter writer = new BufferedWriter(new FileWriter(localFile));
+      writer.write(i+"");
+      writer.close();
     }
   }
 }

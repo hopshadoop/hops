@@ -194,11 +194,11 @@ class CopyCommands {
       }
     }
   }
-  
-  /** 
+
+  /**
    * Copy local files to a remote filesystem
    */
-  public static class Get extends CommandWithDestination {
+  public static class Get extends ParallelCommandWithDestination {
     public static final String NAME = "get";
     public static final String USAGE =
       "[-f] [-p] [-ignoreCrc] [-crc] <src> ... <localdst>";
@@ -228,7 +228,7 @@ class CopyCommands {
   /**
    *  Copy local files to a remote filesystem
    */
-  public static class Put extends CommandWithDestination {
+  public static class Put extends ParallelCommandWithDestination {
     public static final String NAME = "put";
     public static final String USAGE =
         "[-f] [-p] [-l] [-d] <localsrc> ... <dst>";
@@ -291,90 +291,6 @@ class CopyCommands {
     public static final String NAME = "copyFromLocal";
     public static final String USAGE = Put.USAGE;
     public static final String DESCRIPTION = "Identical to the -put command.";
-
-    private ExecutorService copier ;
-    private ConcurrentLinkedQueue<Future> activeCopiers = new ConcurrentLinkedQueue<>();
-
-    /**
-     *  Iterates over the given expanded paths and invokes
-     *  {@link #processPath(PathData)} on each element.  If "recursive" is true,
-     *  will do a post-visit DFS on directories.
-     *  @param parent if called via a recurse, will be the parent dir, else null
-     *  @param items a list of {@link PathData} objects to process
-     *  @throws IOException if anything goes wrong...
-     */
-    protected void processPaths(PathData parent, PathData ... items)
-            throws IOException {
-
-      //go through all files first and copy them
-      for (PathData item : items) {
-        ProcessPathThread processFile = new ProcessPathThread(item);
-        Future f = getThreadProol(getConf()).submit(processFile);
-        activeCopiers.add(f);
-      }
-
-      //wait for all files to be copied
-      List<PathData> sucessfull = new ArrayList<>();
-      while(true) {
-        Future future = activeCopiers.poll();
-        if (future == null) {
-          break;
-        }
-        try {
-          PathData processed  = (PathData)future.get();
-          sucessfull.add(processed);
-        }catch (Exception e) {
-          if(e instanceof ExecutionException){
-            e = (Exception)e.getCause();
-          }
-          displayError(e);
-        }
-      }
-
-      //go through all directories now
-      for (PathData item : items) {
-        try {
-          if (recursive && isPathRecursable(item)) {
-            recursePath(item);
-          }
-          if(sucessfull.contains(item)) {
-            postProcessPath(item);
-          }
-        } catch (IOException e) {
-          displayError(e);
-        }
-      }
-    }
-
-    private class ProcessPathThread implements Callable {
-      PathData item;
-      ProcessPathThread(PathData item){
-        this.item = item;
-      }
-
-      @Override
-      public Object call() throws Exception {
-        processPath(item);
-        return item;
-      }
-    }
-
-//    @Override
-//    protected void processPath(PathData src) throws IOException {
-//      super.processPath(src);
-//    }
-
-    protected ExecutorService getThreadProol(Configuration conf){
-      if(copier == null){
-        int numThreads = 1;
-        if(conf != null){
-          numThreads =  conf.getInt(CommonConfigurationKeys.DFS_CLIENT_COPY_FROM_LOCAL_PARALLEL_THREADS,
-                  CommonConfigurationKeys.DFS_CLIENT_COPY_FROM_LOCAL_PARALLEL_THREADS_DEFAULT );
-        }
-        copier = Executors.newFixedThreadPool(numThreads);
-      }
-      return copier;
-    }
   }
  
   public static class CopyToLocal extends Get {
