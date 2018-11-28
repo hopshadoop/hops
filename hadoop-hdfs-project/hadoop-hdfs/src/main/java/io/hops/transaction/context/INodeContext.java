@@ -379,7 +379,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
     if (canReadCachedRootINode(names[0], parentIds[0])) {
       rootINode = RootINodeCache.getRootINode();
       if (rootINode != null) {
-        if(names[0] == INodeDirectory.ROOT_NAME && parentIds[0] == INodeDirectory.ROOT_PARENT_ID){
+        if(names[0].equals(INodeDirectory.ROOT_NAME) && parentIds[0] == INodeDirectory.ROOT_PARENT_ID){
           LOG.debug("Reading root inode from the cache "+rootINode);
           //remove root from the batch operation. Cached root inode will be added later to the results
           names = Arrays.copyOfRange(names, 1, names.length);
