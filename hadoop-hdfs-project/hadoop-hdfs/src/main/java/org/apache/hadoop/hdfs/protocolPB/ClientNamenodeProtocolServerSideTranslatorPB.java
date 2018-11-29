@@ -1422,7 +1422,8 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       ClientNamenodeProtocolProtos.AddUserGroupRequestProto request)
       throws ServiceException {
     try {
-      server.addUserGroup(request.getUserName(), request.getGroupName(),
+      server.addUserGroup(request.hasUserName() ? request.getUserName() : null,
+          request.hasGroupName() ? request.getGroupName() : null,
           request.getCacheOnly());
       return VOID_ADD_USER_GROUP_CACHE;
     } catch (IOException ex) {
@@ -1436,7 +1437,8 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       ClientNamenodeProtocolProtos.RemoveUserGroupRequestProto request)
       throws ServiceException {
     try {
-      server.removeUserGroup(request.getUserName(), request.getGroupName(),
+      server.removeUserGroup(request.hasUserName() ? request.getUserName() :
+              null, request.hasGroupName() ? request.getGroupName() : null,
           request.getCacheOnly());
       return VOID_REMOVE_USER_GROUP_CACHE;
     } catch (IOException ex) {

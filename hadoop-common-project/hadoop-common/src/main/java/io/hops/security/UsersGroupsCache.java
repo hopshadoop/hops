@@ -129,11 +129,13 @@ class UsersGroupsCache {
           "(" + rn.getCause() + ")");
       List<String> groups = rn.getValue();
       for(String group : groups){
-        List<String> users = groupsToUsers.getIfPresent(group);
-        if(users != null){
-          users.remove(rn.getKey());
-          if(users.isEmpty()){
-            groupsToUsers.invalidate(group);
+        if(group != null) {
+          List<String> users = groupsToUsers.getIfPresent(group);
+          if (users != null) {
+            users.remove(rn.getKey());
+            if (users.isEmpty()) {
+              groupsToUsers.invalidate(group);
+            }
           }
         }
       }
@@ -149,11 +151,15 @@ class UsersGroupsCache {
               "(" + rn.getCause() + ")");
           List<String> users = rn.getValue();
           for (String user : users) {
-            List<String> groups = usersToGroups.getIfPresent(user);
-            if (groups != null) {
-              groups.remove(rn.getKey());
-              if (groups.isEmpty()) {
-                usersToGroups.invalidate(user);
+            if(user != null) {
+              List<String> groups = usersToGroups.getIfPresent(user);
+              if (groups != null) {
+                groups.remove(rn.getKey());
+                if (groups.isEmpty()) {
+                  if (user != null) {
+                    usersToGroups.invalidate(user);
+                  }
+                }
               }
             }
           }
@@ -177,7 +183,9 @@ class UsersGroupsCache {
     @Override
     public void onRemoval(RemovalNotification<Integer, String> rn) {
       LOG.debug("User removal notification for " + rn.toString() + "(" + rn.getCause() + ")");
-      usersToIds.invalidate(rn.getValue());
+      if(rn.getValue() != null) {
+        usersToIds.invalidate(rn.getValue());
+      }
     }
   };
   
@@ -199,7 +207,9 @@ class UsersGroupsCache {
     @Override
     public void onRemoval(RemovalNotification<String, Integer> rn) {
       LOG.debug("User removal notification for " + rn.toString() + "(" + rn.getCause() + ")");
-      idsToUsers.invalidate(rn.getValue());
+      if(rn.getValue() != null) {
+        idsToUsers.invalidate(rn.getValue());
+      }
     }
   };
   
@@ -222,7 +232,9 @@ class UsersGroupsCache {
     @Override
     public void onRemoval(RemovalNotification<Integer, String> rn) {
       LOG.debug("Group removal notification for " + rn.toString() + "(" + rn.getCause() + ")");
-      groupsToIds.invalidate(rn.getValue());
+      if(rn.getValue() != null) {
+        groupsToIds.invalidate(rn.getValue());
+      }
     }
   };
   
@@ -246,7 +258,9 @@ class UsersGroupsCache {
         @Override
         public void onRemoval(RemovalNotification<String, Integer> rn) {
           LOG.debug("Group removal notification for " + rn.toString() + "(" + rn.getCause() + ")");
-          idsToGroups.invalidate(rn.getValue());
+          if(rn.getValue() != null) {
+            idsToGroups.invalidate(rn.getValue());
+          }
         }
   };
   
@@ -305,6 +319,10 @@ class UsersGroupsCache {
     if(!isConfigured)
       return null;
     
+    if(userName == null){
+      return null;
+    }
+    
     Integer userId = usersToIds.getIfPresent(userName);
     if(userId != null){
       LOG.debug("User " + userName + " is already in cache with id=" + userId);
@@ -345,13 +363,19 @@ class UsersGroupsCache {
   }
   
   void removeUserFromCache(String userName){
-    removeUserFromCache(usersToIds.getIfPresent(userName), userName);
+    if(userName != null) {
+      removeUserFromCache(usersToIds.getIfPresent(userName), userName);
+    }
   }
   
   private void removeUserFromCache(Integer userId, String userName){
-    idsToUsers.invalidate(userId);
-    usersToIds.invalidate(userName);
-    usersToGroups.invalidate(userName);
+    if(userId != null) {
+      idsToUsers.invalidate(userId);
+    }
+    if(userName != null) {
+      usersToIds.invalidate(userName);
+      usersToGroups.invalidate(userName);
+    }
   }
   
   int getUserId(String userName) throws IOException {
@@ -398,6 +422,10 @@ class UsersGroupsCache {
     if(!isConfigured)
       return null;
     
+    if(groupName == null){
+      return null;
+    }
+    
     Integer groupId = groupsToIds.getIfPresent(groupName);
     if(groupId != null){
       LOG.debug("Group " + groupName + " is already in cache with id=" + groupId);
@@ -439,13 +467,19 @@ class UsersGroupsCache {
   }
   
   void removeGroupFromCache(String groupName){
-    removeGroupFromCache(groupsToIds.getIfPresent(groupName), groupName);
+    if(groupName != null) {
+      removeGroupFromCache(groupsToIds.getIfPresent(groupName), groupName);
+    }
   }
   
   private void removeGroupFromCache(Integer groupId, String groupName){
-    idsToGroups.invalidate(groupId);
-    groupsToIds.invalidate(groupName);
-    groupsToUsers.invalidate(groupName);
+    if(groupId != null) {
+      idsToGroups.invalidate(groupId);
+    }
+    if(groupName != null) {
+      groupsToIds.invalidate(groupName);
+      groupsToUsers.invalidate(groupName);
+    }
   }
   
   int getGroupId(String groupName) throws IOException {
