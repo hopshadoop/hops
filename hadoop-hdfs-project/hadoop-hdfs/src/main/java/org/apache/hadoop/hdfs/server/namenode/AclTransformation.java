@@ -350,8 +350,10 @@ final class AclTransformation {
     for (AclEntry entry: aclBuilder) {
       scopeFound.add(entry.getScope());
       if (entry.getType() == GROUP || entry.getName() != null) {
-        FsAction scopeUnionPerms = Objects.firstNonNull(
-          unionPerms.get(entry.getScope()), FsAction.NONE);
+        FsAction scopeUnionPerms = unionPerms.get(entry.getScope());
+        if (scopeUnionPerms == null) {
+          scopeUnionPerms = FsAction.NONE;
+        }
         unionPerms.put(entry.getScope(),
           scopeUnionPerms.or(entry.getPermission()));
       }
