@@ -61,7 +61,7 @@ public class QuotaUpdateContext
     }
     super.remove(quotaUpdate);
     if(isLogTraceEnabled()) {
-      log("removed-quotaUpdate", "id", quotaUpdate.getId());
+      log("removed-quotaUpdate", "id", quotaUpdate);
     }
   }
 
