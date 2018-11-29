@@ -487,7 +487,7 @@ public class INodeLock extends BaseINodeLock {
     String path = INodeUtil.constructPath(resolvedINodes);
     addPathINodesAndUpdateResolvingCache(path, resolvedINodes);
 
-    if (resolvedINodes.size() > 0) {
+    if (resolvedINodes!=null && resolvedINodes.size() > 0) {
       INode lastINode = resolvedINodes.get(resolvedINodes.size() - 1);
       if (resolveType == TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN) {
         List<INode> children = findImmediateChildren(lastINode);

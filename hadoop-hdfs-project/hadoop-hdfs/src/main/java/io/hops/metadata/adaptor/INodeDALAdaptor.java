@@ -245,9 +245,9 @@ public class INodeDALAdaptor
         String linkValue = DFSUtil.bytes2String(((INodeSymlink) inode).getSymlink());
         hopINode.setSymlink(linkValue);
       }
+      hopINode.setHeader(inode.getHeader());
+      hopINode.setNumAces(inode.getNumAces());
     }
-    hopINode.setHeader(inode.getHeader());
-    hopINode.setNumAces(inode.getNumAces());
     return hopINode;
   }
 

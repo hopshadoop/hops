@@ -6007,7 +6007,10 @@ public class FSNamesystem
       NameNode.stateChangeLog.info("STATE* Safe mode is already OFF");
       return;
     }
-    safeMode().leave();
+    SafeModeInfo safeMode = safeMode();
+    if(safeMode!=null){
+      safeMode.leave();
+    }
   }
 
   String getSafeModeTip() throws IOException {
