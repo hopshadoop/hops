@@ -17,6 +17,12 @@ package io.hops.metadata;
 
 import com.google.common.collect.Lists;
 import io.hops.common.CountersQueue;
+import io.hops.metadata.common.entity.IntVariable;
+import io.hops.metadata.common.entity.LongVariable;
+import io.hops.metadata.common.entity.Variable;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
+import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.junit.Test;
@@ -51,6 +57,14 @@ public class TestHdfsVariables {
     testIncrementCounter(CounterType.INodeId, 100);
   }
 
+  @Test
+  public void testUpdateIntToLongCounter() throws Exception {
+    IntVariable intVar = new IntVariable(10);
+    LongVariable longVar = new LongVariable(-1);
+    longVar.setValue(intVar.getBytes());
+    assertEquals(intVar.getValue().longValue(), longVar.getValue().longValue());
+  }
+  
   @Test
   public void testIncrementBlockIdCounter() throws Exception {
     testIncrementCounter(CounterType.BlockId, 100);
