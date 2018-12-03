@@ -17,13 +17,10 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.*;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.junit.Before;
 import org.junit.BeforeClass;
 
 /**
@@ -38,11 +35,5 @@ public class TestNameNodeAcl extends FSAclBaseTest {
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
-  }
-  
-  @Before
-  public void setUp() throws Exception {
-    super.setUp();
-    assertTrue(fs instanceof DistributedFileSystem);
   }
 }

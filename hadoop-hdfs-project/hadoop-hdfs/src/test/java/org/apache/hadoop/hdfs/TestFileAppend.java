@@ -17,12 +17,16 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.junit.Assert.fail;
+
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.HardLink;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.MiniDFSCluster.DataNodeProperties;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -30,6 +34,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.junit.Assert;
 import org.junit.Test;
@@ -174,6 +179,7 @@ public class TestFileAppend {
       }
 
     } finally {
+      client.close();
       fs.close();
       cluster.shutdown();
     }
@@ -395,4 +401,58 @@ public class TestFileAppend {
       cluster.shutdown();
     }
   }
+
+  /**
+   * Old replica of the block should not be accepted as valid for append/read
+   */
+  @Test
+  public void testFailedAppendBlockRejection() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+    conf.set("dfs.client.block.write.replace-datanode-on-failure.enable",
+        "false");
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3)
+        .build();
+    DistributedFileSystem fs = null;
+    try {
+      fs = cluster.getFileSystem();
+      Path path = new Path("/test");
+      FSDataOutputStream out = fs.create(path);
+      out.writeBytes("hello\n");
+      out.close();
+
+      // stop one datanode
+      DataNodeProperties dnProp = cluster.stopDataNode(0);
+      String dnAddress = dnProp.datanode.getXferAddress().toString();
+      if (dnAddress.startsWith("/")) {
+        dnAddress = dnAddress.substring(1);
+}
+
+      // append again to bump genstamps
+      for (int i = 0; i < 2; i++) {
+        out = fs.append(path);
+        out.writeBytes("helloagain\n");
+        out.close();
+      }
+
+      // re-open and make the block state as underconstruction
+      out = fs.append(path);
+      cluster.restartDataNode(dnProp, true);
+      // wait till the block report comes
+      Thread.sleep(2000);
+      // check the block locations, this should not contain restarted datanode
+      BlockLocation[] locations = fs.getFileBlockLocations(path, 0,
+          Long.MAX_VALUE);
+      String[] names = locations[0].getNames();
+      for (String node : names) {
+        if (node.equals(dnAddress)) {
+          fail("Failed append should not be present in latest block locations.");
+        }
+      }
+      out.close();
+    } finally {
+      IOUtils.closeStream(fs);
+      cluster.shutdown();
+    }
+  }
+
 }

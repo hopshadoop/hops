@@ -19,7 +19,9 @@ package org.apache.hadoop.yarn.server.security;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.CryptoMaterial;
+import org.apache.hadoop.security.ssl.SecurityMaterial;
+import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -113,7 +115,7 @@ public class TestCertificateLocalizationService {
     }
 
     if (exist) {
-      CryptoMaterial material = certLocSrv.getMaterialLocation(username);
+      X509SecurityMaterial material = certLocSrv.getX509MaterialLocation(username);
       assertEquals(expectedKPath, material.getKeyStoreLocation());
       assertEquals(expectedTPath, material.getTrustStoreLocation());
       assertTrue(expectedKPath.toFile().exists());
@@ -121,9 +123,9 @@ public class TestCertificateLocalizationService {
       assertEquals(kstorePass, material.getKeyStorePass());
       assertEquals(tstorePass, material.getTrustStorePass());
     } else {
-      CryptoMaterial material = null;
+      SecurityMaterial material = null;
       try {
-        material = certLocSrv.getMaterialLocation(username);
+        material = certLocSrv.getX509MaterialLocation(username);
       } catch (FileNotFoundException ex) {
         LOG.info("Exception here is normal");
         assertNull(material);
@@ -175,10 +177,36 @@ public class TestCertificateLocalizationService {
     materializeCertificateUtil(certLocSrv, username, userFolder, bfk, keyStorePass, bft, trustStorePass);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePass, trustStorePass, true);
 
-    certLocSrv.removeMaterial(username);
+    certLocSrv.removeX509Material(username);
     // Deletion is asynchronous so we have to wait
     TimeUnit.MILLISECONDS.sleep(10);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePass, trustStorePass, false);
+  }
+  
+  @Test
+  public void testJWTMaterialization() throws Exception {
+    String jwt = "random_jwt";
+    String username = "Dorothy";
+    
+    certLocSrv.materializeJWT(username, null, username, jwt);
+    JWTSecurityMaterial material = certLocSrv.getJWTMaterialLocation(username, null);
+    assertEquals(jwt, material.getToken());
+    assertTrue(material.getTokenLocation().toFile().exists());
+  }
+  
+  @Test
+  public void testJWTDeletion() throws Exception {
+    String jwt = "a_token";
+    String username = "Dorothy";
+    
+    certLocSrv.materializeJWT(username, null, username, jwt);
+    JWTSecurityMaterial material = certLocSrv.getJWTMaterialLocation(username, null);
+    assertTrue(material.getTokenLocation().toFile().exists());
+    
+    certLocSrv.removeJWTMaterial(username, null);
+    
+    rule.expect(FileNotFoundException.class);
+    JWTSecurityMaterial newMaterial = certLocSrv.getJWTMaterialLocation(username, null);
   }
   
   @Test
@@ -205,8 +233,8 @@ public class TestCertificateLocalizationService {
       String newKeyStorePassword = "kpassword1";
       String newTrustStorePassword = "tpassword1";
       materializeCertificateUtil(delayedCertLoc, username, userFolder, keyStore, keyStorePassword, trustStore, trustStorePassword);
-      delayedCertLoc.updateCryptoMaterial(username, null, newKeyStore, newKeyStorePassword, newTrustStore, newTrustStorePassword);
-      CryptoMaterial material = delayedCertLoc.getMaterialLocation(username);
+      delayedCertLoc.updateX509(username, null, newKeyStore, newKeyStorePassword, newTrustStore, newTrustStorePassword);
+      X509SecurityMaterial material = delayedCertLoc.getX509MaterialLocation(username);
       
       // Make some basic checks here. Extended checks are in testUpdateMaterial
       assertNotEquals(keyStore, material.getKeyStoreMem());
@@ -231,16 +259,16 @@ public class TestCertificateLocalizationService {
         trustStore, trustStorePassword);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePassword, trustStorePassword, true);
     
-    CryptoMaterial oldMaterial = certLocSrv.getMaterialLocation(username);
+    X509SecurityMaterial oldMaterial = certLocSrv.getX509MaterialLocation(username);
     
     ByteBuffer newKeyStore = ByteBuffer.wrap("keyStore1".getBytes());
     ByteBuffer newTrustStore = ByteBuffer.wrap("trustStore1".getBytes());
     String newKeyStorePassword = "kpassword1";
     String newTrustStorePassword = "tpassword1";
-    certLocSrv.updateCryptoMaterial(username, null, newKeyStore, newKeyStorePassword,
+    certLocSrv.updateX509(username, null, newKeyStore, newKeyStorePassword,
         newTrustStore, newTrustStorePassword);
     
-    CryptoMaterial newMaterial = certLocSrv.getMaterialLocation(username);
+    X509SecurityMaterial newMaterial = certLocSrv.getX509MaterialLocation(username);
     assertEquals(newKeyStore, newMaterial.getKeyStoreMem());
     assertEquals(newTrustStore, newMaterial.getTrustStoreMem());
     assertEquals(newKeyStorePassword, newMaterial.getKeyStorePass());
@@ -250,14 +278,14 @@ public class TestCertificateLocalizationService {
     assertEquals(oldMaterial.getTrustStoreLocation().toString(), newMaterial.getTrustStoreLocation().toString());
     assertEquals(oldMaterial.getPasswdLocation().toString(), newMaterial.getPasswdLocation().toString());
     assertEquals(oldMaterial.getRequestedApplications(), newMaterial.getRequestedApplications());
-    assertEquals(CryptoMaterial.STATE.FINISHED, newMaterial.getState());
+    assertEquals(SecurityMaterial.STATE.FINISHED, newMaterial.getState());
     
     assertFalse(keyStore.equals(newMaterial.getKeyStoreMem()));
     assertFalse(trustStore.equals(newMaterial.getTrustStoreMem()));
     assertNotEquals(keyStorePassword, newMaterial.getKeyStorePass());
     assertNotEquals(trustStorePassword, newMaterial.getTrustStorePass());
     
-    certLocSrv.removeMaterial(username);
+    certLocSrv.removeX509Material(username);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, newKeyStorePassword, newTrustStorePassword, false);
   }
   
@@ -268,7 +296,7 @@ public class TestCertificateLocalizationService {
     String userFolder = "userFolder";
     String password = "password";
     materializeCertificateUtil(certLocSrv, username, userFolder, store, password, store, password);
-    certLocSrv.removeMaterial(username);
+    certLocSrv.removeX509Material(username);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, password, password, false);
   }
 
@@ -284,7 +312,7 @@ public class TestCertificateLocalizationService {
     String trustStorePass = "trustStorePass";
 
     materializeCertificateUtil(certLocSrv, username, userFolder, bfk, keyStorePass, bft, trustStorePass);
-    CryptoMaterial cryptoMaterial = certLocSrv.getMaterialLocation(username);
+    X509SecurityMaterial cryptoMaterial = certLocSrv.getX509MaterialLocation(username);
 
     assertTrue(bfk.equals(cryptoMaterial.getKeyStoreMem()));
     assertTrue(bft.equals(cryptoMaterial.getTrustStoreMem()));
@@ -294,7 +322,7 @@ public class TestCertificateLocalizationService {
     assertTrue(bft.equals(cryptoMaterial.getTrustStoreMem()));
 
     // Cleanup
-    certLocSrv.removeMaterial(username);
+    certLocSrv.removeX509Material(username);
   }
 
 
@@ -317,32 +345,32 @@ public class TestCertificateLocalizationService {
     // Make a second materialize certificates call which happen when a second
     // application is launched
     materializeCertificateUtil(certLocSrv, username, userFolder, bfk, keyStorePass0, bft, trustStorePass0);
-    CryptoMaterial cryptoMaterial = certLocSrv.getMaterialLocation(username);
+    SecurityMaterial cryptoMaterial = certLocSrv.getX509MaterialLocation(username);
     assertEquals(2, cryptoMaterial.getRequestedApplications());
     
-    certLocSrv.removeMaterial(username);
+    certLocSrv.removeX509Material(username);
     TimeUnit.MILLISECONDS.sleep(10);
-    cryptoMaterial = certLocSrv.getMaterialLocation(username);
+    cryptoMaterial = certLocSrv.getX509MaterialLocation(username);
     assertEquals(1, cryptoMaterial.getRequestedApplications());
     assertFalse(cryptoMaterial.isSafeToRemove());
 
     // Check that the certificates are still materialized
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePass0, trustStorePass0, true);
 
-    certLocSrv.removeMaterial(username);
+    certLocSrv.removeX509Material(username);
     TimeUnit.MILLISECONDS.sleep(10);
     
     // Check that the certificates have been cleaned up
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePass0, trustStorePass0, false);
 
     rule.expect(FileNotFoundException.class);
-    certLocSrv.getMaterialLocation(username);
+    certLocSrv.getX509MaterialLocation(username);
   }
   
   @Test
   public void testMaterialNotFound() throws Exception {
     rule.expect(FileNotFoundException.class);
-    certLocSrv.getMaterialLocation("username");
+    certLocSrv.getX509MaterialLocation("username");
   }
   
   @Test
@@ -421,6 +449,8 @@ public class TestCertificateLocalizationService {
     ByteBuffer trustStore = ByteBuffer.wrap(someBytes);
     String userA = "userA";
     String userFolderA = "userFolderA";
+    String userAStateKey = userA + "/unknown/" + CertificateLocalizationService.STORAGE_KEY_TYPE.X509;
+    
     String userB = "userB";
     String userFolderB = "userFolderB";
 
@@ -431,8 +461,8 @@ public class TestCertificateLocalizationService {
     Map<String, String> returnMap = parseCertificateLocalizerState(jmxReturn, objectMapper);
     Map<String, Integer> materializedMap = getMaterializedStateOutOfString(returnMap, objectMapper);
     assertEquals(1, materializedMap.size());
-    assertTrue(materializedMap.containsKey(userA));
-    assertEquals(1, materializedMap.get(userA).intValue());
+    assertTrue(materializedMap.containsKey(userAStateKey));
+    assertEquals(1, materializedMap.get(userAStateKey).intValue());
 
     materializeCertificateUtil(certLocSrv, userA, userFolderA, keyStore, "some_pass", trustStore, "some_pass");
     invokeJMXRemoveOperation(mbs, mxbean, userA);
@@ -459,7 +489,7 @@ public class TestCertificateLocalizationService {
     returnMap = parseCertificateLocalizerState(jmxReturn, objectMapper);
     materializedMap = getMaterializedStateOutOfString(returnMap, objectMapper);
     assertEquals(1, materializedMap.size());
-    assertFalse(materializedMap.containsKey(userA));
+    assertFalse(materializedMap.containsKey(userAStateKey));
   }
   
   private boolean invokeJMXRemoveOperation(MBeanServer mbs, ObjectName mxbean, String username) throws Exception {
@@ -493,6 +523,7 @@ public class TestCertificateLocalizationService {
     ByteBuffer trustStore = ByteBuffer.wrap(someBytes);
     String userA = "userA";
     String userFolderA = "userFolderA";
+    String userAStateKey = userA + "/unknown/" + CertificateLocalizationService.STORAGE_KEY_TYPE.X509;
 
     materializeCertificateUtil(certLocSrv, userA, userFolderA, keyStore, "some_pass", trustStore, "some_pass");
     // Wait a bit, it's an async operation
@@ -501,44 +532,45 @@ public class TestCertificateLocalizationService {
     returnMap = parseCertificateLocalizerState(jmxReturn, objectMapper);
     materializedMap = getMaterializedStateOutOfString(returnMap, objectMapper);
     assertEquals(1, materializedMap.size());
-    assertTrue(materializedMap.containsKey(userA));
-    assertEquals(1, materializedMap.get(userA).intValue());
+    assertTrue(materializedMap.containsKey(userAStateKey));
+    assertEquals(1, materializedMap.get(userAStateKey).intValue());
   
     // Now the reference counter should be 2
     materializeCertificateUtil(certLocSrv, userA, userFolderA, keyStore, "some_pass", trustStore, "some_pass");
     jmxReturn = (String) mbs.getAttribute(mxbean, "State");
     returnMap = parseCertificateLocalizerState(jmxReturn, objectMapper);
     materializedMap = getMaterializedStateOutOfString(returnMap, objectMapper);
-    assertEquals(2, materializedMap.get(userA).intValue());
+    assertEquals(2, materializedMap.get(userAStateKey).intValue());
     
     // Materialize another user
     String userB = "userB";
     String userFolderB = "userFolderB";
+    String userBStateKey = userB + "/unknown/" + CertificateLocalizationService.STORAGE_KEY_TYPE.X509;
     materializeCertificateUtil(certLocSrv, userB, userFolderB, keyStore, "some_pass", trustStore, "some_pass");
     TimeUnit.MILLISECONDS.sleep(300);
     jmxReturn = (String) mbs.getAttribute(mxbean, "State");
     returnMap = parseCertificateLocalizerState(jmxReturn, objectMapper);
     materializedMap = getMaterializedStateOutOfString(returnMap, objectMapper);
     assertEquals(2, materializedMap.size());
-    assertTrue(materializedMap.containsKey(userA));
-    assertTrue(materializedMap.containsKey(userB));
-    assertEquals(2, materializedMap.get(userA).intValue());
-    assertEquals(1, materializedMap.get(userB).intValue());
+    assertTrue(materializedMap.containsKey(userAStateKey));
+    assertTrue(materializedMap.containsKey(userBStateKey));
+    assertEquals(2, materializedMap.get(userAStateKey).intValue());
+    assertEquals(1, materializedMap.get(userBStateKey).intValue());
     
     // Remove userA. It should be called twice since it was requested two times
-    certLocSrv.removeMaterial(userA);
-    certLocSrv.removeMaterial(userA);
+    certLocSrv.removeX509Material(userA);
+    certLocSrv.removeX509Material(userA);
     TimeUnit.MILLISECONDS.sleep(300);
     jmxReturn = (String) mbs.getAttribute(mxbean, "State");
     returnMap = parseCertificateLocalizerState(jmxReturn, objectMapper);
     materializedMap = getMaterializedStateOutOfString(returnMap, objectMapper);
     assertEquals(1, materializedMap.size());
-    assertFalse(materializedMap.containsKey(userA));
-    assertTrue(materializedMap.containsKey(userB));
-    assertEquals(1, materializedMap.get(userB).intValue());
+    assertFalse(materializedMap.containsKey(userAStateKey));
+    assertTrue(materializedMap.containsKey(userBStateKey));
+    assertEquals(1, materializedMap.get(userBStateKey).intValue());
     
     // Remove userB
-    certLocSrv.removeMaterial(userB);
+    certLocSrv.removeX509Material(userB);
     TimeUnit.MILLISECONDS.sleep(300);
     jmxReturn = (String) mbs.getAttribute(mxbean, "State");
     returnMap = parseCertificateLocalizerState(jmxReturn, objectMapper);

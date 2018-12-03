@@ -21,9 +21,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,6 +94,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.hops.metadata.yarn.entity.Load;
 import io.hops.util.DBUtility;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplDist;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplNotDist;
 
@@ -404,7 +405,7 @@ public class ResourceTrackerService extends AbstractService implements
               resolve(host), capability, nodeManagerVersion);
     }
     RMNode oldNode = this.rmContext.getRMNodes().putIfAbsent(nodeId, rmNode);
-    Map<ApplicationId, Integer> runningsAppsWithCryptoVersion = request.getRunningApplications();
+    Map<ApplicationId, UpdatedCryptoForApp> runningsAppsWithCryptoVersion = request.getRunningApplications();
     List<ApplicationId> runningApplications = new ArrayList<>(runningsAppsWithCryptoVersion.size());
     runningApplications.addAll(runningsAppsWithCryptoVersion.keySet());
     if (oldNode == null) {
@@ -482,30 +483,41 @@ public class ResourceTrackerService extends AbstractService implements
     response.setRMVersion(YarnVersionInfo.getVersion());
     return response;
   }
-
-  private void pushCryptoUpdatedEventsForRunningApps(Map<ApplicationId, Integer> runningApps, RMNode rmNode) {
-    if (!getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, CommonConfigurationKeys
-        .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+  
+  private void pushCryptoUpdatedEventsForRunningApps(Map<ApplicationId, UpdatedCryptoForApp> runningApps, RMNode rmNode) {
+    if (!isHopsTLSEnabled() && !isJWTEnabled()) {
       return;
     }
-    for (Map.Entry<ApplicationId, Integer> entry : runningApps.entrySet()) {
+    for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : runningApps.entrySet()) {
       ApplicationId appId = entry.getKey();
       RMApp rmApp = rmContext.getRMApps().get(appId);
       if (rmApp != null) {
-        Integer nmCryptoMaterialVersion = entry.getValue();
-        if (rmApp.getCryptoMaterialVersion() > nmCryptoMaterialVersion) {
-          ByteBuffer keyStore = ByteBuffer.wrap(rmApp.getKeyStore());
-          char[] keyStorePassword = rmApp.getKeyStorePassword();
-          ByteBuffer trustStore = ByteBuffer.wrap(rmApp.getTrustStore());
-          char[] trustStorePassword = rmApp.getTrustStorePassword();
-          int cryptoVersion = rmApp.getCryptoMaterialVersion();
-          UpdatedCryptoForApp updatedCrypto = recordFactory.newRecordInstance(UpdatedCryptoForApp.class);
-          updatedCrypto.setKeyStore(keyStore);
-          updatedCrypto.setKeyStorePassword(keyStorePassword);
-          updatedCrypto.setTrustStore(trustStore);
-          updatedCrypto.setTrustStorePassword(trustStorePassword);
-          updatedCrypto.setVersion(cryptoVersion);
-          rmNode.getAppCryptoMaterialToUpdate().putIfAbsent(appId, updatedCrypto);
+        if (isHopsTLSEnabled()) {
+          Integer nmCryptoMaterialVersion = entry.getValue().getVersion();
+          if (rmApp.getCryptoMaterialVersion() > nmCryptoMaterialVersion) {
+            ByteBuffer keyStore = ByteBuffer.wrap(rmApp.getKeyStore());
+            char[] keyStorePassword = rmApp.getKeyStorePassword();
+            ByteBuffer trustStore = ByteBuffer.wrap(rmApp.getTrustStore());
+            char[] trustStorePassword = rmApp.getTrustStorePassword();
+            int cryptoVersion = rmApp.getCryptoMaterialVersion();
+            UpdatedCryptoForApp updatedCrypto = recordFactory.newRecordInstance(UpdatedCryptoForApp.class);
+            updatedCrypto.setKeyStore(keyStore);
+            updatedCrypto.setKeyStorePassword(keyStorePassword);
+            updatedCrypto.setTrustStore(trustStore);
+            updatedCrypto.setTrustStorePassword(trustStorePassword);
+            updatedCrypto.setVersion(cryptoVersion);
+            rmNode.getAppX509ToUpdate().putIfAbsent(appId, updatedCrypto);
+          }
+        }
+        
+        if (isJWTEnabled()) {
+          long nmJWTExpiration = entry.getValue().getJWTExpiration();
+          if (rmApp.getJWTExpiration().isAfter(Instant.ofEpochMilli(nmJWTExpiration))) {
+            UpdatedCryptoForApp updateJWT = recordFactory.newRecordInstance(UpdatedCryptoForApp.class);
+            updateJWT.setJWT(rmApp.getJWT());
+            updateJWT.setJWTExpiration(rmApp.getJWTExpiration().toEpochMilli());
+            rmNode.getAppJWTToUpdate().putIfAbsent(appId, updateJWT);
+          }
         }
       }
     }
@@ -553,12 +565,11 @@ public class ResourceTrackerService extends AbstractService implements
     // Send ping
     this.nmLivelinessMonitor.receivedPing(nodeId);
     
-    if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+    if (isHopsTLSEnabled()) {
       Set<ApplicationId> updatedApps = request.getUpdatedApplicationsWithNewCryptoMaterial();
       if (updatedApps != null) {
         for (ApplicationId appId : updatedApps) {
-          rmNode.getAppCryptoMaterialToUpdate().remove(appId);
+          rmNode.getAppX509ToUpdate().remove(appId);
           RMApp rmApp = rmContext.getRMApps().get(appId);
           rmApp.rmNodeHasUpdatedCryptoMaterial(rmNode.getNodeID());
         }
@@ -596,9 +607,9 @@ public class ResourceTrackerService extends AbstractService implements
         nodeHeartBeatResponse);
 
     populateKeys(request, nodeHeartBeatResponse);
-    if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      setAppsToUpdateWithNewCryptoMaterial(nodeHeartBeatResponse, rmNode);
+    if (isHopsTLSEnabled() || isJWTEnabled()) {
+      Map<ApplicationId, UpdatedCryptoForApp> mergedUpdates = mergeNewSecurityMaterialForApps(rmNode);
+      nodeHeartBeatResponse.setUpdatedCryptoForApps(mergedUpdates);
     }
     
     ConcurrentMap<ApplicationId, ByteBuffer> systemCredentials =
@@ -644,16 +655,43 @@ public class ResourceTrackerService extends AbstractService implements
 
     return nodeHeartBeatResponse;
   }
-
+  
+  // TODO(Antonis): Replace with Stream.concat when we upgrade to Java 8 (HADOOP-11858)
   @InterfaceAudience.Private
   @VisibleForTesting
-  protected void setAppsToUpdateWithNewCryptoMaterial(NodeHeartbeatResponse response, RMNode rmNode) {
-    Set<Map.Entry<ApplicationId, UpdatedCryptoForApp>> appsToUpdate = rmNode.getAppCryptoMaterialToUpdate().entrySet();
-    Map<ApplicationId, UpdatedCryptoForApp> payload = new HashMap<>(appsToUpdate.size());
-    for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : appsToUpdate) {
-      payload.put(entry.getKey(), entry.getValue());
+  protected Map<ApplicationId, UpdatedCryptoForApp> mergeNewSecurityMaterialForApps(RMNode rmNode) {
+    Map<ApplicationId, UpdatedCryptoForApp> x509Updates = rmNode.getAppX509ToUpdate();
+    final Map<ApplicationId, UpdatedCryptoForApp> jwtUpdates = rmNode.getAppJWTToUpdate();
+    Map<ApplicationId, UpdatedCryptoForApp> mergedUpdates = new HashMap<>();
+    List<ApplicationId> mergedJWTUpdates = new ArrayList<>();
+    
+    for (Map.Entry<ApplicationId, UpdatedCryptoForApp> x509Update : x509Updates.entrySet()) {
+      ApplicationId appId = x509Update.getKey();
+      UpdatedCryptoForApp update = x509Update.getValue();
+      if (jwtUpdates.containsKey(appId)) {
+        UpdatedCryptoForApp jwtUpdate = jwtUpdates.get(appId);
+        update.setJWT(jwtUpdate.getJWT());
+        update.setJWTExpiration(jwtUpdate.getJWTExpiration());
+        mergedJWTUpdates.add(appId);
+      }
+      mergedUpdates.put(appId, update);
     }
-    response.setUpdatedCryptoForApps(payload);
+    
+    for (Map.Entry<ApplicationId, UpdatedCryptoForApp> jwtUpdate : jwtUpdates.entrySet()) {
+      ApplicationId appId = jwtUpdate.getKey();
+      UpdatedCryptoForApp update = jwtUpdate.getValue();
+      if (!mergedUpdates.containsKey(appId)) {
+        mergedUpdates.put(appId, update);
+        mergedJWTUpdates.add(appId);
+      }
+    }
+    
+    // For JWT we don't wait for confirmation
+    for (ApplicationId appId : mergedJWTUpdates) {
+      jwtUpdates.remove(appId);
+    }
+    
+    return mergedUpdates;
   }
   
   /**
@@ -773,5 +811,15 @@ public class ResourceTrackerService extends AbstractService implements
   @VisibleForTesting
   public Server getServer() {
     return this.server;
+  }
+  
+  private boolean isHopsTLSEnabled() {
+    return getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT);
+  }
+  
+  private boolean isJWTEnabled() {
+    return getConfig().getBoolean(YarnConfiguration.RM_JWT_ENABLED,
+        YarnConfiguration.DEFAULT_RM_JWT_ENABLED);
   }
 }

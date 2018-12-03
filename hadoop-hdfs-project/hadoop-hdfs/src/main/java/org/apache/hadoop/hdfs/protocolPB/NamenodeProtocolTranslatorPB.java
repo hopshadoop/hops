@@ -38,6 +38,7 @@ import org.apache.hadoop.ipc.RpcClientUtil;
 
 import java.io.Closeable;
 import java.io.IOException;
+import org.apache.hadoop.ipc.ProtocolTranslator;
 
 /**
  * This class is the client side translator to translate the requests made on
@@ -47,7 +48,7 @@ import java.io.IOException;
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public class NamenodeProtocolTranslatorPB
-    implements NamenodeProtocol, ProtocolMetaInterface, Closeable {
+    implements NamenodeProtocol, ProtocolMetaInterface, Closeable, ProtocolTranslator {
   /**
    * RpcController is not used and hence is set to null
    */
@@ -72,6 +73,11 @@ public class NamenodeProtocolTranslatorPB
     RPC.stopProxy(rpcProxy);
   }
 
+  @Override
+  public Object getUnderlyingProxyObject() {
+    return rpcProxy;
+  }
+  
   @Override
   public BlocksWithLocations getBlocks(DatanodeInfo datanode, long size)
       throws IOException {

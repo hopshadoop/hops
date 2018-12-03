@@ -28,9 +28,12 @@ import org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 
 final class BlockRelatedLock extends LockWithType {
 
+  Collection<Object> blks = new ArrayList<>();
   BlockRelatedLock(Type type) {
     super(type);
   }
@@ -45,11 +48,17 @@ final class BlockRelatedLock extends LockWithType {
       //get by blocksId
       for (BlockInfo blk : individualBlockLock.getBlocks()) {
         if (isList()) {
-          acquireLockList(DEFAULT_LOCK_TYPE, getFinderType(true),
-                  blk.getBlockId(), blk.getInodeId());
+          Collection<Object> list = acquireLockList(DEFAULT_LOCK_TYPE,
+                  getFinderType(true), blk.getBlockId(), blk.getInodeId());
+          if(list != null){
+            blks.addAll(list);
+          }
         } else {
-          acquireLock(DEFAULT_LOCK_TYPE, getFinderType(true), blk.getBlockId(),
-                  blk.getInodeId());
+          Object b = acquireLock(DEFAULT_LOCK_TYPE, getFinderType(true),
+                  blk.getBlockId(), blk.getInodeId());
+          if(b != null){
+            blks.add(b);
+          }
         }
       }
       if (lock instanceof BlockLock) {
@@ -57,10 +66,15 @@ final class BlockRelatedLock extends LockWithType {
         BlockLock blockLock = (BlockLock) lock;
         for (INodeFile file : blockLock.getFiles()) {
           if(!file.isFileStoredInDB()) {
-            acquireLockList(DEFAULT_LOCK_TYPE, getFinderType(false),
-                    file.getId());
+            Collection<Object> list = acquireLockList(DEFAULT_LOCK_TYPE,
+                    getFinderType(false), file.getId());
+            if(list != null){
+              blks.addAll(list);
+            }
           }else{
-            LOG.debug("Stuffed Inode:  BlockRelateLock. " + getType() + "'s lock skipped as the file(s) data is stored in the database. File Name: "+file.getLocalName());
+            LOG.debug("Stuffed Inode:  BlockRelateLock. " + getType()
+                    + "'s lock skipped as the file(s) data is stored in " +
+                    "the database. File Name: "+file.getLocalName());
           }
         }
       }
@@ -109,4 +123,7 @@ final class BlockRelatedLock extends LockWithType {
     }
   }
 
+  public Collection<Object> getBlocks(){
+    return blks;
+  }
 }

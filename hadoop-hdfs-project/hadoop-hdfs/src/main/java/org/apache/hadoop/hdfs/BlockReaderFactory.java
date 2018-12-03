@@ -766,7 +766,8 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
       }
     }
     try {
-      Peer peer = remotePeerFactory.newConnectedPeer(inetSocketAddress);
+      Peer peer = remotePeerFactory.newConnectedPeer(inetSocketAddress, token,
+        datanode);
       if (LOG.isTraceEnabled()) {
         LOG.trace("nextTcpPeer: created newConnectedPeer " + peer);
       }

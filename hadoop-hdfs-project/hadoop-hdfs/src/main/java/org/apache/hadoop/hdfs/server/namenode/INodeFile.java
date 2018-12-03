@@ -27,7 +27,6 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
@@ -100,8 +99,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
       short replication, long modificationTime, long atime,
       long preferredBlockSize, byte storagePolicyID, boolean inTree) throws IOException {
     super(id, permissions, modificationTime, atime, inTree);
-    header = HeaderFormat.combineReplication(header, replication);
-    header = HeaderFormat.combinePreferredBlockSize(header, preferredBlockSize);
+    header = HeaderFormat.toLong(preferredBlockSize, replication);
     this.setFileStoredInDBNoPersistence(false); // it is set when the data is stored in the database
     this.setBlockStoragePolicyIDNoPersistance(storagePolicyID);
   }
@@ -492,13 +490,13 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
 
   void setReplication(short replication)
       throws StorageException, TransactionContextException {
-    header = HeaderFormat.combineReplication(header, replication);
+    header = HeaderFormat.REPLICATION.BITS.combine(replication, header);
     save();
   }
   
-  public INodeFile toUnderConstruction(String clientName, String clientMachine, DatanodeID clientNode)
+  public INodeFile toUnderConstruction(String clientName, String clientMachine)
     throws IOException {
-    FileUnderConstructionFeature uc = new FileUnderConstructionFeature(clientName, clientMachine, clientNode, this);
+    FileUnderConstructionFeature uc = new FileUnderConstructionFeature(clientName, clientMachine, this);
     addFeature(uc);
     save();
     return this;

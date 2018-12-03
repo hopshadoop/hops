@@ -41,7 +41,8 @@ class FsVolumeList {
   private final VolumeChoosingPolicy<FsVolumeImpl> blockChooser;
   private volatile int numFailedVolumes;
 
-  FsVolumeList(int failedVols, VolumeChoosingPolicy<FsVolumeImpl> blockChooser) {
+  FsVolumeList(int failedVols,
+      VolumeChoosingPolicy<FsVolumeImpl> blockChooser) {
     this.blockChooser = blockChooser;
     this.numFailedVolumes = failedVols;
   }
@@ -109,9 +110,9 @@ class FsVolumeList {
     }
     return remaining;
   }
-
+  
   void getAllVolumesMap(final String bpid, final ReplicaMap volumeMap) throws IOException {
-    long totalStartTime = System.currentTimeMillis();
+    long totalStartTime = Time.monotonicNow();
     final List<IOException> exceptions = Collections.synchronizedList(
         new ArrayList<IOException>());
     List<Thread> replicaAddingThreads = new ArrayList<Thread>();

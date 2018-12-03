@@ -109,7 +109,7 @@ public class HdfsFileStatus {
    *
    * @return the length of this file, in bytes.
    */
-  final public long getLen() {
+  public final long getLen() {
     return length;
   }
 
@@ -118,7 +118,7 @@ public class HdfsFileStatus {
    *
    * @return true if this is a directory
    */
-  final public boolean isDir() {
+  public final boolean isDir() {
     return isdir;
   }
 
@@ -136,7 +136,7 @@ public class HdfsFileStatus {
    *
    * @return the number of bytes
    */
-  final public long getBlockSize() {
+  public final long getBlockSize() {
     return blocksize;
   }
 
@@ -145,7 +145,7 @@ public class HdfsFileStatus {
    *
    * @return the replication factor of a file.
    */
-  final public short getReplication() {
+  public final short getReplication() {
     return block_replication;
   }
 
@@ -155,7 +155,7 @@ public class HdfsFileStatus {
    * @return the modification time of file in milliseconds since January 1, 1970
    * UTC.
    */
-  final public long getModificationTime() {
+  public final long getModificationTime() {
     return modification_time;
   }
 
@@ -164,7 +164,7 @@ public class HdfsFileStatus {
    *
    * @return the access time of file in milliseconds since January 1, 1970 UTC.
    */
-  final public long getAccessTime() {
+  public final long getAccessTime() {
     return access_time;
   }
 
@@ -173,7 +173,7 @@ public class HdfsFileStatus {
    *
    * @return permssion
    */
-  final public FsPermission getPermission() {
+  public final FsPermission getPermission() {
     return permission;
   }
   
@@ -182,7 +182,7 @@ public class HdfsFileStatus {
    *
    * @return owner of the file
    */
-  final public String getOwner() {
+  public final String getOwner() {
     return owner;
   }
   
@@ -191,7 +191,7 @@ public class HdfsFileStatus {
    *
    * @return group for the file.
    */
-  final public String getGroup() {
+  public final String getGroup() {
     return group;
   }
   
@@ -200,7 +200,7 @@ public class HdfsFileStatus {
    *
    * @return true if the name is empty
    */
-  final public boolean isEmptyLocalName() {
+  public final boolean isEmptyLocalName() {
     return path.length == 0;
   }
 
@@ -209,7 +209,7 @@ public class HdfsFileStatus {
    *
    * @return the local name in string
    */
-  final public String getLocalName() {
+  public final String getLocalName() {
     return DFSUtil.bytes2String(path);
   }
   
@@ -218,7 +218,7 @@ public class HdfsFileStatus {
    *
    * @return the local name in java UTF8
    */
-  final public byte[] getLocalNameInBytes() {
+  public final byte[] getLocalNameInBytes() {
     return path;
   }
 
@@ -229,7 +229,7 @@ public class HdfsFileStatus {
    *     the parent path
    * @return the full path in string
    */
-  final public String getFullName(final String parent) {
+  public final String getFullName(final String parent) {
     if (isEmptyLocalName()) {
       return parent;
     }
@@ -249,7 +249,7 @@ public class HdfsFileStatus {
    *     the parent path
    * @return the full path
    */
-  final public Path getFullPath(final Path parent) {
+  public final Path getFullPath(final Path parent) {
     if (isEmptyLocalName()) {
       return parent;
     }
@@ -262,21 +262,25 @@ public class HdfsFileStatus {
    *
    * @return the symlink as a string.
    */
-  final public String getSymlink() {
+  public final String getSymlink() {
     return DFSUtil.bytes2String(symlink);
   }
 
-  final public byte[] getSymlinkInBytes() {
+  public final byte[] getSymlinkInBytes() {
     return symlink;
   }
 
-  final public long getFileId() { return fileId; }
+  public final long getFileId() { 
+    return fileId; 
+  }
   
-  final public int getChildrenNum() {
+  public final int getChildrenNum() {
     return childrenNum;
   }
 
-  final public boolean isFileStoredInDB(){ return isFileStoredInDB; }
+  public final boolean isFileStoredInDB(){ 
+    return isFileStoredInDB; 
+  }
 
   /**
    * Resolve the short name of the Path given the URI, parent provided. This

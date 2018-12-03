@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdfs.server.datanode.fsdataset;
 
 
+import java.util.Collection;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -31,6 +33,7 @@ import org.apache.hadoop.hdfs.server.datanode.DataStorage;
 import org.apache.hadoop.hdfs.server.datanode.FinalizedReplica;
 import org.apache.hadoop.hdfs.server.datanode.Replica;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaInPipelineInterface;
+import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetFactory;
 import org.apache.hadoop.hdfs.server.datanode.metrics.FSDatasetMBean;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
@@ -42,7 +45,7 @@ import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -504,4 +507,11 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @return true when trash is enabled
    */
   public boolean trashEnabled(String bpid);
+  
+  /**
+   * submit a sync_file_range request to AsyncDiskService
+   */
+  public void submitBackgroundSyncFileRangeRequest(final ExtendedBlock block,
+      final FileDescriptor fd, final long offset, final long nbytes,
+      final int flags);
 }

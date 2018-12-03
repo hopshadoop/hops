@@ -25,7 +25,6 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem;
@@ -33,7 +32,6 @@ import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.*;
@@ -62,6 +60,8 @@ import java.util.logging.Logger;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
+import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
+import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.LeaseExpiredException;
 import static org.junit.Assert.*;
@@ -72,7 +72,9 @@ import static org.junit.Assume.assumeTrue;
  */
 public class TestFileCreation {
   static final String DIR = "/" + TestFileCreation.class.getSimpleName() + "/";
-
+  private static final String RPC_DETAILED_METRICS =
+      "RpcDetailedActivityForPort";
+  
   static final long seed = 0xDEADBEEFL;
   static final int blockSize = 8192;
   static final int numBlocks = 2;
@@ -397,10 +399,14 @@ public class TestFileCreation {
       }
     });
     
+    String metricsName = RPC_DETAILED_METRICS + cluster.getNameNodePort();
+    
     try {
       Path p = new Path("/testfile");
       FSDataOutputStream stm1 = fs.create(p);
       stm1.write(1);
+      
+      assertCounter("CreateNumOps", 1L, getMetrics(metricsName));
 
       // Create file again without overwrite
       try {
@@ -410,7 +416,6 @@ public class TestFileCreation {
         GenericTestUtils
             .assertExceptionContains("already being created by", abce);
       }
-      
       FSDataOutputStream stm2 = fs2.create(p, true);
       stm2.write(2);
       stm2.close();
@@ -554,7 +559,7 @@ public class TestFileCreation {
 
       // wait for the lease to expire
       try {
-        Thread.sleep(5 * leasePeriod);
+        Thread.sleep(6 * leasePeriod);
       } catch (InterruptedException e) {
       }
 

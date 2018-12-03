@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock.Type;
 
@@ -120,9 +121,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
       @Override
       public Object performTask() throws IOException {
 //        return getPendingCached(datanodeManager);
-  Collection<io.hops.metadata.hdfs.entity.CachedBlock> tmp = EntityManager.findList(io.hops.metadata.hdfs.entity.CachedBlock.Finder.ByDatanodeAndTypes, dnId.getDatanodeUuid(),
-        Type.PENDING_CACHED);
-  return CachedBlock.toHops(tmp, datanodeManager);
+        Collection<io.hops.metadata.hdfs.entity.CachedBlock> tmp = EntityManager.findList(
+            io.hops.metadata.hdfs.entity.CachedBlock.Finder.ByDatanodeAndTypes, dnId.getDatanodeUuid(),
+            Type.PENDING_CACHED);
+        return CachedBlock.toHops(tmp, datanodeManager);
       }
     }.handle();
   }
@@ -319,18 +321,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0L, 0L, 0, 0);
   }
 
-  /**
-   * Add block to the storage. Return true on success.
-   */
-  public boolean addBlock(String storageID, BlockInfo b)
-      throws TransactionContextException, StorageException {
-    DatanodeStorageInfo s = getStorageInfo(storageID);
-    if(s != null) {
-      return s.addBlock(b);
-    }
-    return false;
-  }
-
   @VisibleForTesting
   public DatanodeStorageInfo getStorageInfo(String storageID) {
     synchronized (storageMap) {
@@ -369,10 +359,21 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * Remove block from the list of blocks belonging to this data-node.
    * Remove datanode from the block.
    */
-  public boolean removeReplica(BlockInfo b)
-      throws StorageException, TransactionContextException {
-    DatanodeStorageInfo s = b.getStorageOnNode(this);
-
+  boolean removeBlock(BlockInfo b) throws TransactionContextException, StorageException {
+    final DatanodeStorageInfo s = b.getStorageOnNode(this);
+    // if block exists on this datanode
+    if (s != null) {
+      return s.removeBlock(b);
+    }
+    return false;
+  }
+  
+  /**
+   * Remove block from the list of blocks belonging to the data-node. Remove
+   * data-node from the block.
+   */
+  boolean removeBlock(String storageID, BlockInfo b) throws StorageException, TransactionContextException {
+    DatanodeStorageInfo s = getStorageInfo(storageID);
     if (s != null) {
       return b.removeReplica(s) != null;
     }
@@ -582,10 +583,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
     private int index = 0;
     private final List<Iterator<BlockInfo>> iterators;
 
-    private BlockIterator(boolean all, final DatanodeStorageInfo... storages) throws IOException {
+    private BlockIterator(final DatanodeStorageInfo... storages) throws IOException {
       List<Iterator<BlockInfo>> iterators = new ArrayList<Iterator<BlockInfo>>();
       for (DatanodeStorageInfo e : storages) {
-        iterators.add(e.getBlockIterator(all));
+        iterators.add(e.getBlockIterator());
       }
       this.iterators = Collections.unmodifiableList(iterators);
     }
@@ -614,12 +615,21 @@ public class DatanodeDescriptor extends DatanodeInfo {
     }
   }
 
-  public Iterator<BlockInfo> getBlockIterator(boolean all) throws IOException {
-    return new BlockIterator(all, getStorageInfos());
+  public Iterator<BlockInfo> getBlockIterator() throws IOException {
+    return new BlockIterator(getStorageInfos());
   }
 
-  Iterator<BlockInfo> getBlockIterator(final String storageID, boolean all) throws IOException {
-    return new BlockIterator(all, getStorageInfo(storageID));
+  Iterator<BlockInfo> getBlockIterator(final String storageID) throws IOException {
+    return new BlockIterator(getStorageInfo(storageID));
+  }
+  
+  public Map<Long,Long> getAllStorageReplicas(int numBuckets, int nbThreads, int BucketsPerThread,
+      ExecutorService executor) throws IOException {
+    Map<Long, Long> result = new HashMap<>();
+    for(DatanodeStorageInfo storageInfo: getStorageInfos()){
+      result.putAll(storageInfo.getAllStorageReplicas(numBuckets, nbThreads, BucketsPerThread, executor));
+    }
+    return result;
   }
   
   void incrementPendingReplicationWithoutTargets() {

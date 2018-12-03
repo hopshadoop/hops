@@ -23,8 +23,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ExponentialBackOff;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppSecurityMaterialGeneratedEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppSecurityMaterialRenewedEvent;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -249,10 +248,8 @@ public class MockX509SecurityHandler extends X509SecurityHandler {
         X509SecurityManagerMaterial x509Material = new X509SecurityManagerMaterial(
             appId, rawKeystore, appKeystores.getKeyStorePassword(),
             rawTrustStore, appKeystores.getTrustStorePassword(), newCertificateExpiration);
-        RMAppSecurityMaterial<X509SecurityManagerMaterial> securityMaterial = new RMAppSecurityMaterial<>();
-        securityMaterial.addMaterial(x509Material);
         getRmContext().getDispatcher().getEventHandler()
-            .handle(new RMAppSecurityMaterialGeneratedEvent(appId, securityMaterial, RMAppEventType.CERTS_RENEWED));
+            .handle(new RMAppSecurityMaterialRenewedEvent<>(appId, x509Material));
         LOG.debug("Renewed certificate for application " + appId);
       } catch (Exception ex) {
         LOG.error("Exception while renewing certificate. THis should not have happened here :(", ex);

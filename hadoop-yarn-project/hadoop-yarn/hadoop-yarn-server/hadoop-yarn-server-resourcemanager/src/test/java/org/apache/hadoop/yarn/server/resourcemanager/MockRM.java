@@ -70,6 +70,7 @@ import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.NullRMNodeLabelsManager;
@@ -94,6 +95,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityActionsFactory;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityHandler;
@@ -176,6 +178,8 @@ public class MockRM extends ResourceManager {
     RMAppSecurityManager rmAppSecurityManager = new RMAppSecurityManager(this.rmContext);
     rmAppSecurityManager.registerRMAppSecurityHandlerWithType(createX509SecurityHandler(rmAppSecurityManager),
         X509SecurityHandler.class);
+    rmAppSecurityManager.registerRMAppSecurityHandlerWithType(createJWTSecurityHandler(rmAppSecurityManager),
+        JWTSecurityHandler.class);
     return rmAppSecurityManager;
   }
   
@@ -184,6 +188,13 @@ public class MockRM extends ResourceManager {
     RMAppSecurityHandler<X509SecurityHandler.X509SecurityManagerMaterial, X509SecurityHandler.X509MaterialParameter>
         x509SecurityHandler = new TestingX509SecurityHandler(rmAppSecurityManager);
     return x509SecurityHandler;
+  }
+  
+  @Override
+  protected RMAppSecurityHandler createJWTSecurityHandler(RMAppSecurityManager rmAppSecurityManager) {
+    RMAppSecurityHandler<JWTSecurityHandler.JWTSecurityManagerMaterial, JWTSecurityHandler.JWTMaterialParameter>
+        jwtSecurityHandler = new JWTSecurityHandler(this.rmContext, rmAppSecurityManager);
+    return jwtSecurityHandler;
   }
   
   @Override
@@ -657,7 +668,7 @@ public class MockRM extends ResourceManager {
   }
   
   public MockNM registerNode(String nodeIdStr, int memory, int vCores, int
-      gpus, Map<ApplicationId, Integer> runningApplications) throws Exception {
+      gpus, Map<ApplicationId, UpdatedCryptoForApp> runningApplications) throws Exception {
     MockNM nm =
         new MockNM(nodeIdStr, memory, vCores, gpus,
             getResourceTrackerService(),
@@ -668,7 +679,7 @@ public class MockRM extends ResourceManager {
   
   
   public MockNM registerNode(String nodeIdStr, int memory, int vCores,
-      Map<ApplicationId, Integer> runningApplications) throws Exception {
+      Map<ApplicationId, UpdatedCryptoForApp> runningApplications) throws Exception {
     MockNM nm =
         new MockNM(nodeIdStr, memory, vCores, 0, getResourceTrackerService(),
             YarnVersionInfo.getVersion());
@@ -1064,5 +1075,10 @@ public class MockRM extends ResourceManager {
       trustStore.load(null, null);
       return trustStore;
     }
+  }
+  
+  public void expireNM(NodeId nodeId) {
+    getRMContext().getDispatcher().getEventHandler().handle(
+        new RMNodeEvent(nodeId, RMNodeEventType.EXPIRE));
   }
 }

@@ -33,6 +33,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
@@ -40,7 +41,6 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
-import org.apache.hadoop.yarn.api.records.SignalContainerCommand;
 import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
@@ -350,11 +350,19 @@ public class RMNodeImplDist extends RMNodeImpl {
       DBUtility.removeRMNodeApplication(appId, rmNode.nodeId, RMNodeApplication.RMNodeApplicationStatus.RUNNING);
     } catch (IOException ex) {
       LOG.error(ex, ex);
-  }
+    }
   }
 
+  @Override
   protected void cleanUpContainerTransitionInternal(RMNodeImpl rmNode,
-          RMNodeEvent event) {
+        RMNodeEvent event) {
+    List<io.hops.metadata.yarn.entity.ContainerStatus> containerToLog
+        = new ArrayList<>();
+    RMNodeCleanContainerEvent containerEvent = (RMNodeCleanContainerEvent) event;
+    containerToLog.add(new io.hops.metadata.yarn.entity.ContainerStatus(
+        containerEvent.getContainerId().toString(), ContainerState.COMPLETE.name(), "killed",
+        ContainerExitStatus.ABORTED, containerEvent.getNodeId().toString()));
+    context.getContainersLogsService().insertEvent(containerToLog);
     rmNode.containersToClean.add(((RMNodeCleanContainerEvent) event).
             getContainerId());
     try {
@@ -362,7 +370,7 @@ public class RMNodeImplDist extends RMNodeImpl {
               getContainerId(), rmNode.getNodeID());
     } catch (IOException ex) {
       LOG.error(ex, ex);
-  }
+    }
   }
 
   @Override

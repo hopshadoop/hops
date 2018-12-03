@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;

@@ -58,6 +58,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import static org.apache.hadoop.hdfs.server.namenode.INode.EMPTY_LIST;
 
 public class INodeUtil {
@@ -269,12 +270,12 @@ public class INodeUtil {
     }
   }
   
-  public static Map<Long, List<Long>> getINodeIdsForBlockIds(final List<Long> blockIds, int batchSize, int nbThreads)
-      throws IOException {
+  public static Map<Long, List<Long>> getINodeIdsForBlockIds(final List<Long> blockIds, int batchSize, int nbThreads, 
+      ExecutorService executor) throws IOException {
     final Map<Long, List<Long>> inodeIds = new HashMap<>();
 
     try {
-      Slicer.slice(blockIds.size(), batchSize, nbThreads,
+      Slicer.slice(blockIds.size(), batchSize, nbThreads, executor,
           new Slicer.OperationHandler() {
         @Override
         public void handle(int startIndex, int endIndex) throws Exception {

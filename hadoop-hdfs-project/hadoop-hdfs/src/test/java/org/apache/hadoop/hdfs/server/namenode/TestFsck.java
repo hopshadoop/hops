@@ -149,6 +149,8 @@ public class TestFsck {
       conf.setLong(DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY,
           precision);
       conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 10000L);
+      // Set short retry timeouts so this test runs faster
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
       fs = cluster.getFileSystem();
       final String fileName = "/srcdat";

@@ -503,7 +503,7 @@
 
   <property>
     <name>dfs.blockreport.intervalMsec</name>
-    <value>21600000</value>
+    <value>3600000</value>
     <description>Determines block reporting interval in milliseconds.
     </description>
   </property>
@@ -1187,7 +1187,8 @@
     <description>
       Whether or not actual block data that is read/written from/to HDFS should
       be encrypted on the wire. This only needs to be set on the NN and DNs,
-      clients will deduce this automatically.
+      clients will deduce this automatically. It is possible to override this setting 
+      per connection by specifying custom logic via dfs.trustedchannel.resolver.class. 
     </description>
   </property>
 
@@ -1199,6 +1200,51 @@
       the configured JCE default on the system is used (usually 3DES.) It is
       widely believed that 3DES is more cryptographically secure, but RC4 is
       substantially faster.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.trustedchannel.resolver.class</name>
+    <value></value>
+    <description>
+      TrustedChannelResolver is used to determine whether a channel 
+      is trusted for plain data transfer. The TrustedChannelResolver is
+      invoked on both client and server side. If the resolver indicates 
+      that the channel is trusted, then the data transfer will not be 
+      encrypted even if dfs.encrypt.data.transfer is set to true. The
+      default implementation returns false indicating that the channel 
+      is not trusted.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.data.transfer.protection</name>
+    <value></value>
+    <description>
+      A comma-separated list of SASL protection values used for secured
+      connections to the DataNode when reading or writing block data.  Possible
+      values are authentication, integrity and privacy.  authentication means
+      authentication only and no integrity or privacy; integrity implies
+      authentication and integrity are enabled; and privacy implies all of
+      authentication, integrity and privacy are enabled.  If
+      dfs.encrypt.data.transfer is set to true, then it supersedes the setting for
+      dfs.data.transfer.protection and enforces that all connections must use a
+      specialized encrypted SASL handshake.  This property is ignored for
+      connections to a DataNode listening on a privileged port.  In this case, it
+      is assumed that the use of a privileged port establishes sufficient trust.
+    </description>
+  </property>
+  
+  <property>
+    <name>dfs.data.transfer.saslproperties.resolver.class</name>
+    <value></value>
+    <description>
+      SaslPropertiesResolver used to resolve the QOP used for a connection to the
+      DataNode when reading or writing block data.  If not specified, the full set
+      of values specified in dfs.data.transfer.protection is used while
+      determining the QOP used for the connection. If a class is specified, then
+      the QOP values returned by the class will be used while determining the QOP
+      used for the connection.
     </description>
   </property>
 
@@ -1687,4 +1733,60 @@
     </description>
   </property>
   
+  <property>
+    <name>dfs.namenode.startup.delay.block.deletion.sec</name>
+    <value>0</value>
+    <description>The delay in seconds at which we will pause the blocks deletion
+      after Namenode startup. By default it's disabled.
+      In the case a directory has large number of directories and files are
+      deleted, suggested delay is one hour to give the administrator enough time
+      to notice large number of pending deletion blocks and take corrective
+      action.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.namenode.randomize-block-locations-per-block</name>
+    <value>false</value>
+    <description>When fetching replica locations of a block, the replicas
+      are sorted based on network distance. This configuration parameter
+      determines whether the replicas at the same network distance are randomly
+      shuffled. By default, this is false, such that repeated requests for a
+      block's replicas always result in the same order. This potentially improves
+      page cache behavior. However, for some network topologies, it is desirable
+      to shuffle this order for better load balancing.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.namenode.resource.check.threshold</name>
+    <value>0.9</value>
+    <description>The threshold on the memory resources for the database. By
+      default the leader namenode will go into safemode if the database
+      resources are 90% (0.9) used.
+    </description>
+  </property>
+
+
+  <property>
+    <name>dfs.namenode.resource.check.prethreshold</name>
+    <value>0.8</value>
+    <description>The prethreshold on the memory resources for the database. By
+      default all the namenodes will start reading the safemode variable from
+      the database once the database resources are 80% (0.8) used. This is
+      an optimization parameter to avoid overloading the database while reading
+      the safemode status at every request.
+    </description>
+  </property>
+  
+  <property>
+    <name>dfs.namenode.db.check.max.tries</name>
+    <value>3</value>
+    <description>When checking the health of the database it may happen that the
+      database return an error that has an error code that does not match any
+      transient exception but that it still in fact transient. In order not to
+      kill the NN as soon as such an error occure we should allow it to retry
+      the opperation a few times.
+    </description>
+  </property>  
 </configuration>

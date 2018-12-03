@@ -30,10 +30,8 @@ import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.junit.Before;
 import org.junit.BeforeClass;
 
-import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for ACL operation through FileContext APIs
@@ -46,12 +44,6 @@ public class TestFileContextAcl extends FSAclBaseTest {
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
-  }
-
-  @Before
-  public void setUp() throws Exception {
-    super.setUp();
-    assertTrue(fs instanceof FileContextFS);
   }
   
   @Override

@@ -35,22 +35,41 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
+@RunWith(Parameterized.class)
 public class TestEncryptedTransfer {
+  
+  @Parameters
+  public static Collection<Object[]> data() {
+    Collection<Object[]> params = new ArrayList<Object[]>();
+    params.add(new Object[]{null});
+    params.add(new Object[]{"org.apache.hadoop.hdfs.TestEncryptedTransfer$TestTrustedChannelResolver"});
+    return params;
+  }
   
   private static final Log LOG = LogFactory.getLog(TestEncryptedTransfer.class);
   
   private static final String PLAIN_TEXT = "this is very secret plain text";
   private static final Path TEST_PATH = new Path("/non-encrypted-file");
   
-  private static void setEncryptionConfigKeys(Configuration conf) {
+  private void setEncryptionConfigKeys(Configuration conf) {
     conf.setBoolean(DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_KEY, true);
     conf.setBoolean(DFSConfigKeys.DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY, true);
+    if (resolverClazz != null){
+      conf.set(DFSConfigKeys.DFS_TRUSTEDCHANNEL_RESOLVER_CLASS, resolverClazz);
+    }
   }
   
   // Unset DFS_ENCRYPT_DATA_TRANSFER_KEY and DFS_DATA_ENCRYPTION_ALGORITHM_KEY
@@ -64,11 +83,18 @@ public class TestEncryptedTransfer {
     return FileSystem.get(localConf);
   }
 
+  String resolverClazz;
+  public TestEncryptedTransfer(String resolverClazz){
+    this.resolverClazz = resolverClazz;
+  }
+  
   @Test
   public void testEncryptedRead() throws IOException {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new Configuration();
+      // Set short retry timeouts so this test runs faster
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
       cluster = new MiniDFSCluster.Builder(conf).build();
 
       FileSystem fs = getFileSystem(conf);
@@ -196,7 +222,9 @@ public class TestEncryptedTransfer {
           .captureLogs(LogFactory.getLog(DataNode.class));
       try {
         assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
-        fail("Should not have been able to read without encryption enabled.");
+        if (resolverClazz != null && !resolverClazz.endsWith("TestTrustedChannelResolver")){
+          fail("Should not have been able to read without encryption enabled.");
+        }
       } catch (IOException ioe) {
         GenericTestUtils
             .assertExceptionContains("Could not obtain block:", ioe);
@@ -205,8 +233,10 @@ public class TestEncryptedTransfer {
       }
       fs.close();
       
-      GenericTestUtils.assertMatches(logs.getOutput(),
-          "Failed to read expected encryption handshake from client at");
+      if (resolverClazz != null && !resolverClazz.endsWith("TestTrustedChannelResolver")){
+        GenericTestUtils.assertMatches(logs.getOutput(),
+        "Failed to read expected encryption handshake from client at");
+      }
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -443,5 +473,16 @@ public class TestEncryptedTransfer {
     }
     out.write(PLAIN_TEXT.getBytes());
     out.close();
+  }
+  
+    static class TestTrustedChannelResolver extends TrustedChannelResolver {
+    
+    public boolean isTrusted(){
+      return true;
+    }
+   
+    public boolean isTrusted(InetAddress peerAddress){
+      return true;
+    }
   }
 }

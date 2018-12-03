@@ -85,6 +85,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEv
 import org.apache.hadoop.yarn.server.resourcemanager.security.AMRMTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.DelegationTokenRenewer;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityActionsFactory;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
@@ -122,6 +123,7 @@ public class TestRMAppTransitions {
   private TestSchedulerEventDispatcher schedulerDispatcher;
   private RMAppSecurityManager rmAppSecurityManager;
   private X509SecurityHandler x509SecurityHandler;
+  private JWTSecurityHandler jwtSecurityHandler;
   private CertificateLocalizationService certificateLocalizationService;
   private final char[] cryptoPassword = "password".toCharArray();
 
@@ -209,7 +211,9 @@ public class TestRMAppTransitions {
   public void setUp() throws Exception {
     conf = new YarnConfiguration();
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, isSecurityEnabled);
+    conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, isSecurityEnabled);
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "1s");
+    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "1s");
     AuthenticationMethod authMethod = AuthenticationMethod.SIMPLE;
     if (isSecurityEnabled) {
       authMethod = AuthenticationMethod.KERBEROS;
@@ -268,6 +272,10 @@ public class TestRMAppTransitions {
     rmAppSecurityManager = spy(new RMAppSecurityManager(rmContext));
     x509SecurityHandler = spy(new X509SecurityHandler(rmContext, rmAppSecurityManager));
     rmAppSecurityManager.registerRMAppSecurityHandlerWithType(x509SecurityHandler, X509SecurityHandler.class);
+    
+    jwtSecurityHandler = spy(new JWTSecurityHandler(rmContext, rmAppSecurityManager));
+    rmAppSecurityManager.registerRMAppSecurityHandlerWithType(jwtSecurityHandler, JWTSecurityHandler.class);
+    
     rmAppSecurityManager.init(conf);
     rmAppSecurityManager.start();
     
@@ -460,6 +468,11 @@ public class TestRMAppTransitions {
     X509SecurityHandler.X509MaterialParameter x509Param = new X509SecurityHandler.X509MaterialParameter(application
         .getApplicationId(), application.getUser(), application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).generateMaterial(eq(x509Param));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(application
+        .getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler).generateMaterial(eq(jwtParam));
+    
     assertAppState(RMAppState.SUBMITTED, application);
     if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
@@ -475,6 +488,14 @@ public class TestRMAppTransitions {
       Assert.assertNotEquals(0, application.getTrustStorePassword().length);
       Assert.assertTrue(Arrays.equals(cryptoPassword, application.getTrustStorePassword()));
       Assert.assertNotEquals(-1, application.getCertificateExpiration());
+    }
+    
+    if (conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED, YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
+      jwtParam.setExpirationDate(application.getJWTExpiration());
+      verify(jwtSecurityHandler).registerRenewer(eq(jwtParam));
+      Assert.assertNotNull(application.getJWT());
+      Assert.assertNotEquals(0, application.getJWT().length());
+      Assert.assertNotNull(application.getJWTExpiration());
     }
     // verify sendATSCreateEvent() is get called during
     // AddApplicationToSchedulerTransition.
@@ -497,6 +518,8 @@ public class TestRMAppTransitions {
       appState.setTrustStorePassword(new char[]{'a', 'b', 'c'});
       appState.setCryptoMaterialVersion(0);
       appState.setCertificateExpiration(System.currentTimeMillis());
+      appState.setJWT("jwt_token");
+      appState.setJWTExpiration(System.currentTimeMillis());
     }
     state.getApplicationState().put(application.getApplicationId(), appState);
     RMAppEvent event =
@@ -515,10 +538,18 @@ public class TestRMAppTransitions {
       x509Param = new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
           application.getCryptoMaterialVersion());
       x509Param.setExpiration(application.getCertificateExpiration());
-      verify(x509SecurityHandler).registerRenewer(x509Param);
+      verify(x509SecurityHandler).registerRenewer(eq(x509Param));
+  
+      JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(application
+          .getApplicationId(), application.getUser());
+      jwtParam.setExpirationDate(application.getJWTExpiration());
+      verify(jwtSecurityHandler).registerRenewer(eq(jwtParam));
+      
       assertAppState(RMAppState.SUBMITTED, application);
       verify(x509SecurityHandler, never())
           .generateMaterial(any(X509SecurityHandler.X509MaterialParameter.class));
+      verify(jwtSecurityHandler, never())
+          .generateMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class));
     } else {
       // No crypto material stored in state store, so recovered state should be GENERATING_SECURITY_MATERIAL
       // Application State here should be GENERATING_SECURITY_MATERIAL
@@ -538,6 +569,10 @@ public class TestRMAppTransitions {
           new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
               application.getCryptoMaterialVersion());
       verify(x509SecurityHandler).generateMaterial(eq(x509Param));
+  
+      JWTSecurityHandler.JWTMaterialParameter jwtParam =
+          new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+      verify(jwtSecurityHandler).generateMaterial(jwtParam);
       assertAppState(RMAppState.SUBMITTED, application);
     }
     
@@ -546,6 +581,12 @@ public class TestRMAppTransitions {
       Assert.assertNotNull(application.getKeyStore());
       Assert.assertNotEquals(0, application.getKeyStore());
       Assert.assertNotEquals(-1, application.getCertificateExpiration());
+    }
+    
+    if (conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED, YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
+      Assert.assertNotNull(application.getJWT());
+      Assert.assertNotEquals(0, application.getJWT().length());
+      Assert.assertNotNull(application.getJWTExpiration());
     }
     
     return application;
@@ -707,6 +748,10 @@ public class TestRMAppTransitions {
         new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
             application.getCryptoMaterialVersion());
     verify(x509SecurityHandler, never()).revokeMaterial(eq(x509Param), any(Boolean.class));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler, never()).revokeMaterial(eq(jwtParam), any(Boolean.class));
   }
 
   @Test
@@ -728,6 +773,13 @@ public class TestRMAppTransitions {
     verify(x509SecurityHandler, never()).revokeMaterial(any(X509SecurityHandler.X509MaterialParameter.class),
         any(Boolean.class));
     verify(x509SecurityHandler, never()).registerRenewer(any(X509SecurityHandler.X509MaterialParameter.class));
+  
+    verify(jwtSecurityHandler, never())
+        .generateMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class));
+    verify(jwtSecurityHandler, never())
+        .revokeMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class), any(Boolean.class));
+    verify(jwtSecurityHandler, never())
+        .registerRenewer(any(JWTSecurityHandler.JWTMaterialParameter.class));
   }
 
   @Test (timeout = 30000)
@@ -751,6 +803,13 @@ public class TestRMAppTransitions {
         .revokeMaterial(any(X509SecurityHandler.X509MaterialParameter.class), any(Boolean.class));
     verify(x509SecurityHandler, never())
         .registerRenewer(any(X509SecurityHandler.X509MaterialParameter.class));
+    
+    verify(jwtSecurityHandler, never())
+        .generateMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class));
+    verify(jwtSecurityHandler, never())
+        .revokeMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class), any(Boolean.class));
+    verify(jwtSecurityHandler, never())
+        .registerRenewer(any(JWTSecurityHandler.JWTMaterialParameter.class));
     rmContext.getStateStore().removeApplication(application);
   }
 
@@ -779,6 +838,13 @@ public class TestRMAppTransitions {
         .revokeMaterial(any(X509SecurityHandler.X509MaterialParameter.class), any(Boolean.class));
     verify(x509SecurityHandler, never())
         .registerRenewer(any(X509SecurityHandler.X509MaterialParameter.class));
+  
+    verify(jwtSecurityHandler, never())
+        .generateMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class));
+    verify(jwtSecurityHandler, never())
+        .revokeMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class), any(Boolean.class));
+    verify(jwtSecurityHandler, never())
+        .registerRenewer(any(JWTSecurityHandler.JWTMaterialParameter.class));
   }
 
   @Test (timeout = 30000)
@@ -802,6 +868,13 @@ public class TestRMAppTransitions {
         .revokeMaterial(any(X509SecurityHandler.X509MaterialParameter.class), any(Boolean.class));
     verify(x509SecurityHandler, never())
         .registerRenewer(any(X509SecurityHandler.X509MaterialParameter.class));
+  
+    verify(jwtSecurityHandler, never())
+        .generateMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class));
+    verify(jwtSecurityHandler, never())
+        .revokeMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class), any(Boolean.class));
+    verify(jwtSecurityHandler, never())
+        .registerRenewer(any(JWTSecurityHandler.JWTMaterialParameter.class));
   }
 
   @Test (timeout = 30000)
@@ -824,6 +897,11 @@ public class TestRMAppTransitions {
             application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).generateMaterial(eq(x509Param));
     verify(x509SecurityHandler).revokeMaterial(eq(x509Param), eq(false));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler).generateMaterial(eq(jwtParam));
+    verify(jwtSecurityHandler).revokeMaterial(eq(jwtParam), eq(false));
   }
 
   @Test
@@ -851,6 +929,11 @@ public class TestRMAppTransitions {
             application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).generateMaterial(eq(x509Param));
     verify(x509SecurityHandler).revokeMaterial(eq(x509Param), eq(false));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler).generateMaterial(eq(jwtParam));
+    verify(jwtSecurityHandler).revokeMaterial(eq(jwtParam), eq(false));
   }
 
   @Test
@@ -864,6 +947,10 @@ public class TestRMAppTransitions {
         new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
             application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).generateMaterial(eq(x509Param));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler).generateMaterial(eq(jwtParam));
     for (int i=1; i < maxAppAttempts; i++) {
       RMAppEvent event = 
           new RMAppFailedAttemptEvent(application.getApplicationId(), 
@@ -889,6 +976,8 @@ public class TestRMAppTransitions {
     x509Param = new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
         application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).revokeMaterial(eq(x509Param), eq(false));
+    
+    verify(jwtSecurityHandler).revokeMaterial(eq(jwtParam), eq(false));
     sendAppUpdateSavedEvent(application);
     assertFailed(application, ".*" + message + ".*Failing the application.*");
     assertAppFinalStateSaved(application);
@@ -926,6 +1015,11 @@ public class TestRMAppTransitions {
             application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).generateMaterial(eq(x509Param));
     verify(x509SecurityHandler).revokeMaterial(eq(x509Param), eq(false));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler).generateMaterial(eq(jwtParam));
+    verify(jwtSecurityHandler).revokeMaterial(eq(jwtParam), eq(false));
   }
   
   @Test
@@ -954,6 +1048,11 @@ public class TestRMAppTransitions {
             application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).generateMaterial(eq(x509Param));
     verify(x509SecurityHandler).revokeMaterial(eq(x509Param), eq(false));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler).generateMaterial(eq(jwtParam));
+    verify(jwtSecurityHandler).revokeMaterial(eq(jwtParam), eq(false));
   }
 
   @Test
@@ -983,6 +1082,11 @@ public class TestRMAppTransitions {
             application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).generateMaterial(eq(x509Param));
     verify(x509SecurityHandler).revokeMaterial(eq(x509Param), eq(false));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler).generateMaterial(eq(jwtParam));
+    verify(jwtSecurityHandler).revokeMaterial(eq(jwtParam), eq(false));
   }
 
   @Test
@@ -997,6 +1101,7 @@ public class TestRMAppTransitions {
     // RUNNING => FAILED/RESTARTING event RMAppEventType.ATTEMPT_FAILED
     Assert.assertTrue(maxAppAttempts > 1);
     X509SecurityHandler.X509MaterialParameter x509Param;
+    JWTSecurityHandler.JWTMaterialParameter jwtParam;
     for (int i=1; i<maxAppAttempts; i++) {
       RMAppEvent event = 
           new RMAppFailedAttemptEvent(application.getApplicationId(), 
@@ -1007,6 +1112,11 @@ public class TestRMAppTransitions {
               application.getCryptoMaterialVersion());
       verify(x509SecurityHandler, never()).revokeMaterial(eq(x509Param), any(Boolean.class));
       verify(x509SecurityHandler).generateMaterial(eq(x509Param));
+  
+      jwtParam = new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+      verify(jwtSecurityHandler).generateMaterial(eq(jwtParam));
+      verify(jwtSecurityHandler, never()).revokeMaterial(eq(jwtParam), any(Boolean.class));
+      
       assertAppState(RMAppState.ACCEPTED, application);
       appAttempt = application.getCurrentAppAttempt();
       Assert.assertEquals(++expectedAttemptId, 
@@ -1048,6 +1158,10 @@ public class TestRMAppTransitions {
     x509Param = new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
         application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).generateMaterial(eq(x509Param));
+    verify(x509SecurityHandler).revokeMaterial(eq(x509Param), eq(false));
+    
+    jwtParam = new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler).revokeMaterial(eq(jwtParam), eq(false));
   }
 
   @Test
@@ -1140,6 +1254,9 @@ public class TestRMAppTransitions {
     verify(x509SecurityHandler, never()).generateMaterial(any(X509SecurityHandler.X509MaterialParameter.class));
     verify(x509SecurityHandler, never())
         .revokeMaterial(any(X509SecurityHandler.X509MaterialParameter.class), any(Boolean.class));
+    verify(jwtSecurityHandler, never()).generateMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class));
+    verify(jwtSecurityHandler, never())
+        .revokeMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class), any(Boolean.class));
   }
 
   @Test (timeout = 30000)
@@ -1198,6 +1315,10 @@ public class TestRMAppTransitions {
         new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
             application.getCryptoMaterialVersion());
     verify(x509SecurityHandler).revokeMaterial(eq(x509Param), eq(false));
+  
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+    verify(jwtSecurityHandler).revokeMaterial(eq(jwtParam), eq(false));
   }
   
   @Test(timeout = 30000)
@@ -1247,6 +1368,10 @@ public class TestRMAppTransitions {
     verify(x509SecurityHandler, never()).generateMaterial(any(X509SecurityHandler.X509MaterialParameter.class));
     verify(x509SecurityHandler, never())
         .revokeMaterial(any(X509SecurityHandler.X509MaterialParameter.class), any(Boolean.class));
+    
+    verify(jwtSecurityHandler, never()).generateMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class));
+    verify(jwtSecurityHandler, never())
+        .revokeMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class), any(Boolean.class));
   }
   
   public void createRMStateForApplications(

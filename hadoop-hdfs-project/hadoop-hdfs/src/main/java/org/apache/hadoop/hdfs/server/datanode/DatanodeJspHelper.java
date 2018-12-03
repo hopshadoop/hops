@@ -19,7 +19,6 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
-import io.hops.merge.HttpConfig2;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -54,6 +53,7 @@ import java.util.Date;
 import java.util.List;
 import javax.servlet.ServletContext;
 import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.VersionInfo;
 
@@ -519,7 +519,7 @@ public class DatanodeJspHelper {
       JspHelper.streamBlockInAscii(
           new InetSocketAddress(req.getServerName(), datanodePort), bpid,
           blockId, blockToken, genStamp, blockSize, startOffset, chunkSizeToView, out, conf, dfs.getConf(),
-          dfs.getDataEncryptionKey());
+          dfs, getSaslDataTransferClient(req));
     } catch (Exception e) {
       out.print(e);
     }
@@ -684,7 +684,7 @@ public class DatanodeJspHelper {
         "<textarea cols=\"100\" rows=\"25\" wrap=\"virtual\" style=\"width:100%\" READONLY>");
     JspHelper.streamBlockInAscii(addr, poolId, blockId, accessToken, genStamp,
         blockSize, startOffset, chunkSizeToView, out, conf, dfs.getConf(),
-        dfs.getDataEncryptionKey());
+        dfs, getSaslDataTransferClient(req));
     out.print("</textarea>");
     dfs.close();
   }
@@ -717,5 +717,18 @@ public class DatanodeJspHelper {
     }
     sb.append("</td></tr>\n</table></div>");
     return sb.toString();
+  }
+  
+  /**
+   * Gets the {@link SaslDataTransferClient} from the {@link DataNode} attached
+   * to the servlet context.
+   *
+   * @return SaslDataTransferClient from DataNode
+   */
+  private static SaslDataTransferClient getSaslDataTransferClient(
+      HttpServletRequest req) {
+    DataNode dataNode = (DataNode)req.getSession().getServletContext()
+      .getAttribute("datanode");
+    return dataNode.saslClient;
   }
 }

@@ -33,10 +33,8 @@ import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.io.IOUtils;
-import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -59,6 +57,7 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
@@ -94,7 +93,7 @@ public class TestINodeFile {
   private static final PermissionStatus perm = new PermissionStatus(
       "userName", null, FsPermission.getDefault());
   private short replication;
-  private long preferredBlockSize;
+  private long preferredBlockSize = 1024;
 
   @Before
   public void setup() throws IOException{
@@ -408,7 +407,7 @@ public class TestINodeFile {
 
     {
       final INode from = new INodeFile(0, perm, BlockInfo.EMPTY_ARRAY,
-          replication, 0L, 0L, 0L, (byte) 0);
+          replication, 0L, 0L, preferredBlockSize, (byte) 0);
       
       //cast to INodeFile, should success
       final INodeFile f = INodeFile.valueOf(from, path);
@@ -602,6 +601,7 @@ public class TestINodeFile {
     Configuration conf = new Configuration();
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY,
         DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
     MiniDFSCluster cluster = null;
     try {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
@@ -650,6 +650,18 @@ public class TestINodeFile {
       assertEquals(testFileBlockSize,
           nnRpc.getPreferredBlockSize(testFileInodePath.toString()));
 
+      /*
+       * HDFS-6749 added missing calls to FSDirectory.resolvePath in the
+       * following four methods. The calls below ensure that
+       * /.reserved/.inodes paths work properly. No need to check return
+       * values as these methods are tested elsewhere.
+       */
+      {
+        fs.isFileClosed(testFileInodePath);
+        fs.getAclStatus(testFileInodePath);
+        fs.access(testFileInodePath, FsAction.READ_WRITE);
+      }
+      
       // symbolic link related tests
       // Reserved path is not allowed as a target
       String invalidTarget = new Path(baseDir, "invalidTarget").toString();
@@ -1219,8 +1231,7 @@ public class TestINodeFile {
       @Override
       public Object performTask() throws IOException {
         file.setPartitionId(1L);
-        final DatanodeID dnID = new DatanodeID("127.0.0.1:1337");
-        file.toUnderConstruction(clientName, clientMachine, dnID);
+        file.toUnderConstruction(clientName, clientMachine);
         return null;
       }
     };
@@ -1230,7 +1241,6 @@ public class TestINodeFile {
     FileUnderConstructionFeature uc = file.getFileUnderConstructionFeature();
     assertEquals(clientName, uc.getClientName());
     assertEquals(clientMachine, uc.getClientMachine());
-    Assert.assertNotNull(uc.getClientNode());
     
     handler = new HopsTransactionalRequestHandler(HDFSOperationType.ADD_INODE) {
       @Override

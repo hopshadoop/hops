@@ -302,7 +302,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
   
   /** Sets cache used. */
   public void setCacheUsed(long cacheUsed) {
-    LOG.info("Datanode " + this.getDatanodeUuid() + " is seting cache used " + cacheUsed);
+    LOG.debug("Datanode " + this.getDatanodeUuid() + " is seting cache used " + cacheUsed);
     this.cacheUsed = cacheUsed;
   }
 
@@ -402,6 +402,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     buffer.append("Cache Used%: "+percent2String(cacheUsedPercent) + "\n");
     buffer.append("Cache Remaining%: "+percent2String(cacheRemainingPercent) + "\n");
 
+    buffer.append("Xceivers: "+getXceiverCount()+"\n");
     buffer.append("Last contact: " + new Date(lastUpdate) + "\n");
     return buffer.toString();
   }

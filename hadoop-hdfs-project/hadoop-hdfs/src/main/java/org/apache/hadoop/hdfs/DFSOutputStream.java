@@ -35,7 +35,6 @@ import org.apache.hadoop.fs.FSOutputSummer;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Syncable;
-import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream.SyncFlag;
@@ -48,7 +47,6 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.protocol.datatransfer.BlockConstructionStage;
-import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferEncryptor;
 import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.hdfs.protocol.datatransfer.InvalidEncryptionKeyException;
@@ -196,13 +194,13 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   private int currentSizeOfSmallFile = 0;
 
   private class Packet {
+    private static final long HEART_BEAT_SEQNO = -1L;
     long seqno;               // sequencenumber of buffer in block
     long offsetInBlock;       // offset in block
     private boolean lastPacketInBlock;   // is this the last packet in block?
     boolean syncBlock;          // this packet forces the current block to disk
     int numChunks;           // number of chunks currently in packet
     int maxChunks;           // max chunks in packet
-
     byte[] buf;
 
     /**
@@ -221,49 +219,38 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
      */
     int checksumStart;
     int checksumPos;
-    int dataStart;
+    final int dataStart;
     int dataPos;
-
-    private static final long HEART_BEAT_SEQNO = -1L;
 
     /**
      * Create a heartbeat packet.
      */
-    Packet() {
-      this.lastPacketInBlock = false;
-      this.numChunks = 0;
-      this.offsetInBlock = 0;
-      this.seqno = HEART_BEAT_SEQNO;
-
-      buf = new byte[PacketHeader.PKT_MAX_HEADER_LEN];
-
-      checksumStart =
-              checksumPos = dataPos = dataStart = PacketHeader.PKT_MAX_HEADER_LEN;
-      maxChunks = 0;
+    Packet(int checksumSize) {
+      this(0, 0, 0, HEART_BEAT_SEQNO, checksumSize);
     }
 
     /**
      * Create a new packet.
      *
-     * @param pktSize
-     *     maximum size of the packet, including checksum data and actual data.
+     * @param pktSize maximum size of the packet, 
+     *                including checksum data and actual data.
      * @param chunksPerPkt
      *     maximum number of chunks per packet.
      * @param offsetInBlock
      *     offset in bytes into the HDFS block.
      */
-    Packet(int pktSize, int chunksPerPkt, long offsetInBlock) {
+     Packet(int pktSize, int chunksPerPkt, long offsetInBlock, 
+                              long seqno, int checksumSize) {
       this.lastPacketInBlock = false;
       this.numChunks = 0;
       this.offsetInBlock = offsetInBlock;
-      this.seqno = currentSeqno;
-      currentSeqno++;
+      this.seqno = seqno;
 
       buf = new byte[PacketHeader.PKT_MAX_HEADER_LEN + pktSize];
 
       checksumStart = PacketHeader.PKT_MAX_HEADER_LEN;
       checksumPos = checksumStart;
-      dataStart = checksumStart + (chunksPerPkt * checksum.getChecksumSize());
+      dataStart = checksumStart + (chunksPerPkt * checksumSize);
       dataPos = dataStart;
       maxChunks = chunksPerPkt;
     }
@@ -551,6 +538,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
             response.join();
             response = null;
           } catch (InterruptedException e) {
+            DFSClient.LOG.warn("Caught exception ", e);
           }
         }
 
@@ -581,6 +569,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
               try {
                 dataQueue.wait(timeout);
               } catch (InterruptedException e) {
+                DFSClient.LOG.warn("Caught exception ", e);
               }
               doSleep = false;
               now = Time.now();
@@ -590,7 +579,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
             }
             // get packet to be sent.
             if (dataQueue.isEmpty()) {
-              one = new Packet();  // heartbeat packet
+              one = new Packet(checksum.getChecksumSize());  // heartbeat packet
             } else {
               one = dataQueue.getFirst(); // regular data packet
             }
@@ -640,6 +629,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
                   // wait for acks to arrive from datanodes
                   dataQueue.wait(1000);
                 } catch (InterruptedException e) {
+                  DFSClient.LOG.warn("Caught exception ", e);
                 }
               }
             }
@@ -766,6 +756,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           response.close();
           response.join();
         } catch (InterruptedException e) {
+          DFSClient.LOG.warn("Caught exception ", e);
         } finally {
           response = null;
         }
@@ -1134,13 +1125,10 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
         OutputStream unbufOut = NetUtils.getOutputStream(sock, writeTimeout);
         InputStream unbufIn = NetUtils.getInputStream(sock);
-        if (dfsClient.shouldEncryptData()) {
-          IOStreamPair encryptedStreams = DataTransferEncryptor
-                  .getEncryptedStreams(unbufOut, unbufIn,
-                          dfsClient.getDataEncryptionKey());
-          unbufOut = encryptedStreams.out;
-          unbufIn = encryptedStreams.in;
-        }
+        IOStreamPair saslStreams = dfsClient.saslClient.socketSend(sock,
+            unbufOut, unbufIn, dfsClient, blockToken, src);
+        unbufOut = saslStreams.out;
+        unbufIn = saslStreams.in;
         out = new DataOutputStream(new BufferedOutputStream(unbufOut,
                 HdfsConstants.SMALL_BUFFER_SIZE));
         in = new DataInputStream(unbufIn);
@@ -1515,13 +1503,10 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
           OutputStream unbufOut = NetUtils.getOutputStream(s, writeTimeout);
           InputStream unbufIn = NetUtils.getInputStream(s);
-          if (dfsClient.shouldEncryptData()) {
-            IOStreamPair encryptedStreams = DataTransferEncryptor
-                    .getEncryptedStreams(unbufOut, unbufIn,
-                            dfsClient.getDataEncryptionKey());
-            unbufOut = encryptedStreams.out;
-            unbufIn = encryptedStreams.in;
-          }
+          IOStreamPair saslStreams = dfsClient.saslClient.socketSend(s,
+            unbufOut, unbufIn, dfsClient, accessToken, nodes[0]);
+          unbufOut = saslStreams.out;
+          unbufIn = saslStreams.in;
           out = new DataOutputStream(new BufferedOutputStream(unbufOut,
                   HdfsConstants.SMALL_BUFFER_SIZE));
           blockReplyStream = new DataInputStream(unbufIn);
@@ -2064,7 +2049,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     }
 
     if (currentPacket == null) {
-      currentPacket = new Packet(packetSize, chunksPerPacket, bytesCurBlock);
+      currentPacket = new Packet(packetSize, chunksPerPacket, bytesCurBlock, currentSeqno++, this.checksum.
+          getChecksumSize());
       if (DFSClient.LOG.isDebugEnabled()) {
         DFSClient.LOG
                 .debug("DFSClient writeChunk allocating new packet seqno=" +
@@ -2113,7 +2099,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       // indicate the end of block and reset bytesCurBlock.
       //
       if (bytesCurBlock == blockSize) {
-        currentPacket = new Packet(0, 0, bytesCurBlock);
+        currentPacket = new Packet(0, 0, bytesCurBlock, 
+            currentSeqno++, this.checksum.getChecksumSize());
         currentPacket.lastPacketInBlock = true;
         currentPacket.syncBlock = shouldSyncBlock;
         waitAndQueueCurrentPacket();
@@ -2214,8 +2201,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
             // Nothing to send right now,
             // but sync was requested.
             // Send an empty packet
-            currentPacket =
-                    new Packet(packetSize, chunksPerPacket, bytesCurBlock);
+            currentPacket = new Packet(packetSize, chunksPerPacket, bytesCurBlock, currentSeqno++, this.checksum.
+                getChecksumSize());
           }
         } else {
           // We already flushed up to this offset.
@@ -2231,8 +2218,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
             // and the block was partially written,
             // and sync was requested.
             // So send an empty sync packet.
-            currentPacket =
-                    new Packet(packetSize, chunksPerPacket, bytesCurBlock);
+            currentPacket = new Packet(packetSize, chunksPerPacket, bytesCurBlock, currentSeqno++, this.checksum.
+                getChecksumSize());
           } else {
             // just discard the current packet since it is already been sent.
             currentPacket = null;
@@ -2428,15 +2415,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       closeInternal();
       // get last block before destroying the streamer
     } catch (ClosedChannelException e) {
-    } catch (RemoteException e ) {
-      IOException outOfDBExtents =
-              e.unwrapRemoteException(OutOfDBExtentsException.class);
-      if (outOfDBExtents == e) {
+    } catch (OutOfDBExtentsException e ) {
         currentPacket = null;
         forwardSmallFilesPacketsToDataNodes(); // try to store the file on
         bytesCurBlock=0;
         closeInternal();
-      }
     }
     finally {
       closed = true;
@@ -2453,7 +2436,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 //    if(currentPacket == null)
     if (bytesCurBlock != 0) {
       // send an empty packet to mark the end of the block
-      currentPacket = new Packet(0, 0, bytesCurBlock);
+      currentPacket = new Packet(0, 0, bytesCurBlock, 
+            currentSeqno++, this.checksum.getChecksumSize());
       currentPacket.lastPacketInBlock = true;
       currentPacket.syncBlock = shouldSyncBlock;
     }
@@ -2495,17 +2479,18 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           throw new IOException(msg);
         }
         try {
-          Thread.sleep(localTimeout);
           if (retries == 0) {
             throw new IOException("Unable to close file because the last block"
                 + " does not have enough number of replicas.");
           }
           retries--;
+          Thread.sleep(localTimeout);
           localTimeout *= 2;
           if (Time.now() - localstart > 5000) {
             DFSClient.LOG.info("Could not complete " + src + " retrying...");
           }
         } catch (InterruptedException ie) {
+          DFSClient.LOG.warn("Caught exception ", ie);
         }
       }
     }

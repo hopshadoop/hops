@@ -104,6 +104,7 @@ class BlockReceiver implements Closeable {
   private boolean dropCacheBehindWrites;
   private long lastCacheManagementOffset = 0;
   private boolean syncBehindWrites;
+  private boolean syncBehindWritesInBackground;
 
   /**
    * The client name.  It is empty if a datanode is the client
@@ -212,7 +213,8 @@ class BlockReceiver implements Closeable {
       this.dropCacheBehindWrites = (cachingStrategy.getDropBehind() == null)
           ? datanode.getDnConf().dropCacheBehindWrites : cachingStrategy.getDropBehind();
       this.syncBehindWrites = datanode.getDnConf().syncBehindWrites;
-      
+      this.syncBehindWritesInBackground = datanode.getDnConf().syncBehindWritesInBackground;
+            
       final boolean isCreate = isDatanode || isTransfer ||
           stage == BlockConstructionStage.PIPELINE_SETUP_CREATE;
       streams = replicaInfo.createStreams(isCreate, requestedChecksum);
@@ -251,7 +253,7 @@ class BlockReceiver implements Closeable {
       
       if (cause != null) { // possible disk error
         ioe = cause;
-         datanode.checkDiskErrorAsync();
+        datanode.checkDiskErrorAsync();
       }
       
       throw ioe;
@@ -658,8 +660,17 @@ class BlockReceiver implements Closeable {
         //
         
         if (syncBehindWrites) {
-          NativeIO.POSIX.syncFileRangeIfPossible(outFd, lastCacheManagementOffset, offsetInBlock
-              - lastCacheManagementOffset, NativeIO.POSIX.SYNC_FILE_RANGE_WRITE);
+          if (syncBehindWritesInBackground) {
+            this.datanode.getFSDataset().submitBackgroundSyncFileRangeRequest(
+                block, outFd, lastCacheManagementOffset,
+                offsetInBlock - lastCacheManagementOffset,
+                NativeIO.POSIX.SYNC_FILE_RANGE_WRITE);
+          } else {
+            NativeIO.POSIX.syncFileRangeIfPossible(outFd,
+                lastCacheManagementOffset, offsetInBlock
+                    - lastCacheManagementOffset,
+                NativeIO.POSIX.SYNC_FILE_RANGE_WRITE);
+          }
         }
         
         //

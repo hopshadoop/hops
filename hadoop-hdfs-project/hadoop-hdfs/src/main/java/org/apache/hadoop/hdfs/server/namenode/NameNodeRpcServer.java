@@ -19,12 +19,10 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
-import io.hops.exception.ForeignKeyConstraintViolationException;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
-import io.hops.security.UsersGroups;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -148,6 +146,7 @@ import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.BRLoadBalancingOverloadException;
 
 /**
  * This class is responsible for handling all of the RPC calls to the NameNode.
@@ -335,7 +334,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
         DSQuotaExceededException.class,
         AclException.class,
         FSLimitException.PathComponentTooLongException.class,
-        FSLimitException.MaxDirectoryItemsExceededException.class);
+        FSLimitException.MaxDirectoryItemsExceededException.class,
+        BRLoadBalancingOverloadException.class);
   }
   
   /** Allow access to the client RPC server for testing */
@@ -528,15 +528,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void setOwner(String src, String username, String groupname)
       throws IOException {
-    try{
-      namesystem.setOwnerSTO(src, username, groupname);
-    }catch (ForeignKeyConstraintViolationException ex){
-      LOG.debug("setOwner: cache is outdated, flush old values and restart " +
-          "the operation - " + ex);
-      UsersGroups.removeUserFromCache(username);
-      UsersGroups.removeGroupFromCache(groupname);
-      namesystem.setOwnerSTO(src, username, groupname);
-    }
+    namesystem.setOwnerSTO(src, username, groupname);
   }
 
   @Override // ClientProtocol
@@ -789,7 +781,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
       throws IOException {
     DatanodeInfo results[] = namesystem.datanodeReport(type);
     if (results == null) {
-      throw new IOException("Cannot find datanode report");
+      throw new IOException("Failed to get datanode report for " + type
+          + " datanodes.");
     }
     return results;
   }
@@ -956,6 +949,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
     boolean noStaleStorages = false;
     for(StorageBlockReport r : reports) {
       final BlockReport blocks = r.getReport();
+      //
+      // BlockManager.processReport accumulates information of prior calls
+      // for the same node and storage, so the value returned by the last
+      // call of this loop is the final updated value for noStaleStorage.
+      //
       noStaleStorages = bm.processReport(nodeReg, r.getStorage(), blocks);
       metrics.incrStorageBlockReportOps();
     }
@@ -1011,7 +1009,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       LOG.warn("Disk error on " + dnName + ": " + msg);
     } else if (errorCode == DatanodeProtocol.FATAL_DISK_ERROR) {
       LOG.warn("Fatal disk error on " + dnName + ": " + msg);
-      namesystem.getBlockManager().getDatanodeManager().removeDatanode(nodeReg);
+      namesystem.getBlockManager().getDatanodeManager().removeDatanode(nodeReg, false);
     } else {
       LOG.info("Error report from " + dnName + ": " + msg);
     }

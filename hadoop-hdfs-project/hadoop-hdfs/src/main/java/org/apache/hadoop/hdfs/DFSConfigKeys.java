@@ -409,6 +409,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_DATANODE_SYNC_BEHIND_WRITES_KEY =
       "dfs.datanode.sync.behind.writes";
   public static final boolean DFS_DATANODE_SYNC_BEHIND_WRITES_DEFAULT = false;
+  public static final String  DFS_DATANODE_SYNC_BEHIND_WRITES_IN_BACKGROUND_KEY = "dfs.datanode.sync.behind.writes.in.background";
+  public static final boolean DFS_DATANODE_SYNC_BEHIND_WRITES_IN_BACKGROUND_DEFAULT = false;
   public static final String DFS_DATANODE_DROP_CACHE_BEHIND_READS_KEY =
       "dfs.datanode.drop.cache.behind.reads";
   public static final boolean DFS_DATANODE_DROP_CACHE_BEHIND_READS_DEFAULT =
@@ -424,6 +426,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
     "dfs.namenode.path.based.cache.block.map.allocation.percent";
   public static final float    DFS_NAMENODE_PATH_BASED_CACHE_BLOCK_MAP_ALLOCATION_PERCENT_DEFAULT = 0.25f;
 
+  public static final String  DFS_NAMENODE_HTTP_PORT_KEY = "dfs.http.port";
   public static final int DFS_NAMENODE_HTTP_PORT_DEFAULT = 50070;
   public static final String DFS_NAMENODE_HTTP_ADDRESS_KEY =
       "dfs.namenode.http-address";
@@ -514,6 +517,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.https.server.keystore.resource";
   public static final String DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
       "ssl-server.xml";
+  public static final String  DFS_SERVER_HTTPS_KEYPASSWORD_KEY = "ssl.server.keystore.keypassword";
+  public static final String  DFS_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY = "ssl.server.keystore.password";
+  public static final String  DFS_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY = "ssl.server.truststore.password";
   public static final String DFS_NAMENODE_NAME_DIR_RESTORE_KEY =
       "dfs.namenode.name.dir.restore";
   public static final String  DFS_NAMENODE_ACLS_ENABLED_KEY = "dfs.namenode.acls.enabled";
@@ -526,6 +532,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.namenode.min.supported.datanode.version";
   public static final String
       DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_DEFAULT = "2.1.0-beta";
+  
+  public static final String DFS_NAMENODE_RANDOMIZE_BLOCK_LOCATIONS_PER_BLOCK = "dfs.namenode.randomize-block-locations-per-block";
+  public static final boolean DFS_NAMENODE_RANDOMIZE_BLOCK_LOCATIONS_PER_BLOCK_DEFAULT = false;
   
   public static final String DFS_LIST_LIMIT = "dfs.ls.limit";
   public static final int DFS_LIST_LIMIT_DEFAULT = Integer.MAX_VALUE; //1000; [HopsFS] Jira Hops-45
@@ -557,8 +566,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final long    DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS_DEFAULT = 30000L;
 
   /** Pending period of block deletion since NameNode startup */
-  public static final String  DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_MS_KEY = "dfs.namenode.startup.delay.block.deletion.ms";
-  public static final long    DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_MS_DEFAULT = 0L;
+  public static final String  DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_SEC_KEY = "dfs.namenode.startup.delay.block.deletion.sec";
+  public static final long    DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_SEC_DEFAULT = 0L;
   
   // Whether to enable datanode's stale state detection and usage for reads
   public static final String DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY =
@@ -636,6 +645,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   //Following keys have no defaults
   public static final String DFS_DATANODE_DATA_DIR_KEY =
       "dfs.datanode.data.dir";
+  public static final String  DFS_NAMENODE_HTTPS_PORT_KEY = "dfs.https.port";
   public static final int DFS_NAMENODE_HTTPS_PORT_DEFAULT = 50470;
   public static final String DFS_NAMENODE_HTTPS_ADDRESS_KEY =
       "dfs.namenode.https-address";
@@ -885,13 +895,27 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT = 5000;
   public static final String DFS_NAMENODE_DU_RESERVED_KEY =
       "dfs.namenode.resource.du.reserved";
-  public static final long DFS_NAMENODE_DU_RESERVED_DEFAULT = 1024 * 1024 * 100;
-      // 100 MB
+  public static final long DFS_NAMENODE_DU_RESERVED_DEFAULT = 1024 * 1024 * 100; // 100 MB
+  
+  public static final String DFS_NAMENODE_DB_CHECK_MAX_TRIES = "dfs.namenode.db.check.max.tries";
+  public static final int DFS_NAMENODE_DB_CHECK_MAX_TRIES_DEFAULT = 3;
+  
   public static final String DFS_NAMENODE_CHECKED_VOLUMES_KEY =
       "dfs.namenode.resource.checked.volumes";
   public static final String DFS_NAMENODE_CHECKED_VOLUMES_MINIMUM_KEY =
       "dfs.namenode.resource.checked.volumes.minimum";
   public static final int DFS_NAMENODE_CHECKED_VOLUMES_MINIMUM_DEFAULT = 1;
+  
+  public static final String DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD =
+      "dfs.namenode.resource.check.threshold";
+  public static final double DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD_DEFAULT =
+      0.9;
+  
+  public static final String DFS_NAMENODE_RESOURCE_CHECK_PRETHRESHOLD =
+      "dfs.namenode.resource.check.prethreshold";
+  public static final double DFS_NAMENODE_RESOURCE_CHECK_PRETHRESHOLD_DEFAULT =
+      DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD_DEFAULT - (DFS_NAMENODE_RESOURCE_CHECK_THRESHOLD_DEFAULT * 0.1);
+  
   public static final String  DFS_WEB_AUTHENTICATION_SIMPLE_ANONYMOUS_ALLOWED = "dfs.web.authentication.simple.anonymous.allowed";
   public static final String DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY =
       "dfs.web.authentication.kerberos.principal";
@@ -918,11 +942,20 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final boolean DFS_ENCRYPT_DATA_TRANSFER_DEFAULT = false;
   public static final String DFS_DATA_ENCRYPTION_ALGORITHM_KEY =
       "dfs.encrypt.data.transfer.algorithm";
+  public static final String DFS_TRUSTEDCHANNEL_RESOLVER_CLASS = "dfs.trustedchannel.resolver.class";
+  public static final String DFS_DATA_TRANSFER_PROTECTION_KEY = "dfs.data.transfer.protection";
+  public static final String DFS_DATA_TRANSFER_SASL_PROPS_RESOLVER_CLASS_KEY = "dfs.data.transfer.saslproperties.resolver.class";
   
   // Hash bucket config
   public static final String DFS_NUM_BUCKETS_KEY =
       "dfs.blockreport.numbuckets";
   public static final int DFS_NUM_BUCKETS_DEFAULT = 1000;
+  
+  public static final String DFS_BLOCK_FETCHER_NB_THREADS = "dfs.block.fetcher.nb.threads";
+  public static final int DFS_BLOCK_FETCHER_NB_THREADS_DEFAULT = 10;
+  
+  public static final String DFS_BLOCK_FETCHER_BUCKETS_PER_THREAD = "dfs.block.fetcher.buckets.per.thread";
+  public static final int DFS_BLOCK_FETCHER_BUCKETS_PER_THREADS_DEFAULT = 1;
   
   // Handling unresolved DN topology mapping
   public static final String  DFS_REJECT_UNRESOLVED_DN_TOPOLOGY_MAPPING_KEY = 

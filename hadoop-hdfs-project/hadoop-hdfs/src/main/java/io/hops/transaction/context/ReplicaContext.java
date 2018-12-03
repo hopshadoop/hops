@@ -42,7 +42,7 @@ public class ReplicaContext
   public void update(Replica replica)
       throws TransactionContextException {
     super.update(replica);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("updated-replica", "bid", replica.getBlockId(), "sid",
               replica.getStorageId());
     }
@@ -52,7 +52,7 @@ public class ReplicaContext
   public void remove(Replica replica)
       throws TransactionContextException {
     super.remove(replica);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("removed-replica", "bid", replica.getBlockId(), "sid",
               replica.getStorageId());
     }

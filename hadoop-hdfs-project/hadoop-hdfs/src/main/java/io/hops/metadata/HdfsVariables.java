@@ -81,7 +81,7 @@ public class HdfsVariables {
       Object response = handler.handle(vd);
       return response;
     }finally {
-      if(!insideActiveTransaction){
+      if(!insideActiveTransaction && HdfsStorageFactory.getConnector().isTransactionActive()){
         HdfsStorageFactory.getConnector().commit();
       }else{
         HdfsStorageFactory.getConnector().readCommitted();
@@ -273,7 +273,7 @@ public class HdfsVariables {
               throws StorageException {
             LongVariable var =
                 (LongVariable) vd.getVariable(Variable.Finder.SafeModeReached);
-            return var.getValue();
+            return var.getValue() == null ? 0 : var.getValue();
           }
         });
       }
@@ -298,7 +298,10 @@ public class HdfsVariables {
     }.handle();
   }
   
-  public static void setMaxConcurrentBrs(final long value) throws IOException {
+  public static void setMaxConcurrentBrs(final long value, Configuration conf) throws IOException {
+    if(conf!=null){
+      HdfsStorageFactory.setConfiguration(conf);
+    }
     new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_CONCURRENT_BRS) {
       @Override
       public Object performTask() throws IOException {
@@ -549,7 +552,6 @@ public class HdfsVariables {
             vd.setVariable(new IntVariable(Variable.Finder.BlockTotal, value));
             vd.setVariable(new IntVariable(Variable.Finder.BlockThreshold, 0));
             vd.setVariable(new IntVariable(Variable.Finder.BlockReplicationQueueThreshold, 0));
-            System.out.println("GAUTIER blockTotal= " + value);
             return null;
           }
         });
@@ -570,7 +572,6 @@ public class HdfsVariables {
             vd.setVariable(new IntVariable(Variable.Finder.BlockThreshold, blockThreshold));
             vd.setVariable(new IntVariable(Variable.Finder.BlockReplicationQueueThreshold,
                 blockReplicationQueueThreshold));
-            System.out.println("GAUTIER blockTotal= " + blockTotal);
             return null;
           }
         });
@@ -605,7 +606,6 @@ public class HdfsVariables {
             vd.setVariable(new IntVariable(Variable.Finder.BlockReplicationQueueThreshold,
                 newBlockReplicationQueueThreshold));
             int total = blockTotal + deltaBlockTotal;
-            System.out.println("GAUTIER update blockTotal= " + total);
             return null;
           }
         });

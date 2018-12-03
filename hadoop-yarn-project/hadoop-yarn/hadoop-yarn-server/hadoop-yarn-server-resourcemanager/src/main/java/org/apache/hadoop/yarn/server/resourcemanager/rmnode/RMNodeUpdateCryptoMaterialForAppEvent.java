@@ -17,50 +17,19 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
-import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
 
-public class RMNodeUpdateCryptoMaterialForAppEvent extends RMNodeEvent {
-  private final ApplicationId appId;
-  private final byte[] keyStore;
-  private final char[] keyStorePassword;
-  private final byte[] trustStore;
-  private final char[] trustStorePassword;
-  private final int version;
+public class RMNodeUpdateCryptoMaterialForAppEvent<T extends RMAppSecurityManager.SecurityManagerMaterial>
+    extends RMNodeEvent {
+  private final T securityMaterial;
   
-  public RMNodeUpdateCryptoMaterialForAppEvent(NodeId nodeId, ApplicationId appId,
-      byte[] keyStore, char[] keyStorePassword,
-      byte[] trustStore, char[] trustStorePassword, int version) {
+  public RMNodeUpdateCryptoMaterialForAppEvent(NodeId nodeId, T securityMaterial) {
     super(nodeId, RMNodeEventType.UPDATE_CRYPTO_MATERIAL);
-    this.appId = appId;
-    this.keyStore = keyStore;
-    this.keyStorePassword = keyStorePassword;
-    this.trustStore = trustStore;
-    this.trustStorePassword = trustStorePassword;
-    this.version = version;
+    this.securityMaterial = securityMaterial;
   }
   
-  public ApplicationId getAppId() {
-    return appId;
-  }
-  
-  public byte[] getKeyStore() {
-    return keyStore;
-  }
-  
-  public char[] getKeyStorePassword() {
-    return keyStorePassword;
-  }
-  
-  public byte[] getTrustStore() {
-    return trustStore;
-  }
-  
-  public char[] getTrustStorePassword() {
-    return trustStorePassword;
-  }
-  
-  public int getVersion() {
-    return version;
+  public T getSecurityMaterial() {
+    return securityMaterial;
   }
 }

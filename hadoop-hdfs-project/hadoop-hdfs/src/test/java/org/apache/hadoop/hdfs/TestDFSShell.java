@@ -1454,6 +1454,8 @@ public class TestDFSShell {
     PrintStream bak = null;
     try {
       final Configuration conf = new HdfsConfiguration();
+      // Set short retry timeouts so this test runs faster
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
       dfs = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
       FileSystem fs = dfs.getFileSystem();
       Path p = new Path("/foo");

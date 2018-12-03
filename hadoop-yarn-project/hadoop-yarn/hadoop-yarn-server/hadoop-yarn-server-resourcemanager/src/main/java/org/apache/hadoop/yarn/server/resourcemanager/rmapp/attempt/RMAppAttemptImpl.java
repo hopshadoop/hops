@@ -102,6 +102,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityMaterial;
@@ -1727,8 +1728,12 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
     Integer cryptoMaterialVersion = application.getCryptoMaterialVersion();
     X509SecurityHandler.X509MaterialParameter x509Param =
         new X509SecurityHandler.X509MaterialParameter(applicationId, user, cryptoMaterialVersion);
+    JWTSecurityHandler.JWTMaterialParameter jwtParam =
+        new JWTSecurityHandler.JWTMaterialParameter(applicationId, user);
+    
     RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
     securityMaterial.addMaterial(x509Param);
+    securityMaterial.addMaterial(jwtParam);
     eventHandler.handle(new RMAppSecurityManagerEvent(applicationId, securityMaterial,
         RMAppSecurityManagerEventType.REVOKE_SECURITY_MATERIAL));
   }

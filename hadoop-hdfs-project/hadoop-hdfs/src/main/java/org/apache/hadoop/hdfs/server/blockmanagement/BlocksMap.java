@@ -35,6 +35,8 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 
+import com.google.common.base.Preconditions;
+
 /**
  * This class maintains the map from a block to its metadata.
  * block's metadata currently includes blockCollection it belongs to and
@@ -180,7 +182,7 @@ class BlocksMap {
     }
 
     // remove block from the data-node list and the node from the block info
-    return node.removeReplica(info);
+    return node.removeBlock(info);
   }
 
   boolean removeNode(Block b, int sid)
@@ -279,6 +281,18 @@ class BlocksMap {
     }.handle();
   }
 
+  long getMaxInodeId() throws IOException {
+    return (Long) new LightWeightRequestHandler(
+        HDFSOperationType.GET_MAX_INODE_ID) {
+      @Override
+      public Object performTask() throws IOException {
+        INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
+            .getDataAccess(INodeDataAccess.class);
+        return ida.getMaxId();
+      }
+    }.handle();
+  }
+  
   long getMinFileId() throws IOException {
     return (Long) new LightWeightRequestHandler(
         HDFSOperationType.GET_MIN_FILE_ID) {

@@ -440,7 +440,7 @@ public abstract class Server {
   private Responder responder = null;
   private Handler[] handlers = null;
 
-  private final boolean isSSLEnabled;
+  private final boolean isHopsTLSEnabled;
   private final CRLValidator crlValidator;
   private SSLFactory sslFactory = null;
   private String proxySuperuser = null;
@@ -1101,7 +1101,7 @@ public abstract class Server {
      * @throws IOException
        */
     SSLEngine createSSLEngine() throws IOException {
-      if (isSSLEnabled) {
+      if (isHopsTLSEnabled) {
         try {
           SSLEngine sslEngine = sslFactory.createSSLEngine();
           sslEngine.getSession().invalidate();
@@ -1133,7 +1133,7 @@ public abstract class Server {
         if (c != null) {
           boolean handshakeDone = false;
           boolean crlValidationPassed = false;
-          if (isSSLEnabled) {
+          if (isHopsTLSEnabled) {
             if (!c.doHandshake()) {
               // SSL handshake failed
               LOG.error("TLS handshake for " + c.getHostAddress() + " failed");
@@ -1164,7 +1164,7 @@ public abstract class Server {
           }
 
           boolean addToReader = false;
-          if (!isSSLEnabled) {
+          if (!isHopsTLSEnabled) {
             addToReader = true;
           } else {
             if (crlValidator != null && handshakeDone && crlValidationPassed) {
@@ -1422,7 +1422,7 @@ public abstract class Server {
           //
 
           int numBytes = 0;
-          if (isSSLEnabled) {
+          if (isHopsTLSEnabled) {
             numBytes = call.connection.sslChannelWrite(channel, call.rpcResponse);
           } else {
             numBytes = channelWrite(channel, call.rpcResponse);
@@ -1662,13 +1662,39 @@ public abstract class Server {
 
     public int sslChannelWrite(WritableByteChannel channel, ByteBuffer buffer)
       throws IOException {
-      int count = rpcSSLEngine.write(channel, buffer);
+      int count = 0;
+      if (buffer.remaining() <= NIO_BUFFER_LIMIT) {
+        count = rpcSSLEngine.write(channel, buffer);
+      } else {
+        count = sslChannelWriteChunks(channel, buffer);
+      }
       if (count > 0) {
         rpcMetrics.incrSentBytes(count);
       }
       return count;
     }
-
+  
+    public int sslChannelWriteChunks(WritableByteChannel channel, ByteBuffer buffer) throws IOException {
+      int originalLimit = buffer.limit();
+      int initialRemaining = buffer.remaining();
+      int ret = 0;
+      
+      while (buffer.remaining() > 0) {
+        try {
+          int iosize = Math.min(buffer.remaining(), NIO_BUFFER_LIMIT);
+          buffer.limit(buffer.position() + iosize);
+          ret = rpcSSLEngine.write(channel, buffer);
+          if (ret < iosize) {
+            break;
+          }
+        } finally {
+          buffer.limit(originalLimit);
+        }
+      }
+      int nBytes = initialRemaining - buffer.remaining();
+      return (nBytes > 0) ? nBytes : ret;
+    }
+    
     @Override
     public String toString() {
       return getHostAddress() + ":" + remotePort; 
@@ -1970,7 +1996,7 @@ public abstract class Server {
     public int readAndProcess() throws IOException, InterruptedException {
       while (!shouldClose()) { // stop if a fatal response has been sent.
         // Decrypt incoming data
-        if (isSSLEnabled) {
+        if (isHopsTLSEnabled) {
           int bytesRead = rpcSSLEngine.read(channel, sslUnwrappedBuffer, this);
           if (bytesRead < 0) {
             return bytesRead;
@@ -2042,7 +2068,7 @@ public abstract class Server {
           connectionHeaderBuf = null;
           connectionHeaderRead = true;
 
-          if (isSSLEnabled) {
+          if (isHopsTLSEnabled) {
             sslUnwrappedBuffer.compact();
           }
           continue;
@@ -2057,7 +2083,7 @@ public abstract class Server {
         
         count = channelRead(channel, data, sslUnwrappedBuffer);
 
-        if (isSSLEnabled) {
+        if (isHopsTLSEnabled) {
           sslUnwrappedBuffer.compact();
         }
 
@@ -2069,7 +2095,7 @@ public abstract class Server {
           boolean isHeaderRead = connectionContextRead;
           processOneRpc(requestData);
           if (!isHeaderRead ||
-              (isSSLEnabled && sslUnwrappedBuffer.position() != 0)) {
+              (isHopsTLSEnabled && sslUnwrappedBuffer.position() != 0)) {
             continue;
           }
         } 
@@ -2236,7 +2262,7 @@ public abstract class Server {
      * @throws FatalRpcServerException
      */
     private void checkCRLValidity() throws FatalRpcServerException {
-      if (!isSSLEnabled || crlValidator == null) {
+      if (!isHopsTLSEnabled || crlValidator == null) {
         return;
       }
   
@@ -2260,7 +2286,7 @@ public abstract class Server {
        */
       private void authenticateSSLConnection(UserGroupInformation protocolUser)
           throws FatalRpcServerException {
-        if (!isSSLEnabled) {
+        if (!isHopsTLSEnabled) {
           return;
         }
         try {
@@ -2681,7 +2707,7 @@ public abstract class Server {
       data = null;
       dataLengthBuffer = null;
 
-      if (isSSLEnabled && rpcSSLEngine != null) {
+      if (isHopsTLSEnabled && rpcSSLEngine != null) {
         try {
           rpcSSLEngine.close();
         } catch (IOException ex) {
@@ -2891,11 +2917,11 @@ public abstract class Server {
         CommonConfigurationKeysPublic.IPC_SERVER_LOG_SLOW_RPC,
         CommonConfigurationKeysPublic.IPC_SERVER_LOG_SLOW_RPC_DEFAULT));
 
-    this.isSSLEnabled = conf.getBoolean(
+    this.isHopsTLSEnabled = conf.getBoolean(
             CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
             CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT);
 
-    if (this.isSSLEnabled) {
+    if (this.isHopsTLSEnabled) {
       // Configure SSLContext
       this.sslFactory = new SSLFactory(SSLFactory.Mode.SERVER, conf);
       try {
@@ -3377,7 +3403,7 @@ public abstract class Server {
   private int channelRead(ReadableByteChannel channel, 
                           ByteBuffer buffer, ByteBuffer sslUnwrappedBuffer) throws IOException {
     int count = 0;
-    if (isSSLEnabled && sslUnwrappedBuffer != null) {
+    if (isHopsTLSEnabled && sslUnwrappedBuffer != null) {
 
       while (buffer.hasRemaining() && sslUnwrappedBuffer.hasRemaining()) {
         buffer.put(sslUnwrappedBuffer.get());
@@ -3387,7 +3413,7 @@ public abstract class Server {
       if (count > -1) {
         count++;
       }
-    } else if (!isSSLEnabled) {
+    } else if (!isHopsTLSEnabled) {
       count = (buffer.remaining() <= NIO_BUFFER_LIMIT) ?
               channel.read(buffer) : channelIO(channel, null, buffer);
     }

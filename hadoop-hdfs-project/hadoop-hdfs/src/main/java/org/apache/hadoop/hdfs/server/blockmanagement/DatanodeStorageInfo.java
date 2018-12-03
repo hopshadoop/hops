@@ -32,7 +32,11 @@ import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.util.Slicer;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.StorageType;
@@ -190,32 +194,10 @@ public class DatanodeStorageInfo {
   /**
    * Iterates over the list of blocks belonging to the Storage.
    */
-  public Iterator<BlockInfo> getBlockIterator(boolean all) throws IOException {
-    if(all){
-      return getAllStorageBlockInfos().iterator();
-    }else{
-      return new BlockIterator();
-    }
+  public Iterator<BlockInfo> getBlockIterator() throws IOException {
+    return new BlockIterator();
   }
-  
-  private List<BlockInfo> getAllStorageBlockInfos() throws IOException {
-    final int sid = this.sid;
-
-    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
-        HDFSOperationType.GET_ALL_STORAGE_IDS) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory
-            .getDataAccess(BlockInfoDataAccess.class);
-        HdfsStorageFactory.getConnector().beginTransaction();
-        List<BlockInfo> list = da.findBlockInfosByStorageId(sid);
-        HdfsStorageFactory.getConnector().commit();
-        return list;
-      }
-    };
-    return (List<BlockInfo>) findBlocksHandler.handle();
-  }
-  
+      
   private class BlockIterator implements Iterator<BlockInfo> {    
     private Iterator<BlockInfo> blocks = Collections.EMPTY_LIST.iterator();
     long index = 0;
@@ -361,7 +343,22 @@ public class DatanodeStorageInfo {
 
   public boolean addBlock(BlockInfo b)
       throws TransactionContextException, StorageException {
-    return b.addReplica(this);
+    // First check whether the block belongs to a different storage
+    // on the same DN.
+    boolean replaced = false;
+    Integer otherStorage = b.getReplicatedOnDatanode(this.getDatanodeDescriptor());
+    if(otherStorage!=null){
+      if (otherStorage != this.sid) {
+        // The block belongs to a different storage. Remove it first.
+        b.removeReplica(otherStorage);
+        replaced = true;
+      } else {
+        // The block is already associated with this storage.
+        return false;
+      }
+    }
+    b.addStorage(this);
+    return !replaced;
   }
 
   public boolean removeBlock(BlockInfo b)
@@ -427,17 +424,45 @@ public class DatanodeStorageInfo {
         false, capacity, dfsUsed, remaining, blockPoolUsed);
   }
 
-  public Map<Long, Integer> getAllStorageReplicas() throws IOException {
-    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
-        HDFSOperationType.GET_ALL_STORAGE_BLOCKS_IDS) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-            .getDataAccess(ReplicaDataAccess.class);
-        return da.findBlockAndInodeIdsByStorageId(getSid());
+  public Map<Long, Long> getAllStorageReplicas(int numBuckets, int nbThreads, int bucketPerThread,
+      ExecutorService executor) throws IOException {
+    return DatanodeStorageInfo.getAllStorageReplicas(numBuckets, sid, nbThreads, bucketPerThread, executor);
+  }
+  
+  public static Map<Long, Long> getAllStorageReplicas(int numBuckets, final int sid, int nbThreads, int bucketPerThread,
+      ExecutorService executor) throws IOException {
+    final Map<Long, Long> result = new ConcurrentHashMap<>();
+
+    try {
+      Slicer.slice(numBuckets, bucketPerThread, nbThreads, executor,
+          new Slicer.OperationHandler() {
+
+        @Override
+        public void handle(final int startIndex, final int endIndex) throws Exception {
+          LOG.info("get blocks in buckets " + startIndex + " to " + endIndex + " for storage " + sid);
+          final List<Integer> buckets = new ArrayList<>();
+          for (int i = startIndex; i < endIndex; i++) {
+            buckets.add(i);
+          }
+          LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+              HDFSOperationType.GET_ALL_STORAGE_BLOCKS_IDS) {
+            @Override
+            public Object performTask() throws StorageException, IOException {
+              ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+                  .getDataAccess(ReplicaDataAccess.class);
+              return da.findBlockAndInodeIdsByStorageIdAndBucketIds(sid, buckets);
+            }
+          };
+          result.putAll((Map<Long, Long>) findBlocksHandler.handle());
+        }
+      });
+    } catch (Exception e) {
+      if (e instanceof IOException) {
+        throw (IOException) e;
       }
-    };
-    return (Map<Long, Integer>) findBlocksHandler.handle();
+      throw new IOException(e);
+    }
+    return result;
   }
 
   public Map<Long, Long> getAllStorageReplicasInBuckets(

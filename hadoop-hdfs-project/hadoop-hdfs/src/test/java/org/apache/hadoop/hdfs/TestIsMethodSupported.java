@@ -37,6 +37,11 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolPB;
+import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolPB;
+import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.RpcClientUtil;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -91,11 +96,12 @@ public class TestIsMethodSupported {
   
   @Test
   public void testClientNamenodeProtocol() throws IOException {
-    ClientNamenodeProtocolTranslatorPB translator =
-        (ClientNamenodeProtocolTranslatorPB) NameNodeProxies
-            .createNonHAProxy(conf, nnAddress, ClientProtocol.class,
+    ClientProtocol cp =
+        NameNodeProxies.createNonHAProxy(conf, nnAddress, ClientProtocol.class,
                 UserGroupInformation.getCurrentUser(), true).getProxy();
-    assertTrue(translator.isMethodSupported("mkdirs"));
+    RpcClientUtil.isMethodSupported(cp,
+        ClientNamenodeProtocolPB.class, RPC.RpcKind.RPC_PROTOCOL_BUFFER,
+        RPC.getProtocolVersion(ClientNamenodeProtocolPB.class), "mkdirs");
   }
   
   @Test

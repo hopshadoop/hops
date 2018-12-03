@@ -76,7 +76,6 @@ import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Shell;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1596,7 +1595,7 @@ public class UserGroupInformation {
 
   private static void createHopsUser(String user, String[] groups){
     try {
-      UsersGroups.addUserToGroupsTx(user, groups);
+      UsersGroups.addUserGroupsTx(user, groups);
     }catch (IOException ex){
       throw new RuntimeException(ex);
     }

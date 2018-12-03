@@ -22,15 +22,11 @@ import static org.apache.hadoop.service.Service.STATE.STARTED;
 
 import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -41,19 +37,16 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.ipc.Server;
@@ -63,14 +56,13 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.PolicyProvider;
-import org.apache.hadoop.security.ssl.CryptoMaterial;
+import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.service.ServiceStateChangeListener;
-import org.apache.hadoop.util.BackOff;
-import org.apache.hadoop.util.ExponentialBackOff;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
@@ -122,7 +114,8 @@ import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedAppsEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedContainersEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrDecreaseContainersResourceEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrSignalContainersEvent;
-import org.apache.hadoop.yarn.server.nodemanager.CMgrUpdateCryptoMaterialEvent;
+import org.apache.hadoop.yarn.server.nodemanager.CMgrUpdateJWTEvent;
+import org.apache.hadoop.yarn.server.nodemanager.CMgrUpdateX509Event;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerManagerEvent;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
@@ -166,6 +159,7 @@ import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService.Re
 import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService.RecoveredContainerState;
 import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService.RecoveredContainerStatus;
 import org.apache.hadoop.yarn.server.nodemanager.security.authorize.NMPolicyProvider;
+import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.server.utils.YarnServerSecurityUtils;
 
@@ -215,7 +209,8 @@ public class ContainerManagerImpl extends CompositeService implements
   private long waitForContainersOnShutdownMillis;
   
   private final ExecutorService cryptoMaterialUpdaterThreadPool;
-  private final Map<ContainerId, Future> cryptoMaterialUpdaters = new HashMap<>();
+  private final Map<ContainerId, Future> x509Updaters = new HashMap<>();
+  private final Map<ContainerId, Future> jwtUpdaters = new HashMap<>();
 
   public ContainerManagerImpl(Context context, ContainerExecutor exec,
       DeletionService deletionContext, NodeStatusUpdater nodeStatusUpdater,
@@ -342,13 +337,18 @@ public class ContainerManagerImpl extends CompositeService implements
     creds.readTokenStorageStream(
         new DataInputStream(p.getCredentials().newInput()));
     int cryptoMaterialVersion = -1;
+    long jwtExpiration = -1L;
     
-    if (getConfig() != null && getConfig().getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      materializeCertificates(appId, p.getUser(), p.getUserFolder(),
+    if (isHopsTLSEnabled()) {
+      materializeX509(appId, p.getUser(), p.getUserFolder(),
           ProtoUtils.convertFromProtoFormat(p.getKeyStore()), p.getKeyStorePassword(),
           ProtoUtils.convertFromProtoFormat(p.getTrustStore()), p.getTrustStorePassword());
       cryptoMaterialVersion = p.getCryptoVersion();
+    }
+    
+    if (isJWTEnabled()) {
+      materializeJWT(appId, p.getUser(), p.getUserFolder(), p.getJwt());
+      jwtExpiration = p.getJwtExpiration();
     }
     
     List<ApplicationACLMapProto> aclProtoList = p.getAclsList();
@@ -367,13 +367,12 @@ public class ContainerManagerImpl extends CompositeService implements
 
     LOG.info("Recovering application " + appId);
     ApplicationImpl app = null;
-    if (cryptoMaterialVersion == -1) {
-      // Basically if RPC TLS is disabled
+    if (isHopsTLSEnabled() || isJWTEnabled()) {
+      app = new ApplicationImpl(dispatcher, p.getUser(), appId, creds, context, p.getUserFolder(),
+          cryptoMaterialVersion, jwtExpiration);
+    } else {
       app = new ApplicationImpl(dispatcher, p.getUser(), appId,
           creds, context, p.getUserFolder());
-    } else {
-      app = new ApplicationImpl(dispatcher, p.getUser(), appId, creds, context, p.getUserFolder(),
-          cryptoMaterialVersion);
     }
     context.getApplications().put(appId, app);
     app.handle(new ApplicationInitEvent(appId, acls, logAggregationContext));
@@ -824,30 +823,7 @@ public class ContainerManagerImpl extends CompositeService implements
     NMTokenIdentifier nmTokenIdentifier = selectNMTokenIdentifier(remoteUgi);
     authorizeUser(remoteUgi, nmTokenIdentifier);
     
-    ByteBuffer keyStore = requests.getKeyStore();
-    String keyStorePass = requests.getKeyStorePassword();
-    ByteBuffer trustStore = requests.getTrustStore();
-    String trustStorePass = requests.getTrustStorePassword();
-
-    if (getConfig()!=null && getConfig().getBoolean(CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED, CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      ApplicationId appId = nmTokenIdentifier.getApplicationAttemptId()
-          .getApplicationId();
-      String user = null, userFolder = null;
-      // When launching AM container there is only one Container request
-      if (!requests.getStartContainerRequests().isEmpty()) {
-        StartContainerRequest request = requests.getStartContainerRequests().get(0);
-        user = BuilderUtils.newContainerTokenIdentifier(request
-            .getContainerToken()).getApplicationSubmitter();
-        userFolder = BuilderUtils.newContainerTokenIdentifier(request
-            .getContainerToken()).getApplicationSubmitterFolder();
-      }
-      if (user == null || userFolder == null) {
-        throw new IOException("Submitter user is null");
-      }
-      materializeCertificates(appId, user, userFolder, keyStore, keyStorePass, trustStore, trustStorePass);
-    }
+    materializeSecurityMaterial(requests);
     
     List<ContainerId> succeededContainers = new ArrayList<ContainerId>();
     Map<ContainerId, SerializedException> failedContainers =
@@ -879,8 +855,7 @@ public class ContainerManagerImpl extends CompositeService implements
             this.getAMRMProxyService().processApplicationStartRequest(request);
           }
 
-          startContainerInternal(nmTokenIdentifier, containerTokenIdentifier,
-              request, keyStore, keyStorePass, trustStore, trustStorePass);
+          startContainerInternal(nmTokenIdentifier, containerTokenIdentifier, request);
           succeededContainers.add(containerId);
         } catch (YarnException e) {
           failedContainers.put(containerId, SerializedException.newInstance(e));
@@ -898,7 +873,47 @@ public class ContainerManagerImpl extends CompositeService implements
     }
   }
   
-  private void materializeCertificates(ApplicationId appId, String user, String userFolder,
+  private boolean isHopsTLSEnabled() {
+    return ((NodeManager.NMContext) context).isHopsTLSEnabled();
+  }
+  
+  private boolean isJWTEnabled() {
+    return ((NodeManager.NMContext) context).isJWTEnabled();
+  }
+  
+  private void materializeSecurityMaterial(StartContainersRequest requests) throws YarnException, IOException {
+    if (isHopsTLSEnabled() || isJWTEnabled()) {
+      String user = null, userFolder = null;
+      ApplicationId appId = null;
+      // When launching AM container there is only one Container request
+      if (!requests.getStartContainerRequests().isEmpty()) {
+        StartContainerRequest request = requests.getStartContainerRequests().get(0);
+        ContainerTokenIdentifier containerTokenIdentifier = BuilderUtils.newContainerTokenIdentifier(request
+            .getContainerToken());
+        if (containerTokenIdentifier == null) {
+          throw RPCUtil.getRemoteException(new IOException(INVALID_CONTAINERTOKEN_MSG));
+        }
+        user = containerTokenIdentifier.getApplicationSubmitter();
+        userFolder = containerTokenIdentifier.getApplicationSubmitterFolder();
+        appId = containerTokenIdentifier.getContainerID().getApplicationAttemptId().getApplicationId();
+      }
+      
+      if (user == null || userFolder == null) {
+        throw new IOException("User requested container or user folder is null");
+      }
+      
+      if (isHopsTLSEnabled()) {
+        materializeX509(appId, user, userFolder, requests.getKeyStore(), requests.getKeyStorePassword(),
+            requests.getTrustStore(), requests.getTrustStorePassword());
+      }
+      
+      if (isJWTEnabled()) {
+        materializeJWT(appId, user, userFolder, requests.getJWT());
+      }
+    }
+  }
+  
+  private void materializeX509(ApplicationId appId, String user, String userFolder,
       ByteBuffer keyStore, String keyStorePass,
       ByteBuffer trustStore, String trustStorePass) throws IOException {
     
@@ -928,11 +943,29 @@ public class ContainerManagerImpl extends CompositeService implements
     }
   }
   
+  private void materializeJWT(ApplicationId appId, String user, String userFolder, String jwt) throws IOException {
+    if (context.getApplications().containsKey(appId)) {
+      LOG.debug("Application reference exists, JWT should have " +
+          "already been materialized");
+      return;
+    }
+    
+    if (jwt == null || jwt.isEmpty()) {
+      throw new IOException("JWT is enabled but it either null or empty for application " + appId);
+    }
+    try {
+      context.getCertificateLocalizationService().materializeJWT(user, appId.toString(), userFolder, jwt);
+    } catch (InterruptedException ex) {
+      LOG.error(ex, ex);
+      throw new IOException(ex);
+    }
+  }
+  
   private ContainerManagerApplicationProto buildAppProto(ApplicationId appId,
       String user, String userFolder, Credentials credentials,
       Map<ApplicationAccessType, String> appAcls,
       LogAggregationContext logAggregationContext, ByteBuffer keyStore, String keyStorePass,
-      ByteBuffer trustStore, String trustStorePass, int cryptoVersion) {
+      ByteBuffer trustStore, String trustStorePass, int cryptoVersion, String jwt, long jwtExpiration) {
 
     ContainerManagerApplicationProto.Builder builder =
         ContainerManagerApplicationProto.newBuilder();
@@ -940,16 +973,24 @@ public class ContainerManagerImpl extends CompositeService implements
     builder.setUser(user);
     builder.setUserFolder(userFolder);
 
-    if(keyStore!=null){
+    if (keyStore != null) {
       builder.setKeyStore(ProtoUtils.convertToProtoFormat(keyStore));
       builder.setKeyStorePassword(keyStorePass);
     }
-    if(trustStore!=null){
+    if (trustStore != null) {
       builder.setTrustStore(ProtoUtils.convertToProtoFormat(trustStore));
       builder.setTrustStorePassword(trustStorePass);
     }
 
     builder.setCryptoVersion(cryptoVersion);
+    
+    if (jwt != null) {
+      builder.setJwt(jwt);
+    }
+    
+    if (jwtExpiration != -1L) {
+      builder.setJwtExpiration(jwtExpiration);
+    }
     
     if (logAggregationContext != null) {
       builder.setLogAggregationContext((
@@ -984,9 +1025,8 @@ public class ContainerManagerImpl extends CompositeService implements
   
   @SuppressWarnings("unchecked")
   private void startContainerInternal(NMTokenIdentifier nmTokenIdentifier,
-      ContainerTokenIdentifier containerTokenIdentifier,
-      StartContainerRequest request, ByteBuffer keyStore, String keyStorePass,
-      ByteBuffer trustStore, String trustStorePass) throws YarnException, IOException {
+      ContainerTokenIdentifier containerTokenIdentifier, StartContainerRequest request)
+      throws YarnException, IOException {
 
     /*
      * 1) It should save the NMToken into NMTokenSecretManager. This is done
@@ -1024,17 +1064,12 @@ public class ContainerManagerImpl extends CompositeService implements
         }
       }
     }
-    
-    int cryptoMaterialVersion = -1;
-    // Inject crypto material when RPC TLS is enabled as LocalResources
-    if (getConfig() != null && getConfig().getBoolean(
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      injectCryptoMaterialAsLocalResources(user, containerId, launchContext);
-      // Crypto version of this material might be greater than 0, but from the NM's perspective it's
-      // the first time it receives it
-      cryptoMaterialVersion = 0;
-    }
+  
+    injectCryptoMaterialAsLocalResources(user, containerId, launchContext);
+    // Crypto version of this material might be greater than 0, but from the NM's perspective it's
+    // the first time it receives it
+    int cryptoMaterialVersion = isHopsTLSEnabled() ? 0 : -1;
+    long jwtExpiration = isJWTEnabled() ? 0L : -1L;
     
     // Sanity check for local resources
     for (Map.Entry<String, LocalResource> rsrc : launchContext
@@ -1067,7 +1102,8 @@ public class ContainerManagerImpl extends CompositeService implements
       if (!serviceStopped) {
         // Create the application
         Application application =
-            new ApplicationImpl(dispatcher, user, applicationID, credentials, context, userFolder, cryptoMaterialVersion);
+            new ApplicationImpl(dispatcher, user, applicationID, credentials, context, userFolder,
+                cryptoMaterialVersion, jwtExpiration);
         if (null == context.getApplications().putIfAbsent(applicationID,
           application)) {
           LOG.info("Creating a new application reference for app " + applicationID);
@@ -1076,9 +1112,37 @@ public class ContainerManagerImpl extends CompositeService implements
           Map<ApplicationAccessType, String> appAcls =
               container.getLaunchContext().getApplicationACLs();
           
+          ByteBuffer keyStore = null, trustStore = null;
+          String keyStorePass = null, trustStorePass = null;
+          String jwt = null;
+          CertificateLocalizationService certLocService = context.getCertificateLocalizationService();
+          if (certLocService != null) {
+            if (isHopsTLSEnabled()) {
+              try {
+                X509SecurityMaterial x509Material = certLocService.getX509MaterialLocation(user,
+                    applicationID.toString());
+                keyStore = x509Material.getKeyStoreMem();
+                trustStore = x509Material.getTrustStoreMem();
+                keyStorePass = x509Material.getKeyStorePass();
+                trustStorePass = x509Material.getTrustStorePass();
+              } catch (InterruptedException ex) {
+                throw new YarnException("Interrupted while waiting to get X.509 material for " + applicationID, ex);
+              }
+            }
+            if (isJWTEnabled()) {
+              try {
+                JWTSecurityMaterial jwtMaterial = certLocService.getJWTMaterialLocation(user, applicationID.toString());
+                jwt = jwtMaterial.getToken();
+              } catch (InterruptedException ex) {
+                throw new YarnException("Interrupted while waiting to get JWT material for " + applicationID, ex);
+              }
+            }
+          }
+          
           context.getNMStateStore().storeApplication(applicationID,
               buildAppProto(applicationID, user, userFolder, credentials, appAcls,
-                  logAggregationContext, keyStore, keyStorePass, trustStore, trustStorePass, cryptoMaterialVersion));
+                  logAggregationContext, keyStore, keyStorePass, trustStore, trustStorePass, cryptoMaterialVersion,
+                  jwt, jwtExpiration));
           dispatcher.getEventHandler().handle(
             new ApplicationInitEvent(applicationID, appAcls,
               logAggregationContext));
@@ -1129,23 +1193,47 @@ public class ContainerManagerImpl extends CompositeService implements
       throws YarnException, IOException {
     try {
       String applicationId = containerId.getApplicationAttemptId().getApplicationId().toString();
-      CryptoMaterial cryptoMaterial = context
-          .getCertificateLocalizationService().getMaterialLocation(applicationUser, applicationId);
-      Path keyStoreLocation = cryptoMaterial.getKeyStoreLocation();
-      Path trustStoreLocation = cryptoMaterial.getTrustStoreLocation();
-      Path passwdLocation = cryptoMaterial.getPasswdLocation();
+      Map<File, String> resources = null;
       
-      if (keyStoreLocation == null || trustStoreLocation == null || passwdLocation == null) {
-        throw new YarnException("One of the crypto materials for container " + containerId.toString() + " has not " +
-            "been localized correctly and is null");
+      // Inject X.509 material
+      if (isHopsTLSEnabled()) {
+        resources = new HashMap<>();
+        X509SecurityMaterial cryptoMaterial = context
+            .getCertificateLocalizationService()
+            .getX509MaterialLocation(applicationUser, applicationId);
+        Path keyStoreLocation = cryptoMaterial.getKeyStoreLocation();
+        Path trustStoreLocation = cryptoMaterial.getTrustStoreLocation();
+        Path passwdLocation = cryptoMaterial.getPasswdLocation();
+  
+        if (keyStoreLocation == null || trustStoreLocation == null ||
+            passwdLocation == null) {
+          throw new YarnException("One of the crypto materials for container " +
+              containerId.toString() + " has not " +
+              "been localized correctly and is null");
+        }
+  
+        resources.put(keyStoreLocation.toFile(),
+            HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+        resources.put(trustStoreLocation.toFile(),
+            HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+        resources.put(passwdLocation.toFile(),
+            HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
       }
       
-      Map<File, String> resources = new HashMap<>(3);
-      resources.put(keyStoreLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
-      resources.put(trustStoreLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
-      resources.put(passwdLocation.toFile(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+      // Inject JWT material
+      if (isJWTEnabled()) {
+        JWTSecurityMaterial material = context.getCertificateLocalizationService()
+            .getJWTMaterialLocation(applicationUser, applicationId);
+        if (resources == null) {
+          resources = new HashMap<>(1);
+        }
+        resources.put(material.getTokenLocation().toFile(),
+            JWTSecurityMaterial.JWT_LOCAL_RESOURCE_FILE);
+      }
       
-      addAsLocalResource(resources, containerId, containerLaunchContext);
+      if (resources != null) {
+        addAsLocalResource(resources, containerId, containerLaunchContext);
+      }
     } catch (InterruptedException ex) {
       throw new YarnException(ex);
     }
@@ -1464,160 +1552,189 @@ public class ContainerManagerImpl extends CompositeService implements
     }
   }
   
-  private Future removeCryptoUpdaterTask(ContainerId cid) {
+  private Future removeX509UpdaterTask(ContainerId cid) {
     Future task = null;
-    synchronized (cryptoMaterialUpdaters) {
-      task = cryptoMaterialUpdaters.remove(cid);
+    synchronized (x509Updaters) {
+      task = x509Updaters.remove(cid);
     }
     return task;
   }
   
-  private void scheduleCryptoUpdaterForContainer(CMgrUpdateCryptoMaterialEvent event) {
-    LOG.info("Scheduling crypto updater for container " + event.getContainerId());
-    Future previousTask = removeCryptoUpdaterTask(event.getContainerId());
+  private Future removeJWTUpdaterTask(ContainerId cid) {
+    Future task = null;
+    synchronized (jwtUpdaters) {
+      task = jwtUpdaters.remove(cid);
+    }
+    return task;
+  }
+  
+  private void scheduleSecurityUpdaterForContainer(ContainerManagerEvent event) {
+    if (event instanceof CMgrUpdateX509Event) {
+      scheduleX509Updater((CMgrUpdateX509Event) event);
+    } else if (event instanceof CMgrUpdateJWTEvent) {
+      scheduleJWTUpdater((CMgrUpdateJWTEvent) event);
+    }
+  }
+  
+  private void scheduleX509Updater(CMgrUpdateX509Event event) {
+    LOG.debug("Scheduling X.509 updater for container " + event.getContainerId());
+    Future previousTask = removeX509UpdaterTask(event.getContainerId());
     if (previousTask != null) {
       previousTask.cancel(true);
     }
     ContainerImpl container = (ContainerImpl) context.getContainers().get(event.getContainerId());
     if (container != null) {
-      ContainerCryptoMaterialUpdater updater = new ContainerCryptoMaterialUpdater(container, event.getKeyStore(),
+      ContainerX509UpdaterTask updaterTask = new ContainerX509UpdaterTask(container, event.getKeyStore(),
           event.getKeyStorePassword(), event.getTrustStore(), event.getTrustStorePassword(), event.getVersion());
-      scheduleUpdaterInternal(updater, container.getContainerId());
+      scheduleX509UpdaterTaskInternal(updaterTask, container.getContainerId());
     }
   }
   
-  private void scheduleUpdaterInternal(ContainerCryptoMaterialUpdater updater, ContainerId cid) {
+  private void scheduleJWTUpdater(CMgrUpdateJWTEvent event) {
+    LOG.debug("Scheduling JWT updater for container " + event.getContainerId());
+    Future previousTask = removeJWTUpdaterTask(event.getContainerId());
+    if (previousTask != null) {
+      previousTask.cancel(true);
+    }
+    ContainerImpl container = (ContainerImpl) context.getContainers().get(event.getContainerId());
+    if (container != null) {
+      ContainerJWTUpdaterTask updaterTask = new ContainerJWTUpdaterTask(container, event.getJwt(),
+          event.getJwtExpiration());
+      scheduleJWTUpdaterTaskInternal(updaterTask, container.getContainerId());
+    }
+  }
+  
+  private void scheduleX509UpdaterTaskInternal(ContainerX509UpdaterTask updater, ContainerId cid) {
     // Make sure we put the task to the Map before the worker tries to remove itself from the Map
-    synchronized (cryptoMaterialUpdaters) {
+    synchronized (x509Updaters) {
       Future task = cryptoMaterialUpdaterThreadPool.submit(updater);
-      cryptoMaterialUpdaters.put(cid, task);
+      x509Updaters.put(cid, task);
     }
   }
   
-  private class ContainerCryptoMaterialUpdater implements Runnable {
-    private final ContainerImpl container;
+  private void scheduleJWTUpdaterTaskInternal(ContainerJWTUpdaterTask updater, ContainerId cid) {
+    // Make sure we put the task to the Map before the worker tries to remove itself from the Map
+    synchronized (jwtUpdaters) {
+      Future task = cryptoMaterialUpdaterThreadPool.submit(updater);
+      jwtUpdaters.put(cid, task);
+    }
+  }
+  
+  private class ContainerJWTUpdaterTask extends ContainerSecurityUpdaterTask {
+    private final String jwt;
+    private final long jwtExpiration;
+    
+    private ContainerJWTUpdaterTask(ContainerImpl container, String jwt, long jwtExpiration) {
+      super(container);
+      this.jwt = jwt;
+      this.jwtExpiration = jwtExpiration;
+    }
+    
+    @Override
+    protected void removeSecurityUpdaterTask() {
+      removeJWTUpdaterTask(container.getContainerId());
+    }
+    
+    @Override
+    protected void scheduleSecurityUpdaterTask() {
+      scheduleJWTUpdaterTaskInternal(this, container.getContainerId());
+    }
+    
+    @Override
+    protected void execute() throws IOException {
+      container.identifyCryptoMaterialLocation();
+      File jwtFile = container.getJWTLocalizedPath();
+      if (jwtFile == null) {
+        throw new IOException("Could not identify localized JWT file for container " + container.getContainerId());
+      }
+      writeStringToFile(jwtFile, jwt);
+    }
+    
+    @Override
+    protected void updateStateStore() throws IOException {
+      ApplicationId applicationId = container.getContainerId().getApplicationAttemptId().getApplicationId();
+      Application app = context.getApplications().get(applicationId);
+      app.setJWTExpiration(jwtExpiration);
+    
+      try {
+        X509SecurityMaterial x509SecurityMaterial = context.getCertificateLocalizationService()
+            .getX509MaterialLocation(container.getUser(), applicationId.toString());
+        
+        context.getNMStateStore().storeApplication(applicationId,
+            buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
+                container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier()
+                    .getLogAggregationContext(),
+                x509SecurityMaterial.getKeyStoreMem(), String.valueOf(x509SecurityMaterial.getKeyStorePass()),
+                x509SecurityMaterial.getTrustStoreMem(), String.valueOf(x509SecurityMaterial.getTrustStorePass()),
+                app.getX509Version(), jwt, jwtExpiration));
+      } catch (InterruptedException ex) {
+        throw new IOException(ex);
+      }
+    }
+  }
+  
+  private class ContainerX509UpdaterTask extends ContainerSecurityUpdaterTask {
     private final ByteBuffer keyStore;
     private final char[] keyStorePassword;
     private final ByteBuffer trustStore;
     private final char[] trustStorePassword;
     private final int cryptoVersion;
-    private final BackOff backoff;
-    private long backoffTime;
     
-    private ContainerCryptoMaterialUpdater(ContainerImpl container, ByteBuffer keyStore, char[] keyStorePassword,
+    private ContainerX509UpdaterTask(ContainerImpl container, ByteBuffer keyStore, char[] keyStorePassword,
         ByteBuffer trustStore, char[] trustStorePassword, int cryptoVersion) {
-      this.container = container;
+      super(container);
       this.keyStore = keyStore;
       this.keyStorePassword = keyStorePassword;
       this.trustStore = trustStore;
       this.trustStorePassword = trustStorePassword;
       this.cryptoVersion = cryptoVersion;
-      this.backoff = createBackOffPolicy();
-      this.backoffTime = 0L;
-    }
-
-    private BackOff createBackOffPolicy() {
-      return new ExponentialBackOff.Builder()
-          .setInitialIntervalMillis(200)
-          .setMaximumIntervalMillis(5000)
-          .setMultiplier(1.4)
-          .setMaximumRetries(6)
-          .build();
     }
     
     @Override
-    public void run() {
-      try {
-        TimeUnit.MILLISECONDS.sleep(backoffTime);
-        if (!container.getContainerState().equals(
-            org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerState.RUNNING)) {
-          LOG.info("Crypto updater for container " + container.getContainerId() + " run but the container is not in " +
-              "RUNNING state, instead state is: " + container.getContainerState());
-          removeCryptoUpdaterTask(container.getContainerId());
-          return;
-        }
-        container.identifyCryptoMaterialLocation();
-        File keyStorePath = container.getKeyStoreLocalizedPath();
-        File trustStorePath = container.getTrustStoreLocalizedPath();
-        File passwordFilePath = container.getPasswordFileLocalizedPath();
-        if (keyStorePath == null || trustStorePath == null || passwordFilePath == null) {
-          throw new IOException("Could not identify localized cryptographic material location for container " +
-              container.getContainerId());
-        }
-        writeByteBufferToFile(keyStorePath, keyStore);
-        writeByteBufferToFile(trustStorePath, trustStore);
-        // Assume key store password is the same for the trust store and for the key itself
-        writeStringToFile(passwordFilePath, String.valueOf(keyStorePassword));
-        removeCryptoUpdaterTask(container.getContainerId());
-        updateStateStore();
-        LOG.debug("Updated crypto material for container: " + container.getContainerId());
-      } catch (IOException ex) {
-        LOG.error(ex, ex);
-        // Re-schedule here with backoff
-        removeCryptoUpdaterTask(container.getContainerId());
-        backoffTime = backoff.getBackOffInMillis();
-        if (backoffTime != -1) {
-          LOG.warn("Re-scheduling updating crypto material for container " + container.getContainerId() + " after "
-              + backoffTime + "ms");
-          scheduleUpdaterInternal(this, container.getContainerId());
-        } else {
-          LOG.error("Reached maximum number of retries for container " + container.getContainerId() + ", giving up",
-              ex);
-        }
-      } catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-      }
+    protected void removeSecurityUpdaterTask() {
+      removeX509UpdaterTask(container.getContainerId());
     }
     
-    private void writeByteBufferToFile(File target, ByteBuffer data) throws IOException {
-      Set<PosixFilePermission> permissions = null;
-      Path targetPath = target.toPath();
-      if (!target.canWrite()) {
-        permissions = addOwnerWritePermission(targetPath);
-      }
-      FileChannel fileChannel = new FileOutputStream(target, false).getChannel();
-      fileChannel.write(data);
-      fileChannel.close();
-      if (permissions != null) {
-        removeOwnerWritePermission(targetPath, permissions);
-      }
-    }
-  
-    private void writeStringToFile(File target, String data) throws IOException {
-      Set<PosixFilePermission> permissions = null;
-      Path targetPath = target.toPath();
-      if (!target.canWrite()) {
-        permissions = addOwnerWritePermission(targetPath);
-      }
-      FileUtils.writeStringToFile(target, data);
-      if (permissions != null) {
-        removeOwnerWritePermission(targetPath, permissions);
-      }
+    @Override
+    protected void scheduleSecurityUpdaterTask() {
+      scheduleX509UpdaterTaskInternal(this, container.getContainerId());
     }
     
-    private Set<PosixFilePermission> addOwnerWritePermission(Path target) throws IOException {
-      Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(target);
-      if (permissions.add(PosixFilePermission.OWNER_WRITE)) {
-        Files.setPosixFilePermissions(target, permissions);
+    @Override
+    protected void execute() throws IOException {
+      container.identifyCryptoMaterialLocation();
+      File keyStorePath = container.getKeyStoreLocalizedPath();
+      File trustStorePath = container.getTrustStoreLocalizedPath();
+      File passwordFilePath = container.getPasswordFileLocalizedPath();
+      if (keyStorePath == null || trustStorePath == null || passwordFilePath == null) {
+        throw new IOException("Could not identify localized X.509 cryptographic material location for container " +
+            container.getContainerId());
       }
-      return permissions;
+      writeByteBufferToFile(keyStorePath, keyStore);
+      writeByteBufferToFile(trustStorePath, trustStore);
+      // Assume key store password is the same for the trust store and for the key itself
+      writeStringToFile(passwordFilePath, String.valueOf(keyStorePassword));
     }
     
-    private void removeOwnerWritePermission(Path target, Set<PosixFilePermission> permissions) throws IOException {
-      if (permissions.remove(PosixFilePermission.OWNER_WRITE)) {
-        Files.setPosixFilePermissions(target, permissions);
-      }
-    }
-    
-    private void updateStateStore() throws IOException {
+    @Override
+    protected void updateStateStore() throws IOException {
       ApplicationId applicationId = container.getContainerId().getApplicationAttemptId().getApplicationId();
       Application app = context.getApplications().get(applicationId);
-      app.setCryptoMaterialVersion(cryptoVersion);
-      context.getNMStateStore().storeApplication(applicationId,
-          buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
-              container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier()
-                  .getLogAggregationContext(),
-              keyStore, String.valueOf(keyStorePassword), trustStore, String.valueOf(trustStorePassword), cryptoVersion));
+      app.setX509Version(cryptoVersion);
+  
+      try {
+        JWTSecurityMaterial jwtSecurityMaterial = context.getCertificateLocalizationService()
+            .getJWTMaterialLocation(container.getUser(), applicationId.toString());
+        
+        context.getNMStateStore().storeApplication(applicationId,
+            buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
+                container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier()
+                    .getLogAggregationContext(),
+                keyStore, String.valueOf(keyStorePassword), trustStore, String.valueOf(trustStorePassword),
+                cryptoVersion, jwtSecurityMaterial.getToken(), app.getJWTExpiration()));
+      } catch (InterruptedException ex) {
+        throw new IOException(ex);
+      }
     }
   }
   
@@ -1749,7 +1866,7 @@ public class ContainerManagerImpl extends CompositeService implements
       }
       break;
     case UPDATE_CRYPTO_MATERIAL:
-      scheduleCryptoUpdaterForContainer((CMgrUpdateCryptoMaterialEvent) event);
+      scheduleSecurityUpdaterForContainer(event);
       break;
     default:
         throw new YarnRuntimeException(
@@ -1777,8 +1894,13 @@ public class ContainerManagerImpl extends CompositeService implements
   }
 
   @VisibleForTesting
-  public Map<ContainerId, Future> getCryptoMaterialUpdaters() {
-    return cryptoMaterialUpdaters;
+  public Map<ContainerId, Future> getX509Updaters() {
+    return x509Updaters;
+  }
+  
+  @VisibleForTesting
+  public Map<ContainerId, Future> getJWTUpdaters() {
+    return jwtUpdaters;
   }
   
   public Map<String, ByteBuffer> getAuxServiceMetaData() {

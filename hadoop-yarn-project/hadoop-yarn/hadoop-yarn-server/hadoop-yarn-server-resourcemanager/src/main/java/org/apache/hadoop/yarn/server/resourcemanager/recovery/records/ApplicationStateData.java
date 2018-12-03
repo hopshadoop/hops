@@ -207,4 +207,12 @@ public abstract class ApplicationStateData {
   public abstract long getMaterialRotationStartTime();
   
   public abstract void setMaterialRotationStartTime(long materialRotationStartTime);
+  
+  public abstract String getJWT();
+  
+  public abstract void setJWT(String jwt);
+  
+  public abstract long getJWTExpiration();
+  
+  public abstract void setJWTExpiration(long jwtExpiration);
 }

@@ -71,6 +71,7 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -87,6 +88,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import org.apache.hadoop.hdfs.ExtendedBlockId;
 import org.apache.hadoop.io.IOUtils;
 
 /**
@@ -209,7 +211,6 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     this.datanode = datanode;
     this.dataStorage = storage;
     this.conf = conf;
-
     // The number of volumes required for operation is the total number 
     // of volumes minus the number of failed volumes we can tolerate.
     final int volFailuresTolerated =
@@ -236,24 +237,21 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
               + ", volume failures tolerated: " + volFailuresTolerated);
     }
 
-
     storageMap = new ConcurrentHashMap<String, DatanodeStorage>();
     volumeMap = new ReplicaMap(this);
-
     @SuppressWarnings("unchecked")
     final VolumeChoosingPolicy<FsVolumeImpl> blockChooserImpl = ReflectionUtils
         .newInstance(conf.getClass(
             DFSConfigKeys.DFS_DATANODE_FSDATASET_VOLUME_CHOOSING_POLICY_KEY,
-            RoundRobinVolumeChoosingPolicy.class, VolumeChoosingPolicy.class),
-            conf);
-
+            RoundRobinVolumeChoosingPolicy.class,
+            VolumeChoosingPolicy.class), conf);
     volumes = new FsVolumeList(volsFailed, blockChooserImpl);
     asyncDiskService = new FsDatasetAsyncDiskService(datanode);
-    cacheManager = new FsDatasetCache(this);
     for (int idx = 0; idx < storage.getNumStorageDirs(); idx++) {
       addVolume(dataLocations, storage.getStorageDir(idx));
     }
 
+    cacheManager = new FsDatasetCache(this);
     registerMBean(datanode.getDatanodeUuid());
     NUM_BUCKETS = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
         DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
@@ -1195,7 +1193,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       }
 
       // if file is not null, but doesn't exist - possibly disk failed
-      datanode.checkDiskError();
+      datanode.checkDiskErrorAsync();
     }
     
     if (LOG.isDebugEnabled()) {
@@ -1281,8 +1279,14 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
         volumeMap.remove(bpid, invalidBlk);
       }
     
+      // If a DFSClient has the replica in its cache of short-circuit file
+      // descriptors (and the client is using ShortCircuitShm), invalidate it.
+      datanode.getShortCircuitRegistry().processBlockInvalidation(
+                new ExtendedBlockId(invalidBlk.getBlockId(), bpid));
+      
       // If the block is cached, start uncaching it.
       cacheManager.uncacheBlock(bpid, invalidBlk.getBlockId());
+      
       // Delete the block asynchronously to make sure we can do it fast enough.
       // It's ok to unlink the block file before the uncache operation
       // finishes.
@@ -2006,5 +2010,13 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       dir = volumes.get(0).getPath(bpid);
     }
     return new RollingLogsImpl(dir, prefix);
+  }
+  
+  @Override
+  public void submitBackgroundSyncFileRangeRequest(ExtendedBlock block,
+      FileDescriptor fd, long offset, long nbytes, int flags) {
+    FsVolumeImpl fsVolumeImpl = this.getVolume(block);
+    asyncDiskService.submitSyncFileRangeRequest(fsVolumeImpl, fd, offset,
+        nbytes, flags);
   }
 }

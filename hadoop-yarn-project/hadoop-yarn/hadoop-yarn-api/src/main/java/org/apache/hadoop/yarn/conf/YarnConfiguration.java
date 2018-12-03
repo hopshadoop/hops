@@ -2652,4 +2652,21 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL =
       RM_PREFIX + "certificate.revocation-monitor-interval";
   public static String DEFAULT_RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL = "10h";
+  
+  /**
+   * Application JWT configuration
+   */
+  private static String JWT_PREFIX = "jwt.";
+  public static boolean DEFAULT_RM_JWT_ENABLED = false;
+  public static final String RM_JWT_ENABLED = RM_PREFIX + JWT_PREFIX + "enabled";
+  
+  public static String DEFAULT_RM_JWT_VALIDITY_PERIOD = "30m";
+  public static final String RM_JWT_VALIDITY_PERIOD = RM_PREFIX + JWT_PREFIX + "validity";
+  
+  public static String DEFAULT_RM_JWT_EXPIRATION_SAFETY_PERIOD = "30m";
+  public static final String RM_JWT_EXPIRATION_SAFETY_PERIOD = RM_PREFIX + JWT_PREFIX
+      + "expiration-safety-period";
+  
+  public static String DEFAULT_RM_JWT_AUDIENCE = "job";
+  public static final String RM_JWT_AUDIENCE = RM_PREFIX + JWT_PREFIX + "audience";
 }

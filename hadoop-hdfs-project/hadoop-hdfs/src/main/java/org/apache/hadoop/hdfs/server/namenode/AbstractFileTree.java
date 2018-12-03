@@ -324,7 +324,7 @@ abstract class AbstractFileTree {
   }
   
   private void collectChildren(ProjectedINode parent, short depth, int level, List<AclEntry> inheritedDefaults) {
-    activeCollectors.add(namesystem.getSubtreeOperationsExecutor().
+    activeCollectors.add(namesystem.getFSOperationsExecutor().
         submit(new ChildCollector(parent, depth, level, inheritedDefaults)));
   }
   

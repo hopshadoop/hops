@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 
 import java.io.IOException;
+import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 
 public abstract class INodeWithAdditionalFields extends INode {
   
@@ -207,6 +208,19 @@ public abstract class INodeWithAdditionalFields extends INode {
     return this.modificationTime;
   }
   
+  /**
+   * Update modification time if it is larger than the current value.
+   */
+  @Override
+  public final void updateModificationTime(long mtime)
+      throws QuotaExceededException, StorageException, TransactionContextException {
+    Preconditions.checkState(isDirectory());
+    if (mtime <= modificationTime) {
+      return;
+    }
+    setModificationTime(mtime);
+  }
+  
   public final void setModificationTime(long modificationTime)
     throws StorageException, TransactionContextException {
     setModificationTimeNoPersistance(modificationTime);
@@ -272,7 +286,7 @@ public abstract class INodeWithAdditionalFields extends INode {
   
   public final void setHasBlocksNoPersistance(boolean hasBlocks)
     throws StorageException, TransactionContextException {
-    header = HeaderFormat.combineHasBlocksNoPersistance(header, hasBlocks);
+    header = HeaderFormat.HAS_BLOCKS.BITS.combine((hasBlocks) ? 1 : 0, header);
   }
   
   public boolean hasBlocks() {

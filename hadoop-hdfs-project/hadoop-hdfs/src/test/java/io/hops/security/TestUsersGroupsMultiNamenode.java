@@ -68,8 +68,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.Token;
 import org.hamcrest.Matchers;
-import org.junit.Assert;
-import org.junit.Assert.*;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -592,14 +590,14 @@ public class TestUsersGroupsMultiNamenode {
     @Override
     public void addUserGroup(String userName, String groupName,
         boolean cacheOnly) throws IOException {
-      usersGroupsMapping.addUserToGroupTx(userName, groupName, cacheOnly);
+      usersGroupsMapping.addUserGroupTx(userName, groupName, cacheOnly);
       this.cacheOnly = cacheOnly;
     }
     
     @Override
     public void removeUserGroup(String userName, String groupName,
         boolean cacheOnly) throws IOException {
-      usersGroupsMapping.removeUserFromGroupTx(userName, groupName, cacheOnly);
+      usersGroupsMapping.removeUserGroupTx(userName, groupName, cacheOnly);
      this.cacheOnly = cacheOnly;
     }
     

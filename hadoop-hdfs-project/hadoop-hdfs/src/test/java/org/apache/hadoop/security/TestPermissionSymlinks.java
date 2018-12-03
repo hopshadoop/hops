@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.security;
 
+import java.io.FileNotFoundException;
+import static org.apache.hadoop.fs.permission.AclEntryScope.*;
+import static org.apache.hadoop.fs.permission.AclEntryType.*;
+import static org.apache.hadoop.fs.permission.FsAction.*;
+import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -24,6 +29,7 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -34,6 +40,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystemTestWrapper;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
@@ -260,5 +267,34 @@ public class TestPermissionSymlinks {
     }
   }
 
-
+  @Ignore @Test
+  public void testAccess() throws Exception {
+    fs.setPermission(target, new FsPermission((short) 0002));
+    fs.setAcl(target, Arrays.asList(
+        aclEntry(ACCESS, USER, ALL),
+        aclEntry(ACCESS, GROUP, NONE),
+        aclEntry(ACCESS, USER, user.getShortUserName(), WRITE),
+        aclEntry(ACCESS, OTHER, WRITE)));
+    FileContext myfc = user.doAs(new PrivilegedExceptionAction<FileContext>() {
+      @Override
+      public FileContext run() throws IOException {
+        return FileContext.getFileContext(conf);
+      }
+    });
+    // Path to targetChild via symlink
+    myfc.access(link, FsAction.WRITE);
+    try {
+      myfc.access(link, FsAction.ALL);
+      fail("The access call should have failed.");
+    } catch (AccessControlException e) {
+      // expected
+    }
+    Path badPath = new Path(link, "bad");
+    try {
+      myfc.access(badPath, FsAction.READ);
+      fail("The access call should have failed");
+    } catch (FileNotFoundException e) {
+      // expected
+    }
+  }
 }

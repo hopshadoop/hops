@@ -16443,6 +16443,231 @@
         </comparator>
       </comparators>
     </test>
+    
+    <!-- DFS tests -->
+    <test>
+      <description>appendToFile</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -touchz /user/USERNAME/dir1/file0</command>
+        <command>-fs NAMENODE -appendToFile CLITEST_DATA/data15bytes /user/USERNAME/dir1/file0</command>
+        <command>-fs NAMENODE -cat /user/USERNAME/dir1/file0</command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>12345678901234</expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>text</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -put CLITEST_DATA/data15bytes /user/USERNAME/dir1/file0</command>
+        <command>-fs NAMENODE -text /user/USERNAME/dir1/file0</command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME/dir1</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>12345678901234</expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>rmdir</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -rmdir /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -ls /user/USERNAME/</command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>ExactComparator</type>
+          <expected-output></expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>rmdir with ignore-fail-on-non-empty</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -put CLITEST_DATA/data15bytes /user/USERNAME/dir1/file0</command>
+        <command>-fs NAMENODE -rmdir --ignore-fail-on-non-empty /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -ls /user/USERNAME/</command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>Found 1 items</expected-output>
+        </comparator>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>^drwxr-xr-x( )*-( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/user/USERNAME/dir1</expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>df</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -put CLITEST_DATA/data15bytes  /user/USERNAME/dir1/file0</command>
+        <command>-fs NAMENODE -df /user/USERNAME</command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>Filesystem( )*Size( )*Used( )*Available( )*Use%.*</expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>expunge</description>
+      <test-commands>
+        <command>-fs NAMENODE -expunge</command>
+      </test-commands>
+      <cleanup-commands>
+        <command></command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>ExactComparator</type>
+          <expected-output></expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>getmerge</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data30bytes /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -getmerge /user/USERNAME/dir1 CLITEST_DATA/file</command>
+        <command>-cat CLITEST_DATA/file</command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME</command>
+        <command>rm data</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>12345678901234.*</expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <!-- DFSadmin tests -->
+    <test>
+      <description>refreshUserToGroupsMappings</description>
+      <test-commands>
+        <dfs-admin-command>-fs NAMENODE -refreshUserToGroupsMappings</dfs-admin-command>
+      </test-commands>
+      <cleanup-commands>
+        <command></command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>ExactComparator</type>
+          <expected-output></expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>refreshSuperUserGroupsConfiguration</description>
+      <test-commands>
+        <dfs-admin-command>-fs NAMENODE -refreshSuperUserGroupsConfiguration</dfs-admin-command>
+      </test-commands>
+      <cleanup-commands>
+        <command></command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>ExactComparator</type>
+          <expected-output></expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>setQuota</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <dfs-admin-command>-fs NAMENODE -setQuota 3 /user/USERNAME/dir1</dfs-admin-command>
+        <command>-fs NAMENODE -count -q /user/USERNAME/dir1</command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>( )*3.*/user/USERNAME/dir1</expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>clrQuota</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <dfs-admin-command>-fs NAMENODE -setQuota 3 /user/USERNAME/dir1</dfs-admin-command>
+        <dfs-admin-command>-fs NAMENODE -clrQuota /user/USERNAME/dir1</dfs-admin-command>
+        <command>-fs NAMENODE -count -q /user/USERNAME/dir1</command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>( )*none.*/user/USERNAME/dir1</expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>setSpaceQuota</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <dfs-admin-command>-fs NAMENODE -setSpaceQuota 1G /user/USERNAME/dir1</dfs-admin-command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME/dir1</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>ExactComparator</type>
+          <expected-output></expected-output>
+        </comparator>
+      </comparators>
+    </test>
+    <test>
+      <description>setBalancerBandwidth</description>
+      <test-commands>
+        <dfs-admin-command>-fs NAMENODE -setBalancerBandwidth 104857600</dfs-admin-command>
+      </test-commands>
+      <cleanup-commands>
+        <command></command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>ExactComparator</type>
+          <expected-output></expected-output>
+        </comparator>
+      </comparators>
+    </test>
 
     <!-- Tests for moveFromLocal -->
     <test> <!-- TESTED -->

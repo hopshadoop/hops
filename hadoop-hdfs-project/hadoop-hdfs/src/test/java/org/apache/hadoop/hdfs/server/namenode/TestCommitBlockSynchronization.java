@@ -72,6 +72,7 @@ public class TestCommitBlockSynchronization {
     DatanodeStorageInfo[] targets = new DatanodeStorageInfo[0];
 
     FSNamesystem namesystem = new FSNamesystem(conf, cluster.getNameNode());
+    namesystem.setImageLoaded(true);
     FSNamesystem namesystemSpy = spy(namesystem);
     doReturn(1L).when(file).getId();
     BlockInfoUnderConstruction blockInfo = createBlockInfoUnderConstruction(targets, block, file);
@@ -89,8 +90,6 @@ public class TestCommitBlockSynchronization {
     doReturn("").when(namesystemSpy).closeFileCommitBlocks(
         any(INodeFile.class),
         any(BlockInfo.class));
-    doReturn("").when(namesystemSpy).persistBlocks(
-        any(INodeFile.class));
 
     return namesystemSpy;
   }

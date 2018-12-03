@@ -122,7 +122,7 @@ public class TestBlockManager {
         conf.getInt(DFS_SUBTREE_EXECUTOR_LIMIT_KEY,
             DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT));
     fsn = Mockito.mock(FSNamesystem.class);
-    Mockito.doReturn(subTreeOpsPool).when(fsn).getSubtreeOperationsExecutor();
+    Mockito.doReturn(subTreeOpsPool).when(fsn).getFSOperationsExecutor();
     formatStorage();
 
     bm = new BlockManager(fsn, fsn, conf);
@@ -172,7 +172,7 @@ public class TestBlockManager {
   private void removeNode(DatanodeDescriptor deadNode) throws IOException {
     NetworkTopology cluster = bm.getDatanodeManager().getNetworkTopology();
     cluster.remove(deadNode);
-    bm.datanodeRemoved(deadNode);
+    bm.datanodeRemoved(deadNode, false);
   }
 
 
@@ -479,7 +479,7 @@ public class TestBlockManager {
 
         for (DatanodeDescriptor dn : nodes) {
           for (DatanodeStorageInfo storage : dn.getStorageInfos()) {
-            blockInfo.addReplica(storage);
+            blockInfo.addStorage(storage);
           }
         }
         return blockInfo;
@@ -781,7 +781,7 @@ public class TestBlockManager {
     assertEquals(1, ds.getBlockReportCount());
 
     // re-register as if node restarted, should update existing node
-    bm.getDatanodeManager().removeDatanode(node);
+    bm.getDatanodeManager().removeDatanode(node, false);
     reset(node);
     bm.getDatanodeManager().registerDatanode(nodeReg);
     verify(node).updateRegInfo(nodeReg);

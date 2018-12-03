@@ -163,6 +163,19 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
   }
   
+  @Override
+  public String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter)
+      throws URISyntaxException, IOException {
+    // TODO(Antonis): Not implemented yet
+    return null;
+  }
+  
+  @Override
+  public void invalidateJWT(String signingKeyName) throws URISyntaxException, IOException {
+    // TODO(Antonis) Not implemented yet
+  }
+  
+  // GeneralSecurityException is thrown in DevHopsworksRMAppSecurityActions
   protected CloseableHttpClient createHttpClient() throws GeneralSecurityException, IOException {
     BasicCookieStore cookieStore = new BasicCookieStore();
     return HttpClients.custom().setDefaultCookieStore(cookieStore).build();

@@ -48,13 +48,13 @@ public class INodeAttributesContext
       throws TransactionContextException {
     if (iNodeAttributes.isInTree()) {
       super.update(iNodeAttributes);
-      if(isLogDebugEnabled()){
+      if(isLogTraceEnabled()){
         log("updated-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getQuotaCounts().get(
             Quota.DISKSPACE), "DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getQuotaCounts().get(
                 Quota.NAMESPACE), "NS", iNodeAttributes.getNsCount());
       }
     } else {
-      if(isLogDebugEnabled()) {
+      if(isLogTraceEnabled()) {
         log("updated-attributes -- IGNORED as id is not set");
       }
     }
@@ -64,7 +64,7 @@ public class INodeAttributesContext
   public void remove(INodeAttributes iNodeAttributes)
       throws TransactionContextException {
     super.remove(iNodeAttributes);
-    if(isLogDebugEnabled()) {
+    if(isLogTraceEnabled()) {
       log("removed-attributes", "id", iNodeAttributes.getInodeId());
       for(int i = 0; i < Thread.currentThread().getStackTrace().length;i++){
        System.out.println(Thread.currentThread().getStackTrace()[i]) ;
@@ -203,13 +203,13 @@ public class INodeAttributesContext
         INodeAttributes toBeAdded = clone(toBeDeleted, trg_param.getInodeId());
 
         remove(toBeDeleted);
-        if(isLogDebugEnabled()) {
+        if(isLogTraceEnabled()) {
           log("snapshot-maintenance-removed-inode-attribute", "inodeId",
                   toBeDeleted.getInodeId());
         }
 
         add(toBeAdded);
-        if(isLogDebugEnabled()) {
+        if(isLogTraceEnabled()) {
           log("snapshot-maintenance-added-inode-attribute", "inodeId",
                   toBeAdded.getInodeId());
         }

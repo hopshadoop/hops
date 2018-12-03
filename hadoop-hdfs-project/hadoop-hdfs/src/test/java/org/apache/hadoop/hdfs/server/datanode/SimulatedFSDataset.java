@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import java.util.Collection;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.StorageType;
@@ -46,7 +48,7 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -56,8 +58,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
 
 /**
  * This class implements a simulated FSDataset.
@@ -1121,6 +1121,12 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
   @Override
   public FsVolumeSpi getVolume(ExtendedBlock b) {
+    throw new UnsupportedOperationException();
+  }
+  
+  @Override
+  public void submitBackgroundSyncFileRangeRequest(ExtendedBlock block,
+      FileDescriptor fd, long offset, long nbytes, int flags) {
     throw new UnsupportedOperationException();
   }
 }

@@ -25,7 +25,10 @@ import io.hops.metadata.hdfs.dal.HashBucketDataAccess;
 import io.hops.metadata.hdfs.entity.HashBucket;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -166,18 +169,26 @@ public class HashBuckets {
     return result;
   }
   
+  Collection<HashBucket> getBuckets(int storageId)
+      throws TransactionContextException, StorageException {
+    Collection<HashBucket> result = EntityManager.findList(HashBucket.Finder.ByStorageId, storageId);
+    return result;
+  }
+  
   private static String blockToString(Block block){
     return "(id: " + block.getBlockId() + ",#bytes: "+block.getNumBytes() +
         ",GS: " + block.getGenerationStamp()+")";
   }
+
   public void applyHash(int storageId, HdfsServerConstants.ReplicaState state,
       Block block ) throws TransactionContextException, StorageException {
     int bucketId = getBucketForBlock(block);
     HashBucket bucket = getBucket(storageId, bucketId);
-    long newHash = bucket.getHash() + BlockReport.hash(block, state);
+    long curVal = bucket.getHash();
+    long newHash = curVal  + BlockReport.hash(block, state);
     LOG.debug("Applying block:" + blockToString
-        (block) + "sid: " + storageId + "state: " + state.name() + ", hash: "
-        + BlockReport.hash(block, state));
+        (block) + "sid=" + storageId + " state=" + state.name() + ", hash ("+
+        curVal+" + "+ BlockReport.hash(block, state)+" = "+newHash+")");
     
     bucket.setHash(newHash);
   }
@@ -186,11 +197,31 @@ public class HashBuckets {
       state, Block block) throws TransactionContextException, StorageException {
     int bucketId = getBucketForBlock(block);
     HashBucket bucket = getBucket(storageId, bucketId);
-    long newHash = bucket.getHash() - BlockReport.hash(block, state);
+    long currVal = bucket.getHash();
+    long newHash = currVal - BlockReport.hash(block, state);
     LOG.debug("Undo block:" + blockToString
-        (block) + "sid: " + storageId + "state: " + state.name() + ", hash: " +
-        BlockReport.hash(block,state));
+        (block) + " sid=" + storageId + " state=" + state.name() + ", hash (" +
+        currVal+" - "+BlockReport.hash(block,state)+" = "+newHash+")");
     
     bucket.setHash(newHash);
+  }
+  
+  public void resetBuckets(final int storageId) throws IOException {
+    new HopsTransactionalRequestHandler(HDFSOperationType.RESET_STORAGE_HASHES) {
+      @Override
+      public void acquireLock(TransactionLocks tl) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        tl.add(lf.getHashBucketLock(storageId));
+      }
+      
+      @Override
+      public Object performTask() throws IOException {
+        Collection<HashBucket> buckets = getBuckets(storageId);
+        for(HashBucket bucket: buckets){
+            bucket.setHash(0);
+        }
+        return null;
+      }
+    }.handle();
   }
 }

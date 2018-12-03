@@ -78,6 +78,8 @@ message ApplicationStateDataProto {
     optional int64 certificate_expiration = 14;
     optional int64 material_rotation_start = 15;
     optional bool is_during_material_rotation = 16 [default = false];
+    optional string jwt = 17;
+    optional int64 jwt_expiration = 18;
 }
 
 message ApplicationAttemptStateDataProto {

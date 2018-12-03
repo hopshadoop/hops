@@ -47,6 +47,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.fs.permission.FsPermission;
 
 @InterfaceAudience.Private
 public class FileSystemAccessService extends BaseService
@@ -426,6 +427,10 @@ public class FileSystemAccessService extends BaseService
     Configuration conf = new Configuration(true);
     ConfigurationUtils.copy(serviceHadoopConf, conf);
     conf.setBoolean(FILE_SYSTEM_SERVICE_CREATED, true);
+    
+    // Force-clear server-side umask to make HttpFS match WebHDFS behavior
+    conf.set(FsPermission.UMASK_LABEL, "000");
+    
     return conf;
   }
 

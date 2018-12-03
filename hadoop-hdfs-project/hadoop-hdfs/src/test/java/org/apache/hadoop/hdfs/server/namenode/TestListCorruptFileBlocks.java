@@ -68,6 +68,8 @@ public class TestListCorruptFileBlocks {
           1); // datanode scans directories
       conf.setInt(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY,
           3 * 1000); // datanode sends block reports
+      // Set short retry timeouts so this test runs faster
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
       cluster = new MiniDFSCluster.Builder(conf).build();
       FileSystem fs = cluster.getFileSystem();
 
@@ -158,6 +160,8 @@ public class TestListCorruptFileBlocks {
       // start populating repl queues immediately 
       conf.setFloat(DFSConfigKeys.DFS_NAMENODE_REPL_QUEUE_THRESHOLD_PCT_KEY,
           0f);
+      // Set short retry timeouts so this test runs faster
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
       cluster = new MiniDFSCluster.Builder(conf).waitSafeMode(false).build();
       cluster.getNameNodeRpc()
           .setSafeMode(HdfsConstants.SafeModeAction.SAFEMODE_LEAVE, false);

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.api.ParamException;
 import com.sun.jersey.api.container.ContainerException;
 import org.apache.commons.logging.Log;
@@ -24,6 +25,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.web.JsonUtil;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.authorize.AuthorizationException;
+import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.Context;
@@ -33,6 +35,7 @@ import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import org.apache.hadoop.ipc.StandbyException;
 
 /**
  * Handle exceptions.
@@ -42,9 +45,22 @@ public class ExceptionHandler implements ExceptionMapper<Exception> {
   public static final Log LOG = LogFactory.getLog(ExceptionHandler.class);
 
   private static Exception toCause(Exception e) {
-    final Throwable t = e.getCause();
-    if (t != null && t instanceof Exception) {
-      e = (Exception) e.getCause();
+    final Throwable t = e.getCause();    
+    if (e instanceof SecurityException) {
+      // For the issue reported in HDFS-6475, if SecurityException's cause
+      // is InvalidToken, and the InvalidToken's cause is StandbyException,
+      // return StandbyException; Otherwise, leave the exception as is,
+      // since they are handled elsewhere. See HDFS-6588.
+      if (t != null && t instanceof InvalidToken) {
+        final Throwable t1 = t.getCause();
+        if (t1 != null && t1 instanceof StandbyException) {
+          e = (StandbyException)t1;
+        }
+      }
+    } else {
+      if (t != null && t instanceof Exception) {
+        e = (Exception)t;
+      }
     }
     return e;
   }
@@ -77,6 +93,10 @@ public class ExceptionHandler implements ExceptionMapper<Exception> {
       e = ((RemoteException) e).unwrapRemoteException();
     }
 
+    if (e instanceof SecurityException) {
+      e = toCause(e);
+    }
+        
     //Map response status
     final Response.Status s;
     if (e instanceof SecurityException) {
@@ -99,5 +119,10 @@ public class ExceptionHandler implements ExceptionMapper<Exception> {
     final String js = JsonUtil.toJsonString(e);
     return Response.status(s).type(MediaType.APPLICATION_JSON).entity(js)
         .build();
+  }
+  
+  @VisibleForTesting
+  public void initResponse(HttpServletResponse response) {
+    this.response = response;
   }
 }

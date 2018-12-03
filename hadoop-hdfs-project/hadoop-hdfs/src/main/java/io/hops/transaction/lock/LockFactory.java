@@ -20,13 +20,12 @@ import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.ipc.RetryCache;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.ipc.RetryCache;
 
 public class LockFactory {
 
@@ -290,10 +289,18 @@ public class LockFactory {
     return new IndividualHashBucketLock(storageId, bucketId);
   }
   
+  public Lock getHashBucketLock(int storageId) {
+    return new HashBucketLock(storageId);
+  }
+  
   public Lock getLastBlockHashBucketsLock(){
     return new LastBlockReplicasHashBucketLock();
   }
-  
+
+  public Lock getAllUsedHashBucketsLock() {
+    return new HashBucketsLocksAllFileBlocks();
+  }
+
   public Lock getRetryCacheEntryLock(byte[] clientId, int callId){
     return new RetryCacheEntryLock(clientId, callId);
   }
@@ -349,7 +356,7 @@ public class LockFactory {
           list.add(getSqlBatchedInvalidatedBlocksLock());
           break;
         case PE:
-          list.add(getSqlBatchedInvalidatedBlocksLock());
+          list.add(getSqlBatchedPendingBlocksLock());
           break;
         case UC:
           list.add(getSqlBatchedReplicasUnderConstructionLock());

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,12 +36,17 @@ import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.UpdateContainerRequest;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerResponse;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
@@ -132,13 +138,13 @@ public class MockNM {
   }
   
   public RegisterNodeManagerResponse registerNode(
-      Map<ApplicationId, Integer> runningApplications) throws Exception {
+      Map<ApplicationId, UpdatedCryptoForApp> runningApplications) throws Exception {
     return registerNode(null, runningApplications);
   }
 
   public RegisterNodeManagerResponse registerNode(
       List<NMContainerStatus> containerReports,
-      Map<ApplicationId, Integer> runningApplications) throws Exception {
+      Map<ApplicationId, UpdatedCryptoForApp> runningApplications) throws Exception {
     RegisterNodeManagerRequest req = Records.newRecord(
         RegisterNodeManagerRequest.class);
     req.setNodeId(nodeId);
@@ -265,6 +271,13 @@ public class MockNM {
     }
 
     return heartbeatResponse;
+  }
+
+  public UnRegisterNodeManagerResponse unregisterNode() throws YarnException, IOException{
+    
+    UnRegisterNodeManagerRequest request = Records.newRecord(UnRegisterNodeManagerRequest.class);
+    request.setNodeId(nodeId);
+    return resourceTracker.unRegisterNodeManager(request);
   }
 
   public long getMemory() {

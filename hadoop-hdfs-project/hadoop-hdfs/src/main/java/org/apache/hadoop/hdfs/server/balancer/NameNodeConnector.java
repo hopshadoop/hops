@@ -45,7 +45,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Daemon;
 
 import java.io.Closeable;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -57,15 +56,18 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FsServerDefaults;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactory;
 
 /**
  * The class provides utilities for {@link Balancer} to access a NameNode
  */
 @InterfaceAudience.Private
 public class NameNodeConnector implements Closeable {
-  private static final Log LOG = Balancer.LOG;
-  private static final Path BALANCER_ID_PATH = new Path("/system/balancer.id");
+  private static final Log LOG = LogFactory.getLog(NameNodeConnector.class);
+  
   private static final int MAX_NOT_CHANGED_ITERATIONS = 5;
   private static boolean write2IdFile = true;
  
@@ -78,7 +80,7 @@ public class NameNodeConnector implements Closeable {
     final List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>(
         namenodes.size());
     for (URI uri : namenodes) {
-      NameNodeConnector nnc = new NameNodeConnector(uri, null, conf);
+      NameNodeConnector nnc = new NameNodeConnector(name, uri, idPath, null, conf);
       connectors.add(nnc);
     }
     return connectors;
@@ -90,7 +92,7 @@ public class NameNodeConnector implements Closeable {
     final List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>(
         namenodes.size());
     for (Map.Entry<URI, List<Path>> entry : namenodes.entrySet()) {
-      NameNodeConnector nnc = new NameNodeConnector(entry.getKey(), entry.getValue(), conf);
+      NameNodeConnector nnc = new NameNodeConnector(name, entry.getKey(), idPath, entry.getValue(), conf);
       connectors.add(nnc);
     }
     return connectors;
@@ -106,23 +108,20 @@ public class NameNodeConnector implements Closeable {
 
   final NamenodeProtocol namenode;
   final ClientProtocol client;
+  private final KeyManager keyManager;
+  
   final DistributedFileSystem fs;
+  private final Path idPath;
   final OutputStream out;
   private final List<Path> targetPaths;
   private final AtomicLong bytesMoved = new AtomicLong();
   
   private int notChangedIterations = 0;
 
-  private final boolean isBlockTokenEnabled;
-  private final boolean encryptDataTransfer;
-  private boolean shouldRun;
-  private long keyUpdaterInterval;
-  private BlockTokenSecretManager blockTokenSecretManager;
-  private Daemon keyupdaterthread; // AccessKeyUpdater thread
-  private DataEncryptionKey encryptionKey;
-
-  NameNodeConnector(URI nameNodeUri, List<Path> targetPaths, Configuration conf) throws IOException {
+  public NameNodeConnector(String name, URI nameNodeUri, Path idPath, List<Path> targetPaths, Configuration conf) 
+      throws IOException {
     this.nameNodeUri = nameNodeUri;
+    this.idPath = idPath;
     this.targetPaths = targetPaths == null || targetPaths.isEmpty() ? Arrays.asList(new Path("/")) : targetPaths;
 
     this.namenode = NameNodeProxies.createProxy(conf, nameNodeUri, NamenodeProtocol.class).getProxy();
@@ -132,56 +131,13 @@ public class NameNodeConnector implements Closeable {
     final NamespaceInfo namespaceinfo = namenode.versionRequest();
     this.blockpoolID = namespaceinfo.getBlockPoolID();
 
-    final ExportedBlockKeys keys = namenode.getBlockKeys();
-    this.isBlockTokenEnabled = keys.isBlockTokenEnabled();
-    if (isBlockTokenEnabled) {
-      long blockKeyUpdateInterval = keys.getKeyUpdateInterval();
-      long blockTokenLifetime = keys.getTokenLifetime();
-      LOG.info("Block token params received from NN: keyUpdateInterval=" +
-          blockKeyUpdateInterval / (60 * 1000) + " min(s), tokenLifetime=" +
-          blockTokenLifetime / (60 * 1000) + " min(s)");
-      String encryptionAlgorithm =
-          conf.get(DFSConfigKeys.DFS_DATA_ENCRYPTION_ALGORITHM_KEY);
-      this.blockTokenSecretManager =
-          new BlockTokenSecretManager(blockKeyUpdateInterval,
-              blockTokenLifetime, blockpoolID, encryptionAlgorithm);
-      this.blockTokenSecretManager.addKeys(keys);
-      /*
-       * Balancer should sync its block keys with NN more frequently than NN
-       * updates its block keys
-       */
-      this.keyUpdaterInterval = blockKeyUpdateInterval / 4;
-      LOG.info("Balancer will update its block keys every " +
-          keyUpdaterInterval / (60 * 1000) + " minute(s)");
-      this.keyupdaterthread = new Daemon(new BlockKeyUpdater());
-      this.shouldRun = true;
-      this.keyupdaterthread.start();
-    }
-    this.encryptDataTransfer =
-        fs.getServerDefaults(new Path("/")).getEncryptDataTransfer();
-    // Check if there is another balancer running.
+    final FsServerDefaults defaults = fs.getServerDefaults(new Path("/"));
+    this.keyManager = new KeyManager(blockpoolID, namenode,
+        defaults.getEncryptDataTransfer(), conf);
     // Exit if there is another one running.
-    out = checkAndMarkRunningBalancer();
+    out = checkAndMarkRunning(); 
     if (out == null) {
-      throw new IOException("Another balancer is running");
-    }
-  }
-
-  /**
-   * Get an access token for a block.
-   */
-  Token<BlockTokenIdentifier> getAccessToken(ExtendedBlock eb)
-      throws IOException {
-    if (!isBlockTokenEnabled) {
-      return BlockTokenSecretManager.DUMMY_TOKEN;
-    } else {
-      if (!shouldRun) {
-        throw new IOException(
-            "Can not get access token. BlockKeyUpdater is not running");
-      }
-      return blockTokenSecretManager.generateToken(null, eb, EnumSet
-          .of(BlockTokenSecretManager.AccessMode.REPLACE,
-              BlockTokenSecretManager.AccessMode.COPY));
+      throw new IOException("Another " + name + " is running.");
     }
   }
 
@@ -214,6 +170,11 @@ public class NameNodeConnector implements Closeable {
     return client.getDatanodeStorageReport(HdfsConstants.DatanodeReportType.LIVE);
   }
 
+  /** @return the key manager */
+  public KeyManager getKeyManager() {
+    return keyManager;
+  }
+  
   /** @return the list of paths to scan/migrate */
   public List<Path> getTargetPaths() {
     return targetPaths;
@@ -234,36 +195,24 @@ public class NameNodeConnector implements Closeable {
     return true;
   }
 
-  DataEncryptionKey getDataEncryptionKey() throws IOException {
-    if (encryptDataTransfer) {
-      synchronized (this) {
-        if (encryptionKey == null) {
-          encryptionKey = blockTokenSecretManager.generateDataEncryptionKey();
-        }
-        return encryptionKey;
-      }
-    } else {
-      return null;
-    }
-  }
-
-  /* The idea for making sure that there is no more than one balancer
+  /**
+   * The idea for making sure that there is no more than one instance
    * running in an HDFS is to create a file in the HDFS, writes the hostname
-   * of the machine on which the balancer is running to the file, but did not
-   * close the file until the balancer exits.
-   * This prevents the second balancer from running because it can not
+   * of the machine on which the instance is running to the file, but did not
+   * close the file until it exits. 
+   * 
+   * This prevents the second instance from running because it can not
    * creates the file while the first one is running.
    *
-   * This method checks if there is any running balancer and
-   * if no, mark yes if no.
+   * This method checks if there is any running instance. If no, mark yes.
    * Note that this is an atomic operation.
    *
-   * Return null if there is a running balancer; otherwise the output stream
-   * to the newly created file.
+   * @return null if there is a running instance;
+   *         otherwise, the output stream to the newly created file.
    */
-  private OutputStream checkAndMarkRunningBalancer() throws IOException {
+  private OutputStream checkAndMarkRunning() throws IOException {
     try {
-      final FSDataOutputStream out = fs.create(BALANCER_ID_PATH);
+      final FSDataOutputStream out = fs.create(idPath);
       if (write2IdFile) {
         out.writeBytes(InetAddress.getLocalHost().getHostName());
         out.flush();
@@ -279,26 +228,17 @@ public class NameNodeConnector implements Closeable {
     }
   }
 
-  /**
-   * Close the connection.
-   */
+  @Override
   public void close() {
-    shouldRun = false;
-    try {
-      if (keyupdaterthread != null) {
-        keyupdaterthread.interrupt();
-      }
-    } catch (Exception e) {
-      LOG.warn("Exception shutting down access key updater thread", e);
-    }
+    keyManager.close();
 
     // close the output file
     IOUtils.closeStream(out);
     if (fs != null) {
       try {
-        fs.delete(BALANCER_ID_PATH, true);
+        fs.delete(idPath, true);
       } catch (IOException ioe) {
-        LOG.warn("Failed to delete " + BALANCER_ID_PATH, ioe);
+        LOG.warn("Failed to delete " + idPath, ioe);
       }
     }
   }
@@ -307,29 +247,5 @@ public class NameNodeConnector implements Closeable {
   public String toString() {
     return getClass().getSimpleName() + "[namenodeUri=" + nameNodeUri +
         ", id=" + blockpoolID + "]";
-  }
-
-  /**
-   * Periodically updates access keys.
-   */
-  class BlockKeyUpdater implements Runnable {
-    @Override
-    public void run() {
-      try {
-        while (shouldRun) {
-          try {
-            blockTokenSecretManager.addKeys(namenode.getBlockKeys());
-          } catch (IOException e) {
-            LOG.error("Failed to set keys", e);
-          }
-          Thread.sleep(keyUpdaterInterval);
-        }
-      } catch (InterruptedException e) {
-        LOG.debug("InterruptedException in block key updater thread", e);
-      } catch (Throwable e) {
-        LOG.error("Exception in block key updater thread", e);
-        shouldRun = false;
-      }
-    }
   }
 }

@@ -75,21 +75,6 @@ public class CorruptReplicasMap {
   public CorruptReplicasMap(DatanodeManager datanodeMgr) {
     this.datanodeMgr = datanodeMgr;
   }
-
-  /**
-   * Mark the block belonging to datanode as corrupt.
-   *
-   * @param blk
-   *     Block to be added to CorruptReplicasMap
-   * @param storage
-   *     storage which holds the corrupt replica
-   * @param reason
-   *     a textual reason (for logging purposes)
-   */
-  public void addToCorruptReplicasMap(BlockInfo blk, DatanodeStorageInfo
-      storage, String reason) throws StorageException, TransactionContextException {
-    addToCorruptReplicasMap(blk, storage, reason, Reason.NONE);
-  }
   
   /**
    * Mark the block belonging to datanode as corrupt.
@@ -281,13 +266,13 @@ public class CorruptReplicasMap {
     return ((nodes != null) && (nodes.contains(node)));
   }
 
-  public int numCorruptReplicas(BlockInfo blk)
+  int numCorruptReplicas(BlockInfo blk)
       throws StorageException, TransactionContextException {
     Collection<DatanodeDescriptor> nodes = getNodes(blk);
     return (nodes == null) ? 0 : nodes.size();
   }
   
-  public int size() throws IOException {
+  int size() throws IOException {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.COUNT_CORRUPT_REPLICAS) {
       @Override

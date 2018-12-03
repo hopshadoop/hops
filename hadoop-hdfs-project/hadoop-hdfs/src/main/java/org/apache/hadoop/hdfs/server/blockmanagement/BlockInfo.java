@@ -24,23 +24,16 @@ import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.hdfs.entity.ReplicaBase;
 import io.hops.transaction.EntityManager;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.INodeFile;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
+import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
+
+import java.util.*;
 
 /**
  * BlockInfo class maintains for a given
@@ -282,12 +275,8 @@ public class BlockInfo extends Block {
    * Adds new replica for this block.
    * @return the replica stored, or null if it is already stored on this storage
    */
-  boolean addReplica(DatanodeStorageInfo storage)
+  boolean addStorage(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
-
-    if (isReplicatedOnDatanode(storage.getDatanodeDescriptor())) {
-      return false;
-    }
  
     Replica replica =
         new Replica(storage.getSid(), getBlockId(), getInodeId(), HashBuckets
@@ -300,6 +289,10 @@ public class BlockInfo extends Block {
       throws StorageException, TransactionContextException {
     for (Replica replica : getReplicasNoCheck()) {
       remove(replica);
+
+      //update the block report hashes
+      HashBuckets hashBuckets = HashBuckets.getInstance();
+      hashBuckets.undoHash(replica.getStorageId(), HdfsServerConstants.ReplicaState.FINALIZED, this);
     }
   }
 
@@ -321,7 +314,7 @@ public class BlockInfo extends Block {
     }
     return replica;
   }
-
+  
   Replica removeReplica(int sid)
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicasNoCheck();
@@ -336,23 +329,29 @@ public class BlockInfo extends Block {
     return replica;
   }
   /**
-   * Returns true if this block has a replica on the given datanode.
+   * Returns the storage id of the version of the replica stored on the datanode
+   * return null if this block does not have a replica on the given datanode.
    * @param dn
    * @return
    */
-  boolean isReplicatedOnDatanode(DatanodeDescriptor dn)
-      throws StorageException {
+  public Integer getReplicatedOnDatanode(DatanodeDescriptor dn)
+      throws StorageException, TransactionContextException {
     DatanodeStorageInfo[] storages = dn.getStorageInfos();
-    List<Integer> sids = new ArrayList<Integer>();
-    for(DatanodeStorageInfo s : storages) {
+    Set<Integer> sids = new HashSet<>();
+    for (DatanodeStorageInfo s : storages) {
       sids.add(s.getSid());
     }
 
-    BlockInfoDataAccess da =
-        (BlockInfoDataAccess) HdfsStorageFactory
-            .getDataAccess(BlockInfoDataAccess.class);
-
-    return da.existsOnAnyStorage(getInodeId(), getBlockId(), sids);
+    List<Replica> list = (List<Replica>) EntityManager.findList(Replica.Finder.ByBlockIdAndINodeId, getBlockId(),
+        getInodeId());
+    if (list != null) {
+      for (Replica replica : list) {
+        if (sids.contains(replica.getStorageId())) {
+          return replica.getStorageId();
+        }
+      }
+    }
+    return null;
   }
   
   boolean isReplicatedOnStorage(DatanodeStorageInfo storage)

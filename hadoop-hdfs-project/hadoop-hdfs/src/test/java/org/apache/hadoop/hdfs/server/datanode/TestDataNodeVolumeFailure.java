@@ -60,6 +60,9 @@ import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.io.IOUtils;
 
 import javax.net.SocketFactory;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.security.token.Token;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -96,6 +99,7 @@ public class TestDataNodeVolumeFailure {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, block_size);
     // Allow a single volume failure (there are two volumes)
     conf.setInt(DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_BLOCK_FETCHER_BUCKETS_PER_THREAD, DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(dn_num).build();
     cluster.waitActive();
     dataDir = new File(cluster.getDataDirectory());
@@ -371,7 +375,8 @@ public class TestDataNodeVolumeFailure {
         }
   
         @Override
-        public Peer newConnectedPeer(InetSocketAddress addr)
+        public Peer newConnectedPeer(InetSocketAddress addr,
+            Token<BlockTokenIdentifier> blockToken, DatanodeID datanodeId)
             throws IOException {
           Peer peer = null;
           Socket sock = getSocketFactory(conf).createSocket();
