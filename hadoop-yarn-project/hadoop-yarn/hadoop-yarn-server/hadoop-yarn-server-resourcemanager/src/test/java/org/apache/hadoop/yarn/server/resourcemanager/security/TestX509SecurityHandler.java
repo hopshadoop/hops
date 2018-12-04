@@ -135,8 +135,8 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     String sslConfFileName = TestX509SecurityHandler.class.getSimpleName() + ".ssl-server.xml";
     sslServerFile = Paths.get(classPath, sslConfFileName).toFile();
     Configuration sslServer = new Configuration(false);
-    sslServer.set(HopsworksRMAppSecurityActions.HOPSWORKS_USER_KEY, "agent-user");
-    sslServer.set(HopsworksRMAppSecurityActions.HOPSWORKS_PASSWORD_KEY, "agent-password");
+    /*sslServer.set(HopsworksRMAppSecurityActions.HOPSWORKS_USER_KEY, "agent-user");
+    sslServer.set(HopsworksRMAppSecurityActions.HOPSWORKS_PASSWORD_KEY, "agent-password");*/
     KeyStoreTestUtil.saveConfig(sslServerFile, sslServer);
     conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFileName);
   }

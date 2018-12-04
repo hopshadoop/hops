@@ -32,6 +32,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppSecurityMaterial
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
@@ -156,7 +157,8 @@ public class JWTSecurityHandler
   
   @InterfaceAudience.Private
   @VisibleForTesting
-  protected String generateInternal(JWTMaterialParameter parameter) throws URISyntaxException, IOException {
+  protected String generateInternal(JWTMaterialParameter parameter)
+      throws URISyntaxException, IOException, GeneralSecurityException {
     return rmAppSecurityActions.generateJWT(parameter);
   }
   
@@ -245,7 +247,7 @@ public class JWTSecurityHandler
     }
     try {
       rmAppSecurityActions.invalidateJWT(signingKeyName);
-    } catch (URISyntaxException | IOException ex) {
+    } catch (URISyntaxException | IOException | GeneralSecurityException ex) {
       LOG.error("Could not invalidate JWT with signing key " + signingKeyName, ex);
     }
   }

@@ -2656,7 +2656,7 @@ public class YarnConfiguration extends Configuration {
   /**
    * Application JWT configuration
    */
-  private static String JWT_PREFIX = "jwt.";
+  public static String JWT_PREFIX = "jwt.";
   public static boolean DEFAULT_RM_JWT_ENABLED = false;
   public static final String RM_JWT_ENABLED = RM_PREFIX + JWT_PREFIX + "enabled";
   
@@ -2669,4 +2669,12 @@ public class YarnConfiguration extends Configuration {
   
   public static String DEFAULT_RM_JWT_AUDIENCE = "job";
   public static final String RM_JWT_AUDIENCE = RM_PREFIX + JWT_PREFIX + "audience";
+  
+  public static String DEFAULT_RM_JWT_GENERATE_PATH = "/hopsworks-api/api/jwt/create";
+  public static final String RM_JWT_GENERATE_PATH = RM_PREFIX + JWT_PREFIX
+      + "generate-path";
+  
+  public static String DEFAULT_RM_JWT_INVALIDATE_PATH = "/hopsworks-api/api/jwt/remove/";
+  public static final String RM_JWT_INVALIDATE_PATH = RM_PREFIX + JWT_PREFIX
+      + "invalidate-path";
 }
