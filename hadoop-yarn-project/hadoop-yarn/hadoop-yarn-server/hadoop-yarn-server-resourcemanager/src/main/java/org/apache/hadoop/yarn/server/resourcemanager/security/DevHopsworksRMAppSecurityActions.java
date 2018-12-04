@@ -22,6 +22,7 @@ import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.TrustStrategy;
 
@@ -41,18 +42,21 @@ public class DevHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityActi
   }
   
   @Override
-  protected CloseableHttpClient createHttpClient() throws GeneralSecurityException, IOException {
-    BasicCookieStore cookieStore = new BasicCookieStore();
-    SSLContextBuilder sslContextBuilder = new SSLContextBuilder();
-    sslContextBuilder.loadTrustMaterial(new TrustStrategy() {
-      @Override
-      public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
-        return true;
-      }
-    });
-    SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContextBuilder.build(),
-        NoopHostnameVerifier.INSTANCE);
-    return HttpClients.custom().setDefaultCookieStore(cookieStore)
-        .setSSLSocketFactory(sslSocketFactory).build();
+  protected synchronized CloseableHttpClient createHttpClient(PoolingHttpClientConnectionManager connectionManager)
+      throws GeneralSecurityException, IOException {
+    if (httpClient == null) {
+      SSLContextBuilder sslContextBuilder = new SSLContextBuilder();
+      sslContextBuilder.loadTrustMaterial(new TrustStrategy() {
+        @Override
+        public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
+          return true;
+        }
+      });
+      SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContextBuilder.build(),
+          NoopHostnameVerifier.INSTANCE);
+      return HttpClients.custom().setConnectionManager(connectionManager)
+          .setSSLSocketFactory(sslSocketFactory).build();
+    }
+    return httpClient;
   }
 }

@@ -97,6 +97,12 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   }
   
   @Override
+  public void destroy() {
+    // Nothing to do here
+    LOG.debug("Nothing to do here");
+  }
+  
+  @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
   }

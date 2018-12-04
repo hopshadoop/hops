@@ -94,7 +94,7 @@ public class JWTSecurityHandler
     expirationSafetyPeriod = rmAppSecurityManager.parseInterval(safetyExpirationPeriodConf,
         YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD);
     if (jwtEnabled) {
-      rmAppSecurityActions = RMAppSecurityActionsFactory.getInstance().getActor(config);
+      rmAppSecurityActions = rmAppSecurityManager.getRmAppCertificateActions();
     }
   }
   

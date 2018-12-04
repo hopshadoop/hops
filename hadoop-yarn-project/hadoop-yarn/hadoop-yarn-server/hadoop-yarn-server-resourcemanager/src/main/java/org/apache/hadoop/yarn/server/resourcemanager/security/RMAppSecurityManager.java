@@ -154,8 +154,14 @@ public class RMAppSecurityManager extends AbstractService
         if (!renewalExecutorService.awaitTermination(2L, TimeUnit.SECONDS)) {
           renewalExecutorService.shutdownNow();
         }
+        if (rmAppCertificateActions != null) {
+          rmAppCertificateActions.destroy();
+        }
       } catch (InterruptedException ex) {
         renewalExecutorService.shutdownNow();
+        if (rmAppCertificateActions != null) {
+          rmAppCertificateActions.destroy();
+        }
         Thread.currentThread().interrupt();
       }
     }

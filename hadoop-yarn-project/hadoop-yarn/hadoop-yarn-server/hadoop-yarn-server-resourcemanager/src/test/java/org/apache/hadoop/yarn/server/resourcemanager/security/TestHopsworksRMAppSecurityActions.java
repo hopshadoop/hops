@@ -24,6 +24,7 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.resourcemanager.Application;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -47,7 +48,10 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import java.io.IOException;
 import java.net.URL;
@@ -83,6 +87,9 @@ public class TestHopsworksRMAppSecurityActions {
   private Path sslServerPath;
   private Configuration conf;
   
+  @Rule
+  public final ExpectedException rule = ExpectedException.none();
+  
   @BeforeClass
   public static void beforeClass() throws Exception {
     Security.addProvider(new BouncyCastleProvider());
@@ -107,13 +114,15 @@ public class TestHopsworksRMAppSecurityActions {
   }
   
   @After
-  public void afterTest() {
+  public void afterTest() throws Exception {
     if (sslServerPath != null) {
       sslServerPath.toFile().delete();
     }
+    RMAppSecurityActionsFactory.getInstance().getActor(conf).destroy();
   }
   
   @Test
+  @Ignore
   public void testSign() throws Exception {
     KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA", "BC");
     keyPairGenerator.initialize(1024);
@@ -137,6 +146,7 @@ public class TestHopsworksRMAppSecurityActions {
   }
   
   @Test
+  @Ignore
   public void testRevoke() throws Exception {
     testSign();
     RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
@@ -147,12 +157,7 @@ public class TestHopsworksRMAppSecurityActions {
   @Test
   public void testGenerateJWT() throws Exception {
     ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
-    JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(appId, "Flock");
-    jwtParam.setRenewable(false);
-    Instant in10Minutes = Instant.now().plus(10, ChronoUnit.MINUTES);
-    jwtParam.setExpirationDate(in10Minutes);
-    jwtParam.setRenewNotBefore(new Date(in10Minutes.toEpochMilli()));
-    jwtParam.setAudiences(new String[]{"job"});
+    JWTSecurityHandler.JWTMaterialParameter jwtParam = createJWTParameter(appId);
     
     RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
     String jwt = actor.generateJWT(jwtParam);
@@ -164,6 +169,40 @@ public class TestHopsworksRMAppSecurityActions {
     String signingKeyName = "lala";
     RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
     actor.invalidateJWT(signingKeyName);
+  }
+  
+  @Test
+  public void testGenerateSameSigningKeyShouldFail() throws Exception {
+    ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
+    JWTSecurityHandler.JWTMaterialParameter jwtParam = createJWTParameter(appId);
+    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    actor.generateJWT(jwtParam);
+    
+    rule.expect(IOException.class);
+    actor.generateJWT(jwtParam);
+  }
+  
+  @Test
+  public void testGenerateInvalidateGenerate() throws Exception {
+    ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
+    JWTSecurityHandler.JWTMaterialParameter jwtParam = createJWTParameter(appId);
+    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    String jwt0 = actor.generateJWT(jwtParam);
+    Assert.assertNotNull(jwt0);
+    
+    actor.invalidateJWT(appId.toString());
+    String jwt1 = actor.generateJWT(jwtParam);
+    Assert.assertNotEquals(jwt0, jwt1);
+  }
+  
+  private JWTSecurityHandler.JWTMaterialParameter createJWTParameter(ApplicationId appId) {
+    JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(appId, "Flock");
+    jwtParam.setRenewable(false);
+    Instant in10Minutes = Instant.now().plus(10, ChronoUnit.MINUTES);
+    jwtParam.setExpirationDate(in10Minutes);
+    jwtParam.setRenewNotBefore(new Date(in10Minutes.toEpochMilli()));
+    jwtParam.setAudiences(new String[]{"job"});
+    return jwtParam;
   }
   
   private String loginAndGetJWT() throws Exception {

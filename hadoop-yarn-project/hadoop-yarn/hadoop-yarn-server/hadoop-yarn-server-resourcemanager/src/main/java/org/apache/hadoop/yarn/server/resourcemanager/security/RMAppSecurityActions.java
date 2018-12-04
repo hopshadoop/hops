@@ -25,7 +25,8 @@ import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 
 public interface RMAppSecurityActions {
-  void init() throws MalformedURLException, GeneralSecurityException;
+  void init() throws MalformedURLException, GeneralSecurityException, IOException;
+  void destroy();
   X509SecurityHandler.CertificateBundle sign(PKCS10CertificationRequest csr) throws URISyntaxException, IOException, GeneralSecurityException;
   int revoke(String certificateIdentifier) throws URISyntaxException, IOException, GeneralSecurityException;
   

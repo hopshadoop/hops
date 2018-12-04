@@ -38,6 +38,7 @@ import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
@@ -82,8 +83,11 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   private CertificateFactory certificateFactory;
   // JWT
   private URL jwtGeneratePath;
-  private String jwtInvalidatePath;
+  private URL jwtInvalidatePath;
   private String jwt;
+  
+  private PoolingHttpClientConnectionManager httpConnectionManager = null;
+  protected CloseableHttpClient httpClient = null;
   
   public HopsworksRMAppSecurityActions() throws MalformedURLException, GeneralSecurityException {
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_OK);
@@ -102,7 +106,11 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   }
   
   @Override
-  public void init() throws MalformedURLException, GeneralSecurityException {
+  public void init() throws MalformedURLException, GeneralSecurityException, IOException {
+    httpConnectionManager = new PoolingHttpClientConnectionManager();
+    httpConnectionManager.setDefaultMaxPerRoute(50);
+    httpClient = createHttpClient(httpConnectionManager);
+    
     hopsworksHost = new URL(conf.get(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY,
         "http://127.0.0.1"));
     loginEndpoint = new URL(hopsworksHost,
@@ -122,13 +130,13 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     jwtGeneratePath = new URL(hopsworksHost,
         conf.get(YarnConfiguration.RM_JWT_GENERATE_PATH,
             YarnConfiguration.DEFAULT_RM_JWT_GENERATE_PATH));
-    jwtInvalidatePath = conf.get(YarnConfiguration.RM_JWT_INVALIDATE_PATH,
+    String jwtInvalidatePathConf = conf.get(YarnConfiguration.RM_JWT_INVALIDATE_PATH,
         YarnConfiguration.DEFAULT_RM_JWT_INVALIDATE_PATH);
-    if (jwtInvalidatePath.startsWith("/")) {
-      jwtInvalidatePath = "%s" + jwtInvalidatePath + "%s";
-    } else {
-      jwtInvalidatePath = "%s/" + jwtInvalidatePath + "%s";
+    if (!jwtInvalidatePathConf.endsWith("/")) {
+      jwtInvalidatePathConf = jwtInvalidatePathConf + "/";
     }
+    jwtInvalidatePath = new URL(hopsworksHost, jwtInvalidatePathConf);
+    
     certificateFactory = CertificateFactory.getInstance("X.509", "BC");
     sslConf = new Configuration(false);
     sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
@@ -140,17 +148,22 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   }
   
   @Override
+  public void destroy() {
+    if (httpConnectionManager != null) {
+      httpConnectionManager.shutdown();
+    }
+  }
+  
+  @Override
   public X509SecurityHandler.CertificateBundle sign(PKCS10CertificationRequest csr)
       throws URISyntaxException, IOException, GeneralSecurityException {
-    CloseableHttpClient httpClient = null;
+    CloseableHttpResponse signResponse = null;
     try {
-      httpClient = createHttpClient();
-  
       String csrStr = stringifyCSR(csr);
       JsonObject json = new JsonObject();
       json.addProperty("csr", csrStr);
       
-      CloseableHttpResponse signResponse = post(httpClient, json, signEndpoint.toURI(),
+      signResponse = post(json, signEndpoint.toURI(),
           "Hopsworks CA could not sign CSR");
       
       String signResponseEntity = EntityUtils.toString(signResponse.getEntity());
@@ -161,27 +174,25 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
       X509Certificate issuer = parseCertificate(intermediateCaCert);
       return new X509SecurityHandler.CertificateBundle(certificate, issuer);
     } finally {
-      if (httpClient != null) {
-        httpClient.close();
+      if (signResponse != null) {
+        signResponse.close();
       }
     }
   }
   
   @Override
   public int revoke(String certificateIdentifier) throws URISyntaxException, IOException, GeneralSecurityException {
-    CloseableHttpClient httpClient = null;
+    CloseableHttpResponse response = null;
     try {
-      httpClient = createHttpClient();
-      
       String queryParams = buildQueryParams(new BasicNameValuePair(REVOKE_CERT_ID_PARAM, certificateIdentifier));
       URL revokeUrl = buildUrl(revokePath, queryParams);
       
-      CloseableHttpResponse response = delete(httpClient, revokeUrl.toURI(),
+      response = delete(revokeUrl.toURI(),
           "Hopsworks CA could not revoke certificate " + certificateIdentifier);
       return response.getStatusLine().getStatusCode();
     } finally {
-      if (httpClient != null) {
-        httpClient.close();
+      if (response != null) {
+        response.close();
       }
     }
   }
@@ -189,9 +200,8 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   @Override
   public String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter)
       throws URISyntaxException, IOException, GeneralSecurityException {
-    CloseableHttpClient client = null;
+    CloseableHttpResponse response = null;
     try {
-      client = createHttpClient();
       JsonObject json = new JsonObject();
       json.addProperty("subject", jwtParameter.getAppUser());
       json.addProperty("keyName", jwtParameter.getApplicationId().toString());
@@ -201,15 +211,15 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
       json.addProperty("renewable", jwtParameter.isRenewable());
       json.addProperty("expLeeway", jwtParameter.getExpLeeway());
       
-      CloseableHttpResponse response = post(client, json, jwtGeneratePath.toURI(),
+      response = post(json, jwtGeneratePath.toURI(),
           "Hopsworks could not generate JWT for " + jwtParameter.getAppUser()
               + "/" + jwtParameter.getApplicationId().toString());
       String responseStr = EntityUtils.toString(response.getEntity());
       JsonObject jsonResponse = new JsonParser().parse(responseStr).getAsJsonObject();
       return jsonResponse.get("token").getAsString();
     } finally {
-      if (client != null) {
-        client.close();
+      if (response != null) {
+        response.close();
       }
     }
   }
@@ -217,24 +227,27 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   @Override
   public void invalidateJWT(String signingKeyName)
       throws URISyntaxException, IOException, GeneralSecurityException {
-    CloseableHttpClient client = null;
+    CloseableHttpResponse response = null;
     try {
-      client = createHttpClient();
-      URL invalidateURL = new URL(String.format(jwtInvalidatePath, hopsworksHost.toString(), signingKeyName));
-      put(client, invalidateURL.toURI(), "Hopsworks could to invalidate JWT signing key " + signingKeyName);
+      URL invalidateURL = new URL(jwtInvalidatePath, signingKeyName);
+      response = put(invalidateURL.toURI(), "Hopsworks could to invalidate JWT signing key " + signingKeyName);
     } finally {
-      if (client != null) {
-        client.close();
+      if (response != null) {
+        response.close();
       }
     }
   }
   
   // GeneralSecurityException is thrown in DevHopsworksRMAppSecurityActions
-  protected CloseableHttpClient createHttpClient() throws GeneralSecurityException, IOException {
-    return HttpClients.createDefault();
+  protected synchronized CloseableHttpClient createHttpClient(PoolingHttpClientConnectionManager connectionManager)
+      throws GeneralSecurityException, IOException {
+    if (httpClient == null) {
+      return HttpClients.custom().setConnectionManager(connectionManager).build();
+    }
+    return httpClient;
   }
   
-  private CloseableHttpResponse post(CloseableHttpClient httpClient, JsonObject jsonEntity, URI target, String errorMessage)
+  private CloseableHttpResponse post(JsonObject jsonEntity, URI target, String errorMessage)
       throws IOException {
     HttpPost request = new HttpPost(target);
     addAuthenticationHeader(request);
@@ -245,7 +258,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     return response;
   }
   
-  private CloseableHttpResponse delete(CloseableHttpClient httpClient, URI target, String errorMessage)
+  private CloseableHttpResponse delete(URI target, String errorMessage)
       throws IOException {
     HttpDelete request = new HttpDelete(target);
     addAuthenticationHeader(request);
@@ -255,7 +268,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     return response;
   }
   
-  private CloseableHttpResponse put(CloseableHttpClient httpClient, URI target, String errorMessage)
+  private CloseableHttpResponse put(URI target, String errorMessage)
     throws IOException {
     HttpPut request = new HttpPut(target);
     addAuthenticationHeader(request);
