@@ -207,8 +207,10 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
 
     final List<DatanodeStorageInfo> results = new ArrayList<DatanodeStorageInfo>(chosenStorage);
     for (DatanodeStorageInfo storage : chosenStorage) {
-      // add localMachine and related nodes to excludedNodes
-      addToExcludedNodes(storage.getDatanodeDescriptor(), excludedNodes);
+      if(storage!=null){
+        // add localMachine and related nodes to excludedNodes
+        addToExcludedNodes(storage.getDatanodeDescriptor(), excludedNodes);
+      }
     }
 
     boolean avoidStaleNodes = (stats != null

@@ -3182,7 +3182,11 @@ public class FSNamesystem
 
             //find datanode storages
             final DatanodeManager dm = blockManager.getDatanodeManager();
-            chosen = Arrays.asList(dm.getDatanodeStorageInfos(existings, storageIDs));
+            if(existings.length!=0){
+              chosen = Arrays.asList(dm.getDatanodeStorageInfos(existings, storageIDs));
+            } else {
+              chosen = Collections.<DatanodeStorageInfo>emptyList();
+            }
 
             if (clientnode == null) {
               clientnode = getClientNode(clientMachine);
