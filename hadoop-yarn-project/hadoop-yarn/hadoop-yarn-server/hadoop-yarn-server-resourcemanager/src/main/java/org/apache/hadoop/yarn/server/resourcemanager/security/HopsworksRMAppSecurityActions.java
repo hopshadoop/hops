@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.commons.httpclient.HttpStatus;
@@ -25,6 +27,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.hadoop.util.BackOff;
+import org.apache.hadoop.util.ExponentialBackOff;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
@@ -32,6 +36,7 @@ import org.apache.http.HttpRequest;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -47,7 +52,10 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.util.io.pem.PemObjectGenerator;
 import org.bouncycastle.util.io.pem.PemWriter;
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
@@ -61,16 +69,21 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Configurable {
-  public static final String HOPSWORKS_JWT_KEY = YarnConfiguration.RM_PREFIX +
-      YarnConfiguration.JWT_PREFIX + "token";
   public static final String REVOKE_CERT_ID_PARAM = "certId";
+  public static final Pattern JWT_PATTERN = Pattern.compile("^Bearer\\s(.+)");
   
   private static final Log LOG = LogFactory.getLog(HopsworksRMAppSecurityActions.class);
   private static final Set<Integer> ACCEPTABLE_HTTP_RESPONSES = new HashSet<>(2);
   private static final String AUTH_HEADER_CONTENT = "Bearer %s";
+  
   private final AtomicReference<Header> authHeader;
   
   private Configuration conf;
@@ -84,15 +97,21 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   // JWT
   private URL jwtGeneratePath;
   private URL jwtInvalidatePath;
-  private String jwt;
+  private URL jwtAlivePath;
+  private long jwtAliveIntervalSeconds;
   
   private PoolingHttpClientConnectionManager httpConnectionManager = null;
   protected CloseableHttpClient httpClient = null;
+  private final ExecutorService tokenRenewer;
   
   public HopsworksRMAppSecurityActions() throws MalformedURLException, GeneralSecurityException {
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_OK);
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_NO_CONTENT);
     authHeader = new AtomicReference<>();
+    tokenRenewer = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
+        .setNameFormat("JWT renewer thread")
+        .setDaemon(true)
+        .build());
   }
   
   @Override
@@ -140,15 +159,29 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     certificateFactory = CertificateFactory.getInstance("X.509", "BC");
     sslConf = new Configuration(false);
     sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
-    jwt = sslConf.get(HOPSWORKS_JWT_KEY);
-    if (jwt == null) {
+    String jwtConf = sslConf.get(YarnConfiguration.RM_JWT_TOKEN);
+    if (jwtConf == null) {
       throw new GeneralSecurityException("Could not parse JWT from configuration");
     }
-    authHeader.set(createAuthenticationHeader(jwt));
+    authHeader.set(createAuthenticationHeader(jwtConf));
+    
+    jwtAlivePath = new URL(hopsworksHost,
+        conf.get(YarnConfiguration.RM_JWT_ALIVE_PATH, YarnConfiguration.DEFAULT_RM_JWT_ALIVE_PATH));
+    jwtAliveIntervalSeconds = conf.getTimeDuration(YarnConfiguration.RM_JWT_ALIVE_INTERVAL,
+        YarnConfiguration.DEFAULT_RM_JWT_ALIVE_INTERVAL, TimeUnit.SECONDS);
+    tokenRenewer.execute(new TokenRenewer());
   }
   
   @Override
   public void destroy() {
+    try {
+      tokenRenewer.shutdown();
+      if (!tokenRenewer.awaitTermination(1L, TimeUnit.SECONDS)) {
+        tokenRenewer.shutdownNow();
+      }
+    } catch (InterruptedException ex) {
+      tokenRenewer.shutdownNow();
+    }
     if (httpConnectionManager != null) {
       httpConnectionManager.shutdown();
     }
@@ -258,6 +291,14 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     return response;
   }
   
+  private CloseableHttpResponse get(URI target, String errorMessage) throws IOException {
+    HttpGet request = new HttpGet(target);
+    addAuthenticationHeader(request);
+    CloseableHttpResponse response = httpClient.execute(request);
+    checkHTTPResponseCode(response.getStatusLine().getStatusCode(), errorMessage);
+    return response;
+  }
+  
   private CloseableHttpResponse delete(URI target, String errorMessage)
       throws IOException {
     HttpDelete request = new HttpDelete(target);
@@ -317,12 +358,93 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
   }
   
-  private Header createAuthenticationHeader(String jwt) {
+  @VisibleForTesting
+  protected Header createAuthenticationHeader(String jwt) {
     String content = String.format(AUTH_HEADER_CONTENT, jwt);
     return new BasicHeader(HttpHeaders.AUTHORIZATION, content);
   }
   
   private void addAuthenticationHeader(HttpRequest httpRequest) {
     httpRequest.addHeader(authHeader.get());
+  }
+  
+  protected String getJWTFromResponse() throws IOException, URISyntaxException {
+    CloseableHttpResponse response = null;
+    try {
+      response = get(jwtAlivePath.toURI(), " Could not ping Hopsworks to renew JWT");
+      if (!response.containsHeader(HttpHeaders.AUTHORIZATION)) {
+        // JWT is sent only when the previous has expired
+        return null;
+      }
+      Header[] authHeaders = response.getHeaders(HttpHeaders.AUTHORIZATION);
+      for (Header header : authHeaders) {
+        Matcher matcher = JWT_PATTERN.matcher(header.getValue());
+        if (matcher.matches()) {
+          return matcher.group(1);
+        }
+      }
+      throw new IOException("Could not extract JWT from authentication header");
+    } finally {
+      if (response != null) {
+        response.close();
+      }
+    }
+  }
+  
+  private class TokenRenewer implements Runnable {
+    private final BackOff backoff;
+    private long backoffTime = 0L;
+    
+    private TokenRenewer() {
+      backoff = new ExponentialBackOff.Builder()
+          .setInitialIntervalMillis(800)
+          .setMaximumIntervalMillis(5000)
+          .setMultiplier(1.5)
+          .setMaximumRetries(4)
+          .build();
+    }
+    
+    @Override
+    public void run() {
+      while (!Thread.currentThread().isInterrupted()) {
+        try {
+          String jwt = getJWTFromResponse();
+          
+          if (jwt != null
+              && !authHeader.get().getValue().equals(String.format(AUTH_HEADER_CONTENT, jwt))) {
+            authHeader.set(createAuthenticationHeader(jwt));
+            sslConf.set(YarnConfiguration.RM_JWT_TOKEN, jwt);
+            URL sslServerURL = sslConf.getResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
+            File sslServerFile = new File(sslServerURL.getFile());
+            try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(sslServerFile))) {
+              sslConf.writeXml(bos);
+              bos.flush();
+            }
+            LOG.debug("Renewed Hopsworks JWT");
+          }
+          backoff.reset();
+          TimeUnit.SECONDS.sleep(jwtAliveIntervalSeconds);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+        } catch (URISyntaxException ex) {
+          // That's fatal error. Keep going until JWT expires
+          LOG.fatal(ex, ex);
+          Thread.currentThread().interrupt();
+        } catch (IOException ex) {
+          backoffTime = backoff.getBackOffInMillis();
+          if (backoffTime != -1) {
+            LOG.warn(ex + "Retrying in " + backoffTime + "ms", ex);
+            try {
+              TimeUnit.MILLISECONDS.sleep(backoffTime);
+            } catch (InterruptedException iex) {
+              Thread.currentThread().interrupt();
+            }
+          } else {
+            LOG.fatal(ex, ex);
+            Thread.currentThread().interrupt();
+          }
+        }
+      }
+    }
   }
 }

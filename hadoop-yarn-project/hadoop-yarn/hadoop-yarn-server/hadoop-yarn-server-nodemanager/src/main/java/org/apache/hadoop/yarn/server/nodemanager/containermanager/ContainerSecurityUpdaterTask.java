@@ -63,6 +63,8 @@ abstract class ContainerSecurityUpdaterTask implements Runnable {
       execute();
       updateStateStore();
       removeSecurityUpdaterTask();
+      backOff.reset();
+      backOffTime = 0L;
       LOG.debug("Updated security material for container: " + container.getContainerId());
     } catch (IOException ex) {
       LOG.error(ex, ex);

@@ -2916,4 +2916,34 @@
     <name>yarn.resourcemanager.jwt.audience</name>
     <value>job</value>
   </property>
+
+  <property>
+    <description>Hopsworks REST endpoint to send JWT generation requests</description>
+    <name>yarn.resourcemanager.jwt.generate-path</name>
+    <value>/hopsworks-api/api/jwt/create</value>
+  </property>
+
+  <property>
+    <description>Hopsworks REST endpoint to send JWT invalidation requests</description>
+    <name>yarn.resourcemanager.jwt.invalidate-path</name>
+    <value>/hopsworks-api/api/jwt/remove/</value>
+  </property>
+
+  <property>
+    <description>Hopsworks REST endpoint to ping for automatic JWT renewal</description>
+    <name>yarn.resourcemanager.jwt.alive-path</name>
+    <value>/hopsworks-api/api/auth/jwt/session</value>
+  </property>
+
+  <property>
+    <description>Interval to ping Hopsworks to renew JWT</description>
+    <name>yarn.resourcemanager.jwt.alive-interval</name>
+    <value>30m</value>
+  </property>
+
+  <property>
+    <description>Valid JWT used by RMAppSecurityManager</description>
+    <name>yarn.resourcemanager.jwt.token</name>
+    <value>Encoded token</value>
+  </property>
 </configuration>

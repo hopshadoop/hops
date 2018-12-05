@@ -90,7 +90,7 @@ public class RMAppSecurityManager extends AbstractService
     renewalExecutorService = Executors.newScheduledThreadPool(RENEWAL_EXECUTOR_SERVICE_POOL_SIZE,
         new ThreadFactoryBuilder()
             .setDaemon(true)
-            .setNameFormat("RMApp Security Material Renewer")
+            .setNameFormat("RMApp Security Material Renewer #%d")
             .build());
     for (RMAppSecurityHandler handler : securityHandlersMap.values()) {
       handler.init(conf);

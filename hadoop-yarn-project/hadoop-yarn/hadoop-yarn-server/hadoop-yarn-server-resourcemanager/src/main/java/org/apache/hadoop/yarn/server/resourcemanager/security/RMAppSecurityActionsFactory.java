@@ -55,6 +55,9 @@ public final class RMAppSecurityActionsFactory {
   
   @VisibleForTesting
   public void clear() {
+    if (actor != null) {
+      actor.destroy();
+    }
     actor = null;
   }
   

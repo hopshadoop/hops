@@ -19,6 +19,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.security;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -54,9 +55,12 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Security;
@@ -66,8 +70,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class TestHopsworksRMAppSecurityActions {
   private final static Log LOG = LogFactory.getLog(TestHopsworksRMAppSecurityActions.class);
@@ -79,13 +83,12 @@ public class TestHopsworksRMAppSecurityActions {
   private static final String CN = UUID.randomUUID().toString();
   private static final String O = "application_id";
   private static final String OU = "1";
-  private static final Pattern JWT_PATTERN = Pattern.compile("^Bearer\\s(.+)");
   
   private static String classPath;
   
-  private RMAppSecurityActions actions;
   private Path sslServerPath;
   private Configuration conf;
+  private Configuration sslServer;
   
   @Rule
   public final ExpectedException rule = ExpectedException.none();
@@ -104,8 +107,8 @@ public class TestHopsworksRMAppSecurityActions {
     sslServerPath = Paths.get(classPath, sslConfFilename);
     String jwt = loginAndGetJWT();
     
-    Configuration sslServer = new Configuration(false);
-    sslServer.set(HopsworksRMAppSecurityActions.HOPSWORKS_JWT_KEY, jwt);
+    sslServer = new Configuration(false);
+    sslServer.set(YarnConfiguration.RM_JWT_TOKEN, jwt);
     KeyStoreTestUtil.saveConfig(sslServerPath.toFile(), sslServer);
     conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFilename);
     conf.set(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY, HOPSWORKS_ENDPOINT);
@@ -115,10 +118,10 @@ public class TestHopsworksRMAppSecurityActions {
   
   @After
   public void afterTest() throws Exception {
+    RMAppSecurityActionsFactory.getInstance().getActor(conf).destroy();
     if (sslServerPath != null) {
       sslServerPath.toFile().delete();
     }
-    RMAppSecurityActionsFactory.getInstance().getActor(conf).destroy();
   }
   
   @Test
@@ -205,6 +208,49 @@ public class TestHopsworksRMAppSecurityActions {
     return jwtParam;
   }
   
+  @Test
+  public void testPing() throws Exception {
+    String initialJWT = sslServer.get(YarnConfiguration.RM_JWT_TOKEN);
+    Assert.assertNotNull(initialJWT);
+    
+    // Get new actor to start renewer thread
+    RMAppSecurityActions actor = new TestingHopsworksActions();
+    RMAppSecurityActionsFactory.getInstance().register(actor);
+    ((Configurable) actor).setConf(conf);
+    actor.init();
+    TimeUnit.MILLISECONDS.sleep(100);
+    
+    Configuration newSSLServer = new Configuration();
+    newSSLServer.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
+    String newJWT = newSSLServer.get(YarnConfiguration.RM_JWT_TOKEN);
+    Header oldAuthHeader = ((TestingHopsworksActions) actor).createAuthenticationHeader(initialJWT);
+    actor.destroy();
+    Assert.assertNotNull(newJWT);
+    Assert.assertNotEquals(initialJWT, newJWT);
+    Assert.assertEquals(newJWT, ((TestingHopsworksActions) actor).getJWTFromResponse());
+    Header newAuthHeader = ((TestingHopsworksActions) actor).createAuthenticationHeader(newJWT);
+    Assert.assertNotEquals(oldAuthHeader.getValue(), newAuthHeader.getValue());
+    Assert.assertEquals("Bearer " + newJWT, newAuthHeader.getValue());
+  }
+  
+  @Test
+  public void testRetry() throws Exception {
+    conf.set(YarnConfiguration.RM_JWT_ALIVE_INTERVAL, "1s");
+    RMAppSecurityActions actor = new TestingFailingHopsworksActions();
+    ((Configurable) actor).setConf(conf);
+    actor.init();
+    
+    TimeUnit.SECONDS.sleep(5);
+    Assert.assertEquals(3, ((TestingFailingHopsworksActions) actor).failures);
+    
+    actor.destroy();
+    // Eventually JWT should have been updated
+    Configuration newSSLServer = new Configuration();
+    newSSLServer.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
+    String newJWT = newSSLServer.get(YarnConfiguration.RM_JWT_TOKEN);
+    Assert.assertEquals("success", newJWT);
+  }
+  
   private String loginAndGetJWT() throws Exception {
     CloseableHttpClient client = null;
     try {
@@ -231,7 +277,7 @@ public class TestHopsworksRMAppSecurityActions {
       Header[] authHeaders = response.getHeaders(HttpHeaders.AUTHORIZATION);
   
       for (Header h : authHeaders) {
-        Matcher matcher = JWT_PATTERN.matcher(h.getValue());
+        Matcher matcher = HopsworksRMAppSecurityActions.JWT_PATTERN.matcher(h.getValue());
         if (matcher.matches()) {
           return matcher.group(1);
         }
@@ -241,6 +287,35 @@ public class TestHopsworksRMAppSecurityActions {
       if (client != null) {
         client.close();
       }
+    }
+  }
+  
+  private class TestingHopsworksActions extends HopsworksRMAppSecurityActions {
+  
+    private final String newJWT = "new_jwt";
+    
+    public TestingHopsworksActions() throws MalformedURLException, GeneralSecurityException {
+    }
+  
+    @Override
+    protected String getJWTFromResponse() throws IOException, URISyntaxException {
+      return newJWT;
+    }
+  }
+  
+  private class TestingFailingHopsworksActions extends HopsworksRMAppSecurityActions {
+    private int failures = 0;
+    
+    public TestingFailingHopsworksActions() throws MalformedURLException, GeneralSecurityException {
+    }
+    
+    @Override
+    protected String getJWTFromResponse() throws IOException, URISyntaxException {
+      if (failures < 3) {
+        failures++;
+        throw new IOException("Ooops");
+      }
+      return "success";
     }
   }
 }

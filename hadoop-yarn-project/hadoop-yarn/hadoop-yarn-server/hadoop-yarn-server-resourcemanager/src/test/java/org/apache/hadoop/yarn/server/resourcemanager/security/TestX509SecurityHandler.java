@@ -135,8 +135,6 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     String sslConfFileName = TestX509SecurityHandler.class.getSimpleName() + ".ssl-server.xml";
     sslServerFile = Paths.get(classPath, sslConfFileName).toFile();
     Configuration sslServer = new Configuration(false);
-    /*sslServer.set(HopsworksRMAppSecurityActions.HOPSWORKS_USER_KEY, "agent-user");
-    sslServer.set(HopsworksRMAppSecurityActions.HOPSWORKS_PASSWORD_KEY, "agent-password");*/
     KeyStoreTestUtil.saveConfig(sslServerFile, sslServer);
     conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFileName);
   }
@@ -304,70 +302,6 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     assertTrue(x509Handler.getRenewalTasks().isEmpty());
     securityManager.stop();
   }
-  
-  // This test makes a REST call to Hopsworks using HopsworksRMAppSecurityActions actor class
-  // Normally it should be ignored as it requires Hopsworks instance to be running
-  /*@Test
-  @Ignore
-  public void testSuccessfulCertificateCreationRemote() throws Exception {
-    DevHopsworksRMAppSecurityActions mockRemoteActions = Mockito.spy(new DevHopsworksRMAppSecurityActions());
-    mockRemoteActions.setConf(conf);
-    mockRemoteActions.init();
-    RMAppSecurityActionsFactory.getInstance().register(mockRemoteActions);
-    MockRMAppCertificateManager manager = new MockRMAppCertificateManager(false, rmContext);
-    manager.init(conf);
-    manager.start();
-    manager.handle(new RMAppSecurityManagerEvent(
-        ApplicationId.newInstance(System.currentTimeMillis(), 1),
-        "userA", 1,
-        RMAppSecurityManagerEventType.GENERATE_SECURITY_MATERIAL));
-    
-    dispatcher.await();
-    manager.stop();
-  }
-  
-  // This test makes a REST call to Hopsworks using HopsworksRMAppSecurityActions actor class
-  // Normally it should be ignored as it requires Hopsworks instance to be running
-  @Test
-  @Ignore
-  public void testCertificateRevocationRemote() throws Exception {
-    conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
-    
-    DevHopsworksRMAppSecurityActions mockRemoteActions = Mockito.spy(new DevHopsworksRMAppSecurityActions());
-    mockRemoteActions.setConf(conf);
-    mockRemoteActions.init();
-    RMAppSecurityActionsFactory.getInstance().register(mockRemoteActions);
-    
-    MockRMAppCertificateManager manager = Mockito.spy(new MockRMAppCertificateManager(false, rmContext));
-    manager.init(conf);
-    manager.start();
-    String username = "Alice";
-    Integer cryptoMaterialVersion = 1;
-    ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
-    manager.handle(new RMAppSecurityManagerEvent(
-        appId, username, cryptoMaterialVersion, RMAppSecurityManagerEventType.GENERATE_SECURITY_MATERIAL));
-  
-    dispatcher.await();
-    Mockito.verify(mockRemoteActions).sign(Mockito.any(PKCS10CertificationRequest.class));
-    
-    manager.handle(new RMAppSecurityManagerEvent(
-        appId, username, cryptoMaterialVersion, RMAppSecurityManagerEventType.REVOKE_SECURITY_MATERIAL));
-    
-    dispatcher.await();
-    
-    Mockito.verify(manager)
-        .revokeCertificate(appId, username, cryptoMaterialVersion);
-    Mockito.verify(manager)
-        .deregisterFromCertificateRenewer(appId);
-  
-    TimeUnit.SECONDS.sleep(3);
-    
-    String certificateIdentifier = username + "__" + appId.toString() + "__" + cryptoMaterialVersion;
-    Mockito.verify(mockRemoteActions)
-        .revoke(Mockito.eq(certificateIdentifier));
-    
-    manager.stop();
-  }*/
   
   @Test
   public void testFailingCertificateCreationLocal() throws Exception {

@@ -2677,4 +2677,12 @@ public class YarnConfiguration extends Configuration {
   public static String DEFAULT_RM_JWT_INVALIDATE_PATH = "/hopsworks-api/api/jwt/remove/";
   public static final String RM_JWT_INVALIDATE_PATH = RM_PREFIX + JWT_PREFIX
       + "invalidate-path";
+  
+  public static String DEFAULT_RM_JWT_ALIVE_PATH = "/hopsworks-api/api/auth/jwt/session";
+  public static final String RM_JWT_ALIVE_PATH = RM_PREFIX + JWT_PREFIX + "alive-path";
+  
+  public static final String RM_JWT_TOKEN = RM_PREFIX + JWT_PREFIX + "token";
+  
+  public static long DEFAULT_RM_JWT_ALIVE_INTERVAL = 1800;
+  public static final String RM_JWT_ALIVE_INTERVAL = RM_PREFIX + JWT_PREFIX + "alive-interval";
 }
