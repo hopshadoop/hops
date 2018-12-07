@@ -1657,16 +1657,22 @@ public class ContainerManagerImpl extends CompositeService implements
       app.setJWTExpiration(jwtExpiration);
     
       try {
-        X509SecurityMaterial x509SecurityMaterial = context.getCertificateLocalizationService()
-            .getX509MaterialLocation(container.getUser(), applicationId.toString());
-        
-        context.getNMStateStore().storeApplication(applicationId,
-            buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
-                container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier()
-                    .getLogAggregationContext(),
-                x509SecurityMaterial.getKeyStoreMem(), String.valueOf(x509SecurityMaterial.getKeyStorePass()),
-                x509SecurityMaterial.getTrustStoreMem(), String.valueOf(x509SecurityMaterial.getTrustStorePass()),
-                app.getX509Version(), jwt, jwtExpiration));
+        ContainerManagerApplicationProto appProto;
+        if (isHopsTLSEnabled()) {
+          X509SecurityMaterial x509SecurityMaterial = context.getCertificateLocalizationService()
+              .getX509MaterialLocation(container.getUser(), applicationId.toString());
+          appProto = buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
+              container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier()
+                  .getLogAggregationContext(),
+              x509SecurityMaterial.getKeyStoreMem(), String.valueOf(x509SecurityMaterial.getKeyStorePass()),
+              x509SecurityMaterial.getTrustStoreMem(), String.valueOf(x509SecurityMaterial.getTrustStorePass()),
+              app.getX509Version(), jwt, jwtExpiration);
+        } else {
+          appProto = buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
+              container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier().getLogAggregationContext(),
+              null, null, null, null, -1, jwt, jwtExpiration);
+        }
+        context.getNMStateStore().storeApplication(applicationId, appProto);
       } catch (InterruptedException ex) {
         throw new IOException(ex);
       }
@@ -1723,15 +1729,24 @@ public class ContainerManagerImpl extends CompositeService implements
       app.setX509Version(cryptoVersion);
   
       try {
-        JWTSecurityMaterial jwtSecurityMaterial = context.getCertificateLocalizationService()
-            .getJWTMaterialLocation(container.getUser(), applicationId.toString());
+        ContainerManagerApplicationProto appProto;
+        if (isJWTEnabled()) {
+          JWTSecurityMaterial jwtSecurityMaterial = context.getCertificateLocalizationService()
+              .getJWTMaterialLocation(container.getUser(), applicationId.toString());
+          appProto = buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
+              container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier()
+                  .getLogAggregationContext(),
+              keyStore, String.valueOf(keyStorePassword), trustStore, String.valueOf(trustStorePassword),
+              cryptoVersion, jwtSecurityMaterial.getToken(), app.getJWTExpiration());
+        } else {
+          appProto = buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
+              container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier()
+                  .getLogAggregationContext(),
+              keyStore, String.valueOf(keyStorePassword), trustStore, String.valueOf(trustStorePassword),
+              cryptoVersion, null, -1L);
+        }
         
-        context.getNMStateStore().storeApplication(applicationId,
-            buildAppProto(applicationId, container.getUser(), container.getUserFolder(), container.getCredentials(),
-                container.getLaunchContext().getApplicationACLs(), container.getContainerTokenIdentifier()
-                    .getLogAggregationContext(),
-                keyStore, String.valueOf(keyStorePassword), trustStore, String.valueOf(trustStorePassword),
-                cryptoVersion, jwtSecurityMaterial.getToken(), app.getJWTExpiration()));
+        context.getNMStateStore().storeApplication(applicationId, appProto);
       } catch (InterruptedException ex) {
         throw new IOException(ex);
       }
