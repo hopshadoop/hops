@@ -17,16 +17,16 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.impl.client.BasicCookieStore;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.TrustStrategy;
 
-import java.io.IOException;
+import javax.net.ssl.SSLContext;
 import java.net.MalformedURLException;
 import java.security.GeneralSecurityException;
 import java.security.cert.CertificateException;
@@ -42,21 +42,22 @@ public class DevHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityActi
   }
   
   @Override
-  protected synchronized CloseableHttpClient createHttpClient(PoolingHttpClientConnectionManager connectionManager)
-      throws GeneralSecurityException, IOException {
-    if (httpClient == null) {
-      SSLContextBuilder sslContextBuilder = new SSLContextBuilder();
-      sslContextBuilder.loadTrustMaterial(new TrustStrategy() {
-        @Override
-        public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
-          return true;
-        }
-      });
-      SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContextBuilder.build(),
-          NoopHostnameVerifier.INSTANCE);
-      return HttpClients.custom().setConnectionManager(connectionManager)
-          .setSSLSocketFactory(sslSocketFactory).build();
-    }
-    return httpClient;
+  protected PoolingHttpClientConnectionManager createConnectionManager() throws GeneralSecurityException {
+    SSLContextBuilder sslContextBuilder = new SSLContextBuilder();
+    sslContextBuilder.loadTrustMaterial(new TrustStrategy() {
+      @Override
+      public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
+        return true;
+      }
+    });
+    SSLContext sslCtx = sslContextBuilder.build();
+    SSLConnectionSocketFactory sslConnectionFactory = new SSLConnectionSocketFactory(sslCtx, NoopHostnameVerifier
+        .INSTANCE);
+    Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
+        .register("https", sslConnectionFactory)
+        .build();
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
+    connectionManager.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
+    return connectionManager;
   }
 }

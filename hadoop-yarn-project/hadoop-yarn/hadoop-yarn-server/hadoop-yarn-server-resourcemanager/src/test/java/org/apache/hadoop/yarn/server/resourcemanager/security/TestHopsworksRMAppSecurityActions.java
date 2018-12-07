@@ -26,7 +26,6 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.server.resourcemanager.Application;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -76,7 +75,7 @@ import java.util.regex.Matcher;
 
 public class TestHopsworksRMAppSecurityActions {
   private final static Log LOG = LogFactory.getLog(TestHopsworksRMAppSecurityActions.class);
-  private final static String HOPSWORKS_ENDPOINT = "http://bbc4.sics.se:58260";
+  private final static String HOPSWORKS_ENDPOINT = "https://bbc4.sics.se:54719";
   private final static String HOPSWORKS_USER = "agent@hops.io";
   private final static String HOPSWORKS_PASSWORD = "admin";
   
@@ -114,7 +113,7 @@ public class TestHopsworksRMAppSecurityActions {
     conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFilename);
     conf.set(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY, HOPSWORKS_ENDPOINT);
     conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, "org.apache.hadoop.yarn.server.resourcemanager" +
-        ".security.HopsworksRMAppSecurityActions");
+        ".security.DevHopsworksRMAppSecurityActions");
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
     conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
   }

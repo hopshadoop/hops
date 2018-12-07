@@ -2926,7 +2926,7 @@
   <property>
     <description>Hopsworks REST endpoint to ping for automatic JWT renewal</description>
     <name>yarn.resourcemanager.rmappsecurity.jwt.alive-path</name>
-    <value>/hopsworks-api/api/auth/jwt/session</value>
+    <value>/hopsworks-ca/v2/token</value>
   </property>
 
   <property>

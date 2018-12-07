@@ -81,6 +81,8 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   public static final String REVOKE_CERT_ID_PARAM = "certId";
   public static final Pattern JWT_PATTERN = Pattern.compile("^Bearer\\s(.+)");
   
+  protected static final int MAX_CONNECTIONS_PER_ROUTE = 50;
+  
   private static final Log LOG = LogFactory.getLog(HopsworksRMAppSecurityActions.class);
   private static final Set<Integer> ACCEPTABLE_HTTP_RESPONSES = new HashSet<>(2);
   private static final String AUTH_HEADER_CONTENT = "Bearer %s";
@@ -128,9 +130,8 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   
   @Override
   public void init() throws MalformedURLException, GeneralSecurityException, IOException {
-    httpConnectionManager = new PoolingHttpClientConnectionManager();
-    httpConnectionManager.setDefaultMaxPerRoute(50);
-    httpClient = createHttpClient(httpConnectionManager);
+    httpConnectionManager = createConnectionManager();
+    httpClient = HttpClients.custom().setConnectionManager(httpConnectionManager).build();
     
     hopsworksHost = new URL(conf.get(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY,
         "http://127.0.0.1"));
@@ -143,6 +144,12 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     if (conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED, YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
       initJWT();
     }
+  }
+  
+  protected PoolingHttpClientConnectionManager createConnectionManager() throws GeneralSecurityException {
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    connectionManager.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
+    return connectionManager;
   }
   
   private void initX509() throws MalformedURLException, GeneralSecurityException {
@@ -310,15 +317,6 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
         response.close();
       }
     }
-  }
-  
-  // GeneralSecurityException is thrown in DevHopsworksRMAppSecurityActions
-  protected synchronized CloseableHttpClient createHttpClient(PoolingHttpClientConnectionManager connectionManager)
-      throws GeneralSecurityException, IOException {
-    if (httpClient == null) {
-      return HttpClients.custom().setConnectionManager(connectionManager).build();
-    }
-    return httpClient;
   }
   
   private CloseableHttpResponse post(JsonObject jsonEntity, URI target, String errorMessage)
