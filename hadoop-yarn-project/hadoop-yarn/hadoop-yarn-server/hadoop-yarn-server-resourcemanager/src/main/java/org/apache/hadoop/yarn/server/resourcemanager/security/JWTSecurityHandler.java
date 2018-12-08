@@ -146,9 +146,8 @@ public class JWTSecurityHandler
     parameter.setAudiences(jwtAudience);
     Instant now = getNow();
     Instant expirationInstant = now.plus(validityPeriod.getFirst(), validityPeriod.getSecond());
-    Instant renewNotBefore = expirationInstant.plus(1L, ChronoUnit.HOURS);
     parameter.setExpirationDate(expirationInstant);
-    parameter.setRenewNotBefore(Date.from(renewNotBefore));
+    parameter.setValidNotBefore(now);
     // JWT for applications will not be automatically renewed.
     // JWTSecurityHandler will renew them
     parameter.setRenewable(false);
@@ -166,6 +165,12 @@ public class JWTSecurityHandler
   @VisibleForTesting
   protected Instant getNow() {
     return Instant.now();
+  }
+  
+  @InterfaceAudience.Private
+  @VisibleForTesting
+  protected Pair<Long, TemporalUnit> getValidityPeriod() {
+    return validityPeriod;
   }
   
   @VisibleForTesting
@@ -195,7 +200,7 @@ public class JWTSecurityHandler
           .minus(expirationSafetyPeriod.getFirst(), expirationSafetyPeriod.getSecond());
       
       ScheduledFuture task = renewalExecutorService.schedule(
-          createJWTRenewalTask(parameter.getApplicationId(), parameter.appUser),
+          createJWTRenewalTask(parameter.getApplicationId(), parameter.appUser, parameter.token),
           delay.toEpochMilli(), TimeUnit.MILLISECONDS);
       renewalTasks.put(parameter.getApplicationId(), task);
     }
@@ -213,8 +218,8 @@ public class JWTSecurityHandler
   
   @InterfaceAudience.Private
   @VisibleForTesting
-  protected Runnable createJWTRenewalTask(ApplicationId appId, String appUser) {
-    return new JWTRenewer(appId, appUser);
+  protected Runnable createJWTRenewalTask(ApplicationId appId, String appUser, String token) {
+    return new JWTRenewer(appId, appUser, token);
   }
   
   @Override
@@ -252,6 +257,16 @@ public class JWTSecurityHandler
     }
   }
   
+  @InterfaceAudience.Private
+  @VisibleForTesting
+  protected String renewInternal(JWTMaterialParameter param) throws URISyntaxException, IOException,
+      GeneralSecurityException {
+    if (!isJWTEnabled()) {
+      return null;
+    }
+    return rmAppSecurityActions.renewJWT(param);
+  }
+  
   @VisibleForTesting
   @InterfaceAudience.Private
   protected boolean isJWTEnabled() {
@@ -279,9 +294,10 @@ public class JWTSecurityHandler
   
   public static class JWTMaterialParameter extends RMAppSecurityManager.SecurityManagerMaterial {
     private final String appUser;
+    private String token;
     private String[] audiences;
     private Instant expirationDate;
-    private Date renewNotBefore;
+    private Instant validNotBefore;
     private boolean renewable;
     private int expLeeway;
     
@@ -310,12 +326,12 @@ public class JWTSecurityHandler
       this.expirationDate = expirationDate;
     }
   
-    public Date getRenewNotBefore() {
-      return renewNotBefore;
+    public Instant getValidNotBefore() {
+      return validNotBefore;
     }
   
-    public void setRenewNotBefore(Date renewNotBefore) {
-      this.renewNotBefore = renewNotBefore;
+    public void setValidNotBefore(Instant validNotBefore) {
+      this.validNotBefore = validNotBefore;
     }
   
     public boolean isRenewable() {
@@ -334,6 +350,14 @@ public class JWTSecurityHandler
       this.expLeeway = expLeeway;
     }
   
+    public String getToken() {
+      return token;
+    }
+    
+    public void setToken(String token) {
+      this.token = token;
+    }
+    
     @Override
     public int hashCode() {
       int result = 17;
@@ -367,12 +391,14 @@ public class JWTSecurityHandler
   private class JWTRenewer implements Runnable {
     private final ApplicationId appId;
     private final String appUser;
+    private final String token;
     private final BackOff backOff;
     private long backOffTime = 0L;
     
-    public JWTRenewer(ApplicationId appId, String appUser) {
+    public JWTRenewer(ApplicationId appId, String appUser, String token) {
       this.appId = appId;
       this.appUser = appUser;
+      this.token = token;
       this.backOff = rmAppSecurityManager.createBackOffPolicy();
     }
   
@@ -381,8 +407,9 @@ public class JWTSecurityHandler
       try {
         LOG.debug("Renewing JWT for application " + appId);
         JWTMaterialParameter jwtParam = new JWTMaterialParameter(appId, appUser);
+        jwtParam.setToken(token);
         prepareJWTGenerationParameters(jwtParam);
-        String jwt = generateInternal(jwtParam);
+        String jwt = renewInternal(jwtParam);
         renewalTasks.remove(appId);
         JWTSecurityManagerMaterial jwtMaterial = new JWTSecurityManagerMaterial(appId, jwt,
             jwtParam.getExpirationDate());

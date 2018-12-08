@@ -1108,6 +1108,7 @@ public class RMAppImpl implements RMApp, Recoverable {
           JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(app.applicationId,
               app.user);
           jwtParam.setExpirationDate(app.jwtExpiration);
+          jwtParam.setToken(app.jwt);
           app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(jwtParam);
           
           app.scheduler.handle(new AppAddedSchedulerEvent(app.user,
@@ -1146,6 +1147,7 @@ public class RMAppImpl implements RMApp, Recoverable {
       JWTSecurityHandler.JWTMaterialParameter jwtParam  = new JWTSecurityHandler.JWTMaterialParameter(app.applicationId,
           app.user);
       jwtParam.setExpirationDate(app.jwtExpiration);
+      jwtParam.setToken(app.jwt);
       app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(jwtParam);
   
       try {
@@ -1257,6 +1259,7 @@ public class RMAppImpl implements RMApp, Recoverable {
           JWTSecurityHandler.JWTMaterialParameter jwtParam =
               new JWTSecurityHandler.JWTMaterialParameter(app.applicationId, app.user);
           jwtParam.setExpirationDate(app.jwtExpiration);
+          jwtParam.setToken(app.jwt);
           app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(jwtParam);
         }
         
@@ -1343,6 +1346,7 @@ public class RMAppImpl implements RMApp, Recoverable {
       JWTSecurityHandler.JWTMaterialParameter param =
           new JWTSecurityHandler.JWTMaterialParameter(app.applicationId, app.user);
       param.setExpirationDate(app.jwtExpiration);
+      param.setToken(app.jwt);
       app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(param);
     }
   }

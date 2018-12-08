@@ -33,4 +33,6 @@ public interface RMAppSecurityActions {
   String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws URISyntaxException, IOException,
       GeneralSecurityException;
   void invalidateJWT(String signingKeyName) throws URISyntaxException, IOException, GeneralSecurityException;
+  String renewJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws URISyntaxException, IOException,
+      GeneralSecurityException;
 }

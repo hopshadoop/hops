@@ -68,6 +68,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -177,7 +178,7 @@ public class TestHopsworksRMAppSecurityActions {
   }
   
   @Test
-  public void testGenerateSameSigningKeyShouldFail() throws Exception {
+  public void testGenerateJWTSameSigningKeyShouldFail() throws Exception {
     ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
     JWTSecurityHandler.JWTMaterialParameter jwtParam = createJWTParameter(appId);
     RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
@@ -188,7 +189,7 @@ public class TestHopsworksRMAppSecurityActions {
   }
   
   @Test
-  public void testGenerateInvalidateGenerate() throws Exception {
+  public void testGenerateJWTInvalidateGenerate() throws Exception {
     ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
     JWTSecurityHandler.JWTMaterialParameter jwtParam = createJWTParameter(appId);
     RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
@@ -200,12 +201,36 @@ public class TestHopsworksRMAppSecurityActions {
     Assert.assertNotEquals(jwt0, jwt1);
   }
   
+  @Test
+  public void testRenewJWT() throws Exception {
+    ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
+    JWTSecurityHandler.JWTMaterialParameter jwtParam0 = createJWTParameter(appId, 2, ChronoUnit.SECONDS);
+    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    String jwt0 = actor.generateJWT(jwtParam0);
+  
+    TimeUnit.SECONDS.sleep(2);
+    
+    JWTSecurityHandler.JWTMaterialParameter jwtParam1 = createJWTParameter(appId);
+    jwtParam1.setToken(jwt0);
+    String jwt1 = actor.renewJWT(jwtParam1);
+    Assert.assertNotNull(jwt1);
+    Assert.assertNotEquals(jwt0, jwt1);
+    LOG.info(jwt0);
+    LOG.info(jwt1);
+  }
+  
   private JWTSecurityHandler.JWTMaterialParameter createJWTParameter(ApplicationId appId) {
+    return createJWTParameter(appId, 10, ChronoUnit.MINUTES);
+  }
+  
+  private JWTSecurityHandler.JWTMaterialParameter createJWTParameter(ApplicationId appId, long amountToAdd,
+      TemporalUnit unit) {
     JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(appId, "Flock");
     jwtParam.setRenewable(false);
-    Instant in10Minutes = Instant.now().plus(10, ChronoUnit.MINUTES);
-    jwtParam.setExpirationDate(in10Minutes);
-    jwtParam.setRenewNotBefore(new Date(in10Minutes.toEpochMilli()));
+    Instant now = Instant.now();
+    Instant expiresAt = now.plus(amountToAdd, unit);
+    jwtParam.setExpirationDate(expiresAt);
+    jwtParam.setValidNotBefore(now);
     jwtParam.setAudiences(new String[]{"job"});
     return jwtParam;
   }

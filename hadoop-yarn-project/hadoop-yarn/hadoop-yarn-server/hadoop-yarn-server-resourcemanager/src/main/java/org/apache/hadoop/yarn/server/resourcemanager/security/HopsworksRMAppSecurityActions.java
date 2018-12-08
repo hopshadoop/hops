@@ -66,6 +66,7 @@ import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.sql.Date;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -88,6 +89,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   private static final String AUTH_HEADER_CONTENT = "Bearer %s";
   
   private final AtomicReference<Header> authHeader;
+  private final JsonParser jsonParser;
   
   private Configuration conf;
   private Configuration sslConf;
@@ -100,6 +102,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   // JWT
   private URL jwtGeneratePath;
   private URL jwtInvalidatePath;
+  private URL jwtRenewPath;
   private URL jwtAlivePath;
   private long jwtAliveIntervalSeconds;
   private boolean jwtConfigured = false;
@@ -112,6 +115,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_OK);
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_NO_CONTENT);
     authHeader = new AtomicReference<>();
+    jsonParser = new JsonParser();
     tokenRenewer = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
         .setNameFormat("JWT renewer thread")
         .setDaemon(true)
@@ -178,7 +182,10 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
     jwtInvalidatePath = new URL(hopsworksHost, jwtInvalidatePathConf);
   
-  
+    jwtRenewPath = new URL(hopsworksHost,
+        conf.get(YarnConfiguration.RM_JWT_RENEW_PATH,
+            YarnConfiguration.DEFAULT_RM_JWT_RENEW_PATH));
+    
     sslConf = new Configuration(false);
     sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
     String jwtConf = sslConf.get(YarnConfiguration.RM_JWT_TOKEN);
@@ -239,7 +246,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
           "Hopsworks CA could not sign CSR");
       
       String signResponseEntity = EntityUtils.toString(signResponse.getEntity());
-      JsonObject jsonResponse = new JsonParser().parse(signResponseEntity).getAsJsonObject();
+      JsonObject jsonResponse = jsonParser.parse(signResponseEntity).getAsJsonObject();
       String signedCert = jsonResponse.get("signedCert").getAsString();
       X509Certificate certificate = parseCertificate(signedCert);
       String intermediateCaCert = jsonResponse.get("intermediateCaCert").getAsString();
@@ -284,8 +291,8 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
       json.addProperty("subject", jwtParameter.getAppUser());
       json.addProperty("keyName", jwtParameter.getApplicationId().toString());
       json.addProperty("audiences", String.join(",", jwtParameter.getAudiences()));
-      json.addProperty("expiresAt", jwtParameter.getExpirationDate().toEpochMilli());
-      json.addProperty("notBefore", jwtParameter.getRenewNotBefore().getTime());
+      json.addProperty("expiresAt", jwtParameter.getExpirationDate().toString());
+      json.addProperty("notBefore", jwtParameter.getValidNotBefore().toString());
       json.addProperty("renewable", jwtParameter.isRenewable());
       json.addProperty("expLeeway", jwtParameter.getExpLeeway());
       
@@ -293,7 +300,31 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
           "Hopsworks could not generate JWT for " + jwtParameter.getAppUser()
               + "/" + jwtParameter.getApplicationId().toString());
       String responseStr = EntityUtils.toString(response.getEntity());
-      JsonObject jsonResponse = new JsonParser().parse(responseStr).getAsJsonObject();
+      JsonObject jsonResponse = jsonParser.parse(responseStr).getAsJsonObject();
+      return jsonResponse.get("token").getAsString();
+    } finally {
+      if (response != null) {
+        response.close();
+      }
+    }
+  }
+  
+  @Override
+  public String renewJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter)
+      throws URISyntaxException, IOException, GeneralSecurityException {
+    if (!jwtConfigured) {
+      jwtNotConfigured("renewJWT");
+    }
+    CloseableHttpResponse response = null;
+    try {
+      JsonObject json = new JsonObject();
+      json.addProperty("token", jwtParameter.getToken());
+      json.addProperty("expiresAt", jwtParameter.getExpirationDate().toString());
+      json.addProperty("nbf", jwtParameter.getValidNotBefore().toString());
+      response = post(json, jwtRenewPath.toURI(), "Could not renew JWT for " + jwtParameter.getAppUser()
+            + "/" + jwtParameter.getApplicationId());
+      String responseStr = EntityUtils.toString(response.getEntity());
+      JsonObject jsonResponse = jsonParser.parse(responseStr).getAsJsonObject();
       return jsonResponse.get("token").getAsString();
     } finally {
       if (response != null) {

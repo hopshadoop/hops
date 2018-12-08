@@ -2688,6 +2688,10 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_JWT_INVALIDATE_PATH = RM_PREFIX + JWT_PREFIX
       + "invalidate-path";
   
+  public static String DEFAULT_RM_JWT_RENEW_PATH = "/hopsworks-api/api/jwt/renew/";
+  public static final String RM_JWT_RENEW_PATH = RM_PREFIX + JWT_PREFIX
+      + "renew-path";
+  
   public static String DEFAULT_RM_JWT_ALIVE_PATH = "/hopsworks-ca/v2/token";
   public static final String RM_JWT_ALIVE_PATH = RM_PREFIX + JWT_PREFIX + "alive-path";
   

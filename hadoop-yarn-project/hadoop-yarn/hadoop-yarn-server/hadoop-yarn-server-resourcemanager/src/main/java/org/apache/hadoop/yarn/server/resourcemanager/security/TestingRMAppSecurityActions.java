@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.apache.log4j.spi.NOPLogger;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.BasicConstraints;
@@ -143,12 +144,19 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   @Override
   public String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter)
     throws URISyntaxException, IOException {
-    String jwt = RandomStringUtils.randomAlphanumeric(16);
-    return jwt;
+    return RandomStringUtils.randomAlphanumeric(16);
   }
   
   @Override
   public void invalidateJWT(String signingKeyName) throws URISyntaxException, IOException {
     // Nothing to do
+    LOG.info("Invalidating JWT signing key " + signingKeyName);
+  }
+  
+  @Override
+  public String renewJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws URISyntaxException, IOException {
+    // Nothing to do
+    LOG.info("Renewing JWT " + jwtParameter.getAppUser() + "/" + jwtParameter.getApplicationId());
+    return RandomStringUtils.randomAlphanumeric(16);
   }
 }

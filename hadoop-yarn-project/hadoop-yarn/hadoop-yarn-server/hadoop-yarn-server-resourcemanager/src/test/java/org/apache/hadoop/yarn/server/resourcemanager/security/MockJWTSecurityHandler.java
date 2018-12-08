@@ -77,7 +77,8 @@ public class MockJWTSecurityHandler extends JWTSecurityHandler {
     return now;
   }
   
-  private Pair<Long, TemporalUnit> getValidityPeriod() {
+  @Override
+  protected Pair<Long, TemporalUnit> getValidityPeriod() {
     return getRmAppSecurityManager().parseInterval(
         getConfig().get(YarnConfiguration.RM_JWT_VALIDITY_PERIOD,
             YarnConfiguration.DEFAULT_RM_JWT_VALIDITY_PERIOD),
@@ -85,8 +86,8 @@ public class MockJWTSecurityHandler extends JWTSecurityHandler {
   }
   
   @Override
-  protected Runnable createJWTRenewalTask(ApplicationId appId, String appUser) {
-    MockJWTRenewer renewer = new MockJWTRenewer(appId, appUser);
+  protected Runnable createJWTRenewalTask(ApplicationId appId, String appUser, String token) {
+    MockJWTRenewer renewer = new MockJWTRenewer(appId, appUser, token);
     mockRenewer = new AtomicReference<>(renewer);
     return renewer;
   }
@@ -98,14 +99,17 @@ public class MockJWTSecurityHandler extends JWTSecurityHandler {
   protected class MockJWTRenewer implements Runnable {
     private final ApplicationId appId;
     private final String appUser;
+    private final String token;
     private final BackOff backOff;
     private long backOffTime = 0L;
     
     private boolean exceptionRaised = true;
+    private boolean hasRun = false;
     
-    private MockJWTRenewer(ApplicationId appId, String appUser) {
+    private MockJWTRenewer(ApplicationId appId, String appUser, String token) {
       this.appId = appId;
       this.appUser = appUser;
+      this.token = token;
       this.backOff = getRmAppSecurityManager().createBackOffPolicy();
     }
     
@@ -114,8 +118,9 @@ public class MockJWTSecurityHandler extends JWTSecurityHandler {
       try {
         LOG.info("Renewing JWT for " + appId);
         JWTMaterialParameter jwtParam = new JWTMaterialParameter(appId, appUser);
+        jwtParam.setToken(token);
         prepareJWTGenerationParameters(jwtParam);
-        String jwt = generateInternal(jwtParam);
+        String jwt = renewInternal(jwtParam);
         getRenewalTasks().remove(appId);
         JWTSecurityManagerMaterial jwtMaterial = new JWTSecurityManagerMaterial(appId, jwt,
             jwtParam.getExpirationDate());
@@ -124,6 +129,7 @@ public class MockJWTSecurityHandler extends JWTSecurityHandler {
         assertNotEquals(oldJWT, jwtMaterial.getToken());
         LOG.info("Renewed JWT for " + appId);
         exceptionRaised = false;
+        hasRun = true;
       } catch (Exception ex) {
         LOG.error("Exception should not have happened here!");
         LOG.error(ex, ex);
@@ -142,6 +148,10 @@ public class MockJWTSecurityHandler extends JWTSecurityHandler {
     
     public boolean isExceptionRaised() {
       return exceptionRaised;
+    }
+    
+    public boolean hasRun() {
+      return hasRun;
     }
   }
   

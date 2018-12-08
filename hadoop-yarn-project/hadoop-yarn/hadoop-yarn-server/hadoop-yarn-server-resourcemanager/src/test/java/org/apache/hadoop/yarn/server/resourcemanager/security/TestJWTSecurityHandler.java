@@ -33,6 +33,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertFalse;
@@ -145,7 +146,7 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
     config.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
         "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
     config.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "1m");
-    config.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "50s");
+    config.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "55s");
     
     RMAppSecurityActions actor = Mockito.spy(new TestingRMAppSecurityActions());
     RMAppSecurityActionsFactory.getInstance().register(actor);
@@ -164,20 +165,28 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
     
     jwtParam = new JWTSecurityHandler.JWTMaterialParameter(appId, user);
     jwtParam.setExpirationDate(jwt.getExpirationDate());
+    jwtParam.setToken(jwt.getToken());
     securityManager.registerWithMaterialRenewers(jwtParam);
     
     Mockito.verify(jwtHandler).registerRenewer(Mockito.eq(jwtParam));
     
-    // Renewal should roughly happen after 10s
-    MockJWTSecurityHandler.MockJWTRenewer renewer = null;
-    int sleeped = 5;
-    while ((renewer = ((MockJWTSecurityHandler)jwtHandler).getRenewer()) == null && sleeped > 0) {
-      TimeUnit.MILLISECONDS.sleep(500);
+    // Renewal should roughly happen after 5s
+    int sleeped = 7;
+    while (!((MockJWTSecurityHandler) jwtHandler).getRenewer().hasRun() && sleeped > 0) {
+      TimeUnit.SECONDS.sleep(1);
       sleeped--;
     }
     
-    assertTrue(renewer.isExceptionRaised());
-    Mockito.verify(actor).generateJWT(Mockito.eq(jwtParam));
+    Assert.assertNotEquals("Waited too long for JWT renewal to happen",0, sleeped);
+    JWTSecurityHandler.JWTMaterialParameter jwtRenewParam = new JWTSecurityHandler.JWTMaterialParameter(appId, user);
+    jwtRenewParam.setToken(jwt.getToken());
+  
+    // Recompute new expiration date for renewed token
+    Instant now = jwtHandler.getNow();
+    Instant expirationInstant = now.plus(jwtHandler.getValidityPeriod().getFirst(),
+        jwtHandler.getValidityPeriod().getSecond());
+    jwtRenewParam.setExpirationDate(expirationInstant);
+    Mockito.verify(actor).renewJWT(Mockito.eq(jwtRenewParam));
     
     securityManager.stop();
   }
