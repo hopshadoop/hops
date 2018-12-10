@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.security;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
@@ -55,6 +56,7 @@ public class DevHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityActi
         .INSTANCE);
     Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
         .register("https", sslConnectionFactory)
+        .register("http", PlainConnectionSocketFactory.getSocketFactory())
         .build();
     PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
     connectionManager.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
