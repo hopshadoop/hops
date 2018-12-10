@@ -145,8 +145,8 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
   public void testJWTRenewal() throws Exception {
     config.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
         "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
-    config.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "1m");
-    config.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "55s");
+    config.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "5s");
+    config.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "2s");
     
     RMAppSecurityActions actor = Mockito.spy(new TestingRMAppSecurityActions());
     RMAppSecurityActionsFactory.getInstance().register(actor);
@@ -170,8 +170,8 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
     
     Mockito.verify(jwtHandler).registerRenewer(Mockito.eq(jwtParam));
     
-    // Renewal should roughly happen after 5s
-    int sleeped = 7;
+    // Renewal should roughly happen after 7s
+    int sleeped = 15;
     while (!((MockJWTSecurityHandler) jwtHandler).getRenewer().hasRun() && sleeped > 0) {
       TimeUnit.SECONDS.sleep(1);
       sleeped--;

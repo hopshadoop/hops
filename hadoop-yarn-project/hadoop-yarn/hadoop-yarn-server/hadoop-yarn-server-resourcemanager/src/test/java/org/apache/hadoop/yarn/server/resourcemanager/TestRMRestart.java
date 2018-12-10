@@ -210,7 +210,7 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     // This should not kick off certificate rotation
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "1ms");
     // This should not kick off JWT rotation
-    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "1ms");
+    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "1s");
     
     // Start RM
     MockRM rm1 = createMockRM(conf);
@@ -592,8 +592,8 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "40s");
     conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
-    conf.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "50s");
-    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "40s");
+    conf.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "10s");
+    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "6s");
     
     // Start RM 1
     MockRM rm1 = new RMWithCustomRTService(conf);

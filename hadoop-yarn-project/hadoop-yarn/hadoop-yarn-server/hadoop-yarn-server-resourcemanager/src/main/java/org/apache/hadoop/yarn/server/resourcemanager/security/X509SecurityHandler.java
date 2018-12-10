@@ -36,6 +36,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppSecurityMaterialRenewedEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
@@ -61,6 +62,7 @@ import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
@@ -153,7 +155,7 @@ public class X509SecurityHandler
   
     if (isHopsTLSEnabled()) {
       this.certificateLocalizationService = rmContext.getCertificateLocalizationService();
-      rmAppSecurityActions = RMAppSecurityActionsFactory.getInstance().getActor(config);
+      rmAppSecurityActions = rmAppSecurityManager.getRmAppCertificateActions();
       keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGORITHM, SECURITY_PROVIDER);
       keyPairGenerator.initialize(KEY_SIZE);
     }
@@ -229,12 +231,13 @@ public class X509SecurityHandler
     if (!renewalTasks.containsKey(parameter.getApplicationId())) {
       Instant now = Instant.now();
       Instant expirationInstant = Instant.ofEpochMilli(parameter.getExpiration());
-      Instant delay = expirationInstant.minus(now.toEpochMilli(), ChronoUnit.MILLIS)
-          .minus(amountOfTimeToSubstractFromExpiration, renewalUnitOfTime);
+  
+      Duration validityPeriod = Duration.between(now, expirationInstant);
+      Duration delay = validityPeriod.minus(amountOfTimeToSubstractFromExpiration, renewalUnitOfTime);
       
       ScheduledFuture renewTask = renewalExecutorService.schedule(
           createCertificateRenewerTask(parameter.getApplicationId(), parameter.appUser, parameter.cryptoMaterialVersion),
-          delay.toEpochMilli(), TimeUnit.MILLISECONDS);
+          delay.getSeconds(), TimeUnit.SECONDS);
       renewalTasks.put(parameter.getApplicationId(), renewTask);
     }
   }
@@ -633,7 +636,6 @@ public class X509SecurityHandler
         eventHandler.handle(new RMAppSecurityMaterialRenewedEvent<>(appId, x509Material));
         LOG.debug("Renewed certificate for application " + appId);
       } catch (Exception ex) {
-        LOG.error(ex, ex);
         renewalTasks.remove(appId);
         backOffTime = backOff.getBackOffInMillis();
         if (backOffTime != -1) {
@@ -641,7 +643,8 @@ public class X509SecurityHandler
           ScheduledFuture task = renewalExecutorService.schedule(this, backOffTime, TimeUnit.MILLISECONDS);
           renewalTasks.put(appId, task);
         } else {
-          LOG.error("Failed to renew certificate for application " + appId + ". Failed more than 4 times, giving up");
+          LOG.error("Failed to renew certificate for application " + appId + ". Failed more than 4 times, giving " +
+              "up", ex);
         }
       }
     }

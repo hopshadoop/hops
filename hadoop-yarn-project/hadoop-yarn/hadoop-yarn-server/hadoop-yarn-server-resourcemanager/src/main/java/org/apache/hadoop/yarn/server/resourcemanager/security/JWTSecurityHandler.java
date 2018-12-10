@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.security;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.math3.random.RandomDataGenerator;
 import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -33,11 +34,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppSecurityMaterial
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -64,10 +65,12 @@ public class JWTSecurityHandler
   private final Map<ApplicationId, ScheduledFuture> renewalTasks;
   private Pair<Long, TemporalUnit> expirationSafetyPeriod;
   private ScheduledExecutorService renewalExecutorService;
+  private Long leeway;
   
   private Thread invalidationEventsHandler;
   private static final int INVALIDATION_EVENTS_QUEUE_SIZE = 100;
   private final BlockingQueue<JWTInvalidationEvent> invalidationEvents;
+  private final RandomDataGenerator random;
   
   public JWTSecurityHandler(RMContext rmContext, RMAppSecurityManager rmAppSecurityManager) {
     this.rmContext = rmContext;
@@ -75,6 +78,7 @@ public class JWTSecurityHandler
     this.renewalTasks = new ConcurrentHashMap<>();
     this.invalidationEvents = new ArrayBlockingQueue<JWTInvalidationEvent>(INVALIDATION_EVENTS_QUEUE_SIZE);
     this.eventHandler = rmContext.getDispatcher().getEventHandler();
+    this.random = new RandomDataGenerator();
   }
   
   @Override
@@ -93,6 +97,11 @@ public class JWTSecurityHandler
         YarnConfiguration.DEFAULT_RM_JWT_EXPIRATION_SAFETY_PERIOD);
     expirationSafetyPeriod = rmAppSecurityManager.parseInterval(safetyExpirationPeriodConf,
         YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD);
+    if (((ChronoUnit) expirationSafetyPeriod.getSecond()).compareTo(ChronoUnit.SECONDS) < 0) {
+      throw new IllegalArgumentException("Value of " + YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD
+          + " should be at least seconds");
+    }
+    leeway = Duration.of(expirationSafetyPeriod.getFirst(), expirationSafetyPeriod.getSecond()).getSeconds();
     if (jwtEnabled) {
       rmAppSecurityActions = rmAppSecurityManager.getRmAppCertificateActions();
     }
@@ -151,7 +160,7 @@ public class JWTSecurityHandler
     // JWT for applications will not be automatically renewed.
     // JWTSecurityHandler will renew them
     parameter.setRenewable(false);
-    parameter.setExpLeeway(-1);
+    parameter.setExpLeeway(leeway.intValue());
   }
   
   @InterfaceAudience.Private
@@ -194,16 +203,19 @@ public class JWTSecurityHandler
       return;
     }
     if (!renewalTasks.containsKey(parameter.getApplicationId())) {
-      Instant now = Instant.now();
-      Instant delay = parameter.getExpirationDate()
-          .minus(now.toEpochMilli(), ChronoUnit.MILLIS)
-          .minus(expirationSafetyPeriod.getFirst(), expirationSafetyPeriod.getSecond());
-      
       ScheduledFuture task = renewalExecutorService.schedule(
           createJWTRenewalTask(parameter.getApplicationId(), parameter.appUser, parameter.token),
-          delay.toEpochMilli(), TimeUnit.MILLISECONDS);
+          computeScheduledDelay(parameter.getExpirationDate()), TimeUnit.SECONDS);
       renewalTasks.put(parameter.getApplicationId(), task);
     }
+  }
+  
+  private long computeScheduledDelay(Instant expiration) {
+    long upperLimit = Math.max(leeway - 5L, 5L);
+    // random delay in seconds [3, (leeway - 5)]
+    long delayFromExpiration = random.nextLong(3L, upperLimit);
+    Duration duration = Duration.between(getNow(), expiration);
+    return duration.getSeconds() + delayFromExpiration;
   }
   
   public void deregisterFromRenewer(ApplicationId appId) {
@@ -417,7 +429,6 @@ public class JWTSecurityHandler
         eventHandler.handle(new RMAppSecurityMaterialRenewedEvent<>(appId, jwtMaterial));
         LOG.debug("Renewed JWT for application " + appId);
       } catch (Exception ex) {
-        LOG.error(ex, ex);
         renewalTasks.remove(appId);
         backOffTime = backOff.getBackOffInMillis();
         if (backOffTime != -1) {
@@ -425,7 +436,7 @@ public class JWTSecurityHandler
           ScheduledFuture task = renewalExecutorService.schedule(this, backOffTime, TimeUnit.MILLISECONDS);
           renewalTasks.put(appId, task);
         } else {
-          LOG.error("Failed to renew JWT for application " + appId + ". Failed more than 4 times, giving up");
+          LOG.error("Failed to renew JWT for application " + appId + ". Failed more than 4 times, giving up", ex);
         }
       }
     }

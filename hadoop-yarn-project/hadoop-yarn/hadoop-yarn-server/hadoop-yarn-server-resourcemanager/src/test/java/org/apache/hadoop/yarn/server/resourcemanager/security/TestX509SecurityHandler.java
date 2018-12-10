@@ -381,6 +381,7 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
         "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.set(YarnConfiguration.RM_STORE, DBRMStateStore.class.getName());
+    // Validity period is 50 seconds
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "45s");
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
     
@@ -414,7 +415,7 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     // NOTE: The part below is very sensitive to timing issues
     
     // Expiration time for testing TestingRMAppSecurityActions is now + 50 seconds
-    TimeUnit.SECONDS.sleep(5);
+    TimeUnit.SECONDS.sleep(6);
     // Certificate renewal should have happened by now
     byte[] newKeyStore = application.getKeyStore();
     assertFalse(Arrays.equals(keyStore, newKeyStore));
@@ -474,7 +475,7 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     
     rm.stop();
     
-    conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "2d");
+    conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "1s");
     MyMockRM rm2 = new MyMockRM(conf);
     rm2.start();
     nm.setResourceTrackerService(rm2.getResourceTrackerService());
@@ -492,7 +493,6 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     
     rm2.killApp(application.getApplicationId());
     rm2.waitForState(application.getApplicationId(), RMAppState.KILLED);
-    assertTrue(x509SecurityHandler.getRenewalTasks().isEmpty());
     rm2.stop();
   }
   
@@ -646,7 +646,12 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
   
     @Override
     protected RMAppSecurityManager createRMAppSecurityManager() throws Exception {
-      RMAppSecurityManager rmAppSecurityManager = Mockito.spy(new RMAppSecurityManager(rmContext));
+      RMAppSecurityManager rmAppSecurityManager = Mockito.spy(new RMAppSecurityManager(rmContext) {
+        @Override
+        protected void clearRMAppSecurityActionsFactory() {
+          // Do nothing in this case
+        }
+      });
       rmAppSecurityManager.registerRMAppSecurityHandlerWithType(createX509SecurityHandler(rmAppSecurityManager),
           X509SecurityHandler.class);
       rmAppSecurityManager.registerRMAppSecurityHandler(createJWTSecurityHandler(rmAppSecurityManager));

@@ -154,7 +154,7 @@ public class RMAppSecurityManager extends AbstractService
         if (!renewalExecutorService.awaitTermination(2L, TimeUnit.SECONDS)) {
           renewalExecutorService.shutdownNow();
         }
-        RMAppSecurityActionsFactory.getInstance().clear();
+        clearRMAppSecurityActionsFactory();
       } catch (InterruptedException ex) {
         renewalExecutorService.shutdownNow();
         if (rmAppCertificateActions != null) {
@@ -163,6 +163,12 @@ public class RMAppSecurityManager extends AbstractService
         Thread.currentThread().interrupt();
       }
     }
+  }
+  
+  @InterfaceAudience.Private
+  @VisibleForTesting
+  protected void clearRMAppSecurityActionsFactory() {
+    RMAppSecurityActionsFactory.getInstance().clear();
   }
   
   protected ScheduledExecutorService getRenewalExecutorService() {
