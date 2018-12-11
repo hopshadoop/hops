@@ -74,14 +74,14 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 
+@Ignore
 public class TestHopsworksRMAppSecurityActions {
   private final static Log LOG = LogFactory.getLog(TestHopsworksRMAppSecurityActions.class);
-  private final static String HOPSWORKS_ENDPOINT = "https://bbc4.sics.se:54719";
-  private final static String HOPSWORKS_USER = "agent@hops.io";
-  private final static String HOPSWORKS_PASSWORD = "admin";
+  private final static String HOPSWORKS_ENDPOINT = "https://host";
+  private final static String HOPSWORKS_USER = "username";
+  private final static String HOPSWORKS_PASSWORD = "password";
   
   private static final String HOPSWORKS_LOGIN_PATH = "/hopsworks-api/api/auth/login";
-  private static final String CN = UUID.randomUUID().toString();
   private static final String O = "application_id";
   private static final String OU = "1";
   
@@ -128,36 +128,38 @@ public class TestHopsworksRMAppSecurityActions {
   }
   
   @Test
-  @Ignore
   public void testSign() throws Exception {
-    KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA", "BC");
-    keyPairGenerator.initialize(1024);
-    KeyPair keyPair = keyPairGenerator.genKeyPair();
-  
-    X500NameBuilder x500NameBuilder = new X500NameBuilder(BCStyle.INSTANCE);
-    x500NameBuilder.addRDN(BCStyle.CN, CN);
-    x500NameBuilder.addRDN(BCStyle.O, O);
-    x500NameBuilder.addRDN(BCStyle.OU, OU);
-    X500Name x500Name = x500NameBuilder.build();
-  
-    PKCS10CertificationRequestBuilder csrBuilder = new JcaPKCS10CertificationRequestBuilder(x500Name, keyPair
-        .getPublic());
-    PKCS10CertificationRequest csr = csrBuilder.build(
-        new JcaContentSignerBuilder("SHA256withRSA").setProvider("BC")
-            .build(keyPair.getPrivate()));
-  
+    PKCS10CertificationRequest csr = generateCSR(UUID.randomUUID().toString());
     RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
     X509SecurityHandler.CertificateBundle singedBundle = actor.sign(csr);
     Assert.assertNotNull(singedBundle);
   }
   
   @Test
-  @Ignore
   public void testRevoke() throws Exception {
-    testSign();
+    String cn = UUID.randomUUID().toString();
+    PKCS10CertificationRequest csr = generateCSR(cn);
     RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
-    int response = actor.revoke(CN + "__" + O + "__" + OU);
+    actor.sign(csr);
+    int response = actor.revoke(cn + "__" + O + "__" + OU);
     Assert.assertEquals(200, response);
+  }
+  
+  private PKCS10CertificationRequest generateCSR(String cn) throws Exception {
+    KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA", "BC");
+    keyPairGenerator.initialize(1024);
+    KeyPair keyPair = keyPairGenerator.genKeyPair();
+    
+    X500NameBuilder x500NameBuilder = new X500NameBuilder(BCStyle.INSTANCE);
+    x500NameBuilder.addRDN(BCStyle.CN, cn);
+    x500NameBuilder.addRDN(BCStyle.O, O);
+    x500NameBuilder.addRDN(BCStyle.OU, OU);
+    X500Name x500Name = x500NameBuilder.build();
+    
+    PKCS10CertificationRequestBuilder csrBuilder = new JcaPKCS10CertificationRequestBuilder(x500Name, keyPair
+        .getPublic());
+    return  csrBuilder.build(new JcaContentSignerBuilder("SHA256withRSA").setProvider("BC")
+        .build(keyPair.getPrivate()));
   }
   
   @Test
