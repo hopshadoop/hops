@@ -2899,9 +2899,8 @@
   </property>
 
   <property>
-    <description>Amount of time to substract from application JWT expiration date to start the renewal
-      process</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.expiration-safety-period</name>
+    <description>Period of time after expiration that renewal of JWT is still allowed</description>
+    <name>yarn.resourcemanager.rmappsecurity.jwt.expiration-leeway</name>
     <value>10m</value>
   </property>
 

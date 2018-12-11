@@ -63,7 +63,6 @@ public class JWTSecurityHandler
   private RMAppSecurityActions rmAppSecurityActions;
   private Pair<Long, TemporalUnit> validityPeriod;
   private final Map<ApplicationId, ScheduledFuture> renewalTasks;
-  private Pair<Long, TemporalUnit> expirationSafetyPeriod;
   private ScheduledExecutorService renewalExecutorService;
   private Long leeway;
   
@@ -93,15 +92,15 @@ public class JWTSecurityHandler
     String validity = config.get(YarnConfiguration.RM_JWT_VALIDITY_PERIOD,
         YarnConfiguration.DEFAULT_RM_JWT_VALIDITY_PERIOD);
     validityPeriod = rmAppSecurityManager.parseInterval(validity, YarnConfiguration.RM_JWT_VALIDITY_PERIOD);
-    String safetyExpirationPeriodConf = config.get(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD,
-        YarnConfiguration.DEFAULT_RM_JWT_EXPIRATION_SAFETY_PERIOD);
-    expirationSafetyPeriod = rmAppSecurityManager.parseInterval(safetyExpirationPeriodConf,
-        YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD);
-    if (((ChronoUnit) expirationSafetyPeriod.getSecond()).compareTo(ChronoUnit.SECONDS) < 0) {
-      throw new IllegalArgumentException("Value of " + YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD
+    String expirationLeewayConf = config.get(YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY,
+        YarnConfiguration.DEFAULT_RM_JWT_EXPIRATION_LEEWAY);
+    Pair<Long, TemporalUnit> expirationLeeway = rmAppSecurityManager.parseInterval(expirationLeewayConf,
+        YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY);
+    if (((ChronoUnit) expirationLeeway.getSecond()).compareTo(ChronoUnit.SECONDS) < 0) {
+      throw new IllegalArgumentException("Value of " + YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY
           + " should be at least seconds");
     }
-    leeway = Duration.of(expirationSafetyPeriod.getFirst(), expirationSafetyPeriod.getSecond()).getSeconds();
+    leeway = Duration.of(expirationLeeway.getFirst(), expirationLeeway.getSecond()).getSeconds();
     if (jwtEnabled) {
       rmAppSecurityActions = rmAppSecurityManager.getRmAppCertificateActions();
     }

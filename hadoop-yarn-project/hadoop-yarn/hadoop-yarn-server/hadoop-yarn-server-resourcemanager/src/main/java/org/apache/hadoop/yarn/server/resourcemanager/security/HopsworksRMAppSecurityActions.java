@@ -34,6 +34,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpRequest;
+import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
@@ -357,7 +358,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     request.setEntity(new StringEntity(jsonEntity.toString()));
     request.addHeader(HttpHeaders.CONTENT_TYPE, "application/json");
     CloseableHttpResponse response = httpClient.execute(request);
-    checkHTTPResponseCode(response.getStatusLine().getStatusCode(), errorMessage);
+    checkHTTPResponseCode(response, errorMessage);
     return response;
   }
   
@@ -365,7 +366,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     HttpGet request = new HttpGet(target);
     addAuthenticationHeader(request);
     CloseableHttpResponse response = httpClient.execute(request);
-    checkHTTPResponseCode(response.getStatusLine().getStatusCode(), errorMessage);
+    checkHTTPResponseCode(response, errorMessage);
     return response;
   }
   
@@ -375,7 +376,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     addAuthenticationHeader(request);
     request.addHeader(HttpHeaders.CONTENT_TYPE, "text/plain");
     CloseableHttpResponse response = httpClient.execute(request);
-    checkHTTPResponseCode(response.getStatusLine().getStatusCode(), errorMessage);
+    checkHTTPResponseCode(response, errorMessage);
     return response;
   }
   
@@ -385,7 +386,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     addAuthenticationHeader(request);
     request.addHeader(HttpHeaders.CONTENT_TYPE, "application/json");
     CloseableHttpResponse response = httpClient.execute(request);
-    checkHTTPResponseCode(response.getStatusLine().getStatusCode(), errorMessage);
+    checkHTTPResponseCode(response, errorMessage);
     return response;
   }
   
@@ -410,9 +411,11 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
   }
   
-  private void checkHTTPResponseCode(int responseCode, String msg) throws IOException {
-    if (!ACCEPTABLE_HTTP_RESPONSES.contains(responseCode)) {
-      throw new IOException("HTTP error, response code " + responseCode + " Message: " + msg);
+  private void checkHTTPResponseCode(HttpResponse response, String msg) throws IOException {
+    int statusCode = response.getStatusLine().getStatusCode();
+    if (!ACCEPTABLE_HTTP_RESPONSES.contains(statusCode)) {
+      throw new IOException("HTTP error, response code " + statusCode + " Reason: " + response.getStatusLine()
+          .getReasonPhrase() + " Message: " + msg);
     }
   }
   
@@ -442,6 +445,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     CloseableHttpResponse response = null;
     try {
       response = get(jwtAlivePath.toURI(), " Could not ping Hopsworks to renew JWT");
+      LOG.debug("Pinged Hopsworks!");
       if (!response.containsHeader(HttpHeaders.AUTHORIZATION)) {
         // JWT is sent only when the previous has expired
         return null;
@@ -467,10 +471,10 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     
     private TokenRenewer() {
       backoff = new ExponentialBackOff.Builder()
-          .setInitialIntervalMillis(800)
-          .setMaximumIntervalMillis(5000)
+          .setInitialIntervalMillis(1000)
+          .setMaximumIntervalMillis(10000)
           .setMultiplier(1.5)
-          .setMaximumRetries(4)
+          .setMaximumRetries(Integer.MAX_VALUE)
           .build();
     }
     
@@ -490,7 +494,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
               sslConf.writeXml(bos);
               bos.flush();
             }
-            LOG.debug("Renewed Hopsworks JWT");
+            LOG.info("Renewed Hopsworks JWT");
           }
           backoff.reset();
           TimeUnit.SECONDS.sleep(jwtAliveIntervalSeconds);
@@ -500,17 +504,12 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
           // That's fatal error. Keep going until JWT expires
           LOG.fatal(ex, ex);
           Thread.currentThread().interrupt();
-        } catch (IOException ex) {
+        } catch (Exception ex) {
           backoffTime = backoff.getBackOffInMillis();
-          if (backoffTime != -1) {
-            LOG.warn(ex + "Retrying in " + backoffTime + "ms", ex);
-            try {
-              TimeUnit.MILLISECONDS.sleep(backoffTime);
-            } catch (InterruptedException iex) {
-              Thread.currentThread().interrupt();
-            }
-          } else {
-            LOG.fatal(ex, ex);
+          LOG.warn(ex + "Retrying in " + backoffTime + "ms", ex);
+          try {
+            TimeUnit.MILLISECONDS.sleep(backoffTime);
+          } catch (InterruptedException iex) {
             Thread.currentThread().interrupt();
           }
         }

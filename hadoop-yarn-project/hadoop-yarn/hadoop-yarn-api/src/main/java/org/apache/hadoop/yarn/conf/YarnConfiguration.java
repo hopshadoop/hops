@@ -2673,9 +2673,8 @@ public class YarnConfiguration extends Configuration {
   public static String DEFAULT_RM_JWT_VALIDITY_PERIOD = "30m";
   public static final String RM_JWT_VALIDITY_PERIOD = RM_PREFIX + JWT_PREFIX + "validity";
   
-  public static String DEFAULT_RM_JWT_EXPIRATION_SAFETY_PERIOD = "30m";
-  public static final String RM_JWT_EXPIRATION_SAFETY_PERIOD = RM_PREFIX + JWT_PREFIX
-      + "expiration-safety-period";
+  public static String DEFAULT_RM_JWT_EXPIRATION_LEEWAY = "30m";
+  public static final String RM_JWT_EXPIRATION_LEEWAY = RM_PREFIX + JWT_PREFIX + "expiration-leeway";
   
   public static String DEFAULT_RM_JWT_AUDIENCE = "job";
   public static final String RM_JWT_AUDIENCE = RM_PREFIX + JWT_PREFIX + "audience";

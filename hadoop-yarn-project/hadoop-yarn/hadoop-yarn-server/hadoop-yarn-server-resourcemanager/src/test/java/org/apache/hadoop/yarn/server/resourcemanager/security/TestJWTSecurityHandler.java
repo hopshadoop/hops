@@ -29,7 +29,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -146,7 +145,7 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
     config.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
         "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
     config.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "5s");
-    config.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "2s");
+    config.set(YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY, "2s");
     
     RMAppSecurityActions actor = Mockito.spy(new TestingRMAppSecurityActions());
     RMAppSecurityActionsFactory.getInstance().register(actor);

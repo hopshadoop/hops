@@ -213,7 +213,7 @@ public class TestRMAppTransitions {
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, isSecurityEnabled);
     conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, isSecurityEnabled);
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "1s");
-    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_SAFETY_PERIOD, "1s");
+    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY, "1s");
     AuthenticationMethod authMethod = AuthenticationMethod.SIMPLE;
     if (isSecurityEnabled) {
       authMethod = AuthenticationMethod.KERBEROS;
