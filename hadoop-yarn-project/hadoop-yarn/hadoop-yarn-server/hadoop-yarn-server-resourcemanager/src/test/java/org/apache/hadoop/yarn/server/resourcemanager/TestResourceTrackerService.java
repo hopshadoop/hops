@@ -306,8 +306,8 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
     
     conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
-    conf.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "50s");
-    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY, "30s");
+    conf.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "20s");
+    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY, "4s");
     rm = new MockRM(conf);
     rm.start();
     

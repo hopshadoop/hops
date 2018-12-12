@@ -2923,6 +2923,12 @@
   </property>
 
   <property>
+    <description>Hopsworks REST endpoint to send JWT renew requests</description>
+    <name>yarn.resourcemanager.rmappsecurity.jwt.renew-path</name>
+    <value>/hopsworks-api/api/jwt/renew/</value>
+  </property>
+
+  <property>
     <description>Hopsworks REST endpoint to ping for automatic JWT renewal</description>
     <name>yarn.resourcemanager.rmappsecurity.jwt.alive-path</name>
     <value>/hopsworks-ca/v2/token</value>
