@@ -22,6 +22,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -69,7 +70,6 @@ import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
-import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -78,12 +78,15 @@ import java.util.regex.Matcher;
 public class TestHopsworksRMAppSecurityActions {
   private final static Log LOG = LogFactory.getLog(TestHopsworksRMAppSecurityActions.class);
   private final static String HOPSWORKS_ENDPOINT = "https://host";
-  private final static String HOPSWORKS_USER = "username";
+  private final static String HOPSWORKS_USER = "user-email";
   private final static String HOPSWORKS_PASSWORD = "password";
   
   private static final String HOPSWORKS_LOGIN_PATH = "/hopsworks-api/api/auth/login";
   private static final String O = "application_id";
   private static final String OU = "1";
+  
+  private static final String KEYSTORE_LOCATION = "/path/to/keystore";
+  private static final String KEYSTORE_PASS = "12345";
   
   private static String classPath;
   
@@ -110,6 +113,11 @@ public class TestHopsworksRMAppSecurityActions {
     
     sslServer = new Configuration(false);
     sslServer.set(YarnConfiguration.RM_JWT_TOKEN, jwt);
+    sslServer.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+        FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY), KEYSTORE_LOCATION);
+    sslServer.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+        FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY), KEYSTORE_PASS);
+    
     KeyStoreTestUtil.saveConfig(sslServerPath.toFile(), sslServer);
     conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFilename);
     conf.set(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY, HOPSWORKS_ENDPOINT);
@@ -252,6 +260,10 @@ public class TestHopsworksRMAppSecurityActions {
     Configuration newSSLServer = new Configuration();
     newSSLServer.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
     String newJWT = newSSLServer.get(YarnConfiguration.RM_JWT_TOKEN);
+    String keystoreLocation = sslServer.get(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+        FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY));
+    String keystorePass = sslServer.get(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+        FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
     Header oldAuthHeader = ((TestingHopsworksActions) actor).createAuthenticationHeader(initialJWT);
     actor.destroy();
     Assert.assertNotNull(newJWT);
@@ -260,6 +272,8 @@ public class TestHopsworksRMAppSecurityActions {
     Header newAuthHeader = ((TestingHopsworksActions) actor).createAuthenticationHeader(newJWT);
     Assert.assertNotEquals(oldAuthHeader.getValue(), newAuthHeader.getValue());
     Assert.assertEquals("Bearer " + newJWT, newAuthHeader.getValue());
+    Assert.assertEquals(KEYSTORE_LOCATION, keystoreLocation);
+    Assert.assertEquals(KEYSTORE_PASS, keystorePass);
   }
   
   @Test
