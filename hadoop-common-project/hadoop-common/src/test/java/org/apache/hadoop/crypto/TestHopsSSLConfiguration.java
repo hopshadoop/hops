@@ -10,9 +10,11 @@ import org.apache.hadoop.ipc.RpcWritable;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.SSLCertificateException;
+import org.apache.hadoop.net.SocksHopsSSLSocketFactory;
 import org.apache.hadoop.security.ssl.HopsSSLTestUtils;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.envVars.EnvironmentVariables;
 import org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -23,13 +25,18 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +46,7 @@ import java.util.Set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
+@RunWith(value = Parameterized.class)
 public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     private final Log LOG = LogFactory.getLog(TestHopsSSLConfiguration.class);
     private final String BASEDIR =
@@ -50,25 +58,44 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     @Rule
     public final ExpectedException rule = ExpectedException.none();
     
+    @Parameterized.Parameters
+    public static Collection<Class[]> getTestParameters() {
+        return Arrays.asList(new Class[][] {
+            {HopsSSLSocketFactory.class},
+            {SocksHopsSSLSocketFactory.class}
+        });
+    }
     Configuration conf;
     HopsSSLSocketFactory hopsFactory;
     final List<String> filesToPurge = new ArrayList<>();
-
+    private Class socketFactoryInTest;
+    
+    public TestHopsSSLConfiguration(Class socketFactoryInTest) {
+        this.socketFactoryInTest = socketFactoryInTest;
+    }
+    
     @BeforeClass
     public static void beforeClass() throws Exception {
         classPathDir = new File(KeyStoreTestUtil.getClasspathDir(TestHopsSSLConfiguration.class));
     }
     
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
         conf = new Configuration();
-        hopsFactory = new HopsSSLSocketFactory();
+        LOG.info("Testing " + socketFactoryInTest.getSimpleName());
+        hopsFactory = (HopsSSLSocketFactory) newInstance(socketFactoryInTest);
         baseDirFile = new File(BASEDIR);
         baseDirFile.mkdirs();
         
         filesToPurge.clear();
     }
 
+    private <T> T newInstance(Class<T> clazz) throws Exception {
+        Constructor<T> constructor = clazz.getDeclaredConstructor(new Class[]{});
+        constructor.setAccessible(true);
+        return constructor.newInstance();
+    }
+    
     @After
     public void tearDown() throws IOException {
         if (baseDirFile.exists()) {

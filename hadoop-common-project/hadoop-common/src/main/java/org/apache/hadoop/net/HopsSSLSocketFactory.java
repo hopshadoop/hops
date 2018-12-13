@@ -281,10 +281,10 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     }
   }
   
+  @Override
   public Socket createSocket() throws IOException, UnknownHostException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Creating SSL client socket");
-    }
+    LOG.debug("Creating SSL client socket");
+    
     if (conf.getBoolean(FORCE_CONFIGURE, false)) {
       setConf(conf);
     }
@@ -293,7 +293,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     return socketFactory.createSocket();
   }
   
-  private SSLContext initializeSSLContext() throws IOException {
+  protected SSLContext initializeSSLContext() throws IOException {
     try {
       String enabledProtocol = conf.get(HopsSSLSocketFactory.CryptoKeys.SOCKET_ENABLED_PROTOCOL.getValue(),
           HopsSSLSocketFactory.CryptoKeys.SOCKET_ENABLED_PROTOCOL.getDefaultValue());
