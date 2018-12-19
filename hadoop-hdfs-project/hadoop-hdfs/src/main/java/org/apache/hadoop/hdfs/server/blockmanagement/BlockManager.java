@@ -143,7 +143,6 @@ public class BlockManager {
   private volatile long corruptReplicaBlocksCount = 0L;
   private volatile long underReplicatedBlocksCount = 0L;
   private volatile long scheduledReplicationBlocksCount = 0L;
-  private AtomicLong excessBlocksCount = new AtomicLong(0L);
   private AtomicLong postponedMisreplicatedBlocksCount = new AtomicLong(0L);
   private final long startupDelayBlockDeletionInMs;
   
@@ -4955,6 +4954,7 @@ public class BlockManager {
               processPendingReplications();
             }
           } else {
+            updateState();
             LOG.debug("Namesystem is not leader: will not run replication monitor");
           }
           Thread.sleep(replicationRecheckInterval);
