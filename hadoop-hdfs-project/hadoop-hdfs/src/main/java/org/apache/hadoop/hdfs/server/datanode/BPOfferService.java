@@ -1087,45 +1087,49 @@ public class IncrementalBRTask implements Callable{
       reports[i++] = new StorageBlockReport(kvPair.getKey(), blockList);
       totalBlockCount += blockList.getNumberOfBlocks();
     }
-    
+
     // Get a namenode to send the report(s) to
     ActiveNode an = nextNNForBlkReport(totalBlockCount);
-    if (an != null) {
-      blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
-      if (blkReportHander == null || !blkReportHander.isRunning()) {
-        return null; //no one is ready to handle the request, return now without changing the values of lastBlockReport. it will be retried in next cycle
-      }
-    } else {
-      LOG.warn("Unable to send block report");
-      return null;
-    }
-
-    // Send the reports to the NN.
     int numReportsSent;
-    long brSendStartTime = now();
-    if (totalBlockCount < dnConf.blockReportSplitThreshold) {
-      // Below split threshold, send all reports in a single message.
-      numReportsSent = 1;
-      DatanodeCommand cmd =
-          blkReportHander.blockReport(bpRegistration, getBlockPoolId(), reports);
-      if (cmd != null) {
-        cmds.add(cmd);
+    long brSendStartTime;
+    try {
+      if (an != null) {
+        blkReportHander = getAnActor(an.getRpcServerAddressForDatanodes());
+        if (blkReportHander == null || !blkReportHander.isRunning()) {
+          return null; //no one is ready to handle the request, return now without changing the values of lastBlockReport. it will be retried in next cycle
+        }
+      } else {
+        LOG.warn("Unable to send block report");
+        return null;
       }
-    } else {
-      // Send one block report per message.
-      numReportsSent = i;
-      for (StorageBlockReport report : reports) {
-        StorageBlockReport singleReport[] = { report };
-        DatanodeCommand cmd = blkReportHander.blockReport(
-            bpRegistration, getBlockPoolId(), singleReport);
+
+      // Send the reports to the NN.
+      brSendStartTime = now();
+      if (totalBlockCount < dnConf.blockReportSplitThreshold) {
+        // Below split threshold, send all reports in a single message.
+        numReportsSent = 1;
+        DatanodeCommand cmd =
+                blkReportHander.blockReport(bpRegistration, getBlockPoolId(), reports);
         if (cmd != null) {
           cmds.add(cmd);
         }
+      } else {
+        // Send one block report per message.
+        numReportsSent = i;
+        for (StorageBlockReport report : reports) {
+          StorageBlockReport singleReport[] = {report};
+          DatanodeCommand cmd = blkReportHander.blockReport(
+                  bpRegistration, getBlockPoolId(), singleReport);
+          if (cmd != null) {
+            cmds.add(cmd);
+          }
+        }
       }
+    } finally {
+      // In case of un/successful block reports we have to inform the leader that
+      // block reporting has finished for now.
+      getLeaderActor().blockReportCompleted(bpRegistration);
     }
-
-    LOG.info("Block report completed");
-    getLeaderActor().blockReportCompleted(bpRegistration);
 
     // Log the block report processing stats from Datanode perspective
     long brSendCost = now() - brSendStartTime;
