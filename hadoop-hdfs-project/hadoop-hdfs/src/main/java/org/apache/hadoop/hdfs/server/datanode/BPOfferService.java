@@ -68,7 +68,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdfs.client.BlockReportOptions;
-import static org.apache.hadoop.hdfs.server.datanode.BPServiceActor.LOG;
 import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 
@@ -551,6 +550,22 @@ class BPOfferService implements Runnable {
    */
   void scheduleBlockReport(long delay) {
     scheduleBlockReportInt(delay);
+  }
+
+  public boolean otherActorsConnectedToNNs(BPServiceActor skip){
+    try{
+      readLock();
+      for (BPServiceActor actor : bpServices) {
+        if(actor != skip){
+          if (actor.connectedToNN()) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }finally {
+      readUnlock();
+    }
   }
 
   /**
@@ -1135,6 +1150,7 @@ public class IncrementalBRTask implements Callable{
     long brSendCost = now() - brSendStartTime;
     long brCreateCost = brSendStartTime - brCreateStartTime;
     dn.getMetrics().addBlockReport(brSendCost);
+    dn.getMetrics().incrBlocReportCounter(numReportsSent);
     LOG.info("Sent " + numReportsSent + " blockreports " + totalBlockCount +
         " blocks total. Took " + brCreateCost +
         " msec to generate and " + brSendCost +

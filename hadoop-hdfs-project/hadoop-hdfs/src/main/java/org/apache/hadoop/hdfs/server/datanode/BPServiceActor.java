@@ -22,7 +22,6 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -46,6 +45,7 @@ import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.util.Collection;
@@ -85,6 +85,8 @@ class BPServiceActor implements Runnable {
   private DatanodeRegistration bpRegistration;
 
   private final Object waitForHeartBeats = new Object();
+
+  private boolean connectedToNN = false;
 
   BPServiceActor(InetSocketAddress nnAddr, BPOfferService bpos) {
     this.bpos = bpos;
@@ -396,6 +398,8 @@ class BPServiceActor implements Runnable {
           waitForHeartBeats.wait(waitTime);
         }
 
+        // no exceptions so
+        connectedToNN = true;
       } catch (RemoteException re) {
         String reClass = re.getClassName();
         if (UnregisteredNodeException.class.getName().equals(reClass) ||
@@ -416,6 +420,8 @@ class BPServiceActor implements Runnable {
         LOG.warn("OfferService interrupted", e);
       } catch (IOException e) {
         LOG.warn("IOException in offerService", e);
+        //not connected to namenode
+        connectedToNN = false;
       }
     } // while (shouldRun())
   } // offerService
@@ -452,7 +458,13 @@ class BPServiceActor implements Runnable {
     bpos.registrationSucceeded(this, bpRegistration);
 
     // random short delay - helps scatter the BR from all DNs
-    bpos.scheduleBlockReport(dnConf.initialBlockReportDelay);
+    // block report only if the datanode is not already connected
+    // to any other namenode.
+    if(!bpos.otherActorsConnectedToNNs(this)) {
+      bpos.scheduleBlockReport(dnConf.initialBlockReportDelay);
+    } else {
+      LOG.info("Block Report skipped as other BPServiceActors are connected to the namenodes ");
+    }
   }
 
 
@@ -642,5 +654,9 @@ class BPServiceActor implements Runnable {
     } else {
       return null;
     }
+  }
+
+  public boolean connectedToNN(){
+    return connectedToNN;
   }
 }
