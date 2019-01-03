@@ -99,6 +99,8 @@ public class DataNodeMetrics {
   MutableRate heartbeats;
   @Metric
   MutableRate blockReports;
+  @Metric
+  MutableCounterLong blockReportCount;
   @Metric MutableRate cacheReports;
   @Metric
   MutableRate packetAckRoundTripTimeNanos;
@@ -188,6 +190,11 @@ public class DataNodeMetrics {
 
   public void addBlockReport(long latency) {
     blockReports.add(latency);
+  }
+
+  public void incrBlocReportCounter(int increment) {
+    blockReportCount.incr(increment);
+
   }
 
   public void addCacheReport(long latency) {
