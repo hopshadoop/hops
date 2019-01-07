@@ -142,7 +142,7 @@ public class LETransaction {
       context.init_phase = false;
     } catch (LEWeakLocks wl) {
       context.nextTimeTakeStrongerLocks = true;
-      LOG.warn("LE Status: id " + context.id +
+      LOG.info("LE Status: id " + context.id +
           " initPhase Stronger locks requested in next round");
     }
   }
@@ -155,7 +155,7 @@ public class LETransaction {
       membershipMgm();
     } catch (LEWeakLocks wl) {
       context.nextTimeTakeStrongerLocks = true;
-      LOG.warn("LE Status: id " + context.id +
+      LOG.info("LE Status: id " + context.id +
           " periodic update. Stronger locks requested in next round");
     }
     appendHistory();
@@ -169,7 +169,7 @@ public class LETransaction {
       if (txLockType == TransactionLockTypes.LockType.READ) {
         String msg = "LE Status: id " + context.id +
             " Id not found. I have shared locks. Retry with stronger lock";
-        LOG.warn(msg);
+        LOG.info(msg);
         throw new LEWeakLocks(msg);
       } else if (txLockType == TransactionLockTypes.LockType.WRITE) {
         long oldId = context.id;
@@ -179,15 +179,12 @@ public class LETransaction {
                 context.http_address);
         EntityManager.add(newDescriptor);
         if (oldId != LeaderElection.LEADER_INITIALIZATION_ID) {
-          LOG.warn(
-              "LE Status: id " + context.id + " I was kicked out. Old Id was " +
-                  oldId);
+          LOG.warn( "LE Status: id " + context.id + " I was kicked out. Old Id was " + oldId);
           setEvictionFlag();
         }
       } else {
         String msg =
-            "LE Status: id " + context.id + " lock type not supported. Got " +
-                txLockType + " lock";
+            "LE Status: id " + context.id + " lock type not supported. Got " + txLockType + " lock";
         LOG.error(msg);
         throw new IllegalStateException(msg);
       }
@@ -249,7 +246,7 @@ public class LETransaction {
       } else {
         String msg = "LE Status: id " + context.id +
             " I can be the leader but I have weak locks. Retry with stronger lock";
-        LOG.warn(msg);
+        LOG.info(msg);
         throw new LEWeakLocks(msg);
       }
     } else {

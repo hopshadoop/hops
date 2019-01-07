@@ -92,7 +92,7 @@ public class IDsGeneratorFactory {
     synchronized (isConfigured) {
       if (isConfigured) {
         LogFactory.getLog(this.getClass())
-            .error("Called setConfiguration more than once.");
+            .warn("Called setConfiguration more than once.");
         return;
       }
       isConfigured = true;

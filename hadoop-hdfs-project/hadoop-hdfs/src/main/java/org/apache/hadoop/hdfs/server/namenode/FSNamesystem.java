@@ -573,8 +573,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     namesystem.imageLoadComplete();     //HOP: this function was called inside the  namesystem.loadFSImage(...) which is commented out
 
     long timeTakenToLoadFSImage = now() - loadStart;
-    LOG.info(
-        "Finished loading FSImage in " + timeTakenToLoadFSImage + " ms");
+    LOG.debug("Finished loading FSImage in " + timeTakenToLoadFSImage + " ms");
     NameNodeMetrics nnMetrics = NameNode.getNameNodeMetrics();
     if (nnMetrics != null) {
       nnMetrics.setFsImageLoadTime((int) timeTakenToLoadFSImage);

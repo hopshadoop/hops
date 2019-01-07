@@ -882,7 +882,6 @@ public class NameNode implements NameNodeStatusMXBean {
       //Generate a new cluster id
       clusterId = StorageInfo.newClusterID();
     }
-    System.out.println("Formatting using clusterid: " + clusterId);
 
     try {
       HdfsStorageFactory.setConfiguration(conf);
