@@ -115,7 +115,7 @@
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <native-maven-plugin.version>1.0-alpha-8</native-maven-plugin.version>
     <surefire.fork.timeout>900</surefire.fork.timeout>
-    <aws-java-sdk.version>1.10.6</aws-java-sdk.version>
+    <aws-java-sdk.version>1.11.199</aws-java-sdk.version>
   </properties>
 
   <dependencyManagement>
@@ -400,6 +400,12 @@
 
       <dependency>
         <groupId>io.hops</groupId>
+        <artifactId>hadoop-aws</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      
+      <dependency>
+        <groupId>io.hops</groupId>
         <artifactId>hops-leader-election</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -678,6 +684,16 @@
         <groupId>net.java.dev.jets3t</groupId>
         <artifactId>jets3t</artifactId>
         <version>0.9.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.amazonaws</groupId>
+        <artifactId>aws-java-sdk-s3</artifactId>
+        <version>${aws-java-sdk.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.amazonaws</groupId>
+        <artifactId>aws-java-sdk-sts</artifactId>
+        <version>${aws-java-sdk.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.mina</groupId>
