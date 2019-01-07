@@ -103,8 +103,8 @@ public class BRTrackingService {
         ActiveBlockReport abr = new ActiveBlockReport(dnAddress, an.getId(),
                 System.currentTimeMillis(), noOfBlks);
         addActiveBlockReport(abr);
-        LOG.info("Block report from "+dnAddress+" comtaining " + noOfBlks + " blocks " +
-                "is assigned to NN: " + an.getId());
+        LOG.info("Block report from "+dnAddress+" containing " + noOfBlks + " blocks " +
+                "is assigned to NN [ID: "+an.getId()+", IP: "+an.getRpcServerIpAddress()+"]");
         return an;
       }
     }

@@ -279,7 +279,7 @@ public class LeaderElection extends Thread {
     try {
       Thread.sleep(time);
     } catch (InterruptedException ex) {
-      LOG.error("LE Status: id " + context.id + " got Interrupted " + ex);
+      LOG.warn("LE Status: id " + context.id + " got Interrupted " + ex);
     }
   }
 
