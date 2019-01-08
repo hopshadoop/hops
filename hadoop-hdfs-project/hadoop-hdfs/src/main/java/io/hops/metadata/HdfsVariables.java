@@ -506,7 +506,11 @@ public class HdfsVariables {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            int completedScanCount = ((IntVariable) vd.getVariable(Variable.Finder.completedScanCount)).getValue();
+            IntVariable var = (IntVariable) vd.getVariable(Variable.Finder.completedScanCount);
+            int completedScanCount = 0;
+            if(var!=null){
+              completedScanCount = var.getValue();
+            }
             int neededScanCoun = ((IntVariable) vd.getVariable(Variable.Finder.neededScanCount)).getValue();
             return completedScanCount < neededScanCoun;
           }
@@ -524,7 +528,11 @@ public class HdfsVariables {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            int curScanCount = ((IntVariable) vd.getVariable(Variable.Finder.curScanCount)).getValue();
+            IntVariable curScanVar = (IntVariable) vd.getVariable(Variable.Finder.curScanCount);
+            int curScanCount = -1;
+            if(curScanVar!=null){
+              curScanCount = curScanVar.getValue();
+            }
             if (curScanCount >= 0) {
               // If there is a scan in progress, we need to wait for the scan after
               // that.
@@ -532,7 +540,11 @@ public class HdfsVariables {
               int val = curScanCount + 1;
             } else {
               // If there is no scan in progress, we need to wait for the next scan.
-              int completedScanCount = ((IntVariable) vd.getVariable(Variable.Finder.completedScanCount)).getValue();
+              IntVariable completedScanVar = (IntVariable) vd.getVariable(Variable.Finder.completedScanCount);
+              int completedScanCount = 0;
+              if (completedScanVar != null) {
+                completedScanCount = completedScanVar.getValue();
+              }
               vd.setVariable(new IntVariable(Variable.Finder.neededScanCount, completedScanCount + 1));
               int val = completedScanCount +1;
             }
@@ -552,7 +564,11 @@ public class HdfsVariables {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            int curScanCount = ((IntVariable) vd.getVariable(Variable.Finder.curScanCount)).getValue();
+            IntVariable curScanVar = (IntVariable) vd.getVariable(Variable.Finder.curScanCount);
+            int curScanCount = -1;
+            if(curScanVar!=null){
+              curScanCount = curScanVar.getValue();
+            }
             vd.setVariable(new IntVariable(Variable.Finder.completedScanCount, curScanCount));
             vd.setVariable(new IntVariable(Variable.Finder.curScanCount, -1));
             return null;
@@ -571,7 +587,11 @@ public class HdfsVariables {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            int completedScanCount = ((IntVariable) vd.getVariable(Variable.Finder.completedScanCount)).getValue();
+            IntVariable var = (IntVariable) vd.getVariable(Variable.Finder.completedScanCount);
+            int completedScanCount = 0;
+            if(var!=null){
+              completedScanCount = var.getValue();
+            }
             vd.setVariable(new IntVariable(Variable.Finder.curScanCount, completedScanCount+1));
             int val = completedScanCount+1;
             return null;
@@ -590,7 +610,12 @@ public class HdfsVariables {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            return ((IntVariable) vd.getVariable(Variable.Finder.curScanCount)).getValue();
+            IntVariable curScanVar = (IntVariable) vd.getVariable(Variable.Finder.curScanCount);
+            int curScanCount = -1;
+            if(curScanVar!=null){
+              curScanCount = curScanVar.getValue();
+            }
+            return curScanCount;
           }
         });
       }
