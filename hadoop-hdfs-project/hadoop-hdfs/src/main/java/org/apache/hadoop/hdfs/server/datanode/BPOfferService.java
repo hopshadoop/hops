@@ -1292,8 +1292,7 @@ public class IncrementalBRTask implements Callable{
     }
   }
 
-
-  long nnListLastUpdate = System.currentTimeMillis();
+  long nnListLastUpdate = 0;
 
   boolean canUpdateNNList() {
     writeLock();
