@@ -1138,7 +1138,9 @@ public class IncrementalBRTask implements Callable{
     } finally {
       // In case of un/successful block reports we have to inform the leader that
       // block reporting has finished for now.
-      getLeaderActor().blockReportCompleted(bpRegistration);
+      if (blkReportHander != null) {
+        getLeaderActor().blockReportCompleted(bpRegistration);
+      }
     }
 
     // Log the block report processing stats from Datanode perspective
