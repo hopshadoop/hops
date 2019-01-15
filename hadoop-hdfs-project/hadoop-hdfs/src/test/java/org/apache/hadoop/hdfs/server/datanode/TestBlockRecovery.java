@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import io.hops.leader_election.node.ActiveNode;
+import io.hops.leader_election.node.ActiveNodePBImpl;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -164,34 +165,36 @@ public class TestBlockRecovery {
         .thenReturn(new HeartbeatResponse(new DatanodeCommand[0],null));
 
     when(namenode.getActiveNamenodes()).thenReturn(new SortedActiveNodeList() {
+
+
       @Override
       public boolean isEmpty() {
-        return true;
+        return false;
       }
 
       @Override
       public int size() {
-        return 0;
+        return 1;
       }
 
       @Override
       public List<ActiveNode> getActiveNodes() {
-        return new ArrayList<>();
+        return getList();
       }
 
       @Override
       public List<ActiveNode> getSortedActiveNodes() {
-        return null;
+        return getList();
       }
 
       @Override
       public ActiveNode getActiveNode(InetSocketAddress address) {
-        return null;
+        throw new UnsupportedOperationException("Not Implemented Yet");
       }
 
       @Override
       public ActiveNode getLeader() {
-        return null;
+        return getList().get(0);
       }
     });
 
@@ -208,6 +211,7 @@ public class TestBlockRecovery {
           String bpid) throws IOException {
         return namenode;
       }
+
     };
 
     BPOfferService bpos = dn.getAllBpOs()[0];
@@ -221,6 +225,14 @@ public class TestBlockRecovery {
     dn.getAllBpOs()[0].triggerHeartbeatForTests();
   }
 
+  public List<ActiveNode> getList(){
+    List<ActiveNode> list = new ArrayList<ActiveNode>();
+    ActiveNode an =
+            new ActiveNodePBImpl(0, NN_ADDR.getHostName(), NN_ADDR.getHostName(), NN_ADDR.getPort(),
+                    NN_ADDR.getHostName()+":"+NN_ADDR.getPort(), NN_ADDR.getHostName(), NN_ADDR.getPort());
+    list.add(an);
+    return list;
+  }
   /**
    * Cleans the resources and closes the instance of datanode
    *

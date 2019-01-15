@@ -457,6 +457,8 @@ class BPServiceActor implements Runnable {
     LOG.info("Block pool " + this + " successfully registered with NN");
     bpos.registrationSucceeded(this, bpRegistration);
 
+    refreshNNConnections();
+
     // random short delay - helps scatter the BR from all DNs
     // block report only if the datanode is not already connected
     // to any other namenode.
