@@ -174,6 +174,9 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
             doRescan.await(delta, TimeUnit.MILLISECONDS);
             curTimeMs = Time.monotonicNow();
           }
+        }catch(StorageException ignore){
+          //Storage problems should be handled by FSNameSystem.checkAvailableResources(), retry
+          continue;
         } finally {
           lock.unlock();
         }
