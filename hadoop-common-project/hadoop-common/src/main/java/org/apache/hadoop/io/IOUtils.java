@@ -39,6 +39,7 @@ import org.apache.hadoop.util.ChunkedArrayList;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
+import org.slf4j.Logger;
 
 /**
  * An utility class for I/O related functionality. 
@@ -251,6 +252,28 @@ public class IOUtils {
         } catch(IOException e) {
           if (log != null && log.isDebugEnabled()) {
             log.debug("Exception in closing " + c, e);
+          }
+        }
+      }
+    }
+  }
+  
+  /**
+   * Close the Closeable objects and <b>ignore</b> any {@link Throwable} or
+   * null pointers. Must only be used for cleanup in exception handlers.
+   *
+   * @param logger the log to record problems to at debug level. Can be null.
+   * @param closeables the objects to close
+   */
+  public static void cleanupWithLogger(Logger logger,
+      java.io.Closeable... closeables) {
+    for (java.io.Closeable c : closeables) {
+      if (c != null) {
+        try {
+          c.close();
+        } catch (Throwable e) {
+          if (logger != null) {
+            logger.debug("Exception in closing {}", c, e);
           }
         }
       }

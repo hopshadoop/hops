@@ -18,9 +18,12 @@
 
 package org.apache.hadoop.fs.s3a;
 
-import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.metrics2.MetricStringBuilder;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.Interns;
@@ -28,11 +31,15 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.metrics2.lib.MutableMetric;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 
+import java.io.Closeable;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.fs.s3a.Statistic.*;
 
@@ -50,6 +57,9 @@ import static org.apache.hadoop.fs.s3a.Statistic.*;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class S3AInstrumentation {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      S3AInstrumentation.class);
+
   public static final String CONTEXT = "S3AFileSystem";
   private final MetricsRegistry registry =
       new MetricsRegistry("S3AFileSystem").setContext(CONTEXT);
@@ -75,10 +85,15 @@ public class S3AInstrumentation {
   private final MutableCounterLong numberOfFilesCopied;
   private final MutableCounterLong bytesOfFilesCopied;
   private final MutableCounterLong numberOfFilesDeleted;
+  private final MutableCounterLong numberOfFakeDirectoryDeletes;
   private final MutableCounterLong numberOfDirectoriesCreated;
   private final MutableCounterLong numberOfDirectoriesDeleted;
   private final Map<String, MutableCounterLong> streamMetrics =
       new HashMap<>(30);
+
+  /** Instantiate this without caring whether or not S3Guard is enabled. */
+  private final S3GuardInstrumentation s3GuardInstrumentation
+      = new S3GuardInstrumentation();
 
   private static final Statistic[] COUNTERS_TO_CREATE = {
       INVOCATION_COPY_FROM_LOCAL_FILE,
@@ -95,10 +110,29 @@ public class S3AInstrumentation {
       OBJECT_COPY_REQUESTS,
       OBJECT_DELETE_REQUESTS,
       OBJECT_LIST_REQUESTS,
+      OBJECT_CONTINUE_LIST_REQUESTS,
       OBJECT_METADATA_REQUESTS,
       OBJECT_MULTIPART_UPLOAD_ABORTED,
       OBJECT_PUT_BYTES,
-      OBJECT_PUT_REQUESTS
+      OBJECT_PUT_REQUESTS,
+      OBJECT_PUT_REQUESTS_COMPLETED,
+      STREAM_WRITE_FAILURES,
+      STREAM_WRITE_BLOCK_UPLOADS,
+      STREAM_WRITE_BLOCK_UPLOADS_COMMITTED,
+      STREAM_WRITE_BLOCK_UPLOADS_ABORTED,
+      STREAM_WRITE_TOTAL_TIME,
+      STREAM_WRITE_TOTAL_DATA,
+      S3GUARD_METADATASTORE_PUT_PATH_REQUEST,
+      S3GUARD_METADATASTORE_INITIALIZATION
+  };
+
+
+  private static final Statistic[] GAUGES_TO_CREATE = {
+      OBJECT_PUT_REQUESTS_ACTIVE,
+      OBJECT_PUT_BYTES_PENDING,
+      STREAM_WRITE_BLOCK_UPLOADS_ACTIVE,
+      STREAM_WRITE_BLOCK_UPLOADS_PENDING,
+      STREAM_WRITE_BLOCK_UPLOADS_DATA_PENDING,
   };
 
   public S3AInstrumentation(URI name) {
@@ -134,12 +168,19 @@ public class S3AInstrumentation {
     numberOfFilesCopied = counter(FILES_COPIED);
     bytesOfFilesCopied = counter(FILES_COPIED_BYTES);
     numberOfFilesDeleted = counter(FILES_DELETED);
+    numberOfFakeDirectoryDeletes = counter(FAKE_DIRECTORIES_DELETED);
     numberOfDirectoriesCreated = counter(DIRECTORIES_CREATED);
     numberOfDirectoriesDeleted = counter(DIRECTORIES_DELETED);
     ignoredErrors = counter(IGNORED_ERRORS);
     for (Statistic statistic : COUNTERS_TO_CREATE) {
       counter(statistic);
     }
+    for (Statistic statistic : GAUGES_TO_CREATE) {
+      gauge(statistic.getSymbol(), statistic.getDescription());
+    }
+    //todo need a config for the quantiles interval?
+    quantiles(S3GUARD_METADATASTORE_PUT_PATH_LATENCY,
+        "ops", "latency", 1);
   }
 
   /**
@@ -193,6 +234,22 @@ public class S3AInstrumentation {
    */
   protected final MutableGaugeLong gauge(String name, String desc) {
     return registry.newGauge(name, desc, 0L);
+  }
+
+  /**
+   * Create a quantiles in the registry.
+   * @param op  statistic to collect
+   * @param sampleName sample name of the quantiles
+   * @param valueName value name of the quantiles
+   * @param interval interval of the quantiles in seconds
+   * @return the created quantiles metric
+   */
+  protected final MutableQuantiles quantiles(Statistic op,
+      String sampleName,
+      String valueName,
+      int interval) {
+    return registry.newQuantiles(op.getSymbol(), op.getDescription(),
+        sampleName, valueName, interval);
   }
 
   /**
@@ -251,18 +308,46 @@ public class S3AInstrumentation {
    * Lookup a counter by name. Return null if it is not known.
    * @param name counter name
    * @return the counter
+   * @throws IllegalStateException if the metric is not a counter
    */
   private MutableCounterLong lookupCounter(String name) {
     MutableMetric metric = lookupMetric(name);
     if (metric == null) {
       return null;
     }
-    Preconditions.checkNotNull(metric, "not found: " + name);
     if (!(metric instanceof MutableCounterLong)) {
       throw new IllegalStateException("Metric " + name
           + " is not a MutableCounterLong: " + metric);
     }
     return (MutableCounterLong) metric;
+  }
+
+  /**
+   * Look up a gauge.
+   * @param name gauge name
+   * @return the gauge or null
+   * @throws ClassCastException if the metric is not a Gauge.
+   */
+  public MutableGaugeLong lookupGauge(String name) {
+    MutableMetric metric = lookupMetric(name);
+    if (metric == null) {
+      LOG.debug("No gauge {}", name);
+    }
+    return (MutableGaugeLong) metric;
+  }
+
+  /**
+   * Look up a quantiles.
+   * @param name quantiles name
+   * @return the quantiles or null
+   * @throws ClassCastException if the metric is not a Quantiles.
+   */
+  public MutableQuantiles lookupQuantiles(String name) {
+    MutableMetric metric = lookupMetric(name);
+    if (metric == null) {
+      LOG.debug("No quantiles {}", name);
+    }
+    return (MutableQuantiles) metric;
   }
 
   /**
@@ -292,6 +377,14 @@ public class S3AInstrumentation {
    */
   public void fileDeleted(int count) {
     numberOfFilesDeleted.incr(count);
+  }
+
+  /**
+   * Indicate that fake directory request was made.
+   * @param count number of directory entries included in the delete request.
+   */
+  public void fakeDirsDeleted(int count) {
+    numberOfFakeDirectoryDeletes.incr(count);
   }
 
   /**
@@ -340,11 +433,76 @@ public class S3AInstrumentation {
   }
 
   /**
+   * Add a value to a quantiles statistic. No-op if the quantile
+   * isn't found.
+   * @param op operation to look up.
+   * @param value value to add.
+   * @throws ClassCastException if the metric is not a Quantiles.
+   */
+  public void addValueToQuantiles(Statistic op, long value) {
+    MutableQuantiles quantiles = lookupQuantiles(op.getSymbol());
+    if (quantiles != null) {
+      quantiles.add(value);
+    }
+  }
+
+  /**
+   * Increment a specific counter.
+   * No-op if not defined.
+   * @param op operation
+   * @param count atomic long containing value
+   */
+  public void incrementCounter(Statistic op, AtomicLong count) {
+    incrementCounter(op, count.get());
+  }
+
+  /**
+   * Increment a specific gauge.
+   * No-op if not defined.
+   * @param op operation
+   * @param count increment value
+   * @throws ClassCastException if the metric is of the wrong type
+   */
+  public void incrementGauge(Statistic op, long count) {
+    MutableGaugeLong gauge = lookupGauge(op.getSymbol());
+    if (gauge != null) {
+      gauge.incr(count);
+    } else {
+      LOG.debug("No Gauge: "+ op);
+    }
+  }
+
+  /**
+   * Decrement a specific gauge.
+   * No-op if not defined.
+   * @param op operation
+   * @param count increment value
+   * @throws ClassCastException if the metric is of the wrong type
+   */
+  public void decrementGauge(Statistic op, long count) {
+    MutableGaugeLong gauge = lookupGauge(op.getSymbol());
+    if (gauge != null) {
+      gauge.decr(count);
+    } else {
+      LOG.debug("No Gauge: {}", op);
+    }
+  }
+
+  /**
    * Create a stream input statistics instance.
    * @return the new instance
    */
   InputStreamStatistics newInputStreamStatistics() {
     return new InputStreamStatistics();
+  }
+
+  /**
+   * Create a S3Guard instrumentation instance.
+   * There's likely to be at most one instance of this per FS instance.
+   * @return the S3Guard instrumentation point.
+   */
+  public S3GuardInstrumentation getS3GuardInstrumentation() {
+    return s3GuardInstrumentation;
   }
 
   /**
@@ -540,6 +698,225 @@ public class S3AInstrumentation {
       sb.append(", BytesDiscardedInAbort=").append(bytesDiscardedInAbort);
       sb.append('}');
       return sb.toString();
+    }
+  }
+
+  /**
+   * Create a stream output statistics instance.
+   * @return the new instance
+   */
+  OutputStreamStatistics newOutputStreamStatistics(Statistics statistics) {
+    return new OutputStreamStatistics(statistics);
+  }
+
+  /**
+   * Merge in the statistics of a single output stream into
+   * the filesystem-wide statistics.
+   * @param statistics stream statistics
+   */
+  private void mergeOutputStreamStatistics(OutputStreamStatistics statistics) {
+    incrementCounter(STREAM_WRITE_TOTAL_TIME, statistics.totalUploadDuration());
+    incrementCounter(STREAM_WRITE_QUEUE_DURATION, statistics.queueDuration);
+    incrementCounter(STREAM_WRITE_TOTAL_DATA, statistics.bytesUploaded);
+    incrementCounter(STREAM_WRITE_BLOCK_UPLOADS,
+        statistics.blockUploadsCompleted);
+  }
+
+  /**
+   * Statistics updated by an output stream during its actual operation.
+   * Some of these stats may be relayed. However, as block upload is
+   * spans multiple
+   */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
+  public final class OutputStreamStatistics implements Closeable {
+    private final AtomicLong blocksSubmitted = new AtomicLong(0);
+    private final AtomicLong blocksInQueue = new AtomicLong(0);
+    private final AtomicLong blocksActive = new AtomicLong(0);
+    private final AtomicLong blockUploadsCompleted = new AtomicLong(0);
+    private final AtomicLong blockUploadsFailed = new AtomicLong(0);
+    private final AtomicLong bytesPendingUpload = new AtomicLong(0);
+
+    private final AtomicLong bytesUploaded = new AtomicLong(0);
+    private final AtomicLong transferDuration = new AtomicLong(0);
+    private final AtomicLong queueDuration = new AtomicLong(0);
+    private final AtomicLong exceptionsInMultipartFinalize = new AtomicLong(0);
+    private final AtomicInteger blocksAllocated = new AtomicInteger(0);
+    private final AtomicInteger blocksReleased = new AtomicInteger(0);
+
+    private Statistics statistics;
+
+    public OutputStreamStatistics(Statistics statistics){
+      this.statistics = statistics;
+    }
+
+    /**
+     * A block has been allocated.
+     */
+    void blockAllocated() {
+      blocksAllocated.incrementAndGet();
+    }
+
+    /**
+     * A block has been released.
+     */
+    void blockReleased() {
+      blocksReleased.incrementAndGet();
+    }
+
+    /**
+     * Block is queued for upload.
+     */
+    void blockUploadQueued(int blockSize) {
+      blocksSubmitted.incrementAndGet();
+      blocksInQueue.incrementAndGet();
+      bytesPendingUpload.addAndGet(blockSize);
+      incrementGauge(STREAM_WRITE_BLOCK_UPLOADS_PENDING, 1);
+      incrementGauge(STREAM_WRITE_BLOCK_UPLOADS_DATA_PENDING, blockSize);
+    }
+
+    /** Queued block has been scheduled for upload. */
+    void blockUploadStarted(long duration, int blockSize) {
+      queueDuration.addAndGet(duration);
+      blocksInQueue.decrementAndGet();
+      blocksActive.incrementAndGet();
+      incrementGauge(STREAM_WRITE_BLOCK_UPLOADS_PENDING, -1);
+      incrementGauge(STREAM_WRITE_BLOCK_UPLOADS_ACTIVE, 1);
+    }
+
+    /** A block upload has completed. */
+    void blockUploadCompleted(long duration, int blockSize) {
+      this.transferDuration.addAndGet(duration);
+      incrementGauge(STREAM_WRITE_BLOCK_UPLOADS_ACTIVE, -1);
+      blocksActive.decrementAndGet();
+      blockUploadsCompleted.incrementAndGet();
+    }
+
+    /**
+     *  A block upload has failed.
+     *  A final transfer completed event is still expected, so this
+     *  does not decrement the active block counter.
+     */
+    void blockUploadFailed(long duration, int blockSize) {
+      blockUploadsFailed.incrementAndGet();
+    }
+
+    /** Intermediate report of bytes uploaded. */
+    void bytesTransferred(long byteCount) {
+      bytesUploaded.addAndGet(byteCount);
+      statistics.incrementBytesWritten(byteCount);
+      bytesPendingUpload.addAndGet(-byteCount);
+      incrementGauge(STREAM_WRITE_BLOCK_UPLOADS_DATA_PENDING, -byteCount);
+    }
+
+    /**
+     * Note an exception in a multipart complete.
+     */
+    void exceptionInMultipartComplete() {
+      exceptionsInMultipartFinalize.incrementAndGet();
+    }
+
+    /**
+     * Note an exception in a multipart abort.
+     */
+    void exceptionInMultipartAbort() {
+      exceptionsInMultipartFinalize.incrementAndGet();
+    }
+
+    /**
+     * Get the number of bytes pending upload.
+     * @return the number of bytes in the pending upload state.
+     */
+    public long getBytesPendingUpload() {
+      return bytesPendingUpload.get();
+    }
+
+    /**
+     * Output stream has closed.
+     * Trigger merge in of all statistics not updated during operation.
+     */
+    @Override
+    public void close() {
+      if (bytesPendingUpload.get() > 0) {
+        LOG.warn("Closing output stream statistics while data is still marked" +
+            " as pending upload in {}", this);
+      }
+      mergeOutputStreamStatistics(this);
+    }
+
+    long averageQueueTime() {
+      return blocksSubmitted.get() > 0 ?
+          (queueDuration.get() / blocksSubmitted.get()) : 0;
+    }
+
+    double effectiveBandwidth() {
+      double duration = totalUploadDuration() / 1000.0;
+      return duration > 0 ?
+          (bytesUploaded.get() / duration) : 0;
+    }
+
+    long totalUploadDuration() {
+      return queueDuration.get() + transferDuration.get();
+    }
+
+    public int blocksAllocated() {
+      return blocksAllocated.get();
+    }
+
+    public int blocksReleased() {
+      return blocksReleased.get();
+    }
+
+    /**
+     * Get counters of blocks actively allocated; my be inaccurate
+     * if the numbers change during the (non-synchronized) calculation.
+     * @return the number of actively allocated blocks.
+     */
+    public int blocksActivelyAllocated() {
+      return blocksAllocated.get() - blocksReleased.get();
+    }
+
+
+    @Override
+    public String toString() {
+      final StringBuilder sb = new StringBuilder(
+          "OutputStreamStatistics{");
+      sb.append("blocksSubmitted=").append(blocksSubmitted);
+      sb.append(", blocksInQueue=").append(blocksInQueue);
+      sb.append(", blocksActive=").append(blocksActive);
+      sb.append(", blockUploadsCompleted=").append(blockUploadsCompleted);
+      sb.append(", blockUploadsFailed=").append(blockUploadsFailed);
+      sb.append(", bytesPendingUpload=").append(bytesPendingUpload);
+      sb.append(", bytesUploaded=").append(bytesUploaded);
+      sb.append(", blocksAllocated=").append(blocksAllocated);
+      sb.append(", blocksReleased=").append(blocksReleased);
+      sb.append(", blocksActivelyAllocated=").append(blocksActivelyAllocated());
+      sb.append(", exceptionsInMultipartFinalize=").append(
+          exceptionsInMultipartFinalize);
+      sb.append(", transferDuration=").append(transferDuration).append(" ms");
+      sb.append(", queueDuration=").append(queueDuration).append(" ms");
+      sb.append(", averageQueueTime=").append(averageQueueTime()).append(" ms");
+      sb.append(", totalUploadDuration=").append(totalUploadDuration())
+          .append(" ms");
+      sb.append(", effectiveBandwidth=").append(effectiveBandwidth())
+          .append(" bytes/s");
+      sb.append('}');
+      return sb.toString();
+    }
+  }
+
+  /**
+   * Instrumentation exported to S3Guard.
+   */
+  public final class S3GuardInstrumentation {
+
+    /** Initialized event. */
+    public void initialized() {
+      incrementCounter(S3GUARD_METADATASTORE_INITIALIZATION, 1);
+    }
+
+    public void storeClosed() {
+
     }
   }
 }
