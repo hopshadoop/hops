@@ -187,6 +187,9 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
           }
           isScanning = true;
           HdfsVariables.setNeedRescan(false);
+        }catch(StorageException ignore){
+          //Storage problems should be handled by FSNameSystem.checkAvailableResources(), retry
+          continue;
         } finally {
           lock.unlock();
         }

@@ -4928,6 +4928,10 @@ public class BlockManager {
           if(t instanceof TransientStorageException){
             continue;
           }
+          if(t instanceof StorageException){
+            //Storage problems should be handled by FSNameSystem.checkAvailableResources(), retry
+            continue;
+          }
           if (!namesystem.isRunning()) {
             LOG.info("Stopping ReplicationMonitor.");
             if (!(t instanceof InterruptedException)) {
