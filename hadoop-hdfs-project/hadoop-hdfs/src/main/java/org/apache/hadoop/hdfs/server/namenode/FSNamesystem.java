@@ -5914,7 +5914,13 @@ public class FSNamesystem
             final String path = leasePath.getPath();
             final INodeFile cons;
             try {
-              cons = dir.getINode(path).asFile();
+              INode inode = getFSDirectory().getINode(path);
+              if(inode == null ) {
+                // Eventually this will be cleaned by the lease monitor
+                LOG.warn("Unable to find inode for the lease "+path);
+                continue;
+              }
+              cons = inode.asFile();
               Preconditions.checkState(cons.isUnderConstruction());
             } catch (UnresolvedLinkException e) {
               throw new AssertionError("Lease files should reside on this FS");
