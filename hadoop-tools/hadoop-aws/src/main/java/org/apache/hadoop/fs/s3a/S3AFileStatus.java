@@ -31,28 +31,78 @@ import org.apache.hadoop.fs.Path;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class S3AFileStatus extends FileStatus {
-  private boolean isEmptyDirectory;
+  private Tristate isEmptyDirectory;
 
-  // Directories
-  public S3AFileStatus(boolean isdir, boolean isemptydir, Path path) {
-    super(0, isdir, 1, 0, 0, path);
+  /**
+   * Create a directory status.
+   * @param isemptydir is this an empty directory?
+   * @param path the path
+   * @param owner the owner
+   */
+  public S3AFileStatus(boolean isemptydir,
+      Path path,
+      String owner) {
+    this(Tristate.fromBool(isemptydir), path, owner);
+  }
+
+  /**
+   * Create a directory status.
+   * @param isemptydir is this an empty directory?
+   * @param path the path
+   * @param owner the owner
+   */
+  public S3AFileStatus(Tristate isemptydir,
+      Path path,
+      String owner) {
+    super(0, true, 1, 0, 0, path);
     isEmptyDirectory = isemptydir;
+    setOwner(owner);
+    setGroup(owner);
   }
 
-  // Files
+  /**
+   * A simple file.
+   * @param length file length
+   * @param modification_time mod time
+   * @param path path
+   * @param blockSize block size
+   * @param owner owner
+   */
   public S3AFileStatus(long length, long modification_time, Path path,
-      long blockSize) {
+      long blockSize, String owner) {
     super(length, false, 1, blockSize, modification_time, path);
-    isEmptyDirectory = false;
+    isEmptyDirectory = Tristate.FALSE;
+    setOwner(owner);
+    setGroup(owner);
   }
 
-  public boolean isEmptyDirectory() {
+  /**
+   * Convenience constructor for creating from a vanilla FileStatus plus
+   * an isEmptyDirectory flag.
+   * @param source FileStatus to convert to S3AFileStatus
+   * @param isEmptyDirectory TRUE/FALSE if known to be / not be an empty
+   *     directory, UNKNOWN if that information was not computed.
+   * @return a new S3AFileStatus
+   */
+  public static S3AFileStatus fromFileStatus(FileStatus source,
+      Tristate isEmptyDirectory) {
+    if (source.isDirectory()) {
+      return new S3AFileStatus(isEmptyDirectory, source.getPath(),
+          source.getOwner());
+    } else {
+      return new S3AFileStatus(source.getLen(), source.getModificationTime(),
+          source.getPath(), source.getBlockSize(), source.getOwner());
+    }
+  }
+
+
+  /**
+   * @return FALSE if status is not a directory, or its a dir, but known to
+   * not be empty.  TRUE if it is an empty directory.  UNKNOWN if it is a
+   * directory, but we have not computed whether or not it is empty.
+   */
+  public Tristate isEmptyDirectory() {
     return isEmptyDirectory;
-  }
-
-  @Override
-  public String getOwner() {
-    return System.getProperty("user.name");
   }
 
   /** Compare if this object is equal to another object.
@@ -97,7 +147,7 @@ public class S3AFileStatus extends FileStatus {
   @Override
   public String toString() {
     return super.toString() +
-        String.format(" isEmptyDirectory=%s", isEmptyDirectory());
+        String.format(" isEmptyDirectory=%s", isEmptyDirectory().name());
   }
 
 }

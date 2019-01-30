@@ -34,13 +34,47 @@ public final class ExitUtil {
   private static volatile ExitException firstExitException;
   private static volatile HaltException firstHaltException;
 
-  public static class ExitException extends RuntimeException {
+  public static class ExitException extends RuntimeException
+      implements ExitCodeProvider {
     private static final long serialVersionUID = 1L;
+    /**
+     * The status code.
+     */
     public final int status;
 
     public ExitException(int status, String msg) {
       super(msg);
       this.status = status;
+    }
+
+    public ExitException(int status,
+        String message,
+        Throwable cause) {
+      super(message, cause);
+      this.status = status;
+    }
+
+    public ExitException(int status, Throwable cause) {
+      super(cause);
+      this.status = status;
+    }
+
+    @Override
+    public int getExitCode() {
+      return status;
+    }
+
+    /**
+     * String value does not include exception type, just exit code and message.
+     * @return the exit code and any message
+     */
+    @Override
+    public String toString() {
+      String message = getMessage();
+      if (message == null) {
+        message = super.toString();
+      }
+      return Integer.toString(status) + ": " + message;
     }
   }
 

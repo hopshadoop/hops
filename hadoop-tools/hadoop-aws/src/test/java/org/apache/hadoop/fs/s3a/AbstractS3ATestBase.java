@@ -26,19 +26,23 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.contract.s3a.S3AContract;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TestName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.writeDataset;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.maybeEnableS3Guard;
 
 /**
  * An extension of the contract test base set up for S3A tests.
  */
 public abstract class AbstractS3ATestBase extends AbstractFSContractTestBase
     implements S3ATestConstants {
+
+  protected static final Logger LOG =
+      LoggerFactory.getLogger(AbstractS3ATestBase.class);
 
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
@@ -48,15 +52,30 @@ public abstract class AbstractS3ATestBase extends AbstractFSContractTestBase
   @Override
   public void teardown() throws Exception {
     super.teardown();
+    describe("closing file system");
     IOUtils.closeStream(getFileSystem());
   }
-
-  @Rule
-  public TestName methodName = new TestName();
 
   @Before
   public void nameThread() {
     Thread.currentThread().setName("JUnit-" + methodName.getMethodName());
+  }
+
+  @Override
+  protected int getTestTimeoutMillis() {
+    return S3A_TEST_TIMEOUT;
+  }
+
+  /**
+   * Create a configuration, possibly patching in S3Guard options.
+   * @return a configuration
+   */
+  @Override
+  protected Configuration createConfiguration() {
+    Configuration conf = super.createConfiguration();
+    // patch in S3Guard options
+    maybeEnableS3Guard(conf);
+    return conf;
   }
 
   protected Configuration getConfiguration() {
@@ -73,6 +92,17 @@ public abstract class AbstractS3ATestBase extends AbstractFSContractTestBase
   }
 
   /**
+   * Describe a test in the logs.
+   * @param text text to print
+   * @param args arguments to format in the printing
+   */
+  protected void describe(String text, Object... args) {
+    LOG.info("\n\n{}: {}\n",
+        methodName.getMethodName(),
+        String.format(text, args));
+  }
+
+  /**
    * Write a file, read it back, validate the dataset. Overwrites the file
    * if it is present
    * @param name filename (will have the test path prepended to it)
@@ -82,10 +112,21 @@ public abstract class AbstractS3ATestBase extends AbstractFSContractTestBase
    */
   protected Path writeThenReadFile(String name, int len) throws IOException {
     Path path = path(name);
+    writeThenReadFile(path, len);
+    return path;
+  }
+
+  /**
+   * Write a file, read it back, validate the dataset. Overwrites the file
+   * if it is present
+   * @param path path to file
+   * @param len length of file
+   * @throws IOException any IO problem
+   */
+  protected void writeThenReadFile(Path path, int len) throws IOException {
     byte[] data = dataset(len, 'a', 'z');
     writeDataset(getFileSystem(), path, data, data.length, 1024 * 1024, true);
     ContractTestUtils.verifyFileContents(getFileSystem(), path, data);
-    return path;
   }
 
   /**

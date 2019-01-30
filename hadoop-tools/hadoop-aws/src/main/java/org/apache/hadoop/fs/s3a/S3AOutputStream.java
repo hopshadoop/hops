@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.s3a;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.transfer.Upload;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -35,8 +34,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 
 /**
@@ -45,37 +44,27 @@ import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class S3AOutputStream extends OutputStream {
-  private OutputStream backupStream;
-  private File backupFile;
-  private boolean closed;
-  private String key;
-  private Progressable progress;
-  private long partSize;
-  private long partSizeThreshold;
-  private S3AFileSystem fs;
-  private LocalDirAllocator lDirAlloc;
+  private final OutputStream backupStream;
+  private final File backupFile;
+  private final AtomicBoolean closed = new AtomicBoolean(false);
+  private final String key;
+  private final Progressable progress;
+  private final S3AFileSystem fs;
 
   public static final Logger LOG = S3AFileSystem.LOG;
 
   public S3AOutputStream(Configuration conf,
-      S3AFileSystem fs, String key, Progressable progress)
+      S3AFileSystem fs,
+      String key,
+      Progressable progress)
       throws IOException {
     this.key = key;
     this.progress = progress;
     this.fs = fs;
 
-    partSize = fs.getPartitionSize();
-    partSizeThreshold = fs.getMultiPartThreshold();
 
-    if (conf.get(BUFFER_DIR, null) != null) {
-      lDirAlloc = new LocalDirAllocator(BUFFER_DIR);
-    } else {
-      lDirAlloc = new LocalDirAllocator("${hadoop.tmp.dir}/s3a");
-    }
-
-    backupFile = lDirAlloc.createTmpFileForWrite("output-",
+    backupFile = fs.createTmpFileForWrite("output-",
         LocalDirAllocator.SIZE_UNKNOWN, conf);
-    closed = false;
 
     LOG.debug("OutputStream for key '{}' writing to tempfile: {}",
         key, backupFile);
@@ -84,38 +73,47 @@ public class S3AOutputStream extends OutputStream {
         new FileOutputStream(backupFile));
   }
 
+  /**
+   * Check for the filesystem being open.
+   * @throws IOException if the filesystem is closed.
+   */
+  void checkOpen() throws IOException {
+    if (closed.get()) {
+      throw new IOException("Output Stream closed");
+    }
+  }
+
   @Override
   public void flush() throws IOException {
+    checkOpen();
     backupStream.flush();
   }
 
   @Override
-  public synchronized void close() throws IOException {
-    if (closed) {
+  public void close() throws IOException {
+    if (closed.getAndSet(true)) {
       return;
     }
 
     backupStream.close();
     LOG.debug("OutputStream for key '{}' closed. Now beginning upload", key);
-    LOG.debug("Minimum upload part size: {} threshold {}" , partSize,
-        partSizeThreshold);
-
 
     try {
-      final ObjectMetadata om = fs.newObjectMetadata();
-      Upload upload = fs.putObject(
+      final ObjectMetadata om = fs.newObjectMetadata(backupFile.length());
+      UploadInfo info = fs.putObject(
           fs.newPutObjectRequest(
               key,
               om,
               backupFile));
       ProgressableProgressListener listener =
-          new ProgressableProgressListener(fs, key, upload, progress);
-      upload.addProgressListener(listener);
+          new ProgressableProgressListener(fs, key, info.getUpload(), progress);
+      info.getUpload().addProgressListener(listener);
 
-      upload.waitForUploadResult();
+      info.getUpload().waitForUploadResult();
       listener.uploadCompleted();
-      // This will delete unnecessary fake parent directories
-      fs.finishedWrite(key);
+      // This will delete unnecessary fake parent directories, update any
+      // MetadataStore
+      fs.finishedWrite(key, info.getLength());
     } catch (InterruptedException e) {
       throw (InterruptedIOException) new InterruptedIOException(e.toString())
           .initCause(e);
@@ -126,18 +124,19 @@ public class S3AOutputStream extends OutputStream {
         LOG.warn("Could not delete temporary s3a file: {}", backupFile);
       }
       super.close();
-      closed = true;
     }
     LOG.debug("OutputStream for key '{}' upload complete", key);
   }
 
   @Override
   public void write(int b) throws IOException {
+    checkOpen();
     backupStream.write(b);
   }
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
+    checkOpen();
     backupStream.write(b, off, len);
   }
 

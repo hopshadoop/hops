@@ -19,9 +19,10 @@
 package org.apache.hadoop.fs.s3a;
 
 import com.amazonaws.AmazonClientException;
-import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
+import com.amazonaws.services.s3.model.SSECustomerKey;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -32,10 +33,12 @@ import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
 
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
 
+import static org.apache.commons.lang.StringUtils.isNotEmpty;
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 
 /**
@@ -71,13 +74,16 @@ public class S3AInputStream extends FSInputStream implements CanSetReadahead {
   private volatile boolean closed;
   private S3ObjectInputStream wrappedStream;
   private final FileSystem.Statistics stats;
-  private final AmazonS3Client client;
+  private final AmazonS3 client;
   private final String bucket;
   private final String key;
   private final long contentLength;
   private final String uri;
-  public static final Logger LOG = S3AFileSystem.LOG;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(S3AInputStream.class);
   private final S3AInstrumentation.InputStreamStatistics streamStatistics;
+  private S3AEncryptionMethods serverSideEncryptionAlgorithm;
+  private String serverSideEncryptionKey;
   private final S3AInputPolicy inputPolicy;
   private long readahead = Constants.DEFAULT_READAHEAD_RANGE;
 
@@ -98,24 +104,26 @@ public class S3AInputStream extends FSInputStream implements CanSetReadahead {
    */
   private long contentRangeStart;
 
-  public S3AInputStream(String bucket,
-      String key,
+  public S3AInputStream(S3ObjectAttributes s3Attributes,
       long contentLength,
-      AmazonS3Client client,
+      AmazonS3 client,
       FileSystem.Statistics stats,
       S3AInstrumentation instrumentation,
       long readahead,
       S3AInputPolicy inputPolicy) {
-    Preconditions.checkArgument(StringUtils.isNotEmpty(bucket), "No Bucket");
-    Preconditions.checkArgument(StringUtils.isNotEmpty(key), "No Key");
-    Preconditions.checkArgument(contentLength >= 0 , "Negative content length");
-    this.bucket = bucket;
-    this.key = key;
+    Preconditions.checkArgument(isNotEmpty(s3Attributes.getBucket()), "No Bucket");
+    Preconditions.checkArgument(isNotEmpty(s3Attributes.getKey()), "No Key");
+    Preconditions.checkArgument(contentLength >= 0, "Negative content length");
+    this.bucket = s3Attributes.getBucket();
+    this.key = s3Attributes.getKey();
     this.contentLength = contentLength;
     this.client = client;
     this.stats = stats;
     this.uri = "s3a://" + this.bucket + "/" + this.key;
     this.streamStatistics = instrumentation.newInputStreamStatistics();
+    this.serverSideEncryptionAlgorithm =
+        s3Attributes.getServerSideEncryptionAlgorithm();
+    this.serverSideEncryptionKey = s3Attributes.getServerSideEncryptionKey();
     this.inputPolicy = inputPolicy;
     setReadahead(readahead);
   }
@@ -132,7 +140,7 @@ public class S3AInputStream extends FSInputStream implements CanSetReadahead {
       throws IOException {
 
     if (wrappedStream != null) {
-      closeStream("reopen(" + reason + ")", contentRangeFinish);
+      closeStream("reopen(" + reason + ")", contentRangeFinish, false);
     }
 
     contentRangeFinish = calculateRequestLimit(inputPolicy, targetPos,
@@ -144,7 +152,11 @@ public class S3AInputStream extends FSInputStream implements CanSetReadahead {
     streamStatistics.streamOpened();
     try {
       GetObjectRequest request = new GetObjectRequest(bucket, key)
-          .withRange(targetPos, contentRangeFinish);
+          .withRange(targetPos, contentRangeFinish - 1);
+      if (S3AEncryptionMethods.SSE_C.equals(serverSideEncryptionAlgorithm) &&
+          StringUtils.isNotBlank(serverSideEncryptionKey)){
+        request.setSSECustomerKey(new SSECustomerKey(serverSideEncryptionKey));
+      }
       wrappedStream = client.getObject(request).getObjectContent();
       contentRangeStart = targetPos;
       if (wrappedStream == null) {
@@ -257,7 +269,7 @@ public class S3AInputStream extends FSInputStream implements CanSetReadahead {
 
     // if the code reaches here, the stream needs to be reopened.
     // close the stream; if read the object will be opened at the new pos
-    closeStream("seekInStream()", this.contentRangeFinish);
+    closeStream("seekInStream()", this.contentRangeFinish, false);
     pos = targetPos;
   }
 
@@ -414,7 +426,7 @@ public class S3AInputStream extends FSInputStream implements CanSetReadahead {
       closed = true;
       try {
         // close or abort the stream
-        closeStream("close() operation", this.contentRangeFinish);
+        closeStream("close() operation", this.contentRangeFinish, false);
         // this is actually a no-op
         super.close();
       } finally {
@@ -431,23 +443,37 @@ public class S3AInputStream extends FSInputStream implements CanSetReadahead {
    * an abort.
    *
    * This does not set the {@link #closed} flag.
-   *
    * @param reason reason for stream being closed; used in messages
    * @param length length of the stream.
+   * @param forceAbort force an abort; used if explicitly requested.
    */
-  private void closeStream(String reason, long length) {
+  private void closeStream(String reason, long length, boolean forceAbort) {
     if (wrappedStream != null) {
 
       // if the amount of data remaining in the current request is greater
       // than the readahead value: abort.
       long remaining = remainingInCurrentRequest();
-      boolean shouldAbort = remaining > readahead;
+      LOG.debug("Closing stream {}: {}", reason,
+          forceAbort ? "abort" : "soft");
+      boolean shouldAbort = forceAbort || remaining > readahead;
       if (!shouldAbort) {
         try {
           // clean close. This will read to the end of the stream,
           // so, while cleaner, can be pathological on a multi-GB object
+
+          // explicitly drain the stream
+          long drained = 0;
+          while (wrappedStream.read() >= 0) {
+            drained++;
+          }
+          LOG.debug("Drained stream of {} bytes", drained);
+
+          // now close it
           wrappedStream.close();
-          streamStatistics.streamClose(false, remaining);
+          // this MUST come after the close, so that if the IO operations fail
+          // and an abort is triggered, the initial attempt's statistics
+          // aren't collected.
+          streamStatistics.streamClose(false, drained);
         } catch (IOException e) {
           // exception escalates to an abort
           LOG.debug("When closing {} stream for {}", uri, reason, e);
@@ -457,17 +483,40 @@ public class S3AInputStream extends FSInputStream implements CanSetReadahead {
       if (shouldAbort) {
         // Abort, rather than just close, the underlying stream.  Otherwise, the
         // remaining object payload is read from S3 while closing the stream.
+        LOG.debug("Aborting stream");
         wrappedStream.abort();
         streamStatistics.streamClose(true, remaining);
       }
-      LOG.debug("Stream {} {}: {}; streamPos={}, nextReadPos={}," +
+      LOG.debug("Stream {} {}: {}; remaining={} streamPos={},"
+              + " nextReadPos={}," +
           " request range {}-{} length={}",
           uri, (shouldAbort ? "aborted" : "closed"), reason,
-          pos, nextReadPos,
+          remaining, pos, nextReadPos,
           contentRangeStart, contentRangeFinish,
           length);
       wrappedStream = null;
     }
+  }
+
+  /**
+   * Forcibly reset the stream, by aborting the connection. The next
+   * {@code read()} operation will trigger the opening of a new HTTPS
+   * connection.
+   *
+   * This is potentially very inefficient, and should only be invoked
+   * in extreme circumstances. It logs at info for this reason.
+   * @return true if the connection was actually reset.
+   * @throws IOException if invoked on a closed stream.
+   */
+  @InterfaceStability.Unstable
+  public synchronized boolean resetConnection() throws IOException {
+    checkNotClosed();
+    boolean connectionOpen = wrappedStream != null;
+    if (connectionOpen) {
+      LOG.info("Forced reset of connection to {}", uri);
+      closeStream("reset()", contentRangeFinish, true);
+    }
+    return connectionOpen;
   }
 
   @Override
