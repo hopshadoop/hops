@@ -7688,7 +7688,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         @Override
         public void handle(int startIndex, int endIndex) throws Exception {
           final List<Long> ids = safeBlocks.subList(startIndex, endIndex);
-          addSafeBlocksTX(safeBlocks, added);
+          addSafeBlocksTX(ids, added);
         }
       });
     } catch (Exception e) {
