@@ -352,6 +352,7 @@ public enum HDFSOperationType implements OperationType {
   //retry cache
   RETRY_CACHE,
   CLEAN_RETRY_CACHE,
+  CLEAR_RETRY_CACHE,
 
   //Metadata GC
   MDCLEANER,

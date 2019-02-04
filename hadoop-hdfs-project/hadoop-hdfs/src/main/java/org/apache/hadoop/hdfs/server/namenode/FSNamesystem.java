@@ -861,6 +861,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     nnResourceChecker = new NameNodeResourceChecker(conf);
     checkAvailableResources();
     if (isLeader()) {
+      //just started and leader, we can assume that all the NN restarted
+      clearSafeBlocks();
+      clearRetryCache();
       HdfsVariables.setSafeModeInfo(new SafeModeInfo(conf), -1);
       inSafeMode.set(true);
       assert safeMode() != null && !isPopulatingReplQueues();
@@ -6995,6 +6998,18 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }.handle();
   }
 
+  private void clearRetryCache() throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.CLEAR_RETRY_CACHE) {
+      @Override
+      public Object performTask() throws IOException {
+        RetryCacheEntryDataAccess da = (RetryCacheEntryDataAccess) HdfsStorageFactory
+            .getDataAccess(RetryCacheEntryDataAccess.class);
+        da.removeAll();
+        return null;
+      }
+    }.handle();
+  }
+  
   public ExecutorService getFSOperationsExecutor() {
     return fsOperationsExecutor;
   }
