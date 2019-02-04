@@ -97,7 +97,7 @@ fi
 
 if [ "$COMMAND" = "namenode" ] ; then
   CLASS='org.apache.hadoop.hdfs.server.namenode.NameNode'
-  HADOOP_OPTS="$HADOOP_OPTS $HADOOP_NAMENODE_OPTS"
+  HADOOP_OPTS="$HADOOP_OPTS $HADOOP_NAMENODE_OPTS -XX:-OmitStackTraceInFastThrow"
 elif [ "$COMMAND" = "datanode" ] ; then
   CLASS='org.apache.hadoop.hdfs.server.datanode.DataNode'
   if [ "$starting_secure_dn" = "true" ]; then
