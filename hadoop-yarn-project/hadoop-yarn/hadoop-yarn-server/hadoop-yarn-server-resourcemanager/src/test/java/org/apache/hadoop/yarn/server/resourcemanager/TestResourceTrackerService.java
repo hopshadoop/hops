@@ -295,7 +295,7 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
   }
   
   /**
-   * Submit one application, wait for the X.509/JWT renewal to kick off and check the Heartbeat response
+   * Submit one application, wait for the certificate renewal to kick off and check the Heartbeat response
    *
    * @throws Exception
    */
@@ -304,10 +304,6 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Configuration conf = new Configuration();
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "30s");
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
-    
-    conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
-    conf.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "20s");
-    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY, "4s");
     rm = new MockRM(conf);
     rm.start();
     
@@ -333,7 +329,6 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     // App certificate validity period for testing is 50 seconds.
     // Set the delay for the renewer to 50 - 30 = 20 seconds
     // Sleep here for 25 seconds to make sure the renewal has kicked in
-    // Both X.509 and JWT updates should have been squashed into one
     TimeUnit.SECONDS.sleep(25);
     response = nm1.nodeHeartbeat(true);
     Assert.assertNotNull(response.getUpdatedCryptoForApps());
@@ -345,8 +340,6 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertTrue(updatedCryptoForApp.getTrustStore().equals(ByteBuffer.wrap(app.getTrustStore())));
     Assert.assertArrayEquals(app.getKeyStorePassword(), updatedCryptoForApp.getKeyStorePassword());
     Assert.assertArrayEquals(app.getTrustStorePassword(), updatedCryptoForApp.getTrustStorePassword());
-    Assert.assertNotNull(updatedCryptoForApp.getJWT());
-    Assert.assertEquals(app.getJWT(), updatedCryptoForApp.getJWT());
     
     // Wait for the certificate renewer to run again
     TimeUnit.SECONDS.sleep(25);
@@ -360,11 +353,8 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertTrue(newUpdatedCryptoForApp.getTrustStore().equals(ByteBuffer.wrap(app.getTrustStore())));
     Assert.assertArrayEquals(app.getKeyStorePassword(), newUpdatedCryptoForApp.getKeyStorePassword());
     Assert.assertArrayEquals(app.getTrustStorePassword(), newUpdatedCryptoForApp.getTrustStorePassword());
-    Assert.assertNotNull(newUpdatedCryptoForApp.getJWT());
-    Assert.assertEquals(app.getJWT(), newUpdatedCryptoForApp.getJWT());
     
     Assert.assertFalse(newUpdatedCryptoForApp.getKeyStore().equals(updatedCryptoForApp.getKeyStore()));
-    Assert.assertNotEquals(newUpdatedCryptoForApp.getJWT(), updatedCryptoForApp.getJWT());
     
     // Kill application
     rm.killApp(app.getApplicationId());
@@ -375,7 +365,7 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertNotNull(response.getUpdatedCryptoForApps());
     Assert.assertTrue(response.getUpdatedCryptoForApps().isEmpty());
     RMNode rmNode = rm.getRMContext().getRMNodes().get(nm1.getNodeId());
-    Assert.assertTrue(rmNode.getAppX509ToUpdate().isEmpty());
+    Assert.assertTrue(rmNode.getAppCryptoMaterialToUpdate().isEmpty());
     
     rm.stop();
   }
@@ -1373,8 +1363,8 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertEquals(5120 + 10240, metrics.getAvailableMB());
 
     // reconnect of node with changed capability and running applications
-    Map<ApplicationId, UpdatedCryptoForApp> runningApps = new HashMap<>(1);
-    runningApps.put(ApplicationId.newInstance(1, 0), UpdatedCryptoForApp.newInstance(0, 0));
+    Map<ApplicationId, Integer> runningApps = new HashMap<>(1);
+    runningApps.put(ApplicationId.newInstance(1, 0), 0);
     nm1 = rm.registerNode("host2:5678", 15360, 2, runningApps);
     rm.drainEvents();
     response = nm1.nodeHeartbeat(true);

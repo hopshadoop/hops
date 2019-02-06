@@ -49,8 +49,8 @@ enum RMAppAttemptStateProto {
 
 enum RMAppStateProto {
     RMAPP_NEW = 1;
-    RMAPP_NEW_SAVING = 2;
-    RMAPP_GENERATING_SECURITY_MATERIAL = 3;
+    RMAPP_GENERATING_CERTS = 2;
+    RMAPP_NEW_SAVING = 3;
     RMAPP_SUBMITTED = 4;
     RMAPP_ACCEPTED = 5;
     RMAPP_RUNNING = 6;
@@ -78,8 +78,6 @@ message ApplicationStateDataProto {
     optional int64 certificate_expiration = 14;
     optional int64 material_rotation_start = 15;
     optional bool is_during_material_rotation = 16 [default = false];
-    optional string jwt = 17;
-    optional int64 jwt_expiration = 18;
 }
 
 message ApplicationAttemptStateDataProto {

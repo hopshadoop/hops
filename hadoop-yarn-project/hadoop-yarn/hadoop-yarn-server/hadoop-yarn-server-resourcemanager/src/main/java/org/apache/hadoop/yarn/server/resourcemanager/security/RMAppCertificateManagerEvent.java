@@ -20,22 +20,29 @@ package org.apache.hadoop.yarn.server.resourcemanager.security;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
-public class RMAppSecurityManagerEvent extends AbstractEvent<RMAppSecurityManagerEventType> {
+public class RMAppCertificateManagerEvent extends AbstractEvent<RMAppCertificateManagerEventType> {
   private final ApplicationId applicationId;
-  private final RMAppSecurityMaterial securityMaterial;
+  private final String applicationUser;
+  private final Integer cryptoMaterialVersion;
   
-  public RMAppSecurityManagerEvent(ApplicationId applicationId, RMAppSecurityMaterial securityMaterial,
-      RMAppSecurityManagerEventType rmAppCertificateManagerEventType) {
+  public RMAppCertificateManagerEvent(
+      ApplicationId applicationId, String applicationUser, Integer cryptoMaterialVersion,
+      RMAppCertificateManagerEventType rmAppCertificateManagerEventType) {
     super(rmAppCertificateManagerEventType);
     this.applicationId = applicationId;
-    this.securityMaterial = securityMaterial;
+    this.applicationUser = applicationUser;
+    this.cryptoMaterialVersion = cryptoMaterialVersion;
   }
   
   public ApplicationId getApplicationId() {
     return applicationId;
   }
   
-  public RMAppSecurityMaterial getSecurityMaterial() {
-    return securityMaterial;
+  public String getApplicationUser() {
+    return applicationUser;
+  }
+  
+  public Integer getCryptoMaterialVersion() {
+    return cryptoMaterialVersion;
   }
 }

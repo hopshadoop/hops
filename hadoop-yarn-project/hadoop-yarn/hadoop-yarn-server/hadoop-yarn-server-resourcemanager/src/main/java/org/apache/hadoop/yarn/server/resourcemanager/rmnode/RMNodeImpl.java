@@ -41,6 +41,9 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.net.Node;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.CryptoMaterial;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -60,17 +63,25 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
+import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.ClusterMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.NodesListManager;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppRunningOnNodeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.AllocationExpirationInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeResourceUpdateSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
-import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils.ContainerIdComparator;
+import org.apache.hadoop.yarn.state.InvalidStateTransitionException;
 import org.apache.hadoop.yarn.state.MultipleArcTransition;
 import org.apache.hadoop.yarn.state.SingleArcTransition;
 import org.apache.hadoop.yarn.state.StateMachine;
@@ -78,6 +89,7 @@ import org.apache.hadoop.yarn.state.StateMachineFactory;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.util.DBUtility;
 
 /**
  * This class is used to keep track of all the applications/containers
@@ -157,11 +169,7 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       new HashMap<>();
   
   // Map of renewed application certificates that should be propagated to NM
-  private final Map<ApplicationId, UpdatedCryptoForApp> appX509ToUpdate =
-      new ConcurrentHashMap<>();
-  
-  // Map of renewed application JWT that should be propagated to NM
-  private final Map<ApplicationId, UpdatedCryptoForApp> appJWTToUpdate =
+  private final Map<ApplicationId, UpdatedCryptoForApp> appCryptoMaterialToUpdate =
       new ConcurrentHashMap<>();
 
   protected NodeHeartbeatResponse latestNodeHeartBeatResponse = recordFactory
@@ -784,29 +792,16 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent rmNodeEvent) {
       RMNodeUpdateCryptoMaterialForAppEvent updateEvent = (RMNodeUpdateCryptoMaterialForAppEvent) rmNodeEvent;
-      LOG.info("Node " + rmNode.toString() + " received UPDATE_CRYPTO_MATERIAL event for app " + updateEvent
-          .getSecurityMaterial().getApplicationId());
+      LOG.info("Node " + rmNode.toString() + " received UPDATE_CRYPTO_MATERIAL event for app " + updateEvent.getAppId());
       UpdatedCryptoForApp updatedCrypto = recordFactory.newRecordInstance(UpdatedCryptoForApp.class);
-      if (updateEvent.getSecurityMaterial() instanceof X509SecurityHandler.X509SecurityManagerMaterial) {
-        X509SecurityHandler.X509SecurityManagerMaterial updatedMaterial =
-            (X509SecurityHandler.X509SecurityManagerMaterial) updateEvent.getSecurityMaterial();
-        ByteBuffer keyStore = ByteBuffer.wrap(updatedMaterial.getKeyStore());
-        ByteBuffer trustStore = ByteBuffer.wrap(updatedMaterial.getTrustStore());
-        updatedCrypto.setKeyStore(keyStore);
-        updatedCrypto.setKeyStorePassword(updatedMaterial.getKeyStorePassword());
-        updatedCrypto.setTrustStore(trustStore);
-        updatedCrypto.setTrustStorePassword(updatedMaterial.getTrustStorePassword());
-        updatedCrypto.setVersion(updatedMaterial.getCryptoMaterialVersion());
-        rmNode.appX509ToUpdate.put(updateEvent.getSecurityMaterial().getApplicationId(), updatedCrypto);
-      }
-      
-      if (updateEvent.getSecurityMaterial() instanceof JWTSecurityHandler.JWTSecurityManagerMaterial) {
-        JWTSecurityHandler.JWTSecurityManagerMaterial updatedMaterial =
-            (JWTSecurityHandler.JWTSecurityManagerMaterial) updateEvent.getSecurityMaterial();
-        updatedCrypto.setJWT(updatedMaterial.getToken());
-        updatedCrypto.setJWTExpiration(updatedMaterial.getExpirationDate().toEpochMilli());
-        rmNode.appJWTToUpdate.put(updateEvent.getSecurityMaterial().getApplicationId(), updatedCrypto);
-      }
+      ByteBuffer keyStore = ByteBuffer.wrap(updateEvent.getKeyStore());
+      ByteBuffer trustStore = ByteBuffer.wrap(updateEvent.getTrustStore());
+      updatedCrypto.setKeyStore(keyStore);
+      updatedCrypto.setKeyStorePassword(updateEvent.getKeyStorePassword());
+      updatedCrypto.setTrustStore(trustStore);
+      updatedCrypto.setTrustStorePassword(updateEvent.getTrustStorePassword());
+      updatedCrypto.setVersion(updateEvent.getVersion());
+      rmNode.appCryptoMaterialToUpdate.put(updateEvent.getAppId(), updatedCrypto);
     }
   }
   
@@ -1108,12 +1103,7 @@ public static class RecommissionNodeTransition
   }
   
   @Override
-  public Map<ApplicationId, UpdatedCryptoForApp> getAppX509ToUpdate() {
-    return appX509ToUpdate;
-  }
-  
-  @Override
-  public Map<ApplicationId, UpdatedCryptoForApp> getAppJWTToUpdate() {
-    return appJWTToUpdate;
+  public Map<ApplicationId, UpdatedCryptoForApp> getAppCryptoMaterialToUpdate() {
+    return appCryptoMaterialToUpdate;
   }
 }

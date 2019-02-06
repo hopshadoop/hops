@@ -94,7 +94,7 @@ message NodeHeartbeatResponseProto {
 
 message RunningApplicationsProto {
   required ApplicationIdProto app_id = 1;
-  required UpdatedCryptoForAppProto security_material_version = 2;
+  required int32 crypto_material_version = 2;
 }
 
 message SystemCredentialsForAppsProto {
@@ -108,13 +108,11 @@ message UpdatedCryptoForAppsProto {
 }
 
 message UpdatedCryptoForAppProto {
-  optional bytes key_store = 1;
-  optional string key_store_password = 2;
-  optional bytes trust_store = 3;
-  optional string trust_store_password = 4;
-  optional int32 version = 5;
-  optional string jwt = 6;
-  optional int64 jwt_expiration = 7;
+  required bytes key_store = 1;
+  required string key_store_password = 2;
+  required bytes trust_store = 3;
+  required string trust_store_password = 4;
+  required int32 version = 5;
 }
 
 message NMContainerStatusProto {

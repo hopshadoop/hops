@@ -22,8 +22,8 @@ import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -31,6 +31,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
@@ -83,18 +84,15 @@ public class ApplicationImpl implements Application {
   Map<ContainerId, Container> containers =
       new ConcurrentHashMap<>();
   
-  private final AtomicInteger x509Version;
-  private final AtomicLong jwtExpiration;
-  
+  private AtomicInteger cryptoMaterialVersion;
   
   public ApplicationImpl(Dispatcher dispatcher, String user, ApplicationId appId,
       Credentials credentials, Context context, String userFolder) {
-    this(dispatcher, user, appId, credentials, context, userFolder, 0, -1L);
+    this(dispatcher, user, appId, credentials, context, userFolder, 0);
   }
   
   public ApplicationImpl(Dispatcher dispatcher, String user, ApplicationId appId,
-      Credentials credentials, Context context, String userFolder, int x509Version,
-      long jwtExpiration) {
+      Credentials credentials, Context context, String userFolder, int cryptoMaterialVersion) {
     this.dispatcher = dispatcher;
     this.user = user;
     this.userFolder = userFolder;
@@ -102,8 +100,7 @@ public class ApplicationImpl implements Application {
     this.credentials = credentials;
     this.aclsManager = context.getApplicationACLsManager();
     this.context = context;
-    this.x509Version = new AtomicInteger(x509Version);
-    this.jwtExpiration = new AtomicLong(jwtExpiration);
+    this.cryptoMaterialVersion = new AtomicInteger(cryptoMaterialVersion);
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     readLock = lock.readLock();
     writeLock = lock.writeLock();
@@ -146,23 +143,13 @@ public class ApplicationImpl implements Application {
   }
 
   @Override
-  public int getX509Version() {
-    return x509Version.get();
+  public int getCryptoMaterialVersion() {
+    return cryptoMaterialVersion.get();
   }
   
   @Override
-  public void setX509Version(int x509Version) {
-    this.x509Version.set(x509Version);
-  }
-  
-  @Override
-  public long getJWTExpiration() {
-    return jwtExpiration.get();
-  }
-  
-  @Override
-  public void setJWTExpiration(long jwtExpiration) {
-    this.jwtExpiration.set(jwtExpiration);
+  public void setCryptoMaterialVersion(int cryptoMaterialVersion) {
+    this.cryptoMaterialVersion.set(cryptoMaterialVersion);
   }
   
   private static final ContainerDoneTransition CONTAINER_DONE_TRANSITION =
@@ -477,29 +464,18 @@ public class ApplicationImpl implements Application {
       app.context.getApplications().remove(appId);
       app.aclsManager.removeApplication(appId);
       
-      boolean isHopsTLSEnabled = ((NodeManager.NMContext) app.context)
-          .isHopsTLSEnabled();
+      boolean isSSLEnabled = ((NodeManager.NMContext) app.context)
+          .isSSLEnabled();
       
-      if (isHopsTLSEnabled) {
+      if (isSSLEnabled) {
         try {
-          app.context.getCertificateLocalizationService()
-              .removeX509Material(app.getUser(), appId.toString());
-        } catch (InterruptedException ex) {
-          LOG.error("Error while deleting X.509 for application " + appId);
+          CertificateLocalizationCtx.getInstance().getCertificateLocalization()
+              .removeMaterial(app.getUser(), appId.toString());
+        } catch (InterruptedException | ExecutionException ex) {
+          LOG.error("Error while deleting cryptographic material for user " +
+              app.getUser());
         }
       }
-      
-      boolean isJWTEnabled = ((NodeManager.NMContext) app.context)
-          .isJWTEnabled();
-      if (isJWTEnabled) {
-        try {
-          app.context.getCertificateLocalizationService()
-              .removeJWTMaterial(app.getUser(), appId.toString());
-        } catch (InterruptedException ex) {
-          LOG.error("Error while deleting JWT for application " + appId);
-        }
-      }
-      
       try {
         app.context.getNMStateStore().removeApplication(appId);
       } catch (IOException e) {

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
@@ -266,10 +265,6 @@ public interface RMApp extends EventHandler<RMAppEvent> {
   byte[] getTrustStore();
   
   char[] getTrustStorePassword();
-  
-  String getJWT();
-  
-  Instant getJWTExpiration();
   
   Integer getCryptoMaterialVersion();
   

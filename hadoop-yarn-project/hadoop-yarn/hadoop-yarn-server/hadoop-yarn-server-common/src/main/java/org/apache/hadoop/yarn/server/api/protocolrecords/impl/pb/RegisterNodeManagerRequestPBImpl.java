@@ -46,8 +46,7 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.RegisterNodeMa
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.RegisterNodeManagerRequestProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
-import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
-
+    
 public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest {
   RegisterNodeManagerRequestProto proto = RegisterNodeManagerRequestProto.getDefaultInstance();
   RegisterNodeManagerRequestProto.Builder builder = null;
@@ -56,7 +55,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
   private Resource resource = null;
   private NodeId nodeId = null;
   private List<NMContainerStatus> containerStatuses = null;
-  private Map<ApplicationId, UpdatedCryptoForApp> runningApplications = null;
+  private Map<ApplicationId, Integer> runningApplications = null;
   private Set<NodeLabel> labels = null;
 
   public RegisterNodeManagerRequestPBImpl() {
@@ -184,7 +183,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
   }
   
   @Override
-  public Map<ApplicationId, UpdatedCryptoForApp> getRunningApplications() {
+  public Map<ApplicationId, Integer> getRunningApplications() {
     initRunningApplications();
     return runningApplications;
   }
@@ -198,13 +197,13 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     this.runningApplications = new HashMap<>(list.size());
     for (YarnServerCommonServiceProtos.RunningApplicationsProto rup : list) {
       ApplicationId appId = convertFromProtoFormat(rup.getAppId());
-      UpdatedCryptoForApp upc = convertFromProtoFormat(rup.getSecurityMaterialVersion());
-      this.runningApplications.put(appId, upc);
+      Integer cryptoVersion = rup.getCryptoMaterialVersion();
+      this.runningApplications.put(appId, cryptoVersion);
     }
   }
 
   @Override
-  public void setRunningApplications(Map<ApplicationId, UpdatedCryptoForApp> apps) {
+  public void setRunningApplications(Map<ApplicationId, Integer> apps) {
     if (apps == null) {
       return;
     }
@@ -219,10 +218,10 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
       return;
     }
     
-    for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : runningApplications.entrySet()) {
+    for (Map.Entry<ApplicationId, Integer> entry : runningApplications.entrySet()) {
       builder.addRunningApplications(YarnServerCommonServiceProtos.RunningApplicationsProto.newBuilder()
       .setAppId(convertToProtoFormat(entry.getKey()))
-      .setSecurityMaterialVersion(convertToProtoFormat(entry.getValue())));
+      .setCryptoMaterialVersion(entry.getValue()));
     }
   }
 
@@ -324,17 +323,9 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
   private ApplicationIdPBImpl convertFromProtoFormat(ApplicationIdProto p) {
     return new ApplicationIdPBImpl(p);
   }
-  
+
   private ApplicationIdProto convertToProtoFormat(ApplicationId t) {
     return ((ApplicationIdPBImpl)t).getProto();
-  }
-  
-  private UpdatedCryptoForAppPBImpl convertFromProtoFormat(YarnServerCommonServiceProtos.UpdatedCryptoForAppProto p) {
-    return new UpdatedCryptoForAppPBImpl(p);
-  }
-  
-  private YarnServerCommonServiceProtos.UpdatedCryptoForAppProto convertToProtoFormat(UpdatedCryptoForApp t) {
-    return ((UpdatedCryptoForAppPBImpl) t).getProto();
   }
 
   private NodeIdPBImpl convertFromProtoFormat(NodeIdProto p) {

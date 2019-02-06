@@ -462,7 +462,7 @@ public class TypeConverter {
       FinalApplicationStatus finalApplicationStatus) {
     switch (yarnApplicationState) {
     case NEW:
-    case GENERATING_SECURITY_MATERIAL:
+    case GENERATING_CERTS:
     case NEW_SAVING:
     case SUBMITTED:
     case ACCEPTED:

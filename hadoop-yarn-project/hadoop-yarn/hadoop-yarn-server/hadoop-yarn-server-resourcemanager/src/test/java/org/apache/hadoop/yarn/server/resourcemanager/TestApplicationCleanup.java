@@ -53,7 +53,6 @@ import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
-import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
@@ -368,7 +367,7 @@ public class TestApplicationCleanup {
     
     // nm1 register to rm2, and do a heartbeat
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
-    nm1.registerNode(createRunningAppsForRequest(0, 0, app0.getApplicationId()));
+    nm1.registerNode(createRunningAppsForRequest(0, app0.getApplicationId()));
     rm2.waitForState(app0.getApplicationId(), RMAppState.FAILED);
     
     // wait for application cleanup message received
@@ -419,9 +418,9 @@ public class TestApplicationCleanup {
         ContainerId.newContainerId(am0.getApplicationAttemptId(), 1), 0,
         ContainerState.COMPLETE, Resource.newInstance(1024, 1), "", 0,
         Priority.newInstance(0), 1234)),
-        createRunningAppsForRequest(0, 0, app0.getApplicationId()));
+        createRunningAppsForRequest(0, app0.getApplicationId()));
     nm2.setResourceTrackerService(rm2.getResourceTrackerService());
-    nm2.registerNode(createRunningAppsForRequest(0, 0, app0.getApplicationId()));
+    nm2.registerNode(createRunningAppsForRequest(0, app0.getApplicationId()));
 
     // assert app state has been saved.
     rm2.waitForState(app0.getApplicationId(), RMAppState.FAILED);
@@ -471,7 +470,7 @@ public class TestApplicationCleanup {
 
     // nm1 register to rm2, and do a heartbeat
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
-    nm1.registerNode(createRunningAppsForRequest(0, 0, app0.getApplicationId()));
+    nm1.registerNode(createRunningAppsForRequest(0, app0.getApplicationId()));
     rm2.waitForState(app0.getApplicationId(), RMAppState.ACCEPTED);
 
     // Add unknown container for application unknown to scheduler
@@ -508,7 +507,7 @@ public class TestApplicationCleanup {
     waitForAppCleanupMessageRecved(nm1, app0.getApplicationId());
 
     // reconnect NM with application still active
-    nm1.registerNode(createRunningAppsForRequest(0, 0, app0.getApplicationId()));
+    nm1.registerNode(createRunningAppsForRequest(0, app0.getApplicationId()));
     waitForAppCleanupMessageRecved(nm1, app0.getApplicationId());
 
     rm1.stop();
@@ -568,7 +567,7 @@ public class TestApplicationCleanup {
     // 5. Re-register NM by sending completed container status
     List<NMContainerStatus> nMContainerStatusForApp =
         createNMContainerStatusForApp(am0);
-    nm1.registerNode(nMContainerStatusForApp, createRunningAppsForRequest(0, 0, app0.getApplicationId()));
+    nm1.registerNode(nMContainerStatusForApp, createRunningAppsForRequest(0, app0.getApplicationId()));
 
     waitForClusterMemory(nm1, rs, amMemory);
 
@@ -631,11 +630,10 @@ public class TestApplicationCleanup {
     return containerReport;
   }
 
-  private Map<ApplicationId, UpdatedCryptoForApp> createRunningAppsForRequest(Integer cryptoVersion, long jwtExpiration,
-      ApplicationId... appIds) {
-    Map<ApplicationId, UpdatedCryptoForApp> runningApps = new HashMap<>();
+  private Map<ApplicationId, Integer> createRunningAppsForRequest(Integer cryptoVersion, ApplicationId... appIds) {
+    Map<ApplicationId, Integer> runningApps = new HashMap<>();
     for (ApplicationId appId : appIds) {
-      runningApps.put(appId, UpdatedCryptoForApp.newInstance(cryptoVersion, jwtExpiration));
+      runningApps.put(appId, cryptoVersion);
     }
     return runningApps;
   }

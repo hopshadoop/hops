@@ -38,6 +38,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.Credentials;
@@ -561,13 +562,11 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     return containerStatuses;
   }
   
-  private Map<ApplicationId, UpdatedCryptoForApp> getRunningApplications() {
+  private Map<ApplicationId, Integer> getRunningApplications() {
     Map<ApplicationId, Application> runningApps = this.context.getApplications();
-    Map<ApplicationId, UpdatedCryptoForApp> runningApplications = new HashMap<>(runningApps.size());
+    Map<ApplicationId, Integer> runningApplications = new HashMap<>(runningApps.size());
     for (Map.Entry<ApplicationId, Application> entry : runningApps.entrySet()) {
-      Application app = entry.getValue();
-      UpdatedCryptoForApp upc = UpdatedCryptoForApp.newInstance(app.getX509Version(), app.getJWTExpiration());
-      runningApplications.put(entry.getKey(), upc);
+      runningApplications.put(entry.getKey(), entry.getValue().getCryptoMaterialVersion());
     }
     return runningApplications;
   }
@@ -879,29 +878,34 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
               }
             }
             
-            if (((NMContext) context).isHopsTLSEnabled() || ((NMContext) context).isJWTEnabled()) {
+            if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, CommonConfigurationKeys
+                .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
               Map<ApplicationId, UpdatedCryptoForApp> cryptoMaterialToUpdate = response.getUpdatedCryptoForApps();
               if (cryptoMaterialToUpdate != null) {
                 for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : cryptoMaterialToUpdate.entrySet()) {
                   Application application = context.getApplications().get(entry.getKey());
-                  UpdatedCryptoForApp crypto = entry.getValue();
-                  UpdatedCryptoForApp.UPDATE_TYPE updateType = crypto.determineUpdateType();
-                  if (updateType.equals(UpdatedCryptoForApp.UPDATE_TYPE.X509_JWT)) {
-                    if (crypto.getVersion() > application.getX509Version()) {
-                      handleSecurityUpdateForX509(crypto, application, entry.getKey());
+                  
+                  if (application != null) {
+                    UpdatedCryptoForApp crypto = entry.getValue();
+                    if (crypto.getVersion() > application.getCryptoMaterialVersion()) {
+                      context.getCertificateLocalizationService()
+                          .updateCryptoMaterial(application.getUser(), application.getAppId().toString(),
+                              crypto.getKeyStore(), String.valueOf(crypto.getKeyStorePassword()),
+                              crypto.getTrustStore(), String.valueOf(crypto.getTrustStorePassword()));
+  
+                      Set<ContainerId> containers = application.getContainers().keySet();
+                      for (ContainerId cid : containers) {
+                        CMgrUpdateCryptoMaterialEvent event =
+                            new CMgrUpdateCryptoMaterialEvent(cid, crypto.getKeyStore(),
+                                crypto.getKeyStorePassword(), crypto.getTrustStore(), crypto.getTrustStorePassword(),
+                                crypto.getVersion());
+                        dispatcher.getEventHandler().handle(event);
+                      }
                     }
-                    if (crypto.getJWTExpiration() > application.getJWTExpiration()) {
-                      handleSecurityUpdateForJWT(crypto, application);
-                    }
-                  } else if (updateType.equals(UpdatedCryptoForApp.UPDATE_TYPE.X509)) {
-                    if (crypto.getVersion() > application.getX509Version()) {
-                      handleSecurityUpdateForX509(crypto, application, entry.getKey());
-                    }
-                  } else if (updateType.equals(UpdatedCryptoForApp.UPDATE_TYPE.JWT)) {
-                    if (application != null
-                        && crypto.getJWTExpiration() > application.getJWTExpiration()) {
-                      handleSecurityUpdateForJWT(crypto, application);
-                    }
+                    applicationsWithUpdatedCryptoMaterial.add(entry.getKey());
+                  } else {
+                    LOG.warn("Received UpdatedCryptoMaterial request for missing application " + entry.getKey());
+                    applicationsWithUpdatedCryptoMaterial.add(entry.getKey());
                   }
                 }
               }
@@ -933,37 +937,6 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         }
       }
 
-      private void handleSecurityUpdateForX509(UpdatedCryptoForApp crypto, Application application,
-          ApplicationId appId) throws IOException, InterruptedException {
-        if (application != null) {
-          context.getCertificateLocalizationService()
-              .updateX509(application.getUser(), application.getAppId().toString(),
-                  crypto.getKeyStore(), String.valueOf(crypto.getKeyStorePassword()),
-                  crypto.getTrustStore(), String.valueOf(crypto.getTrustStorePassword()));
-  
-          for (ContainerId cid : application.getContainers().keySet()) {
-            CMgrUpdateX509Event event =
-                new CMgrUpdateX509Event(cid, crypto.getKeyStore(),
-                    crypto.getKeyStorePassword(), crypto.getTrustStore(), crypto.getTrustStorePassword(),
-                    crypto.getVersion());
-            dispatcher.getEventHandler().handle(event);
-          }
-        }
-        applicationsWithUpdatedCryptoMaterial.add(appId);
-      }
-      
-      private void handleSecurityUpdateForJWT(UpdatedCryptoForApp crypto, Application application)
-        throws IOException, InterruptedException {
-        if (application != null) {
-          context.getCertificateLocalizationService().updateJWT(application.getUser(), application.getAppId().toString(),
-              crypto.getJWT());
-          for (ContainerId cid : application.getContainers().keySet()) {
-            CMgrUpdateJWTEvent event = new CMgrUpdateJWTEvent(cid, crypto.getJWT(), crypto.getJWTExpiration());
-            dispatcher.getEventHandler().handle(event);
-          }
-        }
-      }
-      
       private void updateMasterKeys(NodeHeartbeatResponse response) {
         // See if the master-key has rolled over
         MasterKey updatedMasterKey = response.getContainerTokenMasterKey();

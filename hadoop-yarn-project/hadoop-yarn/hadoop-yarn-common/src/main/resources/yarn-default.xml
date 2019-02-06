@@ -2852,97 +2852,43 @@
     <description>
       Fully-qualified name of the class used to perform X.509 certificate actions
     </description>
-    <name>yarn.resourcemanager.rmappsecurity.actor-class</name>
-    <value>org.apache.hadoop.yarn.server.resourcemanager.security.HopsworksRMAppSecurityActions</value>
+    <name>hops.rm.certificate.actor.class</name>
+    <value>org.apache.hadoop.yarn.server.resourcemanager.security.HopsworksRMAppCertificateActions</value>
   </property>
 
   <property>
     <description>Hopsworks host used for Application certificate actions</description>
-    <name>yarn.resourcemanager.rmappsecurity.actions-host</name>
+    <name>hops.hopsworks.host</name>
+  </property>
+
+  <property>
+    <description>Hopsworks REST endpoint for agent to login</description>
+    <name>hops.hopsworks.login.endpoint</name>
+    <value>hopsworks-api/api/auth/login</value>
   </property>
 
   <property>
     <description>Hopworks REST endpoint for agent to send application CSR</description>
-    <name>yarn.resourcemanager.rmappsecurity.x509.sign-path</name>
+    <name>hops.hopsworks.sign.endpoint</name>
     <value>hopsworks-ca/v2/certificate/app</value>
   </property>
 
   <property>
     <description>Hopsworks REST endpoint for agent to send certificate revocation request</description>
-    <name>yarn.resourcemanager.rmappsecurity.x509.revoke-path</name>
+    <name>hops.hopsworks.revoke.endpoint</name>
     <value>hopsworks-ca/v2/certificate/app?</value>
   </property>
 
   <property>
     <description>Amount of time to subtract from the application certificate expiration date to start the renewal
       process</description>
-    <name>yarn.resourcemanager.rmappsecurity.x509.expiration-safety-period</name>
+    <name>yarn.resourcemanager.certificate.expiration-safety-period</name>
     <value>2d</value>
   </property>
 
   <property>
     <description>Interval for the Certificate Revocation Monitor thread</description>
-    <name>yarn.resourcemanager.rmappsecurity.x509.revocation-monitor-interval</name>
+    <name>yarn.resourcemanager.certificate.revocation-monitor-interval</name>
     <value>10h</value>
-  </property>
-
-  <property>
-    <description>Enable JWT management for containers</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.enabled</name>
-    <value>false</value>
-  </property>
-
-  <property>
-    <description>Validity period for application JWT</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.validity</name>
-    <value>30m</value>
-  </property>
-
-  <property>
-    <description>Period of time after expiration that renewal of JWT is still allowed</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.expiration-leeway</name>
-    <value>10m</value>
-  </property>
-
-  <property>
-    <description>Comma separated list of application JWT audience</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.audience</name>
-    <value>job</value>
-  </property>
-
-  <property>
-    <description>Hopsworks REST endpoint to send JWT generation requests</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.generate-path</name>
-    <value>/hopsworks-api/api/jwt/create</value>
-  </property>
-
-  <property>
-    <description>Hopsworks REST endpoint to send JWT invalidation requests</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.invalidate-path</name>
-    <value>/hopsworks-api/api/jwt/remove/</value>
-  </property>
-
-  <property>
-    <description>Hopsworks REST endpoint to send JWT renew requests</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.renew-path</name>
-    <value>/hopsworks-api/api/jwt/renew/</value>
-  </property>
-
-  <property>
-    <description>Hopsworks REST endpoint to ping for automatic JWT renewal</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.alive-path</name>
-    <value>/hopsworks-ca/v2/token</value>
-  </property>
-
-  <property>
-    <description>Interval to ping Hopsworks to renew JWT</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.alive-interval</name>
-    <value>30m</value>
-  </property>
-
-  <property>
-    <description>Valid JWT used by RMAppSecurityManager</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.token</name>
-    <value>Encoded token</value>
   </property>
 </configuration>

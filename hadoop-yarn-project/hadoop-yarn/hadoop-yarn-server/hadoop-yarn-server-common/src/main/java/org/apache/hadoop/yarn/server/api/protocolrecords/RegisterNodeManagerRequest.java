@@ -33,7 +33,7 @@ public abstract class RegisterNodeManagerRequest {
   public static RegisterNodeManagerRequest newInstance(NodeId nodeId,
       int httpPort, Resource resource, String nodeManagerVersionId,
       List<NMContainerStatus> containerStatuses,
-      Map<ApplicationId, UpdatedCryptoForApp> runningApplications) {
+      Map<ApplicationId, Integer> runningApplications) {
     return newInstance(nodeId, httpPort, resource, nodeManagerVersionId,
         containerStatuses, runningApplications, null);
   }
@@ -41,7 +41,7 @@ public abstract class RegisterNodeManagerRequest {
   public static RegisterNodeManagerRequest newInstance(NodeId nodeId,
       int httpPort, Resource resource, String nodeManagerVersionId,
       List<NMContainerStatus> containerStatuses,
-      Map<ApplicationId, UpdatedCryptoForApp> runningApplications, Set<NodeLabel> nodeLabels) {
+      Map<ApplicationId, Integer> runningApplications, Set<NodeLabel> nodeLabels) {
     RegisterNodeManagerRequest request =
         Records.newRecord(RegisterNodeManagerRequest.class);
     request.setHttpPort(httpPort);
@@ -70,17 +70,13 @@ public abstract class RegisterNodeManagerRequest {
    * <p>
    * When we have this running application list in node manager register
    * request, we can recover nodes info for running applications. And then we
-   * can take actions accordingly.
-   *
-   * (HOPS TLS & JWT)
-   * Also, for each running application NM sends
+   * can take actions accordingly. Also, for each running application NM sends
    * the version of application's cryptographic material. If RPC TLS is disabled
-   * the version is always 0. This information is used to determine if ResourceTracker
-   * should push to NM possible missing renewals for the security material
+   * the version is always 0
    * 
    * @return running application list in this node
    */
-  public abstract Map<ApplicationId, UpdatedCryptoForApp> getRunningApplications();
+  public abstract Map<ApplicationId, Integer> getRunningApplications();
   
   public abstract void setNodeId(NodeId nodeId);
   public abstract void setHttpPort(int port);
@@ -93,5 +89,5 @@ public abstract class RegisterNodeManagerRequest {
    * Setter for {@link RegisterNodeManagerRequest#getRunningApplications()}
    * @param runningApplications running application in this node
    */
-  public abstract void setRunningApplications(Map<ApplicationId, UpdatedCryptoForApp> runningApplications);
+  public abstract void setRunningApplications(Map<ApplicationId, Integer> runningApplications);
 }

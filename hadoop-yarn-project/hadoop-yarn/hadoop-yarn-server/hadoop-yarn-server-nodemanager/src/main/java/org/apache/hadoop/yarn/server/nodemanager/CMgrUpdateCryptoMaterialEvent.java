@@ -15,24 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
+package org.apache.hadoop.yarn.server.nodemanager;
 
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 
-public class RMNodeUpdateCryptoMaterialForAppEvent extends RMNodeEvent {
-  private final ApplicationId appId;
-  private final byte[] keyStore;
+import java.nio.ByteBuffer;
+
+public class CMgrUpdateCryptoMaterialEvent extends ContainerManagerEvent {
+  private final ContainerId containerId;
+  private final ByteBuffer keyStore;
   private final char[] keyStorePassword;
-  private final byte[] trustStore;
+  private final ByteBuffer trustStore;
   private final char[] trustStorePassword;
   private final int version;
   
-  public RMNodeUpdateCryptoMaterialForAppEvent(NodeId nodeId, ApplicationId appId,
-      byte[] keyStore, char[] keyStorePassword,
-      byte[] trustStore, char[] trustStorePassword, int version) {
-    super(nodeId, RMNodeEventType.UPDATE_CRYPTO_MATERIAL);
-    this.appId = appId;
+  public CMgrUpdateCryptoMaterialEvent(ContainerId containerId, ByteBuffer keyStore, char[] keyStorePassword,
+      ByteBuffer trustStore, char[] trustStorePassword, int version) {
+    super(ContainerManagerEventType.UPDATE_CRYPTO_MATERIAL);
+    this.containerId = containerId;
     this.keyStore = keyStore;
     this.keyStorePassword = keyStorePassword;
     this.trustStore = trustStore;
@@ -40,20 +40,20 @@ public class RMNodeUpdateCryptoMaterialForAppEvent extends RMNodeEvent {
     this.version = version;
   }
   
-  public ApplicationId getAppId() {
-    return appId;
+  public ContainerId getContainerId() {
+    return containerId;
   }
   
-  public byte[] getKeyStore() {
-    return keyStore;
+  public ByteBuffer getKeyStore() {
+    return keyStore.asReadOnlyBuffer();
   }
   
   public char[] getKeyStorePassword() {
     return keyStorePassword;
   }
   
-  public byte[] getTrustStore() {
-    return trustStore;
+  public ByteBuffer getTrustStore() {
+    return trustStore.asReadOnlyBuffer();
   }
   
   public char[] getTrustStorePassword() {

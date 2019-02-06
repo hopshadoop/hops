@@ -37,11 +37,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.hops.security.HopsUtil;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.mapred.ShuffleHandler;
 import org.apache.hadoop.mapreduce.MRJobConfig;
@@ -53,7 +51,6 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
@@ -67,7 +64,6 @@ import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.SignalContainerCommand;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy.ContainerManagementProtocolProxyData;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -168,8 +164,13 @@ public class ContainerLauncherImpl extends AbstractService implements
         List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
         list.add(startRequest);
         StartContainersRequest requestList = StartContainersRequest.newInstance(list);
-        
-        setupCryptoMaterial(requestList);
+  
+        if (getConfig().getBoolean(CommonConfigurationKeysPublic
+                .IPC_SERVER_SSL_ENABLED,
+            CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+          String user = UserGroupInformation.getCurrentUser().getUserName();
+          setupCryptoMaterial(requestList, user);
+        }
         
         StartContainersResponse response =
             proxy.getContainerManagementProtocol().startContainers(requestList);
@@ -213,32 +214,25 @@ public class ContainerLauncherImpl extends AbstractService implements
     public void kill() {
       kill(false);
     }
+
   
-    private void setupCryptoMaterial(StartContainersRequest request) throws IOException {
-      if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-          CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-        Path kStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
-        Path tStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
-        Path passwdPath = Paths.get(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
-      
-        ByteBuffer kStore = ByteBuffer.wrap(Files.readAllBytes(kStorePath));
-        ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
-        String password = readCryptoMaterialPassword(passwdPath.toFile());
-      
-        request.setKeyStore(kStore);
-        request.setKeyStorePassword(password);
-        request.setTrustStore(tStore);
-        request.setTrustStorePassword(password);
-      }
-    
-      if (getConfig().getBoolean(YarnConfiguration.RM_JWT_ENABLED,
-          YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
-        Path path2jwt = Paths.get(JWTSecurityMaterial.JWT_LOCAL_RESOURCE_FILE);
-        String jwt = FileUtils.readFileToString(path2jwt.toFile()).trim();
-        request.setJWT(jwt);
-      }
+    private void setupCryptoMaterial(StartContainersRequest request, String user)
+        throws IOException {
+      Path kStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+      Path tStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+      Path passwdPath = Paths.get(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+  
+      byte[] keyStoreBin = Files.readAllBytes(kStorePath);
+      ByteBuffer kStore = ByteBuffer.wrap(keyStoreBin);
+      ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
+      String password = readCryptoMaterialPassword(passwdPath.toFile());
+  
+      request.setKeyStore(kStore);
+      request.setKeyStorePassword(password);
+      request.setTrustStore(tStore);
+      request.setTrustStorePassword(password);
     }
-    
+  
     private String readCryptoMaterialPassword(File passwdFile)
         throws IOException {
       if (null != certificatePassword) {

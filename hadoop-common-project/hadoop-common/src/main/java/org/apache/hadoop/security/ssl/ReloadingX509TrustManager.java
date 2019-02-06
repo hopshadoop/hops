@@ -255,7 +255,6 @@ public final class ReloadingX509TrustManager
         if (hasFailed()) {
           backOff.reset();
           numberOfFailures = 0;
-          backOffTimeout = 0L;
         }
       } catch (Exception ex) {
         backOffTimeout = backOff.getBackOffInMillis();

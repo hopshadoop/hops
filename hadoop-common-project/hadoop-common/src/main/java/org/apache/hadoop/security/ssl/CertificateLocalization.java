@@ -32,30 +32,20 @@ public interface CertificateLocalization {
       ByteBuffer keyStore, String keyStorePassword,
       ByteBuffer trustStore, String trustStorePassword) throws InterruptedException;
   
-  void materializeJWT(String username, String applicationId, String userFolder, String jwt) throws InterruptedException;
+  void removeMaterial(String username)
+    throws InterruptedException, ExecutionException;
   
-  void removeX509Material(String username)
-    throws InterruptedException;
+  void removeMaterial(String username, String applicationId)
+      throws InterruptedException, ExecutionException;
   
-  void removeX509Material(String username, String applicationId)
-      throws InterruptedException;
-  
-  void removeJWTMaterial(String username, String applicationId)
-    throws InterruptedException;
-  
-  X509SecurityMaterial getX509MaterialLocation(String username)
+  CryptoMaterial getMaterialLocation(String username)
       throws FileNotFoundException, InterruptedException;
   
-  X509SecurityMaterial getX509MaterialLocation(String username, String applicationId)
+  CryptoMaterial getMaterialLocation(String username, String applicationId)
       throws FileNotFoundException, InterruptedException;
   
-  JWTSecurityMaterial getJWTMaterialLocation(String username, String applicationId)
-      throws FileNotFoundException, InterruptedException;
-  
-  void updateX509(String username, String applicationId, ByteBuffer keyStore, String keyStorePassword,
+  void updateCryptoMaterial(String username, String applicationId, ByteBuffer keyStore, String keyStorePassword,
       ByteBuffer trustStore, String trustStorePassword) throws IOException, InterruptedException;
-  
-  void updateJWT(String username, String applicationId, String jwt) throws IOException, InterruptedException;
   
   String getSuperKeystoreLocation();
   

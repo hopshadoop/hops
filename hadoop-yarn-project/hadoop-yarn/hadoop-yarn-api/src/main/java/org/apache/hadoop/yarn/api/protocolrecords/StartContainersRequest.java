@@ -107,12 +107,4 @@ public abstract class StartContainersRequest {
   @Public
   @InterfaceStability.Unstable
   public abstract void setTrustStorePassword(String password);
-  
-  @Public
-  @InterfaceStability.Unstable
-  public abstract String getJWT();
-  
-  @Public
-  @InterfaceStability.Unstable
-  public abstract void setJWT(String jwt);
 }

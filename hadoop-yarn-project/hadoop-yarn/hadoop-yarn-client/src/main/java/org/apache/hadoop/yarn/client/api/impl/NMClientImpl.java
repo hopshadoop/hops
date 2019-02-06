@@ -32,17 +32,14 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.hops.security.HopsUtil;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
@@ -62,7 +59,6 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.client.api.NMClient;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy.ContainerManagementProtocolProxyData;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
 
@@ -213,7 +209,12 @@ public class NMClientImpl extends NMClient {
         StartContainersRequest allRequests =
             StartContainersRequest.newInstance(list);
         
-        setupCryptoMaterial(allRequests);
+        if (getConfig().getBoolean(CommonConfigurationKeysPublic
+            .IPC_SERVER_SSL_ENABLED,
+            CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+          String user = UserGroupInformation.getCurrentUser().getUserName();
+          setupCryptoMaterial(allRequests, user);
+        }
         
         StartContainersResponse response =
             proxy
@@ -244,29 +245,21 @@ public class NMClientImpl extends NMClient {
     }
   }
   
-  private void setupCryptoMaterial(StartContainersRequest request) throws IOException {
-    if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      Path kStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
-      Path tStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
-      Path passwdPath = Paths.get(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
-      
-      ByteBuffer kStore = ByteBuffer.wrap(Files.readAllBytes(kStorePath));
-      ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
-      String password = readCryptoMaterialPassword(passwdPath.toFile());
-  
-      request.setKeyStore(kStore);
-      request.setKeyStorePassword(password);
-      request.setTrustStore(tStore);
-      request.setTrustStorePassword(password);
-    }
+  private void setupCryptoMaterial(StartContainersRequest request, String user)
+      throws IOException {
+    Path kStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+    Path tStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+    Path passwdPath = Paths.get(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
     
-    if (getConfig().getBoolean(YarnConfiguration.RM_JWT_ENABLED,
-        YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
-      Path path2jwt = Paths.get(JWTSecurityMaterial.JWT_LOCAL_RESOURCE_FILE);
-      String jwt = FileUtils.readFileToString(path2jwt.toFile()).trim();
-      request.setJWT(jwt);
-    }
+    byte[] keyStoreBin = Files.readAllBytes(kStorePath);
+    ByteBuffer kStore = ByteBuffer.wrap(keyStoreBin);
+    ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
+    String password = readCryptoMaterialPassword(passwdPath.toFile());
+    
+    request.setKeyStore(kStore);
+    request.setKeyStorePassword(password);
+    request.setTrustStore(tStore);
+    request.setTrustStorePassword(password);
   }
   
   private String readCryptoMaterialPassword(File passwdFile)

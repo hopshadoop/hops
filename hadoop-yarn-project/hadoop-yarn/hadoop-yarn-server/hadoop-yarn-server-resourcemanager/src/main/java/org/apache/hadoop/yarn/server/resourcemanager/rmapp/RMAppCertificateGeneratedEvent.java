@@ -15,46 +15,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.nodemanager;
+package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 
-import java.nio.ByteBuffer;
-
-public class CMgrUpdateX509Event extends CMgrUpdateSecurityMaterialEvent {
-  private final ByteBuffer keyStore;
+public class RMAppCertificateGeneratedEvent extends RMAppEvent {
+  private final byte[] keyStore;
   private final char[] keyStorePassword;
-  private final ByteBuffer trustStore;
+  private final byte[] trustStore;
   private final char[] trustStorePassword;
-  private final int version;
+  private final long expirationEpoch;
   
-  public CMgrUpdateX509Event(ContainerId containerId, ByteBuffer keyStore, char[] keyStorePassword,
-      ByteBuffer trustStore, char[] trustStorePassword, int version) {
-    super(containerId);
+  public RMAppCertificateGeneratedEvent(ApplicationId appId, byte[] keyStore, char[] keyStorePassword,
+      byte[] trustStore, char[] trustStorePassword, long expirationEpoch, RMAppEventType type) {
+    super(appId, type);
     this.keyStore = keyStore;
     this.keyStorePassword = keyStorePassword;
     this.trustStore = trustStore;
     this.trustStorePassword = trustStorePassword;
-    this.version = version;
+    this.expirationEpoch = expirationEpoch;
   }
   
-  public ByteBuffer getKeyStore() {
-    return keyStore.asReadOnlyBuffer();
+  public byte[] getKeyStore() {
+    return keyStore;
   }
   
   public char[] getKeyStorePassword() {
     return keyStorePassword;
   }
   
-  public ByteBuffer getTrustStore() {
-    return trustStore.asReadOnlyBuffer();
+  public byte[] getTrustStore() {
+    return trustStore;
   }
   
   public char[] getTrustStorePassword() {
     return trustStorePassword;
   }
   
-  public int getVersion() {
-    return version;
+  public long getExpirationEpoch() {
+    return expirationEpoch;
   }
 }

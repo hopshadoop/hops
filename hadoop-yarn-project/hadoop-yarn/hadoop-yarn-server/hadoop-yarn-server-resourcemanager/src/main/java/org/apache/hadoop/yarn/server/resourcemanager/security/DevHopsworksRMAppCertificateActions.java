@@ -17,17 +17,15 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import org.apache.http.config.Registry;
-import org.apache.http.config.RegistryBuilder;
-import org.apache.http.conn.socket.ConnectionSocketFactory;
-import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.impl.client.BasicCookieStore;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.TrustStrategy;
 
-import javax.net.ssl.SSLContext;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.security.GeneralSecurityException;
 import java.security.cert.CertificateException;
@@ -38,12 +36,13 @@ import java.security.cert.X509Certificate;
  *
  * NOTE: Use it ONLY for development or use it wisely
  */
-public class DevHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityActions {
-  public DevHopsworksRMAppSecurityActions() throws MalformedURLException, GeneralSecurityException {
+public class DevHopsworksRMAppCertificateActions extends HopsworksRMAppCertificateActions {
+  public DevHopsworksRMAppCertificateActions() throws MalformedURLException, GeneralSecurityException {
   }
   
   @Override
-  protected PoolingHttpClientConnectionManager createConnectionManager() throws GeneralSecurityException {
+  protected CloseableHttpClient createHttpClient() throws GeneralSecurityException, IOException {
+    BasicCookieStore cookieStore = new BasicCookieStore();
     SSLContextBuilder sslContextBuilder = new SSLContextBuilder();
     sslContextBuilder.loadTrustMaterial(new TrustStrategy() {
       @Override
@@ -51,15 +50,9 @@ public class DevHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityActi
         return true;
       }
     });
-    SSLContext sslCtx = sslContextBuilder.build();
-    SSLConnectionSocketFactory sslConnectionFactory = new SSLConnectionSocketFactory(sslCtx, NoopHostnameVerifier
-        .INSTANCE);
-    Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
-        .register("https", sslConnectionFactory)
-        .register("http", PlainConnectionSocketFactory.getSocketFactory())
-        .build();
-    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
-    connectionManager.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
-    return connectionManager;
+    SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContextBuilder.build(),
+        NoopHostnameVerifier.INSTANCE);
+    return HttpClients.custom().setDefaultCookieStore(cookieStore)
+        .setSSLSocketFactory(sslSocketFactory).build();
   }
 }

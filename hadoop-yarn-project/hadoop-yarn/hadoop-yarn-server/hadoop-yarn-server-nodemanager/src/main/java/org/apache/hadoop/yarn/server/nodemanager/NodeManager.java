@@ -195,14 +195,11 @@ public class NodeManager extends CompositeService
       NMContainerTokenSecretManager containerTokenSecretManager,
       NMTokenSecretManagerInNM nmTokenSecretManager,
       NMStateStoreService stateStore) {
-    boolean isHopsTLSEnabled = getConfig().getBoolean
+    boolean isSSLEnabled = getConfig().getBoolean
         (CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
             CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT);
-    boolean isJWTEnabled = getConfig().getBoolean(
-        YarnConfiguration.RM_JWT_ENABLED,
-        YarnConfiguration.DEFAULT_RM_JWT_ENABLED);
     return new NMContext(containerTokenSecretManager, nmTokenSecretManager,
-        dirsHandler, aclsManager, stateStore, isHopsTLSEnabled, isJWTEnabled);
+        dirsHandler, aclsManager, stateStore, isSSLEnabled);
   }
 
   protected void doSecureLogin() throws IOException {
@@ -365,9 +362,7 @@ public class NodeManager extends CompositeService
     DefaultMetricsSystem.initialize("NodeManager");
 
     if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)
-        || conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED,
-        YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
       certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.NM);
       CertificateLocalizationCtx.getInstance().setCertificateLocalization
           (certificateLocalizationService);
@@ -502,8 +497,7 @@ public class NodeManager extends CompositeService
     private boolean isDecommissioned = false;
     private final ConcurrentLinkedQueue<LogAggregationReport>
         logAggregationReportForApps;
-    private final boolean isHopsTLSEnabled;
-    private final boolean isJWTEnabled;
+    private final boolean isSSLEnabled;
     private NodeStatusUpdater nodeStatusUpdater;
     private CertificateLocalizationService certificateLocalizationService;
   
@@ -512,14 +506,13 @@ public class NodeManager extends CompositeService
         LocalDirsHandlerService dirsHandler, ApplicationACLsManager aclsManager,
         NMStateStoreService stateStore) {
       this(containerTokenSecretManager, nmTokenSecretManager, dirsHandler,
-          aclsManager, stateStore, false, false);
+          aclsManager, stateStore, false);
     }
     
     public NMContext(NMContainerTokenSecretManager containerTokenSecretManager,
         NMTokenSecretManagerInNM nmTokenSecretManager,
         LocalDirsHandlerService dirsHandler, ApplicationACLsManager aclsManager,
-        NMStateStoreService stateStore, boolean isHopsTLSEnabled,
-        boolean isJWTenabled) {
+        NMStateStoreService stateStore, boolean isSSLEnabled) {
       this.containerTokenSecretManager = containerTokenSecretManager;
       this.nmTokenSecretManager = nmTokenSecretManager;
       this.dirsHandler = dirsHandler;
@@ -530,8 +523,7 @@ public class NodeManager extends CompositeService
       this.stateStore = stateStore;
       this.logAggregationReportForApps = new ConcurrentLinkedQueue<
           LogAggregationReport>();
-      this.isHopsTLSEnabled = isHopsTLSEnabled;
-      this.isJWTEnabled = isJWTenabled;
+      this.isSSLEnabled = isSSLEnabled;
     }
 
     public void setCertificateLocalizationService
@@ -663,12 +655,8 @@ public class NodeManager extends CompositeService
       this.nodeStatusUpdater = nodeStatusUpdater;
     }
     
-    public boolean isHopsTLSEnabled() {
-      return isHopsTLSEnabled;
-    }
-    
-    public boolean isJWTEnabled() {
-      return isJWTEnabled;
+    public boolean isSSLEnabled() {
+      return isSSLEnabled;
     }
   }
 

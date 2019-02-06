@@ -23,7 +23,6 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -79,9 +78,8 @@ import org.apache.hadoop.yarn.security.client.ClientToAMTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeUpdateCryptoMaterialForAppEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppCertificateManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppManagerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger;
@@ -108,8 +106,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppRemovedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityMaterial;
-import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.server.webproxy.ProxyUriUtils;
 import org.apache.hadoop.yarn.state.InvalidStateTransitionException;
@@ -185,10 +181,6 @@ public class RMAppImpl implements RMApp, Recoverable {
       new HashMap<NodeId, List<String>>();
   private final int maxLogAggregationDiagnosticsInMemory;
   
-  /**
-   * Application security material
-   */
-  // X.509
   private byte[] keyStore = null;
   private char[] keyStorePassword = null;
   private byte[] trustStore = null;
@@ -196,9 +188,6 @@ public class RMAppImpl implements RMApp, Recoverable {
   private long certificateExpiration = -1;
   // Crypto material version is incremented only on certificate rotation
   private Integer cryptoMaterialVersion = 0;
-  // JWT
-  private String jwt;
-  private Instant jwtExpiration;
   
   // These states stored are only valid when app is at killing or final_saving.
   private RMAppState stateBeforeKilling;
@@ -228,7 +217,7 @@ public class RMAppImpl implements RMApp, Recoverable {
     .addTransition(RMAppState.NEW, RMAppState.NEW_SAVING,
         RMAppEventType.START, new RMAppNewlySavingTransition())
      
-    .addTransition(RMAppState.NEW, EnumSet.of(RMAppState.GENERATING_SECURITY_MATERIAL, RMAppState.SUBMITTED,
+    .addTransition(RMAppState.NEW, EnumSet.of(RMAppState.GENERATING_CERTS, RMAppState.SUBMITTED,
             RMAppState.ACCEPTED, RMAppState.FINISHED, RMAppState.FAILED,
             RMAppState.KILLED, RMAppState.FINAL_SAVING),
         RMAppEventType.RECOVER, new RMAppRecoveredTransition())
@@ -243,8 +232,8 @@ public class RMAppImpl implements RMApp, Recoverable {
     .addTransition(RMAppState.NEW_SAVING, RMAppState.NEW_SAVING,
         RMAppEventType.NODE_UPDATE, new RMAppNodeUpdateTransition())
       
-    .addTransition(RMAppState.NEW_SAVING, RMAppState.GENERATING_SECURITY_MATERIAL,
-        RMAppEventType.APP_NEW_SAVED, new RMAppGeneratingSecurityMaterialTransition())
+    .addTransition(RMAppState.NEW_SAVING, RMAppState.GENERATING_CERTS,
+        RMAppEventType.APP_NEW_SAVED, new RMAppGeneratingCertsTransition())
       
     .addTransition(RMAppState.NEW_SAVING, RMAppState.FINAL_SAVING,
         RMAppEventType.KILL,
@@ -259,12 +248,12 @@ public class RMAppImpl implements RMApp, Recoverable {
     .addTransition(RMAppState.NEW_SAVING, RMAppState.NEW_SAVING,
         RMAppEventType.MOVE, new RMAppMoveTransition())
       
-     // Transitions from GENERATING_SECURITY_MATERIAL state
-     .addTransition(RMAppState.GENERATING_SECURITY_MATERIAL, RMAppState.GENERATING_SECURITY_MATERIAL,
+     // Transitions from GENERATING_CERTS state
+     .addTransition(RMAppState.GENERATING_CERTS, RMAppState.GENERATING_CERTS,
          RMAppEventType.NODE_UPDATE, new RMAppNodeUpdateTransition())
-     .addTransition(RMAppState.GENERATING_SECURITY_MATERIAL, RMAppState.SUBMITTED,
-         RMAppEventType.SECURITY_MATERIAL_GENERATED, new AddApplicationToSchedulerTransition())
-     .addTransition(RMAppState.GENERATING_SECURITY_MATERIAL, RMAppState.FINAL_SAVING,
+     .addTransition(RMAppState.GENERATING_CERTS, RMAppState.SUBMITTED,
+         RMAppEventType.CERTS_GENERATED, new AddApplicationToSchedulerTransition())
+     .addTransition(RMAppState.GENERATING_CERTS, RMAppState.FINAL_SAVING,
          RMAppEventType.KILL, new FinalSavingTransition(
              new AppKilledTransition(), RMAppState.KILLED))
       
@@ -284,7 +273,7 @@ public class RMAppImpl implements RMApp, Recoverable {
         new FinalSavingTransition(
           new AppKilledTransition(), RMAppState.KILLED))
     .addTransition(RMAppState.SUBMITTED, RMAppState.SUBMITTED,
-        RMAppEventType.CERTS_RENEWED, new RMAppSecurityMaterialRenewedTransition())
+        RMAppEventType.CERTS_RENEWED, new RMAppCertificatesRenewedTransition())
 
      // Transitions from ACCEPTED state
     .addTransition(RMAppState.ACCEPTED, RMAppState.ACCEPTED,
@@ -313,7 +302,7 @@ public class RMAppImpl implements RMApp, Recoverable {
         RMAppEventType.APP_RUNNING_ON_NODE,
         new AppRunningOnNodeTransition())
     .addTransition(RMAppState.ACCEPTED, RMAppState.ACCEPTED,
-        RMAppEventType.CERTS_RENEWED, new RMAppSecurityMaterialRenewedTransition())
+        RMAppEventType.CERTS_RENEWED, new RMAppCertificatesRenewedTransition())
 
      // Transitions from RUNNING state
     .addTransition(RMAppState.RUNNING, RMAppState.RUNNING,
@@ -338,7 +327,7 @@ public class RMAppImpl implements RMApp, Recoverable {
     .addTransition(RMAppState.RUNNING, RMAppState.KILLING,
         RMAppEventType.KILL, new KillAttemptTransition())
     .addTransition(RMAppState.RUNNING, RMAppState.RUNNING,
-        RMAppEventType.CERTS_RENEWED, new RMAppSecurityMaterialRenewedTransition())
+        RMAppEventType.CERTS_RENEWED, new RMAppCertificatesRenewedTransition())
 
      // Transitions from FINAL_SAVING state
     .addTransition(RMAppState.FINAL_SAVING,
@@ -639,7 +628,7 @@ public class RMAppImpl implements RMApp, Recoverable {
   private FinalApplicationStatus createFinalApplicationStatus(RMAppState state) {
     switch(state) {
     case NEW:
-    case GENERATING_SECURITY_MATERIAL:
+    case GENERATING_CERTS:
     case NEW_SAVING:
     case SUBMITTED:
     case ACCEPTED:
@@ -898,9 +887,6 @@ public class RMAppImpl implements RMApp, Recoverable {
     this.isAppRotatingCryptoMaterial.set(appState.isDuringMaterialRotation());
     this.materialRotationStartTime.set(appState.getMaterialRotationStartTime());
     
-    this.jwt = appState.getJWT();
-    this.jwtExpiration = appState.getJWTExpiration() != -1L ? Instant.ofEpochMilli(appState.getJWTExpiration()) : null;
-    
     // send the ATS create Event during RM recovery.
     // NOTE: it could be duplicated with events sent before RM get restarted.
     sendATSCreateEvent();
@@ -1000,12 +986,9 @@ public class RMAppImpl implements RMApp, Recoverable {
       boolean newNode = app.ranNodes.add(nodeAddedEvent.getNodeId());
       if (newNode && app.isAppRotatingCryptoMaterial.get()) {
         LOG.debug("Sending UPDATE_CRYPTO_EVENT to new running node: " + nodeAddedEvent.getNodeId());
-        X509SecurityHandler.X509SecurityManagerMaterial x509Material = new X509SecurityHandler.X509SecurityManagerMaterial(
-            app.applicationId, app.keyStore, app.keyStorePassword,
-            app.trustStore, app.trustStorePassword, null);
-        x509Material.setCryptoMaterialVersion(app.cryptoMaterialVersion);
         RMNodeUpdateCryptoMaterialForAppEvent updateEvent =
-            new RMNodeUpdateCryptoMaterialForAppEvent(nodeAddedEvent.getNodeId(), x509Material);
+            new RMNodeUpdateCryptoMaterialForAppEvent(nodeAddedEvent.getNodeId(), app.applicationId, app.keyStore,
+                app.keyStorePassword, app.trustStore, app.trustStorePassword, app.cryptoMaterialVersion);
         app.handler.handle(updateEvent);
       }
 
@@ -1089,66 +1072,41 @@ public class RMAppImpl implements RMApp, Recoverable {
       // started or started but not yet saved.
       if (app.attempts.isEmpty()) {
         
-        if (app.isX509MaterialPresent() && app.isJWTMaterialPresent()) {
+        if (app.isCryptoMaterialPresent()) {
           // ResourceManager may have crashed after it has renewed the certificate but before updating
           // RMApp state, so revoke the current version plus 1 to be sure no missed certificate is valid
-          X509SecurityHandler.X509MaterialParameter param =
-              new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, cryptoMaterialVersionToRevoke);
-          app.rmContext.getRMAppSecurityManager().revokeSecurityMaterialSync(param);
-          
-          param = new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, app.cryptoMaterialVersion);
-          param.setExpiration(app.certificateExpiration);
-          app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(param);
+          app.rmContext.getRMAppCertificateManager()
+              .revokeCertificateSynchronously(app.applicationId, app.user, cryptoMaterialVersionToRevoke);
+          app.rmContext.getRMAppCertificateManager()
+              .registerWithCertificateRenewer(app.applicationId, app.user, app.cryptoMaterialVersion,
+                  app.certificateExpiration);
           try {
             app.materializeCertificates();
           } catch (InterruptedException ex) {
             LOG.error("Could not localize certificates for application " + app.applicationId + " during recovery");
           }
-  
-          JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(app.applicationId,
-              app.user);
-          jwtParam.setExpirationDate(app.jwtExpiration);
-          jwtParam.setToken(app.jwt);
-          app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(jwtParam);
           
           app.scheduler.handle(new AppAddedSchedulerEvent(app.user,
               app.submissionContext, false));
           return RMAppState.SUBMITTED;
         } else {
-          RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
-          X509SecurityHandler.X509MaterialParameter x509Param =
-              new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, app.cryptoMaterialVersion);
-          securityMaterial.addMaterial(x509Param);
-  
-          JWTSecurityHandler.JWTMaterialParameter jwtParam =
-              new JWTSecurityHandler.JWTMaterialParameter(app.applicationId, app.user);
-          securityMaterial.addMaterial(jwtParam);
-          
-          RMAppSecurityManagerEvent revokeAndGenerateEvent = new RMAppSecurityManagerEvent(app.applicationId,
-              securityMaterial, RMAppSecurityManagerEventType.REVOKE_GENERATE_MATERIAL);
+          RMAppCertificateManagerEvent revokeAndGenerateEvent = new RMAppCertificateManagerEvent(
+              app.applicationId, app.user, app.cryptoMaterialVersion,
+              RMAppCertificateManagerEventType.REVOKE_GENERATE_CERTIFICATE);
           app.handler.handle(revokeAndGenerateEvent);
           // RMApp should not register with the certificate renewer here as it will register
-          // when it receives SECURITY_MATERIAL_GENERATED event in GENERATING_SECURITY_MATERIAL state
-          return RMAppState.GENERATING_SECURITY_MATERIAL;
+          // when it receives CERTS_GENERATED event in GENERATING_CERTS state
+          return RMAppState.GENERATING_CERTS;
         }
       }
   
       // ResourceManager may have crashed after it has renewed the certificate but before updating
       // RMApp state, so revoke the current version plus 1 to be sure no missed certificate is valid
-      X509SecurityHandler.X509MaterialParameter x509Param =
-          new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, cryptoMaterialVersionToRevoke);
-      app.rmContext.getRMAppSecurityManager()
-          .revokeSecurityMaterialSync(x509Param);
-      x509Param = new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, app.cryptoMaterialVersion);
-      x509Param.setExpiration(app.certificateExpiration);
-      app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(x509Param);
-      
-      // Register with JWT renewer
-      JWTSecurityHandler.JWTMaterialParameter jwtParam  = new JWTSecurityHandler.JWTMaterialParameter(app.applicationId,
-          app.user);
-      jwtParam.setExpirationDate(app.jwtExpiration);
-      jwtParam.setToken(app.jwt);
-      app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(jwtParam);
+      app.rmContext.getRMAppCertificateManager()
+          .revokeCertificateSynchronously(app.applicationId, app.user, cryptoMaterialVersionToRevoke);
+      app.rmContext.getRMAppCertificateManager()
+          .registerWithCertificateRenewer(app.applicationId, app.user, app.cryptoMaterialVersion,
+              app.certificateExpiration);
   
       try {
         app.materializeCertificates();
@@ -1189,168 +1147,75 @@ public class RMAppImpl implements RMApp, Recoverable {
     return buffer;
   }
 
-  private boolean isX509MaterialPresent() {
+  private boolean isCryptoMaterialPresent() {
     return keyStore != null && keyStorePassword != null
         && trustStore != null && trustStorePassword != null;
   }
   
-  private boolean isJWTMaterialPresent() {
-    return jwt != null && !jwt.isEmpty() && jwtExpiration != null;
-  }
-  
-  private void updateApplicationWithX509(X509SecurityHandler.X509SecurityManagerMaterial x509Material) {
-    if (x509Material == null) {
-      return;
-    }
-    keyStore = x509Material.getKeyStore();
-    keyStorePassword = x509Material.getKeyStorePassword();
-    trustStore = x509Material.getTrustStore();
-    trustStorePassword = x509Material.getTrustStorePassword();
-    certificateExpiration = x509Material.getExpirationEpoch();
-  }
-  
-  private void updateApplicationWithJWT(JWTSecurityHandler.JWTSecurityManagerMaterial jwtMaterial) {
-    
-    if (jwtMaterial == null) {
-      return;
-    }
-    jwt = jwtMaterial.getToken();
-    jwtExpiration = jwtMaterial.getExpirationDate();
+  private void updateApplicationWithCryptoMaterial(RMAppCertificateGeneratedEvent event) {
+    keyStore = event.getKeyStore();
+    keyStorePassword = event.getKeyStorePassword();
+    trustStore = event.getTrustStore();
+    trustStorePassword = event.getTrustStorePassword();
+    certificateExpiration = event.getExpirationEpoch();
   }
   
   private static final class AddApplicationToSchedulerTransition extends
       RMAppTransition {
     @Override
     public void transition(RMAppImpl app, RMAppEvent event) {
-      if (event instanceof RMAppSecurityMaterialGeneratedEvent) {
-        RMAppSecurityMaterialGeneratedEvent rmAppSecurityEvent = (RMAppSecurityMaterialGeneratedEvent) event;
-        X509SecurityHandler.X509SecurityManagerMaterial x509Material =
-            (X509SecurityHandler.X509SecurityManagerMaterial) rmAppSecurityEvent.getMaterial()
-            .getMaterial(X509SecurityHandler.X509SecurityManagerMaterial.class);
-        app.updateApplicationWithX509(x509Material);
-  
-        JWTSecurityHandler.JWTSecurityManagerMaterial jwtMaterial = (JWTSecurityHandler.JWTSecurityManagerMaterial)
-            rmAppSecurityEvent.getMaterial().getMaterial(JWTSecurityHandler.JWTSecurityManagerMaterial.class);
-        app.updateApplicationWithJWT(jwtMaterial);
-        
+      if (event instanceof RMAppCertificateGeneratedEvent) {
+        app.updateApplicationWithCryptoMaterial((RMAppCertificateGeneratedEvent) event);
         ApplicationStateData appNewState =
             ApplicationStateData.newInstance(app.submitTime, app.startTime, app.submissionContext, app.user,
-                app.callerContext);
-        if (app.isX509MaterialPresent()) {
-          appNewState.setKeyStore(app.keyStore);
-          appNewState.setKeyStorePassword(app.keyStorePassword);
-          appNewState.setTrustStore(app.trustStore);
-          appNewState.setTrustStorePassword(app.trustStorePassword);
-          appNewState.setCryptoMaterialVersion(app.cryptoMaterialVersion);
-          appNewState.setCertificateExpiration(app.certificateExpiration);
-          appNewState.setIsDuringMaterialRotation(app.isAppRotatingCryptoMaterial.get());
-          appNewState.setMaterialRotationStartTime(app.materialRotationStartTime.get());
-  
-          X509SecurityHandler.X509MaterialParameter x509Param =
-              new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, app.cryptoMaterialVersion);
-          x509Param.setExpiration(app.certificateExpiration);
-          app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(x509Param);
-        }
-        
-        if (app.isJWTMaterialPresent()) {
-          appNewState.setJWT(app.jwt);
-          appNewState.setJWTExpiration(app.jwtExpiration.toEpochMilli());
-  
-          JWTSecurityHandler.JWTMaterialParameter jwtParam =
-              new JWTSecurityHandler.JWTMaterialParameter(app.applicationId, app.user);
-          jwtParam.setExpirationDate(app.jwtExpiration);
-          jwtParam.setToken(app.jwt);
-          app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(jwtParam);
-        }
-        
+                app.callerContext, app.keyStore, app.keyStorePassword,
+                app.trustStore, app.trustStorePassword, app.cryptoMaterialVersion, app.certificateExpiration,
+                app.isAppRotatingCryptoMaterial.get(), app.materialRotationStartTime.get());
         app.rmContext.getStateStore().updateApplicationStateNoNotify(appNewState);
+        app.rmContext.getRMAppCertificateManager()
+            .registerWithCertificateRenewer(app.applicationId, app.user, app.cryptoMaterialVersion,
+                app.certificateExpiration);
       }
       
-      app.handler.handle(new AppAddedSchedulerEvent(app.user, app.submissionContext, false));
+      app.handler.handle(new AppAddedSchedulerEvent(app.user,
+          app.submissionContext, false));
       // send the ATS create Event
       app.sendATSCreateEvent();
     }
   }
   
-  private static final class RMAppSecurityMaterialRenewedTransition extends RMAppTransition {
+  private static final class RMAppCertificatesRenewedTransition extends RMAppTransition {
     @Override
     public void transition(RMAppImpl app, RMAppEvent event) {
-      RMAppSecurityMaterialRenewedEvent securityEvent = (RMAppSecurityMaterialRenewedEvent) event;
-      if (securityEvent.getSecurityMaterial() instanceof X509SecurityHandler.X509SecurityManagerMaterial) {
-        // Do the X509 stuff
-        X509SecurityHandler.X509SecurityManagerMaterial x509Material = (X509SecurityHandler.X509SecurityManagerMaterial)
-            securityEvent.getSecurityMaterial();
-        handleX509RenewEvent(app, x509Material);
-      } else if (securityEvent.getSecurityMaterial() instanceof JWTSecurityHandler.JWTSecurityManagerMaterial) {
-        JWTSecurityHandler.JWTSecurityManagerMaterial jwtMaterial = (JWTSecurityHandler.JWTSecurityManagerMaterial)
-            securityEvent.getSecurityMaterial();
-        handleJWTRenewEvent(app, jwtMaterial);
-      }
-    }
-    
-    private void handleX509RenewEvent(RMAppImpl app,
-        X509SecurityHandler.X509SecurityManagerMaterial x509Material) {
-      app.updateApplicationWithX509(x509Material);
+      LOG.info("Received new certificate");
+      app.updateApplicationWithCryptoMaterial((RMAppCertificateGeneratedEvent) event);
       app.cryptoMaterialVersion++;
       app.isAppRotatingCryptoMaterial.compareAndSet(false, true);
       app.materialRotationStartTime.set(app.systemClock.getTime());
-  
+      
       ApplicationStateData appNewState =
           ApplicationStateData.newInstance(app.submitTime, app.startTime, app.submissionContext, app.user,
               app.callerContext, app.keyStore, app.keyStorePassword,
               app.trustStore, app.trustStorePassword, app.cryptoMaterialVersion, app.certificateExpiration,
               app.isAppRotatingCryptoMaterial.get(), app.materialRotationStartTime.get());
-      appNewState.setJWT(app.jwt);
-      if (app.jwtExpiration != null) {
-        appNewState.setJWTExpiration(app.jwtExpiration.toEpochMilli());
-      } else {
-        appNewState.setJWTExpiration(-1L);
-      }
       app.rmContext.getStateStore().updateApplicationStateNoNotify(appNewState);
-  
+      
       if (app.rmNodesThatUpdatedCryptoMaterial == null) {
         app.rmNodesThatUpdatedCryptoMaterial = new HashSet<>(app.ranNodes.size());
       }
-  
-      x509Material.setCryptoMaterialVersion(app.cryptoMaterialVersion);
-      for (NodeId nodeId : app.ranNodes) {
-        RMNodeUpdateCryptoMaterialForAppEvent<X509SecurityHandler.X509SecurityManagerMaterial> updateEvent =
-            new RMNodeUpdateCryptoMaterialForAppEvent(nodeId, x509Material);
-        app.handler.handle(updateEvent);
-      }
-  
-      X509SecurityHandler.X509MaterialParameter param =
-          new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, app.cryptoMaterialVersion);
-      param.setExpiration(app.certificateExpiration);
-      app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(param);
-    }
-    
-    private void handleJWTRenewEvent(RMAppImpl app,
-        JWTSecurityHandler.JWTSecurityManagerMaterial jwtMaterial) {
-      app.updateApplicationWithJWT(jwtMaterial);
-      ApplicationStateData appNewState =
-          ApplicationStateData.newInstance(app.submitTime, app.startTime, app.submissionContext, app.user,
-              app.callerContext, app.keyStore, app.keyStorePassword,
-              app.trustStore, app.trustStorePassword, app.cryptoMaterialVersion, app.certificateExpiration,
-              app.isAppRotatingCryptoMaterial.get(), app.materialRotationStartTime.get());
-      appNewState.setJWT(jwtMaterial.getToken());
-      appNewState.setJWTExpiration(jwtMaterial.getExpirationDate().toEpochMilli());
-      app.rmContext.getStateStore().updateApplicationStateNoNotify(appNewState);
       
       for (NodeId nodeId : app.ranNodes) {
-        RMNodeUpdateCryptoMaterialForAppEvent<JWTSecurityHandler.JWTSecurityManagerMaterial> updateEvent =
-            new RMNodeUpdateCryptoMaterialForAppEvent(nodeId, jwtMaterial);
+        RMNodeUpdateCryptoMaterialForAppEvent updateEvent =
+            new RMNodeUpdateCryptoMaterialForAppEvent(nodeId, app.applicationId, app.keyStore, app.keyStorePassword,
+                app.trustStore, app.trustStorePassword, app.cryptoMaterialVersion);
         app.handler.handle(updateEvent);
       }
-  
-      JWTSecurityHandler.JWTMaterialParameter param =
-          new JWTSecurityHandler.JWTMaterialParameter(app.applicationId, app.user);
-      param.setExpirationDate(app.jwtExpiration);
-      param.setToken(app.jwt);
-      app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(param);
+      
+      app.rmContext.getRMAppCertificateManager()
+          .registerWithCertificateRenewer(app.applicationId, app.user, app.cryptoMaterialVersion, app.certificateExpiration);
     }
   }
-  
+
   private static final class StartAppAttemptTransition extends RMAppTransition {
     @Override
     public void transition(RMAppImpl app, RMAppEvent event) {
@@ -1430,20 +1295,13 @@ public class RMAppImpl implements RMApp, Recoverable {
     }
   }
   
-  private static final class RMAppGeneratingSecurityMaterialTransition extends RMAppTransition {
+  private static final class RMAppGeneratingCertsTransition extends RMAppTransition {
     @Override
     public void transition(RMAppImpl app, RMAppEvent event) {
-      LOG.info("Generating X.509 and JWT for application " + app.applicationId);
-      X509SecurityHandler.X509MaterialParameter x509Param =
-          new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, app.cryptoMaterialVersion);
-      JWTSecurityHandler.JWTMaterialParameter jwtParam =
-          new JWTSecurityHandler.JWTMaterialParameter(app.applicationId, app.user);
-      RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
-      securityMaterial.addMaterial(x509Param);
-      securityMaterial.addMaterial(jwtParam);
-      RMAppSecurityManagerEvent genSecurityMaterialEvent = new RMAppSecurityManagerEvent(app.applicationId,
-          securityMaterial, RMAppSecurityManagerEventType.GENERATE_SECURITY_MATERIAL);
-      app.handler.handle(genSecurityMaterialEvent);
+      LOG.info("Generating certificates for application " + app.applicationId);
+      RMAppCertificateManagerEvent genCertsEvent = new RMAppCertificateManagerEvent(app.applicationId,
+          app.user, app.cryptoMaterialVersion, RMAppCertificateManagerEventType.GENERATE_CERTIFICATE);
+      app.handler.handle(genCertsEvent);
     }
   }
   
@@ -1509,12 +1367,12 @@ public class RMAppImpl implements RMApp, Recoverable {
     @Override
     public void transition(RMAppImpl app, RMAppEvent event) {
       if ((transitionToDo instanceof AppKilledTransition) &&
-          (app.getState().equals(RMAppState.GENERATING_SECURITY_MATERIAL) || app.getState().equals(RMAppState.ACCEPTED))) {
-        app.sendSecurityMaterialRevocationEvent();
+          (app.getState().equals(RMAppState.GENERATING_CERTS) || app.getState().equals(RMAppState.ACCEPTED))) {
+        app.sendCertificateRevocationEvent();
       }
       // In any other state later than SUBMITTED, the revocation will be done be the RMAppAttempt
       if (app.getState().equals(RMAppState.SUBMITTED)) {
-        app.sendSecurityMaterialRevocationEvent();
+        app.sendCertificateRevocationEvent();
       }
       app.rememberTargetTransitionsAndStoreState(event, transitionToDo,
         targetedFinalState, stateToBeStored);
@@ -1730,7 +1588,7 @@ public class RMAppImpl implements RMApp, Recoverable {
         if (numberOfFailure >= app.maxAppAttempts) {
           app.isNumAttemptsBeyondThreshold = true;
         }
-        app.sendSecurityMaterialRevocationEvent();
+        app.sendCertificateRevocationEvent();
         
         app.rememberTargetTransitionsAndStoreState(event,
           new AttemptFailedFinalStateSavedTransition(), RMAppState.FAILED,
@@ -1740,17 +1598,9 @@ public class RMAppImpl implements RMApp, Recoverable {
     }
   }
 
-  private void sendSecurityMaterialRevocationEvent() {
-    X509SecurityHandler.X509MaterialParameter x509params =
-        new X509SecurityHandler.X509MaterialParameter(applicationId, user, cryptoMaterialVersion);
-    JWTSecurityHandler.JWTMaterialParameter jwtParams =
-        new JWTSecurityHandler.JWTMaterialParameter(applicationId, user);
-    
-    RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
-    securityMaterial.addMaterial(x509params);
-    securityMaterial.addMaterial(jwtParams);
-    handler.handle(new RMAppSecurityManagerEvent(applicationId, securityMaterial,
-        RMAppSecurityManagerEventType.REVOKE_SECURITY_MATERIAL));
+  private void sendCertificateRevocationEvent() {
+    handler.handle(new RMAppCertificateManagerEvent(applicationId, user, cryptoMaterialVersion,
+        RMAppCertificateManagerEventType.REVOKE_CERTIFICATE));
   }
   
   @Override
@@ -2188,16 +2038,6 @@ public class RMAppImpl implements RMApp, Recoverable {
     return cryptoMaterialVersion;
   }
   
-  @Override
-  public Instant getJWTExpiration() {
-    return jwtExpiration;
-  }
-  
-  @Override
-  public String getJWT() {
-    return jwt;
-  }
-  
   @VisibleForTesting
   public Set<NodeId> getRMNodesUpdatedCryptoMaterial() {
     return rmNodesThatUpdatedCryptoMaterial;
@@ -2225,12 +2065,8 @@ public class RMAppImpl implements RMApp, Recoverable {
         rmNodesThatUpdatedCryptoMaterial.add(nodeId);
         if (rmNodesThatUpdatedCryptoMaterial.containsAll(ranNodes)) {
           int cryptoVersionToRevoke = cryptoMaterialVersion - 1;
-          X509SecurityHandler.X509MaterialParameter x509Param = new X509SecurityHandler.X509MaterialParameter
-              (applicationId, user, cryptoVersionToRevoke, true);
-          RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
-          securityMaterial.addMaterial(x509Param);
-          RMAppSecurityManagerEvent event = new RMAppSecurityManagerEvent(applicationId, securityMaterial,
-              RMAppSecurityManagerEventType.REVOKE_CERTIFICATE_AFTER_ROTATION);
+          RMAppCertificateManagerEvent event = new RMAppCertificateManagerEvent(applicationId, user,
+              cryptoVersionToRevoke, RMAppCertificateManagerEventType.REVOKE_CERTIFICATE_AFTER_ROTATION);
           handler.handle(event);
           rmNodesThatUpdatedCryptoMaterial = null;
           isAppRotatingCryptoMaterial.compareAndSet(true, false);

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -66,8 +65,6 @@ public class MockRMApp implements RMApp {
   char[] keyStorePassword;
   byte[] trustStore;
   char[] trustStorePassword;
-  String jwt;
-  Instant jwtExpiration;
   Integer cryptoMaterialVersion = 0;
   long certificateExpiration;
   boolean isAppDuringMaterialRotation = false;
@@ -331,16 +328,6 @@ public class MockRMApp implements RMApp {
   @Override
   public char[] getTrustStorePassword() {
     return trustStorePassword;
-  }
-  
-  @Override
-  public String getJWT() {
-    return jwt;
-  }
-  
-  @Override
-  public Instant getJWTExpiration() {
-    return jwtExpiration;
   }
   
   @Override

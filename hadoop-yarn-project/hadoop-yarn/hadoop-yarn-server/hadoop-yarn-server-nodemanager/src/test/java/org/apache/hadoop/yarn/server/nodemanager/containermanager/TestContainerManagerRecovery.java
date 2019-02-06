@@ -29,7 +29,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
@@ -49,10 +48,9 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.net.ServerSocketUtil;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
-import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
@@ -75,6 +73,8 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.security.NMTokenIdentifier;
+import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedAppsEvent;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
@@ -96,18 +96,19 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.Conta
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceLocalizationService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.LocalizationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.LogHandler;
+import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
 import org.apache.hadoop.yarn.server.nodemanager.recovery.NMMemoryStateStoreService;
 import org.apache.hadoop.yarn.server.nodemanager.recovery.NMNullStateStoreService;
 import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService;
+import org.apache.hadoop.yarn.server.nodemanager.security.NMContainerTokenSecretManager;
+import org.apache.hadoop.yarn.server.nodemanager.security.NMTokenSecretManagerInNM;
+import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.junit.Before;
 import org.junit.Test;
 
 public class TestContainerManagerRecovery extends BaseContainerManagerTest {
 
-  private final String keystoresContent = "some_content";
-  private final String keystoresPassword = "password";
-  private final String jwt = "jwt";
-  
   public TestContainerManagerRecovery() throws UnsupportedFileSystemException {
     super();
   }
@@ -132,7 +133,6 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
     conf.set(YarnConfiguration.NM_LOG_DIRS, localLogDir.getAbsolutePath());
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR, remoteLogDir.getAbsolutePath());
     conf.setLong(YarnConfiguration.NM_LOG_RETAIN_SECONDS, 1);
-    
     // Default delSrvc
     delSrvc = createDeletionService();
     delSrvc.init(conf);
@@ -149,11 +149,10 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
     conf.setBoolean(YarnConfiguration.NM_RECOVERY_SUPERVISED, true);
     conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
     conf.set(YarnConfiguration.YARN_ADMIN_ACL, "yarn_admin_user");
-    
     NMStateStoreService stateStore = new NMMemoryStateStoreService();
     stateStore.init(conf);
     stateStore.start();
-    Context context = createContext(conf, stateStore, true, true);
+    Context context = createContext(conf, stateStore);
     ContainerManagerImpl cm = createContainerManager(context);
     cm.init(conf);
     cm.start();
@@ -207,27 +206,8 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
     assertFalse(context.getApplicationACLsManager().checkAccess(
         UserGroupInformation.createRemoteUser(enemyUser),
         ApplicationAccessType.VIEW_APP, appUser, appId));
-    if (((NMContext) context).isHopsTLSEnabled()) {
-      // User is the app attempt
-      X509SecurityMaterial x509 = context.getCertificateLocalizationService()
-          .getX509MaterialLocation(attemptId.toString(), appId.toString());
-      assertNotNull(x509);
-      assertEquals(keystoresPassword, x509.getKeyStorePass());
-      assertEquals(0, app.getX509Version());
-    }
-    
-    if (((NMContext) context).isJWTEnabled()) {
-      JWTSecurityMaterial jwtMaterial = context.getCertificateLocalizationService()
-          .getJWTMaterialLocation(attemptId.toString(), appId.toString());
-      assertNotNull(jwtMaterial);
-      assertEquals(jwt, jwtMaterial.getToken());
-      assertEquals(0L, app.getJWTExpiration());
-    }
-    
+
     // reset container manager and verify app recovered with proper acls
-    if (certificateLocalizationService != null) {
-      certificateLocalizationService.stop();
-    }
     cm.stop();
     context = createContext(conf, stateStore);
     cm = createContainerManager(context);
@@ -263,22 +243,6 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
     assertFalse(context.getApplicationACLsManager().checkAccess(
         UserGroupInformation.createRemoteUser(enemyUser),
         ApplicationAccessType.VIEW_APP, appUser, appId));
-    if (((NMContext) context).isHopsTLSEnabled()) {
-      // User is the app attempt
-      X509SecurityMaterial x509 = context.getCertificateLocalizationService()
-          .getX509MaterialLocation(attemptId.toString(), appId.toString());
-      assertNotNull(x509);
-      assertEquals(keystoresPassword, x509.getKeyStorePass());
-      assertEquals(0, app.getX509Version());
-    }
-  
-    if (((NMContext) context).isJWTEnabled()) {
-      JWTSecurityMaterial jwtMaterial = context.getCertificateLocalizationService()
-          .getJWTMaterialLocation(attemptId.toString(), appId.toString());
-      assertNotNull(jwtMaterial);
-      assertEquals(jwt, jwtMaterial.getToken());
-      assertEquals(0L, app.getJWTExpiration());
-    }
 
     // simulate application completion
     List<ApplicationId> finishedApps = new ArrayList<ApplicationId>();
@@ -289,9 +253,6 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
 
     // restart and verify app is marked for finishing
     cm.stop();
-    if (certificateLocalizationService != null) {
-      certificateLocalizationService.stop();
-    }
     context = createContext(conf, stateStore);
     cm = createContainerManager(context);
     cm.init(conf);
@@ -326,41 +287,12 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
 
     // restart and verify app is no longer present after recovery
     cm.stop();
-    if (certificateLocalizationService != null) {
-      certificateLocalizationService.stop();
-    }
     context = createContext(conf, stateStore);
     cm = createContainerManager(context);
     cm.init(conf);
     cm.start();
     assertTrue(context.getApplications().isEmpty());
-    if (((NMContext) context).isHopsTLSEnabled()) {
-      boolean materialFound = true;
-      try {
-        context.getCertificateLocalizationService()
-            .getX509MaterialLocation(attemptId.toString(), appId.toString());
-      } catch (FileNotFoundException ex) {
-        LOG.info("Exception here is normal");
-        materialFound = false;
-      }
-      assertFalse(materialFound);
-    }
-    
-    if (((NMContext) context).isJWTEnabled()) {
-      boolean materialFound = true;
-      try {
-        context.getCertificateLocalizationService()
-            .getJWTMaterialLocation(attemptId.toString(), appId.toString());
-      } catch (FileNotFoundException ex) {
-        LOG.info("Exception here is normal");
-        materialFound = false;
-      }
-      assertFalse(materialFound);
-    }
     cm.stop();
-    if (certificateLocalizationService != null) {
-      certificateLocalizationService.stop();
-    }
   }
 
   @Test
@@ -625,7 +557,26 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
     };
   }
 
-  private StartContainersResponse startContainer(final Context context,
+  private NMContext createContext(Configuration conf,
+      NMStateStoreService stateStore) {
+    NMContext context = new NMContext(new NMContainerTokenSecretManager(
+        conf), new NMTokenSecretManagerInNM(), null,
+        new ApplicationACLsManager(conf), stateStore){
+      public int getHttpPort() {
+        return HTTP_PORT;
+      }
+    };
+    // simulate registration with RM
+    MasterKey masterKey = new MasterKeyPBImpl();
+    masterKey.setKeyId(123);
+    masterKey.setBytes(ByteBuffer.wrap(new byte[] { new Integer(123)
+      .byteValue() }));
+    context.getContainerTokenSecretManager().setMasterKey(masterKey);
+    context.getNMTokenSecretManager().setMasterKey(masterKey);
+    return context;
+  }
+
+  private StartContainersResponse startContainer(Context context,
       final ContainerManagerImpl cm, ContainerId cid,
       ContainerLaunchContext clc, LogAggregationContext logAggregationContext)
           throws Exception {
@@ -646,20 +597,8 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
     return user.doAs(new PrivilegedExceptionAction<StartContainersResponse>() {
       @Override
       public StartContainersResponse run() throws Exception {
-        StartContainersRequest startContainersRequest =
-            StartContainersRequest.newInstance(scReqList);
-        if (((NMContext) context).isHopsTLSEnabled()) {
-          ByteBuffer kstore = ByteBuffer.wrap(keystoresContent.getBytes());
-          startContainersRequest.setKeyStore(kstore);
-          startContainersRequest.setKeyStorePassword(keystoresPassword);
-          startContainersRequest.setTrustStore(kstore);
-          startContainersRequest.setTrustStorePassword(keystoresPassword);
-        }
-        
-        if (((NMContext) context).isJWTEnabled()) {
-          startContainersRequest.setJWT(jwt);
-        }
-        return cm.startContainers(startContainersRequest);
+        return cm.startContainers(
+            StartContainersRequest.newInstance(scReqList));
       }
     });
   }
@@ -726,7 +665,7 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
     }
     assertEquals(state, app.getApplicationState());
   }
-  
+
   private ContainerManagerImpl createContainerManager(Context context) {
     final LogHandler logHandler = mock(LogHandler.class);
     final ResourceLocalizationService rsrcSrv =
@@ -734,57 +673,57 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
           @Override
           public void serviceInit(Configuration conf) throws Exception {
           }
-          
+
           @Override
           public void serviceStart() throws Exception {
             // do nothing
           }
-          
+
           @Override
           public void serviceStop() throws Exception {
             // do nothing
           }
-          
+
           @Override
           public void handle(LocalizationEvent event) {
             // do nothing
           }
-        };
-    
+    };
+
     final ContainersLauncher launcher = new ContainersLauncher(context, null,
         null, null, null) {
-      @Override
-      public void handle(ContainersLauncherEvent event) {
-        // do nothing
-      }
+          @Override
+          public void handle(ContainersLauncherEvent event) {
+            // do nothing
+          }
     };
-    
+
     return new ContainerManagerImpl(context,
         mock(ContainerExecutor.class), mock(DeletionService.class),
         mock(NodeStatusUpdater.class), metrics, null) {
-      @Override
-      protected LogHandler createLogHandler(Configuration conf,
-          Context context, DeletionService deletionService) {
-        return logHandler;
-      }
-      
-      @Override
-      protected ResourceLocalizationService createResourceLocalizationService(
-          ContainerExecutor exec, DeletionService deletionContext, Context context) {
-        return rsrcSrv;
-      }
-      
-      @Override
-      protected ContainersLauncher createContainersLauncher(
-          Context context, ContainerExecutor exec) {
-        return launcher;
-      }
-      
-      @Override
-      public void setBlockNewContainerRequests(
-          boolean blockNewContainerRequests) {
-        // do nothing
-      }
+          @Override
+          protected LogHandler createLogHandler(Configuration conf,
+              Context context, DeletionService deletionService) {
+            return logHandler;
+          }
+
+          @Override
+          protected ResourceLocalizationService createResourceLocalizationService(
+              ContainerExecutor exec, DeletionService deletionContext, Context context) {
+            return rsrcSrv;
+          }
+
+          @Override
+          protected ContainersLauncher createContainersLauncher(
+              Context context, ContainerExecutor exec) {
+            return launcher;
+          }
+
+          @Override
+          public void setBlockNewContainerRequests(
+              boolean blockNewContainerRequests) {
+            // do nothing
+          }
     };
   }
 }

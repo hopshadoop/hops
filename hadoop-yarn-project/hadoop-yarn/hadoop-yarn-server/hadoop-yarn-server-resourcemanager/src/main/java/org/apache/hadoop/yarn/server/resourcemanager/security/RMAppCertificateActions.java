@@ -15,19 +15,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.nodemanager;
+package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
-public abstract class CMgrUpdateSecurityMaterialEvent extends ContainerManagerEvent {
-  private final ContainerId containerId;
-  
-  public CMgrUpdateSecurityMaterialEvent(ContainerId containerId) {
-    super(ContainerManagerEventType.UPDATE_CRYPTO_MATERIAL);
-    this.containerId = containerId;
-  }
-  
-  public ContainerId getContainerId() {
-    return containerId;
-  }
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.security.GeneralSecurityException;
+import java.security.cert.X509Certificate;
+
+public interface RMAppCertificateActions {
+  void init() throws MalformedURLException, GeneralSecurityException;
+  RMAppCertificateManager.CertificateBundle sign(PKCS10CertificationRequest csr) throws URISyntaxException, IOException, GeneralSecurityException;
+  int revoke(String certificateIdentifier) throws URISyntaxException, IOException, GeneralSecurityException;
 }

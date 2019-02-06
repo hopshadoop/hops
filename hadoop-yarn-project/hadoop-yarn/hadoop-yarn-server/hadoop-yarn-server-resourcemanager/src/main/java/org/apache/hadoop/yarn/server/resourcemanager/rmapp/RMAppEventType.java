@@ -25,8 +25,8 @@ public enum RMAppEventType {
   KILL,
   MOVE, // Move app to a new queue
 
-  // Source: RMAppSecurityManager
-  SECURITY_MATERIAL_GENERATED,
+  // Source: RMAppCertificateManager
+  CERTS_GENERATED,
   CERTS_RENEWED,
   
   // Source: Scheduler and RMAppManager

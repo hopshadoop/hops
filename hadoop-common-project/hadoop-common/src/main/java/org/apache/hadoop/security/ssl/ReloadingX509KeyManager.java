@@ -285,7 +285,6 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
           if (hasFailed()) {
             numberOfFailures = 0;
             backOff.reset();
-            backOffTimeout = 0L;
           }
         } catch (Exception ex) {
           backOffTimeout = backOff.getBackOffInMillis();

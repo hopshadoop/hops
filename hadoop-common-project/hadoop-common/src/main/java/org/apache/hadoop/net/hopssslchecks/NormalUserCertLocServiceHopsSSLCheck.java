@@ -21,10 +21,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
-import org.apache.hadoop.security.ssl.X509SecurityMaterial;
+import org.apache.hadoop.security.ssl.CryptoMaterial;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Checks for crypto material information provided by the CertificateLocalizationService of RM or NM
@@ -49,7 +50,7 @@ public class NormalUserCertLocServiceHopsSSLCheck extends AbstractHopsSSLCheck {
           if (appId == null) {
             throw new IOException("UserGroupInformation does NOT contain the Application ID");
           }
-          X509SecurityMaterial material = certificateLocalization.getX509MaterialLocation(username, appId);
+          CryptoMaterial material = certificateLocalization.getMaterialLocation(username, appId);
           
           return new HopsSSLCryptoMaterial(
               material.getKeyStoreLocation().toString(),

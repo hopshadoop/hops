@@ -83,9 +83,8 @@ public class TestProtocolRecords {
           ContainerState.RUNNING, Resource.newInstance(1024, 1, 2), "diagnostics",
           0, Priority.newInstance(10), 1234);
     List<NMContainerStatus> reports = Arrays.asList(containerReport);
-    Map<ApplicationId, UpdatedCryptoForApp> runningApplications = new HashMap<>(1);
-    UpdatedCryptoForApp upc = UpdatedCryptoForApp.newInstance(1, 1L);
-    runningApplications.put(appId, upc);
+    Map<ApplicationId, Integer> runningApplications = new HashMap<>(1);
+    runningApplications.put(appId, 0);
     RegisterNodeManagerRequest request =
         RegisterNodeManagerRequest.newInstance(
           NodeId.newInstance("1.1.1.1", 1000), 8080,
@@ -104,9 +103,6 @@ public class TestProtocolRecords {
       requestProto.getResource());
     Assert.assertEquals(1, requestProto.getRunningApplications().size());
     Assert.assertNotNull(requestProto.getRunningApplications().get(appId));
-    upc = requestProto.getRunningApplications().get(appId);
-    Assert.assertEquals(1, upc.getVersion());
-    Assert.assertEquals(1L, upc.getJWTExpiration());
   }
 
   @Test

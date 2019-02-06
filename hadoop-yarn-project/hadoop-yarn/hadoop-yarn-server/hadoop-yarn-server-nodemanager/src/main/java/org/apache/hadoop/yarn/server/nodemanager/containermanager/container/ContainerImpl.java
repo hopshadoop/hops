@@ -40,7 +40,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.Credentials;
-import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
@@ -136,7 +135,6 @@ public class ContainerImpl implements Container {
   private File keyStoreLocalizedPath = null;
   private File trustStoreLocalizedPath = null;
   private File passwordFileLocalizedPath = null;
-  private File jwtLocalizedPath = null;
 
   public ContainerImpl(Configuration conf, Dispatcher dispatcher,
       ContainerLaunchContext launchContext, Credentials creds,
@@ -595,13 +593,8 @@ public class ContainerImpl implements Container {
     return passwordFileLocalizedPath;
   }
   
-  public synchronized File getJWTLocalizedPath() {
-    return jwtLocalizedPath;
-  }
-  
   public synchronized void identifyCryptoMaterialLocation() {
-    if (keyStoreLocalizedPath == null || trustStoreLocalizedPath == null || passwordFileLocalizedPath == null
-        || jwtLocalizedPath == null) {
+    if (keyStoreLocalizedPath == null || trustStoreLocalizedPath == null || passwordFileLocalizedPath == null) {
       for (Map.Entry<Path, List<String>> localizedResource : localizedResources.entrySet()) {
         if (keyStoreLocalizedPath == null &&
             localizedResource.getValue().contains(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME)) {
@@ -615,12 +608,7 @@ public class ContainerImpl implements Container {
             localizedResource.getValue().contains(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME)) {
           passwordFileLocalizedPath = new File(localizedResource.getKey().toString());
         }
-        if (jwtLocalizedPath == null &&
-            localizedResource.getValue().contains(JWTSecurityMaterial.JWT_LOCAL_RESOURCE_FILE)) {
-          jwtLocalizedPath = new File(localizedResource.getKey().toString());
-        }
-        if (keyStoreLocalizedPath != null && trustStoreLocalizedPath != null && passwordFileLocalizedPath != null
-            && jwtLocalizedPath != null) {
+        if (keyStoreLocalizedPath != null && trustStoreLocalizedPath != null && passwordFileLocalizedPath != null) {
           break;
         }
       }

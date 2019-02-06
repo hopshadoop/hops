@@ -115,8 +115,7 @@ public class MockNodes {
     private Set<String> labels;
     private ResourceUtilization containersUtilization;
     private ResourceUtilization nodeUtilization;
-    private Map<ApplicationId, UpdatedCryptoForApp> x509MaterialToUpdate = new ConcurrentHashMap<>();
-    private Map<ApplicationId, UpdatedCryptoForApp> jwtMaterialToUpdate = new ConcurrentHashMap<>();
+    private Map<ApplicationId, UpdatedCryptoForApp> appCryptoMaterialToUpdate = new ConcurrentHashMap<>();
 
     public MockRMNodeImpl(NodeId nodeId, String nodeAddr, String httpAddress,
         Resource perNode, String rackName, String healthReport,
@@ -275,13 +274,8 @@ public class MockNodes {
     }
   
     @Override
-    public Map<ApplicationId, UpdatedCryptoForApp> getAppX509ToUpdate() {
-      return x509MaterialToUpdate;
-    }
-    
-    @Override
-    public Map<ApplicationId, UpdatedCryptoForApp> getAppJWTToUpdate() {
-      return jwtMaterialToUpdate;
+    public Map<ApplicationId, UpdatedCryptoForApp> getAppCryptoMaterialToUpdate() {
+      return appCryptoMaterialToUpdate;
     }
   };
 

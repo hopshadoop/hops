@@ -129,7 +129,7 @@ public class TestRMAppLogAggregationStatus {
     this.rmContext.getRMApps().put(appId, rmApp);
     rmApp.handle(new RMAppEvent(this.appId, RMAppEventType.START));
     rmApp.handle(new RMAppEvent(this.appId, RMAppEventType.APP_NEW_SAVED));
-    rmApp.handle(new RMAppEvent(this.appId, RMAppEventType.SECURITY_MATERIAL_GENERATED));
+    rmApp.handle(new RMAppEvent(this.appId, RMAppEventType.CERTS_GENERATED));
     rmApp.handle(new RMAppEvent(this.appId, RMAppEventType.APP_ACCEPTED));
 
     // This application will be running on two nodes

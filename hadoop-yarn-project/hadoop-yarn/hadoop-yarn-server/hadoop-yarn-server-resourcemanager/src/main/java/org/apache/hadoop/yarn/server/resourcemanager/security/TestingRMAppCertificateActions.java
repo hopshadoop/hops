@@ -18,12 +18,10 @@
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
 import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.apache.log4j.spi.NOPLogger;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.BasicConstraints;
@@ -50,10 +48,9 @@ import java.security.KeyPairGenerator;
 import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Date;
-import java.util.Random;
 
-public class TestingRMAppSecurityActions implements RMAppSecurityActions, Configurable {
-  private final static Logger LOG = LogManager.getLogger(TestingRMAppSecurityActions.class);
+public class TestingRMAppCertificateActions implements RMAppCertificateActions, Configurable {
+  private final static Logger LOG = LogManager.getLogger(TestingRMAppCertificateActions.class);
   
   private final static String KEY_ALGORITHM = "RSA";
   private final static String SIGNATURE_ALGORITHM = "SHA256withRSA";
@@ -64,7 +61,7 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   private ContentSigner sigGen;
   private Configuration conf;
   
-  public TestingRMAppSecurityActions() {
+  public TestingRMAppCertificateActions() {
   }
   
   public X509Certificate getCaCert() {
@@ -98,12 +95,6 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   }
   
   @Override
-  public void destroy() {
-    // Nothing to do here
-    LOG.debug("Nothing to do here");
-  }
-  
-  @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
   }
@@ -114,7 +105,7 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   }
   
   @Override
-  public X509SecurityHandler.CertificateBundle sign(PKCS10CertificationRequest csr)
+  public RMAppCertificateManager.CertificateBundle sign(PKCS10CertificationRequest csr)
       throws URISyntaxException, IOException, GeneralSecurityException {
     JcaPKCS10CertificationRequest jcaRequest = new JcaPKCS10CertificationRequest(csr);
     X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(caCert,
@@ -132,31 +123,12 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
         .addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
     X509Certificate certificate = new JcaX509CertificateConverter().setProvider("BC")
         .getCertificate(certBuilder.build(sigGen));
-    return new X509SecurityHandler.CertificateBundle(certificate, caCert);
+    return new RMAppCertificateManager.CertificateBundle(certificate, caCert);
   }
   
   @Override
   public int revoke(String certificateIdentifier) throws URISyntaxException, IOException {
     LOG.info("Revoking certificate " + certificateIdentifier);
     return HttpStatus.SC_OK;
-  }
-  
-  @Override
-  public String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter)
-    throws URISyntaxException, IOException {
-    return RandomStringUtils.randomAlphanumeric(16);
-  }
-  
-  @Override
-  public void invalidateJWT(String signingKeyName) throws URISyntaxException, IOException {
-    // Nothing to do
-    LOG.info("Invalidating JWT signing key " + signingKeyName);
-  }
-  
-  @Override
-  public String renewJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws URISyntaxException, IOException {
-    // Nothing to do
-    LOG.info("Renewing JWT " + jwtParameter.getAppUser() + "/" + jwtParameter.getApplicationId());
-    return RandomStringUtils.randomAlphanumeric(16);
   }
 }

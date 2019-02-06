@@ -64,7 +64,6 @@ import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
-import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.resourcemanager.Application;
 import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
@@ -283,8 +282,8 @@ public class TestAMRMClientOnRMRestart {
         NMContainerStatus.newInstance(containerId, 0, ContainerState.RUNNING,
             Resource.newInstance(1024, 1), "recover container", 0,
             Priority.newInstance(0), 0);
-    Map<ApplicationId, UpdatedCryptoForApp> runningApps = new HashMap<>(1);
-    runningApps.put(containerId.getApplicationAttemptId().getApplicationId(), UpdatedCryptoForApp.newInstance(0, 0));
+    Map<ApplicationId, Integer> runningApps = new HashMap<>(1);
+    runningApps.put(containerId.getApplicationAttemptId().getApplicationId(), 0);
     nm1.registerNode(Collections.singletonList(containerReport), runningApps);
     nm1.nodeHeartbeat(true);
     dispatcher.await();

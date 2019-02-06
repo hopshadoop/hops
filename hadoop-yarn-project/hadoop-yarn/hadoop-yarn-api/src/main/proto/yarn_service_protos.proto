@@ -297,7 +297,6 @@ message StartContainersRequestProto {
   optional string key_store_password = 3;
   optional bytes trust_store = 4;
   optional string trust_store_password = 5;
-  optional string jwt = 6;
 }
 
 message ContainerExceptionMapProto {

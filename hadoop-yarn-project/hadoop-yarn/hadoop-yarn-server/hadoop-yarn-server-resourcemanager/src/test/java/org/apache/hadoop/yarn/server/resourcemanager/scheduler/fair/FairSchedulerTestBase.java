@@ -51,6 +51,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
+import org.apache.hadoop.yarn.util.Clock;
 
 public class FairSchedulerTestBase {
   public final static String TEST_DIR =
@@ -235,10 +236,10 @@ public class FairSchedulerTestBase {
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);
     event = new RMAppEvent(appId, RMAppEventType.APP_NEW_SAVED);
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);
-    // Application will also receive a SECURITY_MATERIAL_GENERATED event from RMAppCertificateManager later in
+    // Application will also receive a CERTS_GENERATED event from RMAppCertificateManager later in
     // an invalid RMApp state. Since the following call is blocking, and needs to send a Scheduler event
-    // it is OK to handle SECURITY_MATERIAL_GENERATED here also
-    event = new RMAppEvent(appId, RMAppEventType.SECURITY_MATERIAL_GENERATED);
+    // it is OK to handle CERTS_GENERATED here also
+    event = new RMAppEvent(appId, RMAppEventType.CERTS_GENERATED);
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);
     event = new RMAppEvent(appId, RMAppEventType.APP_ACCEPTED);
     resourceManager.getRMContext().getRMApps().get(appId).handle(event);
