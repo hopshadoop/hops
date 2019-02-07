@@ -36,7 +36,8 @@ message ActiveNodeProto {
   optional string serviceIpAddress = 5;
   optional int32 servicePort = 6;
   optional string httpAddress = 7;
-  extensions 8 to 8;
+  optional int32 locationDomainId = 8;
+  extensions 9 to 9;
 }
 
 message SortedActiveNodeListProto{

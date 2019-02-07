@@ -176,7 +176,7 @@ public class LETransaction {
         context.id = getNewNamenondeID();
         LeDescriptor newDescriptor = leFactory
             .getNewDescriptor(context.id, 0/*counter*/, context.rpc_addresses,
-                context.http_address);
+                context.http_address, context.locationDomainId);
         EntityManager.add(newDescriptor);
         if (oldId != LeaderElection.LEADER_INITIALIZATION_ID) {
           LOG.warn( "LE Status: id " + context.id + " I was kicked out. Old Id was " + oldId);
@@ -355,7 +355,7 @@ public class LETransaction {
       String httpAddress = l.getHttpAddress();
       ActiveNode ann =
           new ActiveNodePBImpl(l.getId(), l.getRpcAddresses(), hostName[0], port[0],
-              httpAddress, hostName[1], port[1]);
+              httpAddress, hostName[1], port[1], l.getLocationDomainId());
       activeNameNodeList.add(ann);
     }
 

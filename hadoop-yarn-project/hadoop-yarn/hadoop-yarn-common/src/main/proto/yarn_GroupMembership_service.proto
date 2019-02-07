@@ -26,7 +26,7 @@ package hops.yarnGroupMembership;
 import "ActiveNode.proto";
 
 extend hadoop.common.ActiveNodeProto {
-  optional int64 load = 8;
+  optional int64 load = 9;
 }
 
 service GroupMembershipService {

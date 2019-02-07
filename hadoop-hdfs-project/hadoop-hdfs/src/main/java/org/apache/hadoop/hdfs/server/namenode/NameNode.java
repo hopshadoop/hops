@@ -1369,7 +1369,8 @@ public class NameNode implements NameNodeStatusMXBean {
     leaderElection =
         new LeaderElection(new HdfsLeDescriptorFactory(), leadercheckInterval,
             missedHeartBeatThreshold, leIncrement, httpAddress,
-            rpcAddresses);
+            rpcAddresses, (byte) conf.getInt(DFSConfigKeys.DFS_LOCATION_DOMAIN_ID,
+            DFSConfigKeys.DFS_LOCATION_DOMAIN_ID_DEFAULT));
     leaderElection.start();
 
     try {

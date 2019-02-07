@@ -36,5 +36,7 @@ public interface ActiveNode extends Comparable<ActiveNode> {
   public InetSocketAddress getRpcServerAddressForDatanodes();
 
   public String getHttpAddress();
+  
+  public int getLocationDomainId();
 
 }

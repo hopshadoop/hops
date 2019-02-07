@@ -52,6 +52,9 @@ public class HopsRandomStickyFailoverProxyProvider<T> implements
   private final Configuration conf;
   private final List<AddressRpcProxyPair<T>> proxies =
           new ArrayList<AddressRpcProxyPair<T>>();
+  private final Map<Integer, List<AddressRpcProxyPair<T>>> proxiesByDomainId =
+      new HashMap();
+  
   private final UserGroupInformation ugi;
   private final Class<T> xface;
   private final Random rand = new Random((UUID.randomUUID()).hashCode());
@@ -60,7 +63,9 @@ public class HopsRandomStickyFailoverProxyProvider<T> implements
   protected String name = this.getClass().getSimpleName()+" ("+this.hashCode()+") ";
 
   protected int currentProxyIndex = -1;
-
+  
+  private final int locationDomainId;
+  
   public HopsRandomStickyFailoverProxyProvider(Configuration conf, URI uri,
                                                Class<T> xface) {
     Preconditions.checkArgument(
@@ -82,7 +87,10 @@ public class HopsRandomStickyFailoverProxyProvider<T> implements
     this.conf.setInt(
             CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY,
             maxRetriesOnSocketTimeouts);
-
+    
+    this.locationDomainId = conf.getInt(DFSConfigKeys.DFS_LOCATION_DOMAIN_ID,
+        DFSConfigKeys.DFS_LOCATION_DOMAIN_ID_DEFAULT);
+    
     try {
       ugi = UserGroupInformation.getCurrentUser();
 
@@ -175,6 +183,18 @@ public class HopsRandomStickyFailoverProxyProvider<T> implements
   }
 
   private void setRandProxyIndex() {
+    if(locationDomainId != DFSConfigKeys.DFS_LOCATION_DOMAIN_ID_DEFAULT){
+      List<AddressRpcProxyPair<T>> domainProxies =
+          proxiesByDomainId.get(locationDomainId);
+      if(domainProxies != null && !domainProxies.isEmpty()){
+        int randomNN = rand.nextInt(domainProxies.size());
+        currentProxyIndex = domainProxies.get(randomNN).index;
+        LOG.debug(name + " random proxy index is set to: " + currentProxyIndex + " NN address: " + proxies
+            .get(currentProxyIndex).address + " LocationDomainId: " + locationDomainId);
+        return;
+      }
+    }
+    
     if(proxies.size()>0) {
       currentProxyIndex = rand.nextInt(proxies.size());
       LOG.debug(name + " random proxy index is set to: " + currentProxyIndex + " NN address: " + proxies
@@ -186,9 +206,19 @@ public class HopsRandomStickyFailoverProxyProvider<T> implements
   void updateProxies(List<ActiveNode> anl) throws IOException {
     if (anl != null) {
       this.close(); // close existing proxies
+      int index = 0;
       for (ActiveNode node : anl) {
-        AddressRpcProxyPair<T> pair = new AddressRpcProxyPair<T>(node.getRpcServerAddressForClients());
+        AddressRpcProxyPair<T> pair =
+            new AddressRpcProxyPair<T>(node.getRpcServerAddressForClients(),
+                index);
         proxies.add(pair);
+        
+        if(!proxiesByDomainId.containsKey(node.getLocationDomainId())){
+          proxiesByDomainId.put(node.getLocationDomainId(),
+              new ArrayList<AddressRpcProxyPair<T>>());
+        }
+        proxiesByDomainId.get(node.getLocationDomainId()).add(pair);
+        index++;
       }
 
       LOG.debug(name+" new set of proxies are: "+ Arrays.toString(anl.toArray()));

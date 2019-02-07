@@ -38,9 +38,11 @@ public class FailoverProxyHelper {
   protected static class AddressRpcProxyPair<T> {
     public InetSocketAddress address;
     public T namenode;
-
-    public AddressRpcProxyPair(InetSocketAddress address) {
+    public int index;
+    
+    public AddressRpcProxyPair(InetSocketAddress address, int index) {
       this.address = address;
+      this.index = index;
     }
 
     @Override

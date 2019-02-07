@@ -39,7 +39,8 @@ public class LEContext {
   protected long time_period_increment;
   protected boolean nextTimeTakeStrongerLocks;
   protected List<LeDescriptor> removedNodes; //nodes removed during this round
-
+  protected byte locationDomainId;
+  
   private LEContext() {
   }
 
@@ -55,7 +56,8 @@ public class LEContext {
     http_address = context.http_address;
     time_period_increment = context.time_period_increment;
     nextTimeTakeStrongerLocks = context.nextTimeTakeStrongerLocks;
-
+    locationDomainId = context.locationDomainId;
+    
     //clone history
     history = new ArrayList<HashMap<Long, LeDescriptor>>();
     if (!context.history.isEmpty()) {
