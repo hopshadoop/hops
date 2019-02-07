@@ -1910,4 +1910,18 @@
   </description>
 </property>
 
+  <property>
+    <name>dfs.locationDomainId</name>
+    <value>0</value>
+    <description> Assign a namenode to a specific availability
+      domain (availability zone). The client uses this information to
+      preferably choose a namenode from its availability domain (have the same
+      locationDomainId), otherwise it will pick up a random namenode. The
+      locationDomainIds has to be the same as the ones set in the NDB
+      datanodes to enforce communications between namenodes and NDB datanodes
+      in the same availability domain. This feature is disabled by default by
+      setting its value to 0.
+    </description>
+  </property>
+
 </configuration>

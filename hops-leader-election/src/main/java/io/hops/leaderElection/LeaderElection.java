@@ -49,10 +49,20 @@ public class LeaderElection extends Thread {
   private boolean relinquishCurrentId = false;
   private final LeDescriptorFactory leFactory;
   private List<FailedNodeLeDescriptor> deadNodes;
-
+  
   public LeaderElection(final LeDescriptorFactory leFactory,
       final long time_period, final int max_missed_hb_threshold,
-      final long time_period_increment, String http_address, String rpc_addresses)
+      final long time_period_increment, String http_address,
+      String rpc_addresses) throws IOException{
+    this(leFactory, time_period, max_missed_hb_threshold,
+        time_period_increment, http_address, rpc_addresses,
+        LeDescriptor.DEFAULT_LOCATION_DOMAIN_ID);
+  }
+  
+  public LeaderElection(final LeDescriptorFactory leFactory,
+      final long time_period, final int max_missed_hb_threshold,
+      final long time_period_increment, String http_address,
+      String rpc_addresses, byte locationDomainId)
       throws IOException {
     context = LEContext.initialContext();
     context.init_phase = true;
@@ -61,6 +71,7 @@ public class LeaderElection extends Thread {
     context.rpc_addresses = rpc_addresses;
     context.http_address = http_address;
     context.time_period_increment = time_period_increment;
+    context.locationDomainId = locationDomainId;
     this.leFactory = leFactory;
     this.deadNodes = new ArrayList<FailedNodeLeDescriptor>();
     initialize();

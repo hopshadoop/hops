@@ -17,6 +17,7 @@ package io.hops.leader_election.node;
 
 import io.hops.leader_election.proto.ActiveNodeProtos.ActiveNodeProto;
 import io.hops.leader_election.proto.ActiveNodeProtos.ActiveNodeProtoOrBuilder;
+import io.hops.metadata.election.entity.LeDescriptor;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -41,11 +42,19 @@ public class ActiveNodePBImpl implements ActiveNode {
             proto.getRpcPort(),
             proto.getHttpAddress(),
             proto.getServiceIpAddress(),
-            proto.getServicePort());
+            proto.getServicePort(),
+            proto.getLocationDomainId());
   }
-
+  
   public ActiveNodePBImpl(long id, String hostname, String ipAddress, int port,
       String httpAddress, String serviceRpcIp, int serviceRpcPort) {
+    this(id, hostname, ipAddress, port, httpAddress, serviceRpcIp,
+        serviceRpcPort, LeDescriptor.DEFAULT_LOCATION_DOMAIN_ID);
+  }
+  
+  public ActiveNodePBImpl(long id, String hostname, String ipAddress, int port,
+      String httpAddress, String serviceRpcIp, int serviceRpcPort,
+      int locationDomainId) {
     maybeInitBuilder();
     builder.setId(id);
     builder.setRpcHostname(hostname);
@@ -54,6 +63,7 @@ public class ActiveNodePBImpl implements ActiveNode {
     builder.setHttpAddress(httpAddress);
     builder.setServiceIpAddress(serviceRpcIp);
     builder.setServicePort(serviceRpcPort);
+    builder.setLocationDomainId(locationDomainId);
   }
 
   public ActiveNodeProto getProto() {
@@ -127,7 +137,13 @@ public class ActiveNodePBImpl implements ActiveNode {
     ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
     return p.getHttpAddress();
   }
-
+  
+  @Override
+  public int getLocationDomainId() {
+    ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getLocationDomainId();
+  }
+  
   public void setHttpAddress(String httpAddress) {
     maybeInitBuilder();
     builder.setHttpAddress(httpAddress);
