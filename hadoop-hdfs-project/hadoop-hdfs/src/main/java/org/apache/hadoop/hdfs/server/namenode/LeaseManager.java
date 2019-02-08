@@ -618,6 +618,10 @@ public class LeaseManager {
                 try {
                   INodesInPath iip = fsnamesystem.getFSDirectory().getINodesInPath(p.getPath(),
                       true);
+                  if(iip == null || iip.getLastINode() == null){
+                    removing.add(p);
+                    continue;
+                  }
                   boolean completed = fsnamesystem.internalReleaseLease(leaseToCheck, p.getPath(),
                           iip, HdfsServerConstants.NAMENODE_LEASE_HOLDER);
                   if (LOG.isDebugEnabled()) {
