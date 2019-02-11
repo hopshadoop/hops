@@ -36,6 +36,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
@@ -73,11 +74,16 @@ public class TestHopsUtil {
   public void testGenerateContainerSSLServer() throws Exception {
     Configuration systemConf = new Configuration(false);
     Map<String, String> expected = new HashMap<>();
-    File passwdFile = Paths.get(BASE_DIR_FILE.getAbsolutePath(),
-        HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME).toFile();
+    Path passwdFilePath = Paths.get(BASE_DIR_FILE.getAbsolutePath(),
+        HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+    File passwdFile = passwdFilePath.toFile();
     String password = "password";
     FileUtils.writeStringToFile(passwdFile, password);
-    
+
+    String keyStorePasswordFileKey = FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+        FileBasedKeyStoresFactory.SSL_PASSWORDFILE_LOCATION_TPL_KEY);
+    expected.put(keyStorePasswordFileKey, HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+
     String keyStorePasswordKey = FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY);
     expected.put(keyStorePasswordKey, password);
@@ -128,13 +134,16 @@ public class TestHopsUtil {
     
     assertSSLConfValues(expected, sslConf);
   }
-  
+
   @Test
   public void testGenerateContainerSSLServerConfDefaults() throws IOException {
     Configuration systemConf = new Configuration(false);
-    File passwdFile = Paths.get(BASE_DIR_FILE.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME).toFile();
+    Path passwdFilePath = Paths.get(BASE_DIR_FILE.getAbsolutePath(),
+        HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+    File passwdFile = passwdFilePath.toFile();
     String password = "password";
     FileUtils.writeStringToFile(passwdFile, password);
+
     HopsUtil.generateContainerSSLServerConfiguration(passwdFile, systemConf);
     File sslServerConf = Paths.get(BASE_DIR_FILE.getAbsolutePath(), "ssl-server.xml").toFile();
     Assert.assertTrue(sslServerConf.exists());
@@ -146,32 +155,35 @@ public class TestHopsUtil {
         SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
             .SSL_KEYSTORE_LOCATION_TPL_KEY),
         HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
-   expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-       SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-           .SSL_TRUSTSTORE_LOCATION_TPL_KEY),
-       HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
-   expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-       SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-           .SSL_KEYSTORE_PASSWORD_TPL_KEY), password);
-   expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-       SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-           .SSL_KEYSTORE_KEYPASSWORD_TPL_KEY), password);
-   expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-       SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-           .SSL_TRUSTSTORE_PASSWORD_TPL_KEY), password);
-   expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-       SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-           .SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY),
-       String.valueOf(FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_INTERVAL));
-   expected.put(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-       FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_TIMEUNIT_TPL_KEY),
-       FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_TIMEUNIT);
-   expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-       SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-           .SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY),
-       String.valueOf(FileBasedKeyStoresFactory
-           .DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL));
-   
+    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
+        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
+            .SSL_TRUSTSTORE_LOCATION_TPL_KEY),
+        HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
+        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
+            .SSL_KEYSTORE_PASSWORD_TPL_KEY), password);
+    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
+        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
+            .SSL_KEYSTORE_KEYPASSWORD_TPL_KEY), password);
+    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
+        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
+            .SSL_TRUSTSTORE_PASSWORD_TPL_KEY), password);
+    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
+        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
+            .SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY),
+        String.valueOf(FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_INTERVAL));
+    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+        FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_TIMEUNIT_TPL_KEY),
+        FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_TIMEUNIT);
+    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
+        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
+            .SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY),
+        String.valueOf(FileBasedKeyStoresFactory
+            .DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL));
+    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+        FileBasedKeyStoresFactory.SSL_PASSWORDFILE_LOCATION_TPL_KEY),
+        HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+
     assertSSLConfValues(expected, sslConf);
   }
   

@@ -220,4 +220,55 @@ public class TestReloadingX509KeyManager {
       keyManager.stop();
     }
   }
+
+  @Test
+  public void testReloadWithPasswordfile() throws Exception {
+    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(KEY_PAIR_ALGORITHM);
+    X509Certificate cert1 = KeyStoreTestUtil.generateCertificate("CN=cert1", keyPair, 2, CERTIFICATE_ALGORITHM);
+
+    String keyStoreLocation = Paths.get(BASE_DIR, "testKeystore.jks").toString();
+    KeyStoreTestUtil.createKeyStore(keyStoreLocation, KEYSTORE_PASSWORD, "cert1", keyPair.getPrivate(), cert1);
+
+    String passwordFileLocation = Paths.get(BASE_DIR, "password_file").toString();
+    FileUtils.write(new File(passwordFileLocation), KEYSTORE_PASSWORD);
+
+    ReloadingX509KeyManager keyManager = new ReloadingX509KeyManager("jks", keyStoreLocation, "wrong-password",
+       passwordFileLocation, "wrong-password", 10, TimeUnit.MILLISECONDS);
+
+    try {
+      keyManager.init();
+
+      TimeUnit reloadTimeUnit = keyManager.getReloadTimeUnit();
+      long reloadInterval = keyManager.getReloadInterval();
+
+      X509Certificate[] certChain = keyManager.getCertificateChain("cert1");
+      assertNotNull("Certificate chain should not be null for alias cert1", certChain);
+      assertEquals("Certificate chain should be 1", 1, certChain.length);
+      assertEquals("DN for cert1 should be CN=cert1", cert1.getSubjectDN().getName(),
+          certChain[0].getSubjectDN().getName());
+
+      // Wait a bit for the modification time to be different
+      reloadTimeUnit.sleep(reloadInterval);
+      TimeUnit.SECONDS.sleep(1);
+
+      // Replace keystore with a new one with a different DN
+      X509Certificate cert2 = KeyStoreTestUtil.generateCertificate("CN=cert2", keyPair, 2, CERTIFICATE_ALGORITHM);
+      String newKeystorePassword = "password1";
+      KeyStoreTestUtil.createKeyStore(keyStoreLocation, newKeystorePassword, "cert2", keyPair.getPrivate(), cert2);
+      FileUtils.write(new File(passwordFileLocation), newKeystorePassword);
+
+      reloadTimeUnit.sleep(reloadInterval * 2);
+
+      certChain = keyManager.getCertificateChain("cert1");
+      assertNull("Certificate chain for alias cert1 should be null", certChain);
+      certChain = keyManager.getCertificateChain("cert2");
+      assertNotNull("Certificate chain should not be null for alias cert2", certChain);
+      assertEquals("Certificate chain should be 1", 1, certChain.length);
+      assertEquals("DN for cert2 should be CN=cert2", cert2.getSubjectDN().getName(),
+          certChain[0].getSubjectDN().getName());
+
+    } finally {
+      keyManager.stop();
+    }
+  }
 }
