@@ -897,13 +897,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     try {
       blockManager.getDatanodeManager().markAllDatanodesStale();
 
-      if (isLeader()) {
-        // the node is starting and directly leader, this means that no NN was alive before
-        // Only need to re-process the queue, If not in SafeMode.
-        if (!isInSafeMode()) {
-          LOG.info("Reprocessing replication and invalidation queues");
-          initializeReplQueues();
-        } else {
+      // Only need to re-process the queue, If not in SafeMode.
+      if (!isInSafeMode()) {
+        LOG.info("Reprocessing replication and invalidation queues");
+        initializeReplQueues();
+      } else {
+        if (isLeader()) {
+          // the node is starting and directly leader, this means that no NN was alive before
           HdfsVariables.resetMisReplicatedIndex();
         }
       }
