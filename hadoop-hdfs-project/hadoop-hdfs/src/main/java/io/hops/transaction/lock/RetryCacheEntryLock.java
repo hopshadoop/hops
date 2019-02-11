@@ -47,9 +47,7 @@ public class RetryCacheEntryLock extends Lock {
     for (int i = 0; i < clientId.size(); i++) {
       byte[] cid = clientId.get(i);
       int clid = callId.get(i);
-      if (EntityManager.find(RetryCacheEntry.Finder.ByClientIdAndCallId, cid, clid) == null) {
-        EntityManager.update(new RetryCacheEntry(cid, clid));
-      }
+      EntityManager.find(RetryCacheEntry.Finder.ByClientIdAndCallId, cid, clid);
     }
   }
 
