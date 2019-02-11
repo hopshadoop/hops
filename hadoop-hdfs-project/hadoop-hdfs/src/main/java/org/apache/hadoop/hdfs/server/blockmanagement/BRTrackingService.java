@@ -67,6 +67,7 @@ public class BRTrackingService {
       ActiveBlockReport abr = itr.next();
       if ((System.currentTimeMillis() - abr.getStartTime()) > BR_MAX_PROCESSING_TIME) {
         //remove
+        LOG.warn("block report timed out dn: " + abr.getDnAddress() + " on NN: " + abr.getNnId());
         removeActiveBlockReport(abr);
         itr.remove();
       }
@@ -95,44 +96,47 @@ public class BRTrackingService {
   }
 
   public synchronized ActiveNode assignWork(final SortedActiveNodeList nnList,
-                                           String dnAddress, long noOfBlks) throws IOException {
-    if (canProcessMoreBR()) {
-      int index = getRRIndex(nnList);
-      if (index >= 0 && index < nnList.size()) {
-        ActiveNode an = nnList.getSortedActiveNodes().get(index);
-        ActiveBlockReport abr = new ActiveBlockReport(dnAddress, an.getId(),
-                System.currentTimeMillis(), noOfBlks);
-        addActiveBlockReport(abr);
-        LOG.info("Block report from "+dnAddress+" containing " + noOfBlks + " blocks " +
-                "is assigned to NN [ID: "+an.getId()+", IP: "+an.getRpcServerIpAddress()+"]");
-        return an;
+      final String dnAddress, final long noOfBlks) throws IOException {
+    return (ActiveNode) new LightWeightRequestHandler(HDFSOperationType.BR_LB_GET_ALL) {
+      @Override
+      public Object performTask() throws IOException {
+        boolean isActive = connector.isTransactionActive();
+        if (!isActive) {
+          connector.beginTransaction();
+          connector.writeLock();
+        }
+        try {
+          if (canProcessMoreBR()) {
+            int index = getRRIndex(nnList);
+            if (index >= 0 && index < nnList.size()) {
+              ActiveNode an = nnList.getSortedActiveNodes().get(index);
+              ActiveBlockReport abr = new ActiveBlockReport(dnAddress, an.getId(),
+                  System.currentTimeMillis(), noOfBlks);
+              addActiveBlockReport(abr);
+              LOG.info("Block report from " + dnAddress + " containing " + noOfBlks + " blocks "
+                  + "is assigned to NN [ID: " + an.getId() + ", IP: " + an.getRpcServerIpAddress() + "]");
+              return an;
+            }
+          }
+          String msg = "Work (" + noOfBlks + " blks) could not be assigned. " + "System is fully loaded now. At most "
+              + getBrLbMaxConcurrentBRs()
+              + " concurrent block reports can be processed.";
+          LOG.info(msg);
+          throw new BRLoadBalancingOverloadException(msg);
+        } finally {
+          if (!isActive) {
+            connector.commit();
+          }
+        }
       }
-    }
-    String msg = "Work (" + noOfBlks + " blks) could not be assigned. " +
-            "System is fully loaded now. At most " + getBrLbMaxConcurrentBRs()
-            + " concurrent block reports can be processed.";
-    LOG.debug(msg);
-    throw new BRLoadBalancingOverloadException(msg);
+    }.handle();
   }
 
 
   public synchronized void blockReportCompleted( String dnAddress) throws IOException {
     ActiveBlockReport abr = new ActiveBlockReport(dnAddress, 0, 0, 0);
-    LOG.debug("Block report from "+dnAddress+" has completed");
+    LOG.info("Block report from "+dnAddress+" has completed");
     removeActiveBlockReport(abr);
-  }
-
-  private int getActiveBlockReportsCount() throws IOException {
-    LightWeightRequestHandler handler = new LightWeightRequestHandler(HDFSOperationType
-            .BR_LB_GET_COUNT) {
-      @Override
-      public Object performTask() throws IOException {
-        ActiveBlockReportsDataAccess da = (ActiveBlockReportsDataAccess) HdfsStorageFactory
-                .getDataAccess(ActiveBlockReportsDataAccess.class);
-        return da.countActiveRports();
-      }
-    };
-    return (int) handler.handle();
   }
 
   private List<ActiveBlockReport> getAllActiveBlockReports() throws IOException {
@@ -147,16 +151,23 @@ public class BRTrackingService {
     };
     return (List<ActiveBlockReport>) handler.handle();
   }
-
-
+  
   private void addActiveBlockReport(final ActiveBlockReport abr) throws IOException {
     LightWeightRequestHandler handler = new LightWeightRequestHandler(HDFSOperationType
             .BR_LB_ADD) {
       @Override
       public Object performTask() throws IOException {
+        boolean isActive = connector.isTransactionActive();
+        if(!isActive){
+          connector.beginTransaction();
+          connector.writeLock();
+        }
         ActiveBlockReportsDataAccess da = (ActiveBlockReportsDataAccess) HdfsStorageFactory
                 .getDataAccess(ActiveBlockReportsDataAccess.class);
         da.addActiveReport(abr);
+        if(!isActive){
+          connector.commit();
+        }
         return null;
       }
     };
@@ -168,9 +179,20 @@ public class BRTrackingService {
             .BR_LB_REMOVE) {
       @Override
       public Object performTask() throws IOException {
+        boolean isActive = connector.isTransactionActive();
+        if(!isActive){
+          connector.beginTransaction();
+          connector.writeLock();
+        }
         ActiveBlockReportsDataAccess da = (ActiveBlockReportsDataAccess) HdfsStorageFactory
                 .getDataAccess(ActiveBlockReportsDataAccess.class);
-        da.removeActiveReport(abr);
+        ActiveBlockReport inDB = da.getActiveBlockReport(abr);
+        if(inDB!=null){
+          da.removeActiveReport(inDB);
+        }
+        if(!isActive){
+          connector.commit();
+        }
         return null;
       }
     };
