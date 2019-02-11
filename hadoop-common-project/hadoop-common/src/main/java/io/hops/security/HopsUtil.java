@@ -198,7 +198,11 @@ public class HopsUtil {
         HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
     sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY), cryptoMaterialPassword);
-  
+
+    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+        FileBasedKeyStoresFactory.SSL_PASSWORDFILE_LOCATION_TPL_KEY),
+        HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+
     Configuration sslClientConf = new Configuration(false);
     String sslClientResource = conf.get(SSLFactory.SSL_CLIENT_CONF_KEY, "ssl-client.xml");
     sslClientConf.addResource(sslClientResource);

@@ -73,6 +73,9 @@ public class FileBasedKeyStoresFactory implements KeyStoresFactory {
   public static final String SSL_EXCLUDE_CIPHER_LIST =
       "ssl.{0}.exclude.cipher.list";
 
+  public static final String SSL_PASSWORDFILE_LOCATION_TPL_KEY =
+      "ssl.{0}.passwordfile.location";
+
   /**
    * Default format of the keystore files.
    */
@@ -197,9 +200,13 @@ public class FileBasedKeyStoresFactory implements KeyStoresFactory {
           resolvePropertyName(mode, SSL_KEYSTORE_RELOAD_TIMEUNIT_TPL_KEY),
               DEFAULT_SSL_KEYSTORE_RELOAD_TIMEUNIT);
       TimeUnit reloadTimeUnit = TimeUnit.valueOf(timeUnitStr.toUpperCase());
-      
-      keyManager = new ReloadingX509KeyManager(keystoreType, keystoreLocation, keystorePassword, keystoreKeyPassword,
-          keyStoreReloadInterval, reloadTimeUnit);
+
+      String passwordFileLocationProperty =
+          resolvePropertyName(mode, SSL_PASSWORDFILE_LOCATION_TPL_KEY);
+      String passwordFileLocation = conf.get(passwordFileLocationProperty, null);
+      keyManager = new ReloadingX509KeyManager(keystoreType, keystoreLocation, keystorePassword, passwordFileLocation,
+          keystoreKeyPassword, keyStoreReloadInterval, reloadTimeUnit);
+
       keyManager.init();
       if (LOG.isDebugEnabled()) {
         LOG.debug(mode.toString() + " Loaded KeyStore: " + keystoreLocation);
@@ -223,6 +230,11 @@ public class FileBasedKeyStoresFactory implements KeyStoresFactory {
     String locationProperty =
         resolvePropertyName(mode, SSL_TRUSTSTORE_LOCATION_TPL_KEY);
     String truststoreLocation = conf.get(locationProperty, "");
+
+    String passwordFileLocationProperty =
+          resolvePropertyName(mode, SSL_PASSWORDFILE_LOCATION_TPL_KEY);
+    String passwordFileLocation = conf.get(passwordFileLocationProperty, null);
+
     if (!truststoreLocation.isEmpty()) {
       String passwordProperty = resolvePropertyName(mode,
           SSL_TRUSTSTORE_PASSWORD_TPL_KEY);
@@ -243,6 +255,7 @@ public class FileBasedKeyStoresFactory implements KeyStoresFactory {
       trustManager = new ReloadingX509TrustManager(truststoreType,
           truststoreLocation,
           truststorePassword,
+          passwordFileLocation,
           truststoreReloadInterval);
       trustManager.init();
       if (LOG.isDebugEnabled()) {
