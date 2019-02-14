@@ -227,11 +227,11 @@ message BlockReportBlockProto {
 
 message BlockReportBucketProto {
   repeated BlockReportBlockProto blocks = 1;
+  required bytes hash = 2;
 }
 
 message BlockReportProto {
   repeated BlockReportBucketProto buckets = 1;
-  repeated sint64 hashes = 2;
 }
 
 

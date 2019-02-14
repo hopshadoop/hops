@@ -34,6 +34,7 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
+import org.apache.hadoop.hdfs.server.protocol.Bucket;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -1081,9 +1082,9 @@ public class TestBlockReport2 {
 
       for (Map.Entry<DatanodeStorage, BlockReport> entry : storageReports.entrySet()) {
         BlockReport value = entry.getValue();
-        List<Long> dnHashes = new ArrayList<>();
-        for (long hash : value.getHashes()) {
-          dnHashes.add(hash);
+        List<byte[]> dnHashes = new ArrayList<>();
+        for (Bucket bucket : value.getBuckets()) {
+          dnHashes.add(bucket.getHash());
         }
 
         DatanodeStorageInfo storage = cluster.getNamesystem().getBlockManager().getDatanodeManager().getDatanode(dn.getDatanodeId()).getStorageInfo(entry.getKey().getStorageID());
@@ -1095,18 +1096,26 @@ public class TestBlockReport2 {
           LOG.debug("Number of hashes on NN doesn't match DN. This should only be the case before first report.");
         }
 
-        List<Long> nnHashes = new ArrayList<>(numBuckets);
+        List<byte[]> nnHashes = new ArrayList<>(numBuckets);
         for (HashBucket storageHash : storageHashes) {
           nnHashes.add(storageHash.getBucketId(), storageHash.getHash());
         }
 
-        LOG.debug("DN Hash: " + Arrays.toString(dnHashes.toArray()));
-        LOG.debug("NN Hash: " + Arrays.toString(nnHashes.toArray()));
+        StringBuilder sb = new StringBuilder();
+        for(byte[] hash : dnHashes){
+          sb.append(HashBuckets.hashToString(hash)).append(", ");
+        }
+        LOG.debug("DN Hash: " + sb);
+        sb = new StringBuilder();
+        for(byte[] hash : nnHashes){
+          sb.append(HashBuckets.hashToString(hash)).append(", ");
+        }
+        LOG.debug("NN Hash: " + sb);
 
         for (int j = 0; j < numBuckets; j++) {
-          Long dnHash = dnHashes.get(j);
-          Long nnHash = nnHashes.get(j);
-          if (!dnHash.equals(nnHash)) {
+          byte[] dnHash = dnHashes.get(j);
+          byte[] nnHash = nnHashes.get(j);
+          if (!HashBuckets.hashEquals(dnHash,nnHash)) {
             mismatchCount++;
           }
         }

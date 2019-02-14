@@ -2173,33 +2173,29 @@ public class PBHelper {
   }
   
   public static DatanodeProtocolProtos.BlockReportProto convert(BlockReport report) {
-   
+
     List<DatanodeProtocolProtos.BlockReportBucketProto> bucketProtos = new
-        ArrayList<>();
-    for (Bucket bucket : report.getBuckets()){
-  
+            ArrayList<>();
+    for (Bucket bucket : report.getBuckets()) {
       DatanodeProtocolProtos.BlockReportBucketProto.Builder bucketBuilder =
-          DatanodeProtocolProtos.BlockReportBucketProto.newBuilder();
-      for (ReportedBlock block : bucket.getBlocks()){
+              DatanodeProtocolProtos.BlockReportBucketProto.newBuilder();
+
+      bucketBuilder.setHash(ByteString.copyFrom(bucket.getHash()));
+
+      for (ReportedBlock block : bucket.getBlocks()) {
         bucketBuilder.addBlocks(
-            DatanodeProtocolProtos.BlockReportBlockProto.newBuilder()
-                .setBlockId(block.getBlockId())
-                .setGenerationStamp(block.getGenerationStamp())
-                .setLength(block.getLength())
-                .setState(convert(block.getState())));
+                DatanodeProtocolProtos.BlockReportBlockProto.newBuilder()
+                        .setBlockId(block.getBlockId())
+                        .setGenerationStamp(block.getGenerationStamp())
+                        .setLength(block.getLength())
+                        .setState(convert(block.getState())));
       }
+
       bucketProtos.add(bucketBuilder.build());
     }
-  
-    List<Long> hashes = new ArrayList<>();
-    for (long hash : report.getHashes()){
-      hashes.add(hash);
-    }
-    
+
     return DatanodeProtocolProtos.BlockReportProto.newBuilder()
-        .addAllBuckets(bucketProtos)
-        .addAllHashes(hashes)
-        .build();
+            .addAllBuckets(bucketProtos).build();
   }
   
   private static DatanodeProtocolProtos.BlockReportBlockProto.BlockReportBlockStateProto convert(BlockReportBlockState
@@ -2250,11 +2246,11 @@ public class PBHelper {
       
       Bucket bucket = new Bucket();
       bucket.setBlocks(blocks);
+      bucket.setHash(bucketProto.getHash().toByteArray());
       buckets[i] = bucket;
-      hashes[i] = blockReportProto.getHashes(i);
     }
     
-    return new BlockReport(buckets, hashes, numBlocks);
+    return new BlockReport(buckets, numBlocks);
   }
   
   private static BlockReportBlockState convert(

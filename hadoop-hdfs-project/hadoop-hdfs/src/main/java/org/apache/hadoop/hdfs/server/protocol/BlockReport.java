@@ -19,7 +19,9 @@ package org.apache.hadoop.hdfs.server.protocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.hash.Hashing;
+import io.hops.metadata.hdfs.entity.HashBucket;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.Replica;
 
@@ -30,25 +32,18 @@ import static org.apache.hadoop.hdfs.server.protocol.BlockReportBlockState.FINAL
 public class BlockReport implements Iterable<ReportedBlock> {
   
   private Bucket[] buckets;
-  private long[] hashes;
   private int numBlocks;
   
   public Bucket[] getBuckets(){
     return buckets;
   }
   
-  public long[] getHashes(){
-    return hashes;
-  }
-  
   public int getNumberOfBlocks(){
     return numBlocks;
   }
   
-  public BlockReport(Bucket[] buckets, long[] hashes, int
-      numBlocks){
+  public BlockReport(Bucket[] buckets, int numBlocks){
     this.buckets = buckets;
-    this.hashes = hashes;
     this.numBlocks = numBlocks;
   }
  
@@ -142,48 +137,37 @@ public class BlockReport implements Iterable<ReportedBlock> {
     return corruptReportBuilder.build();
   }
 
-  private static long hashAsFinalized(Block theBlock) {
-    return hash(theBlock.getBlockId(), theBlock.getGenerationStamp(),
+  private static byte[] hashAsFinalized(Block theBlock) {
+    return HashBuckets.hash(theBlock.getBlockId(), theBlock.getGenerationStamp(),
         theBlock.getNumBytes(), HdfsServerConstants.ReplicaState.FINALIZED
             .getValue());
   }
   
-  public static long hashAsFinalized(ReportedBlock block){
+  public static byte[] hashAsFinalized(ReportedBlock block){
     Block toHash = new Block(block.getBlockId(), block.getLength(),
         block.getGenerationStamp());
     return hashAsFinalized(toHash);
   }
-  private static long hash(Replica replica){
-    return hash(replica.getBlockId(), replica.getGenerationStamp(), replica
+  private static byte[] hash(Replica replica){
+    return HashBuckets.hash(replica.getBlockId(), replica.getGenerationStamp(), replica
         .getNumBytes(), replica.getState().getValue());
   }
   
-  public static long hash(Block block, HdfsServerConstants.ReplicaState state){
-    return hash(block.getBlockId(), block.getGenerationStamp(), block
+  public static byte[] hash(Block block, HdfsServerConstants.ReplicaState state){
+    return HashBuckets.hash(block.getBlockId(), block.getGenerationStamp(), block
         .getNumBytes(), state.getValue());
   }
-  
-  private static long hash(long blockId, long generationStamp, long
-      numBytes,
-      int replicaState){
-    return Hashing.md5().newHasher()
-        .putLong(blockId)
-        .putLong(generationStamp)
-        .putLong(numBytes)
-        .putInt(replicaState)
-        .hash().asLong();
-  }
-  
+
   public static class Builder {
     private final int NUM_BUCKETS;
     private ArrayList<ReportedBlock>[] buckets;
-    private long[] hashes;
+    private byte[][] hashes;
     private int blockCounter = 0;
   
     private Builder(int numBuckets) {
       NUM_BUCKETS = numBuckets;
       buckets = new ArrayList[NUM_BUCKETS];
-      hashes = new long[NUM_BUCKETS];
+      hashes = new byte[NUM_BUCKETS][HashBuckets.HASH_LENGTH];
       for (int i = 0; i < NUM_BUCKETS; i++) {
         buckets[i] = new ArrayList<>();
       }
@@ -211,8 +195,9 @@ public class BlockReport implements Iterable<ReportedBlock> {
           replicaState = HdfsServerConstants.ReplicaState.TEMPORARY;
           break;
       }
-      hashes[bucket] += hash(reportBlock.getBlockId(),reportBlock.getGenerationStamp(),reportBlock.getLength(),
+      byte[] hash = HashBuckets.hash(reportBlock.getBlockId(),reportBlock.getGenerationStamp(),reportBlock.getLength(),
               replicaState.getValue());
+      HashBuckets.XORHashes(hashes[bucket], hash);
       blockCounter++;
       return this;
     }
@@ -222,7 +207,7 @@ public class BlockReport implements Iterable<ReportedBlock> {
       buckets[bucket].add(new ReportedBlock(replica.getBlockId(), replica
           .getGenerationStamp(), replica.getNumBytes(), fromReplicaState(
           replica.getState())));
-      hashes[bucket] += hash(replica);
+      HashBuckets.XORHashes(hashes[bucket], hash(replica));
       blockCounter++;
       return this;
     }
@@ -239,7 +224,7 @@ public class BlockReport implements Iterable<ReportedBlock> {
       buckets[bucket].add(new ReportedBlock(theBlock.getBlockId(),
           theBlock.getGenerationStamp(), theBlock.getNumBytes(),
           FINALIZED));
-      hashes[bucket] += hashAsFinalized(theBlock);
+      HashBuckets.XORHashes(hashes[bucket], hashAsFinalized(theBlock));
       blockCounter++;
       return this;
     }
@@ -250,8 +235,9 @@ public class BlockReport implements Iterable<ReportedBlock> {
       for (int i = 0; i < NUM_BUCKETS; i++){
         bucketArray[i] = new Bucket(buckets[i].toArray(new
                 ReportedBlock[buckets[i].size()]));
+        bucketArray[i].setHash(hashes[i]);
       }
-      return new BlockReport(bucketArray, hashes, blockCounter);
+      return new BlockReport(bucketArray, blockCounter);
     }
   
   
