@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.hash.Hashing;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -44,6 +45,8 @@ public class HashBuckets {
   
   private static HashBuckets instance;
   private static int numBuckets;
+
+  public static final int HASH_LENGTH = 20;
 
   public static void initialize(int numBuckets){
     if (instance != null){
@@ -95,7 +98,7 @@ public class HashBuckets {
               public Object performTask() throws IOException {
                 final List<HashBucket> newBuckets = new ArrayList<>();
                 for(int i = 0; i < numBuckets; i++){
-                    newBuckets.add(new HashBucket(storage.getSid(), i, rand.nextLong()));
+                    newBuckets.add(new HashBucket(storage.getSid(), i, getRandomHash()));
                 }
                 HashBucketDataAccess da = (HashBucketDataAccess) HdfsStorageFactory.getDataAccess
                         (HashBucketDataAccess.class);
@@ -116,7 +119,7 @@ public class HashBuckets {
               public Object performTask() throws IOException {
                 final List<HashBucket> deleted = new ArrayList<HashBucket>();
                 for(int i = 0; i < numBuckets; i++){
-                  deleted.add(new HashBucket(storage.getSid(), i, 0));
+                  deleted.add(new HashBucket(storage.getSid(), i, initalizeHash()));
                 }
                 HashBucketDataAccess da = (HashBucketDataAccess) HdfsStorageFactory.getDataAccess
                         (HashBucketDataAccess.class);
@@ -139,7 +142,7 @@ public class HashBuckets {
     final List<HashBucket> newBuckets = new ArrayList<HashBucket>();
     for(int i = 0; i < numBuckets; i++){
       if(!existingMap.containsKey(i)){
-        newBuckets.add(new HashBucket(storage.getSid(), i, 0));
+        newBuckets.add(new HashBucket(storage.getSid(), i, initalizeHash()));
       }
     }
 
@@ -164,7 +167,7 @@ public class HashBuckets {
     HashBucket result = EntityManager.find(HashBucket.Finder
         .ByStorageIdAndBucketId, storageId, bucketId);
     if(result == null){
-      result = new HashBucket(storageId, bucketId, 0);
+      result = new HashBucket(storageId, bucketId, initalizeHash());
     }
     return result;
   }
@@ -181,35 +184,41 @@ public class HashBuckets {
   }
 
   public void applyHash(int storageId, HdfsServerConstants.ReplicaState state,
-      Block block ) throws TransactionContextException, StorageException {
+                        Block block ) throws TransactionContextException, StorageException {
+      applyHash(storageId,state,block, "Apply");
+   }
+
+   private void applyHash(int storageId, HdfsServerConstants.ReplicaState state,
+      Block block, String msg ) throws TransactionContextException, StorageException {
+    String dbgMessage = msg+" block:" + blockToString
+        (block) + "sid=" + storageId + " state=" + state.name()+", hash (";
     int bucketId = getBucketForBlock(block);
     HashBucket bucket = getBucket(storageId, bucketId);
-    long curVal = bucket.getHash();
-    long newHash = curVal  + BlockReport.hash(block, state);
-    LOG.debug("Applying block:" + blockToString
-        (block) + "sid=" + storageId + " state=" + state.name() + ", hash ("+
-        curVal+" + "+ BlockReport.hash(block, state)+" = "+newHash+")");
-    
-    bucket.setHash(newHash);
+
+    byte[] bucketHash = bucket.getHash();
+    byte[] blockHash = BlockReport.hash(block, state);
+
+    dbgMessage += hashToString(bucketHash);
+    dbgMessage += " XOR "+ hashToString(blockHash)+" = ";
+
+    XORHashes(bucketHash, blockHash);
+
+    dbgMessage += hashToString(bucketHash)+")";
+    LOG.debug(dbgMessage);
+
+    bucket.setHash(bucketHash);
   }
-  
-  public void undoHash(int storageId, HdfsServerConstants.ReplicaState
-      state, Block block) throws TransactionContextException, StorageException {
-    int bucketId = getBucketForBlock(block);
-    HashBucket bucket = getBucket(storageId, bucketId);
-    long currVal = bucket.getHash();
-    long newHash = currVal - BlockReport.hash(block, state);
-    LOG.debug("Undo block:" + blockToString
-        (block) + " sid=" + storageId + " state=" + state.name() + ", hash (" +
-        currVal+" - "+BlockReport.hash(block,state)+" = "+newHash+")");
-    
-    bucket.setHash(newHash);
+
+  public void undoHash(int storageId, HdfsServerConstants.ReplicaState state,
+                        Block block ) throws TransactionContextException, StorageException {
+
+    applyHash(storageId,state,block, "Undo");
   }
-  
+
   public void resetBuckets(final int storageId) throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.RESET_STORAGE_HASHES) {
       @Override
-      public void acquireLock(TransactionLocks tl) throws IOException {
+      public void acquireLock(TransactionLocks tl) {
         LockFactory lf = LockFactory.getInstance();
         tl.add(lf.getHashBucketLock(storageId));
       }
@@ -218,10 +227,66 @@ public class HashBuckets {
       public Object performTask() throws IOException {
         Collection<HashBucket> buckets = getBuckets(storageId);
         for(HashBucket bucket: buckets){
-            bucket.setHash(0);
+            bucket.setHash(initalizeHash());
         }
         return null;
       }
     }.handle();
+  }
+
+  public static byte[] hash(long blockId, long generationStamp, long
+          numBytes,
+                             int replicaState){
+    return Hashing.sha1().newHasher()
+            .putLong(blockId)
+            .putLong(generationStamp)
+            .putLong(numBytes)
+            .putInt(replicaState)
+            .hash().asBytes();
+  }
+
+  public static byte[] getRandomHash(){
+    byte[] hash = new byte[HashBuckets.HASH_LENGTH];
+    Random rand = new Random(System.currentTimeMillis());
+    rand.nextBytes(hash);
+    return hash;
+  }
+
+  public static byte[] initalizeHash(){
+    byte[] hash = new byte[HashBuckets.HASH_LENGTH];
+    return hash;
+  }
+
+  public static boolean hashEquals(byte[] a, byte[] b){
+    assert a.length == b.length;
+    for(int i = 0; i < a.length; i++){
+      if (a[i] != b[i]){
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * two bytes arrays of same length are XORed and the
+   * result is stored in byte array {@code a}
+   * @param a
+   * @param b
+   * @return
+   */
+  public static byte[] XORHashes(byte[] a, byte[] b){
+    assert a.length == b.length;
+    for(int i = 0; i < a.length; i++){
+      a[i] = (byte) (a[i] ^ b[i]);
+    }
+    return a;
+  }
+
+  public static String hashToString(byte[] hash){
+    StringBuilder sb = new StringBuilder();
+    for (byte b : hash) {
+      sb.append(String.format("%02X", b));
+    }
+    return sb.toString();
   }
 }

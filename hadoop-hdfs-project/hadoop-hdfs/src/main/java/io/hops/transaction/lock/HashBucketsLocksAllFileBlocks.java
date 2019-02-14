@@ -20,6 +20,7 @@ package io.hops.transaction.lock;
 import io.hops.metadata.hdfs.entity.HashBucket;
 import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.EntityManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -52,7 +53,7 @@ public class HashBucketsLocksAllFileBlocks extends LockWithType {
         if (EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId,
                 replica.getStorageId(), replica.getBucketId()) == null){
           EntityManager.update(new HashBucket(replica.getStorageId(),
-                  replica.getBucketId(), 0));
+                  replica.getBucketId(), HashBuckets.initalizeHash()));
           LOG.warn("The accessed bucket had not been initialized. There might be a misconfiguration.");
         }
 

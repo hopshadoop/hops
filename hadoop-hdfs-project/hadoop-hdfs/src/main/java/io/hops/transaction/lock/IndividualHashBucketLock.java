@@ -19,6 +19,7 @@ package io.hops.transaction.lock;
 
 import io.hops.metadata.hdfs.entity.HashBucket;
 import io.hops.transaction.EntityManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
 
 import java.io.IOException;
 
@@ -36,7 +37,7 @@ public class IndividualHashBucketLock extends Lock {
     setLockMode(TransactionLockTypes.LockType.WRITE);
     if (EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId,
         storageId, bucketId) == null){
-      EntityManager.update(new HashBucket(storageId, bucketId, 0));
+      EntityManager.update(new HashBucket(storageId, bucketId, HashBuckets.initalizeHash()));
       LOG.warn("The accessed bucket had not been initialized. There might be a misconfiguration.");
     }
   }

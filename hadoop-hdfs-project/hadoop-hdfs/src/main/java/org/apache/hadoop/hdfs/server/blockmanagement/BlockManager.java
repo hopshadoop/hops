@@ -2577,8 +2577,8 @@ public class BlockManager {
     
     if(LOG.isDebugEnabled()){
       LOG.debug(String.format("%d/%d reported hashes matched",
-          newReport.getHashes().length-matchingResult.mismatchedBuckets.size(),
-          newReport.getHashes().length));
+          newReport.getBuckets().length-matchingResult.mismatchedBuckets.size(),
+          newReport.getBuckets().length));
     }
     
     final Set<Long> aggregatedSafeBlocks = new HashSet<>();
@@ -2700,7 +2700,7 @@ public class BlockManager {
       @Override
       public Object performTask() throws IOException {
         // scan the report and process newly reported blocks
-        long hash = 0; // Our updated hash should only consider
+        byte[] hash = HashBuckets.initalizeHash(); // Our updated hash should only consider
         // finalized, stored blocks
         for (ReportedBlock brb : reportedBlocks) {
           Block block = new Block();
@@ -2721,7 +2721,7 @@ public class BlockManager {
               // Only update hash with blocks that should not
               // be removed and are finalized. This helps catch excess
               // replicas as well.
-              hash += BlockReport.hashAsFinalized(brb);
+              HashBuckets.XORHashes(hash, BlockReport.hashAsFinalized(brb));
             }
           }
         }
@@ -2769,13 +2769,14 @@ public class BlockManager {
         continue;
       }
       
-      long storedHash = storedHashesMap.get(i).getHash();
+      byte[] storedHash = storedHashesMap.get(i).getHash();
       
       //First block report, or report in safe mode, should always process complete report.
       if (firstBlockReport) {
         //if the bucket is empty there is nothing to process 
         //except if the namenode think that there should be things in the bucket
-        if (report.getBuckets()[i].getBlocks().length == 0 && storedHash == 0) {
+        if (report.getBuckets()[i].getBlocks().length == 0
+                && HashBuckets.hashEquals(storedHash, HashBuckets.initalizeHash())) {
           matchedBuckets.add(i);
           continue;
         }
@@ -2783,16 +2784,16 @@ public class BlockManager {
         continue;
       }
 
-      long reportedHash = report.getHashes()[i];
+      byte[] reportedHash = report.getBuckets()[i].getHash();
 
-      if (storedHash == reportedHash){
+      if (HashBuckets.hashEquals(storedHash, reportedHash)){
         matchedBuckets.add(i);
       } else {
         mismatchedBuckets.add(i);
       }
     }
 
-    assert matchedBuckets.size() + mismatchedBuckets.size() == report.getHashes().length;
+    assert matchedBuckets.size() + mismatchedBuckets.size() == report.getBuckets().length;
     return new HashMatchingResult(matchedBuckets, mismatchedBuckets);
   }
   

@@ -16,6 +16,9 @@ Release 2.7.0 - UNRELEASED
     (Maysam Yabandeh via wang)
 
   IMPROVEMENTS
+    HOPS-1108. Change the plus operator to XOR for combining hashes in the block 
+    reporting system (salman niazi)
+
     HDFS-7055. Add tracing to DFSInputStream (cmccabe)
 
     HDFS-7186. Document the "hadoop trace" command. (Masatake Iwasaki via Colin
