@@ -140,6 +140,4 @@ public abstract class SysInfo {
    * @return total number of bytes written.
    */
   public abstract long getStorageBytesWritten();
-
-  public abstract int getNumGPUs();
 }

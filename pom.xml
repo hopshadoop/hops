@@ -658,6 +658,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <scope>test</scope>
         </dependency>
         <dependency>
+          <groupId>io.hops.gpu</groupId>
+          <artifactId>hops-gpu-management-impl-amd</artifactId>
+          <version>${project.version}</version>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
           <groupId>com.mysql.ndb</groupId>
           <artifactId>clusterj-native</artifactId>
           <version>7.6.9</version>
@@ -666,6 +672,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <dependency>
           <groupId>io.hops.gpu</groupId>
           <artifactId>libhopsnvml</artifactId>
+          <version>${project.version}</version>
+          <type>${lib_ext}</type>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>io.hops.gpu</groupId>
+          <artifactId>libhopsrocm</artifactId>
           <version>${project.version}</version>
           <type>${lib_ext}</type>
           <scope>test</scope>
@@ -720,6 +733,14 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <artifactItem>
                       <groupId>io.hops.gpu</groupId>
                       <artifactId>libhopsnvml</artifactId>
+                      <version>${project.version}</version>
+                      <type>${lib_ext}</type>
+                      <overWrite>true</overWrite>
+                      <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
+                    </artifactItem>
+                    <artifactItem>
+                      <groupId>io.hops.gpu</groupId>
+                      <artifactId>libhopsrocm</artifactId>
                       <version>${project.version}</version>
                       <type>${lib_ext}</type>
                       <overWrite>true</overWrite>

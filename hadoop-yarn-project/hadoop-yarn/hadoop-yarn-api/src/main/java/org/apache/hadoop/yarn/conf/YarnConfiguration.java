@@ -912,6 +912,12 @@ public class YarnConfiguration extends Configuration {
       NM_PREFIX + "resource.gpus.enabled";
   public static final boolean DEFAULT_NM_GPU_RESOURCE_ENABLED = false;
 
+  /** GPU manufacturer on machine **/
+  public static final String NM_GPU_MANAGEMENT_IMPL =
+    NM_PREFIX + "gpu.management-impl";
+  public static final String DEFAULT_NM_GPU_MANAGEMENT_IMPL =
+    "io.hops.management.nvidia.NvidiaManagementLibrary";
+
   /** Conversion ratio for physical memory to virtual memory. */
   public static final String NM_VMEM_PMEM_RATIO =
     NM_PREFIX + "vmem-pmem-ratio";

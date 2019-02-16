@@ -46,6 +46,7 @@ import java.util.regex.Pattern;
 import com.google.common.annotations.VisibleForTesting;
 
 import io.hops.devices.Device;
+import io.hops.devices.GPU;
 import io.hops.devices.GPUAllocator;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
@@ -200,7 +201,7 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
   void init(LinuxContainerExecutor lce, ResourceCalculatorPlugin plugin)
       throws IOException {
     initConfig();
-
+    
     if (isGpuSupportEnabled() && (getGPUAllocator() == null || !getGPUAllocator().isInitialized())) {
       gpuAllocator = GPUAllocator.getInstance();
       getGPUAllocator().initialize(conf);
@@ -348,10 +349,16 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
                 .toString() + " rwm");
       }
 
-      HashSet<Device> totalGPUs = getGPUAllocator().getTotalGPUs();
-      for (Device gpu : totalGPUs) {
-        updateCgroupDevice(CONTROLLER_DEVICES, "", DEVICES_ALLOW, "c " + gpu.toString() +
+      HashSet<GPU> totalGPUs = getGPUAllocator().getTotalGPUs();
+      for (GPU gpu : totalGPUs) {
+        updateCgroupDevice(CONTROLLER_DEVICES, "", DEVICES_ALLOW, "c " +
+          gpu.getGpuDevice().toString() +
                 " rwm");
+        if(gpu.getRenderNode() != null) {
+          updateCgroupDevice(CONTROLLER_DEVICES, "", DEVICES_ALLOW, "c " +
+            gpu.getRenderNode().toString() +
+            " rwm");
+        }
       }
     }
 }
@@ -495,12 +502,22 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
     return deleted;
   }
   
-  private LinkedList<String> createCgroupDeviceEntry(HashSet devices) {
+  private LinkedList<String> createCgroupDeviceEntry(HashSet<GPU> gpus, int numGPUsToAllocate) {
     LinkedList<String> cgroupDenyEntries = new LinkedList<>();
     
-    Iterator<Device> itr = devices.iterator();
+    Iterator<GPU> itr = gpus.iterator();
     while(itr.hasNext()) {
-      cgroupDenyEntries.add("c " + itr.next().toString() + " rwm\n");
+      GPU gpuDevice = itr.next();
+      cgroupDenyEntries.add("c " + gpuDevice.getGpuDevice() + " rwm\n");
+      if(gpuDevice.getRenderNode() != null) {
+        cgroupDenyEntries.add("c " + gpuDevice.getRenderNode() + " rwm\n");
+      }
+    }
+    if(numGPUsToAllocate == 0) {
+      for(Device driver: getGPUAllocator().getMandatoryDrivers()) {
+        cgroupDenyEntries.add("c " + driver.toString() + " rwm\n");
+      }
+
     }
     return cgroupDenyEntries;
   }
@@ -545,18 +562,18 @@ public class CgroupsLCEResourcesHandlerGPU implements LCEResourcesHandler {
 
     if(isGpuSupportEnabled()) {
       int containerGPUs = containerResource.getGPUs();
-      HashSet<Device> deniedDevices =
+      HashSet<GPU> deniedDevices =
           getGPUAllocator().allocate(containerName, containerGPUs);
-      
+
       LinkedList<String> cgroupGPUDenyEntries = createCgroupDeviceEntry
-          (deniedDevices);
+          (deniedDevices, containerGPUs);
       for(String deviceEntry: cgroupGPUDenyEntries) {
         updateCgroupDevice(CONTROLLER_DEVICES, containerName, DEVICES_DENY,
             deviceEntry);
       }
     }
   }
-  
+
   private void clearLimits(ContainerId containerId) {
     if (isCpuWeightEnabled()) {
       deleteCgroup(pathForCgroup(CONTROLLER_CPU, containerId.toString()));

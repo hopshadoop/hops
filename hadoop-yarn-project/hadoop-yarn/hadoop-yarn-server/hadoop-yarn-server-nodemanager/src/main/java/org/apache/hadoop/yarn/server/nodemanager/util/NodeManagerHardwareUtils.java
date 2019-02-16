@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.util;
 
+import io.hops.GPUManagementLibrary;
+import io.hops.GPUManagementLibraryLoader;
+import io.hops.exceptions.GPUManagementLibraryException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -318,10 +321,10 @@ public class NodeManagerHardwareUtils {
     if(configuredGPUs <= 0) {
       return 0;
     }
-    int discoveredGPUs = plugin.getNumGPUs();
+    int discoveredGPUs = getImplNumGPUs(conf);
     if(configuredGPUs > discoveredGPUs) {
       LOG.warn("Could not find " + configuredGPUs + " GPUs as configured." +
-          " Only discovered " + discoveredGPUs + " GPUs" );
+          " Only discovered " + discoveredGPUs + " GPUs");
     }
     int numGPUs = Math.min(discoveredGPUs, configuredGPUs);
     return numGPUs;
@@ -332,4 +335,29 @@ public class NodeManagerHardwareUtils {
                 ResourceCalculatorPlugin.getResourceCalculatorPlugin(null, conf);
         return NodeManagerHardwareUtils.getNodeGPUs(plugin, conf);
       }
+
+  private static int getImplNumGPUs(Configuration conf) {
+    String GPU_MANAGEMENT_LIBRARY_CLASSNAME = conf.get(YarnConfiguration.NM_GPU_MANAGEMENT_IMPL,
+      YarnConfiguration.DEFAULT_NM_GPU_MANAGEMENT_IMPL);
+    GPUManagementLibrary gpuManagementLibrary = null;
+    try {
+      gpuManagementLibrary = GPUManagementLibraryLoader.load(GPU_MANAGEMENT_LIBRARY_CLASSNAME);
+    } catch(GPUManagementLibraryException | UnsatisfiedLinkError | NoClassDefFoundError e) {
+      LOG.error("Could not load GPU management library. Is this NodeManager " +
+        "supposed to offer its GPUs as a resource? If yes, check your configuration.", e);
+    }
+    if(gpuManagementLibrary == null) {
+      LOG.error("Failed to load GPU Management Library, got null");
+      return 0;
+    }
+    if(!gpuManagementLibrary.initialize()) {
+      LOG.error("Could not initialize GPU Management Library, offering 0 GPUs");
+      return 0;
+    }
+    int numGPUs = gpuManagementLibrary.getNumGPUs();
+    if(!gpuManagementLibrary.shutDown()) {
+      LOG.error("Could not shutdown GPU Management Library");
+    }
+    return numGPUs;
+  }
 }

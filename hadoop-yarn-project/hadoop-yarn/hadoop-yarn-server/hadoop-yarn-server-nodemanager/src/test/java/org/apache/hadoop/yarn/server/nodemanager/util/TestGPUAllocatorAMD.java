@@ -1,25 +1,18 @@
 package org.apache.hadoop.yarn.server.nodemanager.util;
 
-import com.google.common.collect.Sets;
 import io.hops.GPUManagementLibrary;
 import io.hops.devices.Device;
+import io.hops.devices.GPU;
 import io.hops.devices.GPUAllocator;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 
-public class TestGPUAllocator {
+public class TestGPUAllocatorAMD {
 
     private static class CustomGPUmanagementLibrary implements GPUManagementLibrary {
 
@@ -45,28 +38,28 @@ public class TestGPUAllocator {
 
         @Override
         public String queryAvailableDevices(int configuredGPUs) {
-            return "195:0 195:1 195:2 195:3 195:4 195:5 195:6 195:7";
+            return "226:0&226:128 226:1&226:129 226:2&226:130 226:3&226:131 226:4&226:132 226:5&226:133 226:6&226:134 226:7&226:135";
         }
     }
 
     private static class CustomGPUAllocator extends GPUAllocator {
 
-        public CustomGPUAllocator(GPUManagementLibrary gpuManagementLibrary) {
-            super(gpuManagementLibrary, new YarnConfiguration());
+        public CustomGPUAllocator(GPUManagementLibrary gpuManagementLibrary, YarnConfiguration conf) {
+            super(gpuManagementLibrary, conf);
         }
     }
-
 
     @Test
     public void testGPUAllocation() throws IOException {
 
         CustomGPUmanagementLibrary lib = new CustomGPUmanagementLibrary();
-        CustomGPUAllocator customGPUAllocator = new CustomGPUAllocator(lib);
         YarnConfiguration conf = new YarnConfiguration();
         conf.setInt(YarnConfiguration.NM_GPUS, 8);
-        customGPUAllocator.initialize(conf);
-        HashSet<Device> initialAvailableGPUs = customGPUAllocator.getConfiguredAvailableGPUs();
-        HashSet<Device> totalGPUs = customGPUAllocator.getTotalGPUs();
+        conf.set(YarnConfiguration.NM_GPU_MANAGEMENT_IMPL, "io.hops.management.amd.AMDManagementLibrary");
+        CustomGPUAllocator customGPUAllocator = new CustomGPUAllocator(lib, conf);
+
+        HashSet<GPU> initialAvailableGPUs = customGPUAllocator.getConfiguredAvailableGPUs();
+        HashSet<GPU> totalGPUs = customGPUAllocator.getTotalGPUs();
         Assert.assertTrue(totalGPUs.containsAll(initialAvailableGPUs));
         Assert.assertTrue(initialAvailableGPUs.containsAll(totalGPUs));
         Assert.assertTrue(totalGPUs.size() == 8);
@@ -74,14 +67,14 @@ public class TestGPUAllocator {
         int numInitialAvailableGPUs = initialAvailableGPUs.size();
 
         ContainerId firstId = ContainerId.fromString("container_1_1_1_1");
-        HashSet<Device> firstAllocation = customGPUAllocator.allocate(firstId.toString(), 4);
-        HashSet<Device> currentlyAvailableDevices = new HashSet<>(customGPUAllocator.getConfiguredAvailableGPUs());
+        HashSet<GPU> firstAllocation = customGPUAllocator.allocate(firstId.toString(), 4);
+        HashSet<GPU> currentlyAvailableDevices = new HashSet<>(customGPUAllocator.getConfiguredAvailableGPUs());
         Assert.assertEquals(numInitialAvailableGPUs - 4, currentlyAvailableDevices.size());
 
         Assert.assertTrue(currentlyAvailableDevices.equals(firstAllocation));
 
         ContainerId secondId = ContainerId.fromString("container_1_1_1_2");
-        HashSet<Device> secondAllocation = customGPUAllocator.allocate(secondId.toString(), 4);
+        HashSet<GPU> secondAllocation = customGPUAllocator.allocate(secondId.toString(), 4);
 
         Assert.assertEquals(4, firstAllocation.size());
 
@@ -96,7 +89,7 @@ public class TestGPUAllocator {
         Assert.assertEquals(numInitialAvailableGPUs, customGPUAllocator.getConfiguredAvailableGPUs().size());
     
         ContainerId thirdId = ContainerId.fromString("container_1_1_1_2");
-        HashSet<Device> thirdAllocation = customGPUAllocator.allocate(thirdId
+        HashSet<GPU> thirdAllocation = customGPUAllocator.allocate(thirdId
             .toString(), 2);
         Assert.assertEquals(6, thirdAllocation.size());
 
@@ -105,19 +98,19 @@ public class TestGPUAllocator {
     }
 
     @Test
-    public void testGPUAllocatorRecovery() throws IOException{
+    public void testGPUAllocatorRecovery() throws IOException {
         CustomGPUmanagementLibrary lib = new CustomGPUmanagementLibrary();
-        CustomGPUAllocator customGPUAllocator = new CustomGPUAllocator(lib);
         YarnConfiguration conf = new YarnConfiguration();
         conf.setInt(YarnConfiguration.NM_GPUS, 8);
-        customGPUAllocator.initialize(conf);
+        conf.set(YarnConfiguration.NM_GPU_MANAGEMENT_IMPL, "io.hops.management.amd.AMDManagementLibrary");
+        CustomGPUAllocator customGPUAllocator = new CustomGPUAllocator(lib, conf);
 
-        HashSet<Device> initialAvailableGPUs = new HashSet<>(customGPUAllocator.getConfiguredAvailableGPUs());
+        HashSet<GPU> initialAvailableGPUs = new HashSet<>(customGPUAllocator.getConfiguredAvailableGPUs());
         int numInitialAvailableGPUs = initialAvailableGPUs.size();
 
         //First container was allocated 195:0 and 195:1
-        Device device0 = new Device(195, 0);
-        Device device1 = new Device(195, 1);
+        GPU device0 = new GPU(new Device(226, 0), new Device(226, 128));
+        GPU device1 = new GPU(new Device(226, 1), new Device(226, 129));
         ContainerId firstId = ContainerId.fromString("container_1_1_1_1");
         String firstDevicesAllow =
                 "c " + device0.toString() + " rwm" +"\n" +
@@ -126,15 +119,15 @@ public class TestGPUAllocator {
                 "c 0:2 rwm\n";
         customGPUAllocator.recoverAllocation(firstId.toString(), firstDevicesAllow);
 
-        HashSet<Device> availableGPUsAfterFirstRecovery = new HashSet<>(customGPUAllocator.getConfiguredAvailableGPUs());
+        HashSet<GPU> availableGPUsAfterFirstRecovery = new HashSet<>(customGPUAllocator.getConfiguredAvailableGPUs());
         Assert.assertFalse(initialAvailableGPUs.equals(availableGPUsAfterFirstRecovery));
         Assert.assertEquals(numInitialAvailableGPUs - 2, availableGPUsAfterFirstRecovery.size());
         Assert.assertFalse(availableGPUsAfterFirstRecovery.contains(device0));
         Assert.assertFalse(availableGPUsAfterFirstRecovery.contains(device1));
 
         //First container was allocated 195:2 and 195:3
-        Device device2 = new Device(195, 2);
-        Device device3 = new Device(195, 3);
+        GPU device2 = new GPU(new Device(226, 2), new Device(226,130));
+        GPU device3 = new GPU(new Device(226, 3), new Device(226, 131));
         ContainerId id = ContainerId.fromString("container_1_1_1_2");
         String secondDevicesAllow =
                 "c " + device2.toString() + " rwm" +"\n" +
@@ -143,32 +136,21 @@ public class TestGPUAllocator {
                 "c 0:2 rwm\n";
         customGPUAllocator.recoverAllocation(id.toString(), secondDevicesAllow);
 
-        HashSet<Device> availableGPUsAfterSecondRecovery = new HashSet<>(customGPUAllocator.getConfiguredAvailableGPUs());
+        HashSet<GPU> availableGPUsAfterSecondRecovery = new HashSet<>(customGPUAllocator.getConfiguredAvailableGPUs());
         Assert.assertFalse(initialAvailableGPUs.equals(availableGPUsAfterSecondRecovery));
         Assert.assertEquals(numInitialAvailableGPUs - 4, availableGPUsAfterSecondRecovery.size());
         Assert.assertFalse(availableGPUsAfterSecondRecovery.contains(device2));
         Assert.assertFalse(availableGPUsAfterSecondRecovery.contains(device3));
 
         ContainerId newContainerId = ContainerId.fromString("container_1_1_1_3");
-        HashSet<Device> allocation = customGPUAllocator.allocate(newContainerId.toString(), 4);
+        HashSet<GPU> allocation = customGPUAllocator.allocate(newContainerId.toString(), 4);
         Assert.assertEquals(4, allocation.size());
-        HashSet<Device> alreadyAllocatedDevices = new HashSet<>();
+        HashSet<GPU> alreadyAllocatedDevices = new HashSet<>();
         alreadyAllocatedDevices.add(device0);
         alreadyAllocatedDevices.add(device1);
         alreadyAllocatedDevices.add(device2);
         alreadyAllocatedDevices.add(device3);
         Assert.assertTrue(allocation.containsAll(alreadyAllocatedDevices));
-
-        HashSet<Device> allowedDevices = new HashSet<>();
-        Device device4 = new Device(195, 4);
-        Device device5 = new Device(195, 5);
-        Device device6 = new Device(195, 6);
-        Device device7 = new Device(195, 7);
-
-        allowedDevices.add(device4);
-        allowedDevices.add(device5);
-        allowedDevices.add(device6);
-        allowedDevices.add(device7);
 
         Assert.assertTrue(customGPUAllocator.getConfiguredAvailableGPUs().isEmpty());
         Assert.assertTrue(customGPUAllocator.getTotalGPUs().size() == 8);
@@ -178,17 +160,17 @@ public class TestGPUAllocator {
     public void testExceedingGPUResource() throws IOException {
 
         CustomGPUmanagementLibrary lib = new CustomGPUmanagementLibrary();
-        CustomGPUAllocator customGPUAllocator = new CustomGPUAllocator(lib);
         YarnConfiguration conf = new YarnConfiguration();
         conf.setInt(YarnConfiguration.NM_GPUS, 8);
-        customGPUAllocator.initialize(conf);
+        conf.set(YarnConfiguration.NM_GPU_MANAGEMENT_IMPL, "io.hops.management.amd.AMDManagementLibrary");
+        CustomGPUAllocator customGPUAllocator = new CustomGPUAllocator(lib, conf);
 
         ContainerId firstContainerId = ContainerId.fromString("container_1_1_1_1");
-        HashSet<Device> firstAllocation = customGPUAllocator.allocate(firstContainerId.toString(), 4);
+        HashSet<GPU> firstAllocation = customGPUAllocator.allocate(firstContainerId.toString(), 4);
 
         //Should throw IOException
         ContainerId secondContainerId = ContainerId.fromString("container_1_1_1_2");
-        HashSet<Device> secondAllocation = customGPUAllocator.allocate(secondContainerId.toString(), 5);
+        HashSet<GPU> secondAllocation = customGPUAllocator.allocate(secondContainerId.toString(), 5);
     }
     
     //Makes sure that if no GPU is requested, all existing GPUs still need to
@@ -196,13 +178,13 @@ public class TestGPUAllocator {
     @Test
     public void testZeroGPURequestedZeroGPUAllocated() throws IOException {
         CustomGPUmanagementLibrary lib = new CustomGPUmanagementLibrary();
-        CustomGPUAllocator customGPUAllocator = new CustomGPUAllocator(lib);
         YarnConfiguration conf = new YarnConfiguration();
         conf.setInt(YarnConfiguration.NM_GPUS, 8);
-        customGPUAllocator.initialize(conf);
+        conf.set(YarnConfiguration.NM_GPU_MANAGEMENT_IMPL, "io.hops.management.amd.AMDManagementLibrary");
+        CustomGPUAllocator customGPUAllocator = new CustomGPUAllocator(lib, conf);
 
         ContainerId firstContainerId = ContainerId.fromString("container_1_1_1_1");
-        HashSet<Device> allocation = customGPUAllocator
+        HashSet<GPU> allocation = customGPUAllocator
             .allocate(firstContainerId.toString(), 0);
 
         Assert.assertTrue(allocation.containsAll
