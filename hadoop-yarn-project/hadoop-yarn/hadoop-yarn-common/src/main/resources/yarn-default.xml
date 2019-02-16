@@ -1220,6 +1220,12 @@
   </property>
 
   <property>
+    <description>GPU manufacturer on machine</description>
+    <name>yarn.nodemanager.gpu.management-impl</name>
+    <value>io.hops.management.nvidia.NvidiaManagementLibrary</value>
+  </property>
+
+  <property>
     <description>Ratio between virtual memory to physical memory when
     setting memory limits for containers. Container allocations are
     expressed in terms of physical memory, and virtual memory usage

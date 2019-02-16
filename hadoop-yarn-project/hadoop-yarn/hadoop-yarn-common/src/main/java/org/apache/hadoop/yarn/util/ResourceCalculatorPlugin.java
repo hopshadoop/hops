@@ -172,14 +172,6 @@ public class ResourceCalculatorPlugin extends Configured {
   }
 
   /**
-   * Obtain the total number of usable GPUs (in non-erroneous state)
-   * @return number of GPUs
-   */
-  public int getNumGPUs(){
-    return sys.getNumGPUs();
-  }
-
-  /**
    * Create the ResourceCalculatorPlugin from the class name and configure it. If
    * class name is null, this method will try and return a memory calculator
    * plugin available for this system.

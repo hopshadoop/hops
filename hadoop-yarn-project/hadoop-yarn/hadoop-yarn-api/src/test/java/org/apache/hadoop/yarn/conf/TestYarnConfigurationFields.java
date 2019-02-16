@@ -67,6 +67,8 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
     configurationPropsToSkipCompare
         .add(YarnConfiguration.DEFAULT_RM_SCHEDULER);
     configurationPropsToSkipCompare
+            .add(YarnConfiguration.DEFAULT_NM_GPU_MANAGEMENT_IMPL);
+    configurationPropsToSkipCompare
         .add(YarnConfiguration
             .YARN_SECURITY_SERVICE_AUTHORIZATION_APPLICATIONCLIENT_PROTOCOL);
     configurationPropsToSkipCompare

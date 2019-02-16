@@ -3,6 +3,7 @@ package io.hops.devices;
 
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import io.hops.GPUManagementLibrary;
 import io.hops.GPUManagementLibraryLoader;
 import io.hops.exceptions.GPUManagementLibraryException;
@@ -26,14 +27,13 @@ public class GPUAllocator {
   final static Log LOG = LogFactory.getLog(GPUAllocator.class);
   private static final GPUAllocator gpuAllocator = new GPUAllocator();
   
-  private HashSet<Device> configuredAvailableGPUs;
-  private HashSet<Device> totalGPUs;
-  private HashMap<String, HashSet<Device>> containerGPUAllocationMapping;
+  private HashSet<GPU> configuredAvailableGPUs;
+  private HashSet<GPU> totalGPUs;
+  private HashMap<String, HashSet<GPU>> containerGPUAllocationMapping;
   private HashSet<Device> mandatoryDrivers;
   private GPUManagementLibrary gpuManagementLibrary;
-  private static final String GPU_MANAGEMENT_LIBRARY_CLASSNAME = "io.hops" +
-      ".management.nvidia.NvidiaManagementLibrary";
-  private static final int NVIDIA_GPU_MAJOR_DEVICE_NUMBER = 195;
+  private static String GPU_MANAGEMENT_LIBRARY_CLASSNAME;
+  private static int GPU_MAJOR_DEVICE_NUMBER;
   private boolean initialized = false;
   
   public static GPUAllocator getInstance(){
@@ -45,15 +45,6 @@ public class GPUAllocator {
     totalGPUs = new HashSet<>();
     containerGPUAllocationMapping = new HashMap<>();
     mandatoryDrivers = new HashSet<>();
-    
-    try {
-      gpuManagementLibrary =
-          GPUManagementLibraryLoader.load(GPU_MANAGEMENT_LIBRARY_CLASSNAME);
-    } catch(GPUManagementLibraryException | UnsatisfiedLinkError e) {
-      LOG.error("Could not load GPU management library. Is this NodeManager " +
-          "supposed to offer its GPUs as a resource? If yes, check " +
-          "installation and make sure hopsnvml-1.0 is present in java.library.path", e);
-    }
   }
   
   @VisibleForTesting
@@ -62,9 +53,14 @@ public class GPUAllocator {
     totalGPUs = new HashSet<>();
     containerGPUAllocationMapping = new HashMap<>();
     mandatoryDrivers = new HashSet<>();
-    
+
     this.gpuManagementLibrary = gpuManagementLibrary;
     initialize(conf);
+  }
+
+  @VisibleForTesting
+  public HashMap<String, HashSet<GPU>> getAllocations() {
+    return new HashMap<>(containerGPUAllocationMapping);
   }
   
   /**
@@ -72,11 +68,32 @@ public class GPUAllocator {
    * @return boolean for success or not
    */
   public boolean initialize(Configuration conf) {
-    if(initialized == false) {
+    if(!initialized) {
+      GPU_MANAGEMENT_LIBRARY_CLASSNAME = conf.get(YarnConfiguration.NM_GPU_MANAGEMENT_IMPL,
+        YarnConfiguration.DEFAULT_NM_GPU_MANAGEMENT_IMPL);
+      LOG.info("Initializing GPUAllocator for " + GPU_MANAGEMENT_LIBRARY_CLASSNAME);
+      try {
+        if(gpuManagementLibrary == null) {
+          gpuManagementLibrary = GPUManagementLibraryLoader.load(GPU_MANAGEMENT_LIBRARY_CLASSNAME);
+        }
+      } catch(GPUManagementLibraryException | UnsatisfiedLinkError | NoClassDefFoundError e) {
+        LOG.error("Could not load GPU management library using provider " + GPU_MANAGEMENT_LIBRARY_CLASSNAME, e);
+      }
       initialized = gpuManagementLibrary.initialize();
+
+      if(GPU_MANAGEMENT_LIBRARY_CLASSNAME.equals
+        (YarnConfiguration.DEFAULT_NM_GPU_MANAGEMENT_IMPL)) {
+        GPU_MAJOR_DEVICE_NUMBER = 195;
+      } else if(GPU_MANAGEMENT_LIBRARY_CLASSNAME.equals("io.hops" +
+        ".management.amd.AMDManagementLibrary")) {
+        GPU_MAJOR_DEVICE_NUMBER = 226;
+      } else {
+        throw new IllegalArgumentException(GPU_MANAGEMENT_LIBRARY_CLASSNAME + " not recognized by GPUAllocator");
+      }
       int numGPUs = NodeManagerHardwareUtils.getNodeGPUs(conf);
       try {
         initMandatoryDrivers();
+        LOG.info("Found mandatory drivers: " + getMandatoryDrivers().toString());
         initConfiguredGPUs(numGPUs);
         initTotalGPUs();
       } catch (IOException ioe) {
@@ -113,7 +130,8 @@ public class GPUAllocator {
   private void initMandatoryDrivers() throws IOException {
     String mandatoryDeviceIds = gpuManagementLibrary
             .queryMandatoryDevices();
-    if (!mandatoryDeviceIds.equals("")) {
+    LOG.info("GPU Management Library drivers: " + mandatoryDeviceIds);
+    if (!Strings.isNullOrEmpty(mandatoryDeviceIds)) {
       String[] mandatoryDeviceIdsArr = mandatoryDeviceIds.split(" ");
       for (int i = 0; i < mandatoryDeviceIdsArr.length; i++) {
         String[] majorMinorPair = mandatoryDeviceIdsArr[i].split(":");
@@ -128,9 +146,7 @@ public class GPUAllocator {
         }
       }
     } else {
-      throw new IOException("Could not discover device numbers for GPU drivers, " +
-              "check driver installation and make sure libnvidia-ml.so.1 is present on " +
-              "LD_LIBRARY_PATH, or disable GPUs in the configuration");
+      throw new IOException("Failed to discover device numbers for GPU drivers using provider: " + GPU_MANAGEMENT_LIBRARY_CLASSNAME);
     }
   }
   
@@ -139,25 +155,42 @@ public class GPUAllocator {
    * may be scheduled and isolated for containers
    */
   private void initConfiguredGPUs(int configuredGPUs) throws IOException {
+    LOG.info("Querying GPU Management Library for " + configuredGPUs + " GPUs");
     String configuredGPUDeviceIds = gpuManagementLibrary
             .queryAvailableDevices(configuredGPUs);
+    LOG.info("GPU Management Library response: " + configuredGPUDeviceIds);
     if (!configuredGPUDeviceIds.equals("")) {
-      String[] configuredGPUDeviceIdsArr = configuredGPUDeviceIds.split(" ");
-      for (int i = 0; i < configuredGPUDeviceIdsArr.length; i++) {
-        String[] majorMinorPair = configuredGPUDeviceIdsArr[i].split(":");
-        try {
-          Device gpu = new Device(
-                  Integer.parseInt(majorMinorPair[0]),
-                  Integer.parseInt(majorMinorPair[1]));
-          configuredAvailableGPUs.add(gpu);
-          LOG.info("Found available GPU device " + gpu.toString() + " for scheduling");
-        } catch (NumberFormatException e) {
-          LOG.error("Unexpected format for major:minor device numbers: " + majorMinorPair[0] + ":" + majorMinorPair[1]);
+      String[] gpuEntries = configuredGPUDeviceIds.split(" ");
+      for (int i = 0; i < gpuEntries.length; i++) {
+        String gpuEntry =  gpuEntries[i];
+        if(GPU_MANAGEMENT_LIBRARY_CLASSNAME.equals
+          (YarnConfiguration.DEFAULT_NM_GPU_MANAGEMENT_IMPL)) {
+          String[] majorMinorPair = gpuEntry.split(":");
+          GPU nvidiaGPU = new GPU(new Device(
+            Integer.parseInt(majorMinorPair[0]),
+            Integer.parseInt(majorMinorPair[1])), null);
+          configuredAvailableGPUs.add(nvidiaGPU);
+          LOG.info("Found available GPU device " + nvidiaGPU.toString() + " for scheduling");
+        } else {
+          String [] gpuRenderNodePair = gpuEntry.split("&");
+          String gpuMajorMinor = gpuRenderNodePair[0];
+          String[] gpuMajorMinorPair = gpuMajorMinor.split(":");
+          String renderNode = gpuRenderNodePair[1];
+          String[] renderNodeMajorMinorPair = renderNode.split(":");
+          GPU amdGPU = new GPU(
+            new Device(
+              Integer.parseInt(gpuMajorMinorPair[0]),
+              Integer.parseInt(gpuMajorMinorPair[1])),
+            new Device(
+              Integer.parseInt(renderNodeMajorMinorPair[0]),
+              Integer.parseInt(renderNodeMajorMinorPair[1])));
+          configuredAvailableGPUs.add(amdGPU);
+          LOG.info("Found available GPU device " + amdGPU.toString() + " for scheduling");
+
         }
       }
     } else {
-      throw new IOException("Could not discover GPU device numbers, either you enabled GPUs but set NM_GPUS to 0," +
-              " or there is a problem with the installation, check that libnvidia-ml.so.1 is present on LD_LIBRARY_PATH");
+      throw new IOException("Could not discover GPU device numbers using provider " + GPU_MANAGEMENT_LIBRARY_CLASSNAME);
     }
   }
 
@@ -176,21 +209,21 @@ public class GPUAllocator {
     return mandatoryDrivers;
   }
   
-  public HashSet<Device> getConfiguredAvailableGPUs() { return configuredAvailableGPUs; }
+  public HashSet<GPU> getConfiguredAvailableGPUs() { return configuredAvailableGPUs; }
 
-  public HashSet<Device> getTotalGPUs() { return totalGPUs; }
+  public HashSet<GPU> getTotalGPUs() { return totalGPUs; }
   
   /**
    * Finds out which gpus are currently allocated to a container
    *
    * @return HashSet containing GPUs currently allocated to containers
    */
-  private HashSet<Device> getAllocatedGPUs() {
-    HashSet<Device> allocatedGPUs = new HashSet<>();
-    Collection<HashSet<Device>> gpuSets = containerGPUAllocationMapping.values();
-    Iterator<HashSet<Device>> itr = gpuSets.iterator();
+  private HashSet<GPU> getAllocatedGPUs() {
+    HashSet<GPU> allocatedGPUs = new HashSet<>();
+    Collection<HashSet<GPU>> gpuSets = containerGPUAllocationMapping.values();
+    Iterator<HashSet<GPU>> itr = gpuSets.iterator();
     while(itr.hasNext()) {
-      HashSet<Device> allocatedGpuSet = itr.next();
+      HashSet<GPU> allocatedGpuSet = itr.next();
       allocatedGPUs.addAll(allocatedGpuSet);
     }
     return allocatedGPUs;
@@ -209,10 +242,10 @@ public class GPUAllocator {
    * GPU then all except the allocated GPU will be returned
    * @throws IOException
    */
-  public synchronized HashSet<Device> allocate(String
+  public synchronized HashSet<GPU> allocate(String
       containerName, int gpus)
       throws IOException {
-    HashSet<Device> gpusToDeny = new HashSet<>(getTotalGPUs());
+    HashSet<GPU> gpusToDeny = new HashSet<>(getTotalGPUs());
 
     if(configuredAvailableGPUs.size() >= gpus) {
       LOG.info("Trying to allocate " + gpus + " GPUs");
@@ -220,11 +253,11 @@ public class GPUAllocator {
       if(gpus > 0) {
 
         LOG.info("Currently unallocated GPUs: " + configuredAvailableGPUs.toString());
-        HashSet<Device> currentlyAllocatedGPUs = getAllocatedGPUs();
+        HashSet<GPU> currentlyAllocatedGPUs = getAllocatedGPUs();
         LOG.info("Currently allocated GPUs: " + currentlyAllocatedGPUs);
 
         //selection method for determining which available GPUs to allocate
-        HashSet<Device> gpuAllocation = selectGPUsToAllocate(gpus);
+        HashSet<GPU> gpuAllocation = selectGPUsToAllocate(gpus);
 
         //remove allocated GPUs from available
         configuredAvailableGPUs.removeAll(gpuAllocation);
@@ -238,6 +271,7 @@ public class GPUAllocator {
         //deny remaining available gpus
         gpusToDeny.removeAll(gpuAllocation);
       }
+
       
       LOG.info("GPUs to deny for " + containerName + " = " +
               gpusToDeny);
@@ -261,26 +295,29 @@ public class GPUAllocator {
    * @param gpus number of GPUs to select for allocation
    * @return set of GPU devices that have been allocated
    */
-  private synchronized HashSet<Device> selectGPUsToAllocate(int gpus) {
+  private synchronized HashSet<GPU> selectGPUsToAllocate(int gpus) {
     
-    HashSet<Device> gpuAllocation = new HashSet<>();
-    Iterator<Device> availableGPUItr = configuredAvailableGPUs.iterator();
+    HashSet<GPU> gpuAllocation = new HashSet<>();
+    Iterator<GPU> availableGPUItr = configuredAvailableGPUs.iterator();
     
     TreeSet<Integer> minDeviceNums = new TreeSet<>();
     
     while(availableGPUItr.hasNext()) {
-      minDeviceNums.add(availableGPUItr.next().getMinorDeviceNumber());
+      minDeviceNums.add(availableGPUItr.next().getGpuDevice().getMinorDeviceNumber());
     }
     
     Iterator<Integer> minGPUDeviceNumItr = minDeviceNums.iterator();
     
     while(minGPUDeviceNumItr.hasNext() && gpus != 0) {
       int gpuMinorNum = minGPUDeviceNumItr.next();
-      Device allocatedGPU = new Device(NVIDIA_GPU_MAJOR_DEVICE_NUMBER, gpuMinorNum);
-      gpuAllocation.add(allocatedGPU);
-      gpus--;
+
+      for(GPU gpu: configuredAvailableGPUs) {
+        if(gpu.getGpuDevice().getMinorDeviceNumber() == gpuMinorNum) {
+          gpuAllocation.add(gpu);
+          gpus--;
+        }
+      }
     }
-    
     return gpuAllocation;
   }
   
@@ -292,7 +329,7 @@ public class GPUAllocator {
    */
   public synchronized void release(String containerName) {
     if(containerGPUAllocationMapping != null && containerGPUAllocationMapping.containsKey(containerName)) {
-      HashSet<Device> gpuAllocation = containerGPUAllocationMapping.
+      HashSet<GPU> gpuAllocation = containerGPUAllocationMapping.
               get(containerName);
       containerGPUAllocationMapping.remove(containerName);
       configuredAvailableGPUs.addAll(gpuAllocation);
@@ -307,7 +344,7 @@ public class GPUAllocator {
    */
   public synchronized void recoverAllocation(String containerId, String
       devicesWhitelistStr) {
-    HashSet<Device> allocatedGPUsForContainer = findGPUsInWhitelist(devicesWhitelistStr);
+    HashSet<GPU> allocatedGPUsForContainer = findGPUsInWhitelist(devicesWhitelistStr);
     if(allocatedGPUsForContainer.isEmpty()) {
       return;
     }
@@ -337,8 +374,8 @@ public class GPUAllocator {
    * @param devicesWhitelistStr
    * @return
    */
-  private HashSet<Device> findGPUsInWhitelist(String devicesWhitelistStr) {
-    HashSet<Device> recoveredGPUs = new HashSet<>();
+  private HashSet<GPU> findGPUsInWhitelist(String devicesWhitelistStr) {
+    HashSet<GPU> recoveredGPUs = new HashSet<>();
     
     Matcher m = DEVICES_LIST_FORMAT.matcher(devicesWhitelistStr);
     
@@ -346,15 +383,23 @@ public class GPUAllocator {
       String majorMinorDeviceNumber = m.group(2);
       String[] majorMinorPair = majorMinorDeviceNumber.split(":");
       int majorDeviceNumber = Integer.parseInt(majorMinorPair[0]);
-      if(majorDeviceNumber == NVIDIA_GPU_MAJOR_DEVICE_NUMBER) {
+      if(majorDeviceNumber == GPU_MAJOR_DEVICE_NUMBER) {
         int minorDeviceNumber = Integer.parseInt(majorMinorPair[1]);
-        Device device = new Device(majorDeviceNumber, minorDeviceNumber);
-        //If not actually a GPU (but same major device number), do not return it
-        if(!getMandatoryDrivers().contains(device)) {
-          recoveredGPUs.add(new Device(majorDeviceNumber, minorDeviceNumber));
-        }
+          GPU gpu = recoverGPU(minorDeviceNumber);
+          if(gpu != null && !getMandatoryDrivers().contains(gpu.getGpuDevice())) {
+            recoveredGPUs.add(gpu);
+          }
       }
     }
     return recoveredGPUs;
+  }
+
+  private GPU recoverGPU(int minDeviceNumber) {
+    for(GPU gpu: configuredAvailableGPUs) {
+      if(gpu.getGpuDevice().getMinorDeviceNumber() == minDeviceNumber) {
+        return gpu;
+      }
+    }
+    return null;
   }
 }
