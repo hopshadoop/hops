@@ -45,11 +45,8 @@ public class NormalUserCertLocServiceHopsSSLCheck extends AbstractHopsSSLCheck {
   
       if (certificateLocalization != null) {
         try {
-          String appId = ugi.getApplicationId();
-          if (appId == null) {
-            throw new IOException("UserGroupInformation does NOT contain the Application ID");
-          }
-          X509SecurityMaterial material = certificateLocalization.getX509MaterialLocation(username, appId);
+          X509SecurityMaterial material =
+              certificateLocalization.getX509MaterialLocation(username, ugi.getApplicationId());
           
           return new HopsSSLCryptoMaterial(
               material.getKeyStoreLocation().toString(),
