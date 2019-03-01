@@ -67,7 +67,6 @@ import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.sql.Date;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -88,6 +87,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   private static final Log LOG = LogFactory.getLog(HopsworksRMAppSecurityActions.class);
   private static final Set<Integer> ACCEPTABLE_HTTP_RESPONSES = new HashSet<>(2);
   private static final String AUTH_HEADER_CONTENT = "Bearer %s";
+  private static final Pattern SUBJECT_USERNAME = Pattern.compile("^(.+)(?>_{2})(.+)$");
   
   private final AtomicReference<Header> authHeader;
   private final JsonParser jsonParser;
@@ -288,8 +288,15 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
     CloseableHttpResponse response = null;
     try {
+      // Application user is the pProject Specific User
+      // We must extract the username out of the PSU
+      Matcher matcher = SUBJECT_USERNAME.matcher(jwtParameter.getAppUser());
+      if (!matcher.matches()) {
+        throw new IOException("Could not extract username out of application user: " + jwtParameter.getAppUser());
+      }
+      String username = matcher.group(2);
       JsonObject json = new JsonObject();
-      json.addProperty("subject", jwtParameter.getAppUser());
+      json.addProperty("subject", username);
       json.addProperty("keyName", jwtParameter.getApplicationId().toString());
       json.addProperty("audiences", String.join(",", jwtParameter.getAudiences()));
       json.addProperty("expiresAt", jwtParameter.getExpirationDate().toString());
