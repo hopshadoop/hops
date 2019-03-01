@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
+import com.nimbusds.jwt.JWT;
+import com.nimbusds.jwt.JWTParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configurable;
@@ -87,6 +89,8 @@ public class TestHopsworksRMAppSecurityActions {
   
   private static final String KEYSTORE_LOCATION = "/path/to/keystore";
   private static final String KEYSTORE_PASS = "12345";
+  
+  private static final String JWT_SUBJECT = "ProjectA1__Flock";
   
   private static String classPath;
   
@@ -178,6 +182,10 @@ public class TestHopsworksRMAppSecurityActions {
     RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
     String jwt = actor.generateJWT(jwtParam);
     Assert.assertNotNull(jwt);
+    String[] tokenizedSubject = JWT_SUBJECT.split("__");
+    JWT decoded = JWTParser.parse(jwt);
+    String subject = decoded.getJWTClaimsSet().getSubject();
+    Assert.assertEquals(tokenizedSubject[1], subject);
   }
   
   @Test
@@ -235,7 +243,7 @@ public class TestHopsworksRMAppSecurityActions {
   
   private JWTSecurityHandler.JWTMaterialParameter createJWTParameter(ApplicationId appId, long amountToAdd,
       TemporalUnit unit) {
-    JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(appId, "Flock");
+    JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(appId, JWT_SUBJECT);
     jwtParam.setRenewable(false);
     Instant now = Instant.now();
     Instant expiresAt = now.plus(amountToAdd, unit);
