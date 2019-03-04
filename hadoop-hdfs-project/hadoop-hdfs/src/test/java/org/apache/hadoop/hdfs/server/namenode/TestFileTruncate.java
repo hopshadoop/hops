@@ -18,16 +18,13 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
-import io.hops.exception.StorageException;
-import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
-import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -35,7 +32,6 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -44,7 +40,6 @@ import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.AppendTestUtil;
@@ -58,9 +53,6 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
-import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -70,12 +62,13 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 
 public class TestFileTruncate {
   static {
     GenericTestUtils.setLogLevel(NameNode.stateChangeLog, Level.ALL);
   }
-static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
+  static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
   static final int BLOCK_SIZE = 4;
   static final short REPLICATION = 3;
   static final int DATANODE_NUM = 3;
@@ -307,8 +300,6 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
     boolean isReady = fs.truncate(p, newLength);
     assertThat("truncate should have triggered block recovery.",
         isReady, is(false));
-    FileStatus fileStatus = fs.getFileStatus(p);
-    assertThat(fileStatus.getLen(), is((long) newLength));
 
     {
       try {
@@ -326,8 +317,6 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
           NameNodeAdapter.getLeaseHolderForPath(cluster.getNameNode(),
           p.toUri().getPath());
       if(leaseHolder.equals(HdfsServerConstants.NAMENODE_LEASE_HOLDER)) {
-        cluster.startDataNodes(conf, DATANODE_NUM, true,
-            HdfsServerConstants.StartupOption.REGULAR, null);
         recoveryTriggered = true;
         break;
       }
@@ -335,6 +324,9 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
     }
     assertThat("lease recovery should have occurred in ~" +
         SLEEP * RECOVERY_ATTEMPTS + " ms.", recoveryTriggered, is(true));
+    cluster.startDataNodes(conf, DATANODE_NUM, true,
+        StartupOption.REGULAR, null);
+    cluster.waitActive();
 
     checkBlockRecovery(p);
 
@@ -346,39 +338,44 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
     fs.delete(p, false);
   }
 
-  
   /**
    * Check truncate recovery.
    */
   @Test
-  public void testTruncateLastBlock() throws IOException {
+  public void testTruncateRecovery() throws IOException {
     FSNamesystem fsn = cluster.getNamesystem();
-
-    String src = "/file";
+    String client = "client";
+    String clientMachine = "clientMachine";
+    Path parent = new Path("/test");
+    String src = "/test/testTruncateRecovery";
     Path srcPath = new Path(src);
 
     byte[] contents = AppendTestUtil.initBuffer(BLOCK_SIZE);
     writeContents(contents, BLOCK_SIZE, srcPath);
 
-    INodeFile inode = getINode(src, fsn.dir, cluster).asFile();
-    long oldGenstamp = GenerationStamp.LAST_RESERVED_STAMP;
-    DatanodeDescriptor dn = DFSTestUtil.getLocalDatanodeDescriptor();
-    DatanodeStorageInfo storage = DFSTestUtil.createDatanodeStorageInfo(
-        "id", InetAddress.getLocalHost().getHostAddress());
-    dn.isAlive = true;
-
-    BlockInfoContiguousUnderConstruction blockInfo = createBlockInfoUnderConstruction(new DatanodeStorageInfo[] {storage}, oldGenstamp);
-
-    initializeBlockRecovery(inode, fsn);
-    BlockInfoContiguous lastBlock = getLastBlock(inode, fsn);
-    assertThat(lastBlock.getBlockUCState(),
-        is(HdfsServerConstants.BlockUCState.BEING_TRUNCATED));
-    long blockRecoveryId = ((BlockInfoContiguousUnderConstruction) lastBlock)
+    INodesInPath iip = getINodesInPath(src, fsn, cluster);
+    INodeFile file = iip.getLastINode().asFile();
+    long initialGenStamp = getLastBlock(file, fsn).getGenerationStamp();
+    // Test that prepareFileForTruncate sets up in-place truncate.
+    Block oldBlock = getLastBlock(file, fsn);
+    Block truncateBlock = prepareFileForTruncate(file, iip, client, clientMachine, fsn); 
+    // In-place truncate uses old block id with new genStamp.
+    assertThat(truncateBlock.getBlockId(),
+        is(equalTo(oldBlock.getBlockId())));
+    assertThat(truncateBlock.getNumBytes(),
+        is(oldBlock.getNumBytes()));
+    assertThat(truncateBlock.getGenerationStamp(),
+        is(oldBlock.getGenerationStamp()+1));
+    assertThat(getLastBlock(file, fsn).getBlockUCState(),
+        is(HdfsServerConstants.BlockUCState.UNDER_RECOVERY));
+    long blockRecoveryId = ((BlockInfoContiguousUnderConstruction) getLastBlock(file, fsn))
         .getBlockRecoveryId();
-     assertThat(blockRecoveryId, is(oldGenstamp + 2));
+    assertThat(blockRecoveryId, is(initialGenStamp + 1));
+
+    fs.delete(parent, true);
   }
-  
-  public INode getINode(final String src, final FSDirectory fsdir, final MiniDFSCluster cluster) throws IOException {
+
+  public INodesInPath getINodesInPath(final String src, final FSNamesystem fsn, final MiniDFSCluster cluster) throws IOException {
     HopsTransactionalRequestHandler getInodeHandler = new HopsTransactionalRequestHandler(
         HDFSOperationType.GET_INODE) {
 
@@ -392,38 +389,13 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
 
       @Override
       public Object performTask() throws IOException {
-        return fsdir.getINode(src);
+        return fsn.getFSDirectory().getINodesInPath4Write(src, true);
 
       }
     };
-    return (INode) getInodeHandler.handle();
+    return (INodesInPath) getInodeHandler.handle();
   }
-
-  private void initializeBlockRecovery(final INodeFile inode, final FSNamesystem fsn) throws IOException{
-    new HopsTransactionalRequestHandler(HDFSOperationType.TRUNCATE) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE,
-            TransactionLockTypes.INodeResolveType.PATH, inode.getId())
-            .setNameNodeID(fsn.getNamenodeId())
-            .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes());
-        locks.add(il).add(lf.getBlockLock()).add(
-            lf.getBlockRelated(LockFactory.BLK.RE.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UC, LockFactory.BLK.IV));
-        locks.add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
-              .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE));
-        
-        locks.add(lf.getAcesLock());
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        fsn.initializeBlockRecovery(inode);
-        return null;
-      }
-    }.handle();
-  }
- 
+   
   private BlockInfoContiguous getLastBlock(final INodeFile inode, final FSNamesystem fsn) throws IOException{
     return (BlockInfoContiguous) new HopsTransactionalRequestHandler(HDFSOperationType.TRUNCATE) {
       @Override
@@ -434,7 +406,7 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
             .setNameNodeID(fsn.getNamenodeId())
             .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock()).add(
-            lf.getBlockRelated(LockFactory.BLK.RE.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UC, LockFactory.BLK.IV));
+            lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UR, LockFactory.BLK.UC, LockFactory.BLK.IV));
         locks.add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
               .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE));
         
@@ -448,42 +420,28 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
       }
     }.handle();
   }
- 
- private BlockInfoContiguousUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages, final long oldGenstamp) throws
-      IOException {
-    return (BlockInfoContiguousUnderConstruction) new HopsTransactionalRequestHandler(
-        HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
-      INodeIdentifier inodeIdentifier = new INodeIdentifier(2L);
-
-      @Override
-      public void setUp() throws StorageException {
-      }
-
+  
+  private Block prepareFileForTruncate(final INodeFile inode, final INodesInPath iip, final String client, final String clientMachine, final FSNamesystem fsn) throws IOException{
+    return (Block) new HopsTransactionalRequestHandler(HDFSOperationType.TRUNCATE) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        locks.add(
-            lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
-            .add(
-                lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
-            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
-            .add(lf.getBlockLock(10, inodeIdentifier))
-            .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
-                LockFactory.BLK.UR));
+        LockFactory lf = LockFactory.getInstance();
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE,
+            TransactionLockTypes.INodeResolveType.PATH, inode.getId())
+            .setNameNodeID(fsn.getNamenodeId())
+            .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockLock()).add(
+            lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UR, LockFactory.BLK.UC, LockFactory.BLK.IV));
+        locks.add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE, client))
+              .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE));
+        
+        locks.add(lf.getAcesLock());
       }
 
       @Override
       public Object performTask() throws IOException {
-        Block block = new Block(0, 1, oldGenstamp);
-        BlockInfoContiguousUnderConstruction blockInfo = new BlockInfoContiguousUnderConstruction(
-        block, 2,
-        HdfsServerConstants.BlockUCState.BEING_TRUNCATED,
-        storages);
-        EntityManager.add(blockInfo);
-        
-        return blockInfo;
+        return fsn.prepareFileForTruncate(iip, client, clientMachine, 1, null);
       }
-
     }.handle();
   }
  
@@ -554,9 +512,15 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
       throws IOException {
     return dfs.getClient().getLocatedBlocks(src.toString(), 0, Long.MAX_VALUE);
   }
-  
+
+  static void assertFileLength(Path file, long length) throws IOException {
+    byte[] data = DFSTestUtil.readFileBuffer(fs, file);
+    assertEquals("Wrong data size in snapshot.", length, data.length);
+  }
+
   static void checkFullFile(Path p, int newLength, byte[] contents)
       throws IOException {
     AppendTestUtil.checkFullFile(fs, p, newLength, contents, p.toString());
   }
+
 }

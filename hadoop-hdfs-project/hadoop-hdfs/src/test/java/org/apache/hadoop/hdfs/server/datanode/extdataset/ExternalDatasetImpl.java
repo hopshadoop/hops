@@ -276,7 +276,7 @@ public class ExternalDatasetImpl implements FsDatasetSpi<ExternalVolumeImpl> {
 
   @Override
   public String updateReplicaUnderRecovery(ExtendedBlock oldBlock,
-      long recoveryId, long newLength) throws IOException {
+      long recoveryId, long newBlockId, long newLength) throws IOException {
     return null;
   }
 

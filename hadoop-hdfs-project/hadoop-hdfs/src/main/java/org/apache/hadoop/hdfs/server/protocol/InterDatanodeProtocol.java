@@ -68,5 +68,6 @@ public interface InterDatanodeProtocol {
    * Update replica with the new generation stamp and length.
    */
   String updateReplicaUnderRecovery(ExtendedBlock oldBlock, long recoveryId,
-      long newLength) throws IOException;
+                                    long newBlockId, long newLength)
+      throws IOException;
 }

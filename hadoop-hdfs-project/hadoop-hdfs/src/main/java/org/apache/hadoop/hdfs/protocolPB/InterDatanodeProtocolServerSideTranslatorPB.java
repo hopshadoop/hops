@@ -73,9 +73,9 @@ public class InterDatanodeProtocolServerSideTranslatorPB
       throws ServiceException {
     final String storageID;
     try {
-      storageID =
-          impl.updateReplicaUnderRecovery(PBHelper.convert(request.getBlock()),
-              request.getRecoveryId(), request.getNewLength());
+      storageID = impl.updateReplicaUnderRecovery(
+              PBHelper.convert(request.getBlock()), request.getRecoveryId(),
+              request.getNewBlockId(), request.getNewLength());
     } catch (IOException e) {
       throw new ServiceException(e);
     }

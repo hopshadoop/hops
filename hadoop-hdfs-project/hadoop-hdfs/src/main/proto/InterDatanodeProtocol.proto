@@ -55,8 +55,10 @@ message InitReplicaRecoveryResponseProto {
  */
 message UpdateReplicaUnderRecoveryRequestProto {
   required ExtendedBlockProto block = 1; // Block identifier
-  required uint64 recoveryId = 2; // New genstamp of the replica
-  required uint64 newLength = 3; // New length of the replica
+  required uint64 recoveryId = 2;        // New genstamp of the replica
+  required uint64 newLength = 3;         // New length of the replica
+  // New blockId for copy (truncate), default is 0.
+  optional uint64 newBlockId = 4 [default = 0];
 }
 
 /**

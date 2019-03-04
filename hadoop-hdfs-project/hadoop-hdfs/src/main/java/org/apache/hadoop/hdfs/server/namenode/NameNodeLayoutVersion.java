@@ -63,7 +63,9 @@ public class NameNodeLayoutVersion {
    * </ul>
    */
   public static enum Feature implements LayoutFeature {
-    ROLLING_UPGRADE(-49, -48, "Support rolling upgrade", false);
+    ROLLING_UPGRADE(-49, -48, "Support rolling upgrade", false),
+    BLOCK_STORAGE_POLICY(-50, "Block Storage policy"),
+    TRUNCATE(-51, "Truncate");
     
     private final FeatureInfo info;
 

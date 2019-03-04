@@ -1009,9 +1009,13 @@ public abstract void destroyAndCollectBlocks(BlocksMapUpdateInfo v, List<INode> 
      * @param toDelete the to-be-deleted block
      */
     public void addDeleteBlock(Block toDelete) {
-      if (toDelete != null) {
-        toDeleteList.add(toDelete);
-      }
+      assert toDelete != null : "toDelete is null";
+      toDeleteList.add(toDelete);
+    }
+
+    public void removeDeleteBlock(Block block) {
+      assert block != null : "block is null";
+      toDeleteList.remove(block);
     }
 
     /**

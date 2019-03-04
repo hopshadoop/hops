@@ -677,7 +677,12 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     final File destDir = DatanodeUtil.idToBlockDir(destRoot, blockId);
     final File dstFile = new File(destDir, srcFile.getName());
     final File dstMeta = FsDatasetUtil.getMetaFile(dstFile, genStamp);
-    
+    return copyBlockFiles(srcMeta, srcFile, dstMeta, dstFile);
+  }
+
+  static File[] copyBlockFiles(File srcMeta, File srcFile, File dstMeta,
+                               File dstFile)
+      throws IOException {
     try {
       Storage.nativeCopyFileUnbuffered(srcMeta, dstMeta, true);
     } catch (IOException e) {
@@ -2063,8 +2068,10 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
 
   @Override // FsDatasetSpi
   public synchronized String updateReplicaUnderRecovery(
-      final ExtendedBlock oldBlock, final long recoveryId, final long newlength)
-      throws IOException {
+                                    final ExtendedBlock oldBlock,
+                                    final long recoveryId,
+                                    final long newBlockId,
+                                    final long newlength) throws IOException {
     //get replica
     final String bpid = oldBlock.getBlockPoolId();
     final ReplicaInfo replica = volumeMap.get(bpid, oldBlock.getBlockId());
@@ -2093,15 +2100,27 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     checkReplicaFiles(replica);
 
     //update replica
-    final FinalizedReplica finalized =
-        updateReplicaUnderRecovery(oldBlock.getBlockPoolId(),
-            (ReplicaUnderRecovery) replica, recoveryId, newlength);
-    assert finalized.getBlockId() == oldBlock.getBlockId() &&
-        finalized.getGenerationStamp() == recoveryId &&
-        finalized.getNumBytes() == newlength :
-        "Replica information mismatched: oldBlock=" + oldBlock +
-            ", recoveryId=" + recoveryId + ", newlength=" + newlength +
-            ", finalized=" + finalized;
+    final FinalizedReplica finalized = updateReplicaUnderRecovery(oldBlock
+        .getBlockPoolId(), (ReplicaUnderRecovery) replica, recoveryId,
+        newBlockId, newlength);
+
+    boolean copyTruncate = newBlockId != oldBlock.getBlockId();
+    if(!copyTruncate) {
+      assert finalized.getBlockId() == oldBlock.getBlockId()
+          && finalized.getGenerationStamp() == recoveryId
+          && finalized.getNumBytes() == newlength
+          : "Replica information mismatched: oldBlock=" + oldBlock
+              + ", recoveryId=" + recoveryId + ", newlength=" + newlength
+              + ", newBlockId=" + newBlockId + ", finalized=" + finalized;
+    } else {
+      assert finalized.getBlockId() == oldBlock.getBlockId()
+          && finalized.getGenerationStamp() == oldBlock.getGenerationStamp()
+          && finalized.getNumBytes() == oldBlock.getNumBytes()
+          : "Finalized and old information mismatched: oldBlock=" + oldBlock
+              + ", genStamp=" + oldBlock.getGenerationStamp()
+              + ", len=" + oldBlock.getNumBytes()
+              + ", finalized=" + finalized;
+    }
 
     //check replica files after update
     checkReplicaFiles(finalized);
@@ -2110,34 +2129,73 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     return getVolume(new ExtendedBlock(bpid, finalized)).getStorageID();
   }
 
-  private FinalizedReplica updateReplicaUnderRecovery(String bpid,
-      ReplicaUnderRecovery rur, long recoveryId, long newlength)
-      throws IOException {
+  private FinalizedReplica updateReplicaUnderRecovery(
+                                          String bpid,
+                                          ReplicaUnderRecovery rur,
+                                          long recoveryId,
+                                          long newBlockId,
+                                          long newlength) throws IOException {
     //check recovery id
     if (rur.getRecoveryID() != recoveryId) {
       throw new IOException(
           "rur.getRecoveryID() != recoveryId = " + recoveryId + ", rur=" + rur);
     }
 
+    boolean copyOnTruncate = newBlockId > 0L && rur.getBlockId() != newBlockId;
+    File blockFile;
+    File metaFile;
     // bump rur's GS to be recovery id
-    bumpReplicaGS(rur, recoveryId);
+    if(!copyOnTruncate) {
+      bumpReplicaGS(rur, recoveryId);
+      blockFile = rur.getBlockFile();
+      metaFile = rur.getMetaFile();
+    } else {
+      File[] copiedReplicaFiles =
+          copyReplicaWithNewBlockIdAndGS(rur, bpid, newBlockId, recoveryId);
+      blockFile = copiedReplicaFiles[1];
+      metaFile = copiedReplicaFiles[0];
+    }
 
     //update length
-    final File replicafile = rur.getBlockFile();
     if (rur.getNumBytes() < newlength) {
       throw new IOException(
           "rur.getNumBytes() < newlength = " + newlength + ", rur=" + rur);
     }
     if (rur.getNumBytes() > newlength) {
       rur.unlinkBlock(1);
-      truncateBlock(replicafile, rur.getMetaFile(), rur.getNumBytes(),
-          newlength);
-      // update RUR with the new length
-      rur.setNumBytesNoPersistance(newlength);
-    }
+      truncateBlock(blockFile, metaFile, rur.getNumBytes(), newlength);
+      if(!copyOnTruncate) {
+        // update RUR with the new length
+        rur.setNumBytesNoPersistance(newlength);
+      } else {
+        // Copying block to a new block with new blockId.
+        // Not truncating original block.
+        ReplicaBeingWritten newReplicaInfo = new ReplicaBeingWritten(
+            newBlockId, recoveryId, rur.getVolume(), blockFile.getParentFile(),
+            newlength);
+        newReplicaInfo.setNumBytesNoPersistance(newlength);
+        volumeMap.add(bpid, newReplicaInfo);
+        finalizeReplica(bpid, newReplicaInfo);
+      }
+   }
 
     // finalize the block
     return finalizeReplica(bpid, rur);
+  }
+
+  private File[] copyReplicaWithNewBlockIdAndGS(
+      ReplicaUnderRecovery replicaInfo, String bpid, long newBlkId, long newGS)
+      throws IOException {
+    String blockFileName = Block.BLOCK_FILE_PREFIX + newBlkId;
+    FsVolumeReference v = volumes.getNextVolume(
+        replicaInfo.getVolume().getStorageType(), replicaInfo.getNumBytes());
+    final File tmpDir = ((FsVolumeImpl) v.getVolume())
+        .getBlockPoolSlice(bpid).getTmpDir();
+    final File destDir = DatanodeUtil.idToBlockDir(tmpDir, newBlkId);
+    final File dstBlockFile = new File(destDir, blockFileName);
+    final File dstMetaFile = FsDatasetUtil.getMetaFile(dstBlockFile, newGS);
+    return copyBlockFiles(replicaInfo.getMetaFile(), replicaInfo.getBlockFile(),
+        dstMetaFile, dstBlockFile);
   }
 
   @Override // FsDatasetSpi
