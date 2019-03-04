@@ -39,7 +39,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * I-node for closed file.
@@ -72,7 +74,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   private int generationStamp = (int) GenerationStamp.LAST_RESERVED_STAMP;
   private long size = 0;
   private boolean isFileStoredInDB = false;
-  
+  private Set<Block> removedBlocks = new HashSet<>();
   /**
    * @return true unconditionally.
    */
@@ -327,7 +329,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     }
     removedINodes.add(this);
   }
-  
+
   @Override
   public String getName() throws StorageException, TransactionContextException {
     // Get the full path name of this inode.
@@ -336,17 +338,13 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
 
 
   @Override
-  public final ContentSummaryComputationContext  computeContentSummary(ContentSummaryComputationContext summary)
-      throws StorageException, TransactionContextException {
-    computeContentSummary4Current(summary.getCounts());
-    return summary;
-  }
-
-  private void computeContentSummary4Current(final Content.Counts counts) throws StorageException,
-      TransactionContextException {
+  public final ContentSummaryComputationContext computeContentSummary(
+      final ContentSummaryComputationContext summary) throws StorageException, TransactionContextException {
+    final Content.Counts counts = summary.getCounts();
     counts.add(Content.LENGTH, computeFileSize());
     counts.add(Content.FILE, 1);
     counts.add(Content.DISKSPACE, diskspaceConsumed());
+    return summary;
   }
   
   /**
@@ -403,8 +401,12 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     return counts;
   }
 
-  long diskspaceConsumed()
-      throws StorageException, TransactionContextException {
+  /**
+   * Compute size consumed by all blocks of the current file,
+   * including blocks in its snapshots.
+   * Use preferred block size for the last block if it is under construction.
+   */
+  long diskspaceConsumed() throws StorageException, TransactionContextException {
     if(isFileStoredInDB()){
       // We do not know the replicaton of the database here. However, to be
       // consistent with normal files we will multiply the file size by the
@@ -637,8 +639,19 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     if (!isInTree()) {
       return null;
     }
-    List<BlockInfoContiguous> blocks = (List<BlockInfoContiguous>) EntityManager
+    List<BlockInfoContiguous> blocksInDB = (List<BlockInfoContiguous>) EntityManager
         .findList(BlockInfoContiguous.Finder.ByINodeId, id);
+    List<BlockInfoContiguous> blocks = null;
+    if (blocksInDB != null) {
+      for (BlockInfoContiguous block : blocksInDB) {
+        if (!removedBlocks.contains(block)) {
+          if(blocks==null){
+            blocks = new ArrayList<>();
+          }
+          blocks.add(block);
+        }
+      }
+    }
     if (blocks != null) {
       Collections.sort(blocks, BlockInfoContiguous.Order.ByBlockIndex);
       return blocks;
@@ -661,7 +674,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     final BlockInfoContiguous[] oldBlocks = getBlocks();
     if (oldBlocks == null)
       return 0;
-    //find the minimum n such that the size of the first n blocks > max
+    // find the minimum n such that the size of the first n blocks > max
     int n = 0;
     long size = 0;
     for(; n < oldBlocks.length && max > size; n++) {
@@ -670,21 +683,11 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     if (n >= oldBlocks.length)
       return size;
 
-    // starting from block n, the data is beyond max.
-    // resize the array.  
-    final BlockInfoContiguous[] newBlocks;
-    if (n == 0) {
-      newBlocks = BlockInfoContiguous.EMPTY_ARRAY;
-    } else {
-      newBlocks = new BlockInfoContiguous[n];
-      System.arraycopy(oldBlocks, 0, newBlocks, 0, n);
-    }
-
     // collect the blocks beyond max
     if (collectedBlocks != null) {
       for(; n < oldBlocks.length; n++) {
         BlockInfoContiguous block = oldBlocks[n];
-        EntityManager.remove(block);
+        removedBlocks.add(block);
         collectedBlocks.addDeleteBlock(block);
       }
     }

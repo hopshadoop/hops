@@ -98,8 +98,8 @@ public class TestCommitBlockSynchronization {
     doReturn(true).when(file).removeLastBlock(any(Block.class));
     doReturn(true).when(file).isUnderConstruction();
     
-    doReturn(mockBlockInfo).when(namesystemSpy).getStoredBlock(any(Block.class));
-    
+    doReturn(mockBlockInfo).when(namesystemSpy).getStoredBlock(any(Block.class));  
+    doReturn(mockBlockInfo).when(file).getLastBlock();
     doReturn("").when(namesystemSpy).closeFileCommitBlocks(
         any(INodeFile.class),
         any(BlockInfoContiguous.class));
@@ -175,6 +175,7 @@ public class TestCommitBlockSynchronization {
     
     doReturn(mockCompletedBlockInfo).when(namesystemSpy)
         .getStoredBlock(any(Block.class));
+    doReturn(mockCompletedBlockInfo).when(file).getLastBlock();
 
     // Repeat the call to make sure it does not throw
     namesystemSpy.commitBlockSynchronization(
@@ -288,6 +289,7 @@ public class TestCommitBlockSynchronization {
     
     doReturn(mockCompletedBlockInfo).when(namesystemSpy)
         .getStoredBlock(any(Block.class));
+    doReturn(mockCompletedBlockInfo).when(file).getLastBlock();
 
     namesystemSpy.commitBlockSynchronization(
         lastBlock, genStamp, length, true, false, newTargets, null);

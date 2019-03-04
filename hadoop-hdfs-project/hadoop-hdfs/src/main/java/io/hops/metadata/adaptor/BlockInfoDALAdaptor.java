@@ -143,6 +143,11 @@ public class BlockInfoDALAdaptor extends
             (BlockInfoContiguousUnderConstruction) hdfsClass;
         hopBlkInfo.setPrimaryNodeIndex(ucBlock.getPrimaryNodeIndex());
         hopBlkInfo.setBlockRecoveryId(ucBlock.getBlockRecoveryId());
+        Block truncateBlock = ucBlock.getTruncateBlock();
+        if(truncateBlock!=null){
+          hopBlkInfo.setTruncateBlockGenerationStamp(truncateBlock.getGenerationStamp());
+          hopBlkInfo.setTruncateBlockNumBytes(truncateBlock.getNumBytes());
+        }
       }
       return hopBlkInfo;
     } else {
@@ -168,6 +173,10 @@ public class BlockInfoDALAdaptor extends
             .setPrimaryNodeIndexNoPersistance(dalClass.getPrimaryNodeIndex());
         ((BlockInfoContiguousUnderConstruction) blockInfo)
             .setBlockRecoveryIdNoPersistance(dalClass.getBlockRecoveryId());
+        if(dalClass.getTruncateBlockNumBytes()>0){
+          Block truncateBlock = new Block(dalClass.getBlockId(), dalClass.getTruncateBlockNumBytes(), dalClass.getTruncateBlockGenerationStamp());
+          ((BlockInfoContiguousUnderConstruction) blockInfo).setTruncateBlock(truncateBlock);
+        }
       } else if (dalClass.getBlockUCState() ==
           HdfsServerConstants.BlockUCState.COMPLETE.ordinal()) {
         blockInfo =

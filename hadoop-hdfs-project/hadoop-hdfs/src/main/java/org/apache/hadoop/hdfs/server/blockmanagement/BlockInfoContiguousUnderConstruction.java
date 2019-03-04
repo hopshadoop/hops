@@ -57,6 +57,11 @@ public class BlockInfoContiguousUnderConstruction extends BlockInfoContiguous {
   private long blockRecoveryId = 0;
 
   /**
+   * The block source to use in the event of copy-on-write truncate.
+   */
+  private Block truncateBlock;
+
+  /**
    * Create block and set its state to {@link BlockUCState#UNDER_CONSTRUCTION}.
    */
   public BlockInfoContiguousUnderConstruction(Block blk, long inodeId) {
@@ -151,6 +156,15 @@ public class BlockInfoContiguousUnderConstruction extends BlockInfoContiguous {
     return blockRecoveryId;
   }
 
+  /** Get recover block */
+  public Block getTruncateBlock() {
+    return truncateBlock;
+  }
+
+  public void setTruncateBlock(Block recoveryBlock) {
+    this.truncateBlock = recoveryBlock;
+  }
+
   /**
    * Process the recorded replicas. When about to commit or finish the
    * pipeline recovery sort out bad replicas.
@@ -203,12 +217,7 @@ public class BlockInfoContiguousUnderConstruction extends BlockInfoContiguous {
   public void initializeBlockRecovery(long recoveryId,
       DatanodeManager datanodeMgr)
       throws StorageException, TransactionContextException {
-    initializeBlockRecovery(BlockUCState.UNDER_RECOVERY, recoveryId, datanodeMgr);
-  }
-  
-  public void initializeBlockRecovery(BlockUCState s, long recoveryId, DatanodeManager datanodeMgr) throws
-      TransactionContextException, StorageException {
-    setBlockUCState(s);
+    setBlockUCState(BlockUCState.UNDER_RECOVERY);
     List<ReplicaUnderConstruction> replicas = getExpectedReplicas();
     setBlockRecoveryId(recoveryId);
     if (replicas.isEmpty()) {

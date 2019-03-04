@@ -1109,7 +1109,9 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
   @Override // FsDatasetSpi
   public String updateReplicaUnderRecovery(ExtendedBlock oldBlock,
-      long recoveryId, long newlength) {
+                                        long recoveryId,
+                                        long newBlockId,
+                                        long newlength) {
     // Caller does not care about the exact Storage UUID returned.
     return datanodeUuid;
   }

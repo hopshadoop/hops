@@ -874,7 +874,8 @@ public class FSDirectory implements Closeable {
   /**
    * Truncate has the following properties:
    * 1.) Any block deletions occur now.
-   * 2.) INode length is truncated now – clients can only read up to new length.
+   * 2.) INode length is truncated now – new clients can only read up to
+   * the truncated length.
    * 3.) INode will be set to UC and lastBlock set to UNDER_RECOVERY.
    * 4.) NN will trigger DN truncation recovery and waits for DNs to report.
    * 5.) File is considered UNDER_RECOVERY until truncation recovery completes.
@@ -892,27 +893,8 @@ public class FSDirectory implements Closeable {
     file.setModificationTime(mtime);
     
     updateCount(iip, 0, file.diskspaceConsumed() - oldDiskspace, true);
-    // If on block boundary, then return
-    long lastBlockDelta = remainingLength - newLength;
-    if(lastBlockDelta == 0){
-      file.recomputeFileSize();
-      return true;
-    }
-    // Set new last block length
-    if (!file.isFileStoredInDB()) {
-      BlockInfoContiguous lastBlock = file.getLastBlock();
-      assert lastBlock.getNumBytes() - lastBlockDelta > 0 : "wrong block size";
-      lastBlock.setNumBytes(lastBlock.getNumBytes() - lastBlockDelta);
-    } else {
-      int newLengthInt = (int) newLength;  //small files should be small enough for their size to fit in an int
-      byte[] oldData = file.getFileDataInDB();
-      byte[] newData = new byte[newLengthInt];
-      System.arraycopy(oldData, 0, newData, 0, newLengthInt);
-      file.deleteFileDataStoredInDB();
-      file.storeFileDataInDB(newData);
-    }
-    file.recomputeFileSize();
-    return false;
+    // return whether on a block boundary
+    return (remainingLength - newLength) == 0;
   }
 
   /**
