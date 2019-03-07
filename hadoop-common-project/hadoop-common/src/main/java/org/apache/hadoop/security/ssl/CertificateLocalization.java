@@ -53,9 +53,9 @@ public interface CertificateLocalization {
       throws FileNotFoundException, InterruptedException;
   
   void updateX509(String username, String applicationId, ByteBuffer keyStore, String keyStorePassword,
-      ByteBuffer trustStore, String trustStorePassword) throws IOException, InterruptedException;
+      ByteBuffer trustStore, String trustStorePassword) throws InterruptedException;
   
-  void updateJWT(String username, String applicationId, String jwt) throws IOException, InterruptedException;
+  void updateJWT(String username, String applicationId, String jwt) throws InterruptedException;
   
   String getSuperKeystoreLocation();
   

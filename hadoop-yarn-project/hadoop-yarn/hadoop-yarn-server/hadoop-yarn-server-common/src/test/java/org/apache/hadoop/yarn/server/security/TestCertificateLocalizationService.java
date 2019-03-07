@@ -147,6 +147,15 @@ public class TestCertificateLocalizationService {
     }
   }
   
+  private void materializeJWTUtil(CertificateLocalizationService certLocSrv, String username, String userFolder,
+      String token) throws InterruptedException {
+    if (service == CertificateLocalizationService.ServiceType.NM) {
+      certLocSrv.materializeJWT(username, null, userFolder, token);
+    } else {
+      certLocSrv.materializeJWT(username, null, username, token);
+    }
+  }
+  
   @Test
   public void testLocalizationDirectory() throws Exception {
     Path materializeDir = certLocSrv.getMaterializeDirectory();
@@ -227,13 +236,18 @@ public class TestCertificateLocalizationService {
       String trustStorePassword = "tpassword0";
       String username = "Dolores";
       String userFolder = "userFolder";
+      String jwt = "Something that's supposed to be a token";
   
       ByteBuffer newKeyStore = ByteBuffer.wrap("keyStore1".getBytes());
       ByteBuffer newTrustStore = ByteBuffer.wrap("trustStore1".getBytes());
       String newKeyStorePassword = "kpassword1";
       String newTrustStorePassword = "tpassword1";
+      String newJWT = "Another token";
       materializeCertificateUtil(delayedCertLoc, username, userFolder, keyStore, keyStorePassword, trustStore, trustStorePassword);
+      materializeJWTUtil(delayedCertLoc, username, userFolder, jwt);
+      
       delayedCertLoc.updateX509(username, null, newKeyStore, newKeyStorePassword, newTrustStore, newTrustStorePassword);
+      delayedCertLoc.updateJWT(username, null, newJWT);
       X509SecurityMaterial material = delayedCertLoc.getX509MaterialLocation(username);
       
       // Make some basic checks here. Extended checks are in testUpdateMaterial
@@ -241,6 +255,9 @@ public class TestCertificateLocalizationService {
       assertNotEquals(keyStorePassword, material.getKeyStorePass());
       assertEquals(newKeyStore, material.getKeyStoreMem());
       assertEquals(newKeyStorePassword, material.getKeyStorePass());
+      
+      JWTSecurityMaterial jwtMaterial = delayedCertLoc.getJWTMaterialLocation(username, null);
+      assertNotEquals(jwt, jwtMaterial.getToken());
     } finally {
       delayedCertLoc.stop();
     }
@@ -254,19 +271,25 @@ public class TestCertificateLocalizationService {
     String trustStorePassword = "tpassword0";
     String username = "Dolores";
     String userFolder = "userFolder";
+    String jwt = "A not very random string";
     
     materializeCertificateUtil(certLocSrv, username, userFolder, keyStore, keyStorePassword,
         trustStore, trustStorePassword);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, keyStorePassword, trustStorePassword, true);
+    materializeJWTUtil(certLocSrv, username, userFolder, jwt);
     
     X509SecurityMaterial oldMaterial = certLocSrv.getX509MaterialLocation(username);
+    JWTSecurityMaterial oldJWTMaterial = certLocSrv.getJWTMaterialLocation(username, null);
+    assertNotNull(oldJWTMaterial);
     
     ByteBuffer newKeyStore = ByteBuffer.wrap("keyStore1".getBytes());
     ByteBuffer newTrustStore = ByteBuffer.wrap("trustStore1".getBytes());
     String newKeyStorePassword = "kpassword1";
     String newTrustStorePassword = "tpassword1";
+    String newJWT = "Again not a very random token";
     certLocSrv.updateX509(username, null, newKeyStore, newKeyStorePassword,
         newTrustStore, newTrustStorePassword);
+    certLocSrv.updateJWT(username, null, newJWT);
     
     X509SecurityMaterial newMaterial = certLocSrv.getX509MaterialLocation(username);
     assertEquals(newKeyStore, newMaterial.getKeyStoreMem());
@@ -284,6 +307,11 @@ public class TestCertificateLocalizationService {
     assertFalse(trustStore.equals(newMaterial.getTrustStoreMem()));
     assertNotEquals(keyStorePassword, newMaterial.getKeyStorePass());
     assertNotEquals(trustStorePassword, newMaterial.getTrustStorePass());
+    
+    JWTSecurityMaterial newJWTMaterial = certLocSrv.getJWTMaterialLocation(username, null);
+    assertEquals(newJWT, newJWTMaterial.getToken());
+    assertNotEquals(jwt, newJWTMaterial.getToken());
+    assertEquals(oldJWTMaterial.getTokenLocation(), newJWTMaterial.getTokenLocation());
     
     certLocSrv.removeX509Material(username);
     verifyMaterialExistOrNot(certLocSrv, username, userFolder, newKeyStorePassword, newTrustStorePassword, false);
@@ -428,6 +456,8 @@ public class TestCertificateLocalizationService {
                 hasBeenMaterialized = materializeInternal((MaterializeEvent) event);
               } else if (event instanceof RemoveEvent) {
                 removeInternal((RemoveEvent) event);
+              } else if (event instanceof UpdateEvent) {
+                updateInternal((UpdateEvent) event);
               }
             } catch (InterruptedException ex) {
               Thread.currentThread().interrupt();
