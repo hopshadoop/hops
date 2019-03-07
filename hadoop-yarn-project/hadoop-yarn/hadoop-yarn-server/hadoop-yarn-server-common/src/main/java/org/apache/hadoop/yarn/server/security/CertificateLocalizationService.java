@@ -283,6 +283,103 @@ public class CertificateLocalizationService extends AbstractService
     }
   }
   
+  private SecurityMaterial prepareMaterialForChange(StorageKey key)
+      throws MaterialNotFoundException, InterruptedException {
+    try {
+      lock.lock();
+      SecurityMaterial material = materialLocation.get(key);
+      if (material == null) {
+        throw new MaterialNotFoundException("Material for key " + key + " is missing");
+      }
+      synchronized (material) {
+        while (!material.getState().equals(SecurityMaterial.STATE.FINISHED)) {
+          material.wait();
+        }
+        material.changeState(SecurityMaterial.STATE.ONGOING);
+      }
+      return material;
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  @Override
+  public void updateX509(String username, String applicationId, ByteBuffer keyStore,
+      String keyStorePassword, ByteBuffer trustStore, String trustStorePassword)
+    throws InterruptedException {
+    StorageKey key = StorageKey.newX509Instance(username, applicationId);
+    try {
+      X509SecurityMaterial x509Material = (X509SecurityMaterial) prepareMaterialForChange(key);
+      x509Material.updateKeyStoreMem(keyStore);
+      x509Material.updateKeyStorePass(keyStorePassword);
+      x509Material.updateTrustStoreMem(trustStore);
+      x509Material.updateTrustStorePass(trustStorePassword);
+      // Dispatch updateEvent
+      UpdateEvent updateEvent = new UpdateEvent(key, x509Material);
+      dispatchEvent(updateEvent);
+      LOG.debug("Dispatched update event for key " + key);
+    } catch (MaterialNotFoundException ex) {
+      LOG.warn("Requested X.509 update but got an exception", ex);
+    }
+  }
+  
+  
+  @Override
+  public void updateJWT(String username, String applicationId, String jwt)
+      throws InterruptedException {
+    StorageKey key = StorageKey.newJWTInstance(username, applicationId);
+    try {
+      JWTSecurityMaterial jwtMaterial = (JWTSecurityMaterial) prepareMaterialForChange(key);
+      jwtMaterial.updateToken(jwt);
+      UpdateEvent updateEvent = new UpdateEvent(key, jwtMaterial);
+      dispatchEvent(updateEvent);
+      LOG.debug("Dispatched JWT update event for key " + key);
+    } catch (MaterialNotFoundException ex) {
+      LOG.warn("Requested JWT update but got an exception", ex);
+    }
+  }
+  
+  @InterfaceAudience.Private
+  @VisibleForTesting
+  protected void updateInternal(UpdateEvent event) {
+    String errorMsg = "";
+    try {
+      SecurityMaterial storedMaterial = materialLocation.get(event.key);
+      if (storedMaterial == null) {
+        LOG.warn("Requested X.509 update for key " + event.key + " but material is missing or has been removed");
+        return;
+      }
+      if (event.cryptoMaterial instanceof X509SecurityMaterial) {
+        errorMsg = "Could not update X.509 security material for key " + event.key;
+        updateInternalX509((X509SecurityMaterial) event.cryptoMaterial);
+      } else if (event.cryptoMaterial instanceof JWTSecurityMaterial) {
+        errorMsg = "Could not update JWT security material for key " + event.key;
+        updateInternalJWT((JWTSecurityMaterial) event.cryptoMaterial);
+      } else {
+        errorMsg = "Unknown security material type " + event.cryptoMaterial.getClass().getCanonicalName();
+      }
+    } catch (IOException ex) {
+      LOG.error("Error updating security material: " + errorMsg, ex);
+    } finally {
+      if (event.cryptoMaterial != null) {
+        synchronized (event.cryptoMaterial) {
+          event.cryptoMaterial.changeState(SecurityMaterial.STATE.FINISHED);
+          event.cryptoMaterial.notifyAll();
+        }
+      }
+    }
+  }
+  
+  private void updateInternalX509(X509SecurityMaterial securityMaterial) throws IOException {
+    writeX509ToLocalFS(securityMaterial.getKeyStoreMem(), securityMaterial.getKeyStoreLocation().toFile(),
+        securityMaterial.getTrustStoreMem(), securityMaterial.getTrustStoreLocation().toFile(),
+        securityMaterial.getKeyStorePass(), securityMaterial.getPasswdLocation().toFile());
+  }
+  
+  private void updateInternalJWT(JWTSecurityMaterial securityMaterial) throws IOException {
+    FileUtils.writeStringToFile(securityMaterial.getTokenLocation().toFile(), securityMaterial.getToken());
+  }
+  
   @Override
   public void materializeJWT(String username, String applicationId, String userFolder, String jwt)
     throws InterruptedException {
@@ -533,89 +630,6 @@ public class CertificateLocalizationService extends AbstractService
     }
   }
   
-  @Override
-  public void updateX509(String username, String applicationId, ByteBuffer keyStore,
-      String keyStorePassword, ByteBuffer trustStore, String trustStorePassword)
-      throws IOException, InterruptedException {
-    StorageKey key = StorageKey.newX509Instance(username, applicationId);
-    SecurityMaterial material = materialLocation.get(key);
-    if (material == null) {
-      LOG.warn("Requested X.509 update for key " + key + " but material is missing");
-      return;
-    }
-    
-    synchronized (material) {
-      while (!material.getState().equals(SecurityMaterial.STATE.FINISHED)) {
-        material.wait();
-      }
-      material.changeState(SecurityMaterial.STATE.ONGOING);
-    }
-    
-    try {
-      // Lock to ensure no remove event is being processed
-      lock.lock();
-      material = materialLocation.get(key);
-      if (material == null) {
-        // Oops material has been removed
-        return;
-      }
-      
-      X509SecurityMaterial x509Material = (X509SecurityMaterial) material;
-      writeX509ToLocalFS(keyStore.asReadOnlyBuffer(), x509Material.getKeyStoreLocation().toFile(),
-          trustStore.asReadOnlyBuffer(), x509Material.getTrustStoreLocation().toFile(),
-          keyStorePassword, x509Material.getPasswdLocation().toFile());
-      
-      x509Material.updateKeyStoreMem(keyStore);
-      x509Material.updateKeyStorePass(keyStorePassword);
-      x509Material.updateTrustStoreMem(trustStore);
-      x509Material.updateTrustStorePass(trustStorePassword);
-    } finally {
-      if (material != null) {
-        synchronized (material) {
-          material.changeState(SecurityMaterial.STATE.FINISHED);
-          material.notifyAll();
-        }
-      }
-      lock.unlock();
-    }
-  }
-  
-  @Override
-  public void updateJWT(String username, String applicationId, String jwt) throws InterruptedException, IOException {
-    StorageKey key = StorageKey.newJWTInstance(username, applicationId);
-    SecurityMaterial material = materialLocation.get(key);
-    if (material == null) {
-      LOG.warn("Requested JWT update for key " + key + " but material is missing");
-      return;
-    }
-    
-    synchronized (material) {
-      while (!material.getState().equals(SecurityMaterial.STATE.FINISHED)) {
-        material.wait();
-      }
-      material.changeState(SecurityMaterial.STATE.ONGOING);
-    }
-    try {
-      lock.lock();
-      material = materialLocation.get(key);
-      if (material == null) {
-        // OOps material has been removed while waiting
-        return;
-      }
-      JWTSecurityMaterial jwtMaterial = (JWTSecurityMaterial) material;
-      FileUtils.writeStringToFile(jwtMaterial.getTokenLocation().toFile(), jwt);
-      jwtMaterial.updateToken(jwt);
-    } finally {
-      if (material != null) {
-        synchronized (material) {
-          material.changeState(SecurityMaterial.STATE.FINISHED);
-          material.notifyAll();
-        }
-      }
-      lock.unlock();
-    }
-  }
-  
   @InterfaceAudience.Private
   @VisibleForTesting
   protected LocalizationEvent dequeue() throws InterruptedException {
@@ -793,6 +807,16 @@ public class CertificateLocalizationService extends AbstractService
     }
   }
   
+  protected class UpdateEvent implements LocalizationEvent {
+    private final StorageKey key;
+    private final SecurityMaterial cryptoMaterial;
+    
+    private UpdateEvent(StorageKey key, SecurityMaterial cryptoMaterial) {
+      this.key = key;
+      this.cryptoMaterial = cryptoMaterial;
+    }
+  }
+  
   @InterfaceAudience.Private
   @VisibleForTesting
   protected class RemoveEvent implements LocalizationEvent {
@@ -820,6 +844,8 @@ public class CertificateLocalizationService extends AbstractService
             materializeInternal((MaterializeEvent) event);
           } else if (event instanceof RemoveEvent) {
             removeInternal((RemoveEvent) event);
+          } else if (event instanceof UpdateEvent) {
+            updateInternal((UpdateEvent) event);
           } else {
             LOG.warn("Unknown event type");
           }
@@ -828,6 +854,22 @@ public class CertificateLocalizationService extends AbstractService
         }
       }
       LOG.info("Stopping localization events handler thread");
+    }
+  }
+  
+  private class MaterialNotFoundException extends Exception {
+    private static final long serialVersionUID = 1L;
+    
+    public MaterialNotFoundException(String reason) {
+      super(reason);
+    }
+    
+    public MaterialNotFoundException(String reason, Throwable throwable) {
+      super(reason, throwable);
+    }
+    
+    public MaterialNotFoundException(Throwable throwable) {
+      super(throwable);
     }
   }
 }

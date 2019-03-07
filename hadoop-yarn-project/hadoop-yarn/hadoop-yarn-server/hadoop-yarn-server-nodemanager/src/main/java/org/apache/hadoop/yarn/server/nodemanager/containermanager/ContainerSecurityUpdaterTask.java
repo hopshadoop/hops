@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.BackOff;
@@ -25,12 +24,15 @@ import org.apache.hadoop.util.ExponentialBackOff;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerImpl;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -89,9 +91,8 @@ abstract class ContainerSecurityUpdaterTask implements Runnable {
     if (!target.canWrite()) {
       permissions = addOwnerWritePermission(targetPath);
     }
-    FileChannel fileChannel = new FileOutputStream(target, false).getChannel();
-    fileChannel.write(data);
-    fileChannel.close();
+    
+    writeInternal(targetPath, data);
     if (permissions != null) {
       removeOwnerWritePermission(targetPath, permissions);
     }
@@ -103,9 +104,37 @@ abstract class ContainerSecurityUpdaterTask implements Runnable {
     if (!target.canWrite()) {
       permissions = addOwnerWritePermission(targetPath);
     }
-    FileUtils.writeStringToFile(target, data);
+    ByteBuffer dataBB = ByteBuffer.wrap(data.getBytes(Charset.defaultCharset()));
+    writeInternal(targetPath, dataBB);
+    
     if (permissions != null) {
       removeOwnerWritePermission(targetPath, permissions);
+    }
+  }
+  
+  private void writeInternal(Path target, ByteBuffer data) throws IOException {
+    try (FileChannel fc = FileChannel.open(target, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
+        StandardOpenOption.TRUNCATE_EXISTING)) {
+      int numOfRetries = 0;
+      FileLock lock = null;
+      while (lock == null && numOfRetries < 5) {
+        try {
+          lock = fc.tryLock();
+          fc.write(data);
+        } catch (OverlappingFileLockException ex) {
+          lock = null;
+          numOfRetries++;
+          try {
+            TimeUnit.MILLISECONDS.sleep(100);
+          } catch(InterruptedException iex) {
+            throw new IOException(iex);
+          }
+        } finally {
+          if (lock != null) {
+            lock.release();
+          }
+        }
+      }
     }
   }
   
