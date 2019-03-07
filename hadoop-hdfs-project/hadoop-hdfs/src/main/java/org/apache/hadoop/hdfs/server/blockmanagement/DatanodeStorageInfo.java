@@ -439,7 +439,7 @@ public class DatanodeStorageInfo {
 
         @Override
         public void handle(final int startIndex, final int endIndex) throws Exception {
-          LOG.info("get blocks in buckets " + startIndex + " to " + endIndex + " for storage " + sid);
+          LOG.debug("get blocks in buckets " + startIndex + " to " + endIndex + " for storage " + sid);
           final List<Integer> buckets = new ArrayList<>();
           for (int i = startIndex; i < endIndex; i++) {
             buckets.add(i);
