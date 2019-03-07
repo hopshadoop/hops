@@ -4413,8 +4413,10 @@ public class BlockManager {
       } else if (node.isDecommissionInProgress() || node.isDecommissioned()) {
         decommissioned++;
       } else {
-        LightWeightLinkedSet<Block> blocksExcess = excessReplicateMap.get(storage.getSid());
+        LightWeightLinkedSet<Block> blocksExcess =
+                excessReplicateMap.getExcessReplica(getBlockInfo(b), storage.getSid());
         if (blocksExcess != null && blocksExcess.contains(b)) {
+          blocksMap.storageList(b);
           excess++;
         } else {
           live++;

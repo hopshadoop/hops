@@ -71,6 +71,20 @@ public class ExcessReplicasMap {
     return excessBlocks;
   }
 
+  public LightWeightLinkedSet<Block> getExcessReplica(BlockInfoContiguous blk, int sid) throws StorageException,
+          TransactionContextException {
+    Collection<ExcessReplica> excessReplicas = getExcessReplicas(blk);
+    LightWeightLinkedSet<Block> ebs = new LightWeightLinkedSet<>();
+    if(excessReplicas != null){
+      for (ExcessReplica er : excessReplicas) {
+        if(er.getStorageId() == sid) {
+          ebs.add(new Block(er.getBlockId()));
+        }
+      }
+    }
+    return ebs;
+  }
+
   public boolean put(int storageId, BlockInfoContiguous excessBlk)
       throws StorageException, TransactionContextException {
     ExcessReplica er = getExcessReplica(storageId, excessBlk);
