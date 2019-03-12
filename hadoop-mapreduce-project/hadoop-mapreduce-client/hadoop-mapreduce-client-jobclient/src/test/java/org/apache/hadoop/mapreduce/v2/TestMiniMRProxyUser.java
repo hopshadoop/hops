@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.mapreduce.v2;
 
+import io.hops.security.UserAlreadyExistsException;
+import io.hops.security.UsersGroups;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -135,6 +137,9 @@ public class TestMiniMRProxyUser {
 
   @Test
   public void testValidProxyUser() throws Exception {
+    try{
+      UsersGroups.addUser("u1");
+    } catch (UserAlreadyExistsException e){}
     UserGroupInformation ugi = UserGroupInformation.createProxyUser("u1", UserGroupInformation.getLoginUser());
     ugi.doAs(new PrivilegedExceptionAction<Void>() {
         public Void run() throws Exception {

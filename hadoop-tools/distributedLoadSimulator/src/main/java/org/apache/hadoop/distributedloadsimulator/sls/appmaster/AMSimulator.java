@@ -274,8 +274,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
     try {
 
       UserGroupInformation ugi = UserGroupInformation.createProxyUser(
-              appAttemptId.toString(), UserGroupInformation.getCurrentUser(),
-              false);
+              appAttemptId.toString(), UserGroupInformation.getCurrentUser());
       ugi.setAuthenticationMethod(SaslRpcServer.AuthMethod.TOKEN);
       ugi.addCredentials(credentials);
       ugi.addToken(amRMToken);
@@ -362,8 +361,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
     LOG.info("register application master for " + appId);
 
     UserGroupInformation ugi = UserGroupInformation.createProxyUser(
-            appAttemptId.toString(), UserGroupInformation.getCurrentUser(),
-            false);
+            appAttemptId.toString(), UserGroupInformation.getCurrentUser());
     ugi.setAuthenticationMethod(SaslRpcServer.AuthMethod.TOKEN);
     ugi.addCredentials(credentials);
     ugi.addToken(amRMToken);

@@ -116,7 +116,7 @@ public class TestReadOnlySharedStorage {
     
     cluster = new MiniDFSCluster.Builder(conf)
         .numDataNodes(NUM_DATANODES)
-        .dataNodeConfOverlays(overlays)
+        .dataNodeConfOverlays(overlays).format(true)
         .build();
     fs = cluster.getFileSystem();
     blockManager = cluster.getNameNode().getNamesystem().getBlockManager();

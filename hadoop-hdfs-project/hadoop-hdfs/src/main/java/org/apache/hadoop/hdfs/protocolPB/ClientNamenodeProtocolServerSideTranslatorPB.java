@@ -278,7 +278,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       VOID_SET_META_ENABLED_RESPONSE =
       ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto.newBuilder()
           .build();
-  
+
   private static final CheckAccessResponseProto
       VOID_CHECKACCESS_RESPONSE = CheckAccessResponseProto.getDefaultInstance();
 
@@ -299,14 +299,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
 
   private static final RemoveAclResponseProto
     VOID_REMOVEACL_RESPONSE = RemoveAclResponseProto.getDefaultInstance();
-  
-  private static final ClientNamenodeProtocolProtos.AddUserGroupResponseProto
-      VOID_ADD_USER_GROUP_CACHE =
-      ClientNamenodeProtocolProtos.AddUserGroupResponseProto.newBuilder().build();
-  
-  private static final ClientNamenodeProtocolProtos.RemoveUserGroupResponseProto
-      VOID_REMOVE_USER_GROUP_CACHE =
-      ClientNamenodeProtocolProtos.RemoveUserGroupResponseProto.newBuilder().build();
+
   /**
    * Constructor
    *
@@ -491,7 +484,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
-  
+
   @Override
   public ClientNamenodeProtocolProtos.GetStoragePoliciesResponseProto getStoragePolicies(
       RpcController controller, ClientNamenodeProtocolProtos.GetStoragePoliciesRequestProto request)
@@ -620,7 +613,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
-  
+
   @Override
   public ReportBadBlocksResponseProto reportBadBlocks(RpcController controller,
       ReportBadBlocksRequestProto req) throws ServiceException {
@@ -730,7 +723,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
-  
+
   @Override
   public RenewLeaseResponseProto renewLease(RpcController controller,
       RenewLeaseRequestProto req) throws ServiceException {
@@ -844,7 +837,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
-  
+
   @Override
   public ListCorruptFileBlocksResponseProto listCorruptFileBlocks(
       RpcController controller, ListCorruptFileBlocksRequestProto req)
@@ -908,7 +901,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
-  
+
   @Override
   public SetQuotaResponseProto setQuota(RpcController controller,
       SetQuotaRequestProto req) throws ServiceException {
@@ -922,7 +915,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
-  
+
   @Override
   public FsyncResponseProto fsync(RpcController controller,
       FsyncRequestProto req) throws ServiceException {
@@ -1080,7 +1073,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
-  
+
   @Override
   public IsFileClosedResponseProto isFileClosed(
       RpcController controller, IsFileClosedRequestProto request)
@@ -1192,7 +1185,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
-  
+
   private ClientNamenodeProtocolProtos.ActiveNamenodeListResponseProto convertANListToResponseProto(
       SortedActiveNodeList anlWrapper) {
     List<ActiveNode> anl = anlWrapper.getActiveNodes();
@@ -1206,7 +1199,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
     }
     return anlrpb.build();
   }
-  
+
   private ActiveNodeProtos.ActiveNodeProto convertANToResponseProto(
       ActiveNode p) {
     ActiveNodeProtos.ActiveNodeProto.Builder anp =
@@ -1234,8 +1227,8 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(ex);
     }
   }
-  
-  
+
+
   @Override
   public CheckAccessResponseProto checkAccess(RpcController controller,
       CheckAccessRequestProto req) throws ServiceException {
@@ -1329,7 +1322,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
- 
+
   @Override
   public AddCacheDirectiveResponseProto addCacheDirective(
       RpcController controller, AddCacheDirectiveRequestProto request)
@@ -1439,34 +1432,109 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
   }
-  
+
   @Override
-  public ClientNamenodeProtocolProtos.AddUserGroupResponseProto addUserGroup(
-      RpcController controller,
-      ClientNamenodeProtocolProtos.AddUserGroupRequestProto request)
-      throws ServiceException {
+  public ClientNamenodeProtocolProtos.AddUserResponseProto addUser(RpcController controller, ClientNamenodeProtocolProtos.AddUserRequestProto request) throws ServiceException {
     try {
-      server.addUserGroup(request.hasUserName() ? request.getUserName() : null,
-          request.hasGroupName() ? request.getGroupName() : null,
-          request.getCacheOnly());
-      return VOID_ADD_USER_GROUP_CACHE;
+      server.addUser(request.hasUserName() ? request.getUserName() : null);
+      return ClientNamenodeProtocolProtos.AddUserResponseProto.newBuilder().build();
     } catch (IOException ex) {
       throw new ServiceException(ex);
     }
   }
-  
+
   @Override
-  public ClientNamenodeProtocolProtos.RemoveUserGroupResponseProto removeUserGroup(
-      RpcController controller,
-      ClientNamenodeProtocolProtos.RemoveUserGroupRequestProto request)
-      throws ServiceException {
+  public ClientNamenodeProtocolProtos.AddGroupResponseProto addGroup(RpcController controller, ClientNamenodeProtocolProtos.AddGroupRequestProto request) throws ServiceException {
     try {
-      server.removeUserGroup(request.hasUserName() ? request.getUserName() :
-              null, request.hasGroupName() ? request.getGroupName() : null,
-          request.getCacheOnly());
-      return VOID_REMOVE_USER_GROUP_CACHE;
+      server.addGroup(request.hasGroupName() ? request.getGroupName() : null);
+      return ClientNamenodeProtocolProtos.AddGroupResponseProto.newBuilder().build();
     } catch (IOException ex) {
       throw new ServiceException(ex);
     }
   }
+
+  @Override
+  public ClientNamenodeProtocolProtos.AddUserToGroupResponseProto addUserToGroup(RpcController controller, ClientNamenodeProtocolProtos.AddUserToGroupRequestProto request) throws ServiceException {
+    try {
+      server.addUserToGroup(request.hasUserName() ? request.getUserName() : null,
+              request.hasGroupName() ? request.getGroupName() : null);
+      return ClientNamenodeProtocolProtos.AddUserToGroupResponseProto.newBuilder().build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.RemoveUserResponseProto removeUser(RpcController controller, ClientNamenodeProtocolProtos.RemoveUserRequestProto request) throws ServiceException {
+    try {
+      server.removeUser(request.hasUserName() ? request.getUserName() : null);
+      return ClientNamenodeProtocolProtos.RemoveUserResponseProto.newBuilder().build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.RemoveGroupResponseProto removeGroup(RpcController controller, ClientNamenodeProtocolProtos.RemoveGroupRequestProto request) throws ServiceException {
+    try {
+      server.removeGroup(request.hasGroupName() ? request.getGroupName() : null);
+      return ClientNamenodeProtocolProtos.RemoveGroupResponseProto.newBuilder().build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.RemoveUserFromGroupResponseProto removeUserFromGroup(RpcController controller, ClientNamenodeProtocolProtos.RemoveUserFromGroupRequestProto request) throws ServiceException {
+    try {
+      server.removeUserFromGroup(request.hasUserName() ? request.getUserName() : null,
+              request.hasGroupName() ? request.getGroupName() : null);
+      return ClientNamenodeProtocolProtos.RemoveUserFromGroupResponseProto.newBuilder().build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.InvCachesUserRemovedResponseProto invCachesUserRemoved(RpcController controller, ClientNamenodeProtocolProtos.InvCachesUserRemovedRequestProto request) throws ServiceException {
+    try {
+      server.invCachesUserRemoved(request.hasUserName() ? request.getUserName() : null);
+      return ClientNamenodeProtocolProtos.InvCachesUserRemovedResponseProto.newBuilder().build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.InvCachesGroupRemovedResponseProto invCachesGroupRemoved(RpcController controller, ClientNamenodeProtocolProtos.InvCachesGroupRemovedRequestProto request) throws ServiceException {
+    try {
+      server.invCachesGroupRemoved(request.hasGroupName() ? request.getGroupName() : null);
+      return ClientNamenodeProtocolProtos.InvCachesGroupRemovedResponseProto.newBuilder().build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.InvCachesUserRemovedFromGroupResponseProto invCachesUserRemovedFromGroup(RpcController controller, ClientNamenodeProtocolProtos.InvCachesUserRemovedFromGroupRequestProto request) throws ServiceException {
+    try {
+      server.invCachesUserRemovedFromGroup(request.hasUserName() ? request.getUserName() : null,
+              request.hasGroupName() ? request.getGroupName() : null);
+      return ClientNamenodeProtocolProtos.InvCachesUserRemovedFromGroupResponseProto.newBuilder().build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.InvCachesUserAddedToGroupResponseProto invCachesUserAddedToGroup(RpcController controller, ClientNamenodeProtocolProtos.InvCachesUserAddedToGroupRequestProto request) throws ServiceException {
+    try {
+      server.invCachesUserAddedToGroup(request.hasUserName() ? request.getUserName() : null,
+              request.hasGroupName() ? request.getGroupName() : null);
+      return ClientNamenodeProtocolProtos.InvCachesUserAddedToGroupResponseProto.newBuilder().build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
 }

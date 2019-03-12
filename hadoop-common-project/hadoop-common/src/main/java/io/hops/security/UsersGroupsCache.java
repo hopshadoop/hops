@@ -16,14 +16,9 @@
 package io.hops.security;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Predicates;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
-import com.google.common.collect.Collections2;
+import com.google.common.cache.*;
 import com.google.common.collect.Lists;
+import io.hops.StorageConnector;
 import io.hops.exception.ForeignKeyConstraintViolationException;
 import io.hops.exception.StorageException;
 import io.hops.exception.UniqueKeyConstraintViolationException;
@@ -43,12 +38,11 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-@VisibleForTesting
 @InterfaceAudience.Private
 class UsersGroupsCache {
-  
+
   private final Log LOG = LogFactory.getLog(UsersGroupsCache.class);
-  
+
   private enum UsersOperationsType implements RequestHandler.OperationType {
     ADD_USER,
     REMOVE_USER,
@@ -57,733 +51,914 @@ class UsersGroupsCache {
     GET_USER_GROUPS,
     GET_USER,
     GET_GROUP,
-    ADD_USER_GROUPS,
-    REMOVE_USER_GROUPS
+    ADD_USER_TO_GROUPS,
+    REMOVE_USER_FROM_GROUPS,
+    CREATE_LOCK_ROWS
   }
-  
-  private class UserNotFoundException extends Exception{
-    public UserNotFoundException(String message) {
-      super(message);
-    }
-  }
-  
-  private class GroupNotFoundException extends Exception{
-    public GroupNotFoundException(String message) {
-      super(message);
-    }
-  }
-  
-  private class GroupsNotFoundForUserException extends Exception{
-    public GroupsNotFoundForUserException(String message) {
-      super(message);
-    }
-  }
-  
+
+  private final UserGroupDataAccess userGroupDataAccess;
+  private final GroupDataAccess<Group> groupDataAccess;
+  private final UserDataAccess<User> userDataAccess;
+
   private LoadingCache<String, List<String>> userToGroupsCache;
 
   private LoadingCache<Integer, String> idToUserCache;
   private LoadingCache<String, Integer> userToIdCache;
-  
+
   private LoadingCache<Integer, String> idToGroupCache;
   private LoadingCache<String, Integer> groupToIdCache;
-  
-  private CacheLoader<String, List<String>> userToGroupsLoader =
-      new CacheLoader<String, List<String>>() {
 
+  private static final String lockRowName = "#HopsSyncUser#";
+  private static User lockUser;
+
+  private CacheLoader<String, List<String>> userToGroupsLoader
+          = new CacheLoader<String, List<String>>() {
     @Override
     public List<String> load(String userName) throws Exception {
-      LOG.debug("Get groups from DB for user=" + userName);
-      List<Group> groups = getGroupsFromDB(userName, getUserId(userName));
-      if(groups == null || groups.isEmpty()){
+      LOG.debug("Get groups from DB for user: " + userName);
+      List<Group> groups = getUserGroupsFromDB(userName, getUserId(userName));
+      if (groups == null || groups.isEmpty()) {
         throw new GroupsNotFoundForUserException("No groups found for user (" + userName + ")");
       }
-      
+
       List<String> groupNames = Lists.newArrayListWithExpectedSize(groups.size());
 
-      for(Group group : groups){
+      for (Group group : groups) {
         groupNames.add(group.getName());
-        addGroupToCache(group.getId(), group.getName());
+        updateGroupCache(group.getId(), group.getName());
       }
       return groupNames;
     }
   };
-  
-  private RemovalListener<String, List<String>> userToGroupsRemoval =
-      new RemovalListener<String, List<String>>() {
+
+  private RemovalListener<String, List<String>> userToGroupsRemoval
+          = new RemovalListener<String, List<String>>() {
     @Override
     public void onRemoval(RemovalNotification<String, List<String>> rn) {
-      LOG.debug("User's groups removal notification for " + rn.toString() +
-          "(" + rn.getCause() + ")");
+      LOG.debug("User's groups removal notification for " + rn.toString()
+              + "(" + rn.getCause() + ")");
     }
   };
-  
+
   private CacheLoader<Integer, String> idToUserLoader = new CacheLoader<Integer, String>() {
     @Override
     public String load(Integer userId) throws Exception {
-      LOG.debug("Get user from DB by id=" + userId);
+      LOG.debug("Get user from DB by ID. UserID: " + userId);
       User user = getUserFromDB(null, userId);
-      if(user != null){
+      if (user != null) {
         userToIdCache.put(user.getName(), userId);
         return user.getName();
       }
-      throw new UserNotFoundException("User (" + userId + ") was not found.");
+      throw new UserNotFoundException("User ID: " + userId + " not found.");
     }
   };
-  
-  private RemovalListener<Integer, String> idToUserRemoval = new RemovalListener<Integer, String>() {
+
+  private RemovalListener<Integer, String> idToUserRemoval
+          = new RemovalListener<Integer, String>() {
     @Override
     public void onRemoval(RemovalNotification<Integer, String> rn) {
-      LOG.debug("User removal notification for " + rn.toString() + "(" + rn.getCause() + ")");
+      LOG.debug("User removal notification for " + rn.toString()
+              + "(" + rn.getCause() + ")");
     }
   };
-  
+
   private CacheLoader<String, Integer> userToIdLoader = new CacheLoader<String, Integer>() {
     @Override
     public Integer load(String userName) throws Exception {
-      LOG.debug("Get user from DB by name=" + userName);
+      LOG.debug("Get user from DB by name: " + userName);
       User user = getUserFromDB(userName, null);
-      if(user != null){
+      if (user != null) {
         idToUserCache.put(user.getId(), userName);
         return user.getId();
       }
-      throw new UserNotFoundException("User (" + userName + ") was not found.");
+      throw new UserNotFoundException("User name: " + userName + " not found.");
     }
   };
-  
-  private RemovalListener<String, Integer> userToIdsNameRemoval =
-      new RemovalListener<String, Integer>() {
+
+  private RemovalListener<String, Integer> userToIdsNameRemoval
+          = new RemovalListener<String, Integer>() {
     @Override
     public void onRemoval(RemovalNotification<String, Integer> rn) {
       LOG.debug("User removal notification for " + rn.toString() + "(" + rn.getCause() + ")");
     }
   };
-  
+
   private CacheLoader<Integer, String> idToGroupLoader = new CacheLoader<Integer, String>() {
     @Override
     public String load(Integer groupId) throws Exception {
-      LOG.debug("Get group from DB by id=" + groupId);
+      LOG.debug("Get group from DB by id: " + groupId);
       Group group = getGroupFromDB(null, groupId);
-      if(group != null){
+      if (group != null) {
         groupToIdCache.put(group.getName(), groupId);
         return group.getName();
       }
-      throw new GroupNotFoundException("Group (" + groupId + ") was not found.");
+      throw new GroupNotFoundException("Group ID: " + groupId + " not found.");
     }
   };
-  
-  private RemovalListener<Integer, String> idToGroupsRemoval =
-      new RemovalListener<Integer, String>() {
+
+  private RemovalListener<Integer, String> idToGroupsRemoval
+          = new RemovalListener<Integer, String>() {
     @Override
     public void onRemoval(RemovalNotification<Integer, String> rn) {
       LOG.debug("Group removal notification for " + rn.toString() + "(" + rn.getCause() + ")");
     }
   };
-  
-  private CacheLoader<String, Integer> groupToIdsLoader =
-      new CacheLoader<String, Integer>() {
+
+  private CacheLoader<String, Integer> groupToIdsLoader = new CacheLoader<String, Integer>() {
     @Override
     public Integer load(String groupName) throws Exception {
-      LOG.debug("Get group from DB by name=" + groupName);
+      LOG.debug("Get group from DB by name: " + groupName);
       Group group = getGroupFromDB(groupName, null);
-      if(group != null){
+      if (group != null) {
         idToGroupCache.put(group.getId(), groupName);
         return group.getId();
       }
-      throw new GroupNotFoundException("Group (" + groupName + ") was not found.");
+      throw new GroupNotFoundException("Group name: " + groupName + " not found.");
+
     }
   };
-  
-  private RemovalListener<String, Integer> groupToIdsRemoval =
-      new RemovalListener<String, Integer>() {
-        @Override
-        public void onRemoval(RemovalNotification<String, Integer> rn) {
-          LOG.debug("Group removal notification for " + rn.toString() + "(" + rn.getCause() + ")");
-        }
+
+  private RemovalListener<String, Integer> groupToIdsRemoval
+          = new RemovalListener<String, Integer>() {
+    @Override
+    public void onRemoval(RemovalNotification<String, Integer> rn) {
+      LOG.debug("Group removal notification for " + rn.toString() + "(" + rn.getCause() + ")");
+    }
   };
-  
-  private final UserGroupDataAccess userGroupDataAccess;
-  private final GroupDataAccess<Group> groupDataAccess;
-  private final UserDataAccess<User> userDataAccess;
-  private final boolean isConfigured;
-  
+
   public UsersGroupsCache(UserDataAccess uda, UserGroupDataAccess ugda,
-      GroupDataAccess gda, int evectionTime, int lrumax){
-    
+                          GroupDataAccess gda, int evectionTime, int lrumax) throws IOException {
+
     this.userDataAccess = uda;
     this.userGroupDataAccess = ugda;
     this.groupDataAccess = gda;
-    
+
     userToGroupsCache = CacheBuilder.newBuilder()
-        .maximumSize(lrumax)
-        .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
-        .removalListener(userToGroupsRemoval)
-        .build(userToGroupsLoader);
-    
+            .maximumSize(lrumax)
+            .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
+            .removalListener(userToGroupsRemoval)
+            .build(userToGroupsLoader);
+
     idToUserCache = CacheBuilder.newBuilder()
-        .maximumSize(lrumax)
-        .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
-        .removalListener(idToUserRemoval)
-        .build(idToUserLoader);
+            .maximumSize(lrumax)
+            .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
+            .removalListener(idToUserRemoval)
+            .build(idToUserLoader);
 
     userToIdCache = CacheBuilder.newBuilder()
-        .maximumSize(lrumax)
-        .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
-        .removalListener(userToIdsNameRemoval)
-        .build(userToIdLoader);
+            .maximumSize(lrumax)
+            .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
+            .removalListener(userToIdsNameRemoval)
+            .build(userToIdLoader);
 
     idToGroupCache = CacheBuilder.newBuilder()
-        .maximumSize(lrumax)
-        .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
-        .removalListener(idToGroupsRemoval)
-        .build(idToGroupLoader);
-    
+            .maximumSize(lrumax)
+            .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
+            .removalListener(idToGroupsRemoval)
+            .build(idToGroupLoader);
+
     groupToIdCache = CacheBuilder.newBuilder()
-        .maximumSize(lrumax)
-        .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
-        .removalListener(groupToIdsRemoval)
-        .build(groupToIdsLoader);
-    
-    isConfigured = userDataAccess != null
-        && userGroupDataAccess != null && groupDataAccess != null;
+            .maximumSize(lrumax)
+            .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
+            .removalListener(groupToIdsRemoval)
+            .build(groupToIdsLoader);
   }
-  
-  Integer addUserIfNotInCache(String userName) throws IOException{
-    if(!isConfigured)
-      return null;
-    
-    if(userName == null){
-      return null;
-    }
 
-    Integer userId = userToIdCache.getIfPresent(userName);
-    if(userId != null){
-      LOG.debug("User " + userName + " is already in cache with id=" + userId);
-      return userId;
-    }
-    addUser(userName);
-    return getUserIdFromCache(userName);
-  }
-  
-  void addUser(String userName) throws IOException {
-    if(!isConfigured)
-      return;
-    
-    if(userName == null)
-      return;
-    LOG.debug("Add user to DB name=" + userName);
-    User user = addUserToDB(userName);
-    LOG.debug("User Added " + user);
-    addUserToCache(user.getId(), user.getName());
-  }
-  
-  private void addUserToCache(Integer userId, String userName){
-    idToUserCache.put(userId, userName);
-    userToIdCache.put(userName, userId);
-  }
-  
-  void removeUser(String userName) throws IOException {
-    if(!isConfigured)
-      return;
-    
-    if(userName == null)
-      return;
-  
-    LOG.debug("Remove user from DB name=" + userName);
-    Integer userId = getUserId(userName);
-    removeUserFromDB(userId);
-    removeUserFromCache(userId, userName);
-  }
-  
-  void removeUserFromCache(String userName){
-    if(userName != null) {
-      removeUserFromCache(userToIdCache.getIfPresent(userName), userName);
-    }
-  }
-  
-  private void removeUserFromCache(Integer userId, String userName){
-    if(userId != null) {
-      idToUserCache.invalidate(userId);
-    }
-    if(userName != null) {
-      userToIdCache.invalidate(userName);
-      userToGroupsCache.invalidate(userName);
-    }
-  }
-  
-  int getUserId(String userName) throws IOException {
-    if(!isConfigured)
-      return 0;
-    
-    if(userName == null)
-      return 0;
-    try {
-      return userToIdCache.get(userName);
-    } catch (ExecutionException e) {
-      if(e.getCause() instanceof UserNotFoundException){
-        return 0;
-      }
-      throw new IOException(e);
-    }
-  }
-  
-  Integer getUserIdFromCache(String userName){
-    if(userName == null)
-      return 0;
-    
-    return userToIdCache.getIfPresent(userName);
-  }
-  
-  String getUserName(Integer userId) throws IOException {
-    if(!isConfigured)
-      return null;
-    
-    if(userId == null || userId <= 0)
-      return null;
-    try {
-      return idToUserCache.get(userId);
-    } catch (ExecutionException e) {
-      if(e.getCause() instanceof UserNotFoundException){
-        return null;
-      }
-      throw new IOException(e);
-    }
-  }
-  
-  
-  Integer addGroupIfNotInCache(String groupName) throws IOException{
-    if(!isConfigured)
-      return null;
-    
-    if(groupName == null){
-      return null;
-    }
+  public void createSyncRow() throws IOException {
+    new LightWeightRequestHandler(UsersOperationsType.CREATE_LOCK_ROWS) {
+      @Override
+      public Object performTask() throws IOException {
+        LOG.debug("Creating UsersGroups Lock Row");
+        boolean fail = false;
+        User user;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
+          connector.beginTransaction();
+        }
+        try {
 
-    Integer groupId = groupToIdCache.getIfPresent(groupName);
-    if(groupId != null){
-      LOG.debug("Group " + groupName + " is already in cache with id=" + groupId);
-      return groupId;
-    }
-    addGroup(groupName);
-    return getGroupIdFromCache(groupName);
-  }
-  
-  void addGroup(String groupName) throws IOException {
-    if(!isConfigured)
-      return;
-    
-    if(groupName == null)
-      return;
-  
-    LOG.debug("Add group to DB name=" + groupName);
-    Group group = addGroupToDB(groupName);
-    LOG.debug("Group Added " + group);
-    addGroupToCache(group.getId(), group.getName());
-  }
-  
-  private void addGroupToCache(Integer groupId, String groupName){
-    idToGroupCache.put(groupId, groupName);
-    groupToIdCache.put(groupName, groupId);
-  }
-  
-  void removeGroup(String groupName) throws IOException {
-    if(!isConfigured)
-      return;
-    
-    if(groupName == null)
-      return;
-    
-    LOG.debug("Remove group from DB name=" + groupName);
-    Integer groupId = getGroupId(groupName);
-    removeGroupFromDB(groupId);
-    removeGroupFromCache(groupId, groupName);
-  }
-  
-  void removeGroupFromCache(String groupName){
-    if(groupName != null) {
-      removeGroupFromCache(groupToIdCache.getIfPresent(groupName), groupName);
-    }
-  }
-  
-  private void removeGroupFromCache(Integer groupId, String groupName){
-    if(groupId != null) {
-      idToGroupCache.invalidate(groupId);
-    }
-    if(groupName != null) {
-      groupToIdCache.invalidate(groupName);
+          user = userDataAccess.getUser(lockRowName);
+          if(user == null){
+            user = userDataAccess.addUser(lockRowName);
+          }
 
-      //get all the users in cache that are part of this grp
-      Map<String, List<String>> u2gMap = userToGroupsCache.asMap();
-      for (String user : u2gMap.keySet()) {
-        if(u2gMap.get(user).contains(groupName)){
-          List<String> userGroups = userToGroupsCache.getIfPresent(user);
-          userGroups.remove(groupName);
-          if(userGroups.isEmpty()){
-            userToGroupsCache.invalidate(user);
+          if (localTx) {
+            connector.commit();
+          }
+        } catch (UniqueKeyConstraintViolationException ue) {  // can happen if multi NNs are
+          // started at the same time
+          user = userDataAccess.getUser(lockRowName);
+          if (localTx) {
+            connector.commit();
+          }
+        } catch (IOException e) {
+          fail = true;
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
           }
         }
-      }
-    }
-  }
-  
-  int getGroupId(String groupName) throws IOException {
-    if(!isConfigured)
-      return 0;
-    
-    if(groupName == null)
-      return 0;
-    try {
-      return groupToIdCache.get(groupName);
-    } catch (ExecutionException e) {
-      if(e.getCause() instanceof GroupNotFoundException){
-        return 0;
-      }
-      throw new IOException(e);
-    }
-  }
-  
-  Integer getGroupIdFromCache(String groupName){
-    if(groupName == null)
-      return 0;
-    return groupToIdCache.getIfPresent(groupName);
-  }
-  
-  String getGroupName(Integer groupId) throws IOException {
-    if(!isConfigured)
-      return null;
-    
-    if(groupId == null || groupId <= 0)
-      return null;
-    try {
-      return idToGroupCache.get(groupId);
-    } catch (ExecutionException e) {
-      if(e.getCause() instanceof GroupNotFoundException){
-        return null;
-      }
-      throw new IOException(e);
-    }
-  }
-  
-  
-  void removeUserFromGroup(String userName, String groupName) throws IOException {
-    if(!isConfigured)
-      return;
-    
-    if(userName == null || groupName == null)
-      return;
-    
-    LOG.debug("Remove user-group from DB user=" + userName + ", group=" + groupName);
-    Integer userId = getUserId(userName);
-    Integer groupId = getGroupId(groupName);
-  
-    removeUserFromGroupFromDB(userId, groupId);
-    removeUserFromGroupInCache(userName, groupName);
-  }
-  
-  List<String> getGroups(String user) throws IOException {
-    if(!isConfigured)
-      return null;
-    
-    if(user == null)
-      return null;
-    try {
-      return userToGroupsCache.get(user);
-    } catch (ExecutionException e) {
-      if(e.getCause() instanceof GroupsNotFoundForUserException){
-        return null;
-      }
-      throw new IOException(e);
-    }
-  }
-  
-  List<String> getGroupsFromCache(String user) throws IOException {
-    if (user == null)
-      return null;
-    return userToGroupsCache.getIfPresent(user);
-  }
-  
-  
-  void removeUserGroupTx(String user, String group, boolean cacheOnly) throws IOException{
-    if(cacheOnly){
-      if(user != null && group == null){
-        removeUserFromCache(user);
-      }else if(user == null && group != null){
-        removeGroupFromCache(group);
-      }else if(user != null && group != null){
-        removeUserFromGroupInCache(user, group);
-      }
-    }else{
-      if(user != null && group == null){
-        removeUser(user);
-      }else if(user == null && group != null){
-        removeGroup(group);
-      }else if(user != null && group != null){
-        removeUserFromGroup(user, group);
-      }
-    }
-  }
-  
-  void addUserGroupTx(String user, String group, boolean cacheOnly) throws IOException{
-    if(cacheOnly){
-      if(user != null && group != null){
-        addUserToGroupsInCache(user, Arrays.asList(group));
-      }
-    }else{
-      addUserGroupTx(user, group);
-    }
-  }
-  
-  void addUserGroupTx(String user, String group) throws IOException {
-    addUserGroupsTx(user, new String[]{group});
-  }
-  
-  void addUserToGroup(String user, String group) throws IOException {
-    addUserGroups(user, new String[]{group});
-  }
-  
-  void addUserGroupsTx(String user, String[] groups) throws IOException {
-    if(!isConfigured)
-      return;
-    
-    try {
-      addUserGroupsInternalTx(user, groups);
-    } catch (ForeignKeyConstraintViolationException ex) {
-      removeUserFromCache(user);
-      for (String group : groups) {
-        removeGroupFromCache(group);
-      }
-      addUserGroupsInternalTx(user, groups);
-    } catch (UniqueKeyConstraintViolationException ex){
-      LOG.debug("User/Group was already added: " + ex);
-    }
-  }
-  
-  private void addUserGroupsInternalTx(final String user, final
-  String[] grps) throws IOException {
-    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.ADD_USER_GROUPS) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        addUserGroups(user, grps);
+        lockUser = user;
         return null;
       }
     }.handle();
   }
-  
-  /**
-   * Adds the user, and the groups if they don't exist in the cache to the
-   * database. Also, add the user to these groups.
-   * @param user
-   * @param grps
-   * @throws IOException
-   */
-  void addUserGroups(String user,
-      String[] grps) throws IOException {
-    
-    if(!isConfigured)
-      return;
-    
-    LOG.debug("Add user (" + user + ") to groups " + grps);
-    
-    Collection<String> groups = null;
-    
-    if (grps != null) {
-      groups = Collections2.filter(Arrays.asList(grps), Predicates
-          .<String>notNull());
+
+  private void ugExclusiveLock(StorageConnector connector) throws IOException {
+    connector.writeLock();
+    User user = null;
+    if (lockUser != null) {
+      user = userDataAccess.getUser(lockUser.getId());
     }
-  
-    Integer userId = null;
-    if(user != null){
-      List<String> availableGroups = userToGroupsCache.getIfPresent(user);
-      if (availableGroups != null && groups != null && !groups.isEmpty()) {
-        if (availableGroups.containsAll(groups)) {
-          LOG.debug("Groups (" + grps + ") already available in the cache for" +
-              " user (" + user + ")");
-          return;
-        }
-      }
-  
-      userId = addUserIfNotInCache(user);
-    }
-    
-    if (groups != null && !groups.isEmpty()) {
-      List<Integer> groupIds = Lists.newArrayList();
-      
-      for (String group : groups) {
-        Integer groupId = addGroupIfNotInCache(group);
-        groupIds.add(groupId);
-      }
-  
-      if (userId != null) {
-        userGroupDataAccess.addUserToGroups(userId, groupIds);
-        addUserToGroupsInCache(user, groups);
-      }
+    connector.readCommitted();
+
+    if (user == null) {
+      throw new RuntimeException("Hard Error. Users/Groups synchronization row is missing.");
     }
   }
-  
-  
-  void addUserToGroupsInCache(String user, Collection<String> groups){
-    List<String> currentGroups = userToGroupsCache.getIfPresent(user);
-    if(currentGroups == null){
-      currentGroups = new ArrayList<>();
-      userToGroupsCache.put(user, currentGroups);
-    }
-    
-    Set<String> newGroups = new HashSet<>();
-    newGroups.addAll(groups);
-    newGroups.removeAll(currentGroups);
-    currentGroups.addAll(newGroups);
+
+  // Taking shared lock has significant performance impact when the cache is disabled
+  // This is because we are using only one database row to synchronize the
+  // users/groups operations.
+  private void ugSharedLock(StorageConnector connector) throws StorageException {
+//    connector.readLock();
+//    User user = null;
+//    if (lockUser != null) {
+//      user = userDataAccess.getUser(lockUser.getId());
+//    }
+//    connector.readCommitted();
+//
+//    if (user == null) {
+//      throw new RuntimeException("Hard Error. Users/Groups synchronization row is missing.");
+//    }
   }
-  
-  
-  void removeUserFromGroupInCache(String user, String group){
-    List<String> currentGroups = userToGroupsCache.getIfPresent(user);
-    if(currentGroups == null){
-      return;
-    }
-    currentGroups.remove(group);
-    if(currentGroups.isEmpty()){
-      userToGroupsCache.invalidate(user);
-    }
-  }
-  
-  void clear(){
+
+  public void clear() {
     userToGroupsCache.invalidateAll();
     idToUserCache.invalidateAll();
     userToIdCache.invalidateAll();
     idToGroupCache.invalidateAll();
     groupToIdCache.invalidateAll();
   }
-  
-  
+
   private User getUserFromDB(final String userName, final Integer userId)
-      throws IOException {
-    if(!isConfigured)
-      return null;
-    
+          throws IOException {
     return (User) new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.GET_USER) {
       @Override
-      public Object performTask() throws StorageException, IOException {
-        return userName == null ? userDataAccess.getUser(userId) :
-            userDataAccess.getUser(userName);
-      }
-    }.handle();
-  }
-  
-  private User addUserToDB(final String userName)
-      throws IOException {
-    if(!isConfigured)
-      return null;
-    
-    return (User) new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.ADD_USER) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        return userDataAccess.addUser(userName);
-      }
-    }.handle();
-  }
-  
-  private void removeUserFromDB(final Integer userId)
-      throws IOException {
-    if(!isConfigured)
-      return;
-    
-    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.REMOVE_USER) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        userDataAccess.removeUser(userId);
-        return null;
-      }
-    }.handle();
-  }
-  
-  private Group getGroupFromDB(final String groupName, final Integer
-      groupId)
-      throws IOException {
-    if(!isConfigured)
-      return null;
-    
-    return (Group) new LightWeightRequestHandler(
-        UsersGroupsCache.UsersOperationsType.GET_GROUP) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        return groupName == null ? groupDataAccess.getGroup(groupId) :
-            groupDataAccess.getGroup(groupName);
-      }
-    }.handle();
-  }
-  
-  private Group addGroupToDB(final String groupName)
-      throws IOException {
-    if(!isConfigured)
-      return null;
-    
-    return (Group) new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.ADD_GROUP) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        return groupDataAccess.addGroup(groupName);
-      }
-    }.handle();
-  }
-  
-  private void removeGroupFromDB(final Integer groupId)
-      throws IOException {
-    if(!isConfigured)
-      return;
-    
-    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.REMOVE_GROUP) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        groupDataAccess.removeGroup(groupId);
-        return null;
-      }
-    }.handle();
-  }
-  
-  private void removeUserFromGroupFromDB(final Integer userId,
-      final Integer groupId) throws IOException{
-    if(!isConfigured)
-      return;
-  
-    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.REMOVE_USER_GROUPS) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        userGroupDataAccess.removeUserFromGroup(userId, groupId);
-        return null;
-      }
-    }.handle();
-  }
-  
-  private List<Group> getGroupsFromDB(final String userName,
-      final Integer userId)
-      throws IOException {
-    if(!isConfigured)
-      return null;
-    
-    return (List<Group>) new LightWeightRequestHandler
-        (UsersGroupsCache.UsersOperationsType.GET_USER_GROUPS) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        List<Group> result = null;
-        boolean transactionActive = connector.isTransactionActive();
-        
-        if (!transactionActive) {
+      public Object performTask() throws IOException {
+        LOG.debug("Get User: " + userName + " from DB.");
+        boolean fail = false;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
           connector.beginTransaction();
         }
-        
-        User user = userId == null ? userDataAccess.getUser(userName) :
-            userDataAccess.getUser(userId);
-        
-        if (user != null) {
-          List<Group> groups = userGroupDataAccess.getGroupsForUser(user.getId());
-          result =groups;
+
+        try {
+          ugSharedLock(connector);
+          User user = userName == null ? userDataAccess.getUser(userId) :
+                  userDataAccess.getUser(userName);
+
+          if (localTx) {
+            connector.commit();
+          }
+
+          return user;
+        } catch (IOException e) {
+          fail = true;
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
+          }
         }
-        if (!transactionActive) {
-          connector.commit();
-        }
-        
-        return result;
       }
     }.handle();
-    
   }
-  
+
+  private User addUserToDB(final String userName) throws IOException {
+
+    return (User) new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.ADD_USER) {
+      @Override
+      public Object performTask() throws IOException {
+        LOG.debug("Add User: " + userName + " to DB.");
+        boolean fail = false;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
+          connector.beginTransaction();
+        }
+
+        try {
+          ugExclusiveLock(connector);
+          User user = userDataAccess.addUser(userName);
+
+          if (localTx) {
+            connector.commit();
+          }
+          return user;
+        } catch (IOException e) {
+          fail = true;
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
+          }
+        }
+      }
+    }.handle();
+  }
+
+  @VisibleForTesting
+  protected void removeUserFromDB(final Integer userId) throws IOException {
+
+    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.REMOVE_USER) {
+      @Override
+      public Object performTask() throws IOException {
+        LOG.debug("Remove UserID: " + userId + " from DB.");
+        boolean fail = false;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
+          connector.beginTransaction();
+        }
+
+        try {
+          ugExclusiveLock(connector);
+          userDataAccess.removeUser(userId);
+
+          if (localTx) {
+            connector.commit();
+          }
+
+          return null;
+        } catch (IOException e) {
+          fail = true;
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
+          }
+        }
+      }
+    }.handle();
+  }
+
+  private Group getGroupFromDB(final String groupName, final Integer groupId) throws IOException {
+
+    return (Group) new LightWeightRequestHandler(
+            UsersGroupsCache.UsersOperationsType.GET_GROUP) {
+      @Override
+      public Object performTask() throws IOException {
+        LOG.debug("Get GroupName: " + groupName + " GroupID: " + groupId + " from DB.");
+        boolean fail = false;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
+          connector.beginTransaction();
+        }
+
+        try {
+          ugSharedLock(connector);
+          Group group = groupName == null ? groupDataAccess.getGroup(groupId) :
+                  groupDataAccess.getGroup(groupName);
+
+          if (localTx) {
+            connector.commit();
+          }
+
+          return group;
+        } catch (IOException e) {
+          fail = true;
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
+          }
+        }
+      }
+    }.handle();
+  }
+
+  private Group addGroupToDB(final String groupName) throws IOException {
+
+    return (Group) new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.ADD_GROUP) {
+      @Override
+      public Object performTask() throws IOException {
+        LOG.debug("Add Group: " + groupName + " to DB.");
+
+        boolean fail = false;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
+          connector.beginTransaction();
+        }
+
+        try {
+          ugExclusiveLock(connector);
+          Group group = groupDataAccess.addGroup(groupName);
+
+          if (localTx) {
+            connector.commit();
+          }
+
+          return group;
+        } catch (IOException e) {
+          fail = true;
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
+          }
+        }
+      }
+    }.handle();
+  }
+
+  @VisibleForTesting
+  protected void removeGroupFromDB(final Integer groupId) throws IOException {
+
+    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.REMOVE_GROUP) {
+      @Override
+      public Object performTask() throws IOException {
+        LOG.debug("Remove GroupID: " + groupId + " from DB.");
+
+        boolean fail = false;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
+          connector.beginTransaction();
+        }
+
+        try {
+          ugExclusiveLock(connector);
+          groupDataAccess.removeGroup(groupId);
+
+          if (localTx) {
+            connector.commit();
+          }
+
+          return null;
+        } catch (IOException e) {
+          fail = true;
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
+          }
+        }
+      }
+    }.handle();
+  }
+
+  private void removeUserFromGroupDB(final Integer userId, final Integer groupId) throws
+          IOException {
+
+    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.REMOVE_USER_FROM_GROUPS) {
+      @Override
+      public Object performTask() throws IOException {
+        LOG.debug("Removing user from group. UserID: " + userId + " GropuID: " + groupId + ".");
+
+        boolean fail = false;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
+          connector.beginTransaction();
+        }
+
+        try {
+          ugExclusiveLock(connector);
+          userGroupDataAccess.removeUserFromGroup(userId, groupId);
+
+          if (localTx) {
+            connector.commit();
+          }
+
+          return null;
+        } catch (IOException e) {
+          fail = true;
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
+          }
+        }
+      }
+    }.handle();
+  }
+
+  @VisibleForTesting
+  public void addUserToGroupDB(final int userId, final int groupId) throws IOException {
+
+    new LightWeightRequestHandler(UsersOperationsType.ADD_USER_TO_GROUPS) {
+      @Override
+      public Object performTask() throws IOException {
+        LOG.debug("Add user to group. UserID: " + userId + " GroupID: " + groupId + ".");
+
+        boolean fail = false;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
+          connector.beginTransaction();
+        }
+
+        try {
+          ugExclusiveLock(connector);
+          userGroupDataAccess.addUserToGroup(userId, groupId);
+
+          if (localTx) {
+            connector.commit();
+          }
+
+          return null;
+        } catch (IOException e) {
+          fail = true;
+
+          if (e instanceof ForeignKeyConstraintViolationException) {
+            //find out which of the IDs are missing.
+            User user = getUserFromDB(null, userId);  // Throws UserNotFoundException
+            if (user == null) {
+              invCachesUserRemoved(userId);
+              throw new UserNotFoundException("Unable to add UserGroup mapping because user with " +
+                      "ID: " + userId + " does not exist.");
+            }
+
+            Group group = getGroupFromDB(null, groupId); // Throws GroupNotFoundException
+            if (group == null) {
+              invCachesGroupRemoved(groupId);
+              throw new GroupNotFoundException("Unable to add UserGroup mapping because group " +
+                      "with  ID: " + groupId + " does not exist.");
+            }
+          }
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
+          }
+        }
+      }
+    }.handle();
+  }
+
+  private List<Group> getUserGroupsFromDB(final String userName, final Integer userId) throws
+          IOException {
+
+    return (List<Group>) new LightWeightRequestHandler
+            (UsersGroupsCache.UsersOperationsType.GET_USER_GROUPS) {
+      @Override
+      public Object performTask() throws IOException {
+        List<Group> result = null;
+        boolean fail = false;
+        boolean localTx = !connector.isTransactionActive();
+        if (localTx) {
+          connector.beginTransaction();
+        }
+
+        try {
+          ugSharedLock(connector);
+          User user = userId == null ? userDataAccess.getUser(userName) :
+                  userDataAccess.getUser(userId);
+          if (user != null) {
+            result = userGroupDataAccess.getGroupsForUser(user.getId());
+          }
+
+          if (localTx) {
+            connector.commit();
+          }
+
+          return result;
+        } catch (IOException e) {
+          fail = true;
+          throw e;
+        } finally {
+          if (fail && localTx) {
+            connector.rollback();
+          }
+        }
+      }
+    }.handle();
+  }
+
+  public String getUserName(int userId) throws IOException {
+    if(userId == 0){
+      return null;
+    }
+
+    try {
+      return idToUserCache.get(userId);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  public int getUserId(String userName) throws IOException {
+    if(userName == null){
+      return 0;
+    }
+
+    try {
+      return userToIdCache.get(userName);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  public List<String> getGroups(String user) throws IOException {
+    assert user != null;
+
+    try {
+      return userToGroupsCache.get(user);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  public int getGroupId(String groupName) throws IOException {
+    if(groupName == null){
+      return 0;
+    }
+
+    try {
+      return groupToIdCache.get(groupName);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  public String getGroupName(int groupId) throws IOException {
+    if(groupId == 0){
+      return null;
+    }
+
+    try {
+      return idToGroupCache.get(groupId);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  public Integer addUser(String userName) throws IOException {
+
+    if (userName == null) {
+      return null;
+    }
+
+    try {
+      int id = userToIdCache.get(userName);
+      throw new UserAlreadyExistsException("User: " + userName + " already exists with ID: " + id);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof UserNotFoundException) {
+        try {
+          User user = addUserToDB(userName);
+          updateUserCache(user.getId(), user.getName());
+        } catch (UniqueKeyConstraintViolationException ue) {
+          throw new UserAlreadyExistsException("User: " + userName + " already exists.");
+        }
+      } else {
+        throw new IOException(e);
+      }
+    }
+
+    return getUserId(userName);
+  }
+
+
+  public Integer addGroup(String groupName) throws IOException {
+
+    if (groupName == null) {
+      return null;
+    }
+    try {
+      groupToIdCache.get(groupName);
+      throw new GroupAlreadyExistsException("Group: " + groupName + " already exists");
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof GroupNotFoundException) {
+        try {
+          Group group = addGroupToDB(groupName);
+          updateGroupCache(group.getId(), group.getName());
+        } catch (UniqueKeyConstraintViolationException ue) {
+          throw new GroupAlreadyExistsException("Group: " + groupName + " already exists");
+        }
+      } else {
+        throw new IOException(e);
+      }
+    }
+    return getGroupId(groupName);
+  }
+
+  public void removeUser(String userName) throws IOException {
+
+    if (userName == null)
+      return;
+
+    try {
+      int userID = userToIdCache.get(userName);
+      LOG.debug("Remove user from DB name: " + userName);
+      removeUserFromDB(userID);
+      invCacheUserRemoved(userID, userName);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof UserNotFoundException) {
+        throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  public void removeGroup(String group) throws IOException {
+    assert group != null;
+
+    LOG.debug("Remove group from DB name: " + group);
+    try {
+      int groupID = groupToIdCache.get(group);
+      removeGroupFromDB(groupID);
+      invCachesGroupRemoved(groupID, group);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof GroupNotFoundException) {
+        throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  public void addUserToGroups(String user, String[] groups) throws IOException {
+    assert user != null;
+    assert groups != null;
+
+    for (String group : groups) {
+      addUserToGroup(user, group);
+    }
+  }
+
+  public void addUserToGroup(String user, String group) throws IOException {
+    assert user != null && group != null;
+
+    LOG.debug("Adding user: " + user + " to Group: " + group);
+
+    List<String> availableGroups = Collections.EMPTY_LIST;
+    try {
+      availableGroups = userToGroupsCache.get(user);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof GroupsNotFoundForUserException) {
+        // ok, continue
+      } else {
+        throw new IOException(e);
+      }
+    }
+
+    if (availableGroups.contains(group)) {
+      throw new UserAlreadyInGroupException("User: " + user + " is already part of Group: " + group + ".");
+    }
+
+    try {
+
+      int userID = userToIdCache.get(user);
+      int groupID = groupToIdCache.get(group);
+
+      addUserToGroupDB(userID, groupID);
+
+      invCacheUserAddedToGroup(user, group);
+
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof UserNotFoundException ||
+              e.getCause() instanceof GroupNotFoundException) {
+        throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  public void removeUserFromGroup(String user, String group) throws IOException {
+
+    if (user == null || group == null)
+      return;
+
+    LOG.debug("Remove user-group from DB user: " + user + ", group: " + group);
+    try {
+
+      int userId = userToIdCache.get(user);
+      int groupId = groupToIdCache.get(group);
+
+      removeUserFromGroupDB(userId, groupId);
+
+      invCachesUserRemovedFromGroup(user, group);
+
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof UserNotFoundException ||
+              e.getCause() instanceof GroupNotFoundException) {
+        throw (IOException) e.getCause();
+      } else {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  //-----------------------Cache Invlaidation Functions-------------------------
+  private void invCachesGroupRemoved(int groupID) {
+    String groupName = null;
+    try {
+      groupName = idToGroupCache.get(groupID);
+    } catch (ExecutionException e) {
+    }
+
+    invCachesGroupRemoved(groupID, groupName);
+  }
+
+  protected void invCachesGroupRemoved(String group) throws IOException {
+    // get the ID
+    int groupID = 0;
+
+    try {
+      groupID = getGroupId(group);
+    } catch (GroupNotFoundException e) {
+    }
+
+    invCachesGroupRemoved(groupID, group);
+  }
+
+  private void invCachesGroupRemoved(int groupId, String groupName) {
+    if (groupId != 0) {
+      idToGroupCache.invalidate(groupId);
+    }
+
+    if (groupName != null) {
+      groupToIdCache.invalidate(groupName);
+
+      //get all the users in cache that are part of this grp
+      Map<String, List<String>> u2gMap = userToGroupsCache.asMap();
+      for (String user : u2gMap.keySet()) {
+        if (u2gMap.get(user).contains(groupName)) {
+          userToGroupsCache.invalidate(user);
+        }
+      }
+    }
+  }
+
+  private void invCachesUserRemoved(int userID) {
+    String userName = null;
+    try {
+      userName = idToUserCache.get(userID);
+    } catch (ExecutionException e) {
+    }
+
+    invCacheUserRemoved(userID, userName);
+  }
+
+  protected void invCacheUserRemoved(String user) throws IOException {
+    assert user != null;
+    // get the ID
+    int userID = 0;
+
+    try {
+      userID = getUserId(user);
+    } catch (UserNotFoundException e) {
+    }
+
+    invCacheUserRemoved(userID, user);
+  }
+
+  private void invCacheUserRemoved(int userId, String userName) {
+    if (userId != 0) {
+      idToUserCache.invalidate(userId);
+    }
+
+    if (userName != null) {
+      userToIdCache.invalidate(userName);
+      userToGroupsCache.invalidate(userName);
+    }
+  }
+
+  protected void invCachesUserRemovedFromGroup(String user, String group) {
+    userToGroupsCache.invalidate(user);
+  }
+
+  protected void invCacheUserAddedToGroup(String user, String group) {
+    userToGroupsCache.invalidate(user);
+  }
+
+  //---------------------Explict Cache Updates---------------------------------
+  private void updateGroupCache(Integer groupID, String groupName) {
+    idToGroupCache.put(groupID, groupName);
+    groupToIdCache.put(groupName, groupID);
+  }
+
+  private void updateUserCache(Integer userID, String userName) {
+    idToUserCache.put(userID, userName);
+    userToIdCache.put(userName, userID);
+  }
 }

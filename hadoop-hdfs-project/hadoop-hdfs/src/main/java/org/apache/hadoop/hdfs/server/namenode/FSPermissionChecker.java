@@ -554,6 +554,10 @@ class FSPermissionChecker {
     }
 
     // if this user is the file owner, return
+    if(inode.getUserName() == null || user == null){
+      System.out.println("");
+    }
+
     if (inode.getUserName().equals(user)) {
       return;
     }

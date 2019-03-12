@@ -238,7 +238,7 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
         new MockAM(rm.getRMContext(), rm.getApplicationMasterService(),
             app.getCurrentAppAttempt().getAppAttemptId());
     UserGroupInformation appUgi =
-        UserGroupInformation.createRemoteUser(appAttempt.toString(),false);
+        UserGroupInformation.createRemoteUser(appAttempt.toString());
     RegisterApplicationMasterResponse response =
         appUgi.doAs(new PrivilegedAction<RegisterApplicationMasterResponse>() {
 
@@ -482,7 +482,7 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
         new MockAM(rm.getRMContext(), rm.getApplicationMasterService(),
             app.getCurrentAppAttempt().getAppAttemptId());
     UserGroupInformation appUgi =
-        UserGroupInformation.createRemoteUser(appAttempt.toString(), false);
+        UserGroupInformation.createRemoteUser(appAttempt.toString());
     RegisterApplicationMasterResponse response =
         appUgi.doAs(new PrivilegedAction<RegisterApplicationMasterResponse>() {
 

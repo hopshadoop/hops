@@ -22,11 +22,13 @@ import io.hops.metadata.hdfs.entity.INode;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
+import io.hops.security.GroupNotFoundException;
+import io.hops.security.UserNotFoundException;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.context.EntityContext;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.namenode.DirectoryWithQuotaFeature;
 import org.apache.hadoop.hdfs.server.namenode.FileUnderConstructionFeature;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
@@ -257,8 +259,21 @@ public class INodeDALAdaptor
     try{
       org.apache.hadoop.hdfs.server.namenode.INode inode = null;
       if (hopINode != null) {
-        PermissionStatus ps = new PermissionStatus(null, null, new FsPermission
-            (hopINode.getPermission()));
+        String group = null;
+        String user = null;
+
+        try {
+          user = UsersGroups.getUser(hopINode.getUserID());
+        } catch (UserNotFoundException e) {
+        }
+
+        try {
+          group = UsersGroups.getGroup(hopINode.getGroupID());
+        } catch (GroupNotFoundException e) {
+        }
+
+        PermissionStatus ps = new PermissionStatus(user, group,
+                new FsPermission(hopINode.getPermission()));
         if (hopINode.isDirectory()) {
           if (hopINode.isDirWithQuota()) {
             inode = new INodeDirectory(hopINode.getId(), hopINode.getName(), ps, true);
@@ -295,8 +310,8 @@ public class INodeDALAdaptor
         inode.setParentIdNoPersistance(hopINode.getParentId());
         inode.setSubtreeLocked(hopINode.isSubtreeLocked());
         inode.setSubtreeLockOwner(hopINode.getSubtreeLockOwner());
-        inode.setUserIDNoPersistance(hopINode.getUserID());
-        inode.setGroupIDNoPersistance(hopINode.getGroupID());
+        inode.setUserIDNoPersistence(hopINode.getUserID());
+        inode.setGroupIDNoPersistence(hopINode.getGroupID());
         inode.setHeaderNoPersistance(hopINode.getHeader());
         inode.setPartitionIdNoPersistance(hopINode.getPartitionId());
         inode.setLogicalTimeNoPersistance(hopINode.getLogicalTime());

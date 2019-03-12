@@ -30,6 +30,9 @@ import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
 import io.hops.metadata.StorageMap;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.security.GroupAlreadyExistsException;
+import io.hops.security.HopsUGException;
+import io.hops.security.UserAlreadyExistsException;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -206,7 +209,11 @@ public class DFSTestUtil {
     String superGroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
         DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
 
-    UsersGroups.addUserToGroup(fsOwnerShortUserName, superGroup);
+    try {
+      UsersGroups.addUser(fsOwnerShortUserName);
+      UsersGroups.addGroup(superGroup);
+      UsersGroups.addUserToGroup(fsOwnerShortUserName, superGroup);
+    } catch (HopsUGException e){ }
   }
    
   /**
@@ -966,6 +973,9 @@ public class DFSTestUtil {
   static public FileSystem getFileSystemAs(UserGroupInformation ugi, 
       final Configuration conf) throws IOException {
     try {
+      UsersGroups.addUser(ugi.getUserName());
+    } catch (UserAlreadyExistsException e){}
+    try {
       return ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
         @Override
         public FileSystem run() throws Exception {
@@ -1186,6 +1196,12 @@ public class DFSTestUtil {
   }
 
   public static void createRootFolder() throws IOException {
+    try {
+      UsersGroups.addUser("user");
+    } catch (UserAlreadyExistsException e) {}
+    try {
+      UsersGroups.addGroup("grp");
+    } catch (GroupAlreadyExistsException e) {}
     createRootFolder(new PermissionStatus("user", "grp", new FsPermission((short) 0755)));
   }
 

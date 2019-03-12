@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.EnumSet;
 
+import io.hops.security.UsersGroups;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -67,6 +68,7 @@ public class TestDefaultBlockPlacementPolicy {
     cluster.waitActive();
     nameNodeRpc = cluster.getNameNodeRpc();
     namesystem = cluster.getNamesystem();
+    UsersGroups.addUser("TestDefaultBlockPlacementPolicy");
     perm = new PermissionStatus("TestDefaultBlockPlacementPolicy", null,
         FsPermission.getDefault());
   }

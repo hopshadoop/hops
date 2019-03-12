@@ -70,7 +70,7 @@ public class TestAMRMRPCResponseId {
   private AllocateResponse allocate(ApplicationAttemptId attemptId,
       final AllocateRequest req) throws Exception {
     UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(attemptId.toString(), false);
+        UserGroupInformation.createRemoteUser(attemptId.toString());
     org.apache.hadoop.security.token.Token<AMRMTokenIdentifier> token =
         rm.getRMContext().getRMApps().get(attemptId.getApplicationId())
           .getRMAppAttempt(attemptId).getAMRMToken();

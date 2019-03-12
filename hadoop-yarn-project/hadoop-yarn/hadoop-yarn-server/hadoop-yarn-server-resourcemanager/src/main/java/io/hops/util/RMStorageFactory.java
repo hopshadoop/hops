@@ -195,4 +195,8 @@ public class RMStorageFactory {
     }
     return dStorageFactory.getDataAccess(type);
   }
+
+  public static void resetDALInitialized() {
+    isInitialized = false;
+  }
 }

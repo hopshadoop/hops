@@ -114,7 +114,7 @@ public class NMTokenIdentifier extends TokenIdentifier {
       appAttemptId = new ApplicationAttemptIdPBImpl(
           proto.getAppAttemptId()).toString();
   }
-    return UserGroupInformation.createRemoteUser(appAttemptId, false);
+    return UserGroupInformation.createRemoteUser(appAttemptId);
   }
   
   public NMTokenIdentifierProto getProto() {

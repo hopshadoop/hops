@@ -27,6 +27,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Random;
 
+import io.hops.security.UserAlreadyExistsException;
+import io.hops.security.UsersGroups;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -397,6 +399,9 @@ public class TestCopyMapper {
       deleteState();
       createSourceData();
 
+      try {
+        UsersGroups.addUser("guest");
+      } catch (UserAlreadyExistsException e){}
       UserGroupInformation tmpUser = UserGroupInformation.createRemoteUser("guest");
 
       final CopyMapper copyMapper = new CopyMapper();
@@ -471,6 +476,9 @@ public class TestCopyMapper {
       deleteState();
       createSourceData();
 
+      try {
+        UsersGroups.addUser("guest");
+      } catch (UserAlreadyExistsException e){}
       UserGroupInformation tmpUser = UserGroupInformation.createRemoteUser("guest");
 
       final CopyMapper copyMapper = new CopyMapper();

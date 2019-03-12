@@ -744,23 +744,69 @@ message CheckAccessRequestProto {
 message CheckAccessResponseProto { // void response
 }
 
-message AddUserGroupRequestProto {
+// Add user
+message AddUserRequestProto {
+  optional string userName = 1;
+}
+message AddUserResponseProto { }
+
+// Add group
+message AddGroupRequestProto {
+  optional string groupName = 1;
+}
+message AddGroupResponseProto { }
+
+// Add user to group
+message AddUserToGroupRequestProto {
   optional string userName = 1;
   optional string groupName = 2;
-  required bool cacheOnly = 3;
 }
+message AddUserToGroupResponseProto { }
 
-message AddUserGroupResponseProto {
+// Remove user
+message RemoveUserRequestProto {
+  optional string userName = 1;
 }
+message RemoveUserResponseProto { }
 
-message RemoveUserGroupRequestProto {
+// Remove group
+message RemoveGroupRequestProto {
+  optional string groupName = 1;
+}
+message RemoveGroupResponseProto { }
+
+// Remove user from group
+message RemoveUserFromGroupRequestProto {
   optional string userName = 1;
   optional string groupName = 2;
-  required bool cacheOnly = 3;
 }
+message RemoveUserFromGroupResponseProto { }
 
-message RemoveUserGroupResponseProto {
+//invalidate caches user removed
+message InvCachesUserRemovedRequestProto {
+  optional string userName = 1;
 }
+message InvCachesUserRemovedResponseProto { }
+
+//invalidate caches group removed
+message InvCachesGroupRemovedRequestProto {
+  optional string groupName = 1;
+}
+message InvCachesGroupRemovedResponseProto { }
+
+//invalidate caches user removed from group
+message InvCachesUserRemovedFromGroupRequestProto {
+  optional string userName = 1;
+  optional string groupName = 2;
+}
+message InvCachesUserRemovedFromGroupResponseProto { }
+
+//invalidate caches user removed from group
+message InvCachesUserAddedToGroupRequestProto {
+  optional string userName = 1;
+  optional string groupName = 2;
+}
+message InvCachesUserAddedToGroupResponseProto { }
 
 service ClientNamenodeProtocol {
   rpc getBlockLocations (GetBlockLocationsRequestProto) returns (GetBlockLocationsResponseProto);
@@ -847,10 +893,16 @@ service ClientNamenodeProtocol {
   rpc getRepairedBlockLocations (GetRepairedBlockLocationsRequsestProto) returns (GetRepairedBlockLocationsResponseProto);
   rpc changeConf (ChangeConfProto) returns (ChangeConfResponseProto);
   rpc checkAccess(CheckAccessRequestProto) returns(CheckAccessResponseProto);
-  rpc getLastUpdatedContentSummary (GetLastUpdatedContentSummaryRequestProto)
-  returns (GetLastUpdatedContentSummaryResponseProto);
-  rpc addUserGroup (AddUserGroupRequestProto) returns
-  (AddUserGroupResponseProto);
-  rpc removeUserGroup (RemoveUserGroupRequestProto) returns
-  (RemoveUserGroupResponseProto);
+  rpc getLastUpdatedContentSummary (GetLastUpdatedContentSummaryRequestProto) returns (GetLastUpdatedContentSummaryResponseProto);
+  rpc addUser (AddUserRequestProto) returns(AddUserResponseProto);
+  rpc addGroup (AddGroupRequestProto) returns(AddGroupResponseProto);
+  rpc addUserToGroup (AddUserToGroupRequestProto) returns(AddUserToGroupResponseProto);
+  rpc removeUser (RemoveUserRequestProto) returns(RemoveUserResponseProto);
+  rpc removeGroup (RemoveGroupRequestProto) returns(RemoveGroupResponseProto);
+  rpc removeUserFromGroup (RemoveUserFromGroupRequestProto) returns (RemoveUserFromGroupResponseProto);
+  rpc invCachesUserRemoved (InvCachesUserRemovedRequestProto) returns (InvCachesUserRemovedResponseProto);
+  rpc invCachesGroupRemoved (InvCachesGroupRemovedRequestProto) returns (InvCachesGroupRemovedResponseProto);
+  rpc invCachesUserRemovedFromGroup (InvCachesUserRemovedFromGroupRequestProto) returns (InvCachesUserRemovedFromGroupResponseProto);
+  rpc invCachesUserAddedToGroup (InvCachesUserAddedToGroupRequestProto) returns (InvCachesUserAddedToGroupResponseProto);
 }
+

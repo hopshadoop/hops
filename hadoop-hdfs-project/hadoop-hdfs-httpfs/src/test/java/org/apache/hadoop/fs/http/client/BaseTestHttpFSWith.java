@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.http.client;
 
+import io.hops.security.UserAlreadyExistsException;
+import io.hops.security.UsersGroups;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.ContentSummary;
@@ -714,6 +716,10 @@ public abstract class BaseTestHttpFSWith extends HFSTestCase {
   @TestHdfs
   public void testOperationDoAs() throws Exception {
     createHttpFSServer();
+
+    try{
+      UsersGroups.addUser(HadoopUsersConfTestHelper.getHadoopUsers()[0]);
+    } catch(UserAlreadyExistsException e){}
     UserGroupInformation ugi = UserGroupInformation
         .createProxyUser(HadoopUsersConfTestHelper.getHadoopUsers()[0],
             UserGroupInformation.getCurrentUser());

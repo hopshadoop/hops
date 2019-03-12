@@ -1657,7 +1657,7 @@ public class Client implements AutoCloseable {
       this.conf = conf;
     }
     
-    InetSocketAddress getAddress() {
+    public InetSocketAddress getAddress() {
       return address;
     }
     

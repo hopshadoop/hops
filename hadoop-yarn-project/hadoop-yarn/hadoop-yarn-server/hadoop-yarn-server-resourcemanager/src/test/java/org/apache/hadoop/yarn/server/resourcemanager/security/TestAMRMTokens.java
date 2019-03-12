@@ -152,7 +152,7 @@ public class TestAMRMTokens {
       // Create a client to the RM.
       UserGroupInformation currentUser =
           UserGroupInformation
-            .createRemoteUser(applicationAttemptId.toString(), false);
+            .createRemoteUser(applicationAttemptId.toString());
       Credentials credentials = containerManager.getContainerCredentials();
       final InetSocketAddress rmBindAddress =
           rm.getApplicationMasterService().getBindAddress();
@@ -273,7 +273,7 @@ public class TestAMRMTokens {
       // Create a client to the RM.
       UserGroupInformation currentUser =
           UserGroupInformation
-            .createRemoteUser(applicationAttemptId.toString(),false);
+            .createRemoteUser(applicationAttemptId.toString());
       Credentials credentials = containerManager.getContainerCredentials();
       final InetSocketAddress rmBindAddress =
           rm.getApplicationMasterService().getBindAddress();
@@ -290,8 +290,7 @@ public class TestAMRMTokens {
       // One allocate call.
       AllocateRequest allocateRequest =
           Records.newRecord(AllocateRequest.class);
-      Assert.assertTrue(
-          rmClient.allocate(allocateRequest).getAMCommand() == null);
+      Assert.assertTrue(rmClient.allocate(allocateRequest).getAMCommand() == null);
 
       // Wait for enough time and make sure the roll_over happens
       // At mean time, the old AMRMToken should continue to work
