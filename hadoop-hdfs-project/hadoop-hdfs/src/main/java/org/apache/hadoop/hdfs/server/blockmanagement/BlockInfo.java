@@ -260,7 +260,7 @@ public class BlockInfo extends Block {
     return replicas;
   }
 
-  List<Replica> getReplicas(DatanodeManager datanodeMgr)
+  public List<Replica> getReplicas(DatanodeManager datanodeMgr)
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicasNoCheck();
     getDatanodes(datanodeMgr, replicas);
