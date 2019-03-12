@@ -33,14 +33,7 @@ import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.RetryCacheEntryDataAccess;
 import io.hops.metadata.hdfs.dal.SafeBlocksDataAccess;
-import io.hops.metadata.hdfs.entity.BlockChecksum;
-import io.hops.metadata.hdfs.entity.EncodingPolicy;
-import io.hops.metadata.hdfs.entity.EncodingStatus;
-import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
-import io.hops.metadata.hdfs.entity.ProjectedINode;
-import io.hops.metadata.hdfs.entity.RetryCacheEntry;
-import io.hops.metadata.hdfs.entity.SubTreeOperation;
+import io.hops.metadata.hdfs.entity.*;
 import io.hops.resolvingcache.Cache;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
@@ -2254,17 +2247,18 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
           lastBlockWithStatus = appendFileInt(src, holder, clientMachine);
 
-          if (lastBlockWithStatus != null && lastBlockWithStatus.getLastBlock() != null && !lastBlockWithStatus.
-              getLastBlock().isPhantomBlock()) {
-            for (String storageID : lastBlockWithStatus.getLastBlock().getStorageIDs()) {
+          if (lastBlockWithStatus != null &&
+                  lastBlockWithStatus.getLastBlock() != null &&
+                  !lastBlockWithStatus.getLastBlock().isPhantomBlock()) {
 
-              int sId = blockManager.getDatanodeManager().getSid(storageID);
-              BlockInfo blockInfo = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
-                  lastBlockWithStatus.getLastBlock().getBlock().getBlockId(), target.getId());
+            BlockInfo blockInfo = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+                    lastBlockWithStatus.getLastBlock().getBlock().getBlockId(), target.getId());
+            for(Replica replica : blockInfo.getReplicas(blockManager.getDatanodeManager())){
+
               Block undoBlock = new Block(blockInfo);
-              undoBlock.setGenerationStampNoPersistance(undoBlock
-                  .getGenerationStamp() - 1);
-              HashBuckets.getInstance().undoHash(sId, HdfsServerConstants.ReplicaState.FINALIZED, undoBlock);
+              undoBlock.setGenerationStampNoPersistance(undoBlock.getGenerationStamp() - 1);
+              HashBuckets.getInstance().undoHash(replica.getStorageId(),
+                      HdfsServerConstants.ReplicaState.FINALIZED, undoBlock);
             }
           }
           success = true;
@@ -5605,11 +5599,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new IOException(msg);
     }
 
-
     //Make sure the hashes are corrected to avoid leaving stale replicas behind
-    for (DatanodeStorageInfo oldLocation :
-        blockInfo.getStorages(blockManager.getDatanodeManager())){
-      HashBuckets.getInstance().undoHash(oldLocation.getSid(),
+    for (Replica replica : blockInfo.getReplicas(blockManager.getDatanodeManager())){
+      HashBuckets.getInstance().undoHash(replica.getStorageId(),
           HdfsServerConstants.ReplicaState.FINALIZED, oldBlock.getLocalBlock());
     }
 
