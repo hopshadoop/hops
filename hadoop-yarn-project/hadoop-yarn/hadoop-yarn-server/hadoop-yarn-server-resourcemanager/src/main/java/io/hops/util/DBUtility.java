@@ -24,6 +24,7 @@ import io.hops.metadata.yarn.dal.*;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.*;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.handler.AsyncLightWeightRequestHandler;
 import java.io.IOException;
 import java.util.*;
@@ -595,6 +596,7 @@ long start = System.currentTimeMillis();
       @Override
       public Object performTask() throws IOException {
         boolean success = connector.formatStorage();
+        UsersGroups.createSyncRow();
         LOG.debug("HOP :: Format storage has been completed: " + success);
         return success;
       }

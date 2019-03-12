@@ -38,6 +38,8 @@ Release 2.7.0 - UNRELEASED
     HDFS-7656. Expose truncate API for HDFS httpfs. (yliu)
 
   IMPROVEMENTS
+    HOPS-1152 Allow disabling Users/Groups Cache on the NN side
+
     HOPS-1108. Change the plus operator to XOR for combining hashes in the block 
     reporting system (salman niazi)
 

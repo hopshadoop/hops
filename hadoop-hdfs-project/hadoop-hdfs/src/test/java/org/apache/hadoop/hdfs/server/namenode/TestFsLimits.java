@@ -23,6 +23,8 @@ import io.hops.exception.StorageException;
 import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
+import io.hops.security.GroupAlreadyExistsException;
+import io.hops.security.UserAlreadyInGroupException;
 import io.hops.security.UsersGroups;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options.Rename;
@@ -47,7 +49,8 @@ public class TestFsLimits {
   static Configuration conf;
   static FSNamesystem fs;
   static boolean fsIsReady;
-  
+
+//  Usersg
   static PermissionStatus perms =
       new PermissionStatus("admin", "admin", FsPermission.getDefault());
 
@@ -67,7 +70,15 @@ public class TestFsLimits {
     HdfsStorageFactory.setConfiguration(conf);
     assert (HdfsStorageFactory.formatStorage());
     NameNode.format(conf);
-    UsersGroups.addUserToGroup(perms.getUserName(), perms.getGroupName());
+    try {
+      UsersGroups.addUser(perms.getUserName());
+    } catch (UserAlreadyInGroupException e){}
+    try {
+      UsersGroups.addGroup(perms.getGroupName());
+    } catch (GroupAlreadyExistsException e){}
+    try {
+      UsersGroups.addUserToGroup(perms.getUserName(), perms.getGroupName());
+    } catch(UserAlreadyInGroupException e){}
     IDsMonitor.getInstance().start();
     NameNode.initMetrics(conf, NamenodeRole.NAMENODE);
     fs = null;

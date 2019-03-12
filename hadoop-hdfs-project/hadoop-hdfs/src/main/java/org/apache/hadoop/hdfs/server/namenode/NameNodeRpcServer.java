@@ -25,6 +25,7 @@ import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import static org.apache.hadoop.util.Time.now;
 
+import io.hops.security.UsersGroups;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
@@ -1519,18 +1520,75 @@ class NameNodeRpcServer implements NamenodeProtocols {
     checkNNStartup();
     return namesystem.listCachePools(prevKey != null ? prevKey : "");
   }
-  
+
   @Override
-  public void addUserGroup(String userName, String groupName, boolean cacheOnly)
-      throws IOException {
-    namesystem.addUserGroup(userName, groupName, cacheOnly);
-  }
-  
-  @Override
-  public void removeUserGroup(String userName, String groupName,
-      boolean cacheOnly) throws IOException {
+  public void addUser(String userName) throws IOException {
     checkNNStartup();
-    namesystem.removeUserGroup(userName, groupName, cacheOnly);
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.addUser(userName);
+  }
+
+  @Override
+  public void addGroup(String groupName) throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.addGroup(groupName);
+  }
+
+  @Override
+  public void addUserToGroup(String userName, String groupName) throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.addUserToGroup(userName,groupName);
+  }
+
+  @Override
+  public void removeUser(String userName) throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.removeUser(userName);
+  }
+
+  @Override
+  public void removeGroup(String groupName) throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.removeGroup(groupName);
+  }
+
+  @Override
+  public void removeUserFromGroup(String userName, String groupName) throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.removeUserFromGroup(userName, groupName);
+  }
+
+  @Override
+  public void invCachesUserRemoved(String userName) throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.invCacheUserRemoved(userName);
+  }
+
+  @Override
+  public void invCachesGroupRemoved(String groupName) throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.invCacheGroupRemoved(groupName);
+  }
+
+  @Override
+  public void invCachesUserRemovedFromGroup(String userName, String groupName) throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.invCacheUserRemovedFromGroup(userName, groupName);
+  }
+
+  @Override
+  public void invCachesUserAddedToGroup(String userName, String groupName) throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    UsersGroups.invCacheUserAddedToGroup(userName, groupName);
   }
 
   @Override // TraceAdminProtocol

@@ -630,7 +630,7 @@ public class TestContainerManagerRecovery extends BaseContainerManagerTest {
       ContainerLaunchContext clc, LogAggregationContext logAggregationContext)
           throws Exception {
     UserGroupInformation user = UserGroupInformation.createRemoteUser(
-        cid.getApplicationAttemptId().toString(), false);
+        cid.getApplicationAttemptId().toString());
     StartContainerRequest scReq = StartContainerRequest.newInstance(
         clc, TestContainerManager.createContainerToken(cid, 0,
             context.getNodeId(), user.getShortUserName(),

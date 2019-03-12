@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.fs.http.server;
 
+import io.hops.security.UserAlreadyExistsException;
+import io.hops.security.UsersGroups;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenAuthenticator;
 import org.apache.hadoop.security.token.delegation.web.KerberosDelegationTokenAuthenticationHandler;
 
@@ -154,6 +156,9 @@ public class TestHttpFSServer extends HFSTestCase {
           HttpFSKerberosAuthenticationHandlerForTesting.class.getName());
     }
     conf.set("httpfs.services.ext", MockGroups.class.getName());
+    try{
+      UsersGroups.addUser(HadoopUsersConfTestHelper.getHadoopUsers()[0]);
+    } catch (UserAlreadyExistsException e){}
     conf.set("httpfs.admin.group", HadoopUsersConfTestHelper.
         getHadoopUserGroups(HadoopUsersConfTestHelper.getHadoopUsers()[0])[0]);
     conf.set(

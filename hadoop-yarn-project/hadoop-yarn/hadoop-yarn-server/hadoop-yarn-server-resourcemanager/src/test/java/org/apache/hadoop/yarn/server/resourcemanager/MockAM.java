@@ -118,8 +118,7 @@ public class MockAM {
     req.setRpcPort(1);
     req.setTrackingUrl("");
     if (ugi == null) {
-      ugi = UserGroupInformation.createRemoteUser(
-          attemptId.toString(), false);
+      ugi = UserGroupInformation.createRemoteUser(attemptId.toString());
       Token<AMRMTokenIdentifier> token =
           context.getRMApps().get(attemptId.getApplicationId())
               .getRMAppAttempt(attemptId).getAMRMToken();
@@ -290,7 +289,7 @@ public class MockAM {
   public AllocateResponse allocate(AllocateRequest allocateRequest)
             throws Exception {
     UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(attemptId.toString(), false);
+        UserGroupInformation.createRemoteUser(attemptId.toString());
     Token<AMRMTokenIdentifier> token =
         context.getRMApps().get(attemptId.getApplicationId())
             .getRMAppAttempt(attemptId).getAMRMToken();
@@ -337,7 +336,7 @@ public class MockAM {
       waitForState(RMAppAttemptState.RUNNING);
     }
     if (ugi == null) {
-      ugi =  UserGroupInformation.createRemoteUser(attemptId.toString(), false);
+      ugi =  UserGroupInformation.createRemoteUser(attemptId.toString());
       Token<AMRMTokenIdentifier> token =
           context.getRMApps()
               .get(attemptId.getApplicationId())

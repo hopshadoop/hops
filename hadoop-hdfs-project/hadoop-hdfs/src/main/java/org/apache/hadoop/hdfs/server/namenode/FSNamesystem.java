@@ -8396,21 +8396,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       return null;
     }
   }
-  
-  
-  public void addUserGroup(String userName, String groupName, boolean cacheOnly)
-      throws IOException {
-    checkSuperuserPrivilege();
-    UsersGroups.addUserGroupTx(userName, groupName, cacheOnly);
-  }
-  
-  
-  public void removeUserGroup(String userName, String groupName,
-      boolean cacheOnly) throws IOException {
-    checkSuperuserPrivilege();
-    UsersGroups.removeUserGroupTx(userName, groupName, cacheOnly);
-  }
-  
+
   public boolean isRetryCacheEnabled(){
     return isRetryCacheEnabled;
   }

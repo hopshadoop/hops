@@ -230,8 +230,7 @@ public class MRAMSimulator extends AMSimulator {
 
     AllocateResponse response = null;
     UserGroupInformation ugi = UserGroupInformation.createProxyUser(
-            appAttemptId.toString(), UserGroupInformation.getCurrentUser(),
-            false);
+            appAttemptId.toString(), UserGroupInformation.getCurrentUser());
     ugi.setAuthenticationMethod(SaslRpcServer.AuthMethod.TOKEN);
     ugi.addCredentials(credentials);
     ugi.addToken(amRMToken);
@@ -483,8 +482,7 @@ public class MRAMSimulator extends AMSimulator {
 
     AllocateResponse response = null;
     UserGroupInformation ugi = UserGroupInformation.createProxyUser(
-            appAttemptId.toString(), UserGroupInformation.getCurrentUser(),
-            false);
+            appAttemptId.toString(), UserGroupInformation.getCurrentUser());
     ugi.setAuthenticationMethod(SaslRpcServer.AuthMethod.TOKEN);
     ugi.addCredentials(credentials);
     ugi.addToken(amRMToken);

@@ -18,6 +18,7 @@ package io.hops.security;
 import org.apache.hadoop.security.JniBasedUnixGroupsMappingWithFallback;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 public class HopsGroupsWithFallBack extends
@@ -25,7 +26,11 @@ public class HopsGroupsWithFallBack extends
 
   @Override
   public List<String> getGroups(final String user) throws IOException {
-    List<String> groups = UsersGroups.getGroups(user);
+    List<String> groups = null;
+    try {
+      groups = UsersGroups.getGroups(user);
+    } catch (HopsUGException e){
+    }
 
     if (groups != null && !groups.isEmpty()) {
       return groups;

@@ -24,6 +24,10 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import io.hops.security.GroupAlreadyExistsException;
+import io.hops.security.UserAlreadyExistsException;
+import io.hops.security.UserAlreadyInGroupException;
+import io.hops.security.UsersGroups;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
@@ -88,6 +92,15 @@ public class TestFSMainOperationsWebHdfs extends FSMainOperationsBaseTest {
       //get file system as a non-superuser
       final UserGroupInformation current =
           UserGroupInformation.getCurrentUser();
+      try{
+        UsersGroups.addUser(current.getShortUserName()+"x");
+      } catch (UserAlreadyExistsException e){}
+      try{
+        UsersGroups.addGroup("user");
+      } catch (GroupAlreadyExistsException e){}
+      try{
+        UsersGroups.addUserToGroup(current.getShortUserName()+"x","user");
+      }catch (UserAlreadyInGroupException e){}
       final UserGroupInformation ugi = UserGroupInformation
           .createUserForTesting(current.getShortUserName() + "x",
               new String[]{"user"});

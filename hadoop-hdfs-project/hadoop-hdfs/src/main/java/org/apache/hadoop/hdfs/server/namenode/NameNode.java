@@ -24,6 +24,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
+import io.hops.security.HopsUGException;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.handler.RequestHandler;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -580,8 +581,12 @@ public class NameNode implements NameNodeStatusMXBean {
     String superGroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
         DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
 
-    UsersGroups.addUserGroupTx(fsOwnerShortUserName, superGroup);
-  
+    try {
+      UsersGroups.addUser(fsOwnerShortUserName);
+      UsersGroups.addGroup(superGroup);
+      UsersGroups.addUserToGroup(fsOwnerShortUserName, superGroup);
+    } catch (HopsUGException e){ }
+
     try {
       createAndStartCRLFetcherService(conf);
     } catch (Exception ex) {
@@ -919,8 +924,8 @@ public class NameNode implements NameNodeStatusMXBean {
       } else {
         HdfsStorageFactory.formatHdfsStorage();
       }
-      StorageInfo
-          .storeStorageInfoToDB(clusterId, Time.now());  //this adds new row to the db
+      StorageInfo.storeStorageInfoToDB(clusterId, Time.now());  //this adds new row to the db
+      UsersGroups.createSyncRow();
     } catch (StorageException e) {
       throw new RuntimeException(e.getMessage());
     }

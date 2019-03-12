@@ -2428,7 +2428,8 @@
     Hops users-groups cache containing the user->group, user->Id, and
     group->Id mappings. When this duration has expired, then the cache is
     invoked to get the groups of the user, user/group ids from the database
-    and then cached back.
+    and then cached back. To disable the cache set this parameter and
+    hops.ug.cache.size to 0.
   </description>
 </property>
 
@@ -2438,7 +2439,8 @@
     <description>
       This is the config controlling the number of entries that can be cached
       in Hops users-groups. When the cache reach this size, it will evict the
-      least recently used mappings.
+      least recently used mappings. To disable the cache set this parameter and
+      hops.ug.cache.secs to 0.
     </description>
   </property>
 

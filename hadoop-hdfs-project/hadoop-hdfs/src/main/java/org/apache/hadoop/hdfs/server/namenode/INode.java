@@ -688,22 +688,19 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    * Set user
    */
   protected abstract void setUser(String user) throws IOException;
-  
-  public abstract void setUserIDNoPersistance(int userID);
+
+  public abstract void setUserID(int userID) throws  IOException;
+
+  public abstract void setUserIDNoPersistence(int userID);
 
   protected abstract void setGroup(String group) throws IOException;
-  
-  public abstract void setGroupIDNoPersistance(int groupID);
+
+  public abstract void setGroupID(int groupID) throws IOException;
+
+  public abstract void setGroupIDNoPersistence(int groupID);
 
   abstract void setPermission(FsPermission permission)
       throws StorageException, TransactionContextException;
-
-  protected void setPermissionStatus(PermissionStatus ps)
-      throws IOException {
-    setUser(ps.getUserName());
-    setGroup(ps.getGroupName());
-    setPermission(ps.getPermission());
-  }
 
   public void setLocalName(String name)
       throws StorageException, TransactionContextException {

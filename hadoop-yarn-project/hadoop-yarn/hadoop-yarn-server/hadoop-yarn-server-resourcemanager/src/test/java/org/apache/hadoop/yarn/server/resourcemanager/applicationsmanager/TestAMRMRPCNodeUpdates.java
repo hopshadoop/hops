@@ -112,7 +112,7 @@ public class TestAMRMRPCNodeUpdates {
   private AllocateResponse allocate(final ApplicationAttemptId attemptId,
       final AllocateRequest req) throws Exception {
     UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(attemptId.toString(), false);
+        UserGroupInformation.createRemoteUser(attemptId.toString());
     Token<AMRMTokenIdentifier> token =
         rm.getRMContext().getRMApps().get(attemptId.getApplicationId())
           .getRMAppAttempt(attemptId).getAMRMToken();

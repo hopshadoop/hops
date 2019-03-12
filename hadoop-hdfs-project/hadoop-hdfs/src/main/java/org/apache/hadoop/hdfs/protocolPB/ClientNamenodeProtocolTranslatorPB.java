@@ -1403,40 +1403,154 @@ public class ClientNamenodeProtocolTranslatorPB
       throw ProtobufHelper.getRemoteException(e);
     }
   }
-  
+
   @Override
-  public void addUserGroup(String userName, String groupName,
-      boolean cacheOnly) throws IOException {
+  public void addUser(String userName) throws IOException {
     try {
-      ClientNamenodeProtocolProtos.AddUserGroupRequestProto.Builder req =
-          ClientNamenodeProtocolProtos.AddUserGroupRequestProto.newBuilder();
+      ClientNamenodeProtocolProtos.AddUserRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.AddUserRequestProto.newBuilder();
       if(userName != null) {
         req.setUserName(userName);
       }
-      if(groupName != null) {
-        req.setGroupName(groupName);
-      }
-      req.setCacheOnly(cacheOnly);
-      rpcProxy.addUserGroup(null, req.build());
+      rpcProxy.addUser(null, req.build());
     } catch (ServiceException ex) {
       throw ProtobufHelper.getRemoteException(ex);
     }
   }
-  
+
   @Override
-  public void removeUserGroup(String userName, String groupName,
-      boolean cacheOnly) throws IOException {
+  public void addGroup(String groupName) throws IOException {
     try {
-      ClientNamenodeProtocolProtos.RemoveUserGroupRequestProto.Builder req =
-          ClientNamenodeProtocolProtos.RemoveUserGroupRequestProto.newBuilder();
+      ClientNamenodeProtocolProtos.AddGroupRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.AddGroupRequestProto.newBuilder();
+      if(groupName != null) {
+        req.setGroupName(groupName);
+      }
+      rpcProxy.addGroup(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
+  public void addUserToGroup(String userName, String groupName) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.AddUserToGroupRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.AddUserToGroupRequestProto.newBuilder();
       if(userName != null) {
         req.setUserName(userName);
       }
       if(groupName != null) {
         req.setGroupName(groupName);
       }
-      req.setCacheOnly(cacheOnly);
-      rpcProxy.removeUserGroup(null, req.build());
+      rpcProxy.addUserToGroup(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
+  public void removeUser(String userName) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.RemoveUserRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.RemoveUserRequestProto.newBuilder();
+      if(userName != null) {
+        req.setUserName(userName);
+      }
+      rpcProxy.removeUser(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
+  public void removeGroup(String groupName) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.RemoveGroupRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.RemoveGroupRequestProto.newBuilder();
+      if(groupName != null) {
+        req.setGroupName(groupName);
+      }
+      rpcProxy.removeGroup(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
+  public void removeUserFromGroup(String userName, String groupName) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.RemoveUserFromGroupRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.RemoveUserFromGroupRequestProto.newBuilder();
+      if(userName != null) {
+        req.setUserName(userName);
+      }
+      if(groupName != null) {
+        req.setGroupName(groupName);
+      }
+      rpcProxy.removeUserFromGroup(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
+  public void invCachesUserRemoved(String userName) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.InvCachesUserRemovedRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.InvCachesUserRemovedRequestProto.newBuilder();
+      if(userName != null) {
+        req.setUserName(userName);
+      }
+      rpcProxy.invCachesUserRemoved(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
+  public void invCachesGroupRemoved(String groupName) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.InvCachesGroupRemovedRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.InvCachesGroupRemovedRequestProto.newBuilder();
+      if(groupName != null) {
+        req.setGroupName(groupName);
+      }
+      rpcProxy.invCachesGroupRemoved(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
+  public void invCachesUserRemovedFromGroup(String userName, String groupName) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.InvCachesUserRemovedFromGroupRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.InvCachesUserRemovedFromGroupRequestProto.newBuilder();
+      if(userName != null) {
+        req.setUserName(userName);
+      }
+      if(groupName != null) {
+        req.setGroupName(groupName);
+      }
+      rpcProxy.invCachesUserRemovedFromGroup(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
+  public void invCachesUserAddedToGroup(String userName, String groupName) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.InvCachesUserAddedToGroupRequestProto.Builder req =
+              ClientNamenodeProtocolProtos.InvCachesUserAddedToGroupRequestProto.newBuilder();
+      if(userName != null) {
+        req.setUserName(userName);
+      }
+      if(groupName != null) {
+        req.setGroupName(groupName);
+      }
+      rpcProxy.invCachesUserAddedToGroup(null, req.build());
     } catch (ServiceException ex) {
       throw ProtobufHelper.getRemoteException(ex);
     }

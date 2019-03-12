@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.hdfs.web;
 
+import io.hops.security.GroupAlreadyExistsException;
+import io.hops.security.UserAlreadyExistsException;
+import io.hops.security.UserAlreadyInGroupException;
+import io.hops.security.UsersGroups;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -81,6 +85,18 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
   protected void setUp() throws Exception {
     //get file system as a non-superuser
     final UserGroupInformation current = UserGroupInformation.getCurrentUser();
+    try{
+      UsersGroups.addUser(current.getShortUserName());
+    } catch (UserAlreadyExistsException e){}
+
+    try{
+      UsersGroups.addGroup("user");
+    } catch(GroupAlreadyExistsException e){}
+
+    try{
+      UsersGroups.addUserToGroup(current.getShortUserName(), "user");
+    } catch(UserAlreadyInGroupException e){}
+
     ugi = UserGroupInformation
         .createUserForTesting(current.getShortUserName() ,
             new String[]{"user"});
@@ -416,6 +432,10 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
       conn.disconnect();
     }
 
+    try{
+      UsersGroups.addUser(ugi.getShortUserName() + "proxy");
+    }catch (UserAlreadyInGroupException e){}
+
     {//test GETHOMEDIRECTORY with unauthorized doAs
       final URL url = webhdfs.toUrl(GetOpParam.Op.GETHOMEDIRECTORY, root,
           new DoAsParam(ugi.getShortUserName() + "proxy"));
@@ -547,6 +567,18 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
   @Test
   public void testAccess() throws IOException, InterruptedException {
     Path p1 = new Path("/pathX");
+    try{
+      UsersGroups.addUser("alpha");
+    } catch (UserAlreadyExistsException e){}
+
+    try{
+      UsersGroups.addGroup("beta");
+    } catch(GroupAlreadyExistsException e){}
+
+    try{
+      UsersGroups.addUserToGroup("alpha", "beta");
+    } catch(UserAlreadyInGroupException e){}
+
     try {
       UserGroupInformation ugi = UserGroupInformation.createUserForTesting("alpha",
           new String[]{"beta"});

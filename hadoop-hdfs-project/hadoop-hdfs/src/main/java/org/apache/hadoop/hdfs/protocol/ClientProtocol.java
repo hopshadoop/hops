@@ -1657,30 +1657,88 @@ public interface ClientProtocol {
 throws IOException;
   
   /**
-   * Add a user/group and/or associate a user with a group.
+   * Add a user
    * @param userName
-   *         the user name to be added, could be null.
-   * @param groupName
-   *         the group name to be added, could be null.
-   * @param cacheOnly
-   *         enables update for the cache only.
    * @throws IOException
    */
   @Idempotent
-  public void addUserGroup(String userName, String groupName,
-      boolean cacheOnly) throws IOException;
-  
+  public void addUser(String userName) throws IOException;
+
   /**
-   * Remove a user/group and/or remove the user from the group.
-   * @param userName
-   *         the user name to be removed, could be null.
+   * Add a group
    * @param groupName
-   *         the group name to be removed, could be null.
-   * @param cacheOnly
-   *         enables removal on the cache only.
    * @throws IOException
    */
   @Idempotent
-  public void removeUserGroup(String userName, String groupName,
-      boolean cacheOnly) throws IOException;
+  public void addGroup(String groupName) throws IOException;
+
+  /**
+   * Add a user to group
+   * @param userName
+   * @param groupName
+   * @throws IOException
+   */
+  @Idempotent
+  public void addUserToGroup(String userName, String groupName) throws IOException;
+
+  /**
+   * remove a user
+   * @param userName
+   * @throws IOException
+   */
+  @Idempotent
+  public void removeUser(String userName) throws IOException;
+
+  /**
+   * remove a group
+   * @param groupName
+   * @throws IOException
+   */
+  @Idempotent
+  public void removeGroup(String groupName) throws IOException;
+
+  /**
+   * Remove a user from group
+   * @param userName
+   * @param groupName
+   * @throws IOException
+   */
+  @Idempotent
+  public void removeUserFromGroup(String userName, String groupName) throws IOException;
+
+  /**
+   * Invalidate caches upon user removal
+   * @param userName
+   * @throws IOException
+   */
+  @Idempotent
+  public void invCachesUserRemoved(String userName) throws IOException;
+
+  /**
+   * Invalidate caches upon group removal
+   * @param groupName
+   * @throws IOException
+   */
+  @Idempotent
+  public void invCachesGroupRemoved(String groupName) throws IOException;
+
+
+  /**
+   * Invalidate caches upon user removal from a group
+   * @param userName
+   * @param groupName
+   * @throws IOException
+   */
+  @Idempotent
+  public void invCachesUserRemovedFromGroup(String userName, String groupName) throws IOException;
+
+
+  /**
+   * Invalidate caches upon user addition to a group
+   * @param userName
+   * @param groupName
+   * @throws IOException
+   */
+  @Idempotent
+  public void invCachesUserAddedToGroup(String userName, String groupName) throws IOException;
 }

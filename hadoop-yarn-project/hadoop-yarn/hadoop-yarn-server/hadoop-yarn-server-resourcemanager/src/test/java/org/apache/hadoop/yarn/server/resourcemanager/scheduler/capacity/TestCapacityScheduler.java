@@ -1141,7 +1141,7 @@ public class TestCapacityScheduler {
     final YarnRPC rpc = YarnRPC.create(conf);
 
     UserGroupInformation currentUser =
-        UserGroupInformation.createRemoteUser(applicationAttemptId.toString(), false);
+        UserGroupInformation.createRemoteUser(applicationAttemptId.toString());
     Credentials credentials = containerManager.getContainerCredentials();
     final InetSocketAddress rmBindAddress =
         rm.getApplicationMasterService().getBindAddress();

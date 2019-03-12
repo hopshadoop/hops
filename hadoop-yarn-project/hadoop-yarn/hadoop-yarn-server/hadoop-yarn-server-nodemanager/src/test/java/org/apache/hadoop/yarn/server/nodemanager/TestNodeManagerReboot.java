@@ -146,7 +146,7 @@ public class TestNodeManagerReboot {
 
     final UserGroupInformation currentUser =
         UserGroupInformation.createRemoteUser(cId.getApplicationAttemptId()
-          .toString(), false);
+          .toString());
     NMTokenIdentifier nmIdentifier =
         new NMTokenIdentifier(cId.getApplicationAttemptId(), nodeId, user, 123);
     currentUser.addTokenIdentifier(nmIdentifier);

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.metadata.HdfsStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -130,7 +131,10 @@ public class TestAllowFormat {
     // 3. Try formatting DFS with allowformat true
     LOG.info("Verifying format will succeed with allowformat true");
     config.setBoolean(DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY, true);
+
+    HdfsStorageFactory.resetDALInitialized();
     NameNode.format(config);
+
     LOG.info("Done verifying format will succeed with allowformat true");
   }
 

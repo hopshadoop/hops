@@ -3,6 +3,7 @@ package org.apache.hadoop.hdfs;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.*;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.conf.Configuration;
@@ -1374,13 +1375,16 @@ public class TestSmallFilesCreation {
    *
    */
   public void TestZLastTestCleanUp() throws IOException {
-      String[] argv = {"-format", "-force"};
-      ExitUtil.disableSystemExit();
-      Configuration conf = new HdfsConfiguration();
-      try {
-        NameNode.createNameNode(argv, conf);
-        fail("createNameNode() did not call System.exit()");
-      } catch (ExitUtil.ExitException e) {
-      }
+    String[] argv = {"-format", "-force"};
+    ExitUtil.disableSystemExit();
+    Configuration conf = new HdfsConfiguration();
+    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.setConfiguration(conf);
+    UsersGroups.createSyncRow();
+    try {
+      NameNode.createNameNode(argv, conf);
+      fail("createNameNode() did not call System.exit()");
+    } catch (ExitUtil.ExitException e) {
     }
+  }
 }

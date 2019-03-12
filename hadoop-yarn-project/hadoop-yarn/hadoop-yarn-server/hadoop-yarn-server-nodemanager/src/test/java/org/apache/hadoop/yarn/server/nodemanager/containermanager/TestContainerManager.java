@@ -162,7 +162,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
         ApplicationAttemptId appAttemptId =
             ApplicationAttemptId.newInstance(appId, 1);
         UserGroupInformation ugi =
-            UserGroupInformation.createRemoteUser(appAttemptId.toString(), false);
+            UserGroupInformation.createRemoteUser(appAttemptId.toString());
         ugi.addTokenIdentifier(new NMTokenIdentifier(appAttemptId, context
           .getNodeId(), user, context.getNMTokenSecretManager().getCurrentKey()
           .getKeyId()));
@@ -252,7 +252,7 @@ public class TestContainerManager extends BaseContainerManagerTest {
   
     final ContainerId cid0 = createContainerId(0);
     UserGroupInformation user = UserGroupInformation.createRemoteUser(
-        cid0.getApplicationAttemptId().toString(), false);
+        cid0.getApplicationAttemptId().toString());
     StartContainerRequest scr0 = StartContainerRequest.newInstance(ctx0,
         createContainerToken(cid0, 0, context.getNodeId(), user.getShortUserName(),
             context.getContainerTokenSecretManager(), userFolder));

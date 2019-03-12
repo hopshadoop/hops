@@ -65,7 +65,7 @@ public class JobTokenIdentifier extends TokenIdentifier {
     if (jobid == null || "".equals(jobid.toString())) {
       return null;
     }
-    return UserGroupInformation.createRemoteUser(jobid.toString(), false);
+    return UserGroupInformation.createRemoteUser(jobid.toString());
   }
   
   /**

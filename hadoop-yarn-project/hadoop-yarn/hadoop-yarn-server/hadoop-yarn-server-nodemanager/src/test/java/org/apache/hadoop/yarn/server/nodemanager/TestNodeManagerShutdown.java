@@ -220,7 +220,7 @@ public class TestNodeManagerShutdown {
     final InetSocketAddress containerManagerBindAddress =
         NetUtils.createSocketAddrForHost("127.0.0.1", port);
     UserGroupInformation currentUser = UserGroupInformation
-        .createRemoteUser(cId.toString(), false);
+        .createRemoteUser(cId.toString());
     org.apache.hadoop.security.token.Token<NMTokenIdentifier> nmToken =
         ConverterUtils.convertFromYarn(
           nm.getNMContext().getNMTokenSecretManager()

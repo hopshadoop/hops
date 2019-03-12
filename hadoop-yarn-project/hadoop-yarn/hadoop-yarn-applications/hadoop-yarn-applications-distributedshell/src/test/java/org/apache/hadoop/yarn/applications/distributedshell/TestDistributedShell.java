@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.hops.metadata.HdfsStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -205,6 +206,7 @@ public class TestDistributedShell {
     if (yarnCluster != null) {
       try {
         yarnCluster.stop();
+        RMStorageFactory.resetDALInitialized();
       } finally {
         yarnCluster = null;
       }
@@ -212,6 +214,7 @@ public class TestDistributedShell {
     if (hdfsCluster != null) {
       try {
         hdfsCluster.shutdown();
+        HdfsStorageFactory.resetDALInitialized();
       } finally {
         hdfsCluster = null;
       }

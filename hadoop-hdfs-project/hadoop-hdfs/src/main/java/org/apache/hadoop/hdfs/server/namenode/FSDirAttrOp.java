@@ -22,6 +22,8 @@ import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
+import io.hops.security.GroupAlreadyExistsException;
+import io.hops.security.UserAlreadyExistsException;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -466,13 +468,21 @@ public class FSDirAttrOp {
     if (inode == null) {
       throw new FileNotFoundException("File does not exist: " + src);
     }
+
     if (username != null) {
-      UsersGroups.addUser(username);
+      try{
+        UsersGroups.addUser(username); // The user may already eixst.
+      } catch (UserAlreadyExistsException e){ }
       inode.setUser(username);
+      inode.setUserID(UsersGroups.getUserID(username));
     }
+
     if (groupname != null) {
-      UsersGroups.addGroup(groupname);
+      try {
+        UsersGroups.addGroup(groupname);
+      } catch (GroupAlreadyExistsException e){}
       inode.setGroup(groupname);
+      inode.setGroupID(UsersGroups.getGroupID(groupname));
     }
     inode.logMetadataEvent(MetadataLogEntry.Operation.UPDATE);
   }

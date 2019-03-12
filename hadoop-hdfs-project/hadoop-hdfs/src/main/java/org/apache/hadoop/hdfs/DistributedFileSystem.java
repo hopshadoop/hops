@@ -1932,7 +1932,7 @@ public class DistributedFileSystem extends FileSystem {
    * @throws IOException
    */
   public void addUser(String userName) throws IOException{
-    dfs.addUserGroup(userName, null);
+    dfs.addUser(userName);
   }
   
   /**
@@ -1942,7 +1942,7 @@ public class DistributedFileSystem extends FileSystem {
    * @throws IOException
    */
   public void addGroup(String groupName) throws IOException{
-    dfs.addUserGroup(null, groupName);
+    dfs.addGroup(groupName);
   }
   
   /**
@@ -1954,7 +1954,7 @@ public class DistributedFileSystem extends FileSystem {
    * @throws IOException
    */
   public void addUserToGroup(String userName, String groupName) throws IOException{
-    dfs.addUserGroup(userName, groupName);
+    dfs.addUserToGroup(userName, groupName);
   }
   
   /**
@@ -1964,7 +1964,7 @@ public class DistributedFileSystem extends FileSystem {
    * @throws IOException
    */
   public void removeUser(String userName) throws IOException{
-    dfs.removeUserGroup(userName, null);
+    dfs.removeUser(userName);
   }
   
   /**
@@ -1974,7 +1974,7 @@ public class DistributedFileSystem extends FileSystem {
    * @throws IOException
    */
   public void removeGroup(String groupName) throws IOException{
-    dfs.removeUserGroup(null, groupName);
+    dfs.removeGroup(groupName);
   }
   
   /**
@@ -1986,6 +1986,6 @@ public class DistributedFileSystem extends FileSystem {
    * @throws IOException
    */
   public void removeUserFromGroup(String userName, String groupName) throws IOException{
-    dfs.removeUserGroup(userName, groupName);
+    dfs.removeUserFromGroup(userName, groupName);
   }
 }

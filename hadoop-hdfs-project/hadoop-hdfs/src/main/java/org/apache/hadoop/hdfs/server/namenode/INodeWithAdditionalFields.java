@@ -21,6 +21,8 @@ import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
+import io.hops.security.GroupNotFoundException;
+import io.hops.security.UserNotFoundException;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -70,14 +72,14 @@ public abstract class INodeWithAdditionalFields extends INode {
     this.name = name;
     this.permission = permission.getPermission();
     this.userName = permission.getUserName();
-    this.userId = UsersGroups.getUserID(permission.getUserName());
+    this.userId = getUserIDDB(userName);
     this.groupName = permission.getGroupName();
-    this.groupId = UsersGroups.getGroupID(permission.getGroupName());
+    this.groupId = getGroupIDDB(groupName);
     this.modificationTime = modificationTime;
     this.accessTime = accessTime;
     this.inTree = inTree;
   }
-  
+
   INodeWithAdditionalFields(long id, byte[] name, PermissionStatus permission,
       long modificationTime, long accessTime, boolean inTree) throws IOException {
     this(null, id, name, permission, modificationTime, accessTime, inTree);
@@ -159,9 +161,6 @@ public abstract class INodeWithAdditionalFields extends INode {
    * Get user name
    */
   public final String getUserName() throws IOException {
-    if(userName == null || userName.isEmpty()){
-      userName = UsersGroups.getUser(userId);
-    }
     return userName;
   }
   
@@ -177,9 +176,6 @@ public abstract class INodeWithAdditionalFields extends INode {
    * Get group name
    */
   public final String getGroupName() throws IOException {
-    if(groupName == null || groupName.isEmpty()){
-      groupName = UsersGroups.getGroup(groupId);
-    }
     return groupName;
   }
   
@@ -265,7 +261,6 @@ public abstract class INodeWithAdditionalFields extends INode {
    */
   public void setUserNoPersistance(String user) throws IOException {
     this.userName = user;
-    this.userId = UsersGroups.getUserID(user);
   }
   
   /**
@@ -273,7 +268,6 @@ public abstract class INodeWithAdditionalFields extends INode {
    */
   public void setGroupNoPersistance(String group) throws IOException {
     this.groupName = group;
-    this.groupId = UsersGroups.getGroupID(group);
   }
   
   public final long getHeader() {
@@ -377,12 +371,22 @@ public abstract class INodeWithAdditionalFields extends INode {
   public void setAccessTimeNoPersistance(long atime) {
     accessTime = atime;
   }
-  
-  public void setUserIDNoPersistance(int userId) {
+
+  public void setUserID(int userId) throws IOException {
+    setUserIDNoPersistence(userId);
+    save();
+  }
+
+  public void setUserIDNoPersistence(int userId) {
     this.userId = userId;
   }
-  
-  public void setGroupIDNoPersistance(int groupId) {
+
+  public void setGroupID(int groupId) throws IOException {
+    setGroupIDNoPersistence(groupId);
+    save();
+  }
+
+  public void setGroupIDNoPersistence(int groupId) {
     this.groupId = groupId;
   }
   
@@ -424,5 +428,31 @@ public abstract class INodeWithAdditionalFields extends INode {
     Preconditions.checkState(!overflow && j == size - 1, "Feature "
       + f.getClass().getSimpleName() + " not found.");
     features = arr;
+  }
+
+  private int getUserIDDB(String name) throws IOException {
+    if(name == null){
+      return 0;
+    }
+    int userID = 0;
+    try{
+      userID = UsersGroups.getUserID(name);
+    } catch (UserNotFoundException e ){
+      return 0;
+    }
+    return userID;
+  }
+
+  private int getGroupIDDB(String name) throws IOException {
+    if(name == null){
+      return 0;
+    }
+    int groupID = 0;
+    try{
+      groupID = UsersGroups.getGroupID(name);
+    } catch (GroupNotFoundException e ){
+      return 0;
+    }
+    return groupID;
   }
 }
