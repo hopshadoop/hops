@@ -50,10 +50,10 @@ public class RevocationListFetcherService extends AbstractService implements Rev
     crlFetcher = CRLFetcherFactory.getInstance().getCRLFetcher(conf);
     fetcherInterval = conf.getTimeDuration(CommonConfigurationKeys.HOPS_CRL_FETCHER_INTERVAL_KEY,
         CommonConfigurationKeys.HOPS_CRL_FETCHER_INTERVAL_DEFAULT, intervalTimeUnit);
-    // Minimum fetcher interval for normal execution is 2 hours
-    if (intervalTimeUnit.equals(TimeUnit.MINUTES) && fetcherInterval < 120) {
-      LOG.info("Configured fetcher interval is too low " + fetcherInterval + " falling back to 120 minutes");
-      fetcherInterval = 120;
+    // Minimum fetcher interval for normal execution is 1 minute
+    if (intervalTimeUnit.equals(TimeUnit.MINUTES) && fetcherInterval < 1) {
+      LOG.info("Configured fetcher interval is too low: " + fetcherInterval + " minutes, falling back to 1 minute");
+      fetcherInterval = 1;
     }
     super.serviceInit(conf);
   }
