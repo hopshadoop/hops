@@ -113,6 +113,7 @@ public class QuotaUpdateManager {
       while (namesystem.isRunning()) {
         startTime = System.currentTimeMillis();
         try {
+          boolean rerunImmediatly = false;
           if (namesystem.isLeader()) {
             if (!prioritizedUpdates.isEmpty()) {
               Iterator<Long> iterator = prioritizedUpdates.poll();
@@ -123,12 +124,14 @@ public class QuotaUpdateManager {
                 iterator.notify();
               }
             }
-            processNextUpdateBatch();
+            rerunImmediatly = processNextUpdateBatch();
           }
-          long sleepDuration =
-              updateInterval - (System.currentTimeMillis() - startTime);
-          if (sleepDuration > 0) {
-            Thread.sleep(updateInterval);
+          //if there is parrent updates apply them immediately
+          if (!rerunImmediatly) {
+            long sleepDuration = updateInterval - (System.currentTimeMillis() - startTime);
+            if (sleepDuration > 0) {
+              Thread.sleep(updateInterval);
+            }
           }
         } catch (InterruptedException ie) {
           LOG.warn("QuotaUpdateMonitor thread received InterruptedException.",
@@ -174,7 +177,7 @@ public class QuotaUpdateManager {
     applyBatchedUpdate(quotaUpdates);
   }
 
-  private void processNextUpdateBatch() throws IOException {
+  private boolean processNextUpdateBatch() throws IOException {
     LightWeightRequestHandler findHandler =
         new LightWeightRequestHandler(HDFSOperationType.GET_NEXT_QUOTA_BATCH) {
           @Override
@@ -188,30 +191,34 @@ public class QuotaUpdateManager {
 
     List<QuotaUpdate> quotaUpdates = (List<QuotaUpdate>) findHandler.handle();
     Collections.sort(quotaUpdates, quotaUpdateComparator);
-
+    boolean rerunImmediatly = false;
     ArrayList<QuotaUpdate> batch = new ArrayList<>();
     for (QuotaUpdate update : quotaUpdates) {
       if (batch.size() == 0 ||
           batch.get(0).getInodeId() == update.getInodeId()) {
         batch.add(update);
       } else {
-        applyBatchedUpdate(batch);
+        rerunImmediatly = rerunImmediatly || applyBatchedUpdate(batch);
         batch = new ArrayList<>();
         batch.add(update);
       }
     }
 
     if (batch.size() != 0) {
-      applyBatchedUpdate(batch);
+      rerunImmediatly = rerunImmediatly || applyBatchedUpdate(batch);
     }
+    if(quotaUpdates.size()==updateLimit){
+      rerunImmediatly = true;
+    }
+    return rerunImmediatly;
   }
 
-  private void applyBatchedUpdate(final List<QuotaUpdate> updates)
+  private boolean applyBatchedUpdate(final List<QuotaUpdate> updates)
       throws IOException {
     if (updates.size() == 0) {
-      return;
+      return false;
     }
-    new HopsTransactionalRequestHandler(HDFSOperationType.APPLY_QUOTA_UPDATE) {
+    return (boolean) new HopsTransactionalRequestHandler(HDFSOperationType.APPLY_QUOTA_UPDATE) {
       INodeIdentifier iNodeIdentifier;
 
       @Override
@@ -272,6 +279,7 @@ public class QuotaUpdateManager {
           }
         }
 
+        boolean hasParentUpdate = false;
         if (dir != null && dir.getId() != INodeDirectory.ROOT_INODE_ID) {
           boolean allNull = counts.getDiskSpace()==0 && counts.getNameSpace()==0;
           Map<QuotaUpdate.StorageType, Long > typeSpace = new HashMap<>();
@@ -283,10 +291,11 @@ public class QuotaUpdateManager {
             QuotaUpdate parentUpdate = new QuotaUpdate(nextId(), dir.getParentId(), counts.getNameSpace(),
                 counts.getDiskSpace(), typeSpace);
             EntityManager.add(parentUpdate);
+            hasParentUpdate = true;
             LOG.debug("adding parent update " + parentUpdate);
           }
         }
-        return null;
+        return hasParentUpdate;
       }
     }.handle(this);
   }
