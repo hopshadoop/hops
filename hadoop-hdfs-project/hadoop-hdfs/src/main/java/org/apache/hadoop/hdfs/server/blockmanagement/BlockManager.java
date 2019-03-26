@@ -2559,22 +2559,21 @@ public class BlockManager {
     final Map<Long, Long> mismatchedBlocksAndInodes = storage
             .getAllStorageReplicasInBuckets(matchingResult.mismatchedBuckets);
 
-    final Set<Long> allMismatchedBlocksOnServer = mismatchedBlocksAndInodes.keySet();
     //Safe mode report and first report for storage will have all buckets mismatched.
-    aggregatedSafeBlocks.addAll(allMismatchedBlocksOnServer);
+    aggregatedSafeBlocks.addAll(mismatchedBlocksAndInodes.keySet());
 
     processMisMatchingBuckets(storage, newReport, matchingResult, toAdd,
             toInvalidate,
             toCorrupt, toUC, firstBlockReport,
             mismatchedBlocksAndInodes,
-            aggregatedSafeBlocks, allMismatchedBlocksOnServer,
+            aggregatedSafeBlocks,
             invalidatedReplicas);
 
     stats.numToAdd = toAdd.size();
     stats.numToInvalidate = toInvalidate.size();
     stats.numToCorrupt = toCorrupt.size();
     stats.numToUC = toUC.size();
-    toRemove.addAll(allMismatchedBlocksOnServer);
+    toRemove.addAll(mismatchedBlocksAndInodes.keySet());
     stats.numToRemove = toRemove.size();
     if (namesystem.isInStartupSafeMode()) {
       aggregatedSafeBlocks.removeAll(toRemove);
@@ -2595,7 +2594,6 @@ public class BlockManager {
                                                final Collection<StatefulBlockInfo> toUC, final boolean firstBlockReport,
                                                final Map<Long, Long> mismatchedBlocksAndInodes,
                                                final Set<Long> aggregatedSafeBlocks,
-                                               final Set<Long> allMismatchedBlocksOnServer,
                                                final Map<Long,Long> invalidatedReplicas) throws IOException {
 
     final Collection<Callable<Void>> subTasks = new ArrayList<>();
@@ -2609,7 +2607,7 @@ public class BlockManager {
               toInvalidate,
               toCorrupt, toUC, firstBlockReport,
               mismatchedBlocksAndInodes,
-              aggregatedSafeBlocks, allMismatchedBlocksOnServer,
+              aggregatedSafeBlocks,
               invalidatedReplicas, bucketBlocks);
           processReportHandler.handle();
           return null;
@@ -2640,7 +2638,6 @@ public class BlockManager {
                                                                 final boolean firstBlockReport,
                                                                 final Map<Long, Long> mismatchedBlocksAndInodes,
                                                                 final Set<Long> aggregatedSafeBlocks,
-                                                                final Set<Long> allMismatchedBlocksOnServer,
                                                                 final Map<Long,Long> invalidatedReplicas,
                                                                 final List<ReportedBlock> reportedBlocks ) {
 
@@ -2686,7 +2683,7 @@ public class BlockManager {
                           toInvalidate,
                           toCorrupt, toUC, aggregatedSafeBlocks,
                           firstBlockReport,
-                          allMismatchedBlocksOnServer.contains(brb.getBlockId()),
+                          mismatchedBlocksAndInodes.containsKey(brb.getBlockId()),
                           invalidatedReplicas);
           if (storedBlock != null) {
             mismatchedBlocksAndInodes.remove(storedBlock.getBlockId());
@@ -2694,7 +2691,7 @@ public class BlockManager {
               // Only update hash with blocks that should not
               // be removed and are finalized. This helps catch excess
               // replicas as well.
-              hash += BlockReport.hashAsFinalized(brb);
+              hash += BlockReport.hashAsFinalized(storedBlock);
             }
           }
         }

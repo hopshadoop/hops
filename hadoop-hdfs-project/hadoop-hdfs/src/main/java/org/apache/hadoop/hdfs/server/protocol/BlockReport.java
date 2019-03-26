@@ -20,6 +20,8 @@ package org.apache.hadoop.hdfs.server.protocol;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.hash.Hashing;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.Replica;
 
@@ -153,6 +155,13 @@ public class BlockReport implements Iterable<ReportedBlock> {
         block.getGenerationStamp());
     return hashAsFinalized(toHash);
   }
+  
+  public static long hashAsFinalized(BlockInfo block){
+    Block toHash = new Block(block.getBlockId(), block.getNumBytes(),
+        block.getGenerationStamp());
+    return hashAsFinalized(toHash);
+  }
+  
   private static long hash(Replica replica){
     return hash(replica.getBlockId(), replica.getGenerationStamp(), replica
         .getNumBytes(), replica.getState().getValue());
