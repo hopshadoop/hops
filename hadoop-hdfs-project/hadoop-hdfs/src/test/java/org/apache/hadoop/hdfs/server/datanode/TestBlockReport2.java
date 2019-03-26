@@ -19,20 +19,21 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import io.hops.metadata.hdfs.entity.HashBucket;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.*;
+import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.*;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.Bucket;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
+import org.apache.hadoop.hdfs.server.protocol.ReportedBlock;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
@@ -43,6 +44,7 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.*;
@@ -89,13 +91,13 @@ public class TestBlockReport2 {
     final int TIMEOUT = 40000;
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Wait for datanode " + DN_N1 + " to appear");
+      LOG.info("Wait for datanode " + DN_N1 + " to appear");
     }
     while (cluster.getDataNodes().size() <= DN_N1) {
       waitTil(20);
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Total number of DNs " + cluster.getDataNodes().size());
+      LOG.info("Total number of DNs " + cluster.getDataNodes().size());
     }
     cluster.waitActive();
 
@@ -111,7 +113,7 @@ public class TestBlockReport2 {
       long waiting_period = Time.now() - start;
       if (count++ % 100 == 0) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Has been waiting for " + waiting_period + " ms.");
+          LOG.info("Has been waiting for " + waiting_period + " ms.");
         }
       }
       if (waiting_period > TIMEOUT) {
@@ -122,14 +124,14 @@ public class TestBlockReport2 {
 
     HdfsServerConstants.ReplicaState state = r.getState();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Replica state before the loop " + state.getValue());
+      LOG.info("Replica state before the loop " + state.getValue());
     }
     start = Time.now();
     while (state != HdfsServerConstants.ReplicaState.TEMPORARY) {
       waitTil(5);
       state = r.getState();
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Keep waiting for " + bl.getBlockName() +
+        LOG.info("Keep waiting for " + bl.getBlockName() +
                 " is in state " + state.getValue());
       }
       if (Time.now() - start > TIMEOUT) {
@@ -138,14 +140,14 @@ public class TestBlockReport2 {
       }
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Replica state after the loop " + state.getValue());
+      LOG.info("Replica state after the loop " + state.getValue());
     }
   }
 
   private void startDNandWait(MiniDFSCluster cluster, int count)
           throws IOException, InterruptedException, TimeoutException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Before next DN start: " + cluster.getDataNodes().size());
+      LOG.info("Before next DN start: " + cluster.getDataNodes().size());
     }
     int expectedDatanodes = count + cluster.getDataNodes().size();
     cluster.startDataNodes(cluster.getConfiguration(0), 1, true, null, null);
@@ -155,7 +157,7 @@ public class TestBlockReport2 {
 
     if (LOG.isDebugEnabled()) {
       int lastDn = datanodes.size() - 1;
-      LOG.debug("New datanode " +
+      LOG.info("New datanode " +
               cluster.getDataNodes().get(lastDn).getDisplayName() +
               " has been started");
     }
@@ -188,17 +190,17 @@ public class TestBlockReport2 {
   private void printStats(MiniDFSCluster cluster) throws IOException {
     BlockManagerTestUtil.updateState(cluster.getNamesystem().getBlockManager());
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Missing " + cluster.getNamesystem().getMissingBlocksCount());
-      LOG.debug(
+      LOG.info("Missing " + cluster.getNamesystem().getMissingBlocksCount());
+      LOG.info(
               "Corrupted " + cluster.getNamesystem().getCorruptReplicaBlocks());
-      LOG.debug("Under-replicated " + cluster.getNamesystem().
+      LOG.info("Under-replicated " + cluster.getNamesystem().
               getUnderReplicatedBlocks());
-      LOG.debug("Pending delete " + cluster.getNamesystem().
+      LOG.info("Pending delete " + cluster.getNamesystem().
               getPendingDeletionBlocks());
-      LOG.debug("Pending replications " + cluster.getNamesystem().
+      LOG.info("Pending replications " + cluster.getNamesystem().
               getPendingReplicationBlocks());
-      LOG.debug("Excess " + cluster.getNamesystem().getExcessBlocks());
-      LOG.debug("Total " + cluster.getNamesystem().getBlocksTotal());
+      LOG.info("Excess " + cluster.getNamesystem().getExcessBlocks());
+      LOG.info("Total " + cluster.getNamesystem().getBlocksTotal());
     }
   }
 
@@ -208,7 +210,7 @@ public class TestBlockReport2 {
     for (int i = 0; i < locatedBlks.size(); i++) {
       if (positionsToRemove != null && positionsToRemove.contains(i)) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug(i + " block to be omitted");
+          LOG.info(i + " block to be omitted");
         }
         continue;
       }
@@ -250,7 +252,7 @@ public class TestBlockReport2 {
             block.getNumBytes() != newLen);
     block.setNumBytesNoPersistance(newLen);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Length of " + block.getBlockName() +
+      LOG.info("Length of " + block.getBlockName() +
               " is changed to " + newLen + " from " + oldLen);
     }
   }
@@ -265,7 +267,7 @@ public class TestBlockReport2 {
             block.getGenerationStamp() != newGS);
     block.setGenerationStampNoPersistance(newGS);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Generation stamp of " + block.getBlockName() +
+      LOG.info("Generation stamp of " + block.getBlockName() +
               " is changed to " + block.getGenerationStamp() + " from " + oldGS);
     }
   }
@@ -331,7 +333,7 @@ public class TestBlockReport2 {
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
 
 
-      LOG.debug("Deleting all files");
+      LOG.info("Deleting all files");
       for (int i = 0; i < 1; i++) {
         Path filePath = new Path(baseName + "/" + i + ".dat");
         fs.delete(filePath, false);
@@ -458,13 +460,13 @@ public class TestBlockReport2 {
       FSDataOutputStream outs[] = new FSDataOutputStream[5];
       for (int i = 0; i < NUM_FILES; i++) {
         Path filePath = new Path(baseName + "/" + i + ".dat");
-        LOG.debug("Creating file: " + filePath);
+        LOG.info("Creating file: " + filePath);
         outs[i] = fs.create(filePath, REPLICATION);
         //write half a block
         byte data[] = new byte[BLOCK_SIZE / 2];
         outs[i].write(data);
         outs[i].flush(); //does not have any impact on block reports
-        LOG.debug("Flushed half a block");
+        LOG.info("Flushed half a block");
       }
 
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
@@ -476,7 +478,7 @@ public class TestBlockReport2 {
         byte data[] = new byte[BLOCK_SIZE / 2 - 1];
         outs[i].write(data);
         outs[i].hflush();
-        LOG.debug("HFlushed half a block -1 ");
+        LOG.info("HFlushed half a block -1 ");
       }
 
       Thread.sleep(50000); //wait for all incremental block reports
@@ -491,11 +493,11 @@ public class TestBlockReport2 {
         outs[i].write(data);
         outs[i].hflush();
         outs[i].close();
-        LOG.debug("HFlushed 1 byte. The block is complete and file is closed.");
+        LOG.info("HFlushed 1 byte. The block is complete and file is closed.");
       }
 
       //make sure that all incremental block reports are processed
-      LOG.debug("Sleeping to make sure that all the incremental BR are " +
+      LOG.info("Sleeping to make sure that all the incremental BR are " +
               "received");
       Thread.sleep(10000);
 
@@ -884,8 +886,11 @@ public class TestBlockReport2 {
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
 
-      corruptHashes(0, cluster);
+      LOG.info("Before corrupting hashes ");
+      
+      corruptNNHashes(0, cluster);
 
+      LOG.info("Restarting Cluster");
       cluster.shutdown();
       cluster = new MiniDFSCluster.Builder(conf).format
               (false).numDataNodes(NUM_DATANODES).build();
@@ -893,6 +898,7 @@ public class TestBlockReport2 {
       fs = (DistributedFileSystem) cluster.getFileSystem();
 
       Thread.sleep(5000);
+      LOG.info("After restart comparing states");
       //after initial BR
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
@@ -951,7 +957,7 @@ public class TestBlockReport2 {
       matchDNandNNState(0, NUM_DATANODES, cluster, 0, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, 0, numBuckets);
 
-      corruptHashes(0, cluster);
+      corruptNNHashes(0, cluster);
 
       matchDNandNNState(0, NUM_DATANODES, cluster, NUM_DATANODES * numBuckets, numBuckets);
       sendAndCheckBR(0, NUM_DATANODES, cluster, poolId, NUM_DATANODES * numBuckets, numBuckets);
@@ -1073,7 +1079,7 @@ public class TestBlockReport2 {
     int mismatchCount = 0;
 
     for (int i = 0; i < numDataNodes; i++) {
-      LOG.debug("DataNode Index: " + i);
+      LOG.info("DataNode Index: " + i);
       DataNode dn = cluster.getDataNodes().get(i);
       Map<DatanodeStorage, BlockReport> storageReports = getDNBR(cluster, dn, numBuckets);
 
@@ -1090,7 +1096,7 @@ public class TestBlockReport2 {
         assertFalse("More buckets on NN than on DN. might indicate configuration issue.", storageHashes.size() > dnHashes.size());
 
         if (storageHashes.size() != dnHashes.size()) {
-          LOG.debug("Number of hashes on NN doesn't match DN. This should only be the case before first report.");
+          LOG.info("Number of hashes on NN doesn't match DN. This should only be the case before first report.");
         }
 
         List<byte[]> nnHashes = new ArrayList<>(numBuckets);
@@ -1102,12 +1108,12 @@ public class TestBlockReport2 {
         for(byte[] hash : dnHashes){
           sb.append(HashBuckets.hashToString(hash)).append(", ");
         }
-        LOG.debug("DN Hash: " + sb);
+        LOG.info("DN Hash: " + sb);
         sb = new StringBuilder();
         for(byte[] hash : nnHashes){
           sb.append(HashBuckets.hashToString(hash)).append(", ");
         }
-        LOG.debug("NN Hash: " + sb);
+        LOG.info("NN Hash: " + sb);
 
         for (int j = 0; j < numBuckets; j++) {
           byte[] dnHash = dnHashes.get(j);
@@ -1122,12 +1128,12 @@ public class TestBlockReport2 {
     if (mismatchCount > tolerance) {
       String msg = "The Hashes Did not match. Mismatched Hashes: " + mismatchCount + " " +
               "Tolerance: " + tolerance;
-      LOG.debug(msg);
+      LOG.info(msg);
       fail(msg);
     }
   }
 
-  private void corruptHashes(int nnId, MiniDFSCluster cluster) throws IOException {
+  private void corruptNNHashes(int nnId, MiniDFSCluster cluster) throws IOException {
     for (DataNode dn : cluster.getDataNodes()) {
       BlockManager bm = cluster.getNamesystem(nnId).getBlockManager();
       DatanodeDescriptor dnd = bm.getDatanodeManager().getDatanode(dn.getDatanodeId());
@@ -1162,7 +1168,6 @@ public class TestBlockReport2 {
   private void sendAndCheckBR(int nnId, int numDataNodes,
                               MiniDFSCluster cluster, String poolId,
                               int tolerance, int numBuckets) throws IOException {
-
     int mismatched = 0;
     for (int i = 0; i < numDataNodes; i++) {
       DataNode dn = cluster.getDataNodes().get(i);
@@ -1172,7 +1177,13 @@ public class TestBlockReport2 {
 
         DatanodeDescriptor datanode = cluster.getNamesystem().getBlockManager().getDatanodeManager().getDatanode(dn.getDatanodeId());
         DatanodeStorageInfo storageInfo = datanode.getStorageInfo(datanodeStorageBlockReportEntry.getKey().getStorageID());
-        BlockManager.ReportStatistics stats = bm.processReport(storageInfo, datanodeStorageBlockReportEntry.getValue());
+
+        List<Integer> mismatchingbuckets = bm.checkHashes(dn.getDatanodeId(),
+                datanodeStorageBlockReportEntry.getKey(), datanodeStorageBlockReportEntry.getValue());
+        BPOfferService.removeMatchingBuckets(mismatchingbuckets, datanodeStorageBlockReportEntry.getValue());
+
+        BlockManager.ReportStatistics stats = bm.processReport(storageInfo,
+                datanodeStorageBlockReportEntry.getValue());
         mismatched += (numBuckets - stats.numBucketsMatching);
 
       }
@@ -1181,7 +1192,7 @@ public class TestBlockReport2 {
     if (mismatched > tolerance) {
       String msg = "BR Buckets mismatched : " + mismatched + " Tolerance: " +
               tolerance;
-      LOG.debug(msg);
+      LOG.info(msg);
       fail(msg);
     }
   }
@@ -1433,6 +1444,83 @@ public class TestBlockReport2 {
       fs.close();
       cluster.shutdownDataNodes();
       cluster.shutdown();
+    }
+  }
+
+  @Test
+  public void doTheJob() throws IOException, InterruptedException {
+    short replicas = (short) 1;
+    Configuration conf = new HdfsConfiguration();
+    final int numBuckets = 1;
+    setConfiguration(conf, numBuckets);
+    conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY,
+            DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_DEFAULT);
+    EnumSet<HdfsDataOutputStream.SyncFlag> syncFlags =
+            EnumSet.of(HdfsDataOutputStream.SyncFlag.UPDATE_LENGTH);
+    final int FILE_SIZE = NUM_BLOCKS * BLOCK_SIZE + 1;
+    final String fileName = "hflushtest.dat";
+    MiniDFSCluster cluster =
+            new MiniDFSCluster.Builder(conf).format(true).numDataNodes(replicas).build();
+
+    cluster.waitActive();
+
+    Thread.sleep(10000);
+
+    DistributedFileSystem fileSystem = cluster.getFileSystem();
+
+    Path testFile = new Path("/testfile");
+    try {
+      FSDataOutputStream out = fileSystem.create(testFile, replicas);
+      BRTestWriter writer = new BRTestWriter(out);
+      Thread t = new Thread(writer);
+      t.start();
+
+      cluster.getDataNodes().get(0).scheduleAllBlockReport(0);
+
+      Thread.sleep(15000);
+
+      writer.stop();
+
+      // open file and read all blocks
+      FSDataInputStream in = fileSystem.open(testFile);
+      byte[] block = AppendTestUtil.initBuffer(BLOCK_SIZE);
+      for (int i = 0; i < writer.blocksWritten; i++) {
+        in.read(block);
+      }
+      in.close();
+
+    } finally {
+      fileSystem.close();
+      cluster.shutdown();
+    }
+  }
+
+
+  private class BRTestWriter implements Runnable {
+    FSDataOutputStream out;
+    boolean stop = false;
+    byte[] block;
+    int blocksWritten = 0;
+    BRTestWriter(FSDataOutputStream out){
+      this.out  = out;
+      block = AppendTestUtil.initBuffer(BLOCK_SIZE);
+    }
+
+    public void stop(){
+      stop = true;
+    }
+    @Override
+    public void run() {
+      try {
+        while (!stop) {
+          out.write(block);
+          out.hflush();
+          blocksWritten++;
+        }
+        out.close();
+      }catch (IOException e){
+       e.printStackTrace();
+      }
     }
   }
 }

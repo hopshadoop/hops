@@ -56,6 +56,7 @@ message DatanodeCommandProto {
     UnusedUpgradeCommand = 6;
     NullDatanodeCommand = 7;
     BlockIdCommand = 8;
+    HashMismatchCommand = 11;
   }
 
   required Type cmdType = 1; // Type of the command
@@ -69,6 +70,7 @@ message DatanodeCommandProto {
   optional KeyUpdateCommandProto keyUpdateCmd = 6;
   optional RegisterCommandProto registerCmd = 7;
   optional BlockIdCommandProto blkIdCmd = 8;
+  optional HashMismatchCommandProto mismatchHashesCmd = 11;
 }
 
 /**
@@ -125,6 +127,20 @@ message BlockRecoveryCommandProto {
  */
 message FinalizeCommandProto {
   required string blockPoolId = 1; // Block pool to be finalized
+}
+
+message StorageMismatchingHashes {
+  required string storageID = 1;
+  repeated uint32 bucketIDs = 2;
+}
+
+
+message AllStorageMismatchingHashes {
+  repeated StorageMismatchingHashes storages = 1;
+}
+
+message HashMismatchCommandProto {
+  required AllStorageMismatchingHashes storages = 1;
 }
 
 /**
@@ -243,6 +259,7 @@ message BlockReportBlockProto {
 message BlockReportBucketProto {
   repeated BlockReportBlockProto blocks = 1;
   required bytes hash = 2;
+  required bool skip = 3 [default = false];
 }
 
 message BlockReportProto {
@@ -438,6 +455,11 @@ service DatanodeProtocolService {
    * Report blocks at a given datanode to the namenode
    */
   rpc blockReport (BlockReportRequestProto) returns (BlockReportResponseProto);
+
+  /**
+   * Report hashes at a given datanode to the namenode
+   */
+  rpc reportHashes (BlockReportRequestProto) returns (BlockReportResponseProto);
 
   /**
    * Report cached blocks at a datanode to the namenode

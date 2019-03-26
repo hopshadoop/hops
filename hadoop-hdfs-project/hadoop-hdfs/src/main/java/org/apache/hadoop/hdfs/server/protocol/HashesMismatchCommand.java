@@ -17,42 +17,32 @@
  */
 package org.apache.hadoop.hdfs.server.protocol;
 
-public class Bucket {
-  
-  private ReportedBlock[] blocks;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
-  private byte[] hash;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-  private boolean skip = false; // skip processing the bucket
-  
-  public Bucket(){}
-  
-  public Bucket(ReportedBlock[] blocks){
-    this.blocks = blocks;
+/**
+ * A BlockCommand is an instruction to a datanode to send block report to
+ * the mismatching buckets
+ */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
+public class HashesMismatchCommand extends DatanodeCommand {
+  Map<String, List<Integer>> missMatchingBuckets;
+
+  public HashesMismatchCommand() {
+    super(DatanodeProtocol.DNA_HASHMISMATCH);
+    this.missMatchingBuckets = new HashMap<>();
   }
 
-  public void setBlocks(ReportedBlock[] blocks) {
-    this.blocks = blocks;
-  }
-  
-  public ReportedBlock[] getBlocks() {
-    return blocks;
+  public void addStorageBuckets(String storageID, List<Integer> buckets){
+    missMatchingBuckets.put(storageID, buckets);
   }
 
-  public void setHash(byte[] hash){
-    this.hash = hash;
-  }
-
-  public byte[] getHash(){
-    return hash;
-  }
-
-  public boolean isSkip() {
-    return skip;
-  }
-
-  public void setSkip(boolean skip) {
-    this.skip = skip;
+  public Map<String, List<Integer>> getMissMatchingBuckets(){
+    return missMatchingBuckets;
   }
 }
-

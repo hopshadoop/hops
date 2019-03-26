@@ -197,6 +197,31 @@ public class DatanodeProtocolClientSideTranslatorPB
   }
 
   @Override
+  public DatanodeCommand reportHashes(DatanodeRegistration registration,
+                                     String poolId, StorageBlockReport[] reports) throws IOException {
+    BlockReportRequestProto.Builder builder =
+            BlockReportRequestProto.newBuilder()
+                    .setRegistration(PBHelper.convert(registration))
+                    .setBlockPoolId(poolId);
+
+    for (StorageBlockReport r : reports) {
+      StorageBlockReportProto.Builder reportBuilder =
+              StorageBlockReportProto.newBuilder()
+                      .setStorage(PBHelper.convert(r.getStorage()))
+                      .setReport(PBHelper.convert(r.getReport()));
+      builder.addReports(reportBuilder.build());
+    }
+    BlockReportResponseProto resp;
+    try {
+      resp = rpcProxy.reportHashes(NULL_CONTROLLER, builder.build());
+    } catch (ServiceException se) {
+      throw ProtobufHelper.getRemoteException(se);
+    }
+    return resp.hasCmd() ? PBHelper.convert(resp.getCmd()) : null;
+  }
+
+
+  @Override
   public DatanodeCommand cacheReport(DatanodeRegistration registration,
       String poolId, List<Long> blockIds, long cacheCapacity, long cacheUsed) throws IOException {
     CacheReportRequestProto.Builder builder =

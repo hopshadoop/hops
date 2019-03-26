@@ -2167,6 +2167,40 @@ public class BlockManager {
   }
 
   /**
+   * The given storage is reporting all its hashes.
+   */
+  public List<Integer> checkHashes(final DatanodeID nodeID,
+                                   final DatanodeStorage storage,
+                                   final BlockReport newReport) throws IOException {
+    final long startTime = Time.now(); //after acquiring write lock
+
+    DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
+    if (node == null || !node.isAlive) {
+      throw new IOException(
+              "ReportHashes from dead or unregistered node: " + nodeID);
+    }
+
+    DatanodeStorageInfo storageInfo = node.getStorageInfo(storage.getStorageID());
+    if (storageInfo == null) {
+      // We handle this for backwards compatibility.
+      storageInfo = node.updateStorage(storage);
+    }
+
+    final boolean firstBlockReport =
+            namesystem.isInStartupSafeMode() || storageInfo.getBlockReportCount() == 0;
+    if (storageInfo.getBlockReportCount() == 0) {
+      HashBuckets.getInstance().createBucketsForStorage(storageInfo);
+    }
+
+    HashMatchingResult matchingResult = calculateMismatchedHashes(storageInfo, newReport,
+            firstBlockReport);
+
+    blockLog.debug("BLOCK* checkHashes: Number of mismatches buckets for storage: "
+            +storageInfo.getStorageID()+" are: "+matchingResult.mismatchedBuckets);
+    return matchingResult.mismatchedBuckets;
+  }
+
+  /**
    * The given storage is reporting all its blocks.
    * Update the (storage-->block list) and (block-->storage list) maps.
    */
@@ -2556,25 +2590,25 @@ public class BlockManager {
     stats.numBuckets = newReport.getBuckets().length;
     stats.numBlocks = newReport.getNumberOfBlocks();
   
-    HashMatchingResult matchingResult = calculateMismatchedHashes(storage, newReport, firstBlockReport);
-    stats.numBucketsMatching = matchingResult.matchingBuckets.size();
-    
+    List<Integer> mismatchedBuckets = getReportedBucketList(newReport);
+    stats.numBucketsMatching = newReport.getBuckets().length-mismatchedBuckets.size();
+
     
     if(LOG.isDebugEnabled()){
       LOG.debug(String.format("%d/%d reported hashes matched",
-          newReport.getBuckets().length-matchingResult.mismatchedBuckets.size(),
+          newReport.getBuckets().length-mismatchedBuckets.size(),
           newReport.getBuckets().length));
     }
     
     final Set<Long> aggregatedSafeBlocks = new HashSet<>();
         
     final Map<Long, Long> mismatchedBlocksAndInodes = storage
-            .getAllStorageReplicasInBuckets(matchingResult.mismatchedBuckets);
+            .getAllStorageReplicasInBuckets(mismatchedBuckets);
 
     //Safe mode report and first report for storage will have all buckets mismatched.
     aggregatedSafeBlocks.addAll(mismatchedBlocksAndInodes.keySet());
 
-    processMisMatchingBuckets(storage, newReport, matchingResult, toAdd,
+    processMisMatchingBuckets(storage, newReport, mismatchedBuckets, toAdd,
             toInvalidate,
             toCorrupt, toUC, firstBlockReport,
             mismatchedBlocksAndInodes,
@@ -2599,7 +2633,7 @@ public class BlockManager {
 
   private void processMisMatchingBuckets(final DatanodeStorageInfo storage,
                                                final BlockReport newReport,
-                                               final HashMatchingResult matchingResult,
+                                               final List<Integer> mismatchedBuckets,
                                                final Collection<BlockInfoContiguous> toAdd,
                                                final Collection<Block> toInvalidate,
                                                final Collection<BlockToMarkCorrupt> toCorrupt,
@@ -2609,7 +2643,7 @@ public class BlockManager {
                                                final Map<Long,Long> invalidatedReplicas) throws IOException {
 
     final Collection<Callable<Void>> subTasks = new ArrayList<>();
-    for (final int bucketId : matchingResult.mismatchedBuckets) {
+    for (final int bucketId : mismatchedBuckets) {
       final Bucket bucket = newReport.getBuckets()[bucketId];
       final List<ReportedBlock> bucketBlocks = Arrays.asList(bucket.getBlocks());
       final Callable<Void> subTask = new Callable<Void>() {
@@ -2731,6 +2765,17 @@ public class BlockManager {
         throw new RuntimeException("Block Report should only contain FINALIZED, RBW " +
             "and RWR replicas. Got: " + state);
     }
+  }
+
+  private List<Integer> getReportedBucketList(BlockReport report) throws IOException {
+    List<Integer> missMatchingBuckets = new ArrayList();
+    for(int i = 0; i < report.getBuckets().length; i++){
+      Bucket b = report.getBuckets()[i];
+      if(!b.isSkip()){
+        missMatchingBuckets.add(i);
+      }
+    }
+    return missMatchingBuckets;
   }
 
   private HashMatchingResult calculateMismatchedHashes(DatanodeStorageInfo storage,

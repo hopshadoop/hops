@@ -637,6 +637,11 @@ class BPServiceActor implements Runnable {
     }
   }
 
+  public DatanodeCommand reportHashes(DatanodeRegistration registration,
+                                     String poolId, StorageBlockReport[] reports) throws IOException {
+    return bpNamenode.reportHashes(registration, poolId, reports);
+  }
+
   public DatanodeCommand blockReport(DatanodeRegistration registration,
       String poolId, StorageBlockReport[] reports) throws IOException {
     return bpNamenode.blockReport(registration, poolId, reports);
