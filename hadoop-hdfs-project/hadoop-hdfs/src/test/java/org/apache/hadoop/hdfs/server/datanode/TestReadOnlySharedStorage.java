@@ -233,12 +233,13 @@ public class TestReadOnlySharedStorage {
   @Test
   public void testNormalReplicaOffline() throws Exception {
     // Stop the datanode hosting the NORMAL replica
+    Thread.sleep(5000);
     cluster.stopDataNode(normalDataNode.getXferAddr());
     
     // Force NameNode to detect that the datanode is down
     BlockManagerTestUtil.noticeDeadDatanode(
         cluster.getNameNode(), normalDataNode.getXferAddr());
-    
+
     // The live replica count should now be zero (since the NORMAL replica is offline)
     NumberReplicas numberReplicas = countReplicas(namesystem, block);
     assertThat(numberReplicas.liveReplicas(), is(0));

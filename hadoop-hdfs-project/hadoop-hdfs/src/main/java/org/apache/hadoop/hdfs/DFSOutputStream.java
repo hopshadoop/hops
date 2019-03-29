@@ -188,9 +188,9 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   //this queue holds data for small files that are stored in the database.
   //when the file is closed the data is send to a NameNode in the close RPC
   private final LinkedList<DFSPacket> smallFileDataQueue = new LinkedList<>();
-  private boolean saveSmallFilesInDB;
   private boolean isThisFileStoredInDB = false;
   private final int dbFileMaxSize;
+  private final boolean forceClientToWriteSFToDisk;
   //if the client calls sync/flush method then the file will be stored on the
   //datanodes irrespective of the file size. The reason is that before the file
   //is close we are not sure about the final size of the file. If we store the
@@ -1718,8 +1718,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   }
 
   private DFSOutputStream(DFSClient dfsClient, String src, Progressable progress,
-      HdfsFileStatus stat, DataChecksum checksum, boolean saveSmallFilesInDB,
-      final int dbFileMaxSize) throws IOException {
+      HdfsFileStatus stat, DataChecksum checksum, final int dbFileMaxSize,
+      boolean forceClientToWriteSFToDisk) throws IOException {
     super(checksum);
     this.dfsClient = dfsClient;
     this.src = src;
@@ -1729,10 +1729,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     this.progress = progress;
     this.cachingStrategy = new AtomicReference<CachingStrategy>(
         dfsClient.getDefaultWriteCachingStrategy());
-    this.saveSmallFilesInDB = saveSmallFilesInDB;
-    if (saveSmallFilesInDB) {
-      isThisFileStoredInDB = true; // treat the current file as small file
-    }
+    isThisFileStoredInDB = false;
+    this.forceClientToWriteSFToDisk = forceClientToWriteSFToDisk;
     this.dbFileMaxSize = dbFileMaxSize;
     if ((progress != null) && DFSClient.LOG.isDebugEnabled()) {
       DFSClient.LOG
@@ -1759,9 +1757,10 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   private DFSOutputStream(DFSClient dfsClient, String src, HdfsFileStatus stat,
                           EnumSet<CreateFlag> flag, Progressable progress,
                           DataChecksum checksum, String[] favoredNodes,
-                          EncodingPolicy policy, boolean saveSmallFilesInDB, final int dbFileMaxSize)
+                          EncodingPolicy policy, final int dbFileMaxSize,
+                          boolean forceClientToWriteSFToDisk)
           throws IOException {
-    this(dfsClient, src, progress, stat, checksum, saveSmallFilesInDB, dbFileMaxSize);
+    this(dfsClient, src, progress, stat, checksum, dbFileMaxSize, forceClientToWriteSFToDisk);
     this.shouldSyncBlock = flag.contains(CreateFlag.SYNC_BLOCK);
 
     if (policy != null) {
@@ -1779,14 +1778,19 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     if (favoredNodes != null && favoredNodes.length != 0) {
       streamer.setFavoredNodes(favoredNodes);
     }
+
+    if(this.forceClientToWriteSFToDisk) {
+      isThisFileStoredInDB = false;
+    }else{
+      isThisFileStoredInDB = stat.isFileStoredInDB();
+    }
   }
   
   static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
       FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
       short replication, long blockSize, Progressable progress, int buffersize,
       DataChecksum checksum, String[] favoredNodes,
-      EncodingPolicy policy, boolean saveSmallFilesInDB,
-      final int dbFileMaxSize) throws IOException {
+      EncodingPolicy policy, final int dbFileMaxSize, boolean forceClientToWriteSFToDisk) throws IOException {
     final HdfsFileStatus stat;
     TraceScope scope =
       dfsClient.newPathTraceScope("newStreamForCreate", src);
@@ -1802,8 +1806,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
             NSQuotaExceededException.class, SafeModeException.class,
             UnresolvedPathException.class);
       }
-      final DFSOutputStream out = new DFSOutputStream(dfsClient, src, stat,
-          flag, progress, checksum, favoredNodes, policy, saveSmallFilesInDB, dbFileMaxSize);
+    final DFSOutputStream out = new DFSOutputStream(dfsClient, src, stat,
+        flag, progress, checksum,favoredNodes, policy, dbFileMaxSize, forceClientToWriteSFToDisk);
       out.start();
       return out;
     } finally {
@@ -1814,19 +1818,25 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
                                             FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
                                             short replication, long blockSize, Progressable progress, int buffersize,
-                                            DataChecksum checksum, boolean saveSmallFilesInDB,
-                                            final int dbFileMaxSize) throws IOException {
+                                            DataChecksum checksum, final int dbFileMaxSize,
+                                            boolean forceClientToWriteSFToDisk) throws IOException {
     return newStreamForCreate(dfsClient, src, masked, flag, createParent,
-            replication, blockSize, progress, buffersize, checksum, null, null, saveSmallFilesInDB, dbFileMaxSize);
+            replication, blockSize, progress, buffersize, checksum, null, null,
+            dbFileMaxSize, forceClientToWriteSFToDisk);
   }
 
   /** Construct a new output stream for append. */
   private DFSOutputStream(DFSClient dfsClient, String src, boolean toNewBlock,
       Progressable progress, LocatedBlock lastBlock, HdfsFileStatus stat,
-      DataChecksum checksum, boolean saveSmallFilesInDB, final int dbFileMaxSize) throws IOException {
-    this(dfsClient, src, progress, stat, checksum, saveSmallFilesInDB,  dbFileMaxSize);
-    initialFileSize = stat.getLen(); // length of file when opened
-    isThisFileStoredInDB = stat.isFileStoredInDB();
+      DataChecksum checksum, final int dbFileMaxSize, boolean forceClientToWriteSFToDisk) throws IOException {
+    this(dfsClient, src, progress, stat, checksum, dbFileMaxSize, forceClientToWriteSFToDisk);
+    this.initialFileSize = stat.getLen(); // length of file when opened
+
+    if(this.forceClientToWriteSFToDisk) {
+      this.isThisFileStoredInDB = false;
+    } else {
+      this.isThisFileStoredInDB = stat.isFileStoredInDB();
+    }
 
     // The last partial block of the file has to be filled.
     if (!toNewBlock && lastBlock != null && !isThisFileStoredInDB) {
@@ -1852,36 +1862,28 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   static DFSOutputStream newStreamForAppend(DFSClient dfsClient, String src,
       boolean toNewBlock, int bufferSize, Progressable progress,
       LocatedBlock lastBlock, HdfsFileStatus stat, DataChecksum checksum,
-      String[] favoredNodes,
-      boolean saveSmallFilesInDB, final int dbFileMaxSize, boolean emulateHDFSClient)
+      String[] favoredNodes, final int dbFileMaxSize, boolean forceClientToWriteSFToDisk)
       throws IOException {
     TraceScope scope =
         dfsClient.newPathTraceScope("newStreamForAppend", src);
     try {        
-      if (stat.isFileStoredInDB()) {
-        String errorMessage = null;
-        if (!saveSmallFilesInDB && !emulateHDFSClient) {
-          errorMessage = "The file is stored in the database. Parameter to store the data in the database is disabled. " +
-                  "Set the " + DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY + " configuration parameter in the hdfs " +
-                  "configuration file";
-        } else if (stat.getLen() > stat.getBlockSize()) {
-          errorMessage = "Invalid paraters for appending a file stored in the database. Block size can not be smaller " +
-                  "than the max size of a file stored in the database";
-        } else if (dbFileMaxSize > stat.getBlockSize()) {
-          errorMessage = "Invalid paraters for appending a file stored in the database. Files stored in the database " +
-                  "can not be larger than a HDFS block";
-        }
-
-        if (errorMessage != null) {
-          throw new IOException(errorMessage + " Stat.isStoredInDB: " + stat.isFileStoredInDB() +
-                  " saveSmallFilesInDB: " + saveSmallFilesInDB + " Stat.len: " + stat.getLen() + " dbFileMaxSize: " +
-                  dbFileMaxSize + " BlockSize: " + stat.getBlockSize());
-        }
+    if (stat.isFileStoredInDB()) {
+      String errorMessage = null;
+      if (stat.getLen() > stat.getBlockSize()) {
+        errorMessage = "Invalid paraters for appending a file stored in the database. Block size can not be smaller " +
+                "than the max size of a file stored in the database";
+      } else if (dbFileMaxSize > stat.getBlockSize()) {
+        errorMessage = "Invalid paraters for appending a file stored in the database. Files stored in the database " +
+                "can not be larger than a HDFS block";
       }
+
+      if (errorMessage != null) {
+        throw new IOException(errorMessage);
+      }
+    }
             
-      
       final DFSOutputStream out = new DFSOutputStream(dfsClient, src, toNewBlock,
-          progress, lastBlock, stat, checksum, saveSmallFilesInDB, dbFileMaxSize);
+        progress, lastBlock, stat, checksum, dbFileMaxSize, forceClientToWriteSFToDisk);
       if (favoredNodes != null && favoredNodes.length != 0) {
         out.streamer.setFavoredNodes(favoredNodes);
       }
@@ -1898,7 +1900,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   private DFSOutputStream(DFSClient dfsClient, String src, 
                           Progressable progress, HdfsFileStatus stat, LocatedBlock lb, DataChecksum checksum)
           throws IOException {
-    this(dfsClient, src, progress, stat, checksum, false, -1);
+    this(dfsClient, src, progress, stat, checksum, -1, false);
     singleBlock = true;
 
     computePacketChunkSize(dfsClient.getConf().writePacketSize,
@@ -1955,14 +1957,12 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   }
 
   private boolean canStoreFileInDB() {
-    return saveSmallFilesInDB &&
-            isThisFileStoredInDB &&
-            !syncOrFlushCalled;
+    return isThisFileStoredInDB && !syncOrFlushCalled;
   }
 
   private void forwardSmallFilesPacketsToDataNodes() {
     // can not save the data in the database
-    if (saveSmallFilesInDB && isThisFileStoredInDB) {
+    if (isThisFileStoredInDB) {
       LOG.debug("Stuffed Inode:  The file can not be stored  in the database");
       isThisFileStoredInDB = false;
       if (!smallFileDataQueue.isEmpty()) {

@@ -282,6 +282,9 @@ public class HdfsFileStatus {
     return isFileStoredInDB; 
   }
 
+  public void setFileStoredInDB(boolean isFileStoredInDB){
+    this.isFileStoredInDB = isFileStoredInDB;
+  }
   /**
    * Resolve the short name of the Path given the URI, parent provided. This
    * FileStatus reference will not contain a valid Path until it is resolved

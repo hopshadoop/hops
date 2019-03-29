@@ -36,8 +36,9 @@ public enum StorageType {
   DISK(false),
   SSD(false),
   RAID5(false),
-  ARCHIVE(false);
-  
+  ARCHIVE(false),
+  DB(false);
+
   private final boolean isTransient;
 
   public static StorageType DEFAULT = DISK;

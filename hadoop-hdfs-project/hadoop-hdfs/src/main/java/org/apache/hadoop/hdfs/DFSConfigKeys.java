@@ -268,9 +268,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
           "dfs.block.report.load.balancing.max.block.report.processing.time";
   public static final long DFS_BR_LB_MAX_BR_PROCESSING_TIME_DEFAULT = 60*60*1000;
 
-  public static final String DFS_STORE_SMALL_FILES_IN_DB_KEY =
-          "dfs.store.small.files.in.db";
-  public static final boolean DFS_STORE_SMALL_FILES_IN_DB_DEFAULT = false;
+  public static final String DFS_FORCE_CLIENT_TO_WRITE_SMALL_FILES_TO_DISK_KEY =
+          "dfs.force.client.to.write.small.files.to.disk.key";
+  public static final boolean DFS_FORCE_CLIENT_TO_WRITE_SMALL_FILES_TO_DISK_DEFAULT = false;
 
   public static final String DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY =
           "dfs.db.ondisk.small.file.max.size";

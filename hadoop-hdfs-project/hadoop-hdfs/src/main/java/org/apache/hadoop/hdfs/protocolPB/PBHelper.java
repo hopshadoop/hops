@@ -1661,6 +1661,8 @@ public class PBHelper {
         return StorageTypeProto.RAID5;
       case ARCHIVE:
         return StorageTypeProto.ARCHIVE;
+      case DB:
+        return StorageTypeProto.DB;
       default:
         Preconditions.checkState(
             false,
@@ -1680,6 +1682,8 @@ public class PBHelper {
         return StorageType.RAID5;
       case ARCHIVE:
         return StorageType.ARCHIVE;
+      case DB:
+        return StorageType.DB;
       default:
         throw new IllegalStateException(
             "BUG: StorageTypeProto not found, type=" + type);

@@ -2015,4 +2015,12 @@
     </description>
   </property>
 
+  <property>
+    <name>dfs.force.client.to.write.small.files.to.disk.key</name>
+    <value>false</value>
+    <description>Even if the storeage type for the file is set to "DB"
+    it is possible to force client to write the file to disk.
+    </description>
+  </property>
+
 </configuration>

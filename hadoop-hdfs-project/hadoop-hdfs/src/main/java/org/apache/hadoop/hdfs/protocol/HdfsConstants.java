@@ -147,12 +147,15 @@ public class HdfsConstants {
   Policy ID	Policy Name	  Block Placement         Fallback storages   Fallback storages
                            (n  replicas)	         for creation	       for replication
   (15	      Lasy_Persist	RAM_DISK: 1, DISK: n-1	   DISK	              DISK)   <-- not implemented in Hops
+  14	      DB            NDB: n	                   SSD, DISK          DISK
   12	      All_SSD	      SSD: n	                   DISK	              DISK
   10	      One_SSD	      SSD: 1,DISK: n-1           SSD, DISK	        SSD, DISK
   7	        Hot (default)	DISK: n	                   <none>	            ARCHIVE
   5	        Warm	        DISK: 1, ARCHIVE: n-1    	 ARCHIVE, DISK	    ARCHIVE, DISK
   2	        Cold	        ARCHIVE: n	               <none>	            <none>
   */
+  public static final String DB_STORAGE_POLICY_NAME = "DB";
+  public static final byte DB_STORAGE_POLICY_ID = 14;
 
   public static final String ALLSSD_STORAGE_POLICY_NAME = "ALL_SSD";
   public static final byte ALLSSD_STORAGE_POLICY_ID = 12;

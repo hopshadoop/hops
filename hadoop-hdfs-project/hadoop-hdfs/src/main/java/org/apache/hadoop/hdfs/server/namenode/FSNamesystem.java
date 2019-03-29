@@ -452,7 +452,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private final boolean erasureCodingEnabled;
   private final ErasureCodingManager erasureCodingManager;
 
-  private final boolean storeSmallFilesInDB;
   private static int DB_ON_DISK_FILE_MAX_SIZE;
   private static int DB_ON_DISK_SMALL_FILE_MAX_SIZE;
   private static int DB_ON_DISK_MEDIUM_FILE_MAX_SIZE;
@@ -604,9 +603,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       this.erasureCodingEnabled =
           ErasureCodingManager.isErasureCodingEnabled(conf);
       this.erasureCodingManager = new ErasureCodingManager(this, conf);
-      this.storeSmallFilesInDB =
-          conf.getBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY,
-              DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_DEFAULT);
       DB_ON_DISK_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY,
               DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_DEFAULT);
       DB_ON_DISK_LARGE_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY,
@@ -1928,6 +1924,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     startFileInternal(pc, iip, permissions, holder, clientMachine, create, overwrite,
         createParent, replication, blockSize);
     final HdfsFileStatus stat = FSDirStatAndListingOp.getFileInfo(dir, src, false, true);
+
+    //Set HdfsFileStatus if the file shoudl be stored in DB
+    final INode inode = dir.getINodesInPath4Write(src).getLastINode();
+    final INodeFile myFile = INodeFile.valueOf(inode, src, true);
+    final BlockStoragePolicy storagePolicy =
+            getBlockManager().getStoragePolicySuite().getPolicy(myFile.getStoragePolicyID());
+    stat.setFileStoredInDB(storagePolicy.getStorageTypes()[0] == StorageType.DB);
+
     logAuditEvent(true, "create", src, null,
         (isAuditEnabled() && isExternalInvocation()) ? stat : null);
     return stat;
@@ -2351,7 +2355,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     //now overwrite the in-memory file
     Configuration newConf = copyConfiguration(conf);
-    newConf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, false);
+    newConf.setBoolean(DFSConfigKeys.DFS_FORCE_CLIENT_TO_WRITE_SMALL_FILES_TO_DISK_KEY, true);
     FileSystem hopsFSClient2 = FileSystem.newInstance(newConf);
     FSDataOutputStream os = hopsFSClient2.create(new Path(src), true );
     os.write(data,0,dataRead);
@@ -8311,10 +8315,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           }
         };
     return (PathInformation)handler.handle(this);
-  }
-
-  public boolean storeSmallFilesInDB() {
-    return this.storeSmallFilesInDB;
   }
 
   public static int dbOnDiskFileMaximumSize() {
