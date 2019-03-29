@@ -132,13 +132,16 @@ public class TestSmallFileSeek {
   @Test
   public void testSeekBugDFS() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     conf.setLong(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, 1024*1024);
     conf.setLong(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, 1024*1024);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
-    FileSystem fileSys = cluster.getFileSystem();
+    DistributedFileSystem fileSys = cluster.getFileSystem();
+
+    fileSys.mkdirs(new Path("/dir"));
+    fileSys.setStoragePolicy(new Path("/dir"), "DB");
+
     try {
-      Path file1 = new Path("seektest.dat");
+      Path file1 = new Path("/dir/seektest.dat");
       writeFile(fileSys, file1);
       seekReadFile(fileSys, file1);
       smallReadSeek(fileSys, file1);
@@ -156,13 +159,16 @@ public class TestSmallFileSeek {
   @Test(expected = IOException.class)
   public void testNegativeSeek() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     conf.setLong(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, 1024*1024);
     conf.setLong(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, 1024*1024);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
-    FileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem fs = cluster.getFileSystem();
+
+    fs.mkdirs(new Path("/dir"));
+    fs.setStoragePolicy(new Path("/dir"), "DB");
+
     try {
-      Path seekFile = new Path("seekboundaries.dat");
+      Path seekFile = new Path("/dir/seekboundaries.dat");
       DFSTestUtil
           .createFile(fs, seekFile, ONEMB, fs.getDefaultReplication(seekFile),
               seed);
@@ -185,13 +191,14 @@ public class TestSmallFileSeek {
   @Test(expected = IOException.class)
   public void testSeekPastFileSize() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     conf.setLong(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, 1024*1024);
     conf.setLong(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, 1024*1024);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
-    FileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem fs = cluster.getFileSystem();
+    fs.mkdirs(new Path("/dir"));
+    fs.setStoragePolicy(new Path("/dir"), "DB");
     try {
-      Path seekFile = new Path("seekboundaries.dat");
+      Path seekFile = new Path("/dir/seekboundaries.dat");
       DFSTestUtil
           .createFile(fs, seekFile, ONEMB, fs.getDefaultReplication(seekFile),
               seed);
@@ -213,7 +220,6 @@ public class TestSmallFileSeek {
   @Test
   public void testSeekBugLocalFS() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     conf.setLong(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, 1024*1024);
     conf.setLong(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, 1024*1024);
     FileSystem fileSys = FileSystem.getLocal(conf);

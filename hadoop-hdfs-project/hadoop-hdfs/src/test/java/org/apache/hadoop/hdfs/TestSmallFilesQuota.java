@@ -98,7 +98,6 @@ public class TestSmallFilesQuota {
   @Test
   public void testQuotaCommands() throws Exception {
     final Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 1000);
     final MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
@@ -106,6 +105,9 @@ public class TestSmallFilesQuota {
     assertTrue("Not a HDFS: " + fs.getUri(),
         fs instanceof DistributedFileSystem);
     final DistributedFileSystem dfs = (DistributedFileSystem) fs;
+
+    dfs.setStoragePolicy(new Path("/"), "DB");
+
     DFSAdmin admin = new DFSAdmin(conf);
     
     try {
@@ -391,7 +393,6 @@ public class TestSmallFilesQuota {
   @Test
   public void testNamespaceCommands() throws Exception {
     final Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 1000);
     final MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
@@ -399,7 +400,9 @@ public class TestSmallFilesQuota {
     assertTrue("Not a HDFS: " + fs.getUri(),
         fs instanceof DistributedFileSystem);
     final DistributedFileSystem dfs = (DistributedFileSystem) fs;
-    
+
+    dfs.setStoragePolicy(new Path("/"), "DB");
+
     try {
       // 1: create directory /nqdir0/qdir1/qdir20/nqdir30
       assertTrue(dfs.mkdirs(new Path("/nqdir0/qdir1/qdir20/nqdir30")));
@@ -605,7 +608,6 @@ public class TestSmallFilesQuota {
   @Test
   public void testSpaceCommands() throws Exception {
     final Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     final int BLOCK_SIZE = 512;
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 1000);
     final MiniDFSCluster cluster =
@@ -614,6 +616,8 @@ public class TestSmallFilesQuota {
     assertTrue("Not a HDFS: " + fs.getUri(),
         fs instanceof DistributedFileSystem);
     final DistributedFileSystem dfs = (DistributedFileSystem) fs;
+
+    dfs.setStoragePolicy(new Path("/"), "DB");
 
     try {
       int fileLen = 1024;
@@ -905,7 +909,6 @@ public class TestSmallFilesQuota {
   @Test
   public void testBlockAllocationAdjustsUsageConservatively() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
 
     final int MAX_SMALL_FILE_SIZE = 6 * 1024;
     final int BLOCK_SIZE = 4 * MAX_SMALL_FILE_SIZE;
@@ -918,7 +921,11 @@ public class TestSmallFilesQuota {
     MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.waitActive();
-    FileSystem fs = cluster.getFileSystem();
+
+    DistributedFileSystem fs = cluster.getFileSystem();
+
+    fs.setStoragePolicy(new Path("/"), "DB");
+
     DFSAdmin admin = new DFSAdmin(conf);
 
     final String nnAddr = conf.get(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY);
@@ -1025,7 +1032,6 @@ public class TestSmallFilesQuota {
   @Test
   public void testMultipleFilesSmallerThanOneBlock() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
 
     final int MAX_SMALL_FILE_SIZE = 5 * 1024;
     final int BLOCK_SIZE = MAX_SMALL_FILE_SIZE + 1024;
@@ -1038,7 +1044,8 @@ public class TestSmallFilesQuota {
     MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.waitActive();
-    FileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem fs = cluster.getFileSystem();
+    fs.setStoragePolicy(new Path("/"), "DB");
     DFSAdmin admin = new DFSAdmin(conf);
 
     final String nnAddr = conf.get(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY);
@@ -1124,7 +1131,6 @@ public class TestSmallFilesQuota {
   public void testAsynchronousQuota() throws Exception {
     // TODO This test should not rely on timing but should call the process function of QuotaUpdateManager manually
     final Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     final int BLOCK_SIZE = 512;
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 5000);
     final MiniDFSCluster cluster =
@@ -1132,6 +1138,7 @@ public class TestSmallFilesQuota {
     try {
       final FileSystem fs = cluster.getFileSystem();
       final DistributedFileSystem dfs = (DistributedFileSystem) fs;
+      dfs.setStoragePolicy(new Path("/"), "DB");
 
       Path testFolder = new Path("/test");
       dfs.mkdirs(testFolder);
@@ -1200,13 +1207,14 @@ public class TestSmallFilesQuota {
   @Test
   public void testSetQuotaLate() throws Exception {
     final Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 5000);
     final MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     try {
       final FileSystem fs = cluster.getFileSystem();
       final DistributedFileSystem dfs = (DistributedFileSystem) fs;
+
+      dfs.setStoragePolicy(new Path("/"), "DB");
 
       Path testFolder = new Path("/test");
       dfs.mkdirs(testFolder);
@@ -1223,13 +1231,14 @@ public class TestSmallFilesQuota {
   @Test
   public void testSetQuotaOnNonExistingDirectory() throws Exception {
     final Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 5000);
     final MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     try {
       final FileSystem fs = cluster.getFileSystem();
       final DistributedFileSystem dfs = (DistributedFileSystem) fs;
+
+      dfs.setStoragePolicy(new Path("/"), "DB");
 
       Path testFolder = new Path("/test");
 
@@ -1246,7 +1255,6 @@ public class TestSmallFilesQuota {
   public void testDiskspaceCalculationForSmallFilesWhenMovedToBlocks() throws
       Exception{
     final Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY, true);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 1000);
     final int MAX_SMALL_FILE_SIZE = 64 * 1024;
     final int BLOCK_SIZE = 2 * MAX_SMALL_FILE_SIZE;
@@ -1261,6 +1269,7 @@ public class TestSmallFilesQuota {
     assertTrue("Not a HDFS: " + fs.getUri(),
         fs instanceof DistributedFileSystem);
     final DistributedFileSystem dfs = (DistributedFileSystem) fs;
+    dfs.setStoragePolicy(new Path("/"), "DB");
     DFSAdmin admin = new DFSAdmin(conf);
 
     try{
