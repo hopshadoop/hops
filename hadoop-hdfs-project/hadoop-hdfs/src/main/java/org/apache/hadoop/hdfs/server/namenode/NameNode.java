@@ -70,7 +70,6 @@ import org.apache.hadoop.util.ExitUtil.ExitException;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-import org.apache.log4j.LogManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -565,8 +564,8 @@ public class NameNode implements NameNodeStatusMXBean {
 
     final long updateThreshold = conf.getLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD,
             DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT);
-    final long  maxConcurrentBRs = conf.getLong( DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS,
-            DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS_DEFAULT);
+    final long  maxConcurrentBRs = conf.getLong( DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN,
+            DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN_DEFAULT);
     final long brMaxProcessingTime = conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME,
             DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME_DEFAULT);
      this.brTrackingService = new BRTrackingService(updateThreshold, maxConcurrentBRs,
@@ -1365,7 +1364,7 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   private void startMDCleanerService(){
-    mdCleaner.startMDCleanerMonitor(namesystem, leaderElection,stoTableCleanDelay);
+    mdCleaner.startMDCleanerMonitor(namesystem, leaderElection, stoTableCleanDelay);
   }
 
   private void stopMDCleanerService(){

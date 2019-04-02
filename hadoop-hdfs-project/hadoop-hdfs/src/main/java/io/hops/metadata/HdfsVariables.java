@@ -786,8 +786,8 @@ public class HdfsVariables {
     Variable.registerVariableDefaultValue(Variable.Finder.QuotaUpdateID,
         new IntVariable(0).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxConcurrentBRs,
-            new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS,
-                    DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS_DEFAULT)).getBytes());
+            new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN,
+                    DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN_DEFAULT)).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.CacheDirectiveID,
         new LongVariable(1).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.neededScanCount,

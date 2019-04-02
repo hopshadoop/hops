@@ -43,7 +43,7 @@ public class BRTrackingService {
                            final long BR_MAX_PROCESSING_TIME) {
     this.DB_VAR_UPDATE_THRESHOLD = DB_VAR_UPDATE_THRESHOLD;
     this.BR_MAX_PROCESSING_TIME = BR_MAX_PROCESSING_TIME;
-    this.cachedMaxConcurrentBRs = MAX_CONCURRENT_BRS;
+    this.cachedMaxConcurrentBRPerNN = MAX_CONCURRENT_BRS;
   }
 
   private int getRRIndex(final SortedActiveNodeList nnList) {
@@ -53,13 +53,10 @@ public class BRTrackingService {
     return (rrIndex++) % nnList.size();
   }
 
-  private boolean canProcessMoreBR() throws IOException {
+  private boolean canProcessMoreBR(final SortedActiveNodeList nnList,
+                                   List<ActiveBlockReport> retActiveBRs) throws IOException {
 
     List<ActiveBlockReport> allActiveBRs = getAllActiveBlockReports();
-
-    if (allActiveBRs.size() < getBrLbMaxConcurrentBRs()) {
-      return true;
-    }
 
     //remove dead operations from the table
     Iterator<ActiveBlockReport> itr = allActiveBRs.iterator();
@@ -73,26 +70,67 @@ public class BRTrackingService {
       }
     }
 
-    if (allActiveBRs.size() < getBrLbMaxConcurrentBRs()) {
+    retActiveBRs.addAll(allActiveBRs);
+    if (allActiveBRs.size() < getBrLbMaxConcurrentBRs(nnList)) {
       return true;
     } else {
       return false;
     }
   }
 
+  private ActiveNode getLeastLoadedNode(final SortedActiveNodeList nnList,
+                                        List<ActiveBlockReport> retActiveBRs) throws IOException {
+    class Tuple{
+      ActiveNode an;
+      Integer counter;
+      Tuple(ActiveNode an, Integer count){
+        this.an = an;
+        this.counter = count;
+      }
+    }
+
+    Map<String, Tuple> usage = new HashMap<>();
+    for (ActiveNode an : nnList.getActiveNodes()) {
+      usage.put(an.getHttpAddress(), new Tuple(an, new Integer(0)));
+    }
+
+    for(ActiveBlockReport abr : retActiveBRs) {
+      Tuple entry = usage.get(abr.getNnAddress());
+      entry.counter += 1;
+    }
+
+    ActiveNode leastLoaded = null;
+    int count = Integer.MAX_VALUE;
+
+    for (String key : usage.keySet()) {
+      Tuple tuple = usage.get(key);
+      if (tuple.counter < count) {
+        leastLoaded = tuple.an;
+        count = tuple.counter;
+      }
+    }
+
+    if (count >= cachedMaxConcurrentBRPerNN) {
+      return null;
+    } else {
+      return leastLoaded;
+    }
+
+  }
+
   private long lastChecked = 0;
-  private long cachedMaxConcurrentBRs = 0;
-  private long getBrLbMaxConcurrentBRs() throws IOException {
+  private long cachedMaxConcurrentBRPerNN = 0;
+  private long getBrLbMaxConcurrentBRs(final SortedActiveNodeList nnList) throws IOException {
     if ((System.currentTimeMillis() - lastChecked) > DB_VAR_UPDATE_THRESHOLD) {
       long value = HdfsVariables.getMaxConcurrentBrs();
-      if (value != cachedMaxConcurrentBRs) {
-        cachedMaxConcurrentBRs = value;
-        LOG.info("BRTrackingService param update. Processing " + cachedMaxConcurrentBRs + " " +
+      if (value != cachedMaxConcurrentBRPerNN) {
+        cachedMaxConcurrentBRPerNN = value;
+        LOG.info("BRTrackingService param update. Processing " + cachedMaxConcurrentBRPerNN + " " +
                 "concurrent block reports");
       }
       lastChecked = System.currentTimeMillis();
     }
-    return cachedMaxConcurrentBRs;
+    return cachedMaxConcurrentBRPerNN * nnList.size();
   }
 
   public synchronized ActiveNode assignWork(final SortedActiveNodeList nnList,
@@ -105,21 +143,23 @@ public class BRTrackingService {
           connector.beginTransaction();
           connector.writeLock();
         }
+
         try {
-          if (canProcessMoreBR()) {
-            int index = getRRIndex(nnList);
-            if (index >= 0 && index < nnList.size()) {
-              ActiveNode an = nnList.getSortedActiveNodes().get(index);
+          List<ActiveBlockReport> retActiveBRs = new ArrayList<>();
+          if (canProcessMoreBR(nnList, retActiveBRs)) {
+            ActiveNode an = getLeastLoadedNode(nnList, retActiveBRs);
+            if( an != null) {
               ActiveBlockReport abr = new ActiveBlockReport(dnAddress, an.getId(),
-                  System.currentTimeMillis(), noOfBlks);
+                      an.getHttpAddress(), System.currentTimeMillis(),
+                      noOfBlks);
               addActiveBlockReport(abr);
               LOG.info("Block report from " + dnAddress + " containing " + noOfBlks + " blocks "
-                  + "is assigned to NN [ID: " + an.getId() + ", IP: " + an.getRpcServerIpAddress() + "]");
+                      + "is assigned to NN [ID: " + an.getId() + ", IP: " + an.getRpcServerIpAddress() + "]");
               return an;
             }
           }
           String msg = "Work (" + noOfBlks + " blks) could not be assigned. " + "System is fully loaded now. At most "
-              + getBrLbMaxConcurrentBRs()
+              + getBrLbMaxConcurrentBRs(nnList)
               + " concurrent block reports can be processed.";
           LOG.info(msg);
           throw new BRLoadBalancingOverloadException(msg);
@@ -134,7 +174,7 @@ public class BRTrackingService {
 
 
   public synchronized void blockReportCompleted( String dnAddress) throws IOException {
-    ActiveBlockReport abr = new ActiveBlockReport(dnAddress, 0, 0, 0);
+    ActiveBlockReport abr = new ActiveBlockReport(dnAddress, 0, "", 0, 0);
     LOG.info("Block report from "+dnAddress+" has completed");
     removeActiveBlockReport(abr);
   }
