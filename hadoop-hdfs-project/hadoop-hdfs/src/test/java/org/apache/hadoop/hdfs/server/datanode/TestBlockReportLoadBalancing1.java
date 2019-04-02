@@ -52,12 +52,12 @@ public class TestBlockReportLoadBalancing1 {
   public void TestBRTrackingService_01() throws IOException, InterruptedException {
     final int NN_COUNT = 5;
     final long DFS_BR_LB_MAX_BR_PROCESSING_TIME = 5 * 1000;
-    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS = NN_COUNT;
+    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN = NN_COUNT;
     final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD = 1000;
 
 
     Configuration conf = new Configuration();
-    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS);
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD);
     HdfsStorageFactory.resetDALInitialized();
@@ -66,17 +66,18 @@ public class TestBlockReportLoadBalancing1 {
 
     List<ActiveNode> list = new ArrayList<>();
     for (int i = 0; i < NN_COUNT; i++) {
-      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000", "", 0);
+      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i,
+              "0.0.0."+i+":10000" /*httpAddress*/, "0.0.0.0", 0);
       list.add(anode);
     }
 
     SortedActiveNodeListPBImpl nnList = new SortedActiveNodeListPBImpl(list);
     BRTrackingService service = new BRTrackingService(DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD,
-            DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
+            DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
 
     String dnAddress = "";
     ActiveNode an = null;
-    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS; i++) {
+    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * NN_COUNT; i++) {
       dnAddress = "0.0.0.0:" + i;
       an = assignWork(nnList, service, dnAddress, 10000);
       assertTrue("Unable to assign work", an != null);
@@ -93,7 +94,7 @@ public class TestBlockReportLoadBalancing1 {
     Thread.sleep(DFS_BR_LB_MAX_BR_PROCESSING_TIME);
 
 
-    for (int i = 0; i < NN_COUNT; i++) {
+    for (int i = 0; i < NN_COUNT * DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN; i++) {
       dnAddress = "0.0.0.0:" + i;
       an = assignWork(nnList, service, dnAddress, 10000);
       assertTrue("Unable to assign work", an != null);
@@ -112,12 +113,12 @@ public class TestBlockReportLoadBalancing1 {
   public void TestBRTrackingService_02() throws IOException, InterruptedException {
     final int NN_COUNT = 5;
     final long DFS_BR_LB_MAX_BR_PROCESSING_TIME = 5 * 1000;
-    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS = NN_COUNT;
+    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN = NN_COUNT;
     final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD = 1000;
 
 
     Configuration conf = new Configuration();
-    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS);
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD);
     HdfsStorageFactory.resetDALInitialized();
@@ -126,22 +127,22 @@ public class TestBlockReportLoadBalancing1 {
 
     List<ActiveNode> list = new ArrayList<>();
     for (int i = 0; i < NN_COUNT; i++) {
-      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000", "", 0);
+      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0."+i+":10000"
+              , "", 0);
       list.add(anode);
     }
 
     SortedActiveNodeListPBImpl nnList = new SortedActiveNodeListPBImpl(list);
     BRTrackingService service = new BRTrackingService(DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD,
-            DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
+            DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
 
     ActiveNode an = null;
     String dnAddress = "";
-    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS; i++) {
+    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * NN_COUNT; i++) {
       dnAddress = "0.0.0.0:" + i;
       an = assignWork(nnList, service, dnAddress, 10000);
       assertTrue("Unable to assign work", an != null);
     }
-
 
     // more work assignment should fail
     an = assignWork(nnList, service, dnAddress, 10000);
@@ -157,7 +158,7 @@ public class TestBlockReportLoadBalancing1 {
     list.remove(0);
     nnList = new SortedActiveNodeListPBImpl(list);
 
-    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS; i++) {
+    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * (nnList.size()); i++) {
       dnAddress = "0.0.0.0:" + i;
       an = assignWork(nnList, service, dnAddress, 10000);
       assertTrue("Unable to assign work", an != null);
@@ -172,12 +173,12 @@ public class TestBlockReportLoadBalancing1 {
 
     // add more namenodes
     for (int i = NN_COUNT; i < 2 * NN_COUNT; i++) {
-      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000", "", 0);
+      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0."+i+":10000", "", 0);
       list.add(anode);
     }
     nnList = new SortedActiveNodeListPBImpl(list);
 
-    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS; i++) {
+    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * nnList.size(); i++) {
       dnAddress = "0.0.0.0:" + i;
       an = assignWork(nnList, service, dnAddress, 10000);
       assertTrue("Unable to assign work", an != null);
@@ -193,12 +194,12 @@ public class TestBlockReportLoadBalancing1 {
   public void TestCommandLine() throws IOException, InterruptedException {
     final int NN_COUNT = 5;
     final long DFS_BR_LB_MAX_BR_PROCESSING_TIME = 5 * 1000;
-    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS = NN_COUNT;
+    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN = NN_COUNT;
     final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD = 1000;
 
 
     Configuration conf = new Configuration();
-    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS);
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD);
     HdfsStorageFactory.resetDALInitialized();
@@ -208,18 +209,19 @@ public class TestBlockReportLoadBalancing1 {
 
     List<ActiveNode> list = new ArrayList<>();
     for (int i = 0; i < NN_COUNT; i++) {
-      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0.0:10000", "", 0);
+      ActiveNodePBImpl anode = new ActiveNodePBImpl(i, "host", "localhost", i, "0.0.0."+i+":10000"
+              , "", 0);
       list.add(anode);
     }
 
     SortedActiveNodeListPBImpl nnList = new SortedActiveNodeListPBImpl(list);
     BRTrackingService service = new BRTrackingService(DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD,
-            DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
+            DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
 
 
     ActiveNode an = null;
     String dnAddress = "";
-    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS; i++) {
+    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * nnList.size(); i++) {
       dnAddress = "0.0.0.0:" + i;
       an = assignWork(nnList, service, dnAddress, 10000);
       assertTrue("Unable to assign work", an != null);
@@ -234,7 +236,7 @@ public class TestBlockReportLoadBalancing1 {
 
     LOG.info("Chainging the number of concurrent block reports");
 
-    String[] argv = {"-concurrentBlkReports", DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS * 2 + ""};
+    String[] argv = {"-concurrentBlkReports", DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * 2 + ""};
     try {
       NameNode.createNameNode(argv, conf);
     } catch (ExitUtil.ExitException e) {
@@ -244,7 +246,7 @@ public class TestBlockReportLoadBalancing1 {
     // sleep. All history will be cleared after that and more work can be  assigned
     Thread.sleep(Math.max(DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD));
 
-    for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS * 2; i++) {
+    for (int i = 0; i < (DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * 2)*nnList.size(); i++) {
       dnAddress = "0.0.0.0:" + i;
       an = assignWork(nnList, service, dnAddress, 10000);
       assertTrue("Unable to assign work", an != null);
@@ -260,12 +262,12 @@ public class TestBlockReportLoadBalancing1 {
     int NN_COUNT = 5;
     int DN_COUNT = 10;
     final long DFS_BR_LB_MAX_BR_PROCESSING_TIME = 5 * 1000;
-    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS = NN_COUNT;
+    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN = NN_COUNT;
     final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD = 1000;
 
 
     Configuration conf = new Configuration();
-    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS);
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD);
 
@@ -285,13 +287,14 @@ public class TestBlockReportLoadBalancing1 {
       }
 
       ActiveNode an = null;
-      for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS; i++) {
+      for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * NN_COUNT; i++) {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
                 cluster.getDataNodes().get(i).getAllBpOs()[0].bpRegistration);
         LOG.info("Assigned work for datanode " + cluster.getDataNodes().get(i).getAllBpOs()[0]
                 .bpRegistration.getXferAddr());
         assertTrue("Unable to assign work", an != null);
       }
+
       // more work assignment should fail
       try {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
@@ -301,7 +304,7 @@ public class TestBlockReportLoadBalancing1 {
       } catch (BRLoadBalancingNonLeaderException e) {
       }
 
-      String[] argv = {"-concurrentBlkReports", DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS * 2 + ""};
+      String[] argv = {"-concurrentBlkReports", DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * 2 + ""};
       try {
         NameNode.createNameNode(argv, conf);
       } catch (ExitUtil.ExitException e) {
@@ -311,7 +314,7 @@ public class TestBlockReportLoadBalancing1 {
       // sleep. All history will be cleared after that and more work can be  assigned
       Thread.sleep(Math.max(DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD));
 
-      for (int i = 0; i < 2 * DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS; i++) {
+      for (int i = 0; i < (2 * DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN)*NN_COUNT; i++) {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(10000,
                 cluster.getDataNodes().get(i).getAllBpOs()[0].bpRegistration);
         assertTrue("Unable to assign work", an != null);
@@ -324,7 +327,7 @@ public class TestBlockReportLoadBalancing1 {
       // sleep. All history will be cleared after that and more work can be  assigned
       Thread.sleep(DFS_BR_LB_MAX_BR_PROCESSING_TIME);
 
-      for (int i = 0; i < 2 * DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS; i++) {
+      for (int i = 0; i < (2 * DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN)*(NN_COUNT-2); i++) {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
                 cluster.getDataNodes().get(i).getAllBpOs()[0].bpRegistration);
         assertTrue("Unable to assign work", an != null);
@@ -362,12 +365,12 @@ public class TestBlockReportLoadBalancing1 {
     int NN_COUNT = 2;
     int DN_COUNT = 1;
     final long DFS_BR_LB_MAX_BR_PROCESSING_TIME = 5 * 1000;
-    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS = NN_COUNT;
+    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN = NN_COUNT;
     final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD = 1000;
 
 
     Configuration conf = new Configuration();
-    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS);
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD);
 

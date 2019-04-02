@@ -254,9 +254,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.erasure_coding.deletion_limit";
   public static final int DEFAULT_DELETION_LIMIT = 100;
 
-  public static final String DFS_BR_LB_MAX_CONCURRENT_BRS =
-          "dfs.block.report.load.balancer.max.concurrent.block.reports";
-  public static final long DFS_BR_LB_MAX_CONCURRENT_BRS_DEFAULT = 5;
+  public static final String DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN =
+          "dfs.block.report.load.balancer.max.concurrent.block.reports.per.nn";
+  public static final long DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN_DEFAULT = 5;
 
   //read the new value from the data base after every minute
   public static final String DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD =
