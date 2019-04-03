@@ -1384,7 +1384,7 @@ public class TestFsck {
       ExtendedBlock eb = util.getFirstBlock(dfs, path);
       DatanodeDescriptor dn = getDatanode(eb, cluster);
       cluster.getNameNode().getNamesystem().getBlockManager()
-          .getDatanodeManager().startDecommission(dn);
+          .getDatanodeManager().getDecomManager().startDecommission(dn);
       String dnName = dn.getXferAddr();
 
       //wait for decommission start

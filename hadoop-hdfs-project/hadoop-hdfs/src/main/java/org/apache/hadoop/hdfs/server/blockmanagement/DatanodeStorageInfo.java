@@ -195,7 +195,7 @@ public class DatanodeStorageInfo {
   /**
    * Iterates over the list of blocks belonging to the Storage.
    */
-  public Iterator<BlockInfoContiguous> getBlockIterator() throws IOException {
+  public Iterator<BlockInfoContiguous> getBlockIterator() {
     return new BlockIterator();
   }
       

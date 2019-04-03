@@ -126,7 +126,7 @@ public class HdfsConfiguration extends Configuration {
       new DeprecationDelta("io.bytes.per.checksum",
         DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY),
       new DeprecationDelta("dfs.client.file-block-storage-locations.timeout",
-        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS)
+        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS),
     });
   }
 
