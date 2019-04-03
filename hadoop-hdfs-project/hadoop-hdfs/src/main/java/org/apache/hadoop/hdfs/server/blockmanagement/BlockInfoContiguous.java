@@ -503,6 +503,10 @@ public class BlockInfoContiguous extends Block {
     return datanodes.toArray(locations);
   }
   
+  public DatanodeDescriptor getDatanode(DatanodeManager datanodeMgr, int i) throws StorageException, TransactionContextException{
+    return getDatanodes(datanodeMgr, getReplicasNoCheck())[i];
+  }
+  
   protected void update(Replica replica)
       throws TransactionContextException, StorageException {
     EntityManager.update(replica);

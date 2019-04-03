@@ -587,7 +587,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
     private int index = 0;
     private final List<Iterator<BlockInfoContiguous>> iterators;
     
-    private BlockIterator(final DatanodeStorageInfo... storages) throws IOException {
+    private BlockIterator(final DatanodeStorageInfo... storages) {
       List<Iterator<BlockInfoContiguous>> iterators = new ArrayList<Iterator<BlockInfoContiguous>>();
       for (DatanodeStorageInfo e : storages) {
         iterators.add(e.getBlockIterator());
@@ -619,7 +619,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
     }
   }
 
-  Iterator<BlockInfoContiguous> getBlockIterator() throws IOException {
+  Iterator<BlockInfoContiguous> getBlockIterator() {
     return new BlockIterator(getStorageInfos());
   }
   Iterator<BlockInfoContiguous> getBlockIterator(final String storageID) throws IOException {

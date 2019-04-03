@@ -29,6 +29,8 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
+import java.util.concurrent.ExecutionException;
+
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -46,7 +48,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
-import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -339,9 +340,8 @@ public class BlockManagerTestUtil {
    * Have DatanodeManager check decommission state.
    * @param dm the DatanodeManager to manipulate
    */
-  public static void checkDecommissionState(DatanodeManager dm,
-      DatanodeDescriptor node) throws IOException {
-    dm.checkDecommissionState(node);
+  public static void recheckDecommissionState(DatanodeManager dm)
+      throws ExecutionException, InterruptedException {
+    dm.getDecomManager().runMonitor();
   }
-
 }
