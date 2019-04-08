@@ -1711,7 +1711,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean shouldCopyOnTruncate = shouldCopyOnTruncate(file, oldBlock);
     if(newBlock == null) {
       newBlock = (shouldCopyOnTruncate) ? createNewBlock(file) :
-          new Block(oldBlock.getBlockId(), oldBlock.getNumBytes(), file.getGenerationStamp()+1);
+          new Block(oldBlock.getBlockId(), oldBlock.getNumBytes(), file.nextGenerationStamp());
     }
 
     BlockInfoContiguousUnderConstruction truncatedBlockUC;
@@ -1744,7 +1744,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       NameNode.stateChangeLog.debug("BLOCK* prepareFileForTruncate: "
           + "Scheduling in-place block truncate to new size "
           + truncatedBlockUC.getTruncateBlock().getNumBytes()
-          + " block=" + truncatedBlockUC);
+          + " block=" + truncatedBlockUC + " recoveryID= " + newBlock.getGenerationStamp());
     }
     if (shouldRecoverNow) {
       truncatedBlockUC.initializeBlockRecovery(newBlock.getGenerationStamp(), getBlockManager().getDatanodeManager());
@@ -3818,7 +3818,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 .add(lf.getLeaseLock(LockType.WRITE))
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                 .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
-                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE));
+                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE, BLK.IV));
+        if (isErasureCodingEnabled()) {
+          locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE, inodeIdentifier.getInodeId()));
+        }
       }
 
       @Override
