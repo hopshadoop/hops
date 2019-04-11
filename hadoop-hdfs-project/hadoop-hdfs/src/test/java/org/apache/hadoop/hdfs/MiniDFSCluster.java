@@ -780,7 +780,7 @@ public class MiniDFSCluster {
         "127.0.0.1:" + nnConf.getHttpPort());
     nameNodeConf
         .set(DFS_NAMENODE_RPC_ADDRESS_KEY, "127.0.0.1:" + nnConf.getIpcPort());
-    nameNodeConf.set(DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, "localhost:0");
+    nameNodeConf.set(DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, "127.0.0.1:0");
 
     // Format and clean out DataNode directories
     if (format) {

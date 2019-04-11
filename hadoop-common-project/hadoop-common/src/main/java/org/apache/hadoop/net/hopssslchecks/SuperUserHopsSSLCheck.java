@@ -46,7 +46,7 @@ public class SuperUserHopsSSLCheck extends AbstractHopsSSLCheck {
   
     String username = ugi.getUserName();
     if (proxySuperUsers.contains(username)) {
-      String hostname = NetUtils.getLocalHostname();
+      String hostname = NetUtils.getLocalCanonicalHostname();
       try {
         isConfigurationNeededForSuperUser(username, hostname, configuration);
       } catch (SSLMaterialAlreadyConfiguredException ex) {
