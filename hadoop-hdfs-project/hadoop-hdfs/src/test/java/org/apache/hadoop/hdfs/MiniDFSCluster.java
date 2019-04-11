@@ -605,7 +605,12 @@ public class MiniDFSCluster {
       conf.setInt(DFS_REPLICATION_KEY, Math.min(replication, numDataNodes));
       int safemodeExtension = conf.getInt(DFS_NAMENODE_SAFEMODE_EXTENSION_TESTING_KEY, 0);
       conf.setInt(DFS_NAMENODE_SAFEMODE_EXTENSION_KEY, safemodeExtension);
-      conf.setInt(DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY, 3); // 3 second
+      int decommissionInterval = conf.getInt(
+          DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY, DFS_NAMENODE_DECOMMISSION_INTERVAL_DEFAULT);
+      if (decommissionInterval == DFS_NAMENODE_DECOMMISSION_INTERVAL_DEFAULT) {
+        decommissionInterval = 3;
+      }
+      conf.setInt(DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY, decommissionInterval);
       conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
           StaticMapping.class, DNSToSwitchMapping.class);
       if (conf.get(DFSConfigKeys.ENCODING_MANAGER_CLASSNAME_KEY) == null) {
