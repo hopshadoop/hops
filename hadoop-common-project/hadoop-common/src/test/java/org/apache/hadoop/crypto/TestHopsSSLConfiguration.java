@@ -87,7 +87,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     
     @Test
     public void testExistingConfIsPreserved() throws Exception {
-        String hostname = NetUtils.getLocalHostname();
+        String hostname = NetUtils.getLocalCanonicalHostname();
         String kstore = "someDir/" + hostname + "__kstore.jks";
         String kstorePass = "somePassword";
         String keyPass = "anotherPassword";
@@ -203,7 +203,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
         touchFile(tstore);
         touchFile(passwdFile.toString());
         FileUtils.writeStringToFile(passwdFile.toFile(), password, false);
-        String hostname = NetUtils.getLocalHostname();
+        String hostname = NetUtils.getLocalCanonicalHostname();
         String hKstore = Paths.get(tmp, hostname + "__kstore.jks")
             .toString();
         String hTstore = Paths.get(tmp, hostname + "__tstore.jks")
@@ -277,7 +277,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     
     @Test
     public void testWithNoConfigSuperuser() throws Exception {
-        String hostname = NetUtils.getLocalHostname();
+        String hostname = NetUtils.getLocalCanonicalHostname();
         String kstore = "/tmp/" + hostname + "__kstore.jks";
         touchFile(kstore);
         String pass = "adminpw";
@@ -372,7 +372,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     
     @Test
     public void testNoConfigHostCertificates() throws Exception {
-        String hostname = NetUtils.getLocalHostname();
+        String hostname = NetUtils.getLocalCanonicalHostname();
         String kstore = "/tmp/" + hostname + "__kstore.jks";
         String tstore = "/tmp/" + hostname + "__tstore.jks";
 
@@ -416,7 +416,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     
     @Test
     public void testHostCertificateWithSuperuser() throws Exception {
-        String hostname = NetUtils.getLocalHostname();
+        String hostname = NetUtils.getLocalCanonicalHostname();
         String kstore = "/tmp/" + hostname + "__kstore.jks";
         String tstore = "/tmp/" + hostname + "__tstore.jks";
         String pass = "anotherPassphrase";

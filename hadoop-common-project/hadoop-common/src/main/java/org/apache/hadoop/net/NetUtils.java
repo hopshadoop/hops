@@ -677,13 +677,13 @@ public class NetUtils {
   }
 
   /**
-   * Return the hostname of the local host as a string
+   * Return the FQDN of the local host as a string
    * @return hostname
    * @throws UnknownHostException
    */
-  public static String getLocalHostname() {
+  public static String getLocalCanonicalHostname() {
     try {
-      return InetAddress.getLocalHost().getHostName();
+      return InetAddress.getLocalHost().getCanonicalHostName();
     } catch (UnknownHostException ex) {
       return "localhost";
     }

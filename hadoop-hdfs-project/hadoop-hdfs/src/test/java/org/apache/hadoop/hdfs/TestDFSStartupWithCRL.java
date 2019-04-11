@@ -103,7 +103,7 @@ public class TestDFSStartupWithCRL {
   
   @Test(timeout = 20000)
   public void testDFSStartup() throws Exception {
-    String hostname = NetUtils.getLocalHostname();
+    String hostname = NetUtils.getLocalCanonicalHostname();
     Path keyStore = Paths.get(BASE_DIR, hostname + "__kstore.jks");
     Path trustStore = Paths.get(BASE_DIR, hostname + "__tstore.jks");
     Path sslServerConfPath = Paths.get(confDir, TestDFSStartupWithCRL.class.getSimpleName() + ".ssl-server.xml");
