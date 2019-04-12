@@ -20,7 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
+import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.security.GroupAlreadyExistsException;
 import io.hops.security.UserAlreadyExistsException;
@@ -484,7 +484,7 @@ public class FSDirAttrOp {
       inode.setGroup(groupname);
       inode.setGroupID(UsersGroups.getGroupID(groupname));
     }
-    inode.logMetadataEvent(MetadataLogEntry.Operation.UPDATE);
+    inode.logMetadataEvent(INodeMetadataLogEntry.Operation.Update);
   }
 
   static boolean setTimes(

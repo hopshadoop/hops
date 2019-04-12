@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
@@ -43,6 +44,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
@@ -110,6 +112,7 @@ public class TestRetryCacheWithHA {
   public void setup() throws Exception {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BlockSize);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY, true);
     conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, /*default 10*/ 0);
     conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY,"1000,2");
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_LIST_CACHE_DIRECTIVES_NUM_RESPONSES, ResponseSize);
@@ -421,7 +424,7 @@ public class TestRetryCacheWithHA {
     if (cacheSets.get(0).size() < cacheSets.get(1).size()) {
       usedNN = 1;
     }
-    assertEquals(19, cacheSets.get(usedNN).size() + cacheSets.get(1-  usedNN).size());
+    assertEquals(21, cacheSets.get(usedNN).size() + cacheSets.get(1-  usedNN).size());
     
     Map<CacheEntry, CacheEntry> oldEntries = new HashMap<CacheEntry, CacheEntry>();
     Iterator<CacheEntry> iter = cacheSets.get(usedNN).iterator();
@@ -440,7 +443,7 @@ public class TestRetryCacheWithHA {
 
     // 3. check the retry cache on the new active NN
     fillCacheFromDB(oldEntries, fsns.get(1 - usedNN));
-    assertEquals(19, cacheSets.get(1 - usedNN).size());
+    assertEquals(21, cacheSets.get(1 - usedNN).size());
     iter = cacheSets.get(1 - usedNN).iterator();
     
     while (iter.hasNext()) {
@@ -554,4 +557,47 @@ public class TestRetryCacheWithHA {
     }
     assertTrue("All pools must be found", tmpNames.isEmpty());
   }
+  
+  /** setXAttr */
+  class SetXAttrOp extends AtMostOnceOp {
+    private final String src;
+    
+    SetXAttrOp(DFSClient client, String src) {
+      super("setXAttr", client);
+      this.src = src;
+    }
+    
+    @Override
+    void prepare() throws Exception {
+      Path p = new Path(src);
+      if (!dfs.exists(p)) {
+        DFSTestUtil.createFile(dfs, p, BlockSize, DataNodes, 0);
+      }
+    }
+    
+    @Override
+    void invoke() throws Exception {
+      client.setXAttr(src, "user.key", "value".getBytes(),
+          EnumSet.of(XAttrSetFlag.CREATE));
+    }
+    
+    @Override
+    boolean checkNamenodeBeforeReturn() throws Exception {
+      for (int i = 0; i < CHECKTIMES; i++) {
+        Map<String, byte[]> iter = dfs.getXAttrs(new Path(src));
+        Set<String> keySet = iter.keySet();
+        if (keySet.contains("user.key")) {
+          return true;
+        }
+        Thread.sleep(1000);
+      }
+      return false;
+    }
+    
+    @Override
+    Object getResult() {
+      return null;
+    }
+  }
+  
 }

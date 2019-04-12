@@ -16,6 +16,7 @@
 package io.hops.transaction.lock;
 
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
@@ -191,7 +192,18 @@ public abstract class BaseINodeLock extends Lock {
     List<INode> list = resolvedINodesMap.getPathINodes(path);
     return list.get(list.size() - 1);
   }
-
+  
+  List<INode> getTargetINodes() {
+    List<INode> targetInodes =
+        Lists.newArrayListWithExpectedSize(resolvedINodesMap.pathToPathINodes.size());
+    for(String path : resolvedINodesMap.pathToPathINodes.keySet()) {
+      List<INode> list = resolvedINodesMap.getPathINodes(path);
+      targetInodes.add(list.get(list.size() - 1));
+    }
+    targetInodes.addAll(resolvedINodesMap.individualInodes);
+    return targetInodes;
+  }
+  
   List<INode> getChildINodes(String path) {
     return resolvedINodesMap.getChildINodes(path);
   }

@@ -37,6 +37,8 @@ import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.fs.XAttr;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.permission.AclEntryType;
@@ -146,6 +148,10 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageReportProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageTypesProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageUuidsProto;
+import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.GetXAttrsResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.XAttrProto;
+import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.XAttrProto.XAttrNamespaceProto;
+import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.XAttrSetFlagProto;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
@@ -222,6 +228,8 @@ public class PBHelper {
       AclEntryType.values();
   private static final FsAction[] FSACTION_VALUES =
       FsAction.values();
+  private static final XAttr.NameSpace[] XATTR_NAMESPACE_VALUES =
+      XAttr.NameSpace.values();
 
   private PBHelper() {
     /** Hidden constructor */
@@ -1981,6 +1989,14 @@ public class PBHelper {
   private static AclEntryType convert(AclEntryTypeProto v) {
     return castEnum(v, ACL_ENTRY_TYPE_VALUES);
   }
+  
+  private static XAttrNamespaceProto convert(XAttr.NameSpace v) {
+    return XAttrNamespaceProto.valueOf(v.ordinal());
+  }
+  
+  private static XAttr.NameSpace convert(XAttrNamespaceProto v) {
+    return castEnum(v, XATTR_NAMESPACE_VALUES);
+  }
 
   public static List<AclEntryProto> convertAclEntryProto(
       List<AclEntry> aclSpec) {
@@ -2034,6 +2050,108 @@ public class PBHelper {
     }
     AclStatusProto r = builder.build();
     return GetAclStatusResponseProto.newBuilder().setResult(r).build();
+  }
+  
+  public static XAttrProto convertXAttrProto(XAttr a) {
+    XAttrProto.Builder builder = XAttrProto.newBuilder();
+    builder.setNamespace(convert(a.getNameSpace()));
+    if (a.getName() != null) {
+      builder.setName(a.getName());
+    }
+    if (a.getValue() != null) {
+      builder.setValue(getByteString(a.getValue()));
+    }
+    return builder.build();
+  }
+  
+  public static List<XAttrProto> convertXAttrProto(
+      List<XAttr> xAttrSpec) {
+    ArrayList<XAttrProto> xAttrs = Lists.newArrayListWithCapacity(
+        xAttrSpec.size());
+    for (XAttr a : xAttrSpec) {
+      XAttrProto.Builder builder = XAttrProto.newBuilder();
+      builder.setNamespace(convert(a.getNameSpace()));
+      if (a.getName() != null) {
+        builder.setName(a.getName());
+      }
+      if (a.getValue() != null) {
+        builder.setValue(getByteString(a.getValue()));
+      }
+      xAttrs.add(builder.build());
+    }
+    return xAttrs;
+  }
+  
+  /**
+   * The flag field in PB is a bitmask whose values are the same a the
+   * emum values of XAttrSetFlag
+   */
+  public static int convert(EnumSet<XAttrSetFlag> flag) {
+    int value = 0;
+    if (flag.contains(XAttrSetFlag.CREATE)) {
+      value |= XAttrSetFlagProto.XATTR_CREATE.getNumber();
+    }
+    if (flag.contains(XAttrSetFlag.REPLACE)) {
+      value |= XAttrSetFlagProto.XATTR_REPLACE.getNumber();
+    }
+    return value;
+  }
+ 
+  public static EnumSet<XAttrSetFlag> convert(int flag) {
+    EnumSet<XAttrSetFlag> result =
+        EnumSet.noneOf(XAttrSetFlag.class);
+    if ((flag & XAttrSetFlagProto.XATTR_CREATE_VALUE) ==
+        XAttrSetFlagProto.XATTR_CREATE_VALUE) {
+      result.add(XAttrSetFlag.CREATE);
+    }
+    if ((flag & XAttrSetFlagProto.XATTR_REPLACE_VALUE) ==
+        XAttrSetFlagProto.XATTR_REPLACE_VALUE) {
+      result.add(XAttrSetFlag.REPLACE);
+    }
+    return result;
+  }
+  
+  public static XAttr convertXAttr(XAttrProto a) {
+    XAttr.Builder builder = new XAttr.Builder();
+    builder.setNameSpace(convert(a.getNamespace()));
+    if (a.hasName()) {
+      builder.setName(a.getName());
+    }
+    if (a.hasValue()) {
+      builder.setValue(a.getValue().toByteArray());
+    }
+    return builder.build();
+  }
+  
+  public static List<XAttr> convertXAttrs(List<XAttrProto> xAttrSpec) {
+    ArrayList<XAttr> xAttrs = Lists.newArrayListWithCapacity(xAttrSpec.size());
+    for (XAttrProto a : xAttrSpec) {
+      XAttr.Builder builder = new XAttr.Builder();
+      builder.setNameSpace(convert(a.getNamespace()));
+      if (a.hasName()) {
+        builder.setName(a.getName());
+      }
+      if (a.hasValue()) {
+        builder.setValue(a.getValue().toByteArray());
+      }
+      xAttrs.add(builder.build());
+    }
+    return xAttrs;
+  }
+  
+  public static List<XAttr> convert(GetXAttrsResponseProto a) {
+    List<XAttrProto> xAttrs = a.getXAttrsList();
+    return convertXAttrs(xAttrs);
+  }
+
+  public static GetXAttrsResponseProto convertXAttrsResponse(
+      List<XAttr> xAttrs) {
+    GetXAttrsResponseProto.Builder builder = GetXAttrsResponseProto
+        .newBuilder();
+    if (xAttrs != null) {
+      builder.addAllXAttrs(convertXAttrProto(xAttrs));
+    }
+    return builder.build();
   }
 
    public static ShortCircuitShmSlotProto convert(SlotId slotId) {

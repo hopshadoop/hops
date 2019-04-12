@@ -31,6 +31,7 @@ import "Security.proto";
 import "hdfs.proto";
 
 import "acl.proto";
+import "xattr.proto";
 
 import "ActiveNode.proto";
 /**
@@ -884,7 +885,9 @@ service ClientNamenodeProtocol {
   rpc removeAcl(RemoveAclRequestProto) returns(RemoveAclResponseProto);
   rpc setAcl(SetAclRequestProto) returns(SetAclResponseProto);
   rpc getAclStatus(GetAclStatusRequestProto) returns(GetAclStatusResponseProto);
-
+  rpc setXAttr(SetXAttrRequestProto) returns(SetXAttrResponseProto);
+  rpc getXAttrs(GetXAttrsRequestProto) returns(GetXAttrsResponseProto);
+  rpc removeXAttr(RemoveXAttrRequestProto) returns(RemoveXAttrResponseProto);
   rpc getActiveNamenodesForClient (ActiveNamenodeListRequestProto) returns (ActiveNamenodeListResponseProto);
   rpc ping (PingRequestProto) returns (PingResponseProto);
   rpc getEncodingStatus (GetEncodingStatusRequestProto) returns (GetEncodingStatusResponseProto);

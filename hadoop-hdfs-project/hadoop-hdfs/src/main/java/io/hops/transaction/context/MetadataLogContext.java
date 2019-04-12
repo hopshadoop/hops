@@ -79,9 +79,7 @@ public class MetadataLogContext
           "MetadataLogEntry");
     }
     super.add(logEntry);
-    log("metadata-log-added","baseDirId", logEntry.getDatasetId(), "inodeId",
-        logEntry.getInodeId(),"name", logEntry.getInodeName(), "pid",
-        logEntry.getInodeParentId(), "Operation", logEntry.getOperation());
+    log("metadata-log-added","logEntry", logEntry);
   }
 
   @Override

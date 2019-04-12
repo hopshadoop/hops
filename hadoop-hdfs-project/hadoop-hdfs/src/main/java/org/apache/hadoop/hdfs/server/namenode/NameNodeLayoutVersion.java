@@ -67,7 +67,8 @@ public class NameNodeLayoutVersion {
     BLOCK_STORAGE_POLICY(-50, "Block Storage policy"),
     TRUNCATE(-51, "Truncate"),
     APPEND_NEW_BLOCK(-52, "Support appending to new block"),
-    QUOTA_BY_STORAGE_TYPE(-53, "Support quota for specific storage types");
+    QUOTA_BY_STORAGE_TYPE(-53, "Support quota for specific storage types"),
+    XATTRS(-54, "Extended attributes");
     
     private final FeatureInfo info;
 

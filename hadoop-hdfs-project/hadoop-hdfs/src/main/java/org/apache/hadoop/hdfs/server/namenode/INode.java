@@ -25,7 +25,7 @@ import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
+import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
@@ -129,6 +129,8 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   public final static long ROOT_PARENT_ID = 0;
   public final static long ROOT_INODE_ID = 1;
   
+  private byte numXAttrs;
+  
   /**
    * To check if the request id is the same as saved id. Don't check fileId
    * with GRANDFATHER_INODE_ID for backward compatibility.
@@ -208,6 +210,22 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   public void removeAclFeature() throws TransactionContextException, StorageException {
     INodeAclHelper.removeAclFeature(this);
   }
+  
+  /**
+   * @return XAttrFeature
+   */
+  abstract XAttrFeature getXAttrFeature();
+  
+  /**
+   * Set <code>XAttrFeature</code>
+   */
+  abstract void addXAttrFeature(XAttrFeature xAttrFeature);
+  
+  
+  /**
+   * Remove <code>XAttrFeature</code>
+   */
+  abstract void removeXAttrFeature();
   
   /**
    * Check whether this is the root inode.
@@ -619,7 +637,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   }
 
 
-  boolean removeNode() throws StorageException, TransactionContextException {
+  boolean removeNode() throws IOException {
     if (parent == null) {
       return false;
     } else {
@@ -761,12 +779,12 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     EntityManager.update(node);
   }
 
-  protected void remove() throws StorageException, TransactionContextException {
+  protected void remove() throws IOException {
     remove(this);
   }
 
   protected void remove(INode node)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     EntityManager.remove(node);
     //if This inode is of type INodeDirectoryWithQuota then also delete the INode Attribute table
     if ((node instanceof INodeDirectory) && ((INodeDirectory) node).isWithQuota()) {
@@ -776,6 +794,14 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     }
     
     cleanParity(node);
+    
+    if(node.getNumXAttrs() > 0){
+      
+      if(node.getXAttrFeature() != null) {
+        node.getXAttrFeature().remove(node.getNumXAttrs());
+        node.removeXAttrFeature();
+      }
+    }
   }
 
   private void cleanParity(INode node)
@@ -820,7 +846,8 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     setSubtreeLocked(false);
   }
 
-  public abstract void logMetadataEvent(MetadataLogEntry.Operation operation)
+  public abstract void logMetadataEvent(
+      INodeMetadataLogEntry.Operation operation)
       throws StorageException, TransactionContextException;
 
   boolean isPathMetaEnabled() throws TransactionContextException, StorageException {
@@ -1034,5 +1061,25 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    * and {@link DirectoryWithQuotaFeature}.
    */
   public interface Feature {
+  }
+  
+  public byte getNumXAttrs() {
+    return numXAttrs;
+  }
+  
+  public void incrementXAttrs()
+      throws TransactionContextException, StorageException {
+    this.numXAttrs++;
+    save();
+  }
+  
+  public void decrementXAttrs()
+      throws TransactionContextException, StorageException {
+    this.numXAttrs--;
+    save();
+  }
+  
+  public void setNumXAttrsNoPersistence(byte numXAttrs) {
+    this.numXAttrs = numXAttrs;
   }
 }

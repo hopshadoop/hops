@@ -20,7 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
+import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
 import io.hops.security.GroupNotFoundException;
 import io.hops.security.UserNotFoundException;
 import io.hops.security.UsersGroups;
@@ -303,7 +303,7 @@ public abstract class INodeWithAdditionalFields extends INode {
   
   private int logicalTime;
   
-  public void logMetadataEvent(MetadataLogEntry.Operation operation)
+  public void logMetadataEvent(INodeMetadataLogEntry.Operation operation)
       throws StorageException, TransactionContextException {
     if(isUnderConstruction()){
       return;
@@ -314,7 +314,7 @@ public abstract class INodeWithAdditionalFields extends INode {
             "wasn't commited to the database");
       }
       INodeDirectory datasetDir = getMetaEnabledParent();
-      EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(),
+      EntityManager.add(new INodeMetadataLogEntry(datasetDir.getId(), getId(),
           getPartitionId(), getParentId(), getLocalName(), incrementLogicalTime(),
           operation));
       save();
@@ -371,7 +371,27 @@ public abstract class INodeWithAdditionalFields extends INode {
   public void setAccessTimeNoPersistance(long atime) {
     accessTime = atime;
   }
-
+  
+  @Override
+  XAttrFeature getXAttrFeature() {
+    return getFeature(XAttrFeature.class);
+  }
+  
+  @Override
+  public void removeXAttrFeature() {
+    XAttrFeature f = getXAttrFeature();
+    Preconditions.checkNotNull(f);
+    removeFeature(f);
+  }
+  
+  @Override
+  public void addXAttrFeature(XAttrFeature f) {
+    XAttrFeature f1 = getXAttrFeature();
+    Preconditions.checkState(f1 == null, "Duplicated XAttrFeature");
+    
+    addFeature(f);
+  }
+  
   public void setUserID(int userId) throws IOException {
     setUserIDNoPersistence(userId);
     save();
@@ -429,7 +449,18 @@ public abstract class INodeWithAdditionalFields extends INode {
       + f.getClass().getSimpleName() + " not found.");
     features = arr;
   }
-
+  
+  protected <T extends Feature> T getFeature(Class<? extends Feature> clazz) {
+    for (Feature f : features) {
+      if (f.getClass() == clazz) {
+        @SuppressWarnings("unchecked")
+        T ret = (T) f;
+        return ret;
+      }
+    }
+    return null;
+  }
+  
   private int getUserIDDB(String name) throws IOException {
     if(name == null){
       return 0;

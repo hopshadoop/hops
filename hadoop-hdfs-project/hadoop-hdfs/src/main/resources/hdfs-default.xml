@@ -1986,4 +1986,33 @@
     the delay time will increase exponentially(double) for each retry.
   </description>
 </property>
+
+  <property>
+    <name>dfs.namenode.xattrs.enabled</name>
+    <value>true</value>
+    <description>
+      Whether support for extended attributes is enabled on the NameNode.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.namenode.fs-limits.max-xattrs-per-inode</name>
+    <value>32</value>
+    <description>
+      Maximum number of extended attributes per inode. The maximum allowed
+      number is 255 extended attributes per inode.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.namenode.fs-limits.max-xattr-size</name>
+    <value>13985</value>
+    <description>
+      The maximum combined size of the name and value of an extended
+      attribute in bytes. The maximum allowed size is 13985, where the name
+      can take up to 255 bytes, and the value size can take up to 13730
+      bytes. If set to 0 the maximum allowed size (13985) is used.
+    </description>
+  </property>
+
 </configuration>

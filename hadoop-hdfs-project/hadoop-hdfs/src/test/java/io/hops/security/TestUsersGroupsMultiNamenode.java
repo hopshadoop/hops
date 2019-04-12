@@ -530,7 +530,24 @@ public class TestUsersGroupsMultiNamenode {
     public AclStatus getAclStatus(String src) throws IOException {
       return null;
     }
-
+  
+    @Override
+    public void setXAttr(String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag)
+        throws IOException {
+    
+    }
+  
+    @Override
+    public List<XAttr> getXAttrs(String src, List<XAttr> xAttrs)
+        throws IOException {
+      return null;
+    }
+  
+    @Override
+    public void removeXAttr(String src, XAttr xAttr) throws IOException {
+    
+    }
+  
     @Override
     public long addCacheDirective(CacheDirectiveInfo directive,
         EnumSet<CacheFlag> flags) throws IOException {

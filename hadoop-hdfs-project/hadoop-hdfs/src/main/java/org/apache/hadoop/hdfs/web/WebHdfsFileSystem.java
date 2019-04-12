@@ -49,6 +49,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.XAttr;
+import org.apache.hadoop.fs.XAttrCodec;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -77,6 +80,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.web.resources.FsActionParam;
 import org.apache.hadoop.security.AccessControlException;
@@ -878,6 +882,66 @@ public class WebHdfsFileSystem extends FileSystem
         new DestinationParam(makeQualified(dst).toUri().getPath()),
         new RenameOptionSetParam(options)
     ).run();
+  }
+  
+  @Override
+  public void setXAttr(Path p, String name, byte[] value,
+      EnumSet<XAttrSetFlag> flag) throws IOException {
+    statistics.incrementWriteOps(1);
+    final HttpOpParam.Op op = PutOpParam.Op.SETXATTR;
+    if (value != null) {
+      new FsPathRunner(op, p, new XAttrNameParam(name), new XAttrValueParam(
+          XAttrCodec.encodeValue(value, XAttrCodec.HEX)),
+          new XAttrSetFlagParam(flag)).run();
+    } else {
+      new FsPathRunner(op, p, new XAttrNameParam(name),
+          new XAttrSetFlagParam(flag)).run();
+    }
+  }
+  
+  @Override
+  public byte[] getXAttr(Path p, String name) throws IOException {
+    final HttpOpParam.Op op = GetOpParam.Op.GETXATTR;
+    return new FsPathResponseRunner<byte[]>(op, p, new XAttrNameParam(name),
+        new XAttrEncodingParam(XAttrCodec.HEX)) {
+      @Override
+      byte[] decodeResponse(Map<?, ?> json) throws IOException {
+        XAttr xAttr = JsonUtil.toXAttr(json);
+        return xAttr != null ? xAttr.getValue() : null;
+      }
+    }.run();
+  }
+  
+  @Override
+  public Map<String, byte[]> getXAttrs(Path p) throws IOException {
+    final HttpOpParam.Op op = GetOpParam.Op.GETXATTRS;
+    return new FsPathResponseRunner<Map<String, byte[]>>(op, p,
+        new XAttrEncodingParam(XAttrCodec.HEX)) {
+      @Override
+      Map<String, byte[]> decodeResponse(Map<?, ?> json) throws IOException {
+        return JsonUtil.toXAttrs(json);
+      }
+    }.run();
+  }
+  
+  @Override
+  public Map<String, byte[]> getXAttrs(Path p, final List<String> names)
+      throws IOException {
+    final HttpOpParam.Op op = GetOpParam.Op.GETXATTRS;
+    return new FsPathResponseRunner<Map<String, byte[]>>(op, p,
+        new XAttrEncodingParam(XAttrCodec.HEX)) {
+      @Override
+      Map<String, byte[]> decodeResponse(Map<?, ?> json) throws IOException {
+        return JsonUtil.toXAttrs(json, names);
+      }
+    }.run();
+  }
+  
+  @Override
+  public void removeXAttr(Path p, String name) throws IOException {
+    statistics.incrementWriteOps(1);
+    final HttpOpParam.Op op = PutOpParam.Op.REMOVEXATTR;
+    new FsPathRunner(op, p, new XAttrNameParam(name)).run();
   }
 
   @Override

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
+import org.apache.hadoop.hdfs.server.namenode.XAttrFeature;
 
 /**
  * An {@link INode} representing a symbolic link.
@@ -125,5 +126,20 @@ public class INodeSymlink extends INodeWithAdditionalFields {
   @Override
   public void addAclFeature(AclFeature f) {
     throw new UnsupportedOperationException("ACLs are not supported on symlinks");
+  }
+
+  @Override
+  final XAttrFeature getXAttrFeature() {
+    throw new UnsupportedOperationException("XAttrs are not supported on symlinks");
+  }
+  
+  @Override
+  public void removeXAttrFeature() {
+    throw new UnsupportedOperationException("XAttrs are not supported on symlinks");
+  }
+  
+  @Override
+  public void addXAttrFeature(XAttrFeature f) {
+    throw new UnsupportedOperationException("XAttrs are not supported on symlinks");
   }
 }
