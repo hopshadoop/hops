@@ -20,7 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
+import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
 import io.hops.transaction.EntityManager;
 
 import java.io.FileNotFoundException;
@@ -224,7 +224,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   }
 
   public boolean removeChild(INode node)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
       remove(existingInode);
@@ -457,7 +457,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     }
   
     if (logMetadataEvent) {
-      node.logMetadataEvent(MetadataLogEntry.Operation.ADD);
+      node.logMetadataEvent(INodeMetadataLogEntry.Operation.Add);
     }
 
     return true;

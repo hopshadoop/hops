@@ -20,6 +20,7 @@ import io.hops.metadata.DalAdaptor;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INode;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.security.GroupNotFoundException;
@@ -34,6 +35,8 @@ import org.apache.hadoop.hdfs.server.namenode.FileUnderConstructionFeature;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.INodeSymlink;
+import org.apache.hadoop.hdfs.server.namenode.INodeWithAdditionalFields;
+import org.apache.hadoop.hdfs.server.namenode.XAttrFeature;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -188,7 +191,7 @@ public class INodeDALAdaptor
   }
 
   @Override
-  public void updateLogicalTime(Collection<MetadataLogEntry> logEntries)
+  public void updateLogicalTime(Collection<INodeMetadataLogEntry> logEntries)
       throws StorageException {
     dataAccess.updateLogicalTime(logEntries);
   }
@@ -249,6 +252,7 @@ public class INodeDALAdaptor
       }
       hopINode.setHeader(inode.getHeader());
       hopINode.setNumAces(inode.getNumAces());
+      hopINode.setNumXAttrs(inode.getNumXAttrs());
     }
     return hopINode;
   }
@@ -317,6 +321,12 @@ public class INodeDALAdaptor
         inode.setLogicalTimeNoPersistance(hopINode.getLogicalTime());
         inode.setBlockStoragePolicyIDNoPersistance(hopINode.getStoragePolicyID());
         inode.setNumAcesNoPersistence(hopINode.getNumAces());
+        inode.setNumXAttrsNoPersistence(hopINode.getNumXAttrs());
+        
+        if(inode.getNumXAttrs() > 0 ){
+          ((INodeWithAdditionalFields) inode).addXAttrFeature(new XAttrFeature(hopINode.getId()));
+        }
+        
       }
       return inode;
     } catch (IOException ex) {

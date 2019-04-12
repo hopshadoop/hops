@@ -19,6 +19,7 @@ package io.hops.transaction.lock;
 import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.ipc.RetryCache;
@@ -429,5 +430,11 @@ public class LockFactory {
   public Lock getAllCachedBlockLocks(){
     return new AllCachedBlockLock();
   }
-    
+  
+  public Lock getXAttrLock(){ return new XAttrLock(); }
+  
+  public Lock getXAttrLock(XAttr attr){ return new XAttrLock(attr); }
+  
+  public Lock getXAttrLock(List<XAttr> attrs){ return new XAttrLock(attrs); }
+  
 }

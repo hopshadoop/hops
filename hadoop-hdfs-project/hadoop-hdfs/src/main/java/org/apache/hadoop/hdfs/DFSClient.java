@@ -99,6 +99,7 @@ import javax.net.SocketFactory;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -117,6 +118,8 @@ import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.fs.XAttr;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
@@ -189,6 +192,8 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.net.InetAddresses;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.FsTracer;
@@ -2710,6 +2715,70 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     } catch(RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
                                      FileNotFoundException.class,
+                                     UnresolvedPathException.class);
+    }
+  }
+  
+  public void setXAttr(String src, String name, byte[] value, 
+      EnumSet<XAttrSetFlag> flag) throws IOException {
+    checkOpen();
+    try {
+      namenode.setXAttr(src, XAttrHelper.buildXAttr(name, value), flag);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+                                     FileNotFoundException.class,
+                                     NSQuotaExceededException.class,
+                                     SafeModeException.class,
+                                     UnresolvedPathException.class);
+    }
+  }
+  
+  public byte[] getXAttr(String src, String name) throws IOException {
+    checkOpen();
+    try {
+      final List<XAttr> xAttrs = XAttrHelper.buildXAttrAsList(name);
+      final List<XAttr> result = namenode.getXAttrs(src, xAttrs);
+      return XAttrHelper.getFirstXAttrValue(result);
+    } catch(RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+                                     FileNotFoundException.class,
+                                     UnresolvedPathException.class);
+    }
+  }
+  
+  public Map<String, byte[]> getXAttrs(String src) throws IOException {
+    checkOpen();
+    try {
+      return XAttrHelper.buildXAttrMap(namenode.getXAttrs(src, null));
+    } catch(RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+                                     FileNotFoundException.class,
+                                     UnresolvedPathException.class);
+    }
+  }
+  
+  public Map<String, byte[]> getXAttrs(String src, List<String> names) 
+      throws IOException {
+    checkOpen();
+    try {
+      return XAttrHelper.buildXAttrMap(namenode.getXAttrs(
+          src, XAttrHelper.buildXAttrs(names)));
+    } catch(RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+                                     FileNotFoundException.class,
+                                     UnresolvedPathException.class);
+    }
+  }
+  
+  public void removeXAttr(String src, String name) throws IOException {
+    checkOpen();
+    try {
+      namenode.removeXAttr(src, XAttrHelper.buildXAttr(name));
+    } catch(RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+                                     FileNotFoundException.class,
+                                     NSQuotaExceededException.class,
+                                     SafeModeException.class,
                                      UnresolvedPathException.class);
     }
   }

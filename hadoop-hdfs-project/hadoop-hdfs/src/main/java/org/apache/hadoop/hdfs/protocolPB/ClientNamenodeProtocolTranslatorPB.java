@@ -40,6 +40,8 @@ import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.XAttr;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -135,6 +137,9 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Update
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CheckAccessRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLastUpdatedContentSummaryRequestProto;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
+import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.GetXAttrsRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.RemoveXAttrRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.SetXAttrRequestProto;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
@@ -1553,6 +1558,49 @@ public class ClientNamenodeProtocolTranslatorPB
       rpcProxy.invCachesUserAddedToGroup(null, req.build());
     } catch (ServiceException ex) {
       throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+  
+  @Override
+  public void setXAttr(String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag)
+      throws IOException {
+    SetXAttrRequestProto req = SetXAttrRequestProto.newBuilder()
+        .setSrc(src)
+        .setXAttr(PBHelper.convertXAttrProto(xAttr))
+        .setFlag(PBHelper.convert(flag))
+        .build();
+    try {
+      rpcProxy.setXAttr(null, req);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+  
+  @Override
+  public List<XAttr> getXAttrs(String src, List<XAttr> xAttrs)
+      throws IOException {
+    GetXAttrsRequestProto.Builder builder = GetXAttrsRequestProto.newBuilder();
+    builder.setSrc(src);
+    if (xAttrs != null) {
+      builder.addAllXAttrs(PBHelper.convertXAttrProto(xAttrs));
+    }
+    GetXAttrsRequestProto req = builder.build();
+    try {
+      return PBHelper.convert(rpcProxy.getXAttrs(null, req));
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+  
+  @Override
+  public void removeXAttr(String src, XAttr xAttr) throws IOException {
+    RemoveXAttrRequestProto req = RemoveXAttrRequestProto
+        .newBuilder().setSrc(src)
+        .setXAttr(PBHelper.convertXAttrProto(xAttr)).build();
+    try {
+      rpcProxy.removeXAttr(null, req);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
     }
   }
 }

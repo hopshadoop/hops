@@ -26,7 +26,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
+import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.context.EntityContext;
@@ -48,7 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicLong;
+
 import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
@@ -474,7 +474,7 @@ abstract class AbstractFileTree {
     
   }
     static class LoggingQuotaCountingFileTree extends QuotaCountingFileTree {
-      private ConcurrentLinkedQueue<MetadataLogEntry> metadataLogEntries =
+      private ConcurrentLinkedQueue<INodeMetadataLogEntry> metadataLogEntries =
           new ConcurrentLinkedQueue<>();
       private final INode srcDataset;
       private final INode dstDataset;
@@ -494,36 +494,35 @@ abstract class AbstractFileTree {
             //Do nothing as non of the directories are metaEnabled
           }else{
             //Moving a non metaEnabled directory under a metaEnabled directory
-            metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
+            metadataLogEntries.add(new INodeMetadataLogEntry(dstDataset.getId(),
                 node.getId(), node.getPartitionId(), node.getParentId(), node
-                .getName(), node.incrementLogicalTime(), MetadataLogEntry.Operation
-                .ADD));
+                .getName(), node.incrementLogicalTime(),
+                INodeMetadataLogEntry.Operation.Add));
           }
         }else{
           if(dstDataset == null){
             //rename a metadateEnabled directory to a non metadataEnabled
             // directory
-            metadataLogEntries.add(new MetadataLogEntry(srcDataset.getId(),
+            metadataLogEntries.add(new INodeMetadataLogEntry(srcDataset.getId(),
                 node.getId(), node.getPartitionId(), node.getParentId(), node
-                .getName(), node.incrementLogicalTime(), MetadataLogEntry.Operation
-                .DELETE));
+                .getName(), node.incrementLogicalTime(),
+                INodeMetadataLogEntry.Operation.Delete));
           }else{
             //Move from one dataset to another
-            metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
+            metadataLogEntries.add(new INodeMetadataLogEntry(dstDataset.getId(),
                 node.getId(), node.getPartitionId(), node.getParentId(), node
-                .getName(), node.incrementLogicalTime(), MetadataLogEntry
-                .Operation.CHANGEDATASET));
+                .getName(), node.incrementLogicalTime(), INodeMetadataLogEntry.Operation.ChangeDataset));
           }
         }
         
         super.addChildNode(parent, level, node, bsps);
       }
       
-      public Collection<MetadataLogEntry> getMetadataLogEntries() {
+      public Collection<INodeMetadataLogEntry> getMetadataLogEntries() {
         return metadataLogEntries;
       }
       
-      static void updateLogicalTime(final Collection<MetadataLogEntry> logEntries)
+      static void updateLogicalTime(final Collection<INodeMetadataLogEntry> logEntries)
           throws IOException {
         new LightWeightRequestHandler(HDFSOperationType.UPDATE_LOGICAL_TIME) {
           @Override
@@ -750,7 +749,8 @@ abstract class AbstractFileTree {
         size,
         from.getLogicalTime(),
         from.getLocalStoragePolicyID(),
-        from.getNumAces());
+        from.getNumAces(),
+        from.getNumXAttrs());
     return result;
   }
 }

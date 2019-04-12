@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
@@ -76,6 +77,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
@@ -1987,5 +1989,92 @@ public class DistributedFileSystem extends FileSystem {
    */
   public void removeUserFromGroup(String userName, String groupName) throws IOException{
     dfs.removeUserFromGroup(userName, groupName);
+  }
+  
+  @Override
+  public void setXAttr(Path path, final String name, final byte[] value,
+      final EnumSet<XAttrSetFlag> flag) throws IOException {
+    Path absF = fixRelativePart(path);
+    new FileSystemLinkResolver<Void>() {
+
+      @Override
+      public Void doCall(final Path p) throws IOException {
+        dfs.setXAttr(getPathName(p), name, value, flag);
+        return null;
+      }
+
+      @Override
+      public Void next(final FileSystem fs, final Path p) throws IOException {
+        fs.setXAttr(p, name, value, flag);
+        return null;
+      }
+    }.resolve(this, absF);
+  }
+  
+  @Override
+  public byte[] getXAttr(Path path, final String name) throws IOException {
+    final Path absF = fixRelativePart(path);
+    return new FileSystemLinkResolver<byte[]>() {
+      @Override
+      public byte[] doCall(final Path p) throws IOException {
+        return dfs.getXAttr(getPathName(p), name);
+      }
+      @Override
+      public byte[] next(final FileSystem fs, final Path p)
+        throws IOException, UnresolvedLinkException {
+        return fs.getXAttr(p, name);
+      }
+    }.resolve(this, absF);
+  }
+  
+  @Override
+  public Map<String, byte[]> getXAttrs(Path path) throws IOException {
+    final Path absF = fixRelativePart(path);
+    return new FileSystemLinkResolver<Map<String, byte[]>>() {
+      @Override
+      public Map<String, byte[]> doCall(final Path p) throws IOException {
+        return dfs.getXAttrs(getPathName(p));
+      }
+      @Override
+      public Map<String, byte[]> next(final FileSystem fs, final Path p)
+        throws IOException, UnresolvedLinkException {
+        return fs.getXAttrs(p);
+      }
+    }.resolve(this, absF);
+  }
+  
+  @Override
+  public Map<String, byte[]> getXAttrs(Path path, final List<String> names)
+      throws IOException {
+    final Path absF = fixRelativePart(path);
+    return new FileSystemLinkResolver<Map<String, byte[]>>() {
+      @Override
+      public Map<String, byte[]> doCall(final Path p) throws IOException {
+        return dfs.getXAttrs(getPathName(p), names);
+      }
+      @Override
+      public Map<String, byte[]> next(final FileSystem fs, final Path p)
+        throws IOException, UnresolvedLinkException {
+        return fs.getXAttrs(p, names);
+      }
+    }.resolve(this, absF);
+  }
+  
+  @Override
+  public void removeXAttr(Path path, final String name) throws IOException {
+    Path absF = fixRelativePart(path);
+    new FileSystemLinkResolver<Void>() {
+      @Override
+      public Void doCall(final Path p) throws IOException {
+        dfs.removeXAttr(getPathName(p), name);
+        return null;
+      }
+
+      @Override
+      public Void next(final FileSystem fs, final Path p) throws IOException {
+        fs.removeXAttr(p, name);
+        return null;
+      }
+    }.resolve(this, absF);
   }
 }

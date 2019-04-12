@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
@@ -28,6 +29,8 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.XAttrCodec;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.util.StringUtils;
@@ -344,6 +347,43 @@ public class TestParam {
     assertNotNull(userParam.getValue());
 
     UserParam.setUserPatternDomain(oldDomain);
+  }
+  
+  @Test
+  public void testXAttrNameParam() {
+    final XAttrNameParam p = new XAttrNameParam("user.a1");
+    Assert.assertEquals(p.getXAttrName(), "user.a1");
+    try {
+      new XAttrNameParam("a1");
+      Assert.fail();
+    } catch (IllegalArgumentException e) {
+      LOG.info("EXPECTED: " + e);
+    }
+  }
+  
+  @Test
+  public void testXAttrValueParam() throws IOException {
+    final XAttrValueParam p = new XAttrValueParam("0x313233");
+    Assert.assertArrayEquals(p.getXAttrValue(),
+        XAttrCodec.decodeValue("0x313233"));
+  }
+  
+  @Test
+  public void testXAttrEncodingParam() {
+    final XAttrEncodingParam p = new XAttrEncodingParam(XAttrCodec.BASE64);
+    Assert.assertEquals(p.getEncoding(), XAttrCodec.BASE64);
+    final XAttrEncodingParam p1 = new XAttrEncodingParam(p.getValueString());
+    Assert.assertEquals(p1.getEncoding(), XAttrCodec.BASE64);
+  }
+  
+  @Test
+  public void testXAttrSetFlagParam() {
+    EnumSet<XAttrSetFlag> flag = EnumSet.of(
+        XAttrSetFlag.CREATE, XAttrSetFlag.REPLACE);
+    final XAttrSetFlagParam p = new XAttrSetFlagParam(flag);
+    Assert.assertEquals(p.getFlag(), flag);
+    final XAttrSetFlagParam p1 = new XAttrSetFlagParam(p.getValueString());
+    Assert.assertEquals(p1.getFlag(), flag);
   }
   
   @Test

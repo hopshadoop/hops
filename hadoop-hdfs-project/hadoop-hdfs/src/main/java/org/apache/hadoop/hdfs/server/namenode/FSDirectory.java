@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -62,7 +63,8 @@ import org.apache.hadoop.hdfs.util.ByteArray;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-
+import org.apache.hadoop.fs.XAttr;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.slf4j.Logger;
@@ -73,6 +75,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.Charsets;
@@ -85,6 +88,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_DE
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY;
 import static org.apache.hadoop.util.Time.now;
 import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
+import org.apache.hadoop.hdfs.XAttrHelper;
 
 /**
  * Both FSDirectory and FSNamesystem manage the state of the namespace.
@@ -111,6 +115,7 @@ public class FSDirectory implements Closeable {
   private final int lsLimit;  // max list limit
   private final int contentCountLimit; // max content summary counts per run
   private long yieldCount = 0; // keep track of lock yield count.
+  private final int inodeXAttrsLimit; //inode xattrs max limit
   
   private boolean quotaEnabled;
 
@@ -193,6 +198,21 @@ public class FSDirectory implements Closeable {
     Preconditions.checkArgument(maxDirItems >= 0, "Cannot set "
         + DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY
         + " to a value less than 0");
+  
+    int inodeXAttrs = conf.getInt(
+        DFSConfigKeys.DFS_NAMENODE_MAX_XATTRS_PER_INODE_KEY,
+        DFSConfigKeys.DFS_NAMENODE_MAX_XATTRS_PER_INODE_DEFAULT);
+    Preconditions.checkArgument(inodeXAttrs >= 0,
+        "Cannot set a negative limit on the number of xattrs per inode (%s).",
+        DFSConfigKeys.DFS_NAMENODE_MAX_XATTRS_PER_INODE_KEY);
+    
+    if(inodeXAttrs > XAttrStorage.getMaxNumberOfXAttrPerInode()){
+      inodeXAttrs = XAttrStorage.getMaxNumberOfXAttrPerInode();
+    }
+    
+    this.inodeXAttrsLimit = inodeXAttrs;
+    
+    NameNode.LOG.info("The maximum number of xattrs per inode is set to " + inodeXAttrsLimit);
     
     int threshold =
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_NAME_CACHE_THRESHOLD_KEY,
@@ -844,7 +864,7 @@ public class FSDirectory implements Closeable {
     return null;
   }
   
-  long removeLastINode(final INodesInPath iip) throws StorageException, TransactionContextException {
+  long removeLastINode(final INodesInPath iip) throws IOException {
     QuotaCounts counts = new QuotaCounts.Builder().build();
     if (isQuotaEnabled()) {
       iip.getLastINode().computeQuotaUsage(getBlockStoragePolicySuite(), counts);
@@ -859,7 +879,7 @@ public class FSDirectory implements Closeable {
    */
   long removeLastINode(final INodesInPath iip, boolean forRename,
           final QuotaCounts counts)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     final INode last = iip.getLastINode();
     final INodeDirectory parent = iip.getINode(-2).asDirectory();
     if(!forRename){
@@ -1515,4 +1535,58 @@ public class FSDirectory implements Closeable {
       }
     }
   }
+  
+  
+  void removeXAttr(String src, XAttr xAttr) throws IOException {
+    XAttr removedXAttr = unprotectedRemoveXAttr(src, xAttr);
+    if (removedXAttr == null) {
+      NameNode.stateChangeLog.info("DIR* FSDirectory.removeXAttr: XAttr " +
+          XAttrHelper.getPrefixName(xAttr) +
+          " does not exist on the path " + src);
+    }
+  }
+  
+  private XAttr unprotectedRemoveXAttr(String src,
+      XAttr xAttr) throws IOException {
+    INodesInPath iip = getINodesInPath4Write(normalizePath(src), true);
+    INode inode = resolveLastINode(iip);
+    XAttr attr = XAttrStorage.readINodeXAttr(inode, xAttr);
+    if(attr != null){
+      XAttrStorage.removeINodeXAttr(inode, xAttr);
+      inode.decrementXAttrs();
+      return xAttr;
+    }
+    return null;
+  }
+  
+  
+  void setXAttr(String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag)
+      throws IOException {
+      unprotectedSetXAttr(src, xAttr, flag);
+  }
+  
+  void unprotectedSetXAttr(String src, XAttr xAttr,
+      EnumSet<XAttrSetFlag> flag) throws IOException {
+    INodesInPath iip = getINodesInPath4Write(normalizePath(src), true);
+    INode inode = resolveLastINode(iip);
+    XAttr attr = XAttrStorage.readINodeXAttr(inode, xAttr);
+    XAttrSetFlag.validate(xAttr.getName(), attr != null, flag);
+    
+    XAttrStorage.updateINodeXAttr(inode, xAttr, attr != null);
+    
+    if (inode.getNumXAttrs() > inodeXAttrsLimit) {
+      throw new IOException("Cannot add additional XAttr to inode, "
+          + "would exceed limit of " + inodeXAttrsLimit);
+    }
+    
+    inode.incrementXAttrs();
+  }
+  
+  
+  List<XAttr> getXAttrs(String src, List<XAttr> xAttrs) throws IOException {
+    INodesInPath iip = getINodesInPath(normalizePath(src), true);
+    INode inode = resolveLastINode(iip);
+    return XAttrStorage.readINodeXAttrs(inode, xAttrs);
+  }
+  
 }
