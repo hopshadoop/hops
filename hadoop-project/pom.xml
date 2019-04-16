@@ -168,6 +168,7 @@
     <woodstox.version>5.4.0</woodstox.version>
     <json-smart.version>2.4.9</json-smart.version>
     <nimbus-jose-jwt.version>9.8.1</nimbus-jose-jwt.version>
+    <assertj.version>3.12.2</assertj.version>
   </properties>
 
   <dependencyManagement>
@@ -1596,7 +1597,7 @@
         <dependency>
           <groupId>org.assertj</groupId>
           <artifactId>assertj-core</artifactId>
-          <version>3.8.0</version>
+          <version>${assertj.version}</version>
           <scope>test</scope>
         </dependency>
       <dependency>
