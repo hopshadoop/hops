@@ -148,5 +148,8 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
 
     // Currently defined in RegistryConstants/core-site.xml
     xmlPrefixToSkipCompare.add("hadoop.registry");
+    
+    // Used as template for variable number of master JWT renew tokens. %d is a sequence number
+    xmlPropsToSkipCompare.add("yarn.resourcemanager.rmappsecurity.jwt.renew-token-%d");
   }
 }

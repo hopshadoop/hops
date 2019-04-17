@@ -2919,36 +2919,51 @@
   <property>
     <description>Hopsworks REST endpoint to send JWT generation requests</description>
     <name>yarn.resourcemanager.rmappsecurity.jwt.generate-path</name>
-    <value>/hopsworks-api/api/jwt/create</value>
+    <value>/hopsworks-api/api/jwt</value>
   </property>
 
   <property>
     <description>Hopsworks REST endpoint to send JWT invalidation requests</description>
     <name>yarn.resourcemanager.rmappsecurity.jwt.invalidate-path</name>
-    <value>/hopsworks-api/api/jwt/remove/</value>
+    <value>/hopsworks-api/api/jwt/key</value>
   </property>
 
   <property>
     <description>Hopsworks REST endpoint to send JWT renew requests</description>
     <name>yarn.resourcemanager.rmappsecurity.jwt.renew-path</name>
-    <value>/hopsworks-api/api/jwt/renew/</value>
+    <value>/hopsworks-api/api/jwt</value>
   </property>
 
   <property>
-    <description>Hopsworks REST endpoint to ping for automatic JWT renewal</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.alive-path</name>
-    <value>/hopsworks-ca/v2/token</value>
+    <description>Hopsworks REST endpoint to send service JWT renew requests</description>
+    <name>yarn.resourcemanager.rmappsecurity.jwt.service-renew-path</name>
+    <value>/hopsworks-api/api/jwt/service</value>
   </property>
 
   <property>
-    <description>Interval to ping Hopsworks to renew JWT</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.alive-interval</name>
-    <value>30m</value>
+    <description>Hopsworks REST endpoint to send service JWT invalidate requests</description>
+    <name>yarn.resourcemanager.rmappsecurity.jwt.service-invalidate-path</name>
+    <value>/hopsworks-api/api/jwt/service</value>
   </property>
 
   <property>
-    <description>Valid JWT used by RMAppSecurityManager</description>
-    <name>yarn.resourcemanager.rmappsecurity.jwt.token</name>
-    <value>Encoded token</value>
+    <description>Validity period of master JWT. If suffix is omitted, defaults to seconds
+      Available suffices are (s)econds, (m)inutes, (h)ours and (d)ays</description>
+    <name>yarn.resourcemanager.rmappsecurity.jwt.master-token-validity</name>
+    <value>432000</value>
   </property>
+
+  <property>
+    <description>Master service JWT to communicate with Hopsworks.
+      It should be located in ssl-server.xml</description>
+    <name>yarn.resourcemanager.rmappsecurity.jwt.master-token</name>
+  </property>
+
+  <property>
+    <description>Variable number of one-time JWTs used to renew the master
+      token with Hopsworks. %d is a placeholder for sequence numbers starting from 0.
+      They should be located in ssl-server.xml</description>
+    <name>yarn.resourcemanager.rmappsecurity.jwt.renew-token-%d</name>
+  </property>
+
 </configuration>
