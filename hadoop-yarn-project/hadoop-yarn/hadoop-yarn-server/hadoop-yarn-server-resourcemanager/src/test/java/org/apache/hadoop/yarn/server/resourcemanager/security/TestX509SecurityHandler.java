@@ -120,7 +120,6 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
   @Before
   public void beforeTest() throws Exception {
     conf = new Configuration();
-    conf.set(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY, "https://bbc3.sics.se:33478");
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "5s");
     RMAppSecurityActionsFactory.getInstance().clear();
     RMStorageFactory.setConfiguration(conf);
