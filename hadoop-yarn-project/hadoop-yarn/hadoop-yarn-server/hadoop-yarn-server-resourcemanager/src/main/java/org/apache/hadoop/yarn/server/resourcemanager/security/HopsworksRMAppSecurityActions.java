@@ -19,11 +19,15 @@ package org.apache.hadoop.yarn.server.resourcemanager.security;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.FieldNamingPolicy;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.nimbusds.jwt.JWT;
+import com.nimbusds.jwt.JWTParser;
 import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -32,6 +36,7 @@ import org.apache.hadoop.util.BackOff;
 import org.apache.hadoop.util.ExponentialBackOff;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.http.Header;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -67,7 +72,13 @@ import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.text.ParseException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -90,7 +101,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   private static final Pattern SUBJECT_USERNAME = Pattern.compile("^(.+)(?>_{2})(.+)$");
   
   private final AtomicReference<Header> authHeader;
-  private final JsonParser jsonParser;
+  private final Gson jsonParser;
   
   private Configuration conf;
   private Configuration sslConf;
@@ -104,9 +115,13 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   private URL jwtGeneratePath;
   private URL jwtInvalidatePath;
   private URL jwtRenewPath;
-  private URL jwtAlivePath;
-  private long jwtAliveIntervalSeconds;
+  private URL serviceJWTRenewPath;
+  private URL serviceJWTInvalidatePath;
+  private long serviceJWTValidityPeriodSeconds;
   private boolean jwtConfigured = false;
+  private String masterToken;
+  private LocalDateTime masterTokenExpiration;
+  private String[] renewalTokens;
   
   private PoolingHttpClientConnectionManager httpConnectionManager = null;
   protected CloseableHttpClient httpClient = null;
@@ -116,7 +131,11 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_OK);
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_NO_CONTENT);
     authHeader = new AtomicReference<>();
-    jsonParser = new JsonParser();
+    GsonBuilder parserBuilder = new GsonBuilder();
+    parserBuilder.setFieldNamingPolicy(FieldNamingPolicy.IDENTITY);
+    parserBuilder.setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+    jsonParser = parserBuilder.create();
+    
     tokenRenewer = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
         .setNameFormat("JWT renewer thread")
         .setDaemon(true)
@@ -141,14 +160,30 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     hopsworksHost = new URL(conf.get(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY,
         "http://127.0.0.1"));
     
-    if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+    if (!conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)
+        && conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED, YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
+      initJWT();
+    } else if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      initJWT();
       initX509();
     }
-    
-    if (conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED, YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
-      initJWT();
-    }
+  }
+  
+  @VisibleForTesting
+  protected void setMasterToken(String masterToken) {
+    this.masterToken = masterToken;
+  }
+  
+  @VisibleForTesting
+  protected void setMasterTokenExpiration(LocalDateTime masterTokenExpiration) {
+    this.masterTokenExpiration = masterTokenExpiration;
+  }
+  
+  @VisibleForTesting
+  protected void setRenewalTokens(String[] renewalTokens) {
+    this.renewalTokens = renewalTokens;
   }
   
   protected PoolingHttpClientConnectionManager createConnectionManager() throws GeneralSecurityException {
@@ -189,25 +224,68 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     
     sslConf = new Configuration(false);
     sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
-    String jwtConf = sslConf.get(YarnConfiguration.RM_JWT_TOKEN);
-    if (jwtConf == null) {
-      throw new GeneralSecurityException("Could not parse JWT from configuration");
+    
+    loadMasterJWT();
+    loadRenewalJWTs();
+    
+    serviceJWTValidityPeriodSeconds = conf.getTimeDuration(YarnConfiguration.RM_JWT_MASTER_VALIDITY_PERIOD,
+        YarnConfiguration.DEFAULT_RM_JWT_MASTER_VALIDITY_PERIOD, TimeUnit.SECONDS);
+    if (serviceJWTValidityPeriodSeconds == 0) {
+      serviceJWTValidityPeriodSeconds = 30L;
     }
-    authHeader.set(createAuthenticationHeader(jwtConf));
-  
-    jwtAlivePath = new URL(hopsworksHost,
-        conf.get(YarnConfiguration.RM_JWT_ALIVE_PATH, YarnConfiguration.DEFAULT_RM_JWT_ALIVE_PATH));
-    jwtAliveIntervalSeconds = conf.getTimeDuration(YarnConfiguration.RM_JWT_ALIVE_INTERVAL,
-        YarnConfiguration.DEFAULT_RM_JWT_ALIVE_INTERVAL, TimeUnit.SECONDS);
+    
+    String serviceJWTRenewPathConf = conf.get(YarnConfiguration.RM_JWT_SERVICE_RENEW_PATH,
+        YarnConfiguration.DEFAULT_RM_JWT_SERVICE_RENEW_PATH);
+    serviceJWTRenewPath = new URL(hopsworksHost, serviceJWTRenewPathConf);
+    String serviceJWTInvalidatePathConf = conf.get(YarnConfiguration.RM_JWT_SERVICE_INVALIDATE_PATH,
+        YarnConfiguration.DEFAULT_RM_JWT_SERVICE_INVALIDATE_PATH);
+    if (!serviceJWTInvalidatePathConf.endsWith("/")) {
+      serviceJWTInvalidatePathConf = serviceJWTRenewPathConf + "/";
+    }
+    serviceJWTInvalidatePath = new URL(hopsworksHost, serviceJWTInvalidatePathConf);
+    
     tokenRenewer.execute(new TokenRenewer());
     jwtConfigured = true;
+  }
+  
+  protected void loadMasterJWT() throws GeneralSecurityException {
+    masterToken = sslConf.get(YarnConfiguration.RM_JWT_MASTER_TOKEN);
+    if (masterToken == null) {
+      throw new GeneralSecurityException("Could not parse JWT from configuration");
+    }
+    authHeader.set(createAuthenticationHeader(masterToken));
+    try {
+      JWT jwt = JWTParser.parse(masterToken);
+      masterTokenExpiration = date2LocalDateTime(jwt.getJWTClaimsSet().getExpirationTime());
+    } catch (ParseException ex) {
+      throw new GeneralSecurityException("Could not parse master JWT", ex);
+    }
+  }
+  
+  protected void loadRenewalJWTs() throws GeneralSecurityException {
+    String renewToken = null;
+    List<String> renewalTokens = new ArrayList<>();
+    int idx = 0;
+    while (true) {
+      String renewTokenKey = String.format(YarnConfiguration.RM_JWT_RENEW_TOKEN_PATTERN, idx);
+      renewToken = sslConf.get(renewTokenKey, "");
+      if (renewToken.isEmpty()) {
+        break;
+      }
+      renewalTokens.add(renewToken);
+      idx++;
+    }
+    if (renewalTokens.isEmpty()) {
+      throw new GeneralSecurityException("Could not load one-time renewal JWTs");
+    }
+    this.renewalTokens = renewalTokens.toArray(new String[renewalTokens.size()]);
   }
   
   @Override
   public void destroy() {
     try {
       tokenRenewer.shutdown();
-      if (!tokenRenewer.awaitTermination(1L, TimeUnit.SECONDS)) {
+      if (!tokenRenewer.awaitTermination(10L, TimeUnit.SECONDS)) {
         tokenRenewer.shutdownNow();
       }
     } catch (InterruptedException ex) {
@@ -240,18 +318,15 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     CloseableHttpResponse signResponse = null;
     try {
       String csrStr = stringifyCSR(csr);
-      JsonObject json = new JsonObject();
-      json.addProperty("csr", csrStr);
+      CSRDTO request = new CSRDTO();
+      request.csr = csrStr;
+      String jsonRequest = jsonParser.toJson(request);
       
-      signResponse = post(json, signEndpoint.toURI(),
-          "Hopsworks CA could not sign CSR");
-      
-      String signResponseEntity = EntityUtils.toString(signResponse.getEntity());
-      JsonObject jsonResponse = jsonParser.parse(signResponseEntity).getAsJsonObject();
-      String signedCert = jsonResponse.get("signedCert").getAsString();
-      X509Certificate certificate = parseCertificate(signedCert);
-      String intermediateCaCert = jsonResponse.get("intermediateCaCert").getAsString();
-      X509Certificate issuer = parseCertificate(intermediateCaCert);
+      signResponse = post(new StringEntity(jsonRequest), signEndpoint.toURI(),"Hopsworks CA could not sign CSR");
+      CSRDTO csrResponse = jsonParser.fromJson(EntityUtils.toString(signResponse.getEntity()),
+          CSRDTO.class);
+      X509Certificate certificate = parseCertificate(csrResponse.signedCert);
+      X509Certificate issuer = parseCertificate(csrResponse.intermediateCaCert);
       return new X509SecurityHandler.CertificateBundle(certificate, issuer);
     } finally {
       if (signResponse != null) {
@@ -296,21 +371,23 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
       Matcher matcher = SUBJECT_USERNAME.matcher(jwtParameter.getAppUser());
       String username = matcher.matches() ? matcher.group(2) : jwtParameter.getAppUser();
       
-      JsonObject json = new JsonObject();
-      json.addProperty("subject", username);
-      json.addProperty("keyName", jwtParameter.getApplicationId().toString());
-      json.addProperty("audiences", String.join(",", jwtParameter.getAudiences()));
-      json.addProperty("expiresAt", jwtParameter.getExpirationDate().toString());
-      json.addProperty("notBefore", jwtParameter.getValidNotBefore().toString());
-      json.addProperty("renewable", jwtParameter.isRenewable());
-      json.addProperty("expLeeway", jwtParameter.getExpLeeway());
+      JWTDTO request = new JWTDTO();
+      request.subject = username;
+      request.keyName = jwtParameter.getApplicationId().toString();
+      request.audiences = String.join(",", jwtParameter.getAudiences());
+      request.expiresAt = instant2Date(jwtParameter.getExpirationDate());
+      request.nbf = instant2Date(jwtParameter.getValidNotBefore());
+      request.renewable = jwtParameter.isRenewable();
+      request.expLeeway = jwtParameter.getExpLeeway();
       
-      response = post(json, jwtGeneratePath.toURI(),
+      String jsonRequest = jsonParser.toJson(request);
+      
+      response = post(new StringEntity(jsonRequest), jwtGeneratePath.toURI(),
           "Hopsworks could not generate JWT for " + jwtParameter.getAppUser()
               + "/" + jwtParameter.getApplicationId().toString());
-      String responseStr = EntityUtils.toString(response.getEntity());
-      JsonObject jsonResponse = jsonParser.parse(responseStr).getAsJsonObject();
-      return jsonResponse.get("token").getAsString();
+      
+      JWTDTO jwtResponse = jsonParser.fromJson(EntityUtils.toString(response.getEntity()), JWTDTO.class);
+      return jwtResponse.token;
     } finally {
       if (response != null) {
         response.close();
@@ -326,15 +403,16 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
     CloseableHttpResponse response = null;
     try {
-      JsonObject json = new JsonObject();
-      json.addProperty("token", jwtParameter.getToken());
-      json.addProperty("expiresAt", jwtParameter.getExpirationDate().toString());
-      json.addProperty("nbf", jwtParameter.getValidNotBefore().toString());
-      response = post(json, jwtRenewPath.toURI(), "Could not renew JWT for " + jwtParameter.getAppUser()
-            + "/" + jwtParameter.getApplicationId());
-      String responseStr = EntityUtils.toString(response.getEntity());
-      JsonObject jsonResponse = jsonParser.parse(responseStr).getAsJsonObject();
-      return jsonResponse.get("token").getAsString();
+      JWTDTO request = new JWTDTO();
+      request.token = jwtParameter.getToken();
+      request.expiresAt = instant2Date(jwtParameter.getExpirationDate());
+      request.nbf = instant2Date(jwtParameter.getValidNotBefore());
+      String jsonRequest = jsonParser.toJson(request);
+      response = put(jwtRenewPath.toURI(), new StringEntity(jsonRequest), "Could not renew JWT for "
+          + jwtParameter.getAppUser() + "/" + jwtParameter.getApplicationId());
+  
+      JWTDTO jwtResponse = jsonParser.fromJson(EntityUtils.toString(response.getEntity()), JWTDTO.class);
+      return jwtResponse.token;
     } finally {
       if (response != null) {
         response.close();
@@ -351,7 +429,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     CloseableHttpResponse response = null;
     try {
       URL invalidateURL = new URL(jwtInvalidatePath, signingKeyName);
-      response = put(invalidateURL.toURI(), "Hopsworks could to invalidate JWT signing key " + signingKeyName);
+      response = delete(invalidateURL.toURI(), "Hopsworks could to invalidate JWT signing key " + signingKeyName);
     } finally {
       if (response != null) {
         response.close();
@@ -359,11 +437,65 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
   }
   
-  private CloseableHttpResponse post(JsonObject jsonEntity, URI target, String errorMessage)
+  @VisibleForTesting
+  LocalDateTime getMasterTokenExpiration() {
+    return masterTokenExpiration;
+  }
+  
+  @VisibleForTesting
+  @InterfaceAudience.Private
+  protected ServiceTokenDTO renewServiceJWT(String token, String oneTimeToken, LocalDateTime expiresAt,
+      LocalDateTime notBefore) throws URISyntaxException, IOException, GeneralSecurityException {
+    if (!jwtConfigured) {
+      jwtNotConfigured("renewServiceJWT");
+    }
+    CloseableHttpResponse httpResponse = null;
+    try {
+      JWTDTO request = new JWTDTO();
+      request.token = token;
+      request.expiresAt = localDateTime2Date(expiresAt);
+      request.nbf = localDateTime2Date(notBefore);
+      String jsonRequest = jsonParser.toJson(request);
+      HttpPut httpRequest = new HttpPut(serviceJWTRenewPath.toURI());
+      Header authHeader = createAuthenticationHeader(oneTimeToken);
+      httpRequest.addHeader(authHeader);
+      httpRequest.setEntity(new StringEntity(jsonRequest));
+      httpRequest.addHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+      httpResponse = httpClient.execute(httpRequest);
+      checkHTTPResponseCode(httpResponse, "Could not make HTTP request to renew service JWT");
+      ServiceTokenDTO renewedTokenResponse = jsonParser.fromJson(EntityUtils.toString(httpResponse.getEntity()),
+          ServiceTokenDTO.class);
+      return renewedTokenResponse;
+    } finally {
+      if (httpResponse != null) {
+        httpResponse.close();
+      }
+    }
+  }
+  
+  @VisibleForTesting
+  @InterfaceAudience.Private
+  protected void invalidateServiceJWT(String token2invalidate)
+      throws URISyntaxException, IOException, GeneralSecurityException {
+    if (!jwtConfigured) {
+      jwtNotConfigured("invalidateServiceToken");
+    }
+    CloseableHttpResponse httpResponse = null;
+    try {
+      URL invalidateURL = new URL(serviceJWTInvalidatePath, token2invalidate);
+      httpResponse = delete(invalidateURL.toURI(), "Could not invalidate token " + token2invalidate);
+    } finally {
+      if (httpResponse != null) {
+        httpResponse.close();
+      }
+    }
+  }
+  
+  private CloseableHttpResponse post(HttpEntity httpEntity, URI target, String errorMessage)
       throws IOException {
     HttpPost request = new HttpPost(target);
     addAuthenticationHeader(request);
-    request.setEntity(new StringEntity(jsonEntity.toString()));
+    request.setEntity(httpEntity);
     request.addHeader(HttpHeaders.CONTENT_TYPE, "application/json");
     CloseableHttpResponse response = httpClient.execute(request);
     checkHTTPResponseCode(response, errorMessage);
@@ -382,16 +514,23 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
       throws IOException {
     HttpDelete request = new HttpDelete(target);
     addAuthenticationHeader(request);
-    request.addHeader(HttpHeaders.CONTENT_TYPE, "text/plain");
+    request.addHeader(HttpHeaders.CONTENT_TYPE, "application/json");
     CloseableHttpResponse response = httpClient.execute(request);
     checkHTTPResponseCode(response, errorMessage);
     return response;
   }
   
-  private CloseableHttpResponse put(URI target, String errorMessage)
+  private CloseableHttpResponse put(URI target, String errorMessage) throws IOException {
+    return put(target, null, errorMessage);
+  }
+  
+  private CloseableHttpResponse put(URI target, HttpEntity httpEntity, String errorMessage)
     throws IOException {
     HttpPut request = new HttpPut(target);
     addAuthenticationHeader(request);
+    if (httpEntity != null) {
+      request.setEntity(httpEntity);
+    }
     request.addHeader(HttpHeaders.CONTENT_TYPE, "application/json");
     CloseableHttpResponse response = httpClient.execute(request);
     checkHTTPResponseCode(response, errorMessage);
@@ -439,6 +578,22 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
   }
   
+  private LocalDateTime date2LocalDateTime(Date date) {
+    return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+  }
+  
+  private Date localDateTime2Date(LocalDateTime localDateTime) {
+    return Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant());
+  }
+  
+  private Date instant2Date(Instant instant) {
+    return Date.from(instant);
+  }
+  
+  private LocalDateTime now() {
+    return LocalDateTime.now();
+  }
+  
   @VisibleForTesting
   protected Header createAuthenticationHeader(String jwt) {
     String content = String.format(AUTH_HEADER_CONTENT, jwt);
@@ -449,79 +604,198 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     httpRequest.addHeader(authHeader.get());
   }
   
-  protected String getJWTFromResponse() throws IOException, URISyntaxException {
-    CloseableHttpResponse response = null;
-    try {
-      response = get(jwtAlivePath.toURI(), " Could not ping Hopsworks to renew JWT");
-      LOG.debug("Pinged Hopsworks!");
-      if (!response.containsHeader(HttpHeaders.AUTHORIZATION)) {
-        // JWT is sent only when the previous has expired
-        return null;
-      }
-      Header[] authHeaders = response.getHeaders(HttpHeaders.AUTHORIZATION);
-      for (Header header : authHeaders) {
-        Matcher matcher = JWT_PATTERN.matcher(header.getValue());
-        if (matcher.matches()) {
-          return matcher.group(1);
-        }
-      }
-      throw new IOException("Could not extract JWT from authentication header");
-    } finally {
-      if (response != null) {
-        response.close();
-      }
-    }
+  protected boolean isTime2Renew(LocalDateTime now, LocalDateTime tokenExpiration) {
+    return now.isAfter(tokenExpiration) || now.isEqual(tokenExpiration);
   }
   
   private class TokenRenewer implements Runnable {
     private final BackOff backoff;
-    private long backoffTime = 0L;
+    private final long sleepPeriodSeconds;
     
     private TokenRenewer() {
+      int maximumRetries = Math.max(1, renewalTokens.length);
       backoff = new ExponentialBackOff.Builder()
           .setInitialIntervalMillis(1000)
-          .setMaximumIntervalMillis(10000)
-          .setMultiplier(1.5)
-          .setMaximumRetries(Integer.MAX_VALUE)
+          .setMaximumIntervalMillis(7000)
+          .setMultiplier(2)
+          .setMaximumRetries(maximumRetries)
           .build();
+      sleepPeriodSeconds = serviceJWTValidityPeriodSeconds / 2;
     }
-    
+
     @Override
     public void run() {
       while (!Thread.currentThread().isInterrupted()) {
         try {
-          String jwt = getJWTFromResponse();
-          
-          if (jwt != null
-              && !authHeader.get().getValue().equals(String.format(AUTH_HEADER_CONTENT, jwt))) {
-            authHeader.set(createAuthenticationHeader(jwt));
-            sslConf.set(YarnConfiguration.RM_JWT_TOKEN, jwt);
-            URL sslServerURL = sslConf.getResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
-            File sslServerFile = new File(sslServerURL.getFile());
-            try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(sslServerFile))) {
-              sslConf.writeXml(bos);
-              bos.flush();
+          // Check if it is time to renew
+          LocalDateTime now = now();
+          if (isTime2Renew(now, masterTokenExpiration)) {
+            backoff.reset();
+            LocalDateTime expiresAt = now().plus(serviceJWTValidityPeriodSeconds, ChronoUnit.SECONDS);
+            int renewalTokenIdx = 0;
+            while (renewalTokenIdx < renewalTokens.length) {
+              try {
+                // Use one-time token to authenticate
+                ServiceTokenDTO renewedTokens = renewServiceJWT(masterToken, renewalTokens[renewalTokenIdx],
+                    expiresAt, now);
+                String oldMasterToken = masterToken;
+                masterToken = renewedTokens.jwt.token;
+                masterTokenExpiration = date2LocalDateTime(renewedTokens.jwt.expiresAt);
+                authHeader.set(createAuthenticationHeader(masterToken));
+                renewalTokens = renewedTokens.renewTokens;
+                try {
+                  // Since renewal of master JWT has gone through, invalidate the old one
+                  invalidateServiceJWT(oldMasterToken);
+                } catch (Exception ex) {
+                  // Do not retry if we failed to invalidate old master token
+                  LOG.warn("Failed to invalidate old service master JWT. Continue...");
+                }
+                sslConf.set(YarnConfiguration.RM_JWT_MASTER_TOKEN, masterToken);
+                for (int i = 0; i < renewalTokens.length; i++) {
+                  String confKey = String.format(YarnConfiguration.RM_JWT_RENEW_TOKEN_PATTERN, i);
+                  sslConf.set(confKey, renewalTokens[i]);
+                }
+                URL sslServerURL = sslConf.getResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
+                File sslServerFile = new File(sslServerURL.getFile());
+                try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(sslServerFile))) {
+                  sslConf.writeXml(bos);
+                  bos.flush();
+                }
+                LOG.info("Updated service JWT");
+                break;
+              } catch (URISyntaxException ex) {
+                LOG.error("There is an error in service JWT renewal URI: " + serviceJWTRenewPath.toString(), ex);
+                break;
+              } catch (Exception ex) {
+                // If for some reason we fail to parse the new token,
+                // we retry and invalidate the failed token
+                renewalTokenIdx++;
+                long backoffTimeout = backoff.getBackOffInMillis();
+                if (backoffTimeout != -1) {
+                  LOG.warn("Error while trying to renew service JWT. Retrying in " + backoffTimeout + " ms", ex);
+                  TimeUnit.MILLISECONDS.sleep(backoffTimeout);
+                } else {
+                  LOG.error("Could not renew service JWT. Manual update is necessary!", ex);
+                  break;
+                }
+              }
             }
-            LOG.info("Renewed Hopsworks JWT");
           }
-          backoff.reset();
-          TimeUnit.SECONDS.sleep(jwtAliveIntervalSeconds);
+          TimeUnit.SECONDS.sleep(sleepPeriodSeconds);
         } catch (InterruptedException ex) {
+          LOG.warn("Service JWT renewer has been interrupted");
           Thread.currentThread().interrupt();
-        } catch (URISyntaxException ex) {
-          // That's fatal error. Keep going until JWT expires
-          LOG.fatal(ex, ex);
-          Thread.currentThread().interrupt();
-        } catch (Exception ex) {
-          backoffTime = backoff.getBackOffInMillis();
-          LOG.warn(ex + "Retrying in " + backoffTime + "ms", ex);
-          try {
-            TimeUnit.MILLISECONDS.sleep(backoffTime);
-          } catch (InterruptedException iex) {
-            Thread.currentThread().interrupt();
-          }
         }
       }
+    }
+  }
+  
+  /**
+   * Classes to serialize HTTP responses from Hopsworks
+   *
+   * Fields name should match the response from Hopsworks
+   */
+  
+  private class CSRDTO {
+    private String csr;
+    private String signedCert;
+    private String intermediateCaCert;
+    private String rootCaCert;
+  }
+  
+  protected class JWTDTO {
+    private String token;
+    private String subject;
+    private String keyName;
+    private String audiences;
+    private Boolean renewable;
+    private Integer expLeeway;
+    private Date expiresAt;
+    private Date nbf;
+  
+    public String getToken() {
+      return token;
+    }
+  
+    public void setToken(String token) {
+      this.token = token;
+    }
+  
+    public String getSubject() {
+      return subject;
+    }
+  
+    public void setSubject(String subject) {
+      this.subject = subject;
+    }
+  
+    public String getKeyName() {
+      return keyName;
+    }
+  
+    public void setKeyName(String keyName) {
+      this.keyName = keyName;
+    }
+  
+    public String getAudiences() {
+      return audiences;
+    }
+  
+    public void setAudiences(String audiences) {
+      this.audiences = audiences;
+    }
+  
+    public Boolean getRenewable() {
+      return renewable;
+    }
+  
+    public void setRenewable(Boolean renewable) {
+      this.renewable = renewable;
+    }
+  
+    public Integer getExpLeeway() {
+      return expLeeway;
+    }
+  
+    public void setExpLeeway(Integer expLeeway) {
+      this.expLeeway = expLeeway;
+    }
+  
+    public Date getExpiresAt() {
+      return expiresAt;
+    }
+  
+    public void setExpiresAt(Date expiresAt) {
+      this.expiresAt = expiresAt;
+    }
+  
+    public Date getNbf() {
+      return nbf;
+    }
+  
+    public void setNbf(Date nbf) {
+      this.nbf = nbf;
+    }
+  }
+  
+  protected class ServiceTokenDTO {
+    private JWTDTO jwt;
+    private String[] renewTokens;
+  
+    public JWTDTO getJwt() {
+      return jwt;
+    }
+  
+    public void setJwt(JWTDTO jwt) {
+      this.jwt = jwt;
+    }
+  
+    public String[] getRenewTokens() {
+      return renewTokens;
+    }
+  
+    public void setRenewTokens(String[] renewTokens) {
+      this.renewTokens = renewTokens;
     }
   }
 }

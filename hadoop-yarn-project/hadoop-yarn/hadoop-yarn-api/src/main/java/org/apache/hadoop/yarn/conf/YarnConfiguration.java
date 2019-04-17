@@ -2685,23 +2685,31 @@ public class YarnConfiguration extends Configuration {
   public static String DEFAULT_RM_JWT_AUDIENCE = "job";
   public static final String RM_JWT_AUDIENCE = RM_PREFIX + JWT_PREFIX + "audience";
   
-  public static String DEFAULT_RM_JWT_GENERATE_PATH = "/hopsworks-api/api/jwt/create";
+  public static String DEFAULT_RM_JWT_GENERATE_PATH = "/hopsworks-api/api/jwt";
   public static final String RM_JWT_GENERATE_PATH = RM_PREFIX + JWT_PREFIX
       + "generate-path";
   
-  public static String DEFAULT_RM_JWT_INVALIDATE_PATH = "/hopsworks-api/api/jwt/remove/";
+  public static String DEFAULT_RM_JWT_INVALIDATE_PATH = "/hopsworks-api/api/jwt/key";
   public static final String RM_JWT_INVALIDATE_PATH = RM_PREFIX + JWT_PREFIX
       + "invalidate-path";
   
-  public static String DEFAULT_RM_JWT_RENEW_PATH = "/hopsworks-api/api/jwt/renew/";
+  public static String DEFAULT_RM_JWT_RENEW_PATH = "/hopsworks-api/api/jwt";
   public static final String RM_JWT_RENEW_PATH = RM_PREFIX + JWT_PREFIX
       + "renew-path";
   
-  public static String DEFAULT_RM_JWT_ALIVE_PATH = "/hopsworks-ca/v2/token";
-  public static final String RM_JWT_ALIVE_PATH = RM_PREFIX + JWT_PREFIX + "alive-path";
+  public static String DEFAULT_RM_JWT_SERVICE_RENEW_PATH = "/hopsworks-api/api/jwt/service";
+  public static final String RM_JWT_SERVICE_RENEW_PATH = RM_PREFIX + JWT_PREFIX
+      + "service-renew-path";
   
-  public static final String RM_JWT_TOKEN = RM_PREFIX + JWT_PREFIX + "token";
+  public static String DEFAULT_RM_JWT_SERVICE_INVALIDATE_PATH = "/hopsworks-api/api/jwt/service";
+  public static final String RM_JWT_SERVICE_INVALIDATE_PATH = RM_PREFIX + JWT_PREFIX
+      + "service-invalidate-path";
   
-  public static long DEFAULT_RM_JWT_ALIVE_INTERVAL = 1800;
-  public static final String RM_JWT_ALIVE_INTERVAL = RM_PREFIX + JWT_PREFIX + "alive-interval";
+  public static final String RM_JWT_MASTER_TOKEN = RM_PREFIX + JWT_PREFIX + "master-token";
+  
+  public static final String RM_JWT_RENEW_TOKEN_PATTERN = RM_PREFIX + JWT_PREFIX + "renew-token-%d";
+  
+  // 5 days
+  public static long DEFAULT_RM_JWT_MASTER_VALIDITY_PERIOD = 432000;
+  public static final String RM_JWT_MASTER_VALIDITY_PERIOD = RM_PREFIX + JWT_PREFIX + "master-token-validity";
 }
