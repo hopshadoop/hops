@@ -60,6 +60,7 @@ public final class TestTriggerBlockReport {
         new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
     FileSystem fs = cluster.getFileSystem();
+    Thread.sleep(10000);
     DatanodeProtocolClientSideTranslatorPB spy =
         DataNodeTestUtils.spyOnBposToNN(
             cluster.getDataNodes().get(0), cluster.getNameNode());

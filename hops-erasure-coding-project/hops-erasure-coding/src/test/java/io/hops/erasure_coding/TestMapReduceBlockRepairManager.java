@@ -69,7 +69,6 @@ public class TestMapReduceBlockRepairManager extends MrClusterTest {
     conf.setInt(DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY, 1);
-    conf.setInt(DFSConfigKeys.DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_KEY, 1);
     numDatanode = 15; // Sometimes a node gets excluded during the test
   }
 

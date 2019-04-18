@@ -680,17 +680,23 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   private void stopCommonServices() {
+    if (leaderElection != null && leaderElection.isRunning()) {
+      try {
+        leaderElection.stopElectionThread();
+      } catch (InterruptedException e) {
+        LOG.warn("LeaderElection thread stopped",e);
+      }
+    }
+
     if (rpcServer != null) {
       rpcServer.stop();
     }
     if (namesystem != null) {
       namesystem.close();
     }
-    if (pauseMonitor != null) pauseMonitor.stop();
-    if (leaderElection != null && leaderElection.isRunning()) {
-      leaderElection.stopElectionThread();
+    if (pauseMonitor != null) {
+      pauseMonitor.stop();
     }
-
     if(mdCleaner != null){
       mdCleaner.stopMDCleanerMonitor();
     }

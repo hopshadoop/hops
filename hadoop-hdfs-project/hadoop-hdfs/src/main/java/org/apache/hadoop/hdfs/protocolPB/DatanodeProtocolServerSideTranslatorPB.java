@@ -170,6 +170,34 @@ public class DatanodeProtocolServerSideTranslatorPB
   }
 
   @Override
+  public BlockReportResponseProto reportHashes(RpcController controller,
+                                              BlockReportRequestProto request) throws ServiceException {
+    DatanodeCommand cmd = null;
+    StorageBlockReport[] storageBlockReports =
+            new StorageBlockReport[request.getReportsCount()];
+
+    int index = 0;
+    for (StorageBlockReportProto s : request.getReportsList()) {
+      DatanodeProtocolProtos.BlockReportProto report = s.getReport();
+      storageBlockReports[index++] =
+              new StorageBlockReport(PBHelper.convert(s.getStorage()),
+                      PBHelper.convert(report));
+    }
+    try {
+      cmd = impl.reportHashes(PBHelper.convert(request.getRegistration()),
+              request.getBlockPoolId(), storageBlockReports);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+    BlockReportResponseProto.Builder builder =
+            BlockReportResponseProto.newBuilder();
+    if (cmd != null) {
+      builder.setCmd(PBHelper.convert(cmd));
+    }
+    return builder.build();
+  }
+
+  @Override
   public CacheReportResponseProto cacheReport(RpcController controller,
       CacheReportRequestProto request) throws ServiceException {
     DatanodeCommand cmd = null;

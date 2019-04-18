@@ -962,7 +962,7 @@ public class TestUsersGroups {
 
       int newUserId = UsersGroups.getUserID(username);
 
-      assertTrue(newUserId > userId);
+      assertTrue(newUserId != userId);
       assertNotEquals(userId, newUserId);
     } finally {
       cluster.shutdown();

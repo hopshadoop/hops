@@ -44,6 +44,9 @@ import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.permission.AclEntryType;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.hdfs.server.protocol.*;
+import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm.ShmId;
+import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm.SlotId;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
@@ -101,6 +104,9 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BalancerBandwidthCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockIdCommandProto;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.HashMismatchCommandProto;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.AllStorageMismatchingHashes;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageMismatchingHashes;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockRecoveryCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeRegistrationProto;
@@ -162,28 +168,13 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
-import org.apache.hadoop.hdfs.server.protocol.BalancerBandwidthCommand;
-import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
-import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
-import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.Bucket;
 import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage.State;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
-import org.apache.hadoop.hdfs.server.protocol.FinalizeCommand;
-import org.apache.hadoop.hdfs.server.protocol.KeyUpdateCommand;
-import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
-import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
-import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo.BlockStatus;
 import org.apache.hadoop.hdfs.server.protocol.RegisterCommand;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
@@ -798,6 +789,8 @@ public class PBHelper {
         return REG_CMD;
       case BlockIdCommand:
         return PBHelper.convert(proto.getBlkIdCmd());
+      case HashMismatchCommand:
+        return PBHelper.convert(proto.getMismatchHashesCmd());
     }
     return null;
   }
@@ -867,7 +860,22 @@ public class PBHelper {
     }
     return list;
   }
-  
+
+  public static HashMismatchCommandProto convert(HashesMismatchCommand cmd) {
+    HashMismatchCommandProto.Builder builder =
+            HashMismatchCommandProto.newBuilder();
+    AllStorageMismatchingHashes.Builder  asmh = AllStorageMismatchingHashes.newBuilder();
+    for (String sid : cmd.getMissMatchingBuckets().keySet()) {
+      List<Integer> buckets = cmd.getMissMatchingBuckets().get(sid);
+      StorageMismatchingHashes.Builder smh = StorageMismatchingHashes.newBuilder();
+      smh.addAllBucketIDs(buckets);
+      smh.setStorageID(sid);
+      asmh.addStorages(smh.build());
+    }
+    builder.setStorages(asmh.build());
+    return builder.build();
+  }
+
   public static BlockIdCommandProto convert(BlockIdCommand cmd) {
     BlockIdCommandProto.Builder builder = BlockIdCommandProto.newBuilder()
         .setBlockPoolId(cmd.getBlockPoolId());
@@ -948,12 +956,17 @@ public class PBHelper {
         builder.setCmdType(DatanodeCommandProto.Type.BlockIdCommand).
             setBlkIdCmd(PBHelper.convert((BlockIdCommand) datanodeCommand));
         break;
+      case DatanodeProtocol.DNA_HASHMISMATCH:
+        builder.setCmdType(DatanodeCommandProto.Type.HashMismatchCommand).
+                setMismatchHashesCmd(PBHelper.convert((HashesMismatchCommand)datanodeCommand));
+        break;
       case DatanodeProtocol.DNA_UNKNOWN: //Not expected
       default:
         builder.setCmdType(DatanodeCommandProto.Type.NullDatanodeCommand);
     }
     return builder.build();
   }
+
 
   public static KeyUpdateCommand convert(KeyUpdateCommandProto keyUpdateCmd) {
     return new KeyUpdateCommand(PBHelper.convert(keyUpdateCmd.getKeys()));
@@ -1026,7 +1039,17 @@ public class PBHelper {
     return new BlockCommand(action, blkCmd.getBlockPoolId(), blocks, targets,
         targetStorageTypes, targetStorageIDs);
   }
-  
+
+
+  public static HashesMismatchCommand convert(HashMismatchCommandProto cmd) {
+    HashesMismatchCommand hmcmd = new HashesMismatchCommand();
+    AllStorageMismatchingHashes asmh = cmd.getStorages();
+    for(StorageMismatchingHashes smh : asmh.getStoragesList()){
+      hmcmd.addStorageBuckets(smh.getStorageID(), smh.getBucketIDsList());
+    }
+    return  hmcmd;
+  }
+
   public static BlockIdCommand convert(BlockIdCommandProto blkIdCmd) {
     int numBlockIds = blkIdCmd.getBlockIdsCount();
     long blockIds[] = new long[numBlockIds];
@@ -2367,6 +2390,7 @@ public class PBHelper {
               DatanodeProtocolProtos.BlockReportBucketProto.newBuilder();
 
       bucketBuilder.setHash(ByteString.copyFrom(bucket.getHash()));
+      bucketBuilder.setSkip(bucket.isSkip());
 
       BlockListAsLongs blocks = bucket.getBlocks();
       if (useBlocksBuffer) {
@@ -2413,6 +2437,7 @@ public class PBHelper {
       Bucket bucket = new Bucket();
       bucket.setBlocks(blocks);
       bucket.setHash(bucketProto.getHash().toByteArray());
+      bucket.setSkip(bucketProto.getSkip());
       buckets[i] = bucket;
     }
     

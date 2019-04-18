@@ -106,6 +106,7 @@ public class TestNameNodeMetrics {
   public void setUp() throws Exception {
     cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(DATANODE_COUNT).build();
     cluster.waitActive();
+    Thread.sleep(10000);
     namesystem = cluster.getNamesystem();
     bm = namesystem.getBlockManager();
     fs = (DistributedFileSystem) cluster.getFileSystem();

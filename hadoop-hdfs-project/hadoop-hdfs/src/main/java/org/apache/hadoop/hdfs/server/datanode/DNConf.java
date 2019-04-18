@@ -100,8 +100,6 @@ public class DNConf {
   final long xceiverStopTimeout;
   final long restartReplicaExpiry;
 
-  final int iBRDispatherTPSize;
-  
   final long maxLockedMemory;
 
   public DNConf(Configuration conf) {
@@ -190,10 +188,7 @@ public class DNConf {
     this.xceiverStopTimeout = conf.getLong(
         DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_KEY,
         DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
-    
-    this.iBRDispatherTPSize = conf.getInt(DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_KEY,
-            DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_DEFAULT);
-    
+
     this.maxLockedMemory = conf.getLong(
         DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
         DFS_DATANODE_MAX_LOCKED_MEMORY_DEFAULT);

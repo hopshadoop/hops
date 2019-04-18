@@ -56,7 +56,11 @@ public class LightWeightNameNode {
 
   public void stop() {
     if (!leaderElection.isStopped()) {
-      leaderElection.stopElectionThread();
+      try {
+        leaderElection.stopElectionThread();
+      } catch (InterruptedException e) {
+        LOG.warn("LeaderElection stopped", e);
+      }
     }
   }
 

@@ -81,6 +81,7 @@ public interface DatanodeProtocol {
   final static int DNA_BALANCERBANDWIDTHUPDATE = 8; // update balancer bandwidth
   final static int DNA_CACHE = 9;      // cache blocks
   final static int DNA_UNCACHE = 10;   // uncache blocks
+  final static int DNA_HASHMISMATCH = 11;   // send block report only for the mismatching buckets
 
   /**
    * Register Datanode.
@@ -121,6 +122,23 @@ public interface DatanodeProtocol {
                                        int failedVolumes,
                                        VolumeFailureSummary volumeFailureSummary)
       throws IOException;
+
+  /**
+   * checkHashes() tells the NameNode about the hashes of all the buckets
+   * on the DN. The namenode compares the hases and returns a list of buckets
+   * whose hashes do not match.
+   *
+   * @param registration
+   * @param poolId
+   *     - the block pool ID for the blocks
+   * @param reports
+   *     - report of blocks per storage. it only contains the hashes for the buckets
+   * @return - the next command for DN to process.
+   * @throws IOException
+   */
+  @Idempotent
+  public DatanodeCommand reportHashes(DatanodeRegistration registration,
+                                     String poolId, StorageBlockReport[] reports) throws IOException;
 
   /**
    * blockReport() tells the NameNode about all the locally-stored blocks.

@@ -217,9 +217,10 @@ public class LeaderElection extends Thread {
 
   }
   
-  public void stopElectionThread() {
+  public void stopElectionThread() throws InterruptedException {
     running = false;
     this.interrupt();
+    this.join();
   }
   
   public boolean isStopped() {

@@ -135,6 +135,7 @@ public class TestDataNodeRollingUpgrade {
     // Now delete the file and ensure the corresponding block in trash
     LOG.info("Deleting file " + pathToDelete + " during rolling upgrade");
     fs.delete(pathToDelete, false);
+    Thread.sleep(5000);
     assert(!fs.exists(pathToDelete));
     triggerHeartBeats();
     assertTrue(trashFile.exists());

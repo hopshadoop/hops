@@ -379,6 +379,9 @@ class BPServiceActor implements Runnable {
           if (!dn.areHeartbeatsDisabledForTests()) {
             HeartbeatResponse resp = sendHeartBeat();
             assert resp != null;
+
+            connectedToNN = true;
+
             dn.getMetrics().addHeartbeat(now() - startTime);
 
             handleRollingUpgradeStatus(resp);
@@ -407,8 +410,6 @@ class BPServiceActor implements Runnable {
           waitForHeartBeats.wait(waitTime);
         }
 
-        // no exceptions so
-        connectedToNN = true;
       } catch (RemoteException re) {
         String reClass = re.getClassName();
         if (UnregisteredNodeException.class.getName().equals(reClass) ||
@@ -478,7 +479,12 @@ class BPServiceActor implements Runnable {
     // random short delay - helps scatter the BR from all DNs
     // block report only if the datanode is not already connected
     // to any other namenode.
-    if(!bpos.otherActorsConnectedToNNs(this)) {
+    // In case of multiple actors (Multi NN)  we would like to 
+    // send only one BR. 
+    // potential race condition here. multiple actor might see that
+    // none of the other actors are yet connected. to avoid such
+    // scenarios we ask the first actor to do BR
+    if(!bpos.otherActorsConnectedToNNs(this) && bpos.firstActor(this)) {
       bpos.scheduleBlockReport(dnConf.initialBlockReportDelay);
     } else {
       LOG.info("Block Report skipped as other BPServiceActors are connected to the namenodes ");
@@ -640,6 +646,11 @@ class BPServiceActor implements Runnable {
       bpNamenode.blockReceivedAndDeleted(registration, poolId,
           receivedAndDeletedBlocks);
     }
+  }
+
+  public DatanodeCommand reportHashes(DatanodeRegistration registration,
+                                     String poolId, StorageBlockReport[] reports) throws IOException {
+    return bpNamenode.reportHashes(registration, poolId, reports);
   }
 
   public DatanodeCommand blockReport(DatanodeRegistration registration,
