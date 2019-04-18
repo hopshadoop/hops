@@ -189,9 +189,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY = "dfs.db.inmemory.file.max.size";
   public static final int DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT = 1*1024; // 1KB
 
-  public static final String DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_KEY = "dfs.dn.incremental.br.thread.pool.size";
-  public static final int DFS_DN_INCREMENTAL_BR_DISPATCHER_THREAD_POOL_SIZE_DEFAULT = 256;
-
   public static final String DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_KEY = "dsf.client.delay.before.file.close";
   public static final int DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_DEFAULT = 0;
 

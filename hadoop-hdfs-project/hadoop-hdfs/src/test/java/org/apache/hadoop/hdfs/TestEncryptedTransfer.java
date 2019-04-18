@@ -547,7 +547,7 @@ public class TestEncryptedTransfer {
   }
   
   @Test
-  public void testEncryptedAppendRequiringBlockTransfer() throws IOException {
+  public void testEncryptedAppendRequiringBlockTransfer() throws IOException, InterruptedException {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new Configuration();
@@ -560,6 +560,7 @@ public class TestEncryptedTransfer {
       
       // Create a file with replication 3, so its block is on 3 / 4 DNs.
       writeTestDataToFile(fs);
+      Thread.sleep(5000);
       assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
       
       // Shut down one of the DNs holding a block replica.

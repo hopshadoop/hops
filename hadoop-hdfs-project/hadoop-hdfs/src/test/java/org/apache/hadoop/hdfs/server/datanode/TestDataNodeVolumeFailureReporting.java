@@ -582,6 +582,7 @@ public class TestDataNodeVolumeFailureReporting {
     conf.setInt(DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY,
         failedVolumesTolerated);
     conf.setInt(DFSConfigKeys.DFS_BLOCK_FETCHER_BUCKETS_PER_THREAD, DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
+    conf.setInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, 1);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes)
         .storagesPerDatanode(storagesPerDatanode).build();
     cluster.waitActive();

@@ -97,6 +97,7 @@ import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
+import org.apache.hadoop.hdfs.server.protocol.*;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -1093,6 +1094,27 @@ class NameNodeRpcServer implements NamenodeProtocols {
     } else {
       return null;
     }
+  }
+
+  @Override // DatanodeProtocol
+  public DatanodeCommand reportHashes(DatanodeRegistration nodeReg,
+                                     String poolId, StorageBlockReport[] reports) throws IOException {
+    checkNNStartup();
+    verifyRequest(nodeReg);
+    if (blockStateChangeLog.isDebugEnabled()) {
+      blockStateChangeLog.debug("*BLOCK* NameNode.reportHashes: from " + nodeReg +
+                      ", reports.length=" + reports.length);
+    }
+
+    HashesMismatchCommand hmc = new HashesMismatchCommand();
+    final BlockManager bm = namesystem.getBlockManager();
+    for(StorageBlockReport r : reports) {
+      final BlockReport blocks = r.getReport();
+      List<Integer> mb = bm.checkHashes(nodeReg, r.getStorage(), blocks);
+      hmc.addStorageBuckets(r.getStorage().getStorageID(), mb);
+    }
+
+    return hmc;
   }
 
   @Override

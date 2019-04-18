@@ -926,9 +926,10 @@ public class TestBlockStoragePolicy {
                                    StorageType[] after) throws Exception {
     final int numDataNodes = 5;
     final StorageType[][] types = genStorageTypes(numDataNodes);
-    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).format(true)
         .numDataNodes(numDataNodes).storageTypes(types).build();
     cluster.waitActive();
+    Thread.sleep(10000);
     final DistributedFileSystem fs = cluster.getFileSystem();
     try {
       final Path dir = new Path("/test");

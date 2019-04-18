@@ -180,10 +180,10 @@ public class DatanodeProtocolClientSideTranslatorPB
     BlockReportRequestProto.Builder builder = BlockReportRequestProto
         .newBuilder().setRegistration(PBHelper.convert(registration))
         .setBlockPoolId(poolId);
-    
+
     boolean useBlocksBuffer = registration.getNamespaceInfo()
         .isCapabilitySupported(Capability.STORAGE_BLOCK_REPORT_BUFFERS);
-    
+
     for (StorageBlockReport r : reports) {
       StorageBlockReportProto.Builder reportBuilder =
           StorageBlockReportProto.newBuilder()
@@ -200,6 +200,34 @@ public class DatanodeProtocolClientSideTranslatorPB
     }
     return resp.hasCmd() ? PBHelper.convert(resp.getCmd()) : null;
   }
+
+  @Override
+  public DatanodeCommand reportHashes(DatanodeRegistration registration,
+                                     String poolId, StorageBlockReport[] reports) throws IOException {
+    BlockReportRequestProto.Builder builder =
+            BlockReportRequestProto.newBuilder()
+                    .setRegistration(PBHelper.convert(registration))
+                    .setBlockPoolId(poolId);
+
+    boolean useBlocksBuffer = registration.getNamespaceInfo()
+            .isCapabilitySupported(Capability.STORAGE_BLOCK_REPORT_BUFFERS);
+
+    for (StorageBlockReport r : reports) {
+      StorageBlockReportProto.Builder reportBuilder =
+              StorageBlockReportProto.newBuilder()
+                      .setStorage(PBHelper.convert(r.getStorage()))
+                      .setReport(PBHelper.convert(r.getReport(), useBlocksBuffer));
+      builder.addReports(reportBuilder.build());
+    }
+    BlockReportResponseProto resp;
+    try {
+      resp = rpcProxy.reportHashes(NULL_CONTROLLER, builder.build());
+    } catch (ServiceException se) {
+      throw ProtobufHelper.getRemoteException(se);
+    }
+    return resp.hasCmd() ? PBHelper.convert(resp.getCmd()) : null;
+  }
+
 
   @Override
   public DatanodeCommand cacheReport(DatanodeRegistration registration,

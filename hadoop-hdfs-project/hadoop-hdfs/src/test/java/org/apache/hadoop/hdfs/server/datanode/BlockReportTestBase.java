@@ -115,7 +115,7 @@ public abstract class BlockReportTestBase  {
   public void startUpCluster() throws IOException {
     REPL_FACTOR = 1; //Reset if case a test has modified the value
     cluster =
-        new MiniDFSCluster.Builder(conf).numDataNodes(REPL_FACTOR).build();
+        new MiniDFSCluster.Builder(conf).format(true).numDataNodes(REPL_FACTOR).build();
     fs = cluster.getFileSystem();
   }
 

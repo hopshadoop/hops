@@ -245,9 +245,9 @@ public class HashBuckets {
             .hash().asBytes();
   }
 
+  static Random rand = new Random(System.currentTimeMillis());
   public static byte[] getRandomHash(){
     byte[] hash = new byte[HashBuckets.HASH_LENGTH];
-    Random rand = new Random(System.currentTimeMillis());
     rand.nextBytes(hash);
     return hash;
   }

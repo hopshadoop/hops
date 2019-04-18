@@ -32,26 +32,17 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.ExceptionCheck;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.blockmanagement.BRLoadBalancingNonLeaderException;
 import org.apache.hadoop.hdfs.server.blockmanagement.BRLoadBalancingOverloadException;
+import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
-import org.apache.hadoop.hdfs.server.protocol.BalancerBandwidthCommand;
-import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
-import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
-import org.apache.hadoop.hdfs.server.protocol.FinalizeCommand;
-import org.apache.hadoop.hdfs.server.protocol.KeyUpdateCommand;
-import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
-import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
+import org.apache.hadoop.hdfs.server.protocol.*;
 import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo.BlockStatus;
-import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
-import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.util.Time;
 
@@ -163,9 +154,6 @@ class BPOfferService implements Runnable {
   private AtomicInteger rpcRoundRobinIndex = new AtomicInteger(0);
   // you have bunch of NNs, which one to send the incremental block report
   private AtomicInteger refreshNNRoundRobinIndex = new AtomicInteger(0);
-  final int maxNumIncrementalReportThreads;
-  private final ExecutorService incrementalBRExecutor;
-  private final ExecutorService brDispatcher;
   //in a heart beat only one actor should talk to name node and get the updated list of NNs
   //how to stop actors from communicating with all the NN at the same time for same RPC?
   //for that we will use a separate RR which will be incremented after Delta time (heartbeat time)
@@ -196,13 +184,7 @@ class BPOfferService implements Runnable {
     }
 
     dnConf = dn.getDnConf();
-
-
-    maxNumIncrementalReportThreads = dnConf.iBRDispatherTPSize;
-    incrementalBRExecutor = Executors.newFixedThreadPool(maxNumIncrementalReportThreads);
-    brDispatcher = Executors.newSingleThreadExecutor();
     prevBlockReportId = DFSUtil.getRandom().nextLong();
-
   }
 
   void refreshNNList(ArrayList<InetSocketAddress> addrs) throws IOException {
@@ -836,7 +818,7 @@ class BPOfferService implements Runnable {
           reportReceivedDeletedBlocks();
         }
 
-        startBRThread();
+        blockReportInternal();
 
         //
         // There is no work to do;  sleep until hearbeat timer elapses,
@@ -866,81 +848,32 @@ class BPOfferService implements Runnable {
     } // while (shouldRun())
   } // offerService
 
-  private BRTask brTask = new BRTask();
-  private Future futur = null;
-  private void startBRThread() throws InterruptedException, ExecutionException{
-    if (futur == null || futur.isDone()) {
-      if (futur != null) {
-        //check that previous run did not end with an exception
-        try {
-          futur.get();
-        } finally {
-          futur = null;
-        }
-      }
-      futur = brDispatcher.submit(brTask);
+  private void blockReportInternal() throws IOException, InterruptedException {
+    List<DatanodeCommand> cmds = blockReport();
+
+    if(cmds != null && blkReportHander != null) { //it is not null if the block report is successful
+      blkReportHander.processCommand(cmds == null ? null : cmds.toArray(new DatanodeCommand[cmds.size()]));
     }
-  }
 
-  private class BRTask implements Callable{
-  /**
-     * Computes a result, or throws an exception if unable to do so.
-     *
-     * @return computed result
-     * @throws Exception if unable to compute a result
-     */
-    @Override
-    public Object call() throws Exception {
-      List<DatanodeCommand> cmds = blockReport();
-
-      boolean brFailed = false;
-      if(cmds != null && blkReportHander != null) { //it is not null if the block report is successful
-        blkReportHander.processCommand(cmds == null ? null : cmds.toArray(new DatanodeCommand[cmds.size()]));
-      }
-
-      if(cmds == null) { // BR failed
-        brFailed = true;
-      }
-
-      DatanodeCommand cmd = cacheReport(cmds!=null);
-      if (cmd != null && blkReportHander != null) {
-        blkReportHander.processCommand(new DatanodeCommand[]{cmd});
-      }
-      
-      if (brFailed){
-        Thread.sleep(2000); //sleep before retrying to send the block report
-      }
-
-      return null;
+    DatanodeCommand cmd = cacheReport(cmds!=null);
+    if (cmd != null && blkReportHander != null) {
+      blkReportHander.processCommand(new DatanodeCommand[]{cmd});
     }
   }
 
   private final Object incrementalBRLock = new Object();
-  private int incrementalBRCounter = 0;
-  private final IncrementalBRTask incrementalBRTask = new IncrementalBRTask();
   /**
    * Report received blocks and delete hints to the Namenode
    *
    * @throws IOException
    */
-  private void reportReceivedDeletedBlocks() throws IOException {
-    synchronized (incrementalBRLock) {
-      if (incrementalBRCounter < maxNumIncrementalReportThreads){
-        incrementalBRCounter++;
-        incrementalBRExecutor.submit(incrementalBRTask);
-      }
-    }
-  }
-
-public class IncrementalBRTask implements Callable{
-    @Override
-    public Object call() throws Exception {
+  public void reportReceivedDeletedBlocks() throws IOException {
     // Generate a list of the pending reports for each storage under the lock
     List<StorageReceivedDeletedBlocks> reports =
-      new ArrayList<>(pendingIncrementalBRperStorage.size());
+            new ArrayList<>(pendingIncrementalBRperStorage.size());
     synchronized (pendingIncrementalBRperStorage) {
       for (Map.Entry<DatanodeStorage, PerStoragePendingIncrementalBR> entry :
-          pendingIncrementalBRperStorage.entrySet()) {
+              pendingIncrementalBRperStorage.entrySet()) {
         final DatanodeStorage storage = entry.getKey();
         final PerStoragePendingIncrementalBR perStorageMap = entry.getValue();
         if (perStorageMap.getBlockInfoCount() > 0) {
@@ -954,38 +887,32 @@ public class IncrementalBRTask implements Callable{
 
     if (reports.size() == 0) {
       // Nothing new to report.
-      synchronized (incrementalBRLock){
-        incrementalBRCounter--;
-      }
-      return null;
-      }
-      // Send incremental block reports to the Namenode outside the lock
-      boolean success = false;
-      final long startTime = Time.monotonicNow();
-      try {
-        blockReceivedAndDeletedWithRetry(reports.toArray(new StorageReceivedDeletedBlocks[reports.size()]));
-        success = true;
-      } finally {
-        dn.getMetrics().addIncrementalBlockReport(Time.monotonicNow()-startTime);
-        if (!success) {
-          synchronized (pendingIncrementalBRperStorage) {
-            for (StorageReceivedDeletedBlocks report : reports) {
-              // If we didn't succeed in sending the report, put all of the
-              // blocks back onto our queue, but only in the case where we
-              // didn't put something newer in the meantime.
-              PerStoragePendingIncrementalBR perStorageMap = pendingIncrementalBRperStorage.get(report.getStorage());
-              perStorageMap.putMissingBlockInfos(report.getBlocks());
-              sendImmediateIBR = true;
-            }
+      return;
+    }
+
+    // Send incremental block reports to the Namenode outside the lock
+    boolean success = false;
+    final long startTime = Time.monotonicNow();
+    try {
+      blockReceivedAndDeletedWithRetry(reports.toArray(new StorageReceivedDeletedBlocks[reports.size()]));
+      success = true;
+    } finally {
+      dn.getMetrics().addIncrementalBlockReport(Time.monotonicNow() - startTime);
+      if (!success) {
+        synchronized (pendingIncrementalBRperStorage) {
+          for (StorageReceivedDeletedBlocks report : reports) {
+            // If we didn't succeed in sending the report, put all of the
+            // blocks back onto our queue, but only in the case where we
+            // didn't put something newer in the meantime.
+            PerStoragePendingIncrementalBR perStorageMap = pendingIncrementalBRperStorage.get(report.getStorage());
+            perStorageMap.putMissingBlockInfos(report.getBlocks());
+            sendImmediateIBR = true;
           }
         }
       }
-    synchronized (incrementalBRLock){
-      incrementalBRCounter--;
     }
-    return null;
+    return;
   }
-}
 
   /**
    * Retrieve the incremental BR state for a given storage UUID
@@ -1118,6 +1045,9 @@ public class IncrementalBRTask implements Callable{
       try {
         if (totalBlockCount < dnConf.blockReportSplitThreshold) {
           // Below split threshold, send all reports in a single message.
+          DatanodeCommand buckets = blkReportHander.reportHashes(bpRegistration, getBlockPoolId()
+                  , slimBlockReports(reports));
+          removeMatchingBuckets(buckets, reports);
           DatanodeCommand cmd = blkReportHander.blockReport(
               bpRegistration, getBlockPoolId(), reports,
               new BlockReportContext(1, 0, reportId));
@@ -1130,6 +1060,9 @@ public class IncrementalBRTask implements Callable{
           // Send one block report per message.
           for (int r = 0; r < reports.length; r++) {
             StorageBlockReport singleReport[] = { reports[r] };
+            DatanodeCommand buckets = blkReportHander.reportHashes(bpRegistration,
+                    getBlockPoolId(), slimBlockReports(singleReport));
+            removeMatchingBuckets(buckets, singleReport);
             DatanodeCommand cmd = blkReportHander.blockReport(bpRegistration, getBlockPoolId(), singleReport,
                 new BlockReportContext(reports.length, r, reportId));
             numReportsSent++;
@@ -1166,12 +1099,56 @@ public class IncrementalBRTask implements Callable{
       // In case of un/successful block reports we have to inform the leader that
       // block reporting has finished for now.
       if (blkReportHander != null) {
-        getLeaderActor().blockReportCompleted(bpRegistration);
+        BPServiceActor leader =  getLeaderActor();
+        if( leader != null){
+          leader.blockReportCompleted(bpRegistration);
+        }
       }
     }
 
     scheduleNextBlockReport(startTime);
     return cmds.size() == 0 ? null : cmds;
+  }
+
+  StorageBlockReport[] slimBlockReports(StorageBlockReport[] reports){
+    StorageBlockReport[] slimStorageReports = new StorageBlockReport[reports.length];
+
+    for(int i = 0 ; i < reports.length; i++){
+      StorageBlockReport fatSR = reports[i];
+      BlockReport fatBR = fatSR.getReport();
+      Bucket slimBuckets[] = new Bucket[fatBR.getBuckets().length];
+
+      for(int j = 0; j < fatBR.getBuckets().length; j++){
+        Bucket slimBucket = new Bucket();
+        slimBucket.setHash(fatBR.getBuckets()[j].getHash());
+        slimBucket.setBlocks(BlockListAsLongs.EMPTY);
+        slimBuckets[j] = slimBucket;
+      }
+
+      BlockReport slimBR = new BlockReport(slimBuckets, fatBR.getNumberOfBlocks());
+
+      slimStorageReports[i] = new StorageBlockReport(fatSR.getStorage(), slimBR);
+    }
+
+    return slimStorageReports;
+  }
+
+  public void removeMatchingBuckets(DatanodeCommand cmd, StorageBlockReport reports[]){
+    Map<String, List<Integer>> map = ((HashesMismatchCommand) cmd).getMissMatchingBuckets();
+    for(StorageBlockReport report : reports){
+      List<Integer> mismatchingBuckets = map.get(report.getStorage().getStorageID());
+      removeMatchingBuckets(mismatchingBuckets,report.getReport());
+    }
+  }
+
+  public static void removeMatchingBuckets(List<Integer> mismatchingBuckets, BlockReport report){
+    HashSet mismatchingBucketsSet = new HashSet(mismatchingBuckets);
+    for(int i = 0; i < report.getBuckets().length; i++){
+      if(!mismatchingBucketsSet.contains(i)){
+        report.getBuckets()[i].setBlocks(BlockListAsLongs.EMPTY);
+        report.getBuckets()[i].setSkip(true);
+      }
+    }
   }
 
   private void scheduleNextBlockReport(long previousReportStartTime) {
@@ -1352,7 +1329,7 @@ public class IncrementalBRTask implements Callable{
     nnListLastUpdate = System.currentTimeMillis();
   }
 
-  public void startWhirlingSufiThread() {
+  public synchronized  void startWhirlingSufiThread() {
     if (blockReportThread == null || !blockReportThread.isAlive()) {
       blockReportThread = new Thread(this, "BlkReportThread");
       blockReportThread.setDaemon(true); // needed for JUnit testing
@@ -1425,6 +1402,15 @@ public class IncrementalBRTask implements Callable{
       }
     });
     return data;
+  }
+
+  public boolean firstActor(BPServiceActor actor) {
+    if (bpServices.size()>0){
+      if(bpServices.get(0).equals(actor)){
+        return true;
+      }
+    }
+    return  false;
   }
 
   private interface ActorActionHandler {

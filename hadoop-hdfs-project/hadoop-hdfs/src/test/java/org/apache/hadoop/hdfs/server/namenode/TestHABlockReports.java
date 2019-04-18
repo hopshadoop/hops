@@ -126,7 +126,7 @@ public class TestHABlockReports extends junit.framework.TestCase {
       setconfig();
       cluster = new MiniDFSCluster.Builder(conf)
               .nnTopology(MiniDFSNNTopology.simpleHOPSTopology(NUM_NAMENODES))
-              .numDataNodes(NUM_DATANODES).build();
+              .numDataNodes(NUM_DATANODES).format(true).build();
       cluster.waitActive();
 
       Thread.sleep(10000); // make sure that all block reports are in
