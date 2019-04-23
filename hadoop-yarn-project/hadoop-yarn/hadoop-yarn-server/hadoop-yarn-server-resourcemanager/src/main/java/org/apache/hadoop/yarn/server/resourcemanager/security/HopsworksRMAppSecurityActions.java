@@ -167,6 +167,21 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
   }
   
+  @VisibleForTesting
+  protected void setMasterToken(String masterToken) {
+    this.masterToken = masterToken;
+  }
+  
+  @VisibleForTesting
+  protected void setMasterTokenExpiration(LocalDateTime masterTokenExpiration) {
+    this.masterTokenExpiration = masterTokenExpiration;
+  }
+  
+  @VisibleForTesting
+  protected void setRenewalTokens(String[] renewalTokens) {
+    this.renewalTokens = renewalTokens;
+  }
+  
   protected PoolingHttpClientConnectionManager createConnectionManager() throws GeneralSecurityException {
     PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
     connectionManager.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
@@ -205,31 +220,10 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     
     sslConf = new Configuration(false);
     sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
-    masterToken = sslConf.get(YarnConfiguration.RM_JWT_MASTER_TOKEN);
-    if (masterToken == null) {
-      throw new GeneralSecurityException("Could not parse JWT from configuration");
-    }
-    authHeader.set(createAuthenticationHeader(masterToken));
-    try {
-      JWT jwt = JWTParser.parse(masterToken);
-      masterTokenExpiration = date2LocalDateTime(jwt.getJWTClaimsSet().getExpirationTime());
-    } catch (ParseException ex) {
-      throw new GeneralSecurityException("Could not parse master JWT", ex);
-    }
-  
-    String renewToken = null;
-    List<String> renewalTokens = new ArrayList<>();
-    int idx = 0;
-    while (true) {
-      String renewTokenKey = String.format(YarnConfiguration.RM_JWT_RENEW_TOKEN_PATTERN, idx);
-      renewToken = sslConf.get(renewTokenKey, "");
-      if (renewToken.isEmpty()) {
-        break;
-      }
-      renewalTokens.add(renewToken);
-      idx++;
-    }
-    this.renewalTokens = renewalTokens.toArray(new String[renewalTokens.size()]);
+    
+    loadMasterJWT();
+    loadRenewalJWTs();
+    
     jwtAliveIntervalSeconds = conf.getTimeDuration(YarnConfiguration.RM_JWT_ALIVE_INTERVAL,
         YarnConfiguration.DEFAULT_RM_JWT_ALIVE_INTERVAL, TimeUnit.SECONDS);
     
@@ -245,6 +239,39 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     
     tokenRenewer.execute(new TokenRenewer());
     jwtConfigured = true;
+  }
+  
+  protected void loadMasterJWT() throws GeneralSecurityException {
+    masterToken = sslConf.get(YarnConfiguration.RM_JWT_MASTER_TOKEN);
+    if (masterToken == null) {
+      throw new GeneralSecurityException("Could not parse JWT from configuration");
+    }
+    authHeader.set(createAuthenticationHeader(masterToken));
+    try {
+      JWT jwt = JWTParser.parse(masterToken);
+      masterTokenExpiration = date2LocalDateTime(jwt.getJWTClaimsSet().getExpirationTime());
+    } catch (ParseException ex) {
+      throw new GeneralSecurityException("Could not parse master JWT", ex);
+    }
+  }
+  
+  protected void loadRenewalJWTs() throws GeneralSecurityException {
+    String renewToken = null;
+    List<String> renewalTokens = new ArrayList<>();
+    int idx = 0;
+    while (true) {
+      String renewTokenKey = String.format(YarnConfiguration.RM_JWT_RENEW_TOKEN_PATTERN, idx);
+      renewToken = sslConf.get(renewTokenKey, "");
+      if (renewToken.isEmpty()) {
+        break;
+      }
+      renewalTokens.add(renewToken);
+      idx++;
+    }
+    if (renewalTokens.isEmpty()) {
+      throw new GeneralSecurityException("Could not load one-time renewal JWTs");
+    }
+    this.renewalTokens = renewalTokens.toArray(new String[renewalTokens.size()]);
   }
   
   @Override
@@ -591,6 +618,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
           LocalDateTime now = now();
           if (isTime2Renew(now, masterTokenExpiration)) {
             backoff.reset();
+            // TODO(Antonis): Configurable master JWT expiration date
             LocalDateTime expiresAt = now().plus(12, ChronoUnit.HOURS);
             int renewalTokenIdx = 0;
             while (renewalTokenIdx < renewalTokens.length) {
