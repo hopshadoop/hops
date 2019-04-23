@@ -117,7 +117,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   private URL jwtRenewPath;
   private URL serviceJWTRenewPath;
   private URL serviceJWTInvalidatePath;
-  private long jwtAliveIntervalSeconds;
+  private long serviceJWTValidityPeriodSeconds;
   private boolean jwtConfigured = false;
   private String masterToken;
   private LocalDateTime masterTokenExpiration;
@@ -224,8 +224,11 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     loadMasterJWT();
     loadRenewalJWTs();
     
-    jwtAliveIntervalSeconds = conf.getTimeDuration(YarnConfiguration.RM_JWT_ALIVE_INTERVAL,
-        YarnConfiguration.DEFAULT_RM_JWT_ALIVE_INTERVAL, TimeUnit.SECONDS);
+    serviceJWTValidityPeriodSeconds = conf.getTimeDuration(YarnConfiguration.RM_JWT_MASTER_VALIDITY_PERIOD,
+        YarnConfiguration.DEFAULT_RM_JWT_MASTER_VALIDITY_PERIOD, TimeUnit.SECONDS);
+    if (serviceJWTValidityPeriodSeconds == 0) {
+      serviceJWTValidityPeriodSeconds = 30L;
+    }
     
     String serviceJWTRenewPathConf = conf.get(YarnConfiguration.RM_JWT_SERVICE_RENEW_PATH,
         YarnConfiguration.DEFAULT_RM_JWT_SERVICE_RENEW_PATH);
@@ -599,6 +602,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
   
   private class TokenRenewer implements Runnable {
     private final BackOff backoff;
+    private final long sleepPeriodSeconds;
     
     private TokenRenewer() {
       int maximumRetries = Math.max(1, renewalTokens.length);
@@ -608,6 +612,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
           .setMultiplier(2)
           .setMaximumRetries(maximumRetries)
           .build();
+      sleepPeriodSeconds = serviceJWTValidityPeriodSeconds / 2;
     }
 
     @Override
@@ -618,8 +623,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
           LocalDateTime now = now();
           if (isTime2Renew(now, masterTokenExpiration)) {
             backoff.reset();
-            // TODO(Antonis): Configurable master JWT expiration date
-            LocalDateTime expiresAt = now().plus(12, ChronoUnit.HOURS);
+            LocalDateTime expiresAt = now().plus(serviceJWTValidityPeriodSeconds, ChronoUnit.SECONDS);
             int renewalTokenIdx = 0;
             while (renewalTokenIdx < renewalTokens.length) {
               try {
@@ -670,7 +674,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
               }
             }
           }
-          TimeUnit.SECONDS.sleep(jwtAliveIntervalSeconds);
+          TimeUnit.SECONDS.sleep(sleepPeriodSeconds);
         } catch (InterruptedException ex) {
           LOG.warn("Service JWT renewer has been interrupted");
           Thread.currentThread().interrupt();

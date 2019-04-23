@@ -2702,6 +2702,8 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_JWT_MASTER_TOKEN = RM_PREFIX + JWT_PREFIX + "master-token";
   
   public static final String RM_JWT_RENEW_TOKEN_PATTERN = RM_PREFIX + JWT_PREFIX + "renew-token-%d";
-  public static long DEFAULT_RM_JWT_ALIVE_INTERVAL = 1800;
-  public static final String RM_JWT_ALIVE_INTERVAL = RM_PREFIX + JWT_PREFIX + "alive-interval";
+  
+  // 5 days
+  public static long DEFAULT_RM_JWT_MASTER_VALIDITY_PERIOD = 432000;
+  public static final String RM_JWT_MASTER_VALIDITY_PERIOD = RM_PREFIX + JWT_PREFIX + "master-token-validity";
 }
