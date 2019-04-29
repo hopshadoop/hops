@@ -246,7 +246,7 @@ public class QuotaUpdateManager {
            * could differ from the view of the parent if outstanding quota updates are applied after being considered
            * by the QuotaCountingFileTree but before successfully moving the subtree.
            */
-          return null;
+          return false;
         }
 
         QuotaCounts counts = new QuotaCounts.Builder().build();
@@ -263,7 +263,7 @@ public class QuotaUpdateManager {
 
         if (dir == null) {
           LOG.debug("dropping update for " + updates.get(0) + " quota " + counts + " because of deletion");
-          return null;
+          return false;
         }
 
         if (dir != null && dir.isQuotaSet()) {
