@@ -774,6 +774,12 @@ public class DBRMStateStore extends RMStateStore {
           ApplicationState hop = new ApplicationState(removeAppId.toString());
           DA.remove(hop);
 
+          //Remove attempts of this app
+          ApplicationAttemptStateDataAccess attemptDA
+                  = (ApplicationAttemptStateDataAccess) RMStorageFactory
+                  .getDataAccess(ApplicationAttemptStateDataAccess.class);
+          List<ApplicationAttemptState> attemptsToRemove = attemptDA.getByAppId(removeAppId.toString());
+          attemptDA.removeAll(attemptsToRemove);
           connector.commit();
         }
         return null;
