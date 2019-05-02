@@ -3384,7 +3384,7 @@ public class BlockManager {
    * For each block in the name-node verify whether it belongs to any file,
    * over or under replicated. Place it into the respective queue.
    */
-  public void processMisReplicatedBlocks() throws IOException {
+  public synchronized void processMisReplicatedBlocks() throws IOException {
     //this normaly reinitialize the block scanning, when should we reinitialize the block scanning and
     //how do we propagate it to all NN?
     stopReplicationInitializer();
