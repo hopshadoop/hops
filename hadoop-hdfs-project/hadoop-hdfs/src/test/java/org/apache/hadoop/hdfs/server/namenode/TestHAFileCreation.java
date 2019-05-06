@@ -2,7 +2,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -38,13 +37,6 @@ import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 public class TestHAFileCreation extends junit.framework.TestCase {
 
   public static final Log LOG = LogFactory.getLog(TestHAFileCreation.class);
-
-  {
-    ((Log4JLogger) NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
-        .setLevel(Level.ALL);
-  }
 
   Configuration conf = new HdfsConfiguration();
   MiniDFSCluster cluster = null;
