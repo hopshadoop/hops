@@ -61,9 +61,16 @@ git checkout master
 mvn clean install -DskipTests
 ```
 
-#### GPU Abstraction Layer Implementation
+#### NVIDIA GPU Implementation
 ```sh
 git clone https://github.com/hopshadoop/hops-gpu-management-impl-nvidia
+git checkout master
+mvn clean install -DskipTests
+```
+
+#### ROCm GPU Implementation
+```sh
+git clone https://github.com/hopshadoop/hops-gpu-management-impl-amd
 git checkout master
 mvn clean install -DskipTests
 ```
