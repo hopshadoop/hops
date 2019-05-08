@@ -212,6 +212,8 @@ message LocatedBlockProto {
   repeated bool isCached = 6 [packed=true]; // if a location in locs is cached
   repeated StorageTypeProto storageTypes = 7;
   repeated string storageIDs = 8;
+
+  // hopsfs
   optional bytes data = 9;
   optional uint64 checksum = 10;
 }
@@ -313,8 +315,12 @@ message HdfsFileStatusProto {
   optional LocatedBlocksProto locations = 12; // suppled only if asked by client
   optional uint64 fileId = 13 [default = 0]; // default as an invalid id
   optional int32 childrenNum = 14 [default = -1];
-  optional bool isFileStoredInDB = 15; // false if not supplied
+  // Optional field for file encryption
+  //optional FileEncryptionInfoProto fileEncryptionInfo = 15;
   optional uint32 storagePolicy = 16 [default = 0]; // block storage policy id
+  
+  //hopsfs
+  optional bool isFileStoredInDB = 17; // false if not supplied
 }
 
 /**
