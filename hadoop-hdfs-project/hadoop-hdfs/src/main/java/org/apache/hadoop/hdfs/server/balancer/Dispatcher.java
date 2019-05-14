@@ -722,7 +722,11 @@ public class Dispatcher {
         if (shouldFetchMoreBlocks()) {
           // fetch new blocks
           try {
-            blocksToReceive -= getBlockList();
+            long received = getBlockList();
+            if(received == 0){
+              return;
+            }
+            blocksToReceive -= received;
             continue;
           } catch (IOException e) {
             LOG.warn("Exception while getting block list", e);

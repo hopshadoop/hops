@@ -233,6 +233,9 @@ public class TestBalancer {
     for(int i = 0; i < blocksDN.length; i++)
       cluster.injectBlocks(i, Arrays.asList(blocksDN[i]), null);
 
+    //wait for the blocks to be added
+    Thread.sleep(10000);
+      
     final long totalCapacity = sum(capacities);
     runBalancer(conf, totalUsedSpace, totalCapacity);
     cluster.shutdown();
@@ -777,7 +780,7 @@ public class TestBalancer {
    * A partially filled datanode is excluded during balancing.
    * This triggers a situation where one of the block's location is unknown.
    */
-  @Test(timeout=300000)
+  @Test//(timeout=300000)
   public void testUnknownDatanode() throws Exception {
     Configuration conf = new HdfsConfiguration();
     initConf(conf);
@@ -813,6 +816,7 @@ public class TestBalancer {
       client = NameNodeProxies.createProxy(conf, cluster.getFileSystem(0).getUri(),
           ClientProtocol.class).getProxy();
 
+      Thread.sleep(2000);
       for(int i = 0; i < 3; i++) {
         cluster.injectBlocks(i, Arrays.asList(blocksDN[i]), null);
       }
