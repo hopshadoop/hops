@@ -181,6 +181,10 @@ public class LockFactory {
     return new IndividualINodeLock(lockType, inodeIdentifier);
   }
 
+  public Lock getINodesLocks(TransactionLockTypes.INodeLockType lockType, List<INodeIdentifier> inodeIdentifiers) {
+    return new INodesLocks(lockType, inodeIdentifiers);
+  }
+  
   public INodeLock getINodeLock(TransactionLockTypes.INodeLockType lockType,
                                 TransactionLockTypes.INodeResolveType resolveType, String... paths) {
     return new INodeLock(lockType, resolveType, paths);

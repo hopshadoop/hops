@@ -150,6 +150,7 @@ class BPOfferService implements Runnable {
   // to make sure the "happens-before" consistency.
   private volatile long lastBlockReport = 0;
   private boolean resetBlockReportTime = true;
+  private boolean nextBlockReportOverwritten = false;
   
   volatile long lastCacheReport = 0;
   
@@ -1065,8 +1066,9 @@ public class IncrementalBRTask implements Callable{
     if (startTime - lastBlockReport <= dnConf.blockReportInterval) {
       return null;
     }
-
-      
+    
+    nextBlockReportOverwritten = false;
+    
 
     ArrayList<DatanodeCommand> cmds = new ArrayList<DatanodeCommand>();
 
@@ -1173,6 +1175,12 @@ public class IncrementalBRTask implements Callable{
   }
 
   private void scheduleNextBlockReport(long previousReportStartTime) {
+    //do not set lastBlockReport when thisone has been set through 
+    // scheduleBlockReportInt
+    if(nextBlockReportOverwritten){
+      nextBlockReportOverwritten = false;
+      return;
+    }
     // If we have sent the first set of block reports, then wait a random
     // time before we start the periodic block reports.
     if (resetBlockReportTime) {
@@ -1248,6 +1256,7 @@ public class IncrementalBRTask implements Callable{
       lastBlockReport = 0;
     }
     resetBlockReportTime = true; // reset future BRs for randomness
+    nextBlockReportOverwritten = true; //make sure that if there is an ongoing blockreport it will not cancel this
   }
 
   /**

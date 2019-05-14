@@ -2208,7 +2208,7 @@ public class BlockManager {
         }
       }
 
-      final long endTime = Time.now();
+      final long endTime = Time.monotonicNow();
 
       // Log the block report processing stats from Namenode perspective
       final NameNodeMetrics metrics = NameNode.getNameNodeMetrics();
@@ -2221,7 +2221,7 @@ public class BlockManager {
           + ", processing time: " + (endTime - startTime) + " ms. " + reportStatistics);
       return !node.hasStaleStorages();
     } catch (Throwable t) {
-      final long endTime = Time.now();
+      final long endTime = Time.monotonicNow();
       blockLog.error("BLOCK* processReport fail: from " + nodeID + " storage: " + storage + ", blocks: " + newReport.
           getNumberOfBlocks() + ", processing time: " + (endTime - startTime) + " ms. " + reportStatistics, t);
       throw t;
@@ -2421,13 +2421,47 @@ public class BlockManager {
   
     final List<Callable<Object>> addTasks = new ArrayList<>();
     int numBlocksLogged = 0;
+    final Map<Long, List<BlockInfoContiguous>> blocksToAddPerInodeId = new HashMap<>();
     for (final BlockInfoContiguous b : toAdd) {
+      List<BlockInfoContiguous> blocksToAddList = blocksToAddPerInodeId.get(b.getInodeId());
+      if(blocksToAddList==null){
+        blocksToAddList=new ArrayList<>();
+        blocksToAddPerInodeId.put(b.getInodeId(), blocksToAddList);
+      }
+      blocksToAddList.add(b);
+    }
+    final Map<Integer, List<BlockInfoContiguous>> blocksToAdd = new HashMap();
+    final Map<Integer, List<Long>> blockIdsToAdd = new HashMap();
+    final Map<Integer, List<Long>> inodeIdsToAdd = new HashMap();
+    int index = 0;
+    for(List<BlockInfoContiguous> entry : blocksToAddPerInodeId.values()){
+      List<BlockInfoContiguous> blocksToAddList = blocksToAdd.get(index);
+      List<Long> blockIdsToAddList = blockIdsToAdd.get(index);
+      List<Long> inodeIdsToAddList = inodeIdsToAdd.get(index);
+      if(blocksToAddList==null){
+        blocksToAddList=new ArrayList<>();
+        blockIdsToAddList=new ArrayList<>();
+        inodeIdsToAddList=new ArrayList<>();
+        blocksToAdd.put(index, blocksToAddList);
+        blockIdsToAdd.put(index, blockIdsToAddList);
+        inodeIdsToAdd.put(index, inodeIdsToAddList);
+      }
+      for(BlockInfoContiguous b : entry){
+        blocksToAddList.add(b);
+        blockIdsToAddList.add(b.getBlockId());
+        inodeIdsToAddList.add(b.getInodeId());
+      }
+      if(blocksToAddList.size()>=100){
+        index++;
+      }
+    }
+    for(final int ind : blocksToAdd.keySet()){
       if (firstBlockReport) {
         final boolean logIt =  numBlocksLogged < maxNumBlocksToLog;
         addTasks.add(new Callable<Object>() {
           @Override
           public Object call() throws Exception {
-            addStoredBlockImmediateTx(b, storage, logIt);
+            addStoredBlockImmediateTx(blocksToAdd.get(ind), blockIdsToAdd.get(ind), inodeIdsToAdd.get(ind), storage, logIt);
             return null;
           }
         });
@@ -2436,7 +2470,9 @@ public class BlockManager {
         addTasks.add(new Callable<Object>() {
           @Override
           public Object call() throws Exception {
-            addStoredBlockTx(b, storage, null, logIt);
+            List<BlockInfoContiguous> l = blocksToAdd.get(ind);
+            List<Long> list = blockIdsToAdd.get(ind);
+            addStoredBlockTx(blocksToAdd.get(ind), blockIdsToAdd.get(ind), inodeIdsToAdd.get(ind), storage, null, logIt);
             return null;
           }
         });
@@ -5284,35 +5320,43 @@ public class BlockManager {
     return binfo;
   }
 
-  private Block addStoredBlockTx(final BlockInfoContiguous block,
+  private void addStoredBlockTx(final List<BlockInfoContiguous> blocks, final List<Long> blockIds, final List<Long> inodeIds,
       final DatanodeStorageInfo storage, final DatanodeDescriptor
       delNodeHint, final boolean logEveryBlock) throws IOException {
-    return (Block) new HopsTransactionalRequestHandler(
+    new HopsTransactionalRequestHandler(
         HDFSOperationType.AFTER_PROCESS_REPORT_ADD_BLK) {
-      INodeIdentifier inodeIdentifier;
+      List<INodeIdentifier> inodeIdentifiers = new ArrayList<>();
 
       @Override
       public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+        Set<Long> addedInodeIds = new HashSet<>();
+        for(long id : inodeIds){
+          if(!addedInodeIds.contains(id)){
+            inodeIdentifiers.add(INodeUtil.resolveINodeFromId(id));
+            addedInodeIds.add(id);
+          }
+        }
       }
 
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
-            .add(lf.getBlockLock(block.getBlockId(), inodeIdentifier)).add(
+        locks.add(lf.getINodesLocks(INodeLockType.WRITE, inodeIdentifiers))
+            .add(lf.getBlockReportingLocks(Longs.toArray(blockIds), Longs.toArray(inodeIds) , new long[0], 0)).add(
             lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.IV, BLK.UR));
         if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
-            inodeIdentifier != null) {
-          locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE,
-              inodeIdentifier.getInodeId()));
+            !inodeIdentifiers.isEmpty()) {
+          locks.add(lf.getBatchedEncodingStatusLock(LockType.WRITE,
+              inodeIdentifiers));
         }
       }
 
       @Override
       public Object performTask() throws IOException {
-        return addStoredBlock(block, storage, delNodeHint, logEveryBlock);
+        for(BlockInfoContiguous block: blocks){
+          Block b = addStoredBlock(block, storage, delNodeHint, logEveryBlock);
+        }
+        return null;
       }
     }.handle();
   }
@@ -5436,35 +5480,41 @@ public class BlockManager {
     }.handle();
   }
 
-  private void addStoredBlockImmediateTx(final BlockInfoContiguous block,
+  private void addStoredBlockImmediateTx(final List<BlockInfoContiguous> blocks, final List<Long> blockIds, final List<Long> inodeIds,
       final DatanodeStorageInfo storage, final boolean logEveryBlock) throws IOException {
     new HopsTransactionalRequestHandler(
         HDFSOperationType.AFTER_PROCESS_REPORT_ADD_BLK_IMMEDIATE) {
-      INodeIdentifier inodeIdentifier;
+      List<INodeIdentifier> inodeIdentifiers = new ArrayList<>();
 
       @Override
       public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+        Set<Long> addedInodeIds = new HashSet<>();
+        for(long id : inodeIds){
+          if(!addedInodeIds.contains(id)){
+            inodeIdentifiers.add(INodeUtil.resolveINodeFromId(id));
+            addedInodeIds.add(id);
+          }
+        }
       }
 
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
-            .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
-            .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.PE, BLK.IV,
-                BLK.UR));
+        locks.add(lf.getINodesLocks(INodeLockType.WRITE, inodeIdentifiers))
+            .add(lf.getBlockReportingLocks(Longs.toArray(blockIds), Longs.toArray(inodeIds) , new long[0], 0)).add(
+            lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.IV, BLK.UR));
         if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
-            inodeIdentifier != null) {
-          locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE,
-              inodeIdentifier.getInodeId()));
+            !inodeIdentifiers.isEmpty()) {
+          locks.add(lf.getBatchedEncodingStatusLock(LockType.WRITE,
+              inodeIdentifiers));
         }
       }
 
       @Override
       public Object performTask() throws IOException {
-        addStoredBlockImmediate(block, storage, logEveryBlock);
+        for(BlockInfoContiguous block: blocks){
+          addStoredBlockImmediate(block, storage, logEveryBlock);
+        }
         return null;
       }
     }.handle();
