@@ -131,7 +131,7 @@ public class TestNameNodeMetrics {
   private void updateMetrics() throws Exception {
     // Wait for metrics update (corresponds to dfs.namenode.replication.interval
     // for some block related metrics to get updated)
-    Thread.sleep(1000);
+    Thread.sleep(1500 * DFS_REPLICATION_INTERVAL);
   }
 
   private void readFile(FileSystem fileSys, Path name) throws IOException {
@@ -405,6 +405,8 @@ public class TestNameNodeMetrics {
    */
   @Test
   public void testSyncAndBlockReportMetric() throws Exception {
+    //Block reporting may take a few seconds
+    Thread.sleep(5000);
     MetricsRecordBuilder rb = getMetrics(NN_METRICS);
     // Each datanode reports in when the cluster comes up
     assertCounter("BlockReportNumOps",
