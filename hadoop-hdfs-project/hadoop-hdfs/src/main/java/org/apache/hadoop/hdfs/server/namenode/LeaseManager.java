@@ -273,9 +273,11 @@ public class LeaseManager {
       renewLease(lease);
     }
 
-    LeasePath lPath = new LeasePath(src, lease.getHolderID());
-    lease.addFirstPath(lPath);
-    EntityManager.add(lPath);
+    if(src != null) {
+      LeasePath lPath = new LeasePath(src, lease.getHolderID());
+      lease.addFirstPath(lPath);
+      EntityManager.add(lPath);
+    }
 
     return lease;
   }
@@ -606,6 +608,11 @@ public class LeaseManager {
               }
 
               LOG.info("Lease " + leaseToCheck + " has expired hard limit");
+
+              if(!leaseToCheck.hasPath()){
+                EntityManager.remove(leaseToCheck);
+                return true;
+              }
 
               final List<LeasePath> removing = new ArrayList<>();
               // need to create a copy of the oldest lease paths, because 

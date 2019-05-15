@@ -25,6 +25,7 @@ import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -156,5 +157,24 @@ public class TestLeaseManager {
     //Initiate a call to checkLease. This should exit within the test timeout
     lm.checkLeases();
   }
-  
+
+  @Test
+  public void testRemoveLease() throws Exception {
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
+    cluster.waitActive();
+
+    // set the hard limit to be 1 second
+    cluster.setLeasePeriod(3*1000, 1000);
+
+    LeaseManager lm = NameNodeAdapter.getLeaseManager(cluster.getNamesystem());
+    addLease(lm, "holder1", null);
+    addLease(lm, "holder2", null);
+    addLease(lm, "holder3", null);
+
+    assertEquals(lm.getNumSortedLeases() , 3);
+
+    Thread.sleep(10000);
+
+    assertEquals(lm.getNumSortedLeases() , 0);
+  }
 }
