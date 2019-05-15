@@ -5250,7 +5250,8 @@ public class BlockManager {
     return completeBlock;
   }
 
-  private void processTimedOutPendingBlock(final long timedOutItemId)
+  @VisibleForTesting
+  public void processTimedOutPendingBlock(final long timedOutItemId)
       throws IOException {
     new HopsTransactionalRequestHandler(
         HDFSOperationType.PROCESS_TIMEDOUT_PENDING_BLOCK) {
@@ -5279,6 +5280,9 @@ public class BlockManager {
       public Object performTask() throws IOException {
         BlockInfo timedOutItem = EntityManager
             .find(BlockInfo.Finder.ByBlockIdAndINodeId, timedOutItemId);
+        if(timedOutItem==null){
+          return null;
+        }
         NumberReplicas num = countNodes(timedOutItem);
         if (isNeededReplication(timedOutItem, getReplication(timedOutItem),
             num.liveReplicas())) {
