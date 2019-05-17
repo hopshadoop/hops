@@ -104,20 +104,26 @@ public class LightWeightCacheDistributed extends LightWeightCache<CacheEntry, Ca
   @Override
   public CacheEntry get(CacheEntry key) {
     CacheEntry entry = super.get(key);
-    try{
-    RetryCacheEntry existInDB = EntityManager.find(RetryCacheEntry.Finder.ByClientIdAndCallId, key.getClientId(), key.getCallId());
-    if(existInDB != null && existInDB.getExpirationTime()  > timer.now()){
-      byte state = existInDB.getState() == CacheEntry.INPROGRESS ? CacheEntry.FAILED : existInDB.getState();
-      RetryCacheDistributed.CacheEntry exist = new CacheEntryWithPayload(existInDB.getClientId(), existInDB.getCallId(), existInDB.getPayload(), existInDB.getExpirationTime(),state);
-      if(entry==null){
-        super.put(exist, accessExpirationPeriod);
-        entry = exist;
+    try {
+      RetryCacheEntry existInDB = EntityManager.find(RetryCacheEntry.Finder.ByClientIdAndCallId, key.getClientId(), key.
+          getCallId());
+      if (existInDB != null && existInDB.getExpirationTime() > timer.now()) {
+        byte state = existInDB.getState() == CacheEntry.INPROGRESS ? CacheEntry.FAILED : existInDB.getState();
+        RetryCacheDistributed.CacheEntry exist = new CacheEntryWithPayload(existInDB.getClientId(), existInDB.
+            getCallId(), existInDB.getPayload(), existInDB.getExpirationTime(), state);
+        if (entry == null) {
+          super.put(exist, accessExpirationPeriod);
+          entry = exist;
+        }
+        existInDB.setExpirationTime(entry.getExpirationTime());
+        EntityManager.update(existInDB);
+      } else if (entry != null) {
+        super.remove(entry);
+        entry = null;
       }
-      existInDB.setExpirationTime(entry.getExpirationTime());
-      EntityManager.update(existInDB);
-    }   
-    }catch(StorageException | TransactionContextException ex){
+    } catch (StorageException | TransactionContextException ex) {
       LOG.error("failed to get or update entry in DB", ex);
+      entry = null;
     }
     return entry;
   }
