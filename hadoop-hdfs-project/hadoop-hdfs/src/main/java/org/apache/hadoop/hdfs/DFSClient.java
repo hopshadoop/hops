@@ -2680,7 +2680,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         + type.toString());
     }
     try (TraceScope ignored = newPathTraceScope("setQuotaByStorageType", src)) {
-      namenode.setQuota(src, HdfsConstants.QUOTA_DONT_SET, quota, type);
+      leaderNN.setQuota(src, HdfsConstants.QUOTA_DONT_SET, quota, type);
     } catch (RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
         FileNotFoundException.class,
