@@ -421,7 +421,13 @@ public class CommonConfigurationKeysPublic {
 
   public static final String IPC_SERVER_SSL_ENABLED = "ipc.server.ssl.enabled";
   public static final boolean IPC_SERVER_SSL_ENABLED_DEFAULT = false;
-
+  
+  /**
+   * Maximum time spent on TLS handshake before the connection is dropped
+   */
+  public static final String IPC_SERVER_TLS_HANDSHAKE_TIMEOUT_MS = "ipc.server.tls.handshake-timeout-ms";
+  public static final long IPC_SERVER_TLS_HANDSHAKE_TIMEOUT_MS_DEFAULT = 2000L;
+  
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
