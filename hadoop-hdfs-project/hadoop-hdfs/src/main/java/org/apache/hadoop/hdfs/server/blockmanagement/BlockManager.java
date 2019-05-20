@@ -2217,7 +2217,6 @@ public class BlockManager {
       // Get the storageinfo object that we are updating in this processreport
       reportStatistics = processReport(storageInfo, newReport);
 
-      storageInfo.receivedBlockReport();
       if (context != null) {
         storageInfo.setLastBlockReportId(context.getReportId());
         if (lastStorageInRpc) {
@@ -5620,5 +5619,20 @@ public class BlockManager {
   public int getRemovalNoThreads() {
     return removalNoThreads;
   }
-  
+
+  public void blockReportCompleted(final DatanodeID nodeID, DatanodeStorage[] storages) throws
+          IOException {
+    //Leader should remove the information about the block report from the DB
+    if(namesystem != null && namesystem.getNameNode() != null){ //for unit testing
+      if(namesystem.getNameNode().isLeader()){
+        namesystem.getNameNode().getBRTrackingService().blockReportCompleted(nodeID.getXferAddr());
+      }
+    }
+
+    DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
+    for(DatanodeStorage storage : storages) {
+      DatanodeStorageInfo storageInfo = node.getStorageInfo(storage.getStorageID());
+      storageInfo.receivedBlockReport();
+    }
+  }
 }

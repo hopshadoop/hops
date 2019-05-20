@@ -1337,11 +1337,6 @@ public class NameNode implements NameNodeStatusMXBean {
     }
   }
 
-  public void blockReportCompleted(final DatanodeID nodeID) throws
-          IOException {
-    brTrackingService.blockReportCompleted(nodeID.getXferAddr());
-  }
-
   private static void dropAndCreateDB(Configuration conf) throws IOException {
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.getConnector().dropAndRecreateDB();
@@ -1440,6 +1435,10 @@ public class NameNode implements NameNodeStatusMXBean {
    */
   boolean isStarted() {
     return this.started.get();
+  }
+
+  public BRTrackingService getBRTrackingService(){
+    return brTrackingService;
   }
 }
 

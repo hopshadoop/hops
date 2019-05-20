@@ -47,16 +47,7 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ReportBadBlo
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageBlockReportProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageReceivedDeletedBlocksProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.*;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
-import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
-import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
-import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
-import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
-import org.apache.hadoop.hdfs.server.protocol.StorageReport;
-import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
+import org.apache.hadoop.hdfs.server.protocol.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -351,7 +342,14 @@ public class DatanodeProtocolServerSideTranslatorPB
   @Override
   public DatanodeProtocolProtos.BlockReportCompletedResponseProto blockReportCompleted(RpcController controller, DatanodeProtocolProtos.BlockReportCompletedRequestProto request) throws ServiceException {
     try {
-      impl.blockReportCompleted(PBHelper.convert(request.getRegistration()));
+      DatanodeStorage[] storages = new DatanodeStorage[request.getStoragesCount()];
+
+      int i = 0;
+      for(DatanodeStorageProto storage : request.getStoragesList()){
+        storages[i++] = PBHelper.convert(storage);
+      }
+
+      impl.blockReportCompleted(PBHelper.convert(request.getRegistration()), storages);
 
       DatanodeProtocolProtos.BlockReportCompletedResponseProto.Builder response =
               DatanodeProtocolProtos.BlockReportCompletedResponseProto.newBuilder();

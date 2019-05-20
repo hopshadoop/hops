@@ -855,6 +855,8 @@ public class TestBlockManager {
 
     bm.processReport(node, new DatanodeStorage(ds.getStorageID()),
         BlockReport.builder(numBuckets).build(), null, false);
+    DatanodeStorage[] storages = {new DatanodeStorage(ds.getStorageID())};
+    bm.blockReportCompleted(node, storages);
     assertEquals(1, ds.getBlockReportCount());
     // send block report again, should NOT be processed
     reset(node);
@@ -871,6 +873,7 @@ public class TestBlockManager {
     reset(node);
     bm.processReport(node, new DatanodeStorage(ds.getStorageID()),
         BlockReport.builder(numBuckets).build(), null, false);
+    bm.blockReportCompleted(node, storages);
     // Reinitialize as registration with empty storage list pruned
     // node.storageMap.
     ds = node.getStorageInfos()[0];
@@ -900,6 +903,8 @@ public class TestBlockManager {
     doReturn(1).when(node).numBlocks();
     bm.processReport(node, new DatanodeStorage(ds.getStorageID()),
         BlockReport.builder(numBuckets).build(), null, false);
+    DatanodeStorage[] storages = {new DatanodeStorage(ds.getStorageID())};
+    bm.blockReportCompleted(node, storages);
     assertEquals(1, ds.getBlockReportCount());
   }
   

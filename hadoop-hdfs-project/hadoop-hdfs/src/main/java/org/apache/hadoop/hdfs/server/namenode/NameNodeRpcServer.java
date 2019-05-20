@@ -1331,8 +1331,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override
-  public void blockReportCompleted(DatanodeRegistration nodeReg) throws IOException {
-    nn.blockReportCompleted(nodeReg);
+  public void blockReportCompleted(DatanodeRegistration nodeReg, DatanodeStorage[] storages) throws IOException {
+    namesystem.getBlockManager().blockReportCompleted(nodeReg, storages);
   }
 
   @Override
