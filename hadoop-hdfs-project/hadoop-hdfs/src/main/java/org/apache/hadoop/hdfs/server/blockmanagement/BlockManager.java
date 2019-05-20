@@ -2451,7 +2451,7 @@ public class BlockManager {
         blockIdsToAddList.add(b.getBlockId());
         inodeIdsToAddList.add(b.getInodeId());
       }
-      if(blocksToAddList.size()>=100){
+      if(blocksToAddList.size()>=processReportBatchSize){
         index++;
       }
     }
