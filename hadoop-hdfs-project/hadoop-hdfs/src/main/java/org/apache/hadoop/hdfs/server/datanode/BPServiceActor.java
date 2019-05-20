@@ -32,15 +32,7 @@ import org.apache.hadoop.hdfs.protocol.UnregisteredNodeException;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.common.IncorrectVersionException;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.DisallowedDatanodeException;
-import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
-import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
-import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
-import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
-import org.apache.hadoop.hdfs.server.protocol.StorageReport;
-import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
+import org.apache.hadoop.hdfs.server.protocol.*;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.util.Time;
@@ -53,7 +45,6 @@ import java.net.SocketTimeoutException;
 import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeStatus;
-import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -658,8 +649,8 @@ class BPServiceActor implements Runnable {
     return bpNamenode.blockReport(registration, poolId, reports, context);
   }
 
-  public void blockReportCompleted(DatanodeRegistration registration) throws IOException {
-    bpNamenode.blockReportCompleted(registration);
+  public void blockReportCompleted(DatanodeRegistration registration, DatanodeStorage[] storages) throws IOException {
+    bpNamenode.blockReportCompleted(registration, storages);
   }
 
   public DatanodeCommand cacheReport(DatanodeRegistration bpRegistration,

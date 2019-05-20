@@ -424,7 +424,8 @@ required DatanodeRegistrationProto registration = 2;
  * void request
  */
 message BlockReportCompletedRequestProto {
-required DatanodeRegistrationProto registration = 1;
+  required DatanodeRegistrationProto registration = 1;
+  repeated DatanodeStorageProto storages = 2;
 }
 
 message GetSmallFileDataProto {

@@ -250,7 +250,8 @@ public interface DatanodeProtocol {
    * The NN then removes the block report from active block reports list
    */
   @Idempotent
-  public void blockReportCompleted(DatanodeRegistration nodeReg) throws IOException;
+  public void blockReportCompleted(DatanodeRegistration nodeReg
+          , DatanodeStorage[] storages) throws IOException;
 
   /**
    * Read the small file data

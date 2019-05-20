@@ -1015,11 +1015,14 @@ class BPOfferService implements Runnable {
     int totalBlockCount = 0;
     StorageBlockReport reports[] =
         new StorageBlockReport[perVolumeBlockLists.size()];
+    DatanodeStorage[] storages = new DatanodeStorage[reports.length];
 
     for(Map.Entry<DatanodeStorage, BlockReport> kvPair : perVolumeBlockLists.entrySet()) {
       BlockReport blockList = kvPair.getValue();
-      reports[i++] = new StorageBlockReport(kvPair.getKey(), blockList);
+      reports[i] = new StorageBlockReport(kvPair.getKey(), blockList);
       totalBlockCount += blockList.getNumberOfBlocks();
+      storages[i] = kvPair.getKey();
+      i++;
     }
 
     // Get a namenode to send the report(s) to
@@ -1099,9 +1102,8 @@ class BPOfferService implements Runnable {
       // In case of un/successful block reports we have to inform the leader that
       // block reporting has finished for now.
       if (blkReportHander != null) {
-        BPServiceActor leader =  getLeaderActor();
-        if( leader != null){
-          leader.blockReportCompleted(bpRegistration);
+        for (BPServiceActor actor : bpServices) {
+          actor.blockReportCompleted(bpRegistration, storages);
         }
       }
     }
