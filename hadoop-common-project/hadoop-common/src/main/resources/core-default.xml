@@ -2150,6 +2150,15 @@
   </description>
 </property>
 
+  <property>
+    <name>ipc.server.tls.handshake-timeout-ms</name>
+    <value>2000</value>
+    <description>When Hops TLS is enabled, this is the maximum amount of time
+      in milliseconds a connection is allowed to perform TLS handshake protocol
+      before it is closed by the server.
+    </description>
+  </property>
+
   <!-- YARN registry -->
 
   <property>

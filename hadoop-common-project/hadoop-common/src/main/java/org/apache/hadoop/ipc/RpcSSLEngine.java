@@ -15,6 +15,8 @@
  */
 package org.apache.hadoop.ipc;
 
+import org.apache.hadoop.conf.Configuration;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
@@ -25,4 +27,5 @@ public interface RpcSSLEngine {
     int read(ReadableByteChannel channel, ByteBuffer buffer, Server.Connection connection) throws IOException;
     int write(WritableByteChannel channel, ByteBuffer src) throws IOException;
     void close() throws IOException;
+    Configuration getConf();
 }
