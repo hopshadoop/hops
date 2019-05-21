@@ -47,8 +47,8 @@ mvn clean install -DskipTests
 This project also contains c++ code that requires NDB `libndbclient.so` library. Download the [MySQL Cluster Distribution](https://dev.mysql.com/downloads/cluster/) and extract the `libndbclient.so` library. Alternatively you can download a custom MySQL Cluster library from our servers. Our custom library supports binding I/O threads to CPU cores for better performance.		
 ```sh
 cd tmp
-wget https://bbc1.sics.se/archiva/repository/Hops/com/mysql/ndb/clusterj-native/7.6.9/clusterj-native-7.6.9-natives-linux.jar
-unzip clusterj-native-7.6.9-natives-linux.jar
+wget https://bbc1.sics.se/archiva/repository/Hops/com/mysql/ndb/clusterj-native/7.6.10/clusterj-native-7.6.10-natives-linux.jar
+unzip clusterj-native-7.6.10-natives-linux.jar
 cp libndbclient.so /usr/lib
 ```
 
