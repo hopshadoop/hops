@@ -942,25 +942,28 @@ public class BlockManager {
     machines[0] = phantomDatanode;
     */
 
-    DatanodeInfo randomDatanode =  datanodeManager.getRandomDN();
-    DatanodeInfo[] machines = new DatanodeInfo[1];
-    if(randomDatanode != null){
-      machines[0] = randomDatanode;
-    }
-    else{
-      DatanodeID phantomDatanodID = new DatanodeID(
-              namesystem.getNameNode().getServiceRpcAddress().getAddress().getHostAddress(),
-              namesystem.getNameNode().getServiceRpcAddress().getAddress().getCanonicalHostName(),
-              namesystem.getBlockPoolId(),
-              DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
-              DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
-              DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
-              DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
-      DatanodeInfo phantomDatanode = new DatanodeInfo(phantomDatanodID);
-      machines[0] = phantomDatanode;
+    List<DatanodeInfo> machines = new ArrayList<>(file.getBlockReplication());
+    for(int i = 0; i < file.getBlockReplication(); i++){
+      DatanodeInfo randomDatanode =  datanodeManager.getRandomDN(machines, file.getBlockReplication());
+      if(randomDatanode != null){
+        machines.add(randomDatanode);
+      }
+      else{
+        DatanodeID phantomDatanodID = new DatanodeID(
+                namesystem.getNameNode().getServiceRpcAddress().getAddress().getHostAddress(),
+                namesystem.getNameNode().getServiceRpcAddress().getAddress().getCanonicalHostName(),
+                namesystem.getBlockPoolId(),
+                DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
+                DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+                DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
+                DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
+        DatanodeInfo phantomDatanode = new DatanodeInfo(phantomDatanodID);
+        machines.add(phantomDatanode);
+      }
     }
 
-    LocatedBlock locatedBlock  = new LocatedBlock(eb, machines, 0, false);
+    LocatedBlock locatedBlock  = new LocatedBlock(eb,
+            machines.toArray(new DatanodeInfo[file.getBlockReplication()]), 0, false);
     locatedBlock.setData(data);
     results.add(locatedBlock);
     return results;

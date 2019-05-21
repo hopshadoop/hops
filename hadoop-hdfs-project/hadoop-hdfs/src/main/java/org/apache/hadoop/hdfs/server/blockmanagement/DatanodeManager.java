@@ -1722,12 +1722,18 @@ public class DatanodeManager {
   }
 
   Random rand = new Random(System.currentTimeMillis());
-  public DatanodeDescriptor getRandomDN(){
+  public DatanodeDescriptor getRandomDN(List<DatanodeInfo> existing, int tries){
     if(datanodeMap.isEmpty()){
         return null;
     }else{
-
-      return (DatanodeDescriptor) datanodeMap.values().toArray()[rand.nextInt(datanodeMap.size())];
+      for(int i = 0; i < tries; i++){
+        DatanodeDescriptor dd = (DatanodeDescriptor) datanodeMap.values()
+                .toArray()[rand.nextInt(datanodeMap.size())];
+        if(!existing.contains(dd)){
+          return dd;
+        }
+      }
+      return null;
     }
   }
 

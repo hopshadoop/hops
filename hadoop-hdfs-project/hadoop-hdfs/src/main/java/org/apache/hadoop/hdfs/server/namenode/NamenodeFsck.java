@@ -531,7 +531,12 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
       boolean isCorrupt = lBlk.isCorrupt();
       String blkName = block.toString();
       DatanodeInfo[] locs = lBlk.getLocations();
-      int liveReplicas = getNumLiveReplicas(block);
+      int liveReplicas = 0;
+      if(lBlk.getBlock().getBlockId() < 0){ //small file stored in DB have non existing -ive block IDs
+        liveReplicas = locs.length;
+      }else{
+        liveReplicas = getNumLiveReplicas(block);
+      }
       res.totalReplicas += liveReplicas;
       short targetFileReplication = file.getReplication();
       res.numExpectedReplicas += targetFileReplication;
@@ -673,7 +678,7 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
       public Object performTask() throws IOException {
         NumberReplicas numberReplicas = namenode.getNamesystem().getBlockManager().countNodes(block.getLocalBlock());
         return numberReplicas.liveReplicas();
-        
+
       }
     }.handle();  
   }
