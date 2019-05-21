@@ -45,7 +45,7 @@ public class TestSmallFilesCreation {
     os.close();
   }
 
-  static void writeFile(FileSystem fs, String name, int size) throws IOException {
+  public static void writeFile(FileSystem fs, String name, int size) throws IOException {
     FSDataOutputStream os = (FSDataOutputStream) fs.create(new Path(name), (short)1);
     writeData(os, 0, size);
     os.close();
@@ -63,7 +63,7 @@ public class TestSmallFilesCreation {
   /**
    * This method reads the file using different read methods.
    */
-  static void verifyFile(FileSystem dfs, String file, int size) throws IOException {
+  public static void verifyFile(FileSystem dfs, String file, int size) throws IOException {
     //reading one byte at a time.
     FSDataInputStream is = dfs.open(new Path(file));
     byte[] buffer = new byte[size];

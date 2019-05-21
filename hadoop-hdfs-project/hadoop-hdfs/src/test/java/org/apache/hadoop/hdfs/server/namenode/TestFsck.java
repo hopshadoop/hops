@@ -37,14 +37,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.DFSClient;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DFSInputStream;
-import org.apache.hadoop.hdfs.DFSTestUtil;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.*;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -116,8 +109,11 @@ import com.google.common.collect.Sets;
 public class TestFsck {
   static final String auditLogFile =
       System.getProperty("test.build.dir", "build/test") + "/audit.log";
-  
-  // Pattern for: 
+
+  private static void initLoggers() {
+    ((Log4JLogger) NamenodeFsck.LOG).getLogger().setLevel(Level.ALL);
+  }
+  // Pattern for:
   // allowed=true ugi=name ip=/address cmd=FSCK src=/ dst=null perm=null
   static final Pattern fsckPattern = Pattern.compile("allowed=.*?\\s" +
           "ugi=.*?\\s" +
@@ -143,6 +139,7 @@ public class TestFsck {
     PrintStream out = new PrintStream(bStream, true);
     ((Log4JLogger) FSPermissionChecker.LOG).getLogger().setLevel(Level.ALL);
     int errCode = ToolRunner.run(new DFSck(conf, out), path);
+    System.out.print(out);
     if (checkErrorCode) {
       assertEquals(expectedErrCode, errCode);
     }
@@ -1565,6 +1562,113 @@ public class TestFsck {
       assertTrue(outStr.contains("ARCHIVE:3(COLD)"));
       assertFalse(outStr.contains("All blocks satisfy specified storage policy."));
      } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  @Test
+  public void testFsckSmallFiles() throws Exception {
+    DFSTestUtil util = new DFSTestUtil.Builder().setName("TestFsck").
+            setNumFiles(5).build();
+    MiniDFSCluster cluster = null;
+    DistributedFileSystem fs = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024 * 1024;
+      final int ONDISK_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_MEDIUM_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT);
+      final int ONDISK_LARGE_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT);
+      final int INMEMORY_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT);
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+
+      final String FILE_NAME1 = "/dir/TEST-FLIE1";
+      final String FILE_NAME2 = "/dir/TEST-FLIE2";
+      final String FILE_NAME3 = "/dir/TEST-FLIE3";
+      final String FILE_NAME4 = "/dir/TEST-FLIE4";
+      final long precision = 1L;
+      conf.setLong(DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY,
+              precision);
+      conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 10000L);
+      conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 3);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
+      fs = cluster.getFileSystem();
+
+      fs.mkdirs(new Path("/dir"));
+      fs.setStoragePolicy(new Path("/dir"), "DB");
+
+      TestSmallFilesCreation.writeFile(fs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+      fs.setReplication(new Path(FILE_NAME1),(short)3);
+      TestSmallFilesCreation.verifyFile(fs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+
+      TestSmallFilesCreation.writeFile(fs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
+      fs.setReplication(new Path(FILE_NAME2),(short)3);
+      TestSmallFilesCreation.verifyFile(fs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
+
+      TestSmallFilesCreation.writeFile(fs, FILE_NAME3, ONDISK_MEDIUM_FILE_MAX_SIZE);
+      fs.setReplication(new Path(FILE_NAME3),(short)3);
+      TestSmallFilesCreation.verifyFile(fs, FILE_NAME3, ONDISK_MEDIUM_FILE_MAX_SIZE);
+
+      TestSmallFilesCreation.writeFile(fs, FILE_NAME4, ONDISK_LARGE_FILE_MAX_SIZE);
+      fs.setReplication(new Path(FILE_NAME4),(short)3);
+      TestSmallFilesCreation.verifyFile(fs, FILE_NAME4, ONDISK_LARGE_FILE_MAX_SIZE);
+
+      assertTrue("Expecting 1 in-memory file. Got: " + TestSmallFilesCreation.countInMemoryDBFiles(),
+              TestSmallFilesCreation.countInMemoryDBFiles() == 1);
+      assertTrue("Expecting 3 on-disk file(s). Got:" + TestSmallFilesCreation.countAllOnDiskDBFiles(),
+              TestSmallFilesCreation.countAllOnDiskDBFiles() == 3);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + TestSmallFilesCreation.countOnDiskSmallDBFiles(),
+              TestSmallFilesCreation.countOnDiskSmallDBFiles() == 1);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + TestSmallFilesCreation.countOnDiskMediumDBFiles(),
+              TestSmallFilesCreation.countOnDiskMediumDBFiles() == 1);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + TestSmallFilesCreation.countOnDiskLargeDBFiles(),
+              TestSmallFilesCreation.countOnDiskLargeDBFiles() == 1);
+
+
+      final String fileName = "/srcdat";
+      util.createFiles(fs, fileName);
+      util.waitReplication(fs, fileName, (short) 3);
+      final Path file = new Path(fileName);
+      long aTime = fs.getFileStatus(file).getAccessTime();
+      Thread.sleep(precision);
+      setupAuditLogs();
+      String outStr = runFsck(conf, 0, true, "/");
+      verifyAuditLogs();
+      assertEquals(aTime, fs.getFileStatus(file).getAccessTime());
+      System.out.println(outStr);
+      assertTrue(outStr.contains(NamenodeFsck.HEALTHY_STATUS));
+      if (fs != null) {
+        try {
+          fs.close();
+        } catch (Exception e) {
+        }
+      }
+      cluster.shutdown();
+
+      // restart the cluster; bring up namenode but not the data nodes
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).format(false)
+              .build();
+      outStr = runFsck(conf, 1, true, "/");
+      // expect the result is corrupt
+      assertTrue(outStr.contains(NamenodeFsck.CORRUPT_STATUS));
+      System.out.println(outStr);
+
+      FSNamesystem.LOG.debug("TestX Starting data nodes");
+      // bring up data nodes & cleanup cluster
+      cluster.startDataNodes(conf, 4, true, null, null);
+      FSNamesystem.LOG.debug("TestX, started Datanodes");
+      cluster.waitActive();
+      cluster.waitClusterUp();
+      fs = cluster.getFileSystem();
+      util.cleanup(fs, "/srcdat");
+    } finally {
+      if (fs != null) {
+        try {
+          fs.close();
+        } catch (Exception e) {
+        }
+      }
       if (cluster != null) {
         cluster.shutdown();
       }
