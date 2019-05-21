@@ -205,7 +205,7 @@
       return r;
     }
 
-    $.get(
+    $.get(get_location() + 
       '/jmx?qry=Hadoop:service=NameNode,name=NameNodeInfo',
       guard_with_startup_progress(function (resp) {
         var data = workaround(resp.beans[0]);
