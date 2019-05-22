@@ -186,6 +186,20 @@ public class TestHopsworksRMAppSecurityActions {
     JWT decoded = JWTParser.parse(jwt);
     String subject = decoded.getJWTClaimsSet().getSubject();
     Assert.assertEquals(tokenizedSubject[1], subject);
+    
+    // Test generate and fall-back to application submitter
+    appId = ApplicationId.newInstance(System.currentTimeMillis(), 2);
+    jwtParam = new JWTSecurityHandler.JWTMaterialParameter(appId, "dorothy");
+    jwtParam.setRenewable(false);
+    Instant now = Instant.now();
+    Instant expiresAt = now.plus(10L, ChronoUnit.MINUTES);
+    jwtParam.setExpirationDate(expiresAt);
+    jwtParam.setValidNotBefore(now);
+    jwtParam.setAudiences(new String[]{"job"});
+    jwt = actor.generateJWT(jwtParam);
+    decoded = JWTParser.parse(jwt);
+    subject = decoded.getJWTClaimsSet().getSubject();
+    Assert.assertEquals("dorothy", subject);
   }
   
   @Test

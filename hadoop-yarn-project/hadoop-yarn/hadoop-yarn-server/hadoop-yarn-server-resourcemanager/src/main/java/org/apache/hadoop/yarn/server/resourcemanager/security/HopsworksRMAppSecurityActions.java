@@ -288,13 +288,14 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
     CloseableHttpResponse response = null;
     try {
-      // Application user is the pProject Specific User
+      // Application user is the Project Specific User
       // We must extract the username out of the PSU
+      // If we fail, then fall-back to application submitter
+      // some endpoints in Hopsworks will not work though as
+      // that user might not be a registered Hopsworks user.
       Matcher matcher = SUBJECT_USERNAME.matcher(jwtParameter.getAppUser());
-      if (!matcher.matches()) {
-        throw new IOException("Could not extract username out of application user: " + jwtParameter.getAppUser());
-      }
-      String username = matcher.group(2);
+      String username = matcher.matches() ? matcher.group(2) : jwtParameter.getAppUser();
+      
       JsonObject json = new JsonObject();
       json.addProperty("subject", username);
       json.addProperty("keyName", jwtParameter.getApplicationId().toString());
