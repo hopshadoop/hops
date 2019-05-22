@@ -984,7 +984,18 @@ public abstract class Server {
               iter.remove();
               try {
                 if (key.isReadable()) {
-                  doRead(key);
+                  Connection connection = (Connection) key.attachment();
+                  try {
+                    doHandshake(connection);
+                    doCRLValidation(connection);
+                    doRead(key);
+                  } catch (IOException ex) {
+                    LOG.warn(ex, ex);
+                    if (connection != null) {
+                      closeConnection(connection);
+                      connection = null;
+                    }
+                  }
                 }
               } catch (CancelledKeyException cke) {
                 // something else closed the connection, ex. responder or
@@ -1117,82 +1128,74 @@ public abstract class Server {
         return null;
       }
     }
-
+    
     void doAccept(SelectionKey key) throws InterruptedException, IOException, OutOfMemoryError {
       ServerSocketChannel server = (ServerSocketChannel) key.channel();
       SocketChannel channel;
       while ((channel = server.accept()) != null) {
-
+        
         channel.configureBlocking(false);
         channel.socket().setTcpNoDelay(tcpNoDelay);
         channel.socket().setKeepAlive(true);
-
+        
         SSLEngine sslEngine = createSSLEngine();
-
+        Reader reader = getReader();
         Connection c = connectionManager.register(channel, sslEngine);
-        if (c != null) {
-          boolean handshakeDone = false;
-          boolean crlValidationPassed = false;
-          if (isHopsTLSEnabled) {
-            try {
-              handshakeDone = c.doHandshake();
-            } catch (IOException ex) {
-              LOG.debug(ex, ex);
-              connectionManager.close(c);
-              throw ex;
-            }
-            if (!handshakeDone) {
-              // SSL handshake failed
-              LOG.error("TLS handshake for " + c.getHostAddress() + " failed");
-              connectionManager.close(c);
-            } else {
-              LOG.debug("TLS handshake for " + c.getHostAddress() + " succeed");
-              if (crlValidator != null) {
-                LOG.debug("Checking certificate validity against CRL");
-                try {
-                  c.checkCRLValidity();
-                  crlValidationPassed = true;
-                } catch (FatalRpcServerException ex) {
-                  LOG.debug(ex.getMessage(), ex);
-                  
-                  // use the wrapped exception if there is one.
-                  Throwable t = (ex.getCause() != null) ? ex.getCause() : ex;
-                  final RpcCall call = new RpcCall(c, -1, 0);
-                  setupResponse(call,
-                      ex.getRpcStatusProto(), ex.getRpcErrorCodeProto(), null,
-                      t.getClass().getName(), t.getMessage());
-                  c.sendResponse(call);
-                  
-                  connectionManager.close(c);
-                }
-              }
-            }
-          }
-
-          boolean addToReader = false;
-          if (!isHopsTLSEnabled) {
-            addToReader = true;
-          } else {
-            if (crlValidator != null && handshakeDone && crlValidationPassed) {
-              addToReader = true;
-            } else if (crlValidator == null && handshakeDone) {
-              addToReader = true;
-            }
-          }
-          if (addToReader) {
-            Reader reader = getReader();
-            key.attach(c); // so closeCurrentConnection can get the object
-            reader.addConnection(c);
-          }
-        } else {
-          // If the connectionManager can't take it, close the connection.
+        // If the connectionManager can't take it, close the connection.
+        if (c == null) {
           if (channel.isOpen()) {
             IOUtils.cleanup(null, channel);
           }
+          continue;
         }
+        key.attach(c); // so closeCurrentConnection can get the object
+        reader.addConnection(c);
       }
     }
 
+    void doCRLValidation(Connection connection) throws IOException {
+      if (!isHopsTLSEnabled) {
+        return;
+      }
+      if (connection == null || connection.crlValidationDone) {
+        LOG.debug("Connection is null or CRL validation has already been done for " + connection);
+        return;
+      }
+      LOG.debug("Starting CRL validation for " + connection);
+      try {
+        connection.crlValidationDone = true;
+        connection.checkCRLValidity();
+        LOG.debug("X.509 certificate has not been revoked for " + connection);
+      } catch (FatalRpcServerException ex) {
+        LOG.warn("CRL validation for " + connection + " did NOT pass", ex);
+        // use the wrapped exception if there is one.
+        Throwable t = (ex.getCause() != null) ? ex.getCause() : ex;
+        final RpcCall call = new RpcCall(connection, -1, 0);
+        setupResponse(call,
+            ex.getRpcStatusProto(), ex.getRpcErrorCodeProto(), null,
+            t.getClass().getName(), t.getMessage());
+        connection.sendResponse(call);
+        throw ex;
+      }
+    }
+    
+    void doHandshake(Connection connection) throws IOException {
+      if (!isHopsTLSEnabled) {
+        return;
+      }
+      if (connection == null || connection.tlsHandshakeDone) {
+        LOG.debug("Connection is null or handshake has already been done for " + connection);
+        return;
+      }
+      LOG.debug("Starting TLS handshake with " + connection);
+      connection.tlsHandshakeDone = true;
+      if (!connection.doHandshake()) {
+        LOG.warn("TLS handshake failed for " + connection);
+        throw new IOException("TLS handshake for " + connection + " has failed");
+      }
+      LOG.debug("TLS handshake completed successfully for " + connection);
+    }
+    
     void doRead(SelectionKey key) throws InterruptedException {
       int count;
       Connection c = (Connection)key.attachment();
@@ -1623,6 +1626,8 @@ public abstract class Server {
     // Buffer to store decrypted incoming data
     // In SSL mode, readAndProcess reads from this buffer instead of the channel directly
     private ByteBuffer sslUnwrappedBuffer = null;
+    private boolean tlsHandshakeDone = false;
+    private boolean crlValidationDone = false;
 
     public Connection(SocketChannel channel, long lastContact) {
       this(channel, lastContact, null);
