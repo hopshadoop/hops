@@ -108,7 +108,7 @@ public abstract class RpcSSLEngineAbstr implements RpcSSLEngine {
     
     @Override
     public boolean doHandshake() throws IOException {
-        LOG.debug("Starting TLS handshake with peer");
+        LOG.debug("Starting TLS handshake with peer " + getRemoteHost());
 
         SSLEngineResult result;
         SSLEngineResult.HandshakeStatus handshakeStatus;
