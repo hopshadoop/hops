@@ -187,22 +187,16 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
   }
 
   private void checkForSnapshotChange() {
-    if (snapshotChanged())
-    // during
-    // the
-    // tx no
-    // replica
-    // should have been changed
-    {// renaming to existing file will put replicas in the deleted list
-      throw new IllegalStateException(
-          "No replica should have been changed during the Tx ( " +
-              this.getClass() + ")");
+    if (snapshotChanged()){
+    // during the tx no replica should have been changed
+    // renaming to existing file will put replicas in the deleted list
+      throw new IllegalStateException("No replica should have been changed during the Tx ( " +
+                      this.getClass() + ")");
     }
   }
 
   protected boolean snapshotChanged() {
-    return !getAdded().isEmpty() || !getModified().isEmpty() ||
-        !getRemoved().isEmpty();
+    return !getAdded().isEmpty() || !getModified().isEmpty();
   }
 
   private void updateReplicas(INodeCandidatePrimaryKey trg_param,
