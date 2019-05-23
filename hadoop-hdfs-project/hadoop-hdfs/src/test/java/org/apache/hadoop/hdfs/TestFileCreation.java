@@ -1880,5 +1880,40 @@ public class TestFileCreation {
     }
   }
 
+  @Test
+  public void testRenameUnderReplicatedFile() throws Exception {
+
+    Configuration conf = new HdfsConfiguration();
+    conf.setInt(DFS_REPLICATION_KEY, 3);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+    FileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+            .newInstance(fs.getUri(), fs.getConf());
+    try {
+
+      fs.mkdirs(new Path("/dir"));
+
+      Path src = new Path("/dir/src");
+      Path dest = new Path("/dir/dest");
+      FSDataOutputStream out = fs.create(src , (short)3);
+      out.write(1);
+      out.close();
+
+      out = fs.create(dest , (short)3);
+      out.write(1);
+      out.close();
+
+      try {
+        dfs.rename(src, dest, Options.Rename.OVERWRITE);
+      } catch (Exception e){
+        fail(e.getMessage());
+      }
+
+    } finally {
+      cluster.shutdown();
+    }
+
+
+  }
 }
 
