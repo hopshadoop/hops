@@ -4443,8 +4443,8 @@ public class BlockManager {
             ReceivedDeletedBlockInfo rdbi = (ReceivedDeletedBlockInfo) getParams()[0];
             LOG.debug("reported block id=" + rdbi.getBlock().getBlockId());
             inodeIdentifier = INodeUtil.resolveINodeFromBlock(rdbi.getBlock());
-            if (inodeIdentifier == null) {
-              LOG.error("Invalid State. deleted blk is not recognized. bid=" +
+            if (inodeIdentifier == null && !rdbi.isDeletedBlock()) {
+              LOG.warn("Invalid State. deleted blk is not recognized. bid=" +
                   rdbi.getBlock().getBlockId());
             }
           }
@@ -4744,6 +4744,12 @@ public class BlockManager {
 
   public void removeBlock(Block block)
       throws StorageException, TransactionContextException, IOException {
+
+    // No need to ACK blocks that are being removed entirely
+    // from the namespace, since the removal of the associated
+    // file already removes them from the block map below.
+    // block.setNumBytesNoPersistance(BlockCommand.NO_ACK);
+
     addToInvalidates(block);
     BlockInfoContiguous storedBlock = getBlockInfo(block);
     removeBlockFromMap(block);
@@ -4753,11 +4759,6 @@ public class BlockManager {
     if (postponedMisreplicatedBlocks.remove(block)) {
       postponedMisreplicatedBlocksCount.decrementAndGet();
     }
-
-    // No need to ACK blocks that are being removed entirely
-    // from the namespace, since the removal of the associated
-    // file already removes them from the block map below.
-    block.setNumBytesNoPersistance(BlockCommand.NO_ACK);
   }
 
   public BlockInfoContiguous getStoredBlock(Block block)
