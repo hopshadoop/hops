@@ -912,6 +912,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
       if(isRetryCacheEnabled) {
         this.retryCacheCleanerThread = new Daemon(new RetryCacheCleaner());
+        this.retryCacheCleanerThread.setName("retry cache cleane");
         retryCacheCleanerThread.start();
       }
 
@@ -8486,6 +8487,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       int numRun = 0;
       while (fsRunning && shouldCacheCleanerRun) {
         try {
+          long start = Time.monotonicNow();
           final List<CacheEntry> toRemove = new ArrayList<>();
           int num = retryCache.getToRemove().drainTo(toRemove);
           if (num > 0) {
@@ -8499,16 +8501,23 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
               @Override
               public Object performTask() throws IOException {
-                for (CacheEntry entry : toRemove) {
+                int i = 0;
+                Iterator<CacheEntry> it = toRemove.iterator();
+                while (it.hasNext() && i<100) {
+                  CacheEntry entry = it.next();
                   if (EntityManager.find(RetryCacheEntry.Finder.ByClientIdAndCallId, entry.getClientId(), entry.
                       getCallId()) != null) {
                     EntityManager.remove(new RetryCacheEntry(entry.getClientId(), entry.getCallId()));
                   }
+                  i++;
+                  it.remove();
                 }
                 return null;
               }
             };
-            rh.handle();
+            while(!toRemove.isEmpty()){
+              rh.handle();
+            }
           }
 
           if (isLeader() && numRun % 60 == 0) {
@@ -8525,9 +8534,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             }.handle();
           }
 
-          Thread.sleep(1000);
+          long pause = 1000-(Time.monotonicNow()-start);
+          if(pause>0){
+            Thread.sleep(pause);
+          }
           numRun++;
-        } catch (Exception e) {
+        } catch (Throwable e) {
           FSNamesystem.LOG.error("Exception in RetryCacheCleaner: ", e);
         }
       }
