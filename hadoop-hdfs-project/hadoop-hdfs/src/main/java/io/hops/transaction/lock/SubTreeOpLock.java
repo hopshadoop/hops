@@ -57,7 +57,8 @@ public final class SubTreeOpLock extends Lock {
        LOG.debug(newPath+" is a directory so checking the STO table for ongoing operations ");
        acquireLockList(lockType, SubTreeOperation.Finder.ByPathPrefix, pathPrefix);
     }else{
-      LOG.info("The last component of the path is not dir. ignoring the request to look in on going STO table");
+      LOG.debug("The last component of the path is not dir. ignoring the request to look in on " +
+              "going STO table");
     }
   }
 
