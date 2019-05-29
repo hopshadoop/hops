@@ -183,7 +183,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       .blockStateChangeLog;
   
   // Dependencies from other parts of NN.
-  protected final FSNamesystem namesystem;
+  protected FSNamesystem namesystem;
   protected final NameNode nn;
   private final NameNodeMetrics metrics;
   
@@ -1654,5 +1654,10 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override
   public void removeXAttr(String src, XAttr xAttr) throws IOException {
     namesystem.removeXAttr(src, xAttr);
+  }
+
+  @VisibleForTesting
+  void setFSNamesystem(FSNamesystem fsn){
+    namesystem = fsn;
   }
 }

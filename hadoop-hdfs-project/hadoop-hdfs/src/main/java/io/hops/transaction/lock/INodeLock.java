@@ -780,10 +780,17 @@ public class INodeLock extends BaseINodeLock {
       sb.append(Arrays.toString(paths));
       sb.append(", ");
     }
+
+    if ( inodeId != -1){
+      sb.append("INodeID: ");
+      sb.append(inodeId);
+      sb.append(",");
+    }
+
     if(lockType != null){
       sb.append("lockType=");
       sb.append(lockType);
-      sb.append(", ");
+      sb.append(" ");
     }
 
     sb.append("}");

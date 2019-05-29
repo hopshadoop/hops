@@ -26,6 +26,8 @@ import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import junit.framework.TestCase;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,17 +41,19 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.junit.Assert;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
-import static org.apache.hadoop.hdfs.TestFileCreation.*;
+import static org.apache.hadoop.hdfs.TestFileCreation.createFile;
+import static org.apache.hadoop.hdfs.TestFileCreation.writeFile;
+import static org.mockito.Matchers.*;
 
 public class TestSubtreeLock extends TestCase {
   static final Log LOG = LogFactory.getLog(TestSubtreeLock.class);
@@ -161,14 +165,14 @@ public class TestSubtreeLock extends TestCase {
 
       AbstractFileTree.FileTree fileTree = AbstractFileTree
               .createFileTreeFromPath(cluster.getNamesystem(),
-              path0.toUri().getPath());
+                      path0.toUri().getPath());
       fileTree.buildUp(cluster.getNameNode().getNamesystem().getBlockManager().getStoragePolicySuite());
       assertEquals(path0.getName(), fileTree.getSubtreeRoot().getName());
       assertEquals(7, fileTree.getAll().size());
       assertEquals(4, fileTree.getHeight());
       assertEquals(file3.toUri().getPath(), fileTree
               .createAbsolutePath(path0.toUri().getPath(), fileTree.getInodeById(
-              TestUtil.getINodeId(cluster.getNameNode(), file3))));
+                      TestUtil.getINodeId(cluster.getNameNode(), file3))));
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -209,7 +213,7 @@ public class TestSubtreeLock extends TestCase {
 
       AbstractFileTree.CountingFileTree fileTree = AbstractFileTree
               .createCountingFileTreeFromPath(cluster.getNamesystem(),
-              path0.toUri().getPath());
+                      path0.toUri().getPath());
       fileTree.buildUp(cluster.getNameNode().getNamesystem().getBlockManager().getStoragePolicySuite());
       assertEquals(7, fileTree.getUsedCounts().getNameSpace());
       assertEquals(bytes0 + bytes1, fileTree.getUsedCounts().getStorageSpace());
@@ -389,7 +393,7 @@ public class TestSubtreeLock extends TestCase {
     }
   }
 
-    @Test
+  @Test
   public void testDelete2() throws IOException, InterruptedException {
     MiniDFSCluster cluster = null;
     try {
@@ -403,28 +407,28 @@ public class TestSubtreeLock extends TestCase {
       assertTrue(fs.mkdir(new Path("/a/c"), FsPermission.getDefault()));
       assertTrue(fs.mkdir(new Path("/a/d"), FsPermission.getDefault()));
 
-      for(int i = 0; i < 5; i++) {
-        createFile(fs, new Path("/a/b/a_b_file_"+i), 1).close();
+      for (int i = 0; i < 5; i++) {
+        createFile(fs, new Path("/a/b/a_b_file_" + i), 1).close();
       }
 
-      for(int i = 0; i < 5; i++) {
-        createFile(fs, new Path("/a/b/a_b_file_"+i), 1).close();
+      for (int i = 0; i < 5; i++) {
+        createFile(fs, new Path("/a/b/a_b_file_" + i), 1).close();
       }
 
-      for(int i = 0; i < 5; i++) {
-        createFile(fs, new Path("/a/c/a_c_file_"+i), 1).close();
+      for (int i = 0; i < 5; i++) {
+        createFile(fs, new Path("/a/c/a_c_file_" + i), 1).close();
       }
 
-      for(int i = 0; i < 10;i ++){
-        assertTrue(fs.mkdirs( new Path("/a/b/c/a_b_c_dir_"+i)));
+      for (int i = 0; i < 10; i++) {
+        assertTrue(fs.mkdirs(new Path("/a/b/c/a_b_c_dir_" + i)));
       }
 
-      for(int i = 0; i < 3;i ++){
-        assertTrue(fs.mkdirs( new Path("/a/b/a_b_dir_"+i)));
+      for (int i = 0; i < 3; i++) {
+        assertTrue(fs.mkdirs(new Path("/a/b/a_b_dir_" + i)));
       }
 
-      for(int i = 0; i < 3;i ++){
-        createFile(fs, new Path("/a/b/c/b/a_b_c_d_file_"+i), 1).close();
+      for (int i = 0; i < 3; i++) {
+        createFile(fs, new Path("/a/b/c/b/a_b_c_d_file_" + i), 1).close();
       }
       assertTrue(fs.delete(new Path("/a")));
       assertFalse(fs.exists(new Path("/a")));
@@ -679,47 +683,48 @@ public class TestSubtreeLock extends TestCase {
    * checks if all the sub tree locks are removed and no flags are set
    */
   public static boolean subTreeLocksExists() throws IOException {
-    if(countAllSubTreeLocks() > 0){
+    if (countAllSubTreeLocks() > 0) {
       return true;
     }
     return false;
   }
+
   public static int countAllSubTreeLocks() throws IOException {
     LightWeightRequestHandler subTreeLockChecker =
             new LightWeightRequestHandler(HDFSOperationType.TEST_SUBTREE_LOCK) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        int count = 0;
-        INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                int count = 0;
+                INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
+                        .getDataAccess(INodeDataAccess.class);
 
-        OngoingSubTreeOpsDataAccess oda = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory.getDataAccess(OngoingSubTreeOpsDataAccess.class);
+                OngoingSubTreeOpsDataAccess oda = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory.getDataAccess(OngoingSubTreeOpsDataAccess.class);
 
-        List<INode> inodes = ida.allINodes();
-        List<SubTreeOperation> ops = (List<SubTreeOperation>) oda.allOps();
+                List<INode> inodes = ida.allINodes();
+                List<SubTreeOperation> ops = (List<SubTreeOperation>) oda.allOps();
 
-        if (ops != null && !ops.isEmpty()) {
-          for (SubTreeOperation op : ops) {
-            count++;
-            LOG.debug("On going sub tree operations table contains: \" " + op.getPath()
-                    + "\" NameNode id: " + op.getNameNodeId() + " OpType: " + op.getOpType()+" " +
-                    "count "+count);
-          }
-        }
+                if (ops != null && !ops.isEmpty()) {
+                  for (SubTreeOperation op : ops) {
+                    count++;
+                    LOG.debug("On going sub tree operations table contains: \" " + op.getPath()
+                            + "\" NameNode id: " + op.getNameNodeId() + " OpType: " + op.getOpType() + " " +
+                            "count " + count);
+                  }
+                }
 
-        if (inodes != null && !inodes.isEmpty()) {
-          for (INode inode : inodes) {
-            if (inode.isSTOLocked()) {
-              LOG.error("INode lock flag is set. Name " + inode.getLocalName()
-                      + " id: " + inode.getId() + " pid: " + inode.getParentId()
-                      + " locked by " + inode.getSTOLockOwner());
-            }
-          }
-        }
+                if (inodes != null && !inodes.isEmpty()) {
+                  for (INode inode : inodes) {
+                    if (inode.isSTOLocked()) {
+                      LOG.error("INode lock flag is set. Name " + inode.getLocalName()
+                              + " id: " + inode.getId() + " pid: " + inode.getParentId()
+                              + " locked by " + inode.getSTOLockOwner());
+                    }
+                  }
+                }
 
-        return count;
-      }
-    };
+                return count;
+              }
+            };
     return (Integer) subTreeLockChecker.handle();
   }
 
@@ -787,7 +792,6 @@ public class TestSubtreeLock extends TestCase {
       assertFalse("Not All subtree locks were removed after operation ", subTreeLocksExists());
 
 
-
       isException = false;
       exception = null;
 
@@ -833,7 +837,7 @@ public class TestSubtreeLock extends TestCase {
       if (inode != null) {
         fail("root should not have been locked");
       }
-      
+
 
     } finally {
       if (cluster != null) {
@@ -841,8 +845,8 @@ public class TestSubtreeLock extends TestCase {
       }
     }
   }
-  
-  
+
+
   @Test
   public void testSubtreeMove() throws IOException {
     MiniDFSCluster cluster = null;
@@ -854,13 +858,13 @@ public class TestSubtreeLock extends TestCase {
       DistributedFileSystem dfs = cluster.getFileSystem();
       dfs.mkdirs(new Path("/Projects/test"));
       dfs.setMetaEnabled(new Path("/Projects"), true);
-      
-            
-      try{
-      dfs.listStatus(new Path("/Projects"));
-      dfs.rename(new Path("/Projects/test"), new Path("/Projects/test1"));
-      dfs.rename(new Path("/Projects/test1"), new Path("/Projects/test"));
-      }catch(Exception e){
+
+
+      try {
+        dfs.listStatus(new Path("/Projects"));
+        dfs.rename(new Path("/Projects/test"), new Path("/Projects/test1"));
+        dfs.rename(new Path("/Projects/test1"), new Path("/Projects/test"));
+      } catch (Exception e) {
         fail("No exception should have been thrown ");
       }
 
@@ -878,7 +882,7 @@ public class TestSubtreeLock extends TestCase {
 
     final int NumberOfFileSystems = 100;
     final String UserPrefix = "testUser";
-    
+
     String userName = UserGroupInformation.getCurrentUser().getShortUserName();
     conf.set(String.format("hadoop.proxyuser.%s.hosts", userName), "*");
     conf.set(String.format("hadoop.proxyuser.%s.users", userName), "*");
@@ -887,7 +891,7 @@ public class TestSubtreeLock extends TestCase {
     ProxyUsers.refreshSuperUserGroupsConfiguration(conf);
 
     final MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).format(true).build();
+            new MiniDFSCluster.Builder(conf).format(true).build();
     cluster.waitActive();
 
     FileSystem superFS = cluster.getFileSystem();
@@ -895,11 +899,11 @@ public class TestSubtreeLock extends TestCase {
     List<UserGroupInformation> ugis = new ArrayList<>();
     List<FileSystem> fss = new ArrayList<>();
 
-    for(int u=0; u<NumberOfFileSystems; u++) {
+    for (int u = 0; u < NumberOfFileSystems; u++) {
       UserGroupInformation ugi =
-          UserGroupInformation.createProxyUserForTesting(UserPrefix+u,
-              UserGroupInformation
-                  .getLoginUser(), new String[]{UserPrefix+u});
+              UserGroupInformation.createProxyUserForTesting(UserPrefix + u,
+                      UserGroupInformation
+                              .getLoginUser(), new String[]{UserPrefix + u});
 
       FileSystem fs = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
 
@@ -917,27 +921,27 @@ public class TestSubtreeLock extends TestCase {
 
       superFS.mkdirs(new Path("/root"));
       superFS.setPermission(new Path("/root"), new FsPermission(FsAction.ALL,
-          FsAction.ALL, FsAction.ALL));
+              FsAction.ALL, FsAction.ALL));
 
 
-      for(int u=0; u<fss.size(); u++){
+      for (int u = 0; u < fss.size(); u++) {
         FileSystem fs = fss.get(u);
         Path root = new Path(String.format("/root/a%d", u));
         fs.mkdirs(root);
-        fs.setOwner(root, UserPrefix + u , UserPrefix + u);
+        fs.setOwner(root, UserPrefix + u, UserPrefix + u);
 
-        fs.mkdirs(new Path(root, "b"+u));
-        fs.mkdirs(new Path(root, "c"+u));
+        fs.mkdirs(new Path(root, "b" + u));
+        fs.mkdirs(new Path(root, "c" + u));
 
-        fs.create(new Path(root, "b"+u+"/f")).close();
-        fs.create(new Path(root, "c"+u+"/f")).close();
+        fs.create(new Path(root, "b" + u + "/f")).close();
+        fs.create(new Path(root, "c" + u + "/f")).close();
 
       }
 
-      for(int u=0; u<fss.size(); u++){
+      for (int u = 0; u < fss.size(); u++) {
         FileSystem fs = fss.get(u);
         Assert
-            .assertTrue(fs.delete(new Path(String.format("/root/a%d", u)), true));
+                .assertTrue(fs.delete(new Path(String.format("/root/a%d", u)), true));
         FileSystem.closeAllForUGI(ugis.get(u));
       }
 
@@ -951,4 +955,77 @@ public class TestSubtreeLock extends TestCase {
     INodeUtil.resolvePathWithNoTransaction(path, false, nodes);
     return nodes.getLast().getId();
   }
+
+  @Test
+  public void testFailedUnsetSTOLock() throws IOException, InterruptedException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      DistributedFileSystem fs = cluster.getFileSystem();
+      assertTrue(fs.mkdir(new Path("/foo"), FsPermission.getDefault()));
+      assertTrue(fs.mkdir(new Path("/foo/bar"), FsPermission.getDefault()));
+      createFile(fs, new Path("/foo/bar/foo"), 1).close();
+
+      final FSNamesystem fsNamesystem = cluster.getNameNode().getNamesystem();
+      final FSNamesystem fsNamesystemSpy = Mockito.spy(fsNamesystem);
+      NameNodeRpcServer rpcServer = (NameNodeRpcServer) cluster.getNameNode().getRpcServer();
+      rpcServer.setFSNamesystem(fsNamesystemSpy);
+
+      final String error = "Unable to remove STO Lock";
+
+      Mockito.doThrow(new StorageException(error)).when(fsNamesystemSpy).unlockSubtreeInternal(anyString(),
+              anyLong());
+
+      fsNamesystem.lockSubtree("/foo", SubTreeOperation.Type.DELETE_STO);
+
+      try {
+        fsNamesystemSpy.unlockSubtree("/foo", cluster.getNameNode().getId());
+      } catch (IOException e) {
+        LOG.info(e, e);
+        if (!e.getMessage().contains(error)) {
+          throw e;
+        }
+      }
+
+      // also add onother bogus STO lock
+      addOngoingSTOEntry("/test/");
+
+      int tries = 0;
+      while (subTreeLocksExists()) {
+        Thread.sleep(1000);
+        if (++tries >= 10) {
+          break;
+        }
+        LOG.info("Waiting to metadata cleaner to remove the lock");
+      }
+
+      assertFalse("Not All subtree locks were removed after operation ", subTreeLocksExists());
+    } catch (Exception e) {
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  void addOngoingSTOEntry(final String path) throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(
+            HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        OngoingSubTreeOpsDataAccess<SubTreeOperation> dataAccess =
+                (OngoingSubTreeOpsDataAccess) HdfsStorageFactory.getDataAccess(OngoingSubTreeOpsDataAccess.class);
+        SubTreeOperation op = new SubTreeOperation(path);
+        op.setAsyncLockRecoveryTime(System.currentTimeMillis());
+        List<SubTreeOperation> modified = new ArrayList<SubTreeOperation>();
+        modified.add(op);
+        dataAccess.prepare(Collections.EMPTY_LIST, Collections.EMPTY_LIST, modified);
+        return null;
+      }
+    };
+    handler.handle();
+  }
+
 }

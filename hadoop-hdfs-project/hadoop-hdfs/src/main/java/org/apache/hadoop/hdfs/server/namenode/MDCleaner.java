@@ -95,6 +95,13 @@ public class MDCleaner {
         }
       }
     }
+
+    //Clean failed STO operations belonging to live NNs
+    Collection<SubTreeOperation> ops = getPathsToRecoverAsync();
+    for(SubTreeOperation op : ops){
+      LOG.info("Cleaning STO Lock. OP = {"+op+"}");
+      namesystem.unlockSubtree(op.getPath(), op.getInodeID());
+    }
   }
 
   Collection<SubTreeOperation> getPaths(final long nnID) throws IOException {
@@ -105,6 +112,20 @@ public class MDCleaner {
                 OngoingSubTreeOpsDataAccess da = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory
                         .getDataAccess(OngoingSubTreeOpsDataAccess.class);
                 return da.allOpsByNN(nnID);
+              }
+            };
+    return (Collection<SubTreeOperation>)subTreeLockChecker.handle();
+
+  }
+
+  Collection<SubTreeOperation> getPathsToRecoverAsync() throws IOException {
+    LightWeightRequestHandler subTreeLockChecker =
+            new LightWeightRequestHandler(HDFSOperationType.MDCLEANER) {
+              @Override
+              public Object performTask() throws IOException {
+                OngoingSubTreeOpsDataAccess da = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory
+                        .getDataAccess(OngoingSubTreeOpsDataAccess.class);
+                return da.allOpsToRecoverAsync();
               }
             };
     return (Collection<SubTreeOperation>)subTreeLockChecker.handle();

@@ -28,11 +28,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.common.entity.Variable;
-import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
-import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
-import io.hops.metadata.hdfs.dal.INodeDataAccess;
-import io.hops.metadata.hdfs.dal.RetryCacheEntryDataAccess;
-import io.hops.metadata.hdfs.dal.SafeBlocksDataAccess;
+import io.hops.metadata.hdfs.dal.*;
 import io.hops.metadata.hdfs.entity.*;
 import io.hops.resolvingcache.Cache;
 import io.hops.transaction.EntityManager;
@@ -7268,9 +7264,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                     + " pid: " + inode.getParentId() + " name: " + inode.getLocalName());
           }
 
-          EntityManager.update(new SubTreeOperation(getSubTreeLockPathPrefix(path)
-                ,nameNode.getId(),stoType));
-          INodeIdentifier iNodeIdentifier =  new INodeIdentifier(inode.getId(), inode.getParentId(),
+          EntityManager.update(new SubTreeOperation(getSubTreeLockPathPrefix(path),
+                  inode.getId() ,nameNode.getId(), stoType,
+                  System.currentTimeMillis(), pc.getUser()));
+          INodeIdentifier iNodeIdentifier =  new INodeIdentifier(inode.getId(),
+                  inode.getParentId(),
               inode.getLocalName(), inode.getPartitionId());
           iNodeIdentifier.setDepth(inode.myDepth());
           iNodeIdentifier.setStoragePolicy(inode.getStoragePolicyID());
@@ -7340,7 +7338,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws IOException
    */
   @VisibleForTesting
-  void unlockSubtree(final String path, final long ignoreStoInodeId) throws IOException {
+  void  unlockSubtreeInternal(final String path, final long ignoreStoInodeId) throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.RESET_SUBTREE_LOCK) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -7367,6 +7365,37 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         return null;
       }
     }.handle(this);
+  }
+
+  @VisibleForTesting
+  void unlockSubtree(final String path, final long ignoreStoInodeId) throws IOException {
+    try{
+      unlockSubtreeInternal(path, ignoreStoInodeId);
+    }catch(Exception e ){
+      //Unable to remove the lock. setting the async removal flag
+      setAsyncLockRemoval(path);
+      throw e;
+    }
+  }
+
+  void setAsyncLockRemoval(final String path) throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(
+            HDFSOperationType.SET_ASYNC_SUBTREE_RECOVERY_FLAG) {
+      @Override
+      public Object performTask() throws IOException {
+        OngoingSubTreeOpsDataAccess<SubTreeOperation> dataAccess =
+                (OngoingSubTreeOpsDataAccess) HdfsStorageFactory.getDataAccess(OngoingSubTreeOpsDataAccess.class);
+        SubTreeOperation op = dataAccess.findByPath(getSubTreeLockPathPrefix(path));
+        if (op != null && op.getAsyncLockRecoveryTime() == 0) { // set the flag if not already set
+          op.setAsyncLockRecoveryTime(System.currentTimeMillis());
+          List<SubTreeOperation> modified = new ArrayList<SubTreeOperation>();
+          modified.add(op);
+          dataAccess.prepare(Collections.EMPTY_LIST, Collections.EMPTY_LIST, modified);
+        }
+        return null;
+      }
+    };
+    handler.handle();
   }
 
   private int pid(String param) {

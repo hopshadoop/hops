@@ -311,6 +311,11 @@ public class NameNode implements NameNodeStatusMXBean {
     return namesystem;
   }
 
+  @VisibleForTesting
+  public void setNamesystem(FSNamesystem fsNamesystem) {
+    this.namesystem = fsNamesystem;
+  }
+
   public NamenodeProtocols getRpcServer() {
     return rpcServer;
   }
@@ -1439,6 +1444,11 @@ public class NameNode implements NameNodeStatusMXBean {
 
   public BRTrackingService getBRTrackingService(){
     return brTrackingService;
+  }
+
+  @VisibleForTesting
+  NameNodeRpcServer getNameNodeRpcServer(){
+    return rpcServer;
   }
 }
 
