@@ -251,7 +251,7 @@ class FSDirRenameOp {
       }
 
       boolean retValue = renameToTransaction(fsd, src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0L,
-              dst, srcCounts, dstCounts, isUsingSubTreeLocks, logEntries, srcIIP, dstIIP, timestamp);
+              dst, srcCounts, dstCounts, isUsingSubTreeLocks, logEntries, timestamp);
 
       // the rename Tx has committed. it has also remove the subTreeLocks
       renameTransactionCommitted = true;
@@ -269,8 +269,7 @@ class FSDirRenameOp {
   private static boolean renameToTransaction(final FSDirectory fsd, final String src, final long srcINodeID,
       final String dst, final QuotaCounts srcCounts, final QuotaCounts dstCounts,
       final boolean isUsingSubTreeLocks,
-      final Collection<INodeMetadataLogEntry> logEntries, final INodesInPath srcIIP,
-      final INodesInPath dstIIP, final long timestamp) throws IOException {
+      final Collection<INodeMetadataLogEntry> logEntries, final long timestamp) throws IOException {
 
     HopsTransactionalRequestHandler renameToHandler = new HopsTransactionalRequestHandler(
         isUsingSubTreeLocks ? HDFSOperationType.SUBTREE_DEPRICATED_RENAME : HDFSOperationType.DEPRICATED_RENAME,
@@ -303,6 +302,8 @@ class FSDirRenameOp {
 
       @Override
       public Object performTask() throws IOException {
+        INodesInPath dstIIP = fsd.getINodesInPath(dst, false);
+        INodesInPath srcIIP = fsd.getINodesInPath(src, false);
 
         if (!isUsingSubTreeLocks) {
           if (fsd.isPermissionEnabled()) {
@@ -310,10 +311,8 @@ class FSDirRenameOp {
             // Rename does not operates on link targets
             // Do not resolveLink when checking permissions of src and dst
             // Check write access to parent of src
-            INodesInPath srcIIP = fsd.getINodesInPath(src, false);
             fsd.checkPermission(pc, srcIIP, false, null, FsAction.WRITE, null, null,
                 false);
-             INodesInPath dstIIP = fsd.getINodesInPath(dst, false);
             // Check write access to ancestor of dst
             fsd.checkPermission(pc, dstIIP, false, FsAction.WRITE, null, null, null,
                 false);
@@ -529,7 +528,7 @@ class FSDirRenameOp {
       }
 
       RenameResult ret = renameToTransaction(fsd, src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0,
-              dst, srcCounts, dstCounts, isUsingSubTreeLocks, logEntries, srcIIP, dstIIP, timestamp, options);
+              dst, srcCounts, dstCounts, isUsingSubTreeLocks, logEntries, timestamp, options);
 
       renameTransactionCommitted = true;
       
@@ -548,8 +547,7 @@ class FSDirRenameOp {
   static RenameResult renameToTransaction(final FSDirectory fsd, final String src, final long srcINodeID, final String dst,
       final QuotaCounts srcCounts, final QuotaCounts dstCounts,
       final boolean isUsingSubTreeLocks,
-      final Collection<INodeMetadataLogEntry> logEntries, final INodesInPath srcIIP,
-      final INodesInPath dstIIP, final long timestamp,
+      final Collection<INodeMetadataLogEntry> logEntries, final long timestamp,
       final Options.Rename... options) throws IOException {
 
     return (RenameResult) new HopsTransactionalRequestHandler(
@@ -592,18 +590,18 @@ class FSDirRenameOp {
 
       @Override
       public Object performTask() throws IOException {
-        
+        INodesInPath dstIIP = fsd.getINodesInPath(dst, false);
+        INodesInPath srcIIP = fsd.getINodesInPath(src, false);
+
         if (!isUsingSubTreeLocks) {
           if (fsd.isPermissionEnabled()) {
             FSPermissionChecker pc = fsd.getFSNamesystem().getPermissionChecker();
             // Rename does not operates on link targets
             // Do not resolveLink when checking permissions of src and dst
             // Check write access to parent of src
-            INodesInPath srcIIP = fsd.getINodesInPath(src, false);
             fsd.checkPermission(pc, srcIIP, false, null, FsAction.WRITE, null, null,
                 false);
             // Check write access to ancestor of dst
-            INodesInPath dstIIP = fsd.getINodesInPath(dst, false);
             fsd.checkPermission(pc, dstIIP, false, FsAction.WRITE, null, null, null,
                 false);
           }
@@ -676,7 +674,7 @@ class FSDirRenameOp {
               tx.logMetadataEvent();
              
             }
-            
+
             tx.snapshotMaintenance();
             tx.updateQuotasInSourceTree(bsps);
             HdfsFileStatus auditStat = fsd.getAuditFileInfo(dstIIP);
@@ -944,7 +942,7 @@ class FSDirRenameOp {
       EntityManager.snapshotMaintenance(
           HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
           srcChild);
-    } 
+    }
   }
   
   static class RenameResult {

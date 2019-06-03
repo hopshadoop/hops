@@ -444,7 +444,6 @@ class FSDirDeleteOp {
     // set the parent's modification time
     final INodeDirectory parent = targetNode.getParent();
     parent.updateModificationTime(mtime);
-    parent.asDirectory().decreaseChildrenNum();
     if (removed == 0) {
       return 0;
     }    
