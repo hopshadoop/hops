@@ -894,6 +894,8 @@ public class FSDirectory implements Closeable {
       if(!parent.removeChild(last)){
         return -1;
       }
+    } else {
+      ((INodeDirectory)parent).decreaseChildrenNum();
     }
 
     if (isQuotaEnabled()) {

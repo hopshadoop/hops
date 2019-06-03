@@ -230,6 +230,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
       remove(existingInode);
+      decreaseChildrenNum();
       return true;
     }
     return false;
@@ -439,11 +440,17 @@ public class INodeDirectory extends INodeWithAdditionalFields {
       short childDepth = (short)(myDepth()+1);
       node.setPartitionIdNoPersistance(INode.calculatePartitionId(node.getParentId(), node.getLocalName(), childDepth));
       EntityManager.add(node);
+      increaseChildrenNum();
       //add the INodeAttributes if it is Directory with Quota
 //      if (this instanceof INodeDirectoryWithQuota) { // [S] I think this is not necessary now. Quota update manager will take care of this
 //        ((INodeDirectoryWithQuota) this).persistAttributes();
 //      }
     } else {
+      //rename operation
+      //do not increment if moved in same folder
+      if(node.getParent().getParentId() != getId()){
+        increaseChildrenNum();
+      }
       node.setParent(this);
     }
 
@@ -452,7 +459,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     if (setModTime) {
       setModificationTime(node.getModificationTime());
     }
-    increaseChildrenNum();
+
     if (node.getGroupName() == null) {
       node.setGroup(getGroupName());
       node.setGroupID(getGroupID());
@@ -665,8 +672,8 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   @Override
   public INode cloneInode () throws IOException{
     return new INodeDirectory(this, true);
-  }  
-  
+  }
+
   public int getChildrenNum() {
     return childrenNum;
   }
@@ -674,7 +681,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   public void setChildrenNum(int childrenNum){
     this.childrenNum = childrenNum;
   }
-  
+
   public void decreaseChildrenNum() throws StorageException, TransactionContextException{
     childrenNum--;
     save();
