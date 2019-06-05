@@ -276,37 +276,47 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     }
     
     @Test
-    public void testWithNoConfigSuperuser() throws Exception {
-        String hostname = NetUtils.getLocalCanonicalHostname();
-        String kstore = "/tmp/" + hostname + "__kstore.jks";
-        touchFile(kstore);
-        String pass = "adminpw";
-        String tstore = "/tmp/" + hostname + "__tstore.jks";
-        touchFile(tstore);
-
-        createServerSSLConfig(kstore, pass, tstore, pass, conf);
-        UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
+    public void testConfigurationLocalizedMaterialUserChangedCWD() throws Exception {
+        File materialDir = Paths.get(BASEDIR, "pwd_dir").toFile();
+        if (!materialDir.exists()) {
+            materialDir.mkdirs();
+        }
+        
+        MockEnvironmentVariablesService mockEnvService = new MockEnvironmentVariablesService();
+        mockEnvService.setEnv("PWD", materialDir.getAbsolutePath());
+        EnvironmentVariablesFactory.setInstance(mockEnvService);
+        
+        LOG.info("Mocked PWD is : " + EnvironmentVariablesFactory.getInstance().getEnv("PWD"));
+        
+        String keystore = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME)
+            .toString();
+        String truststore = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME)
+            .toString();
+        String passwd = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME)
+            .toString();
+        String password = "password";
+        touchFile(keystore);
+        touchFile(truststore);
+        touchFile(passwd);
+        FileUtils.writeStringToFile(new File(passwd), password);
+        
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser("some_user");
         final Set<String> superusers = new HashSet<>(1);
-        superusers.add("glassfish");
+        superusers.add("superuser");
         ugi.doAs(new PrivilegedExceptionAction<Object>() {
             @Override
-            public Object run() throws SSLCertificateException {
+            public Object run() throws Exception {
                 hopsFactory.setConf(conf);
                 hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
             }
         });
-
-        assertEquals(kstore,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(pass,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals(pass,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
-        assertEquals(tstore,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(pass,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+    
+        assertEquals(keystore, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+        assertEquals(truststore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
     
     @Test
@@ -338,7 +348,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
         superusers.add("glassfish");
         ugi.doAs(new PrivilegedExceptionAction<Object>() {
             @Override
-            public SSLCertificateException run() throws Exception {
+            public Void run() throws Exception {
                 hopsFactory.setConf(conf);
                 hopsFactory.configureCryptoMaterial(null, superusers);
                 return null;
@@ -395,13 +405,10 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
         });
 
         assertEquals(kstore, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
-            .KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
-            .KEY_PASSWORD_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
         assertEquals(tstore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
-            .TRUST_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
     
     private void createServerSSLConfig(String keystoreLocation, String keyStorePassword,
