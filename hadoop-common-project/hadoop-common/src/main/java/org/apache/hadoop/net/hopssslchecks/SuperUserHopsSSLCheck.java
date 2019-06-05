@@ -21,7 +21,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
 
@@ -46,9 +45,8 @@ public class SuperUserHopsSSLCheck extends AbstractHopsSSLCheck {
   
     String username = ugi.getUserName();
     if (proxySuperUsers.contains(username)) {
-      String hostname = NetUtils.getLocalCanonicalHostname();
       try {
-        isConfigurationNeededForSuperUser(username, hostname, configuration);
+        isConfigurationNeededForSuperUser(username, configuration);
       } catch (SSLMaterialAlreadyConfiguredException ex) {
         // Already configured, return
         return new HopsSSLCryptoMaterial(

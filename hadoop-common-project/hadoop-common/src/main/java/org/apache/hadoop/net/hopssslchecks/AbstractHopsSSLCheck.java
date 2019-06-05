@@ -66,14 +66,12 @@ public abstract class AbstractHopsSSLCheck implements HopsSSLCheck, Comparable<H
   /**
    * Checks if the RPC TLS properties of the supplied configuration are already configured for proxy superusers
    * @param username Username of the current superuser
-   * @param hostname Hostname of the local machine
    * @param configuration Hadoop configuration
    * @throws SSLMaterialAlreadyConfiguredException If the supplied Hadoop configuration is already configured
    */
-  protected void isConfigurationNeededForSuperUser(String username, String hostname, Configuration configuration)
+  protected void isConfigurationNeededForSuperUser(String username, Configuration configuration)
     throws SSLMaterialAlreadyConfiguredException {
-    if (isCryptoMaterialSet(configuration, username)
-        || isHostnameInCryptoMaterial(hostname, configuration)
+    if (isCryptoMaterialSet(configuration)
         && !configuration.getBoolean(HopsSSLSocketFactory.FORCE_CONFIGURE,
         HopsSSLSocketFactory.DEFAULT_FORCE_CONFIGURE)) {
       throw new SSLMaterialAlreadyConfiguredException("Crypto material for user <" + username + "> has already been" +
@@ -120,15 +118,18 @@ public abstract class AbstractHopsSSLCheck implements HopsSSLCheck, Comparable<H
         truststorePassword);
   }
   
-  private boolean isCryptoMaterialSet(Configuration conf, String username) {
+  /**
+   * Checks if configuration properties for Hops TLS client are set
+   * @param conf Client configuration
+   * @return True if Hops TLS configuration properties are different from default. Otherwise false
+   */
+  private boolean isCryptoMaterialSet(Configuration conf) {
     for (HopsSSLSocketFactory.CryptoKeys key : HopsSSLSocketFactory.CryptoKeys.values()) {
       String propValue = conf.get(key.getValue(), key.getDefaultValue());
-      if (checkForDefaultInProperty(key, propValue)
-        || !checkUsernameInProperty(username, propValue, key.getType())) {
+      if (checkForDefaultInProperty(key, propValue)) {
         return false;
       }
     }
-    
     return true;
   }
   

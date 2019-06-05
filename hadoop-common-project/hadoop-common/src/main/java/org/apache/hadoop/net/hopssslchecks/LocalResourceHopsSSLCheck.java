@@ -24,9 +24,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
+import org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Set;
 
 /**
@@ -43,17 +46,33 @@ public class LocalResourceHopsSSLCheck extends AbstractHopsSSLCheck {
   @Override
   public HopsSSLCryptoMaterial check(UserGroupInformation ugi, Set<String> proxySuperusers, Configuration configuration,
       CertificateLocalization certificateLocalization) throws IOException {
+    
+    // First check in the current working directory
     File localizedKeystore = new File(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
     if (localizedKeystore.exists()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Crypto material found in container localized directory");
+      LOG.debug("Crypto material found in container's CWD");
+      return constructCryptoMaterial(localizedKeystore, new File(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME),
+          new File(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME));
+    }
+    
+    // User might have changed directory, use PWD environment variable to construct the full path
+    String pwd = EnvironmentVariablesFactory.getInstance().getEnv("PWD");
+    if (pwd != null) {
+      Path localizedKeystorePath = Paths.get(pwd, HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+      if (localizedKeystorePath.toFile().exists()) {
+        LOG.debug("Crypto material found in PWD");
+        return constructCryptoMaterial(localizedKeystorePath.toFile(),
+            Paths.get(pwd, HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME).toFile(),
+            Paths.get(pwd, HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME).toFile());
       }
-      File passwordFile = new File(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
-      String password = HopsUtil.readCryptoMaterialPassword(passwordFile);
-      return new HopsSSLCryptoMaterial(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME, password, password,
-          HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME, password, HopsSSLSocketFactory
-          .LOCALIZED_PASSWD_FILE_NAME, true);
     }
     return null;
+  }
+  
+  private HopsSSLCryptoMaterial constructCryptoMaterial(File keystoreLocation, File truststoreLocation,
+      File passwordFileLocation) throws IOException {
+    String password = HopsUtil.readCryptoMaterialPassword(passwordFileLocation);
+    return new HopsSSLCryptoMaterial(keystoreLocation.toString(), password, password, truststoreLocation.toString(),
+        password, passwordFileLocation.toString(), true);
   }
 }

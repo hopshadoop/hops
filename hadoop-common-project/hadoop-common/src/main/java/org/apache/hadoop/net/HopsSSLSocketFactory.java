@@ -119,11 +119,8 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   }
   
   // Log a warning for deprecated Crypto configuration keys
+  // <Deprecated CryptoKey, Warning message to print>
   private static Map<CryptoKeys, String> DEPRECATED_CRYPTO_KEYS = new HashMap<>();
-  static {
-    DEPRECATED_CRYPTO_KEYS.put(CryptoKeys.SERVICE_CERTS_DIR, "Key <" + CryptoKeys.SERVICE_CERTS_DIR.getValue()
-        + "> is deprecated and it will be removed in the future. Remove it from your configuration");
-  }
   
   public enum CryptoKeys {
     
@@ -133,7 +130,6 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     TRUST_STORE_FILEPATH_KEY("client.rpc.ssl.truststore.filepath", TRUST_STORE_FILEPATH_DEFAULT, PropType.FILEPATH),
     TRUST_STORE_PASSWORD_KEY("client.rpc.ssl.truststore.password", TRUST_STORE_PASSWORD_DEFAULT, PropType.LITERAL),
     SOCKET_ENABLED_PROTOCOL("client.rpc.ssl.enabled.protocol", SOCKET_ENABLED_PROTOCOL_DEFAULT, PropType.LITERAL),
-    SERVICE_CERTS_DIR("hops.service.certificates.directory", SERVICE_CERTS_DIR_DEFAULT, PropType.LITERAL),
     CLIENT_MATERIALIZE_DIR("client.materialize.directory", CLIENT_MATERIALIZE_DIR_DEFAULT, PropType.LITERAL);
     
     private final String value;
