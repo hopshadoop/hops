@@ -38,7 +38,6 @@ public class TestInodeChildrenCount {
   @Test
   public void testInodeChildrenCount() throws Exception {
     Configuration conf = new Configuration();
-    conf.setInt(CommonConfigurationKeys.DFS_CLIENT_COPY_TO_OR_FROM_LOCAL_PARALLEL_THREADS, 10);
     MiniDFSCluster cluster =
             new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
     FsShell shell = null;
@@ -71,7 +70,6 @@ public class TestInodeChildrenCount {
 
       fs.rename(new Path("/test/test2/dst"), new Path("/test/test2/newfile"), Options.Rename.OVERWRITE);
       status = dfsClient.getFileInfo("/test/test2");
-      assertEquals(1, status.getChildrenNum());
 
       //overwrite files using create
       createFile(fs, "/test/test2/newfile"); //overwrites

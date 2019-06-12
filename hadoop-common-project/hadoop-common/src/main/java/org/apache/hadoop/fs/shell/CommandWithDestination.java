@@ -64,6 +64,8 @@ abstract class CommandWithDestination extends FsCommand {
   private boolean writeChecksum = true;
   private boolean lazyPersist = false;
   private boolean direct = false;
+  private int numThreads = 1;
+  private boolean isDstRemote = false;
 
   /**
    * The name of the raw xattr namespace. It would be nice to use
@@ -100,6 +102,22 @@ abstract class CommandWithDestination extends FsCommand {
 
   protected void setDirectWrite(boolean flag) {
     direct = flag;
+  }
+
+  protected void setNumThreads(int numThreads){
+    this.numThreads = numThreads;
+  }
+
+  protected int getNumThreads(){
+    return numThreads;
+  }
+
+  public boolean isDstRemote() {
+    return isDstRemote;
+  }
+
+  public void setDstRemote(boolean dstRemote) {
+    isDstRemote = dstRemote;
   }
 
   /**

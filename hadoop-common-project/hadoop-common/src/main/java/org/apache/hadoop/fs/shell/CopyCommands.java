@@ -208,18 +208,32 @@ class CopyCommands {
       "files, the destination must be a directory. Passing " +
       "-f overwrites the destination if it already exists and " +
       "-p preserves access and modification times, " +
-      "ownership and the mode.\n";
+      "ownership and the mode."+
+      "-t num number of parallel threads for copying data. Default 1.\n";
 
     @Override
     protected void processOptions(LinkedList<String> args)
     throws IOException {
       CommandFormat cf = new CommandFormat(
           1, Integer.MAX_VALUE, "crc", "ignoreCrc", "p", "f");
+      cf.addOptionWithValue("t");
       cf.parse(args);
       setWriteChecksum(cf.getOpt("crc"));
       setVerifyChecksum(!cf.getOpt("ignoreCrc"));
       setPreserve(cf.getOpt("p"));
       setOverwrite(cf.getOpt("f"));
+
+      String tOpts = cf.getOptValue("t");
+      if(tOpts == null){
+        setNumThreads(1);
+      } else {
+        try{
+          int numThreads = Integer.parseInt(tOpts);
+          setNumThreads(numThreads);
+        } catch (NumberFormatException e){
+          throw new CommandFormat.UnknownOptionException("Unable to determine number of copy threads");
+        }
+      }
       setRecursive(true);
       getLocalDestination(args);
     }
@@ -231,7 +245,7 @@ class CopyCommands {
   public static class Put extends ParallelCommandWithDestination {
     public static final String NAME = "put";
     public static final String USAGE =
-        "[-f] [-p] [-l] [-d] <localsrc> ... <dst>";
+        "[-f] [-p] [-l] [-d] [-t num] <localsrc> ... <dst>";
     public static final String DESCRIPTION =
       "Copy files from the local file system " +
       "into fs. Copying fails if the file already " +
@@ -242,18 +256,33 @@ class CopyCommands {
       "  -l : Allow DataNode to lazily persist the file to disk. Forces\n" +
       "       replication factor of 1. This flag will result in reduced\n" +
       "       durability. Use with care.\n" +
-        "  -d : Skip creation of temporary file(<dst>._COPYING_).\n";
+      "  -d : Skip creation of temporary file(<dst>._COPYING_).\n"+
+      "  -t num number of parallel threads for copying data. Default 1.\n";
 
     @Override
     protected void processOptions(LinkedList<String> args) throws IOException {
       CommandFormat cf =
           new CommandFormat(1, Integer.MAX_VALUE, "f", "p", "l", "d");
+      cf.addOptionWithValue("t");
       cf.parse(args);
       setOverwrite(cf.getOpt("f"));
       setPreserve(cf.getOpt("p"));
       setLazyPersist(cf.getOpt("l"));
       setDirectWrite(cf.getOpt("d"));
+
+      String tOpts = cf.getOptValue("t");
+      if(tOpts == null){
+        setNumThreads(1);
+      } else {
+        try{
+          int numThreads = Integer.parseInt(tOpts);
+          setNumThreads(numThreads);
+        } catch (NumberFormatException e){
+          throw new CommandFormat.UnknownOptionException("Unable to determine number of copy threads");
+        }
+      }
       getRemoteDestination(args);
+      setDstRemote(true);
       // should have a -r option
       setRecursive(true);
     }

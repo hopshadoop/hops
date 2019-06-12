@@ -56,14 +56,21 @@ public class TestMultithreadedCopyToOrFromLocal {
   @Test
   public void testCopyFromLocal() throws Exception {
     Configuration conf = new Configuration();
-    conf.setInt(CommonConfigurationKeys.DFS_CLIENT_COPY_TO_OR_FROM_LOCAL_PARALLEL_THREADS, 10);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY,true);
     MiniDFSCluster cluster =
             new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
     FsShell shell = null;
-    FileSystem fs = null;
+    DistributedFileSystem fs = null;
     final File localDir = new File(TEST_ROOT_DIR, "localDir");
     final File copiedDir = new File(TEST_ROOT_DIR, "copiedDir");
+    final File copiedBackDir = new File(TEST_ROOT_DIR, "copiedBackDir");
+    String numThreads = "10";
+
     if(copiedDir.exists()){
+      FileUtils.deleteDirectory(copiedDir);
+    }
+
+    if(copiedBackDir.exists()){
       FileUtils.deleteDirectory(copiedDir);
     }
 
@@ -79,20 +86,26 @@ public class TestMultithreadedCopyToOrFromLocal {
       createLocalDir(localDir);
 
       fs.mkdirs(hdfsTestDir);
+      fs.setStoragePolicy(hdfsTestDir, "DB");
       shell = new FsShell(conf);
 
       long startTime = System.currentTimeMillis();
-      String[] argv = new String[]{"-copyFromLocal", localDir.getAbsolutePath(), hdfsTestDirStr+"/copiedDir"};
+      String[] argv = new String[]{"-copyFromLocal", "-t", numThreads,
+              "-d", localDir.getAbsolutePath(), hdfsTestDirStr+"/copiedDir"};
       int res = ToolRunner.run(shell, argv);
       assertEquals("copyFromLocal command should have succeeded", SUCCESS, res);
       LOG.info("Time taken copyFromLocal "+(System.currentTimeMillis() - startTime)/1000+" sec");
 
 
       startTime = System.currentTimeMillis();
-      argv = new String[]{"-copyToLocal", hdfsTestDirStr+"/copiedDir", TEST_ROOT_DIR};
+      argv = new String[]{"-copyToLocal","-t", numThreads, hdfsTestDirStr+"/copiedDir",
+              copiedBackDir.getAbsolutePath()};
       res = ToolRunner.run(shell, argv);
       assertEquals("copyToLocal command should have succeeded", SUCCESS, res);
       LOG.info("Time taken copyToLocal "+(System.currentTimeMillis() - startTime)/1000+" sec");
+
+      //Verify
+      verify(localDir, copiedBackDir);
 
     } finally {
       if (null != shell) {
@@ -103,24 +116,147 @@ public class TestMultithreadedCopyToOrFromLocal {
   }
 
   private void createLocalDir(File base) throws IOException {
-    int filesPerLevel=100;
-    base.mkdir();
-    for(int i = 0; i < filesPerLevel; i++){
-      File localFile = new File(base, "localFile"+i);
-//      localFile.createNewFile();
-      BufferedWriter writer = new BufferedWriter(new FileWriter(localFile));
-      writer.write(i+"");
-      writer.close();
+    createLocalDir(base,0);
+  }
+
+  private void verify(File base1, File base2) throws IOException {
+    verify(base1, base2,0);
+  }
+
+  int filesPerDir = 10;
+  int dirPerDir = 2;
+  int maxDepth = 5;
+
+  private void createLocalDir(File base, int depth) throws IOException {
+    if (depth >= maxDepth) {
+      return;
     }
 
-    final File localDir2 = new File(base, "localDirInternal");
-    localDir2.mkdir();
-    for(int i = 0; i < filesPerLevel; i++){
-      File localFile = new File(localDir2, "localFile"+i);
-//      localFile.createNewFile();
-      BufferedWriter writer = new BufferedWriter(new FileWriter(localFile));
-      writer.write(i+"");
-      writer.close();
+    base.mkdir();
+    for (int dir = 0; dir < dirPerDir; dir++) {
+      final File dirPath = new File(base, "dir_depth_" + depth + "_count_" + dir);
+      dirPath.mkdir();
+      LOG.info(" DIR: "+dirPath);
+      createLocalDir(dirPath, depth+1);
+      for (int file = 0; file < filesPerDir; file++) {
+        final File filePath = new File(dirPath, "file_" + file);
+        BufferedWriter writer = new BufferedWriter(new FileWriter(filePath));
+        writer.write(filePath.toString());
+        writer.close();
+        LOG.info("FILE: "+filePath);
+      }
     }
+  }
+
+  private void verify(File base1, File base2, int depth) throws IOException {
+    if (depth >= maxDepth) {
+      return;
+    }
+
+    for (int dir = 0; dir < dirPerDir; dir++) {
+      final File dirPath1 = new File(base1, "dir_depth_" + depth + "_count_" + dir);
+      final File dirPath2 = new File(base2, "dir_depth_" + depth + "_count_" + dir);
+      assertTrue(dirPath1.isDirectory());
+      assertTrue(dirPath2.isDirectory());
+      verify(dirPath1, dirPath2, depth+1);
+      for (int file = 0; file < filesPerDir; file++) {
+        final File filePath1 = new File(dirPath1, "file_" + file);
+        final File filePath2 = new File(dirPath2, "file_" + file);
+        assertTrue(filePath1.isFile());
+        assertTrue(filePath2.isFile());
+
+        BufferedReader reader1 = new BufferedReader(new FileReader(filePath1));
+        String f1Data = reader1.readLine();
+        reader1.close();
+
+        BufferedReader reader2 = new BufferedReader(new FileReader(filePath1));
+        String f2Data = reader2.readLine();
+        reader2.close();
+
+        assertTrue(f1Data.equals(f2Data));
+      }
+    }
+  }
+
+  @Test
+  public void testCopyFromLocal2() throws Exception {
+    Configuration conf = new Configuration();
+    MiniDFSCluster cluster =
+            new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+    FsShell shell = null;
+    DistributedFileSystem fs = null;
+    final File localFile = new File(TEST_ROOT_DIR, "localFile");
+    final File copiedFile = new File(TEST_ROOT_DIR, "copiedFile");
+    final File copiedBackFile = new File(TEST_ROOT_DIR, "copiedBackFile");
+    String numThreads = "10";
+
+    if(copiedFile.exists()){
+      FileUtils.forceDelete(copiedFile);
+    }
+
+    if(localFile.exists()){
+      FileUtils.forceDelete(localFile);
+    }
+
+    if(copiedBackFile.exists()){
+      FileUtils.forceDelete(copiedBackFile);
+    }
+
+    final String  hdfsTestDirStr = TEST_ROOT_DIR;
+    final Path hdfsTestDir = new Path(hdfsTestDirStr);
+    try {
+      fs = cluster.getFileSystem();
+
+      createLocalFile(localFile);
+
+      fs.mkdirs(hdfsTestDir);
+      fs.setStoragePolicy(hdfsTestDir, "DB");
+
+      shell = new FsShell(conf);
+
+      long startTime = System.currentTimeMillis();
+      String[] argv = new String[]{"-copyFromLocal", "-t", numThreads,
+              "-d", localFile.getAbsolutePath(), copiedFile.getAbsolutePath()};
+      int res = ToolRunner.run(shell, argv);
+      assertEquals("copyFromLocal command should have succeeded", SUCCESS, res);
+      LOG.info("Time taken copyFromLocal "+(System.currentTimeMillis() - startTime)/1000+" sec");
+
+
+      startTime = System.currentTimeMillis();
+      argv = new String[]{"-copyToLocal","-t", numThreads, copiedFile.getAbsolutePath(),
+              copiedBackFile.getAbsolutePath()};
+      res = ToolRunner.run(shell, argv);
+      assertEquals("copyToLocal command should have succeeded", SUCCESS, res);
+      LOG.info("Time taken copyToLocal "+(System.currentTimeMillis() - startTime)/1000+" sec");
+
+      //Verify
+      verifyFiles(localFile, copiedBackFile);
+
+    } finally {
+      if (null != shell) {
+        shell.close();
+      }
+      cluster.shutdown();
+    }
+  }
+
+
+  void createLocalFile(File filePath) throws IOException {
+    BufferedWriter writer = new BufferedWriter(new FileWriter(filePath));
+    writer.write(filePath.toString());
+    writer.close();
+  }
+
+  void verifyFiles(File filePath1, File filePath2) throws IOException {
+    BufferedReader reader1 = new BufferedReader(new FileReader(filePath1));
+    String f1Data = reader1.readLine();
+    reader1.close();
+
+    BufferedReader reader2 = new BufferedReader(new FileReader(filePath1));
+    String f2Data = reader2.readLine();
+    reader2.close();
+
+    assertTrue(f1Data.equals(f2Data));
+
   }
 }

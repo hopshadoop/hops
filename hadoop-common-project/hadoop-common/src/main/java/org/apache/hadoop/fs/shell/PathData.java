@@ -50,7 +50,7 @@ import org.apache.hadoop.fs.PathNotFoundException;
 
 public class PathData implements Comparable<PathData> {
   protected final URI uri;
-  public final FileSystem fs;
+  public FileSystem fs;
   public final Path path;
   public FileStatus stat;
   public boolean exists;
@@ -583,5 +583,13 @@ public class PathData implements Comparable<PathData> {
   @Override
   public int hashCode() {
     return path.hashCode();
+  }
+
+  protected URI getURI(){
+    return uri;
+  }
+
+  protected void overrideFS(FileSystem fs){
+    this.fs = fs;
   }
 }
