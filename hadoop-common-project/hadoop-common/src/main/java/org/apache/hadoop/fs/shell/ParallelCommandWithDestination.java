@@ -41,73 +41,153 @@ abstract class ParallelCommandWithDestination extends  CommandWithDestination{
   protected void processPaths(PathData parent, PathData ... items)
           throws IOException {
 
-    //go through all files first and copy them
-    for (PathData item : items) {
-      ProcessPathThread processFile = new ProcessPathThread(item);
-      Future f = getThreadProol(getConf()).submit(processFile);
-      activeCopiers.add(f);
-    }
-
-    //wait for all files to be copied
-    List<PathData> sucessfull = new ArrayList<>();
-    while(true) {
-      Future future = activeCopiers.poll();
-      if (future == null) {
-        break;
-      }
-      try {
-        PathData processed  = (PathData)future.get();
-        sucessfull.add(processed);
-      }catch (Exception e) {
-        if(e instanceof ExecutionException){
-          e = (Exception)e.getCause();
-        }
-        displayError(e);
-      }
-    }
-
-    //go through all directories now
-    for (PathData item : items) {
-      try {
-        if (recursive && isPathRecursable(item)) {
-          recursePath(item);
-        }
-        if(sucessfull.contains(item)) {
-          postProcessPath(item);
-        }
-      } catch (IOException e) {
-        displayError(e);
-      }
+    if(getNumThreads() == 1){
+      super.processPaths(parent, items);
+    } else {
+      parallelCopy(parent,items);
     }
   }
 
+  List<SrcDstPair> fileToDst = new ArrayList<>();
+  List<PathData> sucessfull = new ArrayList<>();
+  boolean filesSubmitted = false;
+  private void parallelCopy(PathData parent, PathData ... items){
+
+    List<PathData> curdirs = new ArrayList<>();
+    try {
+      for (PathData item : items) {  // create all dirs at this level in parallel
+        if (isPathRecursable(item)) {
+          ProcessPathThread processFile = new ProcessPathThread(item, dst/*dst dir*/);
+          Future f = getThreadProol(getConf()).submit(processFile);
+          activeCopiers.add(f);
+          curdirs.add(item);
+        } else { // collect files
+          fileToDst.add(new SrcDstPair(item, dst));
+
+        }
+      }
+
+      //wait for dirs to be created
+      while(true) {
+        Future future = activeCopiers.poll();
+        if (future == null) {
+          break;
+        }
+        try {
+          PathData processed  = (PathData)future.get();
+          sucessfull.add(processed);
+        }catch (Exception e) {
+          if(e instanceof ExecutionException){
+            e = (Exception)e.getCause();
+          }
+          displayError(e);
+        }
+      }
+
+      for(PathData dir : curdirs){
+        if (recursive && isPathRecursable(dir)) {
+          recursePath(dir);
+        }
+      }
+
+      if(parent==null){  //only top level recursive method will create the files
+        filesSubmitted = true;
+        //all dirs have been created and files collected
+        //create files in parallel
+
+        long time = System.currentTimeMillis();
+        Collections.shuffle(fileToDst);
+        for(SrcDstPair srcDstPair : fileToDst){
+          ProcessPathThread processFile = new ProcessPathThread(srcDstPair.src, srcDstPair.dst);
+          Future f = getThreadProol(getConf()).submit(processFile);
+          activeCopiers.add(f);
+        }
+
+        //wait for files to be created
+        while(true) {
+          Future future = activeCopiers.poll();
+          if (future == null) {
+            break;
+          }
+          try {
+            PathData processed  = (PathData)future.get();
+            sucessfull.add(processed);
+          }catch (Exception e) {
+            if(e instanceof ExecutionException){
+              e = (Exception)e.getCause();
+            }
+            displayError(e);
+          }
+        }
+
+        //post processing
+        //Right now I do not forsee any probelm with random order of postprocessing
+        for(PathData path : sucessfull){
+          postProcessPath(path);
+        }
+      }
+
+    } catch (IOException e) {
+      displayError(e);
+    }
+  }
+
+  ThreadLocal<FileSystem> fileSystems = new ThreadLocal<>();
   private class ProcessPathThread implements Callable {
-    PathData item;
-    ProcessPathThread(PathData item){
-      this.item = item;
+    PathData src;
+    PathData destDir;
+    ProcessPathThread(PathData src, PathData destDir){
+      this.src = src;
+      this.destDir = destDir;
     }
 
     @Override
     public Object call() throws Exception {
-      processPath(item);
-      return item;
+      //for remote destination
+      PathData dest = getTargetPath(src, destDir);
+
+      if( isDstRemote() ){
+        FileSystem dfs = fileSystems.get();
+        if( dfs == null ){
+          dfs = FileSystem.newInstance(dest.getURI(),getConf());
+          fileSystems.set(dfs);
+        }
+        dest.overrideFS(dfs);
+      }
+      
+      processPath(src,dest);
+      return src;
     }
   }
 
-//    @Override
-//    protected void processPath(PathData src) throws IOException {
-//      super.processPath(src);
-//    }
+  private class SrcDstPair {
+    PathData src;
+    PathData dst;
+
+    public SrcDstPair(PathData src, PathData dst) {
+      this.src = src;
+      this.dst = dst;
+    }
+  }
 
   protected ExecutorService getThreadProol(Configuration conf){
     if(copier == null){
-      int numThreads = 1;
-      if(conf != null){
-        numThreads =  conf.getInt(CommonConfigurationKeys.DFS_CLIENT_COPY_TO_OR_FROM_LOCAL_PARALLEL_THREADS,
-                CommonConfigurationKeys.DFS_CLIENT_COPY_TO_OR_FROM_LOCAL_PARALLEL_THREADS_DEFAULT );
-      }
-      copier = Executors.newFixedThreadPool(numThreads);
+      copier = Executors.newFixedThreadPool(getNumThreads());
     }
     return copier;
+  }
+
+  protected PathData getTargetPath(PathData src, PathData dest) throws IOException {
+    PathData target;
+    // on the first loop, the dst may be directory or a file, so only create
+    // a child path if dst is a dir; after recursion, it's always a dir
+    if ((getDepth() > 0) || (dest.exists && dest.stat.isDirectory())) {
+      target = dest.getPathDataForChild(src);
+    } else if (dest.representsDirectory()) { // see if path looks like a dir
+      target = dest.getPathDataForChild(src);
+    } else {
+      target = dest;
+    }
+    return target;
   }
 }

@@ -58,7 +58,6 @@ public class TestPutCLIWithMultiNN {
   public void testPutMultiNN() throws Exception {
     final int NN_COUNT=3;
     Configuration conf = new Configuration();
-    conf.setInt(CommonConfigurationKeys.DFS_CLIENT_COPY_TO_OR_FROM_LOCAL_PARALLEL_THREADS, 10);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
             .nnTopology(MiniDFSNNTopology.simpleHOPSTopology(NN_COUNT))
             .numDataNodes(1).format(true).build();
@@ -86,14 +85,15 @@ public class TestPutCLIWithMultiNN {
       shell = new FsShell(conf);
 
       long startTime = System.currentTimeMillis();
-      String[] argv = new String[]{"-put", localDir.getAbsolutePath(), hdfsTestDirStr+"/copiedDir"};
+      String[] argv = new String[]{"-put", "-t", "10", localDir.getAbsolutePath(), hdfsTestDirStr+
+              "/copiedDir"};
       int res = ToolRunner.run(shell, argv);
       assertEquals("-put command should have succeeded", SUCCESS, res);
       LOG.info("Time taken by put "+(System.currentTimeMillis() - startTime)/1000+" sec");
 
 
       startTime = System.currentTimeMillis();
-      argv = new String[]{"-copyToLocal", hdfsTestDirStr+"/copiedDir", TEST_ROOT_DIR};
+      argv = new String[]{"-copyToLocal", "-t", "10", hdfsTestDirStr+"/copiedDir", TEST_ROOT_DIR};
       res = ToolRunner.run(shell, argv);
       assertEquals("copyToLocal command should have succeeded", SUCCESS, res);
       LOG.info("Time taken by copyToLocal "+(System.currentTimeMillis() - startTime)/1000+" " +"sec");

@@ -480,7 +480,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^-put \[-f\] \[-p\] \[-l\] \[-d\] &lt;localsrc&gt; \.\.\. &lt;dst&gt; :( )*</expected-output>
+          <expected-output>^-put \[-f\] \[-p\] \[-l\] \[-d\] \[-t num\] &lt;localsrc&gt; \.\.\. &lt;dst&gt; :( )*</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
@@ -518,6 +518,10 @@
           <type>RegexpComparator</type>
           <expected-output>^\s*-d  Skip creation of temporary file\(&lt;dst&gt;\._COPYING_\).( )*</expected-output>
         </comparator>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>^\s*-t num number of parallel threads for copying data. Default 1.( )*</expected-output>
+        </comparator>
       </comparators>
     </test>
 
@@ -531,7 +535,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^-copyFromLocal \[-f\] \[-p\] \[-l\] \[-d\] &lt;localsrc&gt; \.\.\. &lt;dst&gt; :\s*</expected-output>
+          <expected-output>^-copyFromLocal \[-f\] \[-p\] \[-l\] \[-d\] \[-t num\] &lt;localsrc&gt; \.\.\. &lt;dst&gt; :\s*</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
