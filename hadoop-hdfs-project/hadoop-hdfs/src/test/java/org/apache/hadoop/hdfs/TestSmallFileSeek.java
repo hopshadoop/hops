@@ -133,7 +133,6 @@ public class TestSmallFileSeek {
   public void testSeekBugDFS() throws IOException {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, 1024*1024);
-    conf.setLong(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, 1024*1024);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     DistributedFileSystem fileSys = cluster.getFileSystem();
 
@@ -160,7 +159,6 @@ public class TestSmallFileSeek {
   public void testNegativeSeek() throws IOException {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, 1024*1024);
-    conf.setLong(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, 1024*1024);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     DistributedFileSystem fs = cluster.getFileSystem();
 
@@ -192,7 +190,6 @@ public class TestSmallFileSeek {
   public void testSeekPastFileSize() throws IOException {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, 1024*1024);
-    conf.setLong(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, 1024*1024);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     DistributedFileSystem fs = cluster.getFileSystem();
     fs.mkdirs(new Path("/dir"));
@@ -221,7 +218,6 @@ public class TestSmallFileSeek {
   public void testSeekBugLocalFS() throws IOException {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, 1024*1024);
-    conf.setLong(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, 1024*1024);
     FileSystem fileSys = FileSystem.getLocal(conf);
     try {
       Path file1 = new Path("build/test/data", "seektest.dat");

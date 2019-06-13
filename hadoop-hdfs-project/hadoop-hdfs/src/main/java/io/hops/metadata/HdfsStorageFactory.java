@@ -165,6 +165,10 @@ public class HdfsStorageFactory {
     isDALInitialized = false;
   }
 
+  public static boolean isInitialized(){
+    return isDALInitialized;
+  }
+
   public static void setConfiguration(Configuration conf) throws IOException {
     IDsMonitor.getInstance().setConfiguration(conf);
     Cache.getInstance(conf);

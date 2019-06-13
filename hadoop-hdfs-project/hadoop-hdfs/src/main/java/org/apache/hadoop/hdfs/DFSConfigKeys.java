@@ -168,20 +168,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_FORCE_CLIENT_TO_WRITE_SMALL_FILES_TO_DISK_KEY = "dfs.force.client.to.write.small.files.to.disk.key";
   public static final boolean DFS_FORCE_CLIENT_TO_WRITE_SMALL_FILES_TO_DISK_DEFAULT = false;
 
-  public static final String DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY = "dfs.db.ondisk.small.file.max.size";
-  public static final int DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT = 2000;
-
-  public static final String DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_KEY = "dfs.db.ondisk.medium.file.max.size";
-  public static final int DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT = 4000;
-
-  public static final String DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY = "dfs.db.ondisk.large.file.max.size";
-  public static final int DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT = 64*1024;
-
   public static final String DFS_DB_FILE_MAX_SIZE_KEY = "dfs.db.file.max.size";
   public static final int DFS_DB_FILE_MAX_SIZE_DEFAULT = 64 * 1024;
-
-  public static final String DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY = "dfs.db.inmemory.file.max.size";
-  public static final int DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT = 1*1024; // 1KB
 
   public static final String DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_KEY = "dsf.client.delay.before.file.close";
   public static final int DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_DEFAULT = 0;
