@@ -181,68 +181,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
 import org.apache.hadoop.fs.CacheFlag;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CHECKSUM_TYPE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DIR_DELETE_BATCH_SIZE;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DIR_DELETE_BATCH_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOGGERS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_ASYNC_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_ASYNC_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DEFAULT_AUDIT_LOGGER_NAME;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_KEY_UPDATE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_KEY_UPDATE_INTERVAL_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MIN_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MIN_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPL_QUEUE_THRESHOLD_PCT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_HEAP_PERCENT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_HEAP_PERCENT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DATANODES_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DATANODES_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_ENABLED_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUPPORT_APPEND_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUPPORT_APPEND_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_KEY;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -263,6 +201,8 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
 import org.apache.hadoop.ipc.RetryCacheDistributed.CacheEntryWithPayload;
 import org.apache.hadoop.util.StringUtils;
+
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.util.Time.now;
 import org.apache.hadoop.util.Timer;
 import org.apache.log4j.Appender;
@@ -449,11 +389,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private final boolean erasureCodingEnabled;
   private final ErasureCodingManager erasureCodingManager;
 
-  private static int DB_ON_DISK_FILE_MAX_SIZE;
-  private static int DB_ON_DISK_SMALL_FILE_MAX_SIZE;
-  private static int DB_ON_DISK_MEDIUM_FILE_MAX_SIZE;
-  private static int DB_ON_DISK_LARGE_FILE_MAX_SIZE;
-  private static int DB_IN_MEMORY_FILE_MAX_SIZE;
+  static int DB_IN_MEMORY_BUCKET_SIZE;
+  static int DB_ON_DISK_SMALL_BUCKET_SIZE;
+  static int DB_ON_DISK_MEDIUM_BUCKET_SIZE;
+  static int DB_ON_DISK_LARGE_BUCKET_SIZE;
+  static int DB_MAX_SMALL_FILE_SIZE = 0;
 
   /** flag indicating whether replication queues have been initialized */
   boolean initializedReplQueues = false;
@@ -600,21 +540,18 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       this.erasureCodingEnabled =
           ErasureCodingManager.isErasureCodingEnabled(conf);
       this.erasureCodingManager = new ErasureCodingManager(this, conf);
-      DB_ON_DISK_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY,
-              DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_DEFAULT);
-      DB_ON_DISK_LARGE_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY,
-              DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT);
-      DB_ON_DISK_MEDIUM_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_KEY,
-              DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT);
-      DB_ON_DISK_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY,
-              DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT);
-      DB_IN_MEMORY_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY,
-          DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT);
 
-      if (!(DB_IN_MEMORY_FILE_MAX_SIZE < DB_ON_DISK_SMALL_FILE_MAX_SIZE &&
-      DB_ON_DISK_SMALL_FILE_MAX_SIZE < DB_ON_DISK_MEDIUM_FILE_MAX_SIZE &&
-      DB_ON_DISK_MEDIUM_FILE_MAX_SIZE < DB_ON_DISK_LARGE_FILE_MAX_SIZE &&
-      DB_ON_DISK_LARGE_FILE_MAX_SIZE == DB_ON_DISK_FILE_MAX_SIZE)){
+      DB_IN_MEMORY_BUCKET_SIZE = getDBFileInMemBucketSize();
+      DB_ON_DISK_SMALL_BUCKET_SIZE = getDBFileSmallBucketSize();
+      DB_ON_DISK_MEDIUM_BUCKET_SIZE = getDBFileMediumBucketSize();
+      DB_ON_DISK_LARGE_BUCKET_SIZE = getDBFileLargeBucketSize();
+
+      DB_MAX_SMALL_FILE_SIZE = conf.getInt(DFS_DB_FILE_MAX_SIZE_KEY,
+              DFS_DB_FILE_MAX_SIZE_DEFAULT);
+
+      if (!(DB_IN_MEMORY_BUCKET_SIZE < DB_ON_DISK_SMALL_BUCKET_SIZE &&
+      DB_ON_DISK_SMALL_BUCKET_SIZE < DB_ON_DISK_MEDIUM_BUCKET_SIZE &&
+      DB_ON_DISK_MEDIUM_BUCKET_SIZE < DB_ON_DISK_LARGE_BUCKET_SIZE)){
         throw new IllegalArgumentException("The size for the database files is not correctly set");
       }
 
@@ -2351,7 +2288,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final String clientMachine, boolean newBlock) throws IOException {
     // open the small file
     FileSystem hopsFSClient1 = FileSystem.newInstance(conf);
-    byte[] data = new byte[conf.getInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_DEFAULT)];
+    byte[] data = new byte[DB_MAX_SMALL_FILE_SIZE];
     FSDataInputStream is = hopsFSClient1.open(new Path(src));
     int dataRead = is.read(data,0,data.length);
     is.close();
@@ -8328,25 +8265,24 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return (PathInformation)handler.handle(this);
   }
 
-  public static int dbOnDiskFileMaximumSize() {
-    return DB_ON_DISK_FILE_MAX_SIZE;
+  public static int getMaxSmallFileSize() {
+    return DB_MAX_SMALL_FILE_SIZE;
   }
 
-
-  public static int dbOnDiskSmallFileMaxSize() {
-    return DB_ON_DISK_SMALL_FILE_MAX_SIZE;
+  public static int getDBOnDiskSmallBucketSize() {
+    return DB_ON_DISK_SMALL_BUCKET_SIZE;
   }
 
-  public static int dbOnDiskMediumFileMaxSize() {
-    return DB_ON_DISK_MEDIUM_FILE_MAX_SIZE;
+  public static int getDBOnDiskMediumBucketSize() {
+    return DB_ON_DISK_MEDIUM_BUCKET_SIZE;
   }
 
-  public static int dbOnDiskLargeFileMaxSize() {
-    return DB_ON_DISK_LARGE_FILE_MAX_SIZE;
+  public static int getDBOnDiskLargeBucketSize() {
+    return DB_ON_DISK_LARGE_BUCKET_SIZE;
   }
 
-  public static int dbInMemorySmallFileMaxSize() {
-    return DB_IN_MEMORY_FILE_MAX_SIZE;
+  public static int getDBInMemBucketSize() {
+    return DB_IN_MEMORY_BUCKET_SIZE;
   }
 
   public byte[] getSmallFileData(final long id) throws IOException {
@@ -8693,19 +8629,84 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return isTestingSTO;
   }
 
-  public Times saveTimes(){
-    if(isTestingSTO) {
+  public Times saveTimes() {
+    if (isTestingSTO) {
       delays.remove();
       Times times = new Times(delayBeforeSTOFlag, delayAfterBuildingTree);
       delays.set(times);
       return times;
-    }else{
+    } else {
       return null;
     }
   }
 
-  public boolean isRetryCacheEnabled(){
+  public boolean isRetryCacheEnabled() {
     return isRetryCacheEnabled;
+  }
+
+  private static int getDBFileInMemBucketSize() throws IOException {
+    if (!HdfsStorageFactory.isInitialized()) {
+      return 0;
+    }
+    LightWeightRequestHandler h =
+            new LightWeightRequestHandler(HDFSOperationType.GET_DB_FILE_TABLE_SIZE) {
+              @Override
+              public Object performTask() throws IOException {
+                InMemoryInodeDataAccess da = (InMemoryInodeDataAccess) HdfsStorageFactory
+                        .getDataAccess(InMemoryInodeDataAccess.class);
+                return da.getLength();
+              }
+            };
+    return (int) h.handle();
+  }
+
+  private static int getDBFileSmallBucketSize() throws IOException {
+    if (!HdfsStorageFactory.isInitialized()) {
+      return 0;
+    }
+    LightWeightRequestHandler h =
+            new LightWeightRequestHandler(HDFSOperationType.GET_DB_FILE_TABLE_SIZE) {
+              @Override
+              public Object performTask() throws IOException {
+                SmallOnDiskInodeDataAccess da = (SmallOnDiskInodeDataAccess) HdfsStorageFactory
+                        .getDataAccess(SmallOnDiskInodeDataAccess.class);
+                return da.getLength();
+              }
+            };
+    return (int) h.handle();
+  }
+
+
+  private static int getDBFileMediumBucketSize() throws IOException {
+    if (!HdfsStorageFactory.isInitialized()) {
+      return 0;
+    }
+    LightWeightRequestHandler h =
+            new LightWeightRequestHandler(HDFSOperationType.GET_DB_FILE_TABLE_SIZE) {
+              @Override
+              public Object performTask() throws IOException {
+                MediumOnDiskInodeDataAccess da = (MediumOnDiskInodeDataAccess) HdfsStorageFactory
+                        .getDataAccess(MediumOnDiskInodeDataAccess.class);
+                return da.getLength();
+              }
+            };
+    return (int) h.handle();
+  }
+
+  private static int getDBFileLargeBucketSize() throws IOException {
+    if (!HdfsStorageFactory.isInitialized()) {
+      return 0;
+    }
+    LightWeightRequestHandler h =
+            new LightWeightRequestHandler(HDFSOperationType.GET_DB_FILE_TABLE_SIZE) {
+              @Override
+              public Object performTask() throws IOException {
+                LargeOnDiskInodeDataAccess da = (LargeOnDiskInodeDataAccess) HdfsStorageFactory
+                        .getDataAccess(LargeOnDiskInodeDataAccess.class);
+                return da.getLength();
+              }
+            };
+    return (int) h.handle();
   }
 }
 

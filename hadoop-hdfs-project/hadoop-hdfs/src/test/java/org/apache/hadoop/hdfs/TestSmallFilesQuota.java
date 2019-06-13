@@ -913,7 +913,6 @@ public class TestSmallFilesQuota {
     final int MAX_SMALL_FILE_SIZE = 6 * 1024;
     final int BLOCK_SIZE = 4 * MAX_SMALL_FILE_SIZE;
 
-    conf.setInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
     conf.setInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
 
@@ -1037,7 +1036,6 @@ public class TestSmallFilesQuota {
     final int BLOCK_SIZE = MAX_SMALL_FILE_SIZE + 1024;
 
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
-    conf.setInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
     conf.setInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
     conf.setBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY, true);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 1000);
@@ -1259,7 +1257,6 @@ public class TestSmallFilesQuota {
     final int MAX_SMALL_FILE_SIZE = 64 * 1024;
     final int BLOCK_SIZE = 2 * MAX_SMALL_FILE_SIZE;
 
-    conf.setInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
     conf.setInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
 

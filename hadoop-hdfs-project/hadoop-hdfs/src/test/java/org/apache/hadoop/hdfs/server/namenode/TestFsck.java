@@ -1577,12 +1577,7 @@ public class TestFsck {
     try {
       Configuration conf = new HdfsConfiguration();
       final int BLOCK_SIZE = 1024 * 1024;
-      final int ONDISK_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_SMALL_FILE_MAX_SIZE_DEFAULT);
-      final int ONDISK_MEDIUM_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_MEDIUM_FILE_MAX_SIZE_DEFAULT);
-      final int ONDISK_LARGE_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_ONDISK_LARGE_FILE_MAX_SIZE_DEFAULT);
-      final int INMEMORY_SMALL_FILE_MAX_SIZE = conf.getInt(DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_INMEMORY_FILE_MAX_SIZE_DEFAULT);
       conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
-
       final String FILE_NAME1 = "/dir/TEST-FLIE1";
       final String FILE_NAME2 = "/dir/TEST-FLIE2";
       final String FILE_NAME3 = "/dir/TEST-FLIE3";
@@ -1593,26 +1588,32 @@ public class TestFsck {
       conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 10000L);
       conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 3);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
+
+      final int ONDISK_SMALL_BUCKET_SIZE = FSNamesystem.getDBOnDiskSmallBucketSize();
+      final int ONDISK_MEDIUM_BUCKET_SIZE = FSNamesystem.getDBOnDiskMediumBucketSize();
+      final int MAX_SMALL_FILE_SIZE = FSNamesystem.getMaxSmallFileSize();
+      final int INMEMORY_BUCKET_SIZE = FSNamesystem.getDBInMemBucketSize();
+
       fs = cluster.getFileSystem();
 
       fs.mkdirs(new Path("/dir"));
       fs.setStoragePolicy(new Path("/dir"), "DB");
 
-      TestSmallFilesCreation.writeFile(fs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+      TestSmallFilesCreation.writeFile(fs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
       fs.setReplication(new Path(FILE_NAME1),(short)3);
-      TestSmallFilesCreation.verifyFile(fs, FILE_NAME1, INMEMORY_SMALL_FILE_MAX_SIZE);
+      TestSmallFilesCreation.verifyFile(fs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
 
-      TestSmallFilesCreation.writeFile(fs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
+      TestSmallFilesCreation.writeFile(fs, FILE_NAME2, ONDISK_SMALL_BUCKET_SIZE);
       fs.setReplication(new Path(FILE_NAME2),(short)3);
-      TestSmallFilesCreation.verifyFile(fs, FILE_NAME2, ONDISK_SMALL_FILE_MAX_SIZE);
+      TestSmallFilesCreation.verifyFile(fs, FILE_NAME2, ONDISK_SMALL_BUCKET_SIZE);
 
-      TestSmallFilesCreation.writeFile(fs, FILE_NAME3, ONDISK_MEDIUM_FILE_MAX_SIZE);
+      TestSmallFilesCreation.writeFile(fs, FILE_NAME3, ONDISK_MEDIUM_BUCKET_SIZE);
       fs.setReplication(new Path(FILE_NAME3),(short)3);
-      TestSmallFilesCreation.verifyFile(fs, FILE_NAME3, ONDISK_MEDIUM_FILE_MAX_SIZE);
+      TestSmallFilesCreation.verifyFile(fs, FILE_NAME3, ONDISK_MEDIUM_BUCKET_SIZE);
 
-      TestSmallFilesCreation.writeFile(fs, FILE_NAME4, ONDISK_LARGE_FILE_MAX_SIZE);
+      TestSmallFilesCreation.writeFile(fs, FILE_NAME4, MAX_SMALL_FILE_SIZE);
       fs.setReplication(new Path(FILE_NAME4),(short)3);
-      TestSmallFilesCreation.verifyFile(fs, FILE_NAME4, ONDISK_LARGE_FILE_MAX_SIZE);
+      TestSmallFilesCreation.verifyFile(fs, FILE_NAME4, MAX_SMALL_FILE_SIZE);
 
       assertTrue("Expecting 1 in-memory file. Got: " + TestSmallFilesCreation.countInMemoryDBFiles(),
               TestSmallFilesCreation.countInMemoryDBFiles() == 1);
