@@ -1103,7 +1103,7 @@ class BPOfferService implements Runnable {
       // block reporting has finished for now.
       if (blkReportHander != null) {
         for (BPServiceActor actor : bpServices) {
-          actor.blockReportCompleted(bpRegistration, storages);
+          actor.blockReportCompleted(bpRegistration, storages, success);
         }
       }
     }
