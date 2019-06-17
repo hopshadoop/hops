@@ -340,31 +340,33 @@ public class DatanodeProtocolServerSideTranslatorPB
   }
 
   @Override
-  public DatanodeProtocolProtos.BlockReportCompletedResponseProto blockReportCompleted(RpcController controller, DatanodeProtocolProtos.BlockReportCompletedRequestProto request) throws ServiceException {
+  public DatanodeProtocolProtos.BlockReportCompletedResponseProto blockReportCompleted(RpcController controller,
+      DatanodeProtocolProtos.BlockReportCompletedRequestProto request) throws ServiceException {
     try {
       DatanodeStorage[] storages = new DatanodeStorage[request.getStoragesCount()];
 
       int i = 0;
-      for(DatanodeStorageProto storage : request.getStoragesList()){
+      for (DatanodeStorageProto storage : request.getStoragesList()) {
         storages[i++] = PBHelper.convert(storage);
       }
 
-      impl.blockReportCompleted(PBHelper.convert(request.getRegistration()), storages);
+      impl.blockReportCompleted(PBHelper.convert(request.getRegistration()), storages, request.getSuccess());
 
-      DatanodeProtocolProtos.BlockReportCompletedResponseProto.Builder response =
-              DatanodeProtocolProtos.BlockReportCompletedResponseProto.newBuilder();
-     return response.build();
+      DatanodeProtocolProtos.BlockReportCompletedResponseProto.Builder response
+          = DatanodeProtocolProtos.BlockReportCompletedResponseProto.newBuilder();
+      return response.build();
     } catch (IOException e) {
       throw new ServiceException(e);
     }
   }
 
   @Override
-  public DatanodeProtocolProtos.SmallFileDataResponseProto getSmallFileData(RpcController controller, DatanodeProtocolProtos.GetSmallFileDataProto request) throws ServiceException {
-    try{
+  public DatanodeProtocolProtos.SmallFileDataResponseProto getSmallFileData(RpcController controller,
+      DatanodeProtocolProtos.GetSmallFileDataProto request) throws ServiceException {
+    try {
       byte[] data = impl.getSmallFileData(request.getId());
-      return  PBHelper.convert(data);
-    } catch (IOException e){
+      return PBHelper.convert(data);
+    } catch (IOException e) {
       throw new ServiceException(e);
     }
   }

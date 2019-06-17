@@ -251,7 +251,7 @@ public interface DatanodeProtocol {
    */
   @Idempotent
   public void blockReportCompleted(DatanodeRegistration nodeReg
-          , DatanodeStorage[] storages) throws IOException;
+          , DatanodeStorage[] storages, boolean success) throws IOException;
 
   /**
    * Read the small file data

@@ -649,8 +649,9 @@ class BPServiceActor implements Runnable {
     return bpNamenode.blockReport(registration, poolId, reports, context);
   }
 
-  public void blockReportCompleted(DatanodeRegistration registration, DatanodeStorage[] storages) throws IOException {
-    bpNamenode.blockReportCompleted(registration, storages);
+  public void blockReportCompleted(DatanodeRegistration registration, DatanodeStorage[] storages, boolean success)
+      throws IOException {
+    bpNamenode.blockReportCompleted(registration, storages, success);
   }
 
   public DatanodeCommand cacheReport(DatanodeRegistration bpRegistration,

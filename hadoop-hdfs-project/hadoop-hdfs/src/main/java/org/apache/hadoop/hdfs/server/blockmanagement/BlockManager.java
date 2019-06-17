@@ -5624,7 +5624,7 @@ public class BlockManager {
     return removalNoThreads;
   }
 
-  public void blockReportCompleted(final DatanodeID nodeID, DatanodeStorage[] storages) throws
+  public void blockReportCompleted(final DatanodeID nodeID, DatanodeStorage[] storages, boolean success) throws
           IOException {
     //Leader should remove the information about the block report from the DB
     if(namesystem != null && namesystem.getNameNode() != null){ //for unit testing
@@ -5633,10 +5633,12 @@ public class BlockManager {
       }
     }
 
-    DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
-    for(DatanodeStorage storage : storages) {
-      DatanodeStorageInfo storageInfo = node.getStorageInfo(storage.getStorageID());
-      storageInfo.receivedBlockReport();
+    if (success) {
+      DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
+      for (DatanodeStorage storage : storages) {
+        DatanodeStorageInfo storageInfo = node.getStorageInfo(storage.getStorageID());
+        storageInfo.receivedBlockReport();
+      }
     }
   }
 }

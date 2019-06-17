@@ -372,11 +372,13 @@ public class DatanodeProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void blockReportCompleted(DatanodeRegistration nodeReg, DatanodeStorage[] storages) throws IOException {
+  public void blockReportCompleted(DatanodeRegistration nodeReg, DatanodeStorage[] storages, boolean success) throws
+      IOException {
 
     BlockReportCompletedRequestProto.Builder request =
                 BlockReportCompletedRequestProto.newBuilder();
     request.setRegistration(PBHelper.convert(nodeReg));
+    request.setSuccess(success);
     for(int i = 0; i < storages.length; i++){
       HdfsProtos.DatanodeStorageProto.Builder dnsb = HdfsProtos.DatanodeStorageProto.newBuilder();
       request.addStorages(PBHelper.convert(storages[i]));
