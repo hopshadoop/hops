@@ -5578,7 +5578,7 @@ public class BlockManager {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(lf.getINodesLocks(INodeLockType.WRITE, inodeIdentifiers))
-            .add(lf.getBlockReportingLocks(Longs.toArray(blockIds), Longs.toArray(inodeIds) , new long[0], 0)).add(
+            .add(lf.getBlockLock()).add(
             lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.IV, BLK.UR));
         if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
             !inodeIdentifiers.isEmpty()) {
