@@ -96,7 +96,9 @@ public class BRTrackingService {
 
     for(ActiveBlockReport abr : retActiveBRs) {
       Tuple entry = usage.get(abr.getNnAddress());
-      entry.counter += 1;
+      if (entry != null) {
+        entry.counter += 1;
+      }
     }
 
     ActiveNode leastLoaded = null;
