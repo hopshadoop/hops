@@ -5628,9 +5628,7 @@ public class BlockManager {
           IOException {
     //Leader should remove the information about the block report from the DB
     if(namesystem != null && namesystem.getNameNode() != null){ //for unit testing
-      if(namesystem.getNameNode().isLeader()){
-        namesystem.getNameNode().getBRTrackingService().blockReportCompleted(nodeID.getXferAddr());
-      }
+      namesystem.getNameNode().getBRTrackingService().blockReportCompleted(nodeID.getXferAddr());
     }
 
     if (success) {
