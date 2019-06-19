@@ -262,7 +262,7 @@ public class TestBlockReportLoadBalancing1 {
     int NN_COUNT = 5;
     int DN_COUNT = 10;
     final long DFS_BR_LB_MAX_BR_PROCESSING_TIME = 5 * 1000;
-    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN = NN_COUNT;
+    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN = 1;
     final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD = 1000;
 
 
@@ -282,10 +282,6 @@ public class TestBlockReportLoadBalancing1 {
 
       Thread.sleep(10000);
 
-      if (true) {
-        return;
-      }
-
       ActiveNode an = null;
       for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * NN_COUNT; i++) {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
@@ -304,7 +300,7 @@ public class TestBlockReportLoadBalancing1 {
       } catch (BRLoadBalancingNonLeaderException e) {
       }
 
-      String[] argv = {"-concurrentBlkReports", DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * 2 + ""};
+      String[] argv = {"-concurrentBlkReports", 2 + ""};
       try {
         NameNode.createNameNode(argv, conf);
       } catch (ExitUtil.ExitException e) {
@@ -314,7 +310,7 @@ public class TestBlockReportLoadBalancing1 {
       // sleep. All history will be cleared after that and more work can be  assigned
       Thread.sleep(Math.max(DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD));
 
-      for (int i = 0; i < (2 * DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN)*NN_COUNT; i++) {
+      for (int i = 0; i < 2 *NN_COUNT; i++) {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(10000,
                 cluster.getDataNodes().get(i).getAllBpOs().get(0).bpRegistration);
         assertTrue("Unable to assign work", an != null);
@@ -327,7 +323,7 @@ public class TestBlockReportLoadBalancing1 {
       // sleep. All history will be cleared after that and more work can be  assigned
       Thread.sleep(DFS_BR_LB_MAX_BR_PROCESSING_TIME);
 
-      for (int i = 0; i < (2 * DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN)*(NN_COUNT-2); i++) {
+      for (int i = 0; i < 2  *(NN_COUNT-2); i++) {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
                 cluster.getDataNodes().get(i).getAllBpOs().get(0).bpRegistration);
         assertTrue("Unable to assign work", an != null);
@@ -407,6 +403,73 @@ public class TestBlockReportLoadBalancing1 {
       return service.assignWork(nnList, dnAddress, blks);
     } catch (Exception e) {
       return null;
+    }
+  }
+
+  @Test
+  public void TestClusterMultiNNBR() throws IOException, InterruptedException {
+
+    int NN_COUNT = 5;
+    int DN_COUNT = 10;
+    final long DFS_BR_LB_MAX_BR_PROCESSING_TIME = 5 * 1000;
+    final long DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN = 2;
+    final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD = 1000;
+
+
+    Configuration conf = new Configuration();
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN);
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD);
+
+    MiniDFSCluster cluster = null;
+    try {
+
+      cluster = new MiniDFSCluster.Builder(conf)
+              .nnTopology(MiniDFSNNTopology.simpleHOPSTopology(NN_COUNT))
+              .format(true).numDataNodes(DN_COUNT).build();
+      cluster.waitActive();
+
+
+      Thread.sleep(10000);
+
+      ActiveNode an = null;
+      for (int i = 0; i < DN_COUNT; i++) {
+        an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
+                cluster.getDataNodes().get(i).getAllBpOs().get(0).bpRegistration);
+        LOG.info("Assigned work for datanode " + cluster.getDataNodes().get(i).getAllBpOs().get(0).bpRegistration.getXferAddr());
+        assertTrue( an != null);
+      }
+
+      // more work assignment should fail
+      try {
+        an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
+                cluster.getDataNodes().get(0).getAllBpOs().get(0).bpRegistration);
+        fail("More work should not have been assigned");
+      } catch (BRLoadBalancingOverloadException e) {
+      }
+
+      for (int i = 0; i < DN_COUNT; i++) {
+        //broadcast that the br is completed
+        String dnAddress = cluster.getDataNodes().get(i).getAllBpOs().get(0)
+                .bpRegistration.getXferAddr();
+
+        for(int n = 0; n < NN_COUNT; n++){
+          NameNode nn = cluster.getNameNode(n);
+          nn.getBRTrackingService().blockReportCompleted(dnAddress);
+        }
+      }
+
+      for (int i = 0; i < DN_COUNT; i++) {
+        an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
+                cluster.getDataNodes().get(i).getAllBpOs().get(0).bpRegistration);
+        LOG.info("Assigned work for datanode " + cluster.getDataNodes().get(i).getAllBpOs().get(0).bpRegistration.getXferAddr());
+        assertTrue( an != null);
+      }
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 }
