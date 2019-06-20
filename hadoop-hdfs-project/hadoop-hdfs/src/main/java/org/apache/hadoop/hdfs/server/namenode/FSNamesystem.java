@@ -7076,7 +7076,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       public Object performTask() throws IOException {
         SafeBlocksDataAccess da = (SafeBlocksDataAccess) HdfsStorageFactory
             .getDataAccess(SafeBlocksDataAccess.class);
-        da.remove(safeBlock);
+        if(da.isSafe(safeBlock)){
+          da.remove(safeBlock);
+        }
         return null;
       }
     }.handle();
