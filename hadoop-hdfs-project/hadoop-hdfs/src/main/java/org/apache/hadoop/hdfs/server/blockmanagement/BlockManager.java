@@ -5635,9 +5635,11 @@ public class BlockManager {
 
     if (success) {
       DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
-      for (DatanodeStorage storage : storages) {
-        DatanodeStorageInfo storageInfo = node.getStorageInfo(storage.getStorageID());
-        storageInfo.receivedBlockReport();
+      if (node != null) {
+        for (DatanodeStorage storage : storages) {
+          DatanodeStorageInfo storageInfo = node.getStorageInfo(storage.getStorageID());
+          storageInfo.receivedBlockReport();
+        }
       }
     }
   }
