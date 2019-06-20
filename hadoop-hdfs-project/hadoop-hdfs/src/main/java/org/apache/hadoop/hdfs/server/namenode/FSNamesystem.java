@@ -842,6 +842,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     nnResourceChecker = new NameNodeResourceChecker(conf);
     checkAvailableResources();
     if (isLeader()) {
+      // the node is starting and directly leader, this means that no NN was alive before
+      clearSafeBlocks();
+      clearActiveBlockReports();
       HdfsVariables.setSafeModeInfo(new SafeModeInfo(conf), -1);
       inSafeMode.set(true);
       assert safeMode() != null && !isPopulatingReplQueues();
@@ -922,6 +925,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 //      blockManager.getDatanodeManager().setShouldSendCachingCommands(true);
     } finally {
       startingActiveService = false;
+      checkSafeMode();
     }
   }
   
@@ -7156,6 +7160,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws IOException
    */
   private void clearSafeBlocks() throws IOException {
+    LOG.warn("cealring the safe blocks tabl, this may take some time.");
     new LightWeightRequestHandler(HDFSOperationType.CLEAR_SAFE_BLOCKS) {
       @Override
       public Object performTask() throws IOException {
@@ -7167,6 +7172,18 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }.handle();
   }
 
+  private void clearActiveBlockReports() throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.CLEAR_SAFE_BLOCKS) {
+      @Override
+      public Object performTask() throws IOException {
+        ActiveBlockReportsDataAccess da = (ActiveBlockReportsDataAccess) HdfsStorageFactory
+            .getDataAccess(ActiveBlockReportsDataAccess.class);
+        da.removeAll();
+        return null;
+      }
+    }.handle();
+  }
+  
   public ExecutorService getFSOperationsExecutor() {
     return fsOperationsExecutor;
   }
