@@ -74,6 +74,7 @@ import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.NodeLabelsUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.DynamicResourceConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptContainerFinishedEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
@@ -491,7 +492,7 @@ public class ResourceTrackerService extends AbstractService implements
     for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : runningApps.entrySet()) {
       ApplicationId appId = entry.getKey();
       RMApp rmApp = rmContext.getRMApps().get(appId);
-      if (rmApp != null) {
+      if (rmApp != null && !RMAppImpl.isAppInFinalState(rmApp)) {
         if (isHopsTLSEnabled()) {
           Integer nmCryptoMaterialVersion = entry.getValue().getVersion();
           if (rmApp.getCryptoMaterialVersion() > nmCryptoMaterialVersion) {
