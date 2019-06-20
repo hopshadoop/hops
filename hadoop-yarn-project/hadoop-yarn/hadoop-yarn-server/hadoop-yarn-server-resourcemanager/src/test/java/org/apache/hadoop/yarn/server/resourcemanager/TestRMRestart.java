@@ -585,6 +585,68 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     }
   }
   
+  /**
+   * Special edge case:
+   * 1. Start an application
+   * 2. Finish application
+   * 3. RM gets killed
+   * 4. RM recovers
+   * 5. NM resyncs - NM hasn't received that application has finished and report it as running
+   *    together with its local crypto material state
+   * 6. RM receives the running applications and tries to infer if NM has missed
+   *    a crypto material update by comparing RM's crypto material state with the state
+   *    NM has sent
+   * 7. NPE because the RMApp has finished and JWT expiration date is null
+   */
+  @Test
+  public void testRMRestartAfterAppFinishedPushingCryptoMaterial() throws Exception {
+    conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
+    conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "40s");
+    conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
+    conf.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "10s");
+    conf.set(YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY, "6s");
+    
+    // Start RM
+    MockRM rm1 = createMockRM(conf);
+    Assume.assumeFalse(rm1.getResourceScheduler() instanceof FairScheduler);
+    rm1.start();
+    
+    MockNM nm = new MockNM("127.0.0.1:1337", 20 * 2014, rm1.getResourceTrackerService());
+    nm.registerNode();
+    
+    RMApp app = rm1.submitApp(1024);
+    RMAppAttempt appAttempt = app.getCurrentAppAttempt();
+    nm.nodeHeartbeat(true);
+    MockAM am = rm1.sendAMLaunched(appAttempt.getAppAttemptId());
+    am.registerAppAttempt();
+  
+    rm1.waitForState(app.getApplicationId(), RMAppState.RUNNING);
+  
+    AllocateResponse allocateResponse = am.allocate("127.0.0.1", 2 * 1024, 2, new ArrayList<ContainerId>());
+    nm.nodeHeartbeat(true);
+  
+    while (allocateResponse.getAllocatedContainers().size() < 2) {
+      nm.nodeHeartbeat(true);
+      allocateResponse = am.allocate(new ArrayList<ResourceRequest>(), new ArrayList<ContainerId>());
+      TimeUnit.MILLISECONDS.sleep(100);
+    }
+    LOG.info("Containers allocated");
+    finishApplicationMaster(app, rm1, nm, am);
+    LOG.info("App finished");
+    
+    MockRM rm2 = createMockRM(conf);
+    rm2.start();
+    nm.setResourceTrackerService(rm2.getResourceTrackerService());
+    LOG.info("NM heartbeating to new RM");
+    NodeHeartbeatResponse hbResponse = nm.nodeHeartbeat(true);
+    Assert.assertEquals(NodeAction.RESYNC, hbResponse.getNodeAction());
+    Map<ApplicationId, UpdatedCryptoForApp> runningApps = new HashMap<>();
+    UpdatedCryptoForApp uca = UpdatedCryptoForApp.newInstance(1, System.currentTimeMillis());
+    runningApps.put(app.getApplicationId(), uca);
+    nm.registerNode(runningApps);
+    hbResponse = nm.nodeHeartbeat(true);
+    Assert.assertEquals(0, hbResponse.getUpdatedCryptoForApps().size());
+  }
   
   @Test(timeout = 50000)
   public void testRMRestartBeforeSendingCryptoUpdateToNM() throws Exception {
