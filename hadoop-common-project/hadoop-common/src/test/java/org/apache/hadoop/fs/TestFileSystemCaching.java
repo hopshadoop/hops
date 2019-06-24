@@ -218,6 +218,41 @@ public class TestFileSystemCaching {
     // file system.
     assertSame(fsA, fsA1);
   }
+
+  @Test
+  public void testDifferentFSForDifferentAppID() throws Exception{
+    final Configuration conf = new Configuration();
+    conf.set("fs.cachedfile.impl", FileSystem.getFileSystemClass("file", null).getName());
+    UserGroupInformation ugiA = UserGroupInformation.createRemoteUser("foo");
+    FileSystem fsA = ugiA.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
+      public FileSystem run() throws Exception {
+        return FileSystem.get(new URI("cachedfile://a"), conf);
+      }
+    });
+
+    UserGroupInformation ugiAppA = UserGroupInformation.createRemoteUser("foo");
+    ugiAppA.addApplicationId("appA");
+    FileSystem fsAppA = ugiAppA.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
+      public FileSystem run() throws Exception {
+        return FileSystem.get(new URI("cachedfile://a"), conf);
+      }
+    });
+
+    UserGroupInformation ugiAppB = UserGroupInformation.createRemoteUser("foo");
+    ugiAppA.addApplicationId("appB");
+    FileSystem fsAppB = ugiAppB.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
+      public FileSystem run() throws Exception {
+        return FileSystem.get(new URI("cachedfile://a"), conf);
+      }
+    });
+
+    assertNotSame(fsA, fsAppA);
+    assertNotSame(fsA, fsAppB);
+    assertNotSame(fsAppA, fsAppB);
+  }
   
   @Test
   public void testUserFS() throws Exception {
@@ -277,7 +312,7 @@ public class TestFileSystemCaching {
     });
     assertNotSame(fsA, fsA1);
   }
-  
+
   @Test
   public void testDelete() throws IOException {
     FileSystem mockFs = mock(FileSystem.class);

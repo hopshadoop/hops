@@ -202,35 +202,6 @@ public class LogAggregationService extends AbstractService implements
     // Checking the existence of the TLD
     FileSystem remoteFS = null;
     try {
-      if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-            CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)
-          && sslConf != null) {
-        // Setting the keystore file path here is necessary to get the correct
-        // cached FileSystem object
-        String kstorePath = sslConf.get(
-            FileBasedKeyStoresFactory
-                .resolvePropertyName(SSLFactory.Mode.SERVER,
-                    FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY));
-        String kstorePass = sslConf.get(
-            FileBasedKeyStoresFactory
-                .resolvePropertyName(SSLFactory.Mode.SERVER,
-                    FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
-        String keyPass = sslConf.get(
-            FileBasedKeyStoresFactory
-                .resolvePropertyName(SSLFactory.Mode.SERVER,
-                    FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY));
-        String tstorePath = sslConf.get(
-            FileBasedKeyStoresFactory
-                .resolvePropertyName(SSLFactory.Mode.SERVER,
-                    FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
-        String tstorePass = sslConf.get(
-            FileBasedKeyStoresFactory
-                .resolvePropertyName(SSLFactory.Mode.SERVER,
-                    FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
-        HopsSSLSocketFactory.configureTlsClient(kstorePath, kstorePass,
-            keyPass, tstorePath, tstorePass, conf);
-      }
-      
       remoteFS = getFileSystem(conf);
     } catch (IOException e) {
       throw new YarnRuntimeException("Unable to get Remote FileSystem instance", e);
@@ -325,18 +296,7 @@ public class LogAggregationService extends AbstractService implements
         @Override
         public Object run() throws Exception {
           try {
-            // TODO: Reuse FS for user?
-            // Setting the keystore file path here is necessary to get the correct
-            // cached FileSystem object
             Configuration conf = getConfig();
-            if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-                CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-              conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY
-                      .getValue(),
-                  context.getCertificateLocalizationService()
-                      .getX509MaterialLocation(user, appId.toString()).getKeyStoreLocation().toString());
-            }
-            
             FileSystem remoteFS = getFileSystem(conf);
             
             // Only creating directories if they are missing to avoid

@@ -172,7 +172,10 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
   
   @Override
   public void setConf(Configuration conf) {
-    this.conf = conf;
+    // Here we clone the configuration object as the client might pass the same configuration object
+    // for different users. The `configureCryptoMaterial` changes the configuration object with user
+    // specific configuration. If the configuration object is the same, they will conflict with each other.
+    this.conf = new Configuration(conf);
     sslClientConf = new Configuration(false);
     String sslConfResource = conf.get(SSLFactory.SSL_CLIENT_CONF_KEY, "ssl-client.xml");
     sslClientConf.addResource(sslConfResource);
