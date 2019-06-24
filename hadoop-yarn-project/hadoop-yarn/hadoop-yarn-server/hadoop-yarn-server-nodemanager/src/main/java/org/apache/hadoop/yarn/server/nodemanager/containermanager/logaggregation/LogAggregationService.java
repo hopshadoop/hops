@@ -325,18 +325,7 @@ public class LogAggregationService extends AbstractService implements
         @Override
         public Object run() throws Exception {
           try {
-            // TODO: Reuse FS for user?
-            // Setting the keystore file path here is necessary to get the correct
-            // cached FileSystem object
             Configuration conf = getConfig();
-            if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-                CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-              conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY
-                      .getValue(),
-                  context.getCertificateLocalizationService()
-                      .getX509MaterialLocation(user, appId.toString()).getKeyStoreLocation().toString());
-            }
-            
             FileSystem remoteFS = getFileSystem(conf);
             
             // Only creating directories if they are missing to avoid

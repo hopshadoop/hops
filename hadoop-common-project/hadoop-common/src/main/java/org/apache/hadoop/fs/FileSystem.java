@@ -2817,7 +2817,6 @@ public abstract class FileSystem extends Configured implements Closeable {
       final String authority;
       final UserGroupInformation ugi;
       final long unique;   // an artificial way to make a key unique
-      String keystoreUsed;
 
       Key(URI uri, Configuration conf) throws IOException {
         this(uri, conf, 0);
@@ -2831,17 +2830,11 @@ public abstract class FileSystem extends Configured implements Closeable {
         this.unique = unique;
         
         this.ugi = UserGroupInformation.getCurrentUser();
-
-        this.keystoreUsed = conf.get(HopsSSLSocketFactory.CryptoKeys
-                .KEY_STORE_FILEPATH_KEY.getValue(),
-            HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY
-                .getDefaultValue());
       }
 
       @Override
       public int hashCode() {
-        return (scheme + authority + keystoreUsed).hashCode() + ugi.hashCode() + (int)
-            unique;
+        return (scheme + authority).hashCode() + ugi.hashCode() + (int)unique;
       }
 
       static boolean isEqual(Object a, Object b) {
@@ -2858,17 +2851,14 @@ public abstract class FileSystem extends Configured implements Closeable {
           return isEqual(this.scheme, that.scheme)
                  && isEqual(this.authority, that.authority)
                  && isEqual(this.ugi, that.ugi)
-                 && (this.unique == that.unique)
-                && isEqual(this.keystoreUsed, that.keystoreUsed);
+                 && (this.unique == that.unique);
         }
         return false;        
       }
 
       @Override
       public String toString() {
-        return "("+ugi.toString() + ")@" + scheme + "://" + authority
-            + " <kstore: " + keystoreUsed + ">";
-
+        return "("+ugi.toString() + ")@" + scheme + "://" + authority;
       }
     }
   }

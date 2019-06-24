@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     private final Log LOG = LogFactory.getLog(TestHopsSSLConfiguration.class);
@@ -112,11 +113,12 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
             }
         });
 
-        assertEquals(kstore, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(kstorePass, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals(keyPass, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
-        assertEquals(tstore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(tstorePass, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+        Configuration factoryConf = hopsFactory.getConf();
+        assertEquals(kstore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(kstorePass, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(keyPass, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+        assertEquals(tstore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(tstorePass, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
 
     @Test
@@ -142,16 +144,17 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
             }
         });
 
+        Configuration factoryConf = hopsFactory.getConf();
         assertEquals(kstore,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
         assertEquals(password,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
         assertEquals(password,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
         assertEquals(tstore,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
         assertEquals(password,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
 
     @Test
@@ -175,17 +178,18 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
                 return null;
             }
         });
-        
+
+        Configuration factoryConf = hopsFactory.getConf();
         assertEquals("k_certificate",
-                conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
         assertEquals(password,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
         assertEquals(password,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
         assertEquals("t_certificate",
-                conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
         assertEquals(password,
-                conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+                factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
 
     @Test
@@ -227,16 +231,17 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
                 return null;
             }
         });
-        
-        assertEquals(kstore, conf.get(HopsSSLSocketFactory.CryptoKeys
+
+        Configuration factoryConf = hopsFactory.getConf();
+        assertEquals(kstore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys
             .KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys
             .KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys
             .KEY_PASSWORD_KEY.getValue()));
-        assertEquals(tstore, conf.get(HopsSSLSocketFactory.CryptoKeys
+        assertEquals(tstore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys
             .TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys
             .TRUST_STORE_PASSWORD_KEY.getValue()));
     }
     
@@ -311,12 +316,13 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
                 return null;
             }
         });
-    
-        assertEquals(keystore, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
-        assertEquals(truststore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+
+        Configuration factoryConf = hopsFactory.getConf();
+        assertEquals(keystore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+        assertEquals(truststore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
     
     @Test
@@ -354,12 +360,13 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
                 return null;
             }
         });
-        
-        assertEquals(keystore, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
-        assertEquals(truststore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+
+        Configuration factoryConf = hopsFactory.getConf();
+        assertEquals(keystore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+        assertEquals(truststore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
     
     // Mock system environment variables
@@ -404,11 +411,12 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
             }
         });
 
-        assertEquals(kstore, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
-        assertEquals(tstore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(password, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+        Configuration factoryConf = hopsFactory.getConf();
+        assertEquals(kstore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+        assertEquals(tstore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(password, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
     
     private void createServerSSLConfig(String keystoreLocation, String keyStorePassword,
@@ -450,11 +458,56 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
             }
         });
 
-        assertEquals(kstore, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(pass, conf.get((HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue())));
-        assertEquals(pass, conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
-        assertEquals(tstore, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
-        assertEquals(pass, conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+        Configuration factoryConf = hopsFactory.getConf();
+        assertEquals(kstore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(pass, factoryConf.get((HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue())));
+        assertEquals(pass, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+        assertEquals(tstore, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+        assertEquals(pass, factoryConf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
+    }
+
+    @Test
+    public void testConfigurationCloned() throws Exception {
+        File materialDir = Paths.get(BASEDIR, "pwd_dir").toFile();
+        if (!materialDir.exists()) {
+            materialDir.mkdirs();
+        }
+
+        MockEnvironmentVariablesService mockEnvService = new MockEnvironmentVariablesService();
+        mockEnvService.setEnv("PWD", materialDir.getAbsolutePath());
+        EnvironmentVariablesFactory.setInstance(mockEnvService);
+
+        LOG.info("Mocked PWD is : " + EnvironmentVariablesFactory.getInstance().getEnv("PWD"));
+
+        String keystore = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME)
+            .toString();
+        String truststore = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME)
+            .toString();
+        String passwd = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME)
+            .toString();
+        String password = "password";
+        touchFile(keystore);
+        touchFile(truststore);
+        touchFile(passwd);
+        FileUtils.writeStringToFile(new File(passwd), password);
+
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser("some_user");
+        final Set<String> superusers = new HashSet<>(1);
+        superusers.add("superuser");
+        ugi.doAs(new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws Exception {
+                hopsFactory.setConf(conf);
+                hopsFactory.configureCryptoMaterial(null, superusers);
+                return null;
+            }
+        });
+
+        assertNull(conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue()));
+        assertNull(conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_PASSWORD_KEY.getValue()));
+        assertNull(conf.get(HopsSSLSocketFactory.CryptoKeys.KEY_PASSWORD_KEY.getValue()));
+        assertNull(conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_FILEPATH_KEY.getValue()));
+        assertNull(conf.get(HopsSSLSocketFactory.CryptoKeys.TRUST_STORE_PASSWORD_KEY.getValue()));
     }
     
     private String touchFile(String file) throws IOException {
