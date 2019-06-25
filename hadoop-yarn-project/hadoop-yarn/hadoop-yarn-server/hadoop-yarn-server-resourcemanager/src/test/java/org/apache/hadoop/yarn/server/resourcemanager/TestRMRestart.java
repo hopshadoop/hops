@@ -18,37 +18,20 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.isA;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
-
+import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -61,6 +44,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.service.Service.STATE;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
@@ -94,6 +78,7 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.RMState;
@@ -122,21 +107,36 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import com.google.common.base.Supplier;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Sets;
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
-import org.junit.Assume;
-import org.junit.Ignore;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
+
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 public class TestRMRestart extends ParameterizedSchedulerTestBase {
   private static final Log LOG = LogFactory.getLog(TestRMRestart.class);
@@ -712,8 +712,8 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     // new NM to represent re-registration
     nm = new MockNM("127.0.0.1:1337", 20 * 1024, rm2.getResourceTrackerService());
     Map<ApplicationId, UpdatedCryptoForApp> runningApps = new HashMap<>();
-    UpdatedCryptoForApp upc = UpdatedCryptoForApp.newInstance(app.getCryptoMaterialVersion(), app.getJWTExpiration()
-        .toEpochMilli());
+    UpdatedCryptoForApp upc = UpdatedCryptoForApp.newInstance(app.getCryptoMaterialVersion(),
+        DateUtils.localDateTime2UnixEpoch(app.getJWTExpiration()));
     runningApps.put(app.getApplicationId(), upc);
     nm.registerNode(runningApps);
     nmHeartbeatResponse = nm.nodeHeartbeat(true);
@@ -747,8 +747,8 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     Assert.assertEquals(app.getCryptoMaterialVersion(),
         new Integer(nmHeartbeatResponse.getUpdatedCryptoForApps().get(app
         .getApplicationId()).getVersion()));
-    Assert.assertEquals(app.getJWTExpiration().toEpochMilli(), nmHeartbeatResponse.getUpdatedCryptoForApps()
-        .get(app.getApplicationId()).getJWTExpiration());
+    Assert.assertEquals(DateUtils.localDateTime2UnixEpoch(app.getJWTExpiration()),
+        nmHeartbeatResponse.getUpdatedCryptoForApps().get(app.getApplicationId()).getJWTExpiration());
     
     rm2.stop();
   }

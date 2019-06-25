@@ -32,10 +32,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
@@ -181,10 +180,10 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
     jwtRenewParam.setToken(jwt.getToken());
   
     // Recompute new expiration date for renewed token
-    Instant now = jwtHandler.getNow();
-    Instant expirationInstant = now.plus(jwtHandler.getValidityPeriod().getFirst(),
+    LocalDateTime now = jwtHandler.getNow();
+    LocalDateTime expirationDate = now.plus(jwtHandler.getValidityPeriod().getFirst(),
         jwtHandler.getValidityPeriod().getSecond());
-    jwtRenewParam.setExpirationDate(expirationInstant);
+    jwtRenewParam.setExpirationDate(expirationDate);
     Mockito.verify(actor).renewJWT(Mockito.eq(jwtRenewParam));
     
     securityManager.stop();

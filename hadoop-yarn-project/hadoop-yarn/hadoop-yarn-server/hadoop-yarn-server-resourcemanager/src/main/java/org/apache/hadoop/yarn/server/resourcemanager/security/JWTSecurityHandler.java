@@ -25,6 +25,7 @@ import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.BackOff;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -35,7 +36,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
@@ -153,9 +154,9 @@ public class JWTSecurityHandler
   @VisibleForTesting
   protected void prepareJWTGenerationParameters(JWTMaterialParameter parameter) {
     parameter.setAudiences(jwtAudience);
-    Instant now = getNow();
-    Instant expirationInstant = now.plus(validityPeriod.getFirst(), validityPeriod.getSecond());
-    parameter.setExpirationDate(expirationInstant);
+    LocalDateTime now = getNow();
+    LocalDateTime expirationTime = now.plus(validityPeriod.getFirst(), validityPeriod.getSecond());
+    parameter.setExpirationDate(expirationTime);
     parameter.setValidNotBefore(now);
     // JWT for applications will not be automatically renewed.
     // JWTSecurityHandler will renew them
@@ -172,8 +173,8 @@ public class JWTSecurityHandler
   
   @InterfaceAudience.Private
   @VisibleForTesting
-  protected Instant getNow() {
-    return Instant.now();
+  protected LocalDateTime getNow() {
+    return DateUtils.getNow();
   }
   
   @InterfaceAudience.Private
@@ -210,7 +211,7 @@ public class JWTSecurityHandler
     }
   }
   
-  private long computeScheduledDelay(Instant expiration) {
+  private long computeScheduledDelay(LocalDateTime expiration) {
     long upperLimit = Math.max(leeway - 5L, 5L);
     // random delay in seconds [3, (leeway - 5)]
     long delayFromExpiration = random.nextLong(3L, upperLimit);
@@ -287,9 +288,9 @@ public class JWTSecurityHandler
   
   public class JWTSecurityManagerMaterial extends RMAppSecurityManager.SecurityManagerMaterial {
     private final String token;
-    private final Instant expirationDate;
+    private final LocalDateTime expirationDate;
     
-    public JWTSecurityManagerMaterial(ApplicationId applicationId, String token, Instant expirationDate) {
+    public JWTSecurityManagerMaterial(ApplicationId applicationId, String token, LocalDateTime expirationDate) {
       super(applicationId);
       this.token = token;
       this.expirationDate = expirationDate;
@@ -299,7 +300,7 @@ public class JWTSecurityHandler
       return token;
     }
     
-    public Instant getExpirationDate() {
+    public LocalDateTime getExpirationDate() {
       return expirationDate;
     }
   }
@@ -308,8 +309,8 @@ public class JWTSecurityHandler
     private final String appUser;
     private String token;
     private String[] audiences;
-    private Instant expirationDate;
-    private Instant validNotBefore;
+    private LocalDateTime expirationDate;
+    private LocalDateTime validNotBefore;
     private boolean renewable;
     private int expLeeway;
     
@@ -330,19 +331,19 @@ public class JWTSecurityHandler
       this.audiences = audiences;
     }
   
-    public Instant getExpirationDate() {
+    public LocalDateTime getExpirationDate() {
       return expirationDate;
     }
   
-    public void setExpirationDate(Instant expirationDate) {
+    public void setExpirationDate(LocalDateTime expirationDate) {
       this.expirationDate = expirationDate;
     }
   
-    public Instant getValidNotBefore() {
+    public LocalDateTime getValidNotBefore() {
       return validNotBefore;
     }
   
-    public void setValidNotBefore(Instant validNotBefore) {
+    public void setValidNotBefore(LocalDateTime validNotBefore) {
       this.validNotBefore = validNotBefore;
     }
   

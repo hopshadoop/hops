@@ -21,12 +21,12 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.util.BackOff;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
 import java.time.temporal.TemporalUnit;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,7 +43,7 @@ import static org.junit.Assert.assertTrue;
 
 public class MockJWTSecurityHandler extends JWTSecurityHandler {
   protected final Log LOG = LogFactory.getLog(MockJWTSecurityHandler.class);
-  private Instant now;
+  private LocalDateTime now;
   private final Map<ApplicationId, String> app2jwt;
   private AtomicReference<MockJWTRenewer> mockRenewer;
   
@@ -58,11 +58,11 @@ public class MockJWTSecurityHandler extends JWTSecurityHandler {
       return null;
     }
     ApplicationId appId = parameter.getApplicationId();
-    now = Instant.now();
+    now = DateUtils.getNow();
     prepareJWTGenerationParameters(parameter);
     assertTrue(now.isBefore(parameter.getExpirationDate()));
     Pair<Long, TemporalUnit> validity = getValidityPeriod();
-    Instant expTime = now.plus(validity.getFirst(), validity.getSecond());
+    LocalDateTime expTime = now.plus(validity.getFirst(), validity.getSecond());
     assertEquals(parameter.getExpirationDate(), expTime);
     assertFalse(parameter.isRenewable());
     String jwt = generateInternal(parameter);
@@ -73,7 +73,7 @@ public class MockJWTSecurityHandler extends JWTSecurityHandler {
   }
   
   @Override
-  protected Instant getNow() {
+  protected LocalDateTime getNow() {
     return now;
   }
   

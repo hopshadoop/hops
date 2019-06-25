@@ -17,12 +17,7 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.applicationsmanager;
 
-import java.time.Instant;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.collect.Lists;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.yarn.MockApps;
@@ -50,7 +45,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.util.Records;
 
-import com.google.common.collect.Lists;
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @InterfaceAudience.Private
 public abstract class MockAsm extends MockApps {
@@ -245,7 +244,7 @@ public abstract class MockAsm extends MockApps {
     }
     
     @Override
-    public Instant getJWTExpiration() {
+    public LocalDateTime getJWTExpiration() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
     

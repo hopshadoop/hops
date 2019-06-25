@@ -33,6 +33,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.util.BackOff;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.util.ExponentialBackOff;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.http.Header;
@@ -73,9 +74,7 @@ import java.security.GeneralSecurityException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.text.ParseException;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
@@ -133,7 +132,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     authHeader = new AtomicReference<>();
     GsonBuilder parserBuilder = new GsonBuilder();
     parserBuilder.setFieldNamingPolicy(FieldNamingPolicy.IDENTITY);
-    parserBuilder.setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+    parserBuilder.setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
     jsonParser = parserBuilder.create();
     
     tokenRenewer = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
@@ -256,7 +255,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     authHeader.set(createAuthenticationHeader(masterToken));
     try {
       JWT jwt = JWTParser.parse(masterToken);
-      masterTokenExpiration = date2LocalDateTime(jwt.getJWTClaimsSet().getExpirationTime());
+      masterTokenExpiration = DateUtils.date2LocalDateTime(jwt.getJWTClaimsSet().getExpirationTime());
     } catch (ParseException ex) {
       throw new GeneralSecurityException("Could not parse master JWT", ex);
     }
@@ -375,13 +374,12 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
       request.subject = username;
       request.keyName = jwtParameter.getApplicationId().toString();
       request.audiences = String.join(",", jwtParameter.getAudiences());
-      request.expiresAt = instant2Date(jwtParameter.getExpirationDate());
-      request.nbf = instant2Date(jwtParameter.getValidNotBefore());
+      request.expiresAt = DateUtils.localDateTime2Date(jwtParameter.getExpirationDate());
+      request.nbf = DateUtils.localDateTime2Date(jwtParameter.getValidNotBefore());
       request.renewable = jwtParameter.isRenewable();
       request.expLeeway = jwtParameter.getExpLeeway();
       
       String jsonRequest = jsonParser.toJson(request);
-      
       response = post(new StringEntity(jsonRequest), jwtGeneratePath.toURI(),
           "Hopsworks could not generate JWT for " + jwtParameter.getAppUser()
               + "/" + jwtParameter.getApplicationId().toString());
@@ -405,8 +403,8 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     try {
       JWTDTO request = new JWTDTO();
       request.token = jwtParameter.getToken();
-      request.expiresAt = instant2Date(jwtParameter.getExpirationDate());
-      request.nbf = instant2Date(jwtParameter.getValidNotBefore());
+      request.expiresAt = DateUtils.localDateTime2Date(jwtParameter.getExpirationDate());
+      request.nbf = DateUtils.localDateTime2Date(jwtParameter.getValidNotBefore());
       String jsonRequest = jsonParser.toJson(request);
       response = put(jwtRenewPath.toURI(), new StringEntity(jsonRequest), "Could not renew JWT for "
           + jwtParameter.getAppUser() + "/" + jwtParameter.getApplicationId());
@@ -453,8 +451,8 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     try {
       JWTDTO request = new JWTDTO();
       request.token = token;
-      request.expiresAt = localDateTime2Date(expiresAt);
-      request.nbf = localDateTime2Date(notBefore);
+      request.expiresAt = DateUtils.localDateTime2Date(expiresAt);
+      request.nbf = DateUtils.localDateTime2Date(notBefore);
       String jsonRequest = jsonParser.toJson(request);
       HttpPut httpRequest = new HttpPut(serviceJWTRenewPath.toURI());
       Header authHeader = createAuthenticationHeader(oneTimeToken);
@@ -578,22 +576,6 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
     }
   }
   
-  private LocalDateTime date2LocalDateTime(Date date) {
-    return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
-  }
-  
-  private Date localDateTime2Date(LocalDateTime localDateTime) {
-    return Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant());
-  }
-  
-  private Date instant2Date(Instant instant) {
-    return Date.from(instant);
-  }
-  
-  private LocalDateTime now() {
-    return LocalDateTime.now();
-  }
-  
   @VisibleForTesting
   protected Header createAuthenticationHeader(String jwt) {
     String content = String.format(AUTH_HEADER_CONTENT, jwt);
@@ -628,10 +610,10 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
       while (!Thread.currentThread().isInterrupted()) {
         try {
           // Check if it is time to renew
-          LocalDateTime now = now();
+          LocalDateTime now = DateUtils.getNow();
           if (isTime2Renew(now, masterTokenExpiration)) {
             backoff.reset();
-            LocalDateTime expiresAt = now().plus(serviceJWTValidityPeriodSeconds, ChronoUnit.SECONDS);
+            LocalDateTime expiresAt = DateUtils.getNow().plus(serviceJWTValidityPeriodSeconds, ChronoUnit.SECONDS);
             int renewalTokenIdx = 0;
             while (renewalTokenIdx < renewalTokens.length) {
               try {
@@ -640,7 +622,7 @@ public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Conf
                     expiresAt, now);
                 String oldMasterToken = masterToken;
                 masterToken = renewedTokens.jwt.token;
-                masterTokenExpiration = date2LocalDateTime(renewedTokens.jwt.expiresAt);
+                masterTokenExpiration = DateUtils.date2LocalDateTime(renewedTokens.jwt.expiresAt);
                 authHeader.set(createAuthenticationHeader(masterToken));
                 renewalTokens = renewedTokens.renewTokens;
                 try {

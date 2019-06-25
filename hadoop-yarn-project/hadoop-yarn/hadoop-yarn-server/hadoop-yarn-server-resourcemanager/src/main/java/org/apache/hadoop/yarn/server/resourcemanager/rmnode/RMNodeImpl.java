@@ -18,29 +18,13 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.net.Node;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -77,7 +61,23 @@ import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 /**
  * This class is used to keep track of all the applications/containers
@@ -804,7 +804,7 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         JWTSecurityHandler.JWTSecurityManagerMaterial updatedMaterial =
             (JWTSecurityHandler.JWTSecurityManagerMaterial) updateEvent.getSecurityMaterial();
         updatedCrypto.setJWT(updatedMaterial.getToken());
-        updatedCrypto.setJWTExpiration(updatedMaterial.getExpirationDate().toEpochMilli());
+        updatedCrypto.setJWTExpiration(DateUtils.localDateTime2UnixEpoch(updatedMaterial.getExpirationDate()));
         rmNode.appJWTToUpdate.put(updateEvent.getSecurityMaterial().getApplicationId(), updatedCrypto);
       }
     }
