@@ -18,11 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import java.time.Instant;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -39,6 +34,11 @@ import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * The interface to an Application in the ResourceManager. Take a
@@ -269,7 +269,7 @@ public interface RMApp extends EventHandler<RMAppEvent> {
   
   String getJWT();
   
-  Instant getJWTExpiration();
+  LocalDateTime getJWTExpiration();
   
   Integer getCryptoMaterialVersion();
   

@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import java.time.Instant;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -43,6 +37,12 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class MockRMApp implements RMApp {
   static final int DT = 1000000; // ms
@@ -67,7 +67,7 @@ public class MockRMApp implements RMApp {
   byte[] trustStore;
   char[] trustStorePassword;
   String jwt;
-  Instant jwtExpiration;
+  LocalDateTime jwtExpiration;
   Integer cryptoMaterialVersion = 0;
   long certificateExpiration;
   boolean isAppDuringMaterialRotation = false;
@@ -339,7 +339,7 @@ public class MockRMApp implements RMApp {
   }
   
   @Override
-  public Instant getJWTExpiration() {
+  public LocalDateTime getJWTExpiration() {
     return jwtExpiration;
   }
   

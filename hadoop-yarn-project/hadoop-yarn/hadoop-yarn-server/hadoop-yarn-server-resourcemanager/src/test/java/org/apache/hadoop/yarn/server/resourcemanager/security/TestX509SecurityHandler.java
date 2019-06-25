@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -78,7 +79,7 @@ import java.security.KeyStore;
 import java.security.Security;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
@@ -220,14 +221,14 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     rmAppSecurityManager.init(conf);
     rmAppSecurityManager.start();
     
-    Instant now = Instant.now();
-    Instant expiration = now.plus(10, ChronoUnit.SECONDS);
-    ApplicationId appId = ApplicationId.newInstance(now.toEpochMilli(), 1);
-    x509SecurityHandler.setOldCertificateExpiration(expiration.toEpochMilli());
+    LocalDateTime now = DateUtils.getNow();
+    LocalDateTime expiration = now.plus(10, ChronoUnit.SECONDS);
+    ApplicationId appId = ApplicationId.newInstance(DateUtils.localDateTime2UnixEpoch(now), 1);
+    x509SecurityHandler.setOldCertificateExpiration(DateUtils.localDateTime2UnixEpoch(expiration));
   
     X509SecurityHandler.X509MaterialParameter x509Param =
         new X509SecurityHandler.X509MaterialParameter(appId, "Dolores", 1);
-    x509Param.setExpiration(expiration.toEpochMilli());
+    x509Param.setExpiration(DateUtils.localDateTime2UnixEpoch(expiration));
     x509SecurityHandler.registerRenewer(x509Param);
     Map<ApplicationId, ScheduledFuture> tasks = x509SecurityHandler.getRenewalTasks();
     ScheduledFuture renewalTask = tasks.get(appId);
@@ -253,12 +254,12 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     securityManager.init(conf);
     securityManager.start();
   
-    Instant now = Instant.now();
-    Instant expiration = now.plus(10, ChronoUnit.SECONDS);
-    ApplicationId appId = ApplicationId.newInstance(now.toEpochMilli(), 1);
+    LocalDateTime now = DateUtils.getNow();
+    LocalDateTime expiration = now.plus(10, ChronoUnit.SECONDS);
+    ApplicationId appId = ApplicationId.newInstance(DateUtils.localDateTime2UnixEpoch(now), 1);
     X509SecurityHandler.X509MaterialParameter x509Param =
         new X509SecurityHandler.X509MaterialParameter(appId, "Dolores", 1);
-    x509Param.setExpiration(expiration.toEpochMilli());
+    x509Param.setExpiration(DateUtils.localDateTime2UnixEpoch(expiration));
     x509Handler.registerRenewer(x509Param);
     
     
@@ -288,12 +289,12 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     securityManager.init(conf);
     securityManager.start();
     
-    Instant now = Instant.now();
-    Instant expiration = now.plus(10, ChronoUnit.SECONDS);
-    ApplicationId appId = ApplicationId.newInstance(now.toEpochMilli(), 1);
+    LocalDateTime now = DateUtils.getNow();
+    LocalDateTime expiration = now.plus(10, ChronoUnit.SECONDS);
+    ApplicationId appId = ApplicationId.newInstance(DateUtils.localDateTime2UnixEpoch(now), 1);
     X509SecurityHandler.X509MaterialParameter x509Param =
         new X509SecurityHandler.X509MaterialParameter(appId, "Dolores", 1);
-    x509Param.setExpiration(expiration.toEpochMilli());
+    x509Param.setExpiration(DateUtils.localDateTime2UnixEpoch(expiration));
     x509Handler.registerRenewer(x509Param);
     TimeUnit.SECONDS.sleep(10);
     assertEquals(2, x509Handler.getNumberOfRenewalFailures());

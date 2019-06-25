@@ -17,22 +17,9 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
-
+import com.google.common.annotations.VisibleForTesting;
+import io.hops.metadata.yarn.entity.Load;
+import io.hops.util.DBUtility;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -43,6 +30,7 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.VersionUtil;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -81,6 +69,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplDist;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplNotDist;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeReconnectEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStartedEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStatusEvent;
@@ -91,13 +81,21 @@ import org.apache.hadoop.yarn.server.utils.YarnServerBuilderUtils;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 
-import com.google.common.annotations.VisibleForTesting;
-import io.hops.metadata.yarn.entity.Load;
-import io.hops.util.DBUtility;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplDist;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplNotDist;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 public class ResourceTrackerService extends AbstractService implements
     ResourceTracker {
@@ -513,10 +511,10 @@ public class ResourceTrackerService extends AbstractService implements
         
         if (isJWTEnabled()) {
           long nmJWTExpiration = entry.getValue().getJWTExpiration();
-          if (rmApp.getJWTExpiration().isAfter(Instant.ofEpochMilli(nmJWTExpiration))) {
+          if (rmApp.getJWTExpiration().isAfter(DateUtils.unixEpoch2LocalDateTime(nmJWTExpiration))) {
             UpdatedCryptoForApp updateJWT = recordFactory.newRecordInstance(UpdatedCryptoForApp.class);
             updateJWT.setJWT(rmApp.getJWT());
-            updateJWT.setJWTExpiration(rmApp.getJWTExpiration().toEpochMilli());
+            updateJWT.setJWTExpiration(DateUtils.localDateTime2UnixEpoch(rmApp.getJWTExpiration()));
             rmNode.getAppJWTToUpdate().putIfAbsent(appId, updateJWT);
           }
         }
