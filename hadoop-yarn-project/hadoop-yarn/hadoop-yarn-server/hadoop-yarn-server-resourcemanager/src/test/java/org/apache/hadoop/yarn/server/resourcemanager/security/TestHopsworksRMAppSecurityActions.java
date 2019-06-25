@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.http.Header;
@@ -75,9 +76,7 @@ import java.security.KeyPairGenerator;
 import java.security.Security;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
@@ -214,8 +213,8 @@ public class TestHopsworksRMAppSecurityActions {
     appId = ApplicationId.newInstance(System.currentTimeMillis(), 2);
     jwtParam = new JWTSecurityHandler.JWTMaterialParameter(appId, "dorothy");
     jwtParam.setRenewable(false);
-    Instant now = Instant.now();
-    Instant expiresAt = now.plus(10L, ChronoUnit.MINUTES);
+    LocalDateTime now = DateUtils.getNow();
+    LocalDateTime expiresAt = now.plus(10L, ChronoUnit.MINUTES);
     jwtParam.setExpirationDate(expiresAt);
     jwtParam.setValidNotBefore(now);
     jwtParam.setAudiences(new String[]{"job"});
@@ -282,8 +281,8 @@ public class TestHopsworksRMAppSecurityActions {
       TemporalUnit unit) {
     JWTSecurityHandler.JWTMaterialParameter jwtParam = new JWTSecurityHandler.JWTMaterialParameter(appId, JWT_SUBJECT);
     jwtParam.setRenewable(false);
-    Instant now = Instant.now();
-    Instant expiresAt = now.plus(amountToAdd, unit);
+    LocalDateTime now = DateUtils.getNow();
+    LocalDateTime expiresAt = now.plus(amountToAdd, unit);
     jwtParam.setExpirationDate(expiresAt);
     jwtParam.setValidNotBefore(now);
     jwtParam.setAudiences(new String[]{"job"});
@@ -293,9 +292,9 @@ public class TestHopsworksRMAppSecurityActions {
   @Test
   public void testConfUpdate() throws Exception {
     LocalDateTime now = LocalDateTime.now();
-    Date nbf = Date.from(now.atZone(ZoneId.systemDefault()).toInstant());
+    Date nbf = DateUtils.localDateTime2Date(now);
     LocalDateTime expiration = now.plus(10, ChronoUnit.MINUTES);
-    Date expirationDate = Date.from(expiration.atZone(ZoneId.systemDefault()).toInstant());
+    Date expirationDate = DateUtils.localDateTime2Date(expiration);
     JWTClaimsSet masterClaims = new JWTClaimsSet();
     masterClaims.setSubject("master_token");
     masterClaims.setExpirationTime(expirationDate);
@@ -337,8 +336,8 @@ public class TestHopsworksRMAppSecurityActions {
   
   @Test
   public void testServiceJWTRenewalRetry() throws Exception {
-    LocalDateTime expiration = LocalDateTime.now().plus(10, ChronoUnit.MINUTES);
-    Date expirationDate = Date.from(expiration.atZone(ZoneId.systemDefault()).toInstant());
+    LocalDateTime expiration = DateUtils.getNow().plus(10, ChronoUnit.MINUTES);
+    Date expirationDate = DateUtils.localDateTime2Date(expiration);
     JWTClaimsSet claims = new JWTClaimsSet();
     claims.setSubject("test");
     claims.setExpirationTime(expirationDate);
@@ -436,7 +435,7 @@ public class TestHopsworksRMAppSecurityActions {
       JWTDTO jwt = new JWTDTO();
       jwt.setToken(newMasterToken);
       jwt.setExpiresAt(this.expiresAt);
-      jwt.setNbf(Date.from(notBefore.atZone(ZoneId.systemDefault()).toInstant()));
+      jwt.setNbf(DateUtils.localDateTime2Date(notBefore));
       
       ServiceTokenDTO serviceTokenResponse = new ServiceTokenDTO();
       serviceTokenResponse.setJwt(jwt);
@@ -482,7 +481,7 @@ public class TestHopsworksRMAppSecurityActions {
       JWTDTO jwt = new JWTDTO();
       jwt.setToken(newMasterToken);
       jwt.setExpiresAt(this.expiresAt);
-      jwt.setNbf(Date.from(notBefore.atZone(ZoneId.systemDefault()).toInstant()));
+      jwt.setNbf(DateUtils.localDateTime2Date(notBefore));
       ServiceTokenDTO serviceTokenResponse = new ServiceTokenDTO();
       serviceTokenResponse.setJwt(jwt);
       serviceTokenResponse.setRenewTokens(newRenewalTokens);

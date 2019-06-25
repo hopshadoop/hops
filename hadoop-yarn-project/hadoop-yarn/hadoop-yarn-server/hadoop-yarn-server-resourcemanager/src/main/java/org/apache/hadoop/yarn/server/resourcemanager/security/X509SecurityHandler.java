@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.util.BackOff;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -36,7 +37,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppSecurityMaterialRenewedEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
@@ -63,7 +63,7 @@ import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
@@ -229,10 +229,10 @@ public class X509SecurityHandler
       return;
     }
     if (!renewalTasks.containsKey(parameter.getApplicationId())) {
-      Instant now = Instant.now();
-      Instant expirationInstant = Instant.ofEpochMilli(parameter.getExpiration());
+      LocalDateTime now = DateUtils.getNow();
+      LocalDateTime expirationDate = DateUtils.unixEpoch2LocalDateTime(parameter.getExpiration());
   
-      Duration validityPeriod = Duration.between(now, expirationInstant);
+      Duration validityPeriod = Duration.between(now, expirationDate);
       Duration delay = validityPeriod.minus(amountOfTimeToSubstractFromExpiration, renewalUnitOfTime);
       
       ScheduledFuture renewTask = renewalExecutorService.schedule(
@@ -567,11 +567,11 @@ public class X509SecurityHandler
     public void run() {
       while (!Thread.currentThread().isInterrupted()) {
         try {
-          Instant now = Instant.now();
+          LocalDateTime now = DateUtils.getNow();
           for (Map.Entry<ApplicationId, RMApp> entry : rmContext.getRMApps().entrySet()) {
             RMApp app = entry.getValue();
             if (app.isAppRotatingCryptoMaterial()) {
-              if (Instant.ofEpochMilli(app.getMaterialRotationStartTime())
+              if (DateUtils.unixEpoch2LocalDateTime(app.getMaterialRotationStartTime())
                   .minus(revocationMonitorInterval, revocationUnitOfInterval).isBefore(now)) {
                 Integer versionToRevoke = app.getCryptoMaterialVersion() - 1;
                 LOG.debug("Revoking certificate for app " + entry.getKey() + " with version " + versionToRevoke);

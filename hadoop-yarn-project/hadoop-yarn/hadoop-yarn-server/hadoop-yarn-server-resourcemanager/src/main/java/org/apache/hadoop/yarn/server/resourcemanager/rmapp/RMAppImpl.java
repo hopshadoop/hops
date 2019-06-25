@@ -18,32 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -55,6 +30,7 @@ import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
@@ -78,10 +54,6 @@ import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.security.client.ClientToAMTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeUpdateCryptoMaterialForAppEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppManagerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAppManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger;
@@ -105,9 +77,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptS
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppStartAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanAppEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeUpdateCryptoMaterialForAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppRemovedSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityMaterial;
 import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
@@ -122,7 +98,31 @@ import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class RMAppImpl implements RMApp, Recoverable {
@@ -198,7 +198,7 @@ public class RMAppImpl implements RMApp, Recoverable {
   private Integer cryptoMaterialVersion = 0;
   // JWT
   private String jwt;
-  private Instant jwtExpiration;
+  private LocalDateTime jwtExpiration;
   
   // These states stored are only valid when app is at killing or final_saving.
   private RMAppState stateBeforeKilling;
@@ -899,7 +899,8 @@ public class RMAppImpl implements RMApp, Recoverable {
     this.materialRotationStartTime.set(appState.getMaterialRotationStartTime());
     
     this.jwt = appState.getJWT();
-    this.jwtExpiration = appState.getJWTExpiration() != -1L ? Instant.ofEpochMilli(appState.getJWTExpiration()) : null;
+    this.jwtExpiration = appState.getJWTExpiration() != -1L ?
+        DateUtils.unixEpoch2LocalDateTime(appState.getJWTExpiration()) : null;
     
     // send the ATS create Event during RM recovery.
     // NOTE: it could be duplicated with events sent before RM get restarted.
@@ -1254,7 +1255,7 @@ public class RMAppImpl implements RMApp, Recoverable {
         
         if (app.isJWTMaterialPresent()) {
           appNewState.setJWT(app.jwt);
-          appNewState.setJWTExpiration(app.jwtExpiration.toEpochMilli());
+          appNewState.setJWTExpiration(DateUtils.localDateTime2UnixEpoch(app.jwtExpiration));
   
           JWTSecurityHandler.JWTMaterialParameter jwtParam =
               new JWTSecurityHandler.JWTMaterialParameter(app.applicationId, app.user);
@@ -1302,7 +1303,7 @@ public class RMAppImpl implements RMApp, Recoverable {
               app.isAppRotatingCryptoMaterial.get(), app.materialRotationStartTime.get());
       appNewState.setJWT(app.jwt);
       if (app.jwtExpiration != null) {
-        appNewState.setJWTExpiration(app.jwtExpiration.toEpochMilli());
+        appNewState.setJWTExpiration(DateUtils.localDateTime2UnixEpoch(app.jwtExpiration));
       } else {
         appNewState.setJWTExpiration(-1L);
       }
@@ -1334,7 +1335,7 @@ public class RMAppImpl implements RMApp, Recoverable {
               app.trustStore, app.trustStorePassword, app.cryptoMaterialVersion, app.certificateExpiration,
               app.isAppRotatingCryptoMaterial.get(), app.materialRotationStartTime.get());
       appNewState.setJWT(jwtMaterial.getToken());
-      appNewState.setJWTExpiration(jwtMaterial.getExpirationDate().toEpochMilli());
+      appNewState.setJWTExpiration(DateUtils.localDateTime2UnixEpoch(jwtMaterial.getExpirationDate()));
       app.rmContext.getStateStore().updateApplicationStateNoNotify(appNewState);
       
       for (NodeId nodeId : app.ranNodes) {
@@ -2189,7 +2190,7 @@ public class RMAppImpl implements RMApp, Recoverable {
   }
   
   @Override
-  public Instant getJWTExpiration() {
+  public LocalDateTime getJWTExpiration() {
     return jwtExpiration;
   }
   
