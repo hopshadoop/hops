@@ -319,28 +319,16 @@ public class BlockManager {
   /**
    * Number of blocks to process at one batch
    */
-  private final int processReportBatchSize;
-  /**
-   * Number of files to process at one batch
-   */
-  private final int processMisReplicatedBatchSize;
+  private final int slicerBatchSize;
+
   /**
    * Number of batches to be processed by this namenode at one time
    */
   private final int processMisReplicatedNoOfBatchs;
   /**
-   * Number of threads procession batches in parallel
+   * Number of threads for slicers
    */
-  private final int processMisReplicatedNoThreads;
-  
-  /**
-   * Number of files to process at one batch
-   */
-  private final int removalBatchSize;
-  /**
-   * Number of threads procession batches in parallel
-   */
-  private final int removalNoThreads;
+  private final int slicerNbThreads;
   
   private final int numBuckets;
   private final int blockFetcherNBThreads;
@@ -436,29 +424,18 @@ public class BlockManager {
         conf.getLong(DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_KEY,
             DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_DEFAULT);
         
-    this.processReportBatchSize =
-        conf.getInt(DFSConfigKeys.DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE,
-            DFSConfigKeys.DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE_DEFAULT);
-
-    this.processMisReplicatedBatchSize =
-        conf.getInt(DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE,
-            DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE_DEFAULT);
+    this.slicerBatchSize =
+        conf.getInt(DFSConfigKeys.DFS_NAMENODE_SLICER_BATCH_SIZE,
+            DFSConfigKeys.DFS_NAMENODE_SLICER_BATCH_SIZE_DEFAULT);
 
     this.processMisReplicatedNoOfBatchs = conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_BATCHS,
         DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_BATCHS_DEFAULT);
 
-    this.processMisReplicatedNoThreads = conf.getInt(
-        DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS,
-        DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT);
+    this.slicerNbThreads = conf.getInt(
+        DFSConfigKeys.DFS_NAMENODE_SLICER_NB_OF_THREADS,
+        DFSConfigKeys.DFS_NAMENODE_SLICER_NB_OF_THREADS_DEFAULT);
             
-    this.removalBatchSize =
-        conf.getInt(DFSConfigKeys.DFS_NAMENODE_REMOVAL_BATCH_SIZE,
-            DFSConfigKeys.DFS_NAMENODE_REMOVAL_BATCH_SIZE_DEFAULT);
-    this.removalNoThreads = conf.getInt(
-        DFSConfigKeys.DFS_NAMENODE_REMOVAL_NO_OF_THREADS,
-        DFSConfigKeys.DFS_NAMENODE_REMOVAL_NO_OF_THREADS_DEFAULT);
-        
     LOG.info("defaultReplication         = " + defaultReplication);
     LOG.info("maxReplication             = " + maxReplication);
     LOG.info("minReplication             = " + minReplication);
@@ -467,11 +444,9 @@ public class BlockManager {
     LOG.info("replicationRecheckInterval = " + replicationRecheckInterval);
     LOG.info("encryptDataTransfer        = " + encryptDataTransfer);
     LOG.info("maxNumBlocksToLog          = " + maxNumBlocksToLog);
-    LOG.info("misReplicatedBatchSize     = " + processMisReplicatedBatchSize);
+    LOG.info("slicerBatchSize            = " + slicerBatchSize);
     LOG.info("misReplicatedNoOfBatchs    = " + processMisReplicatedNoOfBatchs);   
-    LOG.info("misReplicatedNoOfThreads   = " + processMisReplicatedNoThreads);   
-    LOG.info("removalBatchSize           = " + removalBatchSize);
-    LOG.info("removalNoOfThreads         = " + removalNoThreads);   
+    LOG.info("slicerNbOfBatchs           = " + processMisReplicatedNoOfBatchs);   
   }
 
   private NameNodeBlockTokenSecretManager createBlockTokenSecretManager(
@@ -2483,7 +2458,7 @@ public class BlockManager {
         blockIdsToAddList.add(b.getBlockId());
         inodeIdsToAddList.add(b.getInodeId());
       }
-      if(blocksToAddList.size()>=processReportBatchSize){
+      if(blocksToAddList.size()>=slicerBatchSize){
         index++;
       }
     }
@@ -2553,11 +2528,11 @@ public class BlockManager {
   public void removeBlocks(List<Long> allBlockIds, final DatanodeDescriptor node) throws IOException {
 
     final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(allBlockIds,
-        removalBatchSize, removalNoThreads, ((FSNamesystem) namesystem).getFSOperationsExecutor());
+        slicerBatchSize, slicerNbThreads, ((FSNamesystem) namesystem).getFSOperationsExecutor());
     final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
-      Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads, 
+      Slicer.slice(inodeIds.size(), slicerBatchSize, slicerNbThreads, 
           ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
@@ -2587,7 +2562,7 @@ public class BlockManager {
     final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
-      Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads,
+      Slicer.slice(inodeIds.size(), slicerBatchSize, slicerNbThreads,
           ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
@@ -2616,7 +2591,7 @@ public class BlockManager {
     final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
-      Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads,
+      Slicer.slice(inodeIds.size(), slicerBatchSize, slicerNbThreads,
           ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
@@ -3654,7 +3629,7 @@ public class BlockManager {
     replicationQueuesInitProgress = 0;
     final AtomicLong totalProcessed = new AtomicLong(0);   
     boolean haveMore;
-    final int filesToProcess = processMisReplicatedBatchSize * processMisReplicatedNoOfBatchs;
+    final int filesToProcess = slicerBatchSize * processMisReplicatedNoOfBatchs;
 
     addToMisReplicatedRangeQueue(new MisReplicatedRange(namesystem.getNamenodeId(), -1));
     long maxInodeId = 0;
@@ -3726,7 +3701,7 @@ public class BlockManager {
         maxInodeId + ")");
 
     try {
-      Slicer.slice(allINodes.size(), processMisReplicatedBatchSize, processMisReplicatedNoThreads, 
+      Slicer.slice(allINodes.size(), slicerBatchSize, slicerNbThreads, 
           ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
@@ -4255,12 +4230,12 @@ public class BlockManager {
     }
     
     final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(blockIds,
-        processMisReplicatedBatchSize, processMisReplicatedNoThreads, ((FSNamesystem) namesystem).getFSOperationsExecutor());
+        slicerBatchSize, slicerNbThreads, ((FSNamesystem) namesystem).getFSOperationsExecutor());
     final List<Long> allInodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
     final Map<Block, List<DatanodeStorageInfo>> locationsMap = new ConcurrentHashMap<>();
     
     try{
-      Slicer.slice(allInodeIds.size(), processMisReplicatedBatchSize, processMisReplicatedNoThreads,
+      Slicer.slice(allInodeIds.size(), slicerBatchSize, slicerNbThreads,
           ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
@@ -4656,7 +4631,7 @@ public class BlockManager {
     final List<Long> inodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
 
     try {
-      Slicer.slice(inodeIds.size(), removalBatchSize, removalNoThreads, 
+      Slicer.slice(inodeIds.size(), slicerBatchSize, slicerNbThreads, 
           ((FSNamesystem) namesystem).getFSOperationsExecutor(),
           new Slicer.OperationHandler() {
         @Override
@@ -5634,11 +5609,11 @@ public class BlockManager {
   }
 
   public int getRemovalBatchSize() {
-    return removalBatchSize;
+    return slicerBatchSize;
   }
 
   public int getRemovalNoThreads() {
-    return removalNoThreads;
+    return slicerNbThreads;
   }
 
   public void blockReportCompleted(final DatanodeID nodeID, DatanodeStorage[] storages, boolean success) throws
