@@ -55,7 +55,7 @@ public class DatanodeStorageInfo {
   
   public static final DatanodeStorageInfo[] EMPTY_ARRAY = {};
 
-  private static int BLOCKITERATOR_BATCH_SIZE = 10000;
+  public static int BLOCKITERATOR_BATCH_SIZE = 500;
   
   public static StorageType[] toStorageTypes(DatanodeStorageInfo[] storages) {
     StorageType[] storageTypes = new StorageType[storages.length];
@@ -198,16 +198,20 @@ public class DatanodeStorageInfo {
   /**
    * Iterates over the list of blocks belonging to the Storage.
    */
-  public Iterator<BlockInfoContiguous> getBlockIterator() {
-    return new BlockIterator();
+  public Iterator<BlockInfoContiguous> getBlockIterator(int startIndex) throws IOException {
+    return new BlockIterator(startIndex);
   }
       
   private class BlockIterator implements Iterator<BlockInfoContiguous> {    
     private Iterator<BlockInfoContiguous> blocks = Collections.EMPTY_LIST.iterator();
     long index = 0;
     
-    public BlockIterator(){
-      update();
+    public BlockIterator(int startIndex) throws IOException{
+      LOG.info("GAUTIER get startIndex");
+      long start = System.currentTimeMillis();
+      index = getStartBlockId(startIndex);
+      long duration = System.currentTimeMillis()-start;
+      LOG.info("GAUTIER got startIndex index: " + index + " duration " + duration);
     }
     
     @Override
@@ -232,13 +236,20 @@ public class DatanodeStorageInfo {
     }
 
     private void update(){
-      try{
-      while(!blocks.hasNext() && hasBlocksWithIdGreaterThan(index)){
-        blocks = getStorageBlockInfos(index, BLOCKITERATOR_BATCH_SIZE).iterator();
-        index = index+BLOCKITERATOR_BATCH_SIZE;
-      }
-      }catch(IOException ex){
-        LOG.warn(ex,ex);
+      try {
+        LOG.info("GAUTIER blockIterator update index: " + index);
+        long start = System.currentTimeMillis();
+        List<BlockInfoContiguous> list =null;
+        while (!blocks.hasNext() && hasBlocksWithIdGreaterThan(index)) {
+          list = getStorageBlockInfos(index, BLOCKITERATOR_BATCH_SIZE);
+          blocks = list.iterator();
+          index = Math.max(list.get(list.size()-1).getBlockId() +1 , index + BLOCKITERATOR_BATCH_SIZE);
+        }
+        int size = list!=null?list.size():0;
+        long duration = System.currentTimeMillis()-start;
+        LOG.info("GAUTIER blockIterator updated size " + size + " duration " + duration);
+      } catch (IOException ex) {
+        LOG.warn(ex, ex);
       }
     }
     
@@ -270,6 +281,32 @@ public class DatanodeStorageInfo {
     return (List<BlockInfoContiguous>) findBlocksHandler.handle();
   }
   
+  private long getStartBlockId(final long index) throws IOException {
+    final int sid = this.sid;
+
+    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_STORAGE_IDS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        boolean transactionActive = connector.isTransactionActive();
+        try {
+          if (!transactionActive) {
+            connector.beginTransaction();
+          }
+
+          ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+              .getDataAccess(ReplicaDataAccess.class);
+          return da.findBlockIdAtIndex(sid, index, BLOCKITERATOR_BATCH_SIZE);
+        } finally {
+          if (!transactionActive) {
+            connector.commit();
+          }
+        }
+      }
+    };
+    return (long) findBlocksHandler.handle();
+  }
+  
   private boolean hasBlocksWithIdGreaterThan(final long from) throws IOException {
     final int sid = this.sid;
 
@@ -295,7 +332,7 @@ public class DatanodeStorageInfo {
     };
     return (boolean) hasBlocksHandler.handle();
   }
-    
+   
   long getLastBlockReportId() {
     return lastBlockReportId;
   }

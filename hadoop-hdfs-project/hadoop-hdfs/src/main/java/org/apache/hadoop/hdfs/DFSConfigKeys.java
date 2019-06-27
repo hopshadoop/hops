@@ -68,7 +68,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODE_IDSMONITOR_CHECK_INTERVAL_IN_MS = "dfs.namenode.id.updateThreshold";
   public static final int DFS_NAMENODE_IDSMONITOR_CHECK_INTERVAL_IN_MS_DEFAULT = 1000;
   public static final String DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE = "dfs.namenode.processReport.batchsize";
-  public static final int DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE_DEFAULT = 10;
+  public static final int DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE_DEFAULT = 500;
   public static final String DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE = "dfs.namenode.misreplicated.batchsize";
   public static final int DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE_DEFAULT = 500;
   public static final String DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_BATCHS = "dfs.namenode.misreplicated.noofbatches";
@@ -161,7 +161,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int DEFAULT_DELETION_LIMIT = 100;
 
   public static final String DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN = "dfs.block.report.load.balancer.max.concurrent.block.reports.per.nn";
-  public static final long DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN_DEFAULT = 5;
+  public static final long DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN_DEFAULT = 1;
 
   //read the new value from the data base after every minute
   public static final String DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD = "dfs.block.report.load.balancing.db.var.update.threashold";

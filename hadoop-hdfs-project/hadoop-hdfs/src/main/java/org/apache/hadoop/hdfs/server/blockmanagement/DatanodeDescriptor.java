@@ -642,10 +642,28 @@ public class DatanodeDescriptor extends DatanodeInfo {
     private int index = 0;
     private final List<Iterator<BlockInfoContiguous>> iterators;
     
-    private BlockIterator(final DatanodeStorageInfo... storages) {
+    private BlockIterator(final int startBlock, final DatanodeStorageInfo... storages) throws IOException {
+      if(startBlock < 0) {
+        throw new IllegalArgumentException(
+            "Illegal value startBlock = " + startBlock);
+      }
       List<Iterator<BlockInfoContiguous>> iterators = new ArrayList<Iterator<BlockInfoContiguous>>();
+      int s = startBlock;
+      int sumBlocks = 0;
+      boolean first = true;
       for (DatanodeStorageInfo e : storages) {
-        iterators.add(e.getBlockIterator());
+        int numBlocks = e.numBlocks();
+        sumBlocks += numBlocks;
+        if(sumBlocks <= startBlock) {
+          s -= numBlocks;
+        } else {
+          if(first){
+            iterators.add(e.getBlockIterator(s));
+            first = false;
+          }else{
+            iterators.add(e.getBlockIterator(0));
+          }
+        }
       }
       this.iterators = Collections.unmodifiableList(iterators);
     }
@@ -674,11 +692,19 @@ public class DatanodeDescriptor extends DatanodeInfo {
     }
   }
 
-  Iterator<BlockInfoContiguous> getBlockIterator() {
-    return new BlockIterator(getStorageInfos());
+  Iterator<BlockInfoContiguous> getBlockIterator() throws IOException {
+    return new BlockIterator(0, getStorageInfos());
   }
+  
+    /**
+   * Get iterator, which starts iterating from the specified block.
+   */
+  Iterator<BlockInfoContiguous> getBlockIterator(final int startBlock) throws IOException {
+    return new BlockIterator(startBlock, getStorageInfos());
+  }
+  
   Iterator<BlockInfoContiguous> getBlockIterator(final String storageID) throws IOException {
-    return new BlockIterator(getStorageInfo(storageID));
+    return new BlockIterator(0, getStorageInfo(storageID));
   }
   
   public Map<Long,Long> getAllStorageReplicas(int numBuckets, int nbThreads, int BucketsPerThread,

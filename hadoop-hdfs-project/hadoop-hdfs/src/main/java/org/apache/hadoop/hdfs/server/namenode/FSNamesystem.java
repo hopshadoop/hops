@@ -709,6 +709,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       
       this.maxDBTries = conf.getInt(DFSConfigKeys.DFS_NAMENODE_DB_CHECK_MAX_TRIES,
           DFSConfigKeys.DFS_NAMENODE_DB_CHECK_MAX_TRIES_DEFAULT);
+      DatanodeStorageInfo.BLOCKITERATOR_BATCH_SIZE = slicerBatchSize;
     } catch (IOException | RuntimeException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
       close();
