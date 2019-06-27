@@ -700,12 +700,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       this.isRetryCacheEnabled = conf.getBoolean(DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY,
           DFS_NAMENODE_ENABLE_RETRY_CACHE_DEFAULT);
       this.retryCache = ignoreRetryCache ? null : initRetryCache(conf);
-      this.slicerBatchSize = conf.getInt(DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE,
-          DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE_DEFAULT);
+      this.slicerBatchSize = conf.getInt(DFSConfigKeys.DFS_NAMENODE_SLICER_BATCH_SIZE,
+          DFSConfigKeys.DFS_NAMENODE_SLICER_BATCH_SIZE_DEFAULT);
 
       this.slicerNbThreads = conf.getInt(
-          DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS,
-          DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT);
+          DFSConfigKeys.DFS_NAMENODE_SLICER_NB_OF_THREADS,
+          DFSConfigKeys.DFS_NAMENODE_SLICER_NB_OF_THREADS_DEFAULT);
       
       this.maxDBTries = conf.getInt(DFSConfigKeys.DFS_NAMENODE_DB_CHECK_MAX_TRIES,
           DFSConfigKeys.DFS_NAMENODE_DB_CHECK_MAX_TRIES_DEFAULT);
