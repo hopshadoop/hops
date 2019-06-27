@@ -451,7 +451,7 @@ public class BlockManager {
     this.processMisReplicatedNoThreads = conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS,
         DFSConfigKeys.DFS_NAMENODE_PROCESS_MISREPLICATED_NO_OF_THREADS_DEFAULT);
-    
+            
     this.removalBatchSize =
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_REMOVAL_BATCH_SIZE,
             DFSConfigKeys.DFS_NAMENODE_REMOVAL_BATCH_SIZE_DEFAULT);
@@ -1195,12 +1195,8 @@ public class BlockManager {
     if (numBlocks == 0) {
       return new BlocksWithLocations(new BlockWithLocations[0]);
     }
-    Iterator<BlockInfoContiguous> iter = node.getBlockIterator();
     int startBlock = DFSUtil.getRandom().nextInt(numBlocks); // starting from a random block
-    // skip blocks
-    for (int i = 0; i < startBlock; i++) {
-      iter.next();
-    }
+    Iterator<BlockInfoContiguous> iter = node.getBlockIterator(startBlock);    
     List<BlockWithLocations> results = new ArrayList<>();
     long totalSize = 0;
     BlockInfoContiguous curBlock;
@@ -4250,45 +4246,66 @@ public class BlockManager {
    */
   private long addBlocks(final List<Block> blocks, List<BlockWithLocations> results)
       throws IOException {
+    
+    List<Long> blockIds = new ArrayList<>(blocks.size());
+    final Map<Long, Block> blockIdsToBlocks = new HashMap<>();
+    for (Block block : blocks) {
+      blockIds.add(block.getBlockId());
+      blockIdsToBlocks.put(block.getBlockId(), block);
+    }
+    
+    final Map<Long, List<Long>> inodeIdsToBlockMap = INodeUtil.getINodeIdsForBlockIds(blockIds,
+        processMisReplicatedBatchSize, processMisReplicatedNoThreads, ((FSNamesystem) namesystem).getFSOperationsExecutor());
+    final List<Long> allInodeIds = new ArrayList<>(inodeIdsToBlockMap.keySet());
+    final Map<Block, List<DatanodeStorageInfo>> locationsMap = new ConcurrentHashMap<>();
+    
+    try{
+      Slicer.slice(allInodeIds.size(), processMisReplicatedBatchSize, processMisReplicatedNoThreads,
+          ((FSNamesystem) namesystem).getFSOperationsExecutor(),
+          new Slicer.OperationHandler() {
+        @Override
+        public void handle(int startIndex, int endIndex)
+            throws Exception {
+          final List<Long> inodeIds = allInodeIds.subList(startIndex, endIndex);
 
-    final Map<Block, List<DatanodeStorageInfo>> locationsMap = new HashMap<>();
+          new HopsTransactionalRequestHandler(HDFSOperationType.GET_VALID_BLK_LOCS) {
+            List<INodeIdentifier> inodeIdentifiers;
 
-    new HopsTransactionalRequestHandler(HDFSOperationType.GET_VALID_BLK_LOCS) {
-      List<INodeIdentifier> inodeIdentifiers;
+            @Override
+            public void setUp() throws StorageException, IOException {
+              inodeIdentifiers = INodeUtil.resolveINodesFromIds(inodeIds);
+            }
 
-      @Override
-      public void setUp() throws StorageException, IOException {
-        List<Long> blockIds = new ArrayList<>(blocks.size());
-        for(Block block: blocks){
-          blockIds.add(block.getBlockId());
+            @Override
+            public void acquireLock(TransactionLocks locks) throws IOException {
+              LockFactory lf = LockFactory.getInstance();
+              locks.add(
+                  lf.getBatchedINodesLock(inodeIdentifiers))
+                  .add(lf.getSqlBatchedBlocksLock())
+                  .add(lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV));
+            }
+
+            @Override
+            public Object performTask() throws IOException {
+              for (INodeIdentifier identifier : inodeIdentifiers) {
+                for (long blockId : inodeIdsToBlockMap.get(identifier.getInodeId())) {
+                  Block block = blockIdsToBlocks.get(blockId);
+                  BlockInfoContiguous temp = getBlockInfo(block);
+                  final List<DatanodeStorageInfo> ms = getValidLocations(temp);
+                  if (!ms.isEmpty()) {
+                    locationsMap.put(block, ms);
+                  }
+                }
+              }
+              return null;
+            }
+          }.handle(namesystem);
         }
-        List<Long> inodeIds = new ArrayList<>(INodeUtil.getINodeIdsForBlockIds(blockIds, removalBatchSize,
-            removalNoThreads, ((FSNamesystem) namesystem).getFSOperationsExecutor()).keySet());
-        inodeIdentifiers = INodeUtil.resolveINodesFromIds(inodeIds);
-      }
-
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getBatchedINodesLock(inodeIdentifiers))
-            .add(lf.getSqlBatchedBlocksLock())
-            .add(lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV));
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        for (Block block : blocks) {
-          BlockInfoContiguous temp = getBlockInfo(block);
-          final List<DatanodeStorageInfo> ms = getValidLocations(temp);
-          if (!ms.isEmpty()) {
-            locationsMap.put(block, ms);
-          }
-        }
-        return null;
-      }
-    }.handle(namesystem);
-
+      });
+    } catch (Exception ex) {
+      throw new IOException(ex);
+    }
+    
     if (locationsMap.isEmpty()) {
       return 0;
     } else {
