@@ -15,7 +15,7 @@
  */
 package io.hops.transaction.lock;
 
-import io.hops.exception.StorageException;
+import io.hops.common.INodeUtil;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
@@ -51,25 +51,16 @@ final class INodesLocks extends BaseINodeLock {
 
     Collections.sort(inodeIdentifiers);
     for (INodeIdentifier inodeIdentifier : inodeIdentifiers) {
-      setPartitioningKey(inodeIdentifier.getInodeId());
+      List<INode> resolvedINodes = resolveUsingCache(lockType, inodeIdentifier.getInodeId());
+      
+      String path = INodeUtil.constructPath(resolvedINodes);
+      addPathINodesAndUpdateResolvingCache(path, resolvedINodes);
 
-      INode inode = null;
-      if (inodeIdentifier.getName() != null && inodeIdentifier.getPid() != null) {
-        inode = find(lockType, inodeIdentifier.getName(), inodeIdentifier.getPid(),
-            inodeIdentifier.getPartitionId(), inodeIdentifier.getInodeId());
-      } else if (inodeIdentifier.getInodeId() != null) {
-        inode = find(lockType, inodeIdentifier.getInodeId());
-      } else {
-        throw new StorageException(
-            "INodeIdentifier object is not properly " + "initialized ");
-      }
-
-      addIndividualINode(inode);
     }
     acquireINodeAttributes();
 
   }
-
+  
   @Override
   public String toString() {
     if ( lockType != null && inodeIdentifiers != null && !inodeIdentifiers.isEmpty()){
