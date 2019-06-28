@@ -207,11 +207,7 @@ public class DatanodeStorageInfo {
     long index = 0;
     
     public BlockIterator(int startIndex) throws IOException{
-      LOG.info("GAUTIER get startIndex");
-      long start = System.currentTimeMillis();
       index = getStartBlockId(startIndex);
-      long duration = System.currentTimeMillis()-start;
-      LOG.info("GAUTIER got startIndex index: " + index + " duration " + duration);
     }
     
     @Override
@@ -237,8 +233,6 @@ public class DatanodeStorageInfo {
 
     private void update(){
       try {
-        LOG.info("GAUTIER blockIterator update index: " + index);
-        long start = System.currentTimeMillis();
         List<BlockInfoContiguous> list =null;
         while (!blocks.hasNext() && hasBlocksWithIdGreaterThan(index)) {
           list = getStorageBlockInfos(index, BLOCKITERATOR_BATCH_SIZE);
@@ -246,8 +240,6 @@ public class DatanodeStorageInfo {
           index = Math.max(list.get(list.size()-1).getBlockId() +1 , index + BLOCKITERATOR_BATCH_SIZE);
         }
         int size = list!=null?list.size():0;
-        long duration = System.currentTimeMillis()-start;
-        LOG.info("GAUTIER blockIterator updated size " + size + " duration " + duration);
       } catch (IOException ex) {
         LOG.warn(ex, ex);
       }
