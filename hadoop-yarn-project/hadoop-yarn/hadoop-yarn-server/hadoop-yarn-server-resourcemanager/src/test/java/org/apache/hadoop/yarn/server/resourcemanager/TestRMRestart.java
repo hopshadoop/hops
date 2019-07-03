@@ -76,6 +76,9 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
+import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
@@ -97,8 +100,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.TestUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityMaterial;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -646,6 +654,83 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     nm.registerNode(runningApps);
     hbResponse = nm.nodeHeartbeat(true);
     Assert.assertEquals(0, hbResponse.getUpdatedCryptoForApps().size());
+  }
+  
+  /**
+   * Test bug where the following workflow would throw a NPE in ResourceManager
+   * 1. Start RM with JWT disabled
+   * 2. Submit application and wait for running
+   * 3. Enable JWT and restart RM
+   *
+   * During recovery RMApp would try to register with JWT renewer but
+   * JWT from previous attempt is null
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testRMRestartEnablingJWTAppRunning() throws Exception {
+    // Start RM with JWT disabled
+    MockRM rm1 = createMockRM(conf);
+    Assume.assumeFalse(rm1.getResourceScheduler() instanceof FairScheduler);
+    rm1.start();
+    MockNM nm = new MockNM("127.0.0.1:1337", 20 * 1024, rm1.getResourceTrackerService());
+    nm.registerNode();
+    final RMApp app = rm1.submitApp(1024);
+    MockAM am = MockRM.launchAndRegisterAM(app, rm1, nm);
+    
+    Configuration newConf = new Configuration(conf);
+    newConf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
+    // Start second RM with JWT enabled
+    MockRM rm2 = new MockRM(newConf) {
+      @Override
+      protected ApplicationMasterLauncher createAMLauncher() {
+        return new ApplicationMasterLauncher(getRMContext()) {
+          @Override
+          protected void serviceStart() {
+            // override to not start rpc handler
+          }
+  
+          @Override
+          public void handle(AMLauncherEvent appEvent) {
+            // Just send crypto material revocation event
+            if (appEvent.getType().equals(AMLauncherEventType.CLEANUP)) {
+              RMApp application = rmContext.getRMApps().get(
+                  app.getApplicationId());
+              X509SecurityHandler.X509MaterialParameter x509Param =
+                  new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
+                      application.getCryptoMaterialVersion());
+              JWTSecurityHandler.JWTMaterialParameter jwtParam =
+                  new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+  
+              RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
+              securityMaterial.addMaterial(x509Param);
+              securityMaterial.addMaterial(jwtParam);
+              RMAppSecurityManagerEvent securityMaterialCleanup =
+                  new RMAppSecurityManagerEvent(application.getApplicationId(),
+                      securityMaterial, RMAppSecurityManagerEventType.REVOKE_SECURITY_MATERIAL);
+              getRmDispatcher().getEventHandler().handle(securityMaterialCleanup);
+            }
+          }
+  
+          @Override
+          protected void serviceStop() {
+            // don't do anything
+          }
+        };
+      }
+    };
+    rm2.start();
+    nm.setResourceTrackerService(rm2.getResourceTrackerService());
+    NMContainerStatus status = createNMContainerStatus(am.getApplicationAttemptId(), 1, ContainerState.COMPLETE);
+    nm.registerNode(Arrays.asList(status), null);
+    
+    RMApp recoveredApp = rm2.getRMContext().getRMApps().get(app.getApplicationId());
+    int timeout = 0;
+    while (recoveredApp.getAppAttempts().size() != 2 && timeout++ < 20) {
+      TimeUnit.SECONDS.sleep(1);
+    }
+    MockAM am1 = MockRM.launchAndRegisterAM(recoveredApp, rm2, nm);
+    MockRM.finishAMAndVerifyAppState(recoveredApp, rm2, nm, am1);
   }
   
   @Test(timeout = 50000)

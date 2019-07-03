@@ -511,7 +511,8 @@ public class ResourceTrackerService extends AbstractService implements
         
         if (isJWTEnabled()) {
           long nmJWTExpiration = entry.getValue().getJWTExpiration();
-          if (rmApp.getJWTExpiration().isAfter(DateUtils.unixEpoch2LocalDateTime(nmJWTExpiration))) {
+          if (rmApp.getJWTExpiration() != null
+              && rmApp.getJWTExpiration().isAfter(DateUtils.unixEpoch2LocalDateTime(nmJWTExpiration))) {
             UpdatedCryptoForApp updateJWT = recordFactory.newRecordInstance(UpdatedCryptoForApp.class);
             updateJWT.setJWT(rmApp.getJWT());
             updateJWT.setJWTExpiration(DateUtils.localDateTime2UnixEpoch(rmApp.getJWTExpiration()));
