@@ -1136,25 +1136,30 @@ public class RMAppImpl implements RMApp, Recoverable {
   
       // ResourceManager may have crashed after it has renewed the certificate but before updating
       // RMApp state, so revoke the current version plus 1 to be sure no missed certificate is valid
-      X509SecurityHandler.X509MaterialParameter x509Param =
-          new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, cryptoMaterialVersionToRevoke);
-      app.rmContext.getRMAppSecurityManager()
-          .revokeSecurityMaterialSync(x509Param);
-      x509Param = new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, app.cryptoMaterialVersion);
-      x509Param.setExpiration(app.certificateExpiration);
-      app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(x509Param);
+      if (app.isX509MaterialPresent()) {
+        X509SecurityHandler.X509MaterialParameter x509Param =
+            new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, cryptoMaterialVersionToRevoke);
+        app.rmContext.getRMAppSecurityManager()
+            .revokeSecurityMaterialSync(x509Param);
+        x509Param =
+            new X509SecurityHandler.X509MaterialParameter(app.applicationId, app.user, app.cryptoMaterialVersion);
+        x509Param.setExpiration(app.certificateExpiration);
+        app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(x509Param);
+  
+        try {
+          app.materializeCertificates();
+        } catch (InterruptedException ex) {
+          LOG.error("Could not localize certificates for application " + app.applicationId + " during recovery");
+        }
+      }
       
       // Register with JWT renewer
-      JWTSecurityHandler.JWTMaterialParameter jwtParam  = new JWTSecurityHandler.JWTMaterialParameter(app.applicationId,
-          app.user);
-      jwtParam.setExpirationDate(app.jwtExpiration);
-      jwtParam.setToken(app.jwt);
-      app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(jwtParam);
-  
-      try {
-        app.materializeCertificates();
-      } catch (InterruptedException ex) {
-        LOG.error("Could not localize certificates for application " + app.applicationId + " during recovery");
+      if (app.isJWTMaterialPresent()) {
+        JWTSecurityHandler.JWTMaterialParameter jwtParam =
+            new JWTSecurityHandler.JWTMaterialParameter(app.applicationId, app.user);
+        jwtParam.setExpirationDate(app.jwtExpiration);
+        jwtParam.setToken(app.jwt);
+        app.rmContext.getRMAppSecurityManager().registerWithMaterialRenewers(jwtParam);
       }
       
       // Add application to scheduler synchronously to guarantee scheduler
