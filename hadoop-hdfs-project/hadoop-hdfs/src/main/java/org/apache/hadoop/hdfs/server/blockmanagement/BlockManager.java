@@ -4498,30 +4498,36 @@ public class BlockManager {
             HashBuckets hashBuckets = HashBuckets.getInstance();
             switch (rdbi.getStatus()) {
               case RECEIVING_BLOCK:
+                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.RECEIVING_BLOCK.name());
                 processAndHandleReportedBlock(storage, rdbi.getBlock(),
                         ReplicaState.RBW, null);
                 received[0]++;
                 break;
               case APPENDING:
+                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.APPENDING.name());
                 processAndHandleReportedBlock(storage, rdbi.getBlock(),
                     ReplicaState.RBW, null);
                 received[0]++;
                 break;
               case RECOVERING_APPEND:
+                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.RECOVERING_APPEND.name());
                 processAndHandleReportedBlock(storage, rdbi.getBlock(),
                     ReplicaState.RBW, null);
                 received[0]++;
                 break;
               case RECEIVED_BLOCK:
+                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK.name());
                 addBlock(storage, rdbi.getBlock(), rdbi.getDelHints());
                 hashBuckets.applyHash(storage.getSid(), ReplicaState.FINALIZED, rdbi.getBlock());
                 received[0]++;
                 break;
               case UPDATE_RECOVERED:
+                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.UPDATE_RECOVERED.name());
                 addBlock(storage, rdbi.getBlock(), rdbi.getDelHints());
                 received[0]++;
                 break;
               case DELETED_BLOCK:
+                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.DELETED_BLOCK.name());
                 removeStoredBlock(rdbi.getBlock(), storage.getDatanodeDescriptor());
                 deleted[0]++;
                 break;
