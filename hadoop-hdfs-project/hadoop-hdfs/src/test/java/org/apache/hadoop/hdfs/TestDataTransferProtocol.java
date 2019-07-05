@@ -258,7 +258,7 @@ public class TestDataTransferProtocol {
       long newBlockId = firstBlock.getBlockId() + BLOCK_ID_FUDGE;
       ExtendedBlock newBlock =
           new ExtendedBlock(firstBlock.getBlockPoolId(), newBlockId, 0,
-              firstBlock.getGenerationStamp());
+              firstBlock.getGenerationStamp(), firstBlock.getCloudBucketID());
 
       // test PIPELINE_SETUP_CREATE on a new block
       testWrite(newBlock, BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L,

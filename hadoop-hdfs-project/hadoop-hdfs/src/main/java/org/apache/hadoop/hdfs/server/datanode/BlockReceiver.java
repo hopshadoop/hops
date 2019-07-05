@@ -809,7 +809,9 @@ class BlockReceiver implements Closeable {
           } else {
             // for isDatnode or TRANSFER_FINALIZED
             // Finalize the block.
+            datanode.data.preFinalize(block);
             datanode.data.finalizeBlock(block);
+            datanode.data.postFinalize(block);
           }
         }
         datanode.metrics.incrBlocksWritten();
@@ -1307,7 +1309,10 @@ class BlockReceiver implements Closeable {
         BlockReceiver.this.close();
         endTime = ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
         block.setNumBytes(replicaInfo.getNumBytes());
+
+        datanode.data.preFinalize(block);
         datanode.data.finalizeBlock(block);
+        datanode.data.postFinalize(block);
       }
 
       if (pinning) {

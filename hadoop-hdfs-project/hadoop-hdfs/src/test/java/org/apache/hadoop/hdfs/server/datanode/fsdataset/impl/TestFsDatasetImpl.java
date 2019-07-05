@@ -362,7 +362,7 @@ public class TestFsDatasetImpl {
       ReplicaInfo info;
       List<Block> blockList = new ArrayList<Block>();
       for (int i = 1; i <= 63; i++) {
-        eb = new ExtendedBlock(BLOCKPOOL, i, 1, 1000 + i);
+        eb = new ExtendedBlock(BLOCKPOOL, i, 1, 1000 + i, Block.NON_EXISTING_BUCKET_ID);
         info = new FinalizedReplica(
             eb.getLocalBlock(), vol, vol.getCurrentDir().getParentFile());
         ds.volumeMap.add(BLOCKPOOL, info);
@@ -379,7 +379,7 @@ public class TestFsDatasetImpl {
       assertTrue(ds.isDeletingBlock(BLOCKPOOL, blockList.get(0).getBlockId()));
 
       blockList.clear();
-      eb = new ExtendedBlock(BLOCKPOOL, 64, 1, 1064);
+      eb = new ExtendedBlock(BLOCKPOOL, 64, 1, 1064, Block.NON_EXISTING_BUCKET_ID);
       info = new FinalizedReplica(
           eb.getLocalBlock(), vol, vol.getCurrentDir().getParentFile());
       ds.volumeMap.add(BLOCKPOOL, info);

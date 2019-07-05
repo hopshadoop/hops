@@ -38,9 +38,9 @@ public class ReplicaBeingWritten extends ReplicaInPipeline {
    * @param bytesToReserve disk space to reserve for this replica, based on
    *                       the estimated maximum block length.
    */
-  public ReplicaBeingWritten(long blockId, long genStamp, 
-        FsVolumeSpi vol, File dir, long bytesToReserve) {
-    super(blockId, genStamp, vol, dir, bytesToReserve);
+  public ReplicaBeingWritten(long blockId, long genStamp,
+        short cloudBucketID, FsVolumeSpi vol, File dir, long bytesToReserve) {
+    super(blockId, genStamp, cloudBucketID, vol, dir, bytesToReserve);
   }
   
   /**
@@ -72,8 +72,9 @@ public class ReplicaBeingWritten extends ReplicaInPipeline {
    *                       the estimated maximum block length.
    */
   public ReplicaBeingWritten(long blockId, long len, long genStamp,
-      FsVolumeSpi vol, File dir, Thread writer, long bytesToReserve) {
-    super(blockId, len, genStamp, vol, dir, writer, bytesToReserve);
+                             short cloudBucketID, FsVolumeSpi vol, File dir,
+                             Thread writer, long bytesToReserve) {
+    super(blockId, len, genStamp, cloudBucketID, vol, dir, writer, bytesToReserve);
   }
 
   /**

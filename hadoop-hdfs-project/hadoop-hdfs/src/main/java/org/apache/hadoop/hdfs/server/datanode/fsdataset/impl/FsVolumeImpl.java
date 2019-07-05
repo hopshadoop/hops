@@ -161,8 +161,8 @@ public class FsVolumeImpl implements FsVolumeSpi {
     }
     FsDatasetImpl.LOG.trace("Reference count: " + op + " " + this + ": " +
         this.reference.getReferenceCount());
-    FsDatasetImpl.LOG.trace(
-        Joiner.on("\n").join(Thread.currentThread().getStackTrace()));
+//    FsDatasetImpl.LOG.trace(
+//        Joiner.on("\n").join(Thread.currentThread().getStackTrace()));
   }
 
   /**
@@ -265,6 +265,10 @@ public class FsVolumeImpl implements FsVolumeSpi {
     return getBlockPoolSlice(bpid).getTmpDir();
   }
 
+  public File getCacheDir(String bpid) throws IOException{
+    return getBlockPoolSlice(bpid).getCacheDir();
+  }
+
   void decDfsUsed(String bpid, long value) {
     synchronized (dataset) {
       BlockPoolSlice bp = bpSlices.get(bpid);
@@ -341,7 +345,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
     return reserved;
   }
 
-  BlockPoolSlice getBlockPoolSlice(String bpid) throws IOException {
+  public BlockPoolSlice getBlockPoolSlice(String bpid) throws IOException {
     BlockPoolSlice bp = bpSlices.get(bpid);
     if (bp == null) {
       throw new IOException("block pool " + bpid + " is not found");

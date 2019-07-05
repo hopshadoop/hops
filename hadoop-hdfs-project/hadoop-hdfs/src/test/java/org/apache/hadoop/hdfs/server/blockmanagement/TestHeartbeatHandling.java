@@ -101,7 +101,7 @@ public class TestHeartbeatHandling {
       synchronized (hm) {
         for (int i = 0; i < MAX_REPLICATE_BLOCKS; i++) {
           dd.addBlockToBeReplicated(
-              new Block(i, 0, GenerationStamp.LAST_RESERVED_STAMP), ONE_TARGET);
+              new Block(i, 0, GenerationStamp.LAST_RESERVED_STAMP, Block.NON_EXISTING_BUCKET_ID), ONE_TARGET);
         }
         DatanodeCommand[] cmds =
             NameNodeAdapter.sendHeartBeat(nodeReg, dd, namesystem)
@@ -114,7 +114,7 @@ public class TestHeartbeatHandling {
         ArrayList<Block> blockList =
             new ArrayList<>(MAX_INVALIDATE_BLOCKS);
         for (int i = 0; i < MAX_INVALIDATE_BLOCKS; i++) {
-          blockList.add(new Block(i, 0, GenerationStamp.LAST_RESERVED_STAMP));
+          blockList.add(new Block(i, 0, GenerationStamp.LAST_RESERVED_STAMP, Block.NON_EXISTING_BUCKET_ID));
         }
         dd.addBlocksToBeInvalidated(blockList);
         cmds = NameNodeAdapter.sendHeartBeat(nodeReg, dd, namesystem)
@@ -292,7 +292,7 @@ public class TestHeartbeatHandling {
 
       @Override
       public Object performTask() throws IOException {
-        Block block = new Block(10, 0, GenerationStamp.LAST_RESERVED_STAMP);
+        Block block = new Block(10, 0, GenerationStamp.LAST_RESERVED_STAMP, Block.NON_EXISTING_BUCKET_ID);
         EntityManager.add(new BlockInfoContiguous(block,
             inodeIdentifier != null ? inodeIdentifier.getInodeId() : BlockInfoContiguous.NON_EXISTING_ID));
         BlockInfoContiguousUnderConstruction blockInfo = new BlockInfoContiguousUnderConstruction(

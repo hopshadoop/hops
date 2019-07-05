@@ -223,7 +223,7 @@ public class TestIncrementalBrVariations {
   }
 
   private static Block getDummyBlock() {
-    return new Block(0L, 100L, 1048576L);
+    return new Block(0L, 100L, 1048576L, Block.NON_EXISTING_BUCKET_ID);
   }
 
   private static StorageReceivedDeletedBlocks[] makeReportForReceivedBlock(

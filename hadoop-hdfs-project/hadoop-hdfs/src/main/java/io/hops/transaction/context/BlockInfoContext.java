@@ -71,7 +71,8 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfoContiguou
     updateInodeBlocks(blockInfo);
     if(isLogTraceEnabled()) {
       log("updated-blockinfo", "bid", blockInfo.getBlockId(), "inodeId",
-              blockInfo.getInodeId(), "blk index", blockInfo.getBlockIndex());
+              blockInfo.getInodeId(), "blk index", blockInfo.getBlockIndex(),
+              "cloudBucketID", blockInfo.getCloudBucketID());
     }
 
   }
@@ -270,9 +271,14 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfoContiguou
                 return input.getInodeId() == inodeId;
               }
             });
-    BlockInfoContiguous result = Collections.max(notRemovedBlks, BlockInfoContiguous.Order.ByBlockIndex);
-    hit(bFinder, result, "inodeId", inodeId);
-    return result;
+    if(notRemovedBlks.size()>0) {
+      BlockInfoContiguous result = Collections.max(notRemovedBlks, BlockInfoContiguous.Order.ByBlockIndex);
+      hit(bFinder, result, "inodeId", inodeId);
+      return result;
+    } else {
+      miss(bFinder, (BlockInfoContiguous) null, "inodeId", inodeId);
+      return null;
+    }
   }
 
 

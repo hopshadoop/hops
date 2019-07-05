@@ -27,6 +27,7 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
@@ -133,7 +134,7 @@ public class TestTransferRbw {
         //transfer RBW
         final ExtendedBlock b =
             new ExtendedBlock(bpid, oldrbw.getBlockId(), oldrbw.getBytesAcked(),
-                oldrbw.getGenerationStamp());
+                oldrbw.getGenerationStamp(), Block.NON_EXISTING_BUCKET_ID);
         final BlockOpResponseProto s = DFSTestUtil
             .transferRbw(b, DFSClientAdapter.getDFSClient(fs), oldnodeinfo,
                 newnodeinfo);

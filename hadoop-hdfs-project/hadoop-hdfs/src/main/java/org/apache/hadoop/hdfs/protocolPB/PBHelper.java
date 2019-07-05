@@ -344,12 +344,14 @@ public class PBHelper {
   // Block
   public static BlockProto convert(Block b) {
     return BlockProto.newBuilder().setBlockId(b.getBlockId())
-        .setGenStamp(b.getGenerationStamp()).setNumBytes(b.getNumBytes())
+        .setGenStamp(b.getGenerationStamp())
+        .setNumBytes(b.getNumBytes())
+        .setCloudBucketID(b.getCloudBucketID())
         .build();
   }
 
   public static Block convert(BlockProto b) {
-    return new Block(b.getBlockId(), b.getNumBytes(), b.getGenStamp());
+    return new Block(b.getBlockId(), b.getNumBytes(), b.getGenStamp(), (short) b.getCloudBucketID());
   }
 
   public static BlockWithLocationsProto convert(BlockWithLocations blk) {
@@ -456,7 +458,7 @@ public class PBHelper {
       return null;
     }
     return new ExtendedBlock(eb.getPoolId(), eb.getBlockId(), eb.getNumBytes(),
-        eb.getGenerationStamp());
+        eb.getGenerationStamp(), (short)eb.getCloudBucketID());
   }
 
   public static ExtendedBlockProto convert(final ExtendedBlock b) {
@@ -468,6 +470,7 @@ public class PBHelper {
         setBlockId(b.getBlockId()).
         setNumBytes(b.getNumBytes()).
         setGenerationStamp(b.getGenerationStamp()).
+        setCloudBucketID(b.getCloudBucketID()).
         build();
   }
 
@@ -669,6 +672,7 @@ public class PBHelper {
     if(b.isPhantomBlock() && b.isDataSet()){
       builder.setData(ByteString.copyFrom(b.getData()));
     }
+
     return builder.build();
   }
 
@@ -1372,7 +1376,6 @@ public class PBHelper {
         fs.hasChildrenNum() ? fs.getChildrenNum() : -1,
         fs.hasFileEncryptionInfo() ? convert(fs.getFileEncryptionInfo()) :
             null,
-        fs.hasIsFileStoredInDB() ? fs.getIsFileStoredInDB() : false,
         fs.hasStoragePolicy() ? (byte) fs.getStoragePolicy()
             : HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED);
   }
@@ -1402,7 +1405,6 @@ public class PBHelper {
         setFileId(fs.getFileId()).
         setChildrenNum(fs.getChildrenNum()).
         setPath(ByteString.copyFrom(fs.getLocalNameInBytes())).
-        setIsFileStoredInDB(fs.isFileStoredInDB()).
         setStoragePolicy(fs.getStoragePolicy());
     if (fs.isSymlink()) {
       builder.setSymlink(ByteString.copyFrom(fs.getSymlinkInBytes()));
@@ -1728,6 +1730,8 @@ public class PBHelper {
         return StorageTypeProto.ARCHIVE;
       case DB:
         return StorageTypeProto.DB;
+      case CLOUD:
+        return StorageTypeProto.CLOUD;
       default:
         Preconditions.checkState(
             false,
@@ -1749,6 +1753,8 @@ public class PBHelper {
         return StorageType.ARCHIVE;
       case DB:
         return StorageType.DB;
+      case CLOUD:
+        return StorageType.CLOUD;
       default:
         throw new IllegalStateException(
             "BUG: StorageTypeProto not found, type=" + type);

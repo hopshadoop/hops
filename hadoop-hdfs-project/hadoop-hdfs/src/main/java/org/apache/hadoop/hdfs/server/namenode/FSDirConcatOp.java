@@ -37,6 +37,7 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
@@ -163,6 +164,8 @@ class FSDirConcatOp {
     final INodeFile targetINode = targetIIP.getLastINode().asFile();
     final INodeDirectory targetParent = targetINode.getParent();
     // now check the srcs
+    int diskFiles = 0;
+    int cloudFiles = 0;
     for (String src : srcs) {
       final INodesInPath iip = fsd.getINodesInPath4Write(src);
       // permission check for srcs
@@ -184,6 +187,28 @@ class FSDirConcatOp {
         throw new HadoopIllegalArgumentException("concat: the src file " + src
             + " is the same with the target file " + targetIIP.getPath());
       }
+
+      // source file cannot be under construction or empty
+      if(srcINodeFile.getStoragePolicyID() == HdfsConstants.DB_STORAGE_POLICY_ID) {
+        throw new HadoopIllegalArgumentException("concat: source file " + src
+                + " is stored in DB.");
+      }
+
+      if(srcINodeFile.getStoragePolicyID() == HdfsConstants.CLOUD_STORAGE_POLICY_ID){
+        cloudFiles++;
+      } else {
+        diskFiles++;
+      }
+
+      if(cloudFiles > 1 && diskFiles > 1) {
+        throw new HadoopIllegalArgumentException("concat: some src files are stored on" +
+                " DN disks and some are stored in the cloud");
+      }
+
+
+      //for CLOUD storage policy all file should have same storage policy
+      //we can not mix different storage policies.
+
       // source file cannot be under construction or empty
       if(srcINodeFile.isUnderConstruction() || srcINodeFile.numBlocks() == 0) {
         throw new HadoopIllegalArgumentException("concat: source file " + src
@@ -285,6 +310,7 @@ class FSDirConcatOp {
     }
 
     trgInode.setModificationTime(timestamp);
+    trgInode.setHasBlocks(true);
     trgParent.updateModificationTime(timestamp);
     // update quota on the parent directory ('count' files removed, 0 space)
     fsd.unprotectedUpdateCount(targetIIP, targetIIP.length() - 1, deltas);

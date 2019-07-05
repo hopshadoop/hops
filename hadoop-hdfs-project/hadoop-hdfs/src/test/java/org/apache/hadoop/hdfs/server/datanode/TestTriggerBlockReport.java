@@ -95,7 +95,8 @@ public final class TestTriggerBlockReport {
         datanode.getAllBpOs().get(0);
     String storageUuid =
         datanode.getFSDataset().getVolumes().get(0).getStorageID();
-    ExtendedBlock rdbi = new ExtendedBlock(service.getBlockPoolId(), 5678, 512, 1000);
+    ExtendedBlock rdbi = new ExtendedBlock(service.getBlockPoolId(), 5678, 512,
+            1000, Block.NON_EXISTING_BUCKET_ID);
     service.notifyNamenodeDeletedBlock(rdbi, storageUuid);
 
     // Manually trigger a block report.

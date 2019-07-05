@@ -89,6 +89,7 @@ public class DataStorage extends Storage {
   public final static String STORAGE_DIR_RBW = "rbw";
   public final static String STORAGE_DIR_FINALIZED = "finalized";
   public final static String STORAGE_DIR_TMP = "tmp";
+  public final static String STORAGE_DIR_CACHE = "cache";
 
   /**
    * Set of bpids for which 'trash' is currently enabled.

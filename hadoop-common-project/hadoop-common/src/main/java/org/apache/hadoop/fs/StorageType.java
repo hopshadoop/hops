@@ -37,7 +37,8 @@ public enum StorageType {
   SSD(false),
   RAID5(false),
   ARCHIVE(false),
-  DB(false);
+  DB(false),
+  CLOUD(false);
 
   private final boolean isTransient;
 

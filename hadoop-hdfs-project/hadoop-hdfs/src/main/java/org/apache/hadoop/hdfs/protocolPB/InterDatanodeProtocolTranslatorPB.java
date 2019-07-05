@@ -97,7 +97,8 @@ public class InterDatanodeProtocolTranslatorPB
     
     BlockProto b = resp.getBlock();
     return new ReplicaRecoveryInfo(b.getBlockId(), b.getNumBytes(),
-        b.getGenStamp(), PBHelper.convert(resp.getState()));
+        b.getGenStamp(), (short)b.getCloudBucketID(),
+        PBHelper.convert(resp.getState()));
   }
 
   @Override

@@ -18,12 +18,18 @@
 package org.apache.hadoop.hdfs.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableFactories;
+import org.apache.hadoop.io.WritableFactory;
 
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.io.*;
@@ -37,6 +43,9 @@ import org.apache.hadoop.io.*;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class Block implements Writable, Comparable<Block> {
+
+  static final Log LOG = LogFactory.getLog(Block.class);
+
   public static final String BLOCK_FILE_PREFIX = "blk_";
   public static final String METADATA_EXTENSION = ".meta";
 
@@ -95,30 +104,34 @@ public class Block implements Writable, Comparable<Block> {
   }
 
   private static long NON_EXISTING_BLK_ID = Long.MIN_VALUE;
+  public static short NON_EXISTING_BUCKET_ID = -1;
   private long blockId;
   private long numBytes;
   private long generationStamp;
+  private short cloudBucketID = NON_EXISTING_BUCKET_ID;
 
   public Block() {
-    this(NON_EXISTING_BLK_ID, 0, 0);
+    this(NON_EXISTING_BLK_ID, 0, 0, NON_EXISTING_BUCKET_ID);
   }
 
-  public Block(final long blkid, final long len, final long generationStamp) {
-    setNoPersistance(blkid, len, generationStamp);
+  public Block(final long blkid, final long len, final long generationStamp,
+               final short cloudBucketID) {
+    setNoPersistance(blkid, len, generationStamp, cloudBucketID);
   }
 
   public Block(final long blkid) {
-    this(blkid, 0, HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP);
+    this(blkid, 0, HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP, NON_EXISTING_BUCKET_ID);
   }
 
   public Block(Block blk) {
-    this(blk.blockId, blk.numBytes, blk.generationStamp);
+    this(blk.blockId, blk.numBytes, blk.generationStamp, blk.cloudBucketID);
   }
 
-  public void setNoPersistance(long blkid, long len, long genStamp) {
+  public void setNoPersistance(long blkid, long len, long genStamp, short cloudBucketID) {
     this.blockId = blkid;
     this.numBytes = len;
     this.generationStamp = genStamp;
+    this.cloudBucketID = cloudBucketID;
   }
 
   /**
@@ -153,6 +166,19 @@ public class Block implements Writable, Comparable<Block> {
 
   public void setGenerationStampNoPersistance(long stamp) {
     generationStamp = stamp;
+  }
+
+  public short getCloudBucketID(){
+    return cloudBucketID;
+  }
+
+  public void setCloudBucketIDNoPersistance(final short cloudBucketID){
+    this.cloudBucketID = cloudBucketID;
+  }
+
+  public boolean isProvidedBlock(){
+    //this block is stored in a cloud bucket
+    return this.cloudBucketID != NON_EXISTING_BUCKET_ID;
   }
 
   /**
@@ -236,5 +262,13 @@ public class Block implements Writable, Comparable<Block> {
   public int hashCode() {
     //GenerationStamp is IRRELEVANT and should not be used here
     return (int) (blockId ^ (blockId >>> 32));
+  }
+
+  static Random rand = new Random(System.currentTimeMillis());
+  public static short getRandomCloudBucket(int maxBuckets){
+    if(maxBuckets > Short.MAX_VALUE){
+      LOG.error("Number of buckets can not be greater than "+ Short.MAX_VALUE);
+    }
+    return (short)rand.nextInt(maxBuckets);
   }
 }

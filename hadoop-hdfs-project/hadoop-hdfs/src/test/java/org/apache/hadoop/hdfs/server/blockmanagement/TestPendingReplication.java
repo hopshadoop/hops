@@ -81,7 +81,7 @@ public class TestPendingReplication {
     //
     DatanodeStorageInfo[] storages = DFSTestUtil.createDatanodeStorageInfos(10);
     for (int i = 0; i < 10; i++) {
-      BlockInfoContiguous block = newBlockInfo(new Block(i, i, 0), i);
+      BlockInfoContiguous block = newBlockInfo(new Block(i, i, 0, Block.NON_EXISTING_BUCKET_ID), i);
       DatanodeStorageInfo[] targets = new DatanodeStorageInfo[i];
       System.arraycopy(storages, 0, targets, 0, i);
       increment(pendingReplications, block, DatanodeStorageInfo.toDatanodeDescriptors(targets));
@@ -94,7 +94,7 @@ public class TestPendingReplication {
     //
     // remove one item and reinsert it
     //
-    BlockInfoContiguous blk = newBlockInfo(new Block(8, 8, 0), 8);
+    BlockInfoContiguous blk = newBlockInfo(new Block(8, 8, 0, Block.NON_EXISTING_BUCKET_ID), 8);
     decrement(pendingReplications, blk, storages[7].getDatanodeDescriptor());             // removes one replica
     assertEquals("pendingReplications.getNumReplicas ", 7,
         getNumReplicas(pendingReplications, blk));
@@ -112,7 +112,7 @@ public class TestPendingReplication {
     // are sane.
     //
     for (int i = 0; i < 10; i++) {
-      BlockInfoContiguous block = newBlockInfo(new Block(i, i, 0), i);
+      BlockInfoContiguous block = newBlockInfo(new Block(i, i, 0, Block.NON_EXISTING_BUCKET_ID), i);
       int numReplicas = getNumReplicas(pendingReplications, block);
       assertTrue(numReplicas == i);
     }
@@ -131,7 +131,7 @@ public class TestPendingReplication {
     }
 
     for (int i = 10; i < 15; i++) {
-      BlockInfoContiguous block = newBlockInfo(new Block(i, i, 0), i);
+      BlockInfoContiguous block = newBlockInfo(new Block(i, i, 0, Block.NON_EXISTING_BUCKET_ID), i);
       increment(pendingReplications, block, DatanodeStorageInfo.toDatanodeDescriptors(
               DFSTestUtil.createDatanodeStorageInfos(i)));
     }

@@ -122,7 +122,6 @@ class JsonUtilClient {
     final long mTime = ((Number) m.get("modificationTime")).longValue();
     final long blockSize = ((Number) m.get("blockSize")).longValue();
     final short replication = ((Number) m.get("replication")).shortValue();
-    final boolean isFileStoredInDB = m.containsKey("isFileStoredInDB")? ((Boolean) m.get("isFileStoredInDB") ): false;
     final long fileId = m.containsKey("fileId") ?
         ((Number) m.get("fileId")).longValue() : HdfsConstantsClient.GRANDFATHER_INODE_ID;
     final int childrenNum = getInt(m, "childrenNum", -1);
@@ -130,10 +129,10 @@ class JsonUtilClient {
         (byte) ((Number) m.get("storagePolicy")).longValue() :
         HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
     return new HdfsFileStatus(len, type == WebHdfsConstants.PathType.DIRECTORY, replication,
-        blockSize, mTime, aTime, permission, owner, group,
-        symlink, DFSUtilClient.string2Bytes(localName),
-        fileId, childrenNum, null, isFileStoredInDB,
-        storagePolicy);
+            blockSize, mTime, aTime, permission, owner, group,
+            symlink, DFSUtilClient.string2Bytes(localName),
+            fileId, childrenNum, null,
+            storagePolicy);
   }
 
   /** Convert a Json map to an ExtendedBlock object. */
@@ -147,7 +146,9 @@ class JsonUtilClient {
     final long numBytes = ((Number) m.get("numBytes")).longValue();
     final long generationStamp =
         ((Number) m.get("generationStamp")).longValue();
-    return new ExtendedBlock(blockPoolId, blockId, numBytes, generationStamp);
+    final short cloudBucketID = ((Number) m.get("cloudBucketID")).shortValue();
+    return new ExtendedBlock(blockPoolId, blockId,
+            numBytes, generationStamp, cloudBucketID);
   }
 
   static int getInt(Map<?, ?> m, String key, final int defaultValue) {

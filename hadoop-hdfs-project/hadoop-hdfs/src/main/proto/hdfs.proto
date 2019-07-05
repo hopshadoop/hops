@@ -38,6 +38,7 @@ message ExtendedBlockProto {
   required uint64 blockId = 2; // the local id within a pool
   required uint64 generationStamp = 3;
   optional uint64 numBytes = 4 [default = 0]; // len does not belong in ebid
+  optional int32 cloudBucketID = 5 [ default = -1 ];
   // here for historical reasons
 }
 
@@ -174,6 +175,7 @@ enum StorageTypeProto {
   ARCHIVE = 4;
   RAM_DISK = 5;
   DB = 6;
+  CLOUD = 7;
 }
 
 ///**
@@ -461,6 +463,7 @@ message BlockProto {
   required uint64 blockId = 1;
   required uint64 genStamp = 2;
   optional uint64 numBytes = 3 [default = 0];
+  optional int32 cloudBucketID = 4 [ default = -1 ];
 }
 
 /**

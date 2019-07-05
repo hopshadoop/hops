@@ -32,8 +32,8 @@ public class ReplicaRecoveryInfo extends Block {
   private ReplicaState originalState;
 
   public ReplicaRecoveryInfo(long blockId, long diskLen, long gs,
-      ReplicaState rState) {
-    setNoPersistance(blockId, diskLen, gs);
+                             short cloudBucketID, ReplicaState rState) {
+    setNoPersistance(blockId, diskLen, gs, cloudBucketID);
     originalState = rState;
   }
 

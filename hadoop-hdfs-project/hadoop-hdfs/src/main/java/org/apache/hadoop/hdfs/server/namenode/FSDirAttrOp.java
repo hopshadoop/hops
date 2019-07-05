@@ -277,7 +277,8 @@ public class FSDirAttrOp {
         INode targetNode = iip.getLastINode();
         // [s] for the files stored in the database setting the replication level does not make
         // any sense. For now we will just set the replication level as requested by the user
-        if (isFile && !((INodeFile) targetNode).isFileStoredInDB()) {
+        if (isFile && (!((INodeFile) targetNode).isFileStoredInDB() &&
+                targetNode.getStoragePolicyID() != HdfsConstants.CLOUD_STORAGE_POLICY_ID)) {
           bm.setReplication(blockRepls[0], blockRepls[1], src, blocks);
         }
         return isFile;

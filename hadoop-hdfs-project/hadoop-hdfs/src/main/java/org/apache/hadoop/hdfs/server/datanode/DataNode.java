@@ -75,15 +75,7 @@ import org.apache.hadoop.hdfs.HDFSPolicyProvider;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
-import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
-import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.protocol.HdfsBlocksMetadata;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
+import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.datatransfer.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
@@ -117,6 +109,7 @@ import org.apache.hadoop.hdfs.server.datanode.SecureDataNodeStarter.SecureResour
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics;
+import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.server.datanode.web.DatanodeHttpServer;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
@@ -194,7 +187,6 @@ import javax.management.ObjectName;
 
 import org.apache.hadoop.hdfs.net.DomainPeerServer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
-import org.apache.hadoop.hdfs.protocol.DatanodeLocalInfo;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactory;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferServer;
@@ -205,6 +197,8 @@ import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.tracing.TraceUtils;
 import org.apache.hadoop.tracing.TracerConfigurationManager;
+
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.htrace.core.Tracer;
@@ -2952,6 +2946,7 @@ public class DataNode extends ReconfigurableBase
     boolean isTruncateRecovery = rBlock.getNewBlock() != null;
     long blockId = (isTruncateRecovery) ?
         rBlock.getNewBlock().getBlockId() : block.getBlockId();
+    short cloudBucketID = block.getCloudBucketID();
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("block=" + block + ", (length=" + block.getNumBytes() +
@@ -2962,7 +2957,7 @@ public class DataNode extends ReconfigurableBase
     // or their replicas have 0 length.
     // The block can be deleted.
     if (syncList.isEmpty()) {
-      nn.commitBlockSynchronization(block, recoveryId, 0, true, true,
+      commitBlockSyncWithRetry(nn, block, recoveryId, 0, true, true,
           DatanodeID.EMPTY_ARRAY, null);
       return;
     }
@@ -2989,7 +2984,7 @@ public class DataNode extends ReconfigurableBase
     // and the new block size
     List<BlockRecord> participatingList = new ArrayList<>();
     final ExtendedBlock newBlock = new ExtendedBlock(bpid, blockId,
-        -1, recoveryId);
+        -1, recoveryId, cloudBucketID );
     switch (bestState) {
       case FINALIZED:
         assert finalizedLength > 0 : "finalizedLength is not positive";
@@ -3056,10 +3051,66 @@ public class DataNode extends ReconfigurableBase
       datanodes[i] = r.id;
       storages[i] = r.storageID;
     }
-    nn.commitBlockSynchronization(block, newBlock.getGenerationStamp(),
+    commitBlockSyncWithRetry(nn, block, newBlock.getGenerationStamp(),
         newBlock.getNumBytes(), true, false, datanodes, storages);
   }
-  
+
+  protected void commitBlockSyncWithRetry(DatanodeProtocolClientSideTranslatorPB nn,
+          ExtendedBlock block, long newgenerationstamp, long newlength, boolean closeFile,
+      boolean deleteblock, DatanodeID[] newtargets, String[] newtargetstorages)
+          throws IOException {
+
+    int retries = conf.getInt(
+            DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY,
+            DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_DEFAULT);
+
+    long sleeptime = conf.getInt(
+            DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY,
+            DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_DEFAULT);
+
+      long localstart = Time.monotonicNow();
+      while (true) {
+        try {
+          nn.commitBlockSynchronization(block, newgenerationstamp,
+                  newlength, closeFile, deleteblock, newtargets, newtargetstorages);
+          return;
+        } catch (RemoteException e) {
+          IOException ue =
+                  e.unwrapRemoteException(FileNotFoundException.class,
+                          AccessControlException.class,
+                          NSQuotaExceededException.class,
+                          DSQuotaExceededException.class,
+                          UnresolvedPathException.class);
+          if (ue != e) {
+            throw ue; // no need to retry these exceptions
+          }
+
+          if (NotReplicatedYetException.class.getName().
+                  equals(e.getClassName())) {
+            if (retries == 0) {
+              throw e;
+            } else {
+              --retries;
+              LOG.info("Exception while syncing a block", e);
+              long elapsed = Time.monotonicNow() - localstart;
+              if (elapsed > 5000) {
+                LOG.info("Waiting for block sycn for " + (elapsed / 1000) + " seconds");
+              }
+              try {
+                LOG.warn("NotReplicatedYetException sleeping " + block + " retries left " + retries);
+                Thread.sleep(sleeptime);
+                sleeptime *= 2;
+              } catch (InterruptedException ie) {
+                LOG.warn("Caught exception ", ie);
+              }
+            }
+          } else {
+            throw e;
+          }
+        }
+      }
+  }
+
   private static void logRecoverBlock(String who, RecoveringBlock rb) {
     ExtendedBlock block = rb.getBlock();
     DatanodeInfo[] targets = rb.getLocations();

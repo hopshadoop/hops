@@ -1023,7 +1023,7 @@ public class NNThroughputBenchmark implements Tool {
     void formBlockReport() {
       // fill remaining slots with blocks that do not exist
       for (int idx = blocks.size()-1; idx >= nrBlocks; idx--) {
-        Block block = new Block(blocks.size() - idx, 0, 0);
+        Block block = new Block(blocks.size() - idx, 0, 0, Block.NON_EXISTING_BUCKET_ID);
         blocks.set(idx, new BlockReportReplica(block));
       }
       blockReportList = BlockReport.builder(NUM_BUCKETS).build();

@@ -141,7 +141,7 @@ public class TestBlockInfoUnderConstruction {
 
       @Override
       public Object performTask() throws IOException {
-        Block block = new Block(10, 0, GenerationStamp.LAST_RESERVED_STAMP);
+        Block block = new Block(10, 0, GenerationStamp.LAST_RESERVED_STAMP, Block.NON_EXISTING_BUCKET_ID);
         EntityManager.add(new BlockInfoContiguous(block,
             inodeIdentifier != null ? inodeIdentifier.getInodeId() : BlockInfoContiguous.NON_EXISTING_ID));
         BlockInfoContiguousUnderConstruction blockInfo = new BlockInfoContiguousUnderConstruction(

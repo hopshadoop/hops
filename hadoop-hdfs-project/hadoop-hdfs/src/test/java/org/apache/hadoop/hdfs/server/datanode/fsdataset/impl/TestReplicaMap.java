@@ -32,7 +32,7 @@ import static org.junit.Assert.fail;
 public class TestReplicaMap {
   private final ReplicaMap map = new ReplicaMap(TestReplicaMap.class);
   private final String bpid = "BP-TEST";
-  private final Block block = new Block(1234, 1234, 1234);
+  private final Block block = new Block(1234, 1234, 1234, Block.NON_EXISTING_BUCKET_ID);
   
   @Before
   public void setup() {

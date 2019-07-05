@@ -21,6 +21,7 @@ package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
 import java.io.File;
 import java.io.FileDescriptor;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -33,8 +34,11 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.CloudProvider;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.server.datanode.DatanodeUtil;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.CloudPersistenceProvider;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeReference;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.io.IOUtils;
@@ -221,7 +225,14 @@ class FsDatasetAsyncDiskService {
         volumeRef, blockFile, metaFile, block, trashDirectory);
     execute(((FsVolumeImpl) volumeRef.getVolume()).getCurrentDir(), deletionTask);
   }
-  
+
+  void deleteAsyncProvidedBlock(ExtendedBlock block, CloudPersistenceProvider cloud,
+                                File blockFile, File metaFile, File volumeDir) {
+    FsDatasetAsyncDiskService.CloudReplicaObjectDeleteTask deletionTask =
+            new FsDatasetAsyncDiskService.CloudReplicaObjectDeleteTask(
+                    block, cloud, blockFile, metaFile);
+    execute(volumeDir, deletionTask);
+  }
   /**
    * A task for deleting a block file and its associated meta file, as well
    * as decrement the dfs usage of the volume.
@@ -319,6 +330,63 @@ class FsDatasetAsyncDiskService {
         bs.clear();
       }
       numDeletedBlocks = 0;
+    }
+  }
+
+  public class CloudReplicaObjectDeleteTask implements Runnable {
+    final ExtendedBlock block;
+    final CloudPersistenceProvider cloud;
+    final File localBlockFile;
+    final File localMetaFile;
+
+    public CloudReplicaObjectDeleteTask(ExtendedBlock block, CloudPersistenceProvider cloud,
+                                        final File localBlockFile, final File localMetaFile ) {
+      this.block = block;
+      this.cloud = cloud;
+      this.localBlockFile = localBlockFile;
+      this.localMetaFile = localMetaFile;
+    }
+
+    @Override
+    public String toString() {
+      // Called in AsyncDiskService.execute for displaying error messages.
+      return "HopsFS-Cloud. deletion of block " + block.getBlockPoolId() + " BlockID: " +
+              block.getBlockId() + " GenStamp: " + block.getGenerationStamp() +
+              " CloudBucketID " + block.getCloudBucketID();
+    }
+
+    @Override
+    public void run() {
+      LOG.info("HopsFS-Cloud. Deleting block from cloud. " + block);
+      short bucketID = block.getCloudBucketID();
+      String blockKey = CloudFsDatasetImpl.getBlockKey(block.getLocalBlock());
+      String metaFileKey = CloudFsDatasetImpl.getMetaFileKey(block.getLocalBlock());
+
+
+      try {
+        cloud.deleteObject(bucketID, blockKey);
+        if (localBlockFile.delete()) {
+          LOG.info("HopsFS-Cloud. Deleted cached block "+blockKey);
+          ((CloudFsDatasetImpl) fsdatasetImpl).providedBlocksCacheDelete(block.getBlockPoolId(),
+                  localBlockFile);
+        } else {
+          LOG.info("HopsFS-Cloud. No local cached copy found for block:"
+                  +blockKey);
+        }
+
+        cloud.deleteObject(bucketID, metaFileKey);
+        //delete these blocks from local cache
+        if (localMetaFile.delete()) {
+          LOG.info("HopsFS-Cloud. Deleted cached block meta file: "+metaFileKey);
+          ((CloudFsDatasetImpl) fsdatasetImpl).providedBlocksCacheDelete(block.getBlockPoolId(),
+                  localMetaFile);
+        } else {
+          LOG.info("HopsFS-Cloud. No local cached copy found for Meta file:"
+                  +metaFileKey);
+        }
+      } catch (IOException e) {
+        LOG.warn("HopsFS-Cloud. Unable to delete block "+block, e);
+      }
     }
   }
 }

@@ -169,7 +169,7 @@ public class TestPBHelper {
 
   @Test
   public void testConvertBlock() {
-    Block b = new Block(1, 100, 3);
+    Block b = new Block(1, 100, 3, Block.NON_EXISTING_BUCKET_ID);
     BlockProto bProto = PBHelper.convert(b);
     Block b2 = PBHelper.convert(bProto);
     assertEquals(b, b2);
@@ -180,7 +180,7 @@ public class TestPBHelper {
     final String[] storageIDs = {"s1", "s2", "s3"};
     final StorageType[] storageTypes = {
         StorageType.DISK, StorageType.DISK, StorageType.DISK};
-    return new BlockWithLocations(new Block(bid, 0, 1),
+    return new BlockWithLocations(new Block(bid, 0, 1, Block.NON_EXISTING_BUCKET_ID),
         datanodeUuids, storageIDs, storageTypes);
   }
 
@@ -258,7 +258,7 @@ public class TestPBHelper {
   }
 
   public ExtendedBlock getExtendedBlock(long blkid) {
-    return new ExtendedBlock("bpid", blkid, 100, 2);
+    return new ExtendedBlock("bpid", blkid, 100, 2, Block.NON_EXISTING_BUCKET_ID);
   }
 
   private void compare(DatanodeInfo dn1, DatanodeInfo dn2) {
@@ -410,7 +410,7 @@ public class TestPBHelper {
         StorageType.DISK
     };
     LocatedBlock lb = new LocatedBlock(
-        new ExtendedBlock("bp12", 12345, 10, 53),
+        new ExtendedBlock("bp12", 12345, 10, 53, Block.NON_EXISTING_BUCKET_ID),
         dnInfos, storageIDs, media, 5, false, new DatanodeInfo[]{});
 
     lb.setBlockToken(new Token<BlockTokenIdentifier>(
@@ -429,7 +429,7 @@ public class TestPBHelper {
             AdminStates.NORMAL)
     };
     LocatedBlock lb = new LocatedBlock(
-        new ExtendedBlock("bp12", 12345, 10, 53), dnInfos);
+        new ExtendedBlock("bp12", 12345, 10, 53, Block.NON_EXISTING_BUCKET_ID), dnInfos);
     lb.setBlockToken(new Token<BlockTokenIdentifier>(
         "identifier".getBytes(), "password".getBytes(), new Text("kind"),
         new Text("service")));

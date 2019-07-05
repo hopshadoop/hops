@@ -292,7 +292,9 @@ class DataStreamer extends Daemon {
   // datanodes. This will slow down the file creations and put unnecessary stress
   // on the NameNodes.
   private boolean syncOrFlushCalled = false;
-    
+
+  private static BlockStoragePolicySuite policySuite = BlockStoragePolicySuite.createDefaultSuite();
+
   private DataStreamer(HdfsFileStatus stat, DFSClient dfsClient, String src,
                        Progressable progress, DataChecksum checksum,
                        AtomicReference<CachingStrategy> cachingStrategy,
@@ -316,7 +318,8 @@ class DataStreamer extends Daemon {
     if(this.forceClientToWriteSFToDisk) {
       isThisFileStoredInDB = false;
     }else{
-      isThisFileStoredInDB = stat.isFileStoredInDB();
+      isThisFileStoredInDB =
+              policySuite.getPolicy(stat.getStoragePolicy()).getStorageTypes()[0] == StorageType.DB;
     }
   }
 
@@ -1393,7 +1396,8 @@ class DataStreamer extends Daemon {
     if (success) {
       // update pipeline at the namenode
       ExtendedBlock newBlock = new ExtendedBlock(
-          block.getBlockPoolId(), block.getBlockId(), block.getNumBytes(), newGS);
+          block.getBlockPoolId(), block.getBlockId(), block.getNumBytes(),
+          newGS, block.getCloudBucketID());
       dfsClient.namenode.updatePipeline(dfsClient.clientName, block, newBlock,
           nodes, storageIDs);
       // update client side generation stamp
@@ -1776,6 +1780,15 @@ class DataStreamer extends Daemon {
    */
   ExtendedBlock getBlock() {
     return block;
+  }
+
+  /**
+   * get the file status
+   *
+   * @return file status 
+   */
+  HdfsFileStatus getStat() {
+    return stat;
   }
 
   /**

@@ -291,13 +291,14 @@ public class TestGetBlocks {
     long[] blkids = new long[10];
     for (int i = 0; i < blkids.length; i++) {
       blkids[i] = 1000L + RAN.nextInt(100000);
-      map.put(new Block(blkids[i], 0, blkids[i]), blkids[i]);
+      map.put(new Block(blkids[i], 0, blkids[i], Block.NON_EXISTING_BUCKET_ID), blkids[i]);
     }
     System.out.println("map=" + map.toString().replace(",", "\n  "));
 
     for (int i = 0; i < blkids.length; i++) {
       Block b = new Block(blkids[i], 0,
-          HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP);
+          HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP, Block.NON_EXISTING_BUCKET_ID);
+
       Long v = map.get(b);
       System.out.println(b + " => " + v);
       assertEquals(v.longValue(), blkids[i]);

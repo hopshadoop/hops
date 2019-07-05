@@ -24,6 +24,7 @@ import java.io.Writer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DU;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
@@ -64,7 +65,7 @@ import org.apache.hadoop.util.Time;
  * <p/>
  * This class is synchronized by {@link FsVolumeImpl}.
  */
-class BlockPoolSlice {
+public class BlockPoolSlice {
   static final Log LOG = LogFactory.getLog(BlockPoolSlice.class);
   
   private final String bpid;
@@ -75,6 +76,7 @@ class BlockPoolSlice {
   private final File finalizedDir;
   private final File rbwDir; // directory store RBW replica
   private final File tmpDir; // directory store Temporary replica
+  private final File cacheDir; // directory store Temporary replica
   private static String DU_CACHE_FILE = "dfsUsed";
   private volatile boolean dfsUsedSaved = false;
   private static final int SHUTDOWN_HOOK_PRIORITY = 30;
@@ -84,6 +86,7 @@ class BlockPoolSlice {
   // TODO:FEDERATION scalability issue - a thread per DU is needed
   private final DU dfsUsage;
 
+  private ProvidedBlocksCacheCleaner providedBlocksCache = null;
   /**
    * Create a blook pool slice
    *
@@ -118,6 +121,7 @@ class BlockPoolSlice {
     if (tmpDir.exists()) {
       FileUtil.fullyDelete(tmpDir);
     }
+
     this.rbwDir = new File(currentDir, DataStorage.STORAGE_DIR_RBW);
     final boolean supportAppends =
         conf.getBoolean(DFSConfigKeys.DFS_SUPPORT_APPEND_KEY,
@@ -135,6 +139,15 @@ class BlockPoolSlice {
         throw new IOException("Mkdirs failed to create " + tmpDir.toString());
       }
     }
+
+    // Setting up cache Dir
+    this.cacheDir = new File(bpDir, DataStorage.STORAGE_DIR_CACHE);
+    if (!cacheDir.mkdirs()) {
+      if (!cacheDir.isDirectory()) {
+        throw new IOException("Mkdirs failed to create " + cacheDir.toString());
+      }
+    }
+
     // Use cached value initially if available. Or the following call will
     // block until the initial du command completes.
     this.dfsUsage = new DU(bpDir, conf, loadDfsUsed());
@@ -150,6 +163,27 @@ class BlockPoolSlice {
           }
         }
       }, SHUTDOWN_HOOK_PRIORITY);
+
+    //Start the cache monitor for CLOUD storages
+    if (volume.getStorageType() == StorageType.CLOUD) {
+      int threshold =
+              conf.getInt(DFSConfigKeys.DFS_DN_CLOUD_CACHE_DELETE_ACTIVATION_PRECENTAGE_KEY,
+                      DFSConfigKeys.DFS_DN_CLOUD_CACHE_DELETE_ACTIVATION_PRECENTAGE_DEFAULT);
+      long interval =
+              conf.getLong(DFSConfigKeys.DFS_DN_CLOUD_CACHE_CHECK_INTERVAL_KEY,
+                      DFSConfigKeys.DFS_DN_CLOUD_CACHE_CHECK_INTERVAL_DEFAULT);
+      int deleteBatchSize =
+              conf.getInt(DFSConfigKeys.DFS_DN_CLOUD_CACHE_DELETE_BATCH_SIZE_KEY,
+                      DFSConfigKeys.DFS_DN_CLOUD_CACHE_DELETE_BATCH_SIZE_DEFAULT);
+      int waitBeforeDelete =
+      conf.getInt(DFSConfigKeys.DFS_DN_CLOUD_CACHE_DELETE_WAIT_KEY,
+              DFSConfigKeys.DFS_DN_CLOUD_CACHE_DELETE_WAIT_DEFAULT);
+      providedBlocksCache = new ProvidedBlocksCacheCleaner(getCacheDir(), interval,
+              threshold, deleteBatchSize, waitBeforeDelete);
+      providedBlocksCache.start();
+    } else {
+      providedBlocksCache = null;
+    }
   }
 
   File getDirectory() {
@@ -166,6 +200,10 @@ class BlockPoolSlice {
 
   File getTmpDir() {
     return tmpDir;
+  }
+
+  File getCacheDir() {
+    return cacheDir;
   }
 
   /** Run DU on local drives.  It must be synchronized from caller. */
@@ -322,10 +360,11 @@ class BlockPoolSlice {
     ReplicaInfo newReplica = null;
     long blockId = block.getBlockId();
     long genStamp = block.getGenerationStamp();
+    short cloudBucketID = block.getCloudBucketID();
     if (isFinalized) {
       newReplica = new FinalizedReplica(blockId, 
-          block.getNumBytes(), genStamp, volume, DatanodeUtil
-          .idToBlockDir(finalizedDir, blockId));
+          block.getNumBytes(), genStamp, block.getCloudBucketID(), volume,
+          DatanodeUtil.idToBlockDir(finalizedDir, blockId));
     } else {
       File file = new File(rbwDir, block.getBlockName());
       boolean loadRwr = true;
@@ -341,7 +380,7 @@ class BlockPoolSlice {
           // and don't reserve any more space for writes.
           newReplica = new ReplicaBeingWritten(blockId,
               validateIntegrityAndSetLength(file, genStamp), 
-              genStamp, volume, file.getParentFile(), null, 0);
+              genStamp, cloudBucketID, volume, file.getParentFile(), null, 0);
           loadRwr = false;
         }
         sc.close();
@@ -360,7 +399,7 @@ class BlockPoolSlice {
       if (loadRwr) {
         newReplica = new ReplicaWaitingToBeRecovered(blockId,
             validateIntegrityAndSetLength(file, genStamp),
-            genStamp, volume, file.getParentFile());
+            genStamp, cloudBucketID, volume, file.getParentFile());
       }
     }
 
@@ -373,7 +412,6 @@ class BlockPoolSlice {
     }
   }
   
-
   /**
    * Add replicas under the given directory to the volume map
    *
@@ -407,7 +445,7 @@ class BlockPoolSlice {
       long genStamp = FsDatasetUtil.getGenerationStampFromFile(
           files, file);
       long blockId = Block.filename2id(file.getName());
-      Block block = new Block(blockId, file.length(), genStamp); 
+      Block block = new Block(blockId, file.length(), genStamp, Block.NON_EXISTING_BUCKET_ID );
       addReplicaToReplicasMap(block, volumeMap, 
           isFinalized);
     }
@@ -508,6 +546,9 @@ class BlockPoolSlice {
     saveDfsUsed();
     dfsUsedSaved = true;
     dfsUsage.shutdown();
+    if (providedBlocksCache != null) {
+      providedBlocksCache.shutdown();
+    }
   }
 
   private boolean readReplicasFromCache(ReplicaMap volumeMap) {
@@ -619,4 +660,21 @@ class BlockPoolSlice {
       }
     }
   }
+
+  public void fileAccessed(File f){
+    if(providedBlocksCache != null) {
+      providedBlocksCache.fileAccessed(f.getAbsolutePath());
+    }
+  }
+
+  public void fileDeleted(File f){
+    if(providedBlocksCache != null) {
+      providedBlocksCache.fileDeleted(f.getAbsolutePath());
+    }
+  }
+
+  public ProvidedBlocksCacheCleaner getProvidedBlocksCacheCleaner(){
+    return providedBlocksCache;
+  }
+
 }

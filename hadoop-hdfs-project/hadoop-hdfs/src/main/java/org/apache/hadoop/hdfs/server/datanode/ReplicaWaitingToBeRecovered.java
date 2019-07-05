@@ -50,8 +50,8 @@ public class ReplicaWaitingToBeRecovered extends ReplicaInfo {
    *     directory path where block and meta files are located
    */
   public ReplicaWaitingToBeRecovered(long blockId, long len, long genStamp,
-      FsVolumeSpi vol, File dir) {
-    super(blockId, len, genStamp, vol, dir);
+      short cloudBucketID, FsVolumeSpi vol, File dir) {
+    super(blockId, len, genStamp, cloudBucketID, vol, dir);
   }
   
   /**

@@ -73,6 +73,7 @@ public class TestBlockStoragePolicy {
   static final byte ONESSD  = HdfsConstants.ONESSD_STORAGE_POLICY_ID;
   static final byte ALLSSD  = HdfsConstants.ALLSSD_STORAGE_POLICY_ID;
   static final byte DB  = HdfsConstants.DB_STORAGE_POLICY_ID;
+  static final byte CLOUD  = HdfsConstants.CLOUD_STORAGE_POLICY_ID;
 
   @Test (timeout=300000)
   public void testConfigKeyEnabled() throws IOException {
@@ -131,6 +132,9 @@ public class TestBlockStoragePolicy {
     expectedPolicyStrings.put(DB, "BlockStoragePolicy{DB:" + DB +
             ", storageTypes=[DB], creationFallbacks=[SSD, DISK], " +
             "replicationFallbacks=[SSD, DISK]}");
+    expectedPolicyStrings.put(CLOUD, "BlockStoragePolicy{CLOUD:" + CLOUD +
+            ", storageTypes=[CLOUD], creationFallbacks=[CLOUD], " +
+            "replicationFallbacks=[CLOUD]}");
 
     for(byte i = 1; i < 16; i++) {
       final BlockStoragePolicy policy = POLICY_SUITE.getPolicy(i); 
@@ -1081,19 +1085,21 @@ public class TestBlockStoragePolicy {
     final DistributedFileSystem fs = cluster.getFileSystem();
     try {
       BlockStoragePolicy[] policies = fs.getStoragePolicies();
-      Assert.assertEquals(6, policies.length);
+      Assert.assertEquals(7, policies.length);
       Assert.assertEquals(POLICY_SUITE.getPolicy(COLD).toString(),
           policies[0].toString());
+      Assert.assertEquals(POLICY_SUITE.getPolicy(CLOUD).toString(),
+              policies[1].toString());
       Assert.assertEquals(POLICY_SUITE.getPolicy(WARM).toString(),
-          policies[1].toString());
-      Assert.assertEquals(POLICY_SUITE.getPolicy(HOT).toString(),
           policies[2].toString());
-      Assert.assertEquals(POLICY_SUITE.getPolicy(ONESSD).toString(),
+      Assert.assertEquals(POLICY_SUITE.getPolicy(HOT).toString(),
           policies[3].toString());
-      Assert.assertEquals(POLICY_SUITE.getPolicy(ALLSSD).toString(),
+      Assert.assertEquals(POLICY_SUITE.getPolicy(ONESSD).toString(),
           policies[4].toString());
+      Assert.assertEquals(POLICY_SUITE.getPolicy(ALLSSD).toString(),
+          policies[5].toString());
       Assert.assertEquals(POLICY_SUITE.getPolicy(DB).toString(),
-              policies[5].toString());
+              policies[6].toString());
     } finally {
       IOUtils.cleanup(null, fs);
       cluster.shutdown();

@@ -30,7 +30,7 @@ public class ExtendedBlock {
   private Block block;
 
   public ExtendedBlock() {
-    this(null, 0, 0, 0);
+    this(null, 0, 0, 0, Block.NON_EXISTING_BUCKET_ID);
   }
 
   public ExtendedBlock(final ExtendedBlock b) {
@@ -38,7 +38,7 @@ public class ExtendedBlock {
   }
 
   public ExtendedBlock(final String poolId, final long blockId) {
-    this(poolId, blockId, 0, 0);
+    this(poolId, blockId, 0, 0, Block.NON_EXISTING_BUCKET_ID);
   }
 
   public ExtendedBlock(String poolId, Block b) {
@@ -47,9 +47,9 @@ public class ExtendedBlock {
   }
 
   public ExtendedBlock(final String poolId, final long blkid, final long len,
-      final long genstamp) {
+      final long genstamp, short cloudBlockID) {
     this.poolId = poolId;
-    block = new Block(blkid, len, genstamp);
+    block = new Block(blkid, len, genstamp, cloudBlockID);
   }
 
   public String getBlockPoolId() {
@@ -98,6 +98,18 @@ public class ExtendedBlock {
 
   public Block getLocalBlock() {
     return block;
+  }
+
+  public short getCloudBucketID(){
+    return block.getCloudBucketID();
+  }
+
+  public void setCloudBucketID(short cloudBucketID){
+    block.setCloudBucketIDNoPersistance(cloudBucketID);
+  }
+
+  public boolean isProvidedBlock() {
+    return block.isProvidedBlock();
   }
 
   @Override // Object

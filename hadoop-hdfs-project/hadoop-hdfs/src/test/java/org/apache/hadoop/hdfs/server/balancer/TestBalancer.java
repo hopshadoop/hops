@@ -149,7 +149,7 @@ public class TestBalancer {
       for(int i=0; i<numOfBlocks; i++) {
         ExtendedBlock b = locatedBlocks.get(i).getBlock();
         blocks[i] = new ExtendedBlock(b.getBlockPoolId(), b.getBlockId(), b
-            .getNumBytes(), b.getGenerationStamp());
+            .getNumBytes(), b.getGenerationStamp(), b.getCloudBucketID());
       }
 
       return blocks;

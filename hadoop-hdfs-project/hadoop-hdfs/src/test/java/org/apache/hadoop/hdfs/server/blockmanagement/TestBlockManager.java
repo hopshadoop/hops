@@ -702,7 +702,7 @@ public class TestBlockManager {
     bm.replicationStreamsHardLimit = 1;
 
     final long blockId = 42;         // arbitrary
-    final Block aBlock = new Block(blockId, 0, 0);
+    final Block aBlock = new Block(blockId, 0, 0, Block.NON_EXISTING_BUCKET_ID);
 
     final List<DatanodeDescriptor> origNodes = getNodes(0, 1);
     
@@ -774,7 +774,7 @@ public class TestBlockManager {
     bm.replicationStreamsHardLimit = 1;
 
     long blockId = 42;         // arbitrary
-    final Block aBlock = new Block(blockId, 0, 0);
+    final Block aBlock = new Block(blockId, 0, 0, Block.NON_EXISTING_BUCKET_ID);
     final List<DatanodeDescriptor> origNodes = getNodes(0, 1);
     addNodes(origNodes);
     // Add the block to the first node.

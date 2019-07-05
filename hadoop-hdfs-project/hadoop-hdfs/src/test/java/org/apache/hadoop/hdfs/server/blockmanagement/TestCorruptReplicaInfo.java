@@ -71,7 +71,7 @@ public class TestCorruptReplicaInfo {
   private BlockInfoContiguous getBlock(Integer block_id) {
     if (!block_map.containsKey(block_id)) {
       block_map
-          .put(block_id, new BlockInfoContiguous(new Block(block_id, 0, 0), block_id));
+          .put(block_id, new BlockInfoContiguous(new Block(block_id, 0, 0, Block.NON_EXISTING_BUCKET_ID), block_id));
     }
     
     return block_map.get(block_id);

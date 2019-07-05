@@ -42,6 +42,7 @@ import org.apache.hadoop.hdfs.server.datanode.ReplicaNotFoundException;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.UnexpectedReplicaStateException;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetFactory;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.HopsFsDatasetFactory;
 import org.apache.hadoop.hdfs.server.datanode.metrics.FSDatasetMBean;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
@@ -75,10 +76,17 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
      */
     public static Factory<?> getFactory(Configuration conf) {
       @SuppressWarnings("rawtypes")
-      final Class<? extends Factory> clazz =
-          conf.getClass(DFSConfigKeys.DFS_DATANODE_FSDATASET_FACTORY_KEY,
-              FsDatasetFactory.class, Factory.class);
-      return ReflectionUtils.newInstance(clazz, conf);
+
+      boolean cloud = conf.getBoolean(DFSConfigKeys.DFS_ENABLE_CLOUD_PERSISTENCE,
+              DFSConfigKeys.DFS_ENABLE_CLOUD_PERSISTENCE_DEFAULT);
+      if(cloud){
+        return ReflectionUtils.newInstance(HopsFsDatasetFactory.class, conf);
+      } else {
+        final Class<? extends Factory> clazz =
+                conf.getClass(DFSConfigKeys.DFS_DATANODE_FSDATASET_FACTORY_KEY,
+                        FsDatasetFactory.class, Factory.class);
+        return ReflectionUtils.newInstance(clazz, conf);
+      }
     }
 
     /**
@@ -181,11 +189,11 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * Get reference to the replica meta info in the replicasMap.
    * To be called from methods that are synchronized on {@link FSDataset}
    *
-   * @param blockId
+   * @param block
    * @return replica from the replicas map
    */
   @Deprecated
-  public Replica getReplica(String bpid, long blockId);
+  public Replica getReplica(ExtendedBlock block);
 
   /**
    * @return replica meta information
@@ -321,6 +329,14 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
       throws IOException;
   
   /**
+   * Pre-Finalize stage where the provided block is uploaded to the cloud
+   *
+   * @param b
+   * @throws IOException
+   */
+  public void preFinalize(ExtendedBlock b) throws IOException;
+
+  /**
    * Finalizes the block previously opened for writing using writeToBlock.
    * The block size is what is in the parameter b and it must match the amount
    * of data written
@@ -332,6 +348,14 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * that has been removed.
    */
   public void finalizeBlock(ExtendedBlock b) throws IOException;
+
+  /**
+   * Post-Finalize stage
+   *
+   * @param b
+   * @throws IOException
+   */
+  public void postFinalize(ExtendedBlock b) throws IOException;
 
   /**
    * Unfinalizes the block previously opened for writing using writeToBlock.

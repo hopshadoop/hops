@@ -74,6 +74,11 @@ public class TestSmallFilesCreation {
    * This method reads the file using different read methods.
    */
   public static void verifyFile(FileSystem dfs, String file, int size) throws IOException {
+    //verify size
+    long sizeDFS = dfs.getFileStatus(new Path(file)).getLen();
+    assertTrue("Expected: "+size+" Actual: "+sizeDFS, sizeDFS == size);
+
+    //verify content
     //reading one byte at a time.
     FSDataInputStream is = dfs.open(new Path(file));
     byte[] buffer = new byte[size];
@@ -1506,6 +1511,137 @@ public class TestSmallFilesCreation {
     out.close();
   }
 
+  @Test
+  public void TestConcat() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024 * 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+      cluster.waitActive();
+
+      final int ONDISK_SMALL_BUCKET_SIZE = FSNamesystem.getDBOnDiskSmallBucketSize();
+      final int ONDISK_MEDIUM_BUCKET_SIZE = FSNamesystem.getDBOnDiskMediumBucketSize();
+      final int MAX_SMALL_FILE_SIZE = FSNamesystem.getMaxSmallFileSize();
+      final int INMEMORY_BUCKET_SIZE = FSNamesystem.getDBInMemBucketSize();
+
+      Path paths[] = new Path[4];
+      for(int i = 0; i < 4; i++){
+        paths[i] = new Path("/dir/TEST-FLIE"+i);
+      }
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      dfs.mkdirs(new Path("/dir"));
+      dfs.setStoragePolicy(new Path("/dir"), "DB");
+
+      writeFile(dfs,  paths[0].toString(), INMEMORY_BUCKET_SIZE);
+      verifyFile(dfs, paths[0].toString(), INMEMORY_BUCKET_SIZE);
+      writeFile(dfs,  paths[1].toString(), ONDISK_SMALL_BUCKET_SIZE);
+      verifyFile(dfs, paths[1].toString(), ONDISK_SMALL_BUCKET_SIZE);
+      writeFile(dfs,  paths[2].toString(), ONDISK_MEDIUM_BUCKET_SIZE);
+      verifyFile(dfs, paths[2].toString(), ONDISK_MEDIUM_BUCKET_SIZE);
+      writeFile(dfs,  paths[3].toString(), MAX_SMALL_FILE_SIZE);
+      verifyFile(dfs, paths[3].toString(), MAX_SMALL_FILE_SIZE);
+
+      assertTrue("Expecting 1 in-memory file. Got: " + countInMemoryDBFiles(), countInMemoryDBFiles() == 1);
+      assertTrue("Expecting 3 on-disk file(s). Got:" + countAllOnDiskDBFiles(), countAllOnDiskDBFiles() == 3);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + countOnDiskSmallDBFiles(), countOnDiskSmallDBFiles() == 1);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + countOnDiskMediumDBFiles(), countOnDiskMediumDBFiles() == 1);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + countOnDiskLargeDBFiles(), countOnDiskLargeDBFiles() == 1);
+
+      //combine these files
+
+      Path merged = new Path("/dir/merged");
+      writeFile(dfs, merged.toString(), 0);
+      try {
+        dfs.concat(merged, paths);
+      } catch (IOException e){
+        if (!e.getMessage().contains("stored in DB")){
+          throw e;
+        }
+      }
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.getMessage());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  @Test
+  public void TestTruncate() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024 * 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+      cluster.waitActive();
+
+      final int ONDISK_SMALL_BUCKET_SIZE = FSNamesystem.getDBOnDiskSmallBucketSize();
+      final int ONDISK_MEDIUM_BUCKET_SIZE = FSNamesystem.getDBOnDiskMediumBucketSize();
+      final int MAX_SMALL_FILE_SIZE = FSNamesystem.getMaxSmallFileSize();
+      final int INMEMORY_BUCKET_SIZE = FSNamesystem.getDBInMemBucketSize();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      dfs.mkdirs(new Path("/dir"));
+      dfs.setStoragePolicy(new Path("/dir"), "DB");
+
+      Path file = new Path("/dir/file");
+
+      writeFile(dfs,  file.toString(), MAX_SMALL_FILE_SIZE);
+      verifyFile(dfs, file.toString(), MAX_SMALL_FILE_SIZE);
+
+      assertTrue("Expecting 0 in-memory file. Got: " + countInMemoryDBFiles(), countInMemoryDBFiles() == 0);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + countAllOnDiskDBFiles(), countAllOnDiskDBFiles() == 1);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countOnDiskSmallDBFiles(), countOnDiskSmallDBFiles() == 0);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countOnDiskMediumDBFiles(), countOnDiskMediumDBFiles() == 0);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + countOnDiskLargeDBFiles(), countOnDiskLargeDBFiles() == 1);
+
+      assert dfs.truncate(file, ONDISK_MEDIUM_BUCKET_SIZE) == true;
+      verifyFile(dfs, file.toString(), ONDISK_MEDIUM_BUCKET_SIZE);
+
+      assertTrue("Expecting 0 in-memory file. Got: " + countInMemoryDBFiles(), countInMemoryDBFiles() == 0);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + countAllOnDiskDBFiles(), countAllOnDiskDBFiles() == 1);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countOnDiskSmallDBFiles(), countOnDiskSmallDBFiles() == 0);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + countOnDiskMediumDBFiles(), countOnDiskMediumDBFiles() == 1);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countOnDiskLargeDBFiles(), countOnDiskLargeDBFiles() == 0);
+
+      assert dfs.truncate(file, ONDISK_SMALL_BUCKET_SIZE) == true;
+      verifyFile(dfs, file.toString(), ONDISK_SMALL_BUCKET_SIZE);
+
+      assertTrue("Expecting 0 in-memory file. Got: " + countInMemoryDBFiles(), countInMemoryDBFiles() == 0);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + countAllOnDiskDBFiles(), countAllOnDiskDBFiles() == 1);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + countOnDiskSmallDBFiles(), countOnDiskSmallDBFiles() == 1);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countOnDiskMediumDBFiles(), countOnDiskMediumDBFiles() == 0);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countOnDiskLargeDBFiles(), countOnDiskLargeDBFiles() == 0);
+
+      assert dfs.truncate(file, INMEMORY_BUCKET_SIZE) == true;
+      verifyFile(dfs, file.toString(), INMEMORY_BUCKET_SIZE);
+
+      Thread.sleep(1000);
+      assertTrue("Expecting 1 in-memory file. Got: " + countInMemoryDBFiles(), countInMemoryDBFiles() == 1);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countAllOnDiskDBFiles(), countAllOnDiskDBFiles() == 0);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countOnDiskSmallDBFiles(), countOnDiskSmallDBFiles() == 0);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countOnDiskMediumDBFiles(), countOnDiskMediumDBFiles() == 0);
+      assertTrue("Expecting 0 on-disk file(s). Got:" + countOnDiskLargeDBFiles(), countOnDiskLargeDBFiles() == 0);
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.getMessage());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
   @Test
   /** force format the database to release the extents
    *

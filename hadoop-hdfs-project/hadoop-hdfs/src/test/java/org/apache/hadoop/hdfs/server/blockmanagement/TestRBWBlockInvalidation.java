@@ -246,7 +246,7 @@ public class TestRBWBlockInvalidation {
 
         // Compute and send invalidations, waiting until they're fully processed.
         cluster.getNameNode().getNamesystem().getBlockManager()
-            .computeInvalidateWork(2);
+            .computeInvalidateWorkForDNs(2);
         cluster.triggerHeartbeats();
         HATestUtil.waitForDNDeletions(cluster);
         cluster.triggerDeletionReports();

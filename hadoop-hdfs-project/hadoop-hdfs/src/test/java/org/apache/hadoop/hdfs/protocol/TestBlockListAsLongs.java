@@ -64,10 +64,10 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 
 public class TestBlockListAsLongs {
-  static Block b1 = new Block(1, 11, 111);
-  static Block b2 = new Block(2, 22, 222);
-  static Block b3 = new Block(3, 33, 333);
-  static Block b4 = new Block(4, 44, 444);
+  static Block b1 = new Block(1, 11, 111, Block.NON_EXISTING_BUCKET_ID);
+  static Block b2 = new Block(2, 22, 222, Block.NON_EXISTING_BUCKET_ID);
+  static Block b3 = new Block(3, 33, 333, Block.NON_EXISTING_BUCKET_ID);
+  static Block b4 = new Block(4, 44, 444, Block.NON_EXISTING_BUCKET_ID);
 
   @Test
   public void testEmptyReport() {
@@ -126,7 +126,7 @@ public class TestBlockListAsLongs {
     Replica[] replicas = new Replica[100000];
     Random rand = new Random(0);
     for (int i=0; i<replicas.length; i++) {
-      Block b = new Block(rand.nextLong(), i, i<<4);
+      Block b = new Block(rand.nextLong(), i, i<<4, Block.NON_EXISTING_BUCKET_ID);
       switch (rand.nextInt(2)) {
         case 0:
           replicas[i] = new FinalizedReplica(b, null, null);
@@ -214,7 +214,7 @@ public class TestBlockListAsLongs {
     NamespaceInfo nsInfo = new NamespaceInfo(1, "cluster", "bp", 1);
     reg.setNamespaceInfo(nsInfo);
 
-    Replica r = new FinalizedReplica(new Block(1, 2, 3), null, null);
+    Replica r = new FinalizedReplica(new Block(1, 2, 3, Block.NON_EXISTING_BUCKET_ID), null, null);
     BlockReport bbl = BlockReport.builder(1).add(r).build();
     DatanodeStorage storage = new DatanodeStorage("s1");
     StorageBlockReport[] sbr = { new StorageBlockReport(storage, bbl) };    

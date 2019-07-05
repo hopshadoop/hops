@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.MiniDFSNNTopology;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -170,13 +171,14 @@ public class TestWriteToReplica {
     // setup replicas map
     
     ExtendedBlock[] blocks =
-        new ExtendedBlock[]{new ExtendedBlock(bpid, 1, 1, 2001),
-            new ExtendedBlock(bpid, 2, 1, 2002),
-            new ExtendedBlock(bpid, 3, 1, 2003),
-            new ExtendedBlock(bpid, 4, 1, 2004),
-            new ExtendedBlock(bpid, 5, 1, 2005),
-            new ExtendedBlock(bpid, 6, 1, 2006)};
-    
+        new ExtendedBlock[]{
+            new ExtendedBlock(bpid, 1, 1, 2001, Block.NON_EXISTING_BUCKET_ID),
+            new ExtendedBlock(bpid, 2, 1, 2002, Block.NON_EXISTING_BUCKET_ID),
+            new ExtendedBlock(bpid, 3, 1, 2003, Block.NON_EXISTING_BUCKET_ID),
+            new ExtendedBlock(bpid, 4, 1, 2004, Block.NON_EXISTING_BUCKET_ID),
+            new ExtendedBlock(bpid, 5, 1, 2005, Block.NON_EXISTING_BUCKET_ID),
+            new ExtendedBlock(bpid, 6, 1, 2006, Block.NON_EXISTING_BUCKET_ID)};
+
     ReplicaMap replicasMap = dataSet.volumeMap;
     FsVolumeImpl vol = (FsVolumeImpl) dataSet.volumes
         .getNextVolume(StorageType.DEFAULT, 0).getVolume();
@@ -188,7 +190,8 @@ public class TestWriteToReplica {
     
     replicasMap.add(bpid, new ReplicaInPipeline(
         blocks[TEMPORARY].getBlockId(),
-        blocks[TEMPORARY].getGenerationStamp(), vol,
+        blocks[TEMPORARY].getGenerationStamp(),
+        blocks[TEMPORARY].getCloudBucketID(), vol,
         vol.createTmpFile(bpid, blocks[TEMPORARY].getLocalBlock()).getParentFile(), 0));
     
     replicaInfo = new ReplicaBeingWritten(blocks[RBW].getLocalBlock(), vol,
@@ -652,23 +655,24 @@ public class TestWriteToReplica {
     long id = 1; // This variable is used as both blockId and genStamp
     for (String bpId: bpList) {
       for (FsVolumeImpl volume: volumes) {
-        ReplicaInfo finalizedReplica = new FinalizedReplica(id, 1, id, volume,
+        ReplicaInfo finalizedReplica = new FinalizedReplica(id, 1, id,
+           Block.NON_EXISTING_BUCKET_ID, volume,
             DatanodeUtil.idToBlockDir(volume.getFinalizedDir(bpId), id));
         volumeMap.add(bpId, finalizedReplica);
         id++;
         
-        ReplicaInfo rbwReplica = new ReplicaBeingWritten(id, 1, id, volume, 
-            volume.getRbwDir(bpId), null, 100);
+        ReplicaInfo rbwReplica = new ReplicaBeingWritten(id, 1, id,
+                Block.NON_EXISTING_BUCKET_ID, volume, volume.getRbwDir(bpId), null, 100);
         volumeMap.add(bpId, rbwReplica);
         id++;
 
-        ReplicaInfo rwrReplica = new ReplicaWaitingToBeRecovered(id, 1, id, 
-            volume, volume.getRbwDir(bpId));
+        ReplicaInfo rwrReplica = new ReplicaWaitingToBeRecovered(id, 1, id,
+                Block.NON_EXISTING_BUCKET_ID, volume, volume.getRbwDir(bpId));
         volumeMap.add(bpId, rwrReplica);
         id++;
         
-        ReplicaInfo ripReplica = new ReplicaInPipeline(id, id, volume, 
-            volume.getTmpDir(bpId), 0);
+        ReplicaInfo ripReplica = new ReplicaInPipeline(id, id, Block.NON_EXISTING_BUCKET_ID,
+                volume, volume.getTmpDir(bpId), 0);
         volumeMap.add(bpId, ripReplica);
         id++;
       }

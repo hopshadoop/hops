@@ -178,7 +178,7 @@ public class BlockManagerTestUtil {
   
   public static int computeInvalidationWork(BlockManager bm)
       throws IOException {
-    return bm.computeInvalidateWork(Integer.MAX_VALUE);
+    return bm.computeInvalidateWorkForDNs(Integer.MAX_VALUE);
   }
   
   /**

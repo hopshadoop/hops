@@ -582,6 +582,11 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
     binfo.finalizeBlock(b.getBlockPoolId(), b.getNumBytes());
   }
 
+  @Override
+  public void postFinalize(ExtendedBlock b) throws IOException {
+
+  }
+
   @Override // FsDatasetSpi
   public synchronized void unfinalizeBlock(ExtendedBlock b) throws IOException{
     if (isValidRbw(b)) {
@@ -712,10 +717,10 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
   @Override
   @Deprecated
-  public Replica getReplica(String bpid, long blockId) {
-    final Map<Block, BInfo> map = blockMap.get(bpid);
+  public Replica getReplica(ExtendedBlock block) {
+    final Map<Block, BInfo> map = blockMap.get(block.getBlockPoolId());
     if (map != null) {
-      return map.get(new Block(blockId));
+      return map.get(new Block(block.getBlockId()));
     }
     return null;
   }
@@ -738,7 +743,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
       if (binfo == null) {
         return null;
       }
-      return new Block(blkid, binfo.getGenerationStamp(), binfo.getNumBytes());
+      return new Block(blkid, binfo.getGenerationStamp(), binfo.getNumBytes(), Block.NON_EXISTING_BUCKET_ID);
     }
     return null;
   }
@@ -901,7 +906,12 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
     map.put(binfo.theBlock, binfo);
     return binfo.getStorageUuid();
   }
-  
+
+  @Override
+  public void preFinalize(ExtendedBlock b) throws IOException {
+
+  }
+
   @Override // FsDatasetSpi
   public synchronized ReplicaHandler recoverRbw(
       ExtendedBlock b, long newGS, long minBytesRcvd, long maxBytesRcvd)
@@ -1172,7 +1182,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
     }
 
     return new ReplicaRecoveryInfo(binfo.getBlockId(), binfo.getBytesOnDisk(),
-        binfo.getGenerationStamp(),
+        binfo.getGenerationStamp(), Block.NON_EXISTING_BUCKET_ID,
         binfo.isFinalized() ? ReplicaState.FINALIZED : ReplicaState.RBW);
   }
 

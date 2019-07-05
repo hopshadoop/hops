@@ -91,7 +91,7 @@ public class TestComputeInvalidateWork {
   }
 
   /**
-   * Test if {@link BlockManager#computeInvalidateWork(int)}
+   * Test if {@link BlockManager#computeInvalidateWorkForDNs(int)}
    * can schedule invalidate work correctly 
    */
   @Test(timeout=120000)
@@ -101,23 +101,23 @@ public class TestComputeInvalidateWork {
       for (int i=0; i<nodes.length; i++) {
         for(int j=0; j<3*blockInvalidateLimit+1; j++) {
           Block block = new Block(i*(blockInvalidateLimit+1)+j, 0,
-              GenerationStamp.LAST_RESERVED_STAMP);
+              GenerationStamp.LAST_RESERVED_STAMP, Block.NON_EXISTING_BUCKET_ID);
           addToInvalidates(bm, block, nodes[i], namesystem);
         }
       }
       
       assertEquals(blockInvalidateLimit*NUM_OF_DATANODES,
-          bm.computeInvalidateWork(NUM_OF_DATANODES+1));
+          bm.computeInvalidateWorkForDNs(NUM_OF_DATANODES+1));
       assertEquals(blockInvalidateLimit*NUM_OF_DATANODES,
-          bm.computeInvalidateWork(NUM_OF_DATANODES));
+          bm.computeInvalidateWorkForDNs(NUM_OF_DATANODES));
       assertEquals(blockInvalidateLimit*(NUM_OF_DATANODES-1),
-          bm.computeInvalidateWork(NUM_OF_DATANODES-1));
-      int workCount = bm.computeInvalidateWork(1);
+          bm.computeInvalidateWorkForDNs(NUM_OF_DATANODES-1));
+      int workCount = bm.computeInvalidateWorkForDNs(1);
       if (workCount == 1) {
-        assertEquals(blockInvalidateLimit+1, bm.computeInvalidateWork(2));
+        assertEquals(blockInvalidateLimit+1, bm.computeInvalidateWorkForDNs(2));
       } else {
         assertEquals(workCount, blockInvalidateLimit);
-        assertEquals(2, bm.computeInvalidateWork(2));
+        assertEquals(2, bm.computeInvalidateWorkForDNs(2));
       }
   }
 
@@ -135,12 +135,12 @@ public class TestComputeInvalidateWork {
       dnr = new DatanodeRegistration(UUID.randomUUID().toString(), dnr);
       cluster.stopDataNode(nodes[0].getXferAddr());
 
-      Block block = new Block(0, 0, GenerationStamp.LAST_RESERVED_STAMP);
+      Block block = new Block(0, 0, GenerationStamp.LAST_RESERVED_STAMP, Block.NON_EXISTING_BUCKET_ID);
       addToInvalidates(bm, block, nodes[0], namesystem);
       bm.getDatanodeManager().registerDatanode(dnr);
 
       // Since UUID has changed, the invalidation work should be skipped
-      assertEquals(0, bm.computeInvalidateWork(1));
+      assertEquals(0, bm.computeInvalidateWorkForDNs(1));
       assertEquals(0, bm.getPendingDeletionBlocksCount());
   }
 

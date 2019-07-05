@@ -47,7 +47,8 @@ public class InvalidatedBlockContext
     super.update(hopInvalidatedBlock);
     if(isLogTraceEnabled()) {
       log("added-invblock", "bid", hopInvalidatedBlock.getBlockId(), "sid",
-         hopInvalidatedBlock.getStorageId());
+         hopInvalidatedBlock.getStorageId(), " CloudBucketID",
+         hopInvalidatedBlock.getCloudBucketID());
     }
   }
 

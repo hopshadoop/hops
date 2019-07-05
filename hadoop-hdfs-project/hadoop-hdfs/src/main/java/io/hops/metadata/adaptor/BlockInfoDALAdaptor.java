@@ -136,7 +136,7 @@ public class BlockInfoDALAdaptor extends
       BlockInfo hopBlkInfo =
           new BlockInfo(hdfsClass.getBlockId(), hdfsClass.getBlockIndex(),
               hdfsClass.getInodeId(), hdfsClass.getNumBytes(),
-              hdfsClass.getGenerationStamp(),
+              hdfsClass.getGenerationStamp(), hdfsClass.getCloudBucketID(),
               hdfsClass.getBlockUCState().ordinal(), hdfsClass.getTimestamp());
       if (hdfsClass instanceof BlockInfoContiguousUnderConstruction) {
         BlockInfoContiguousUnderConstruction ucBlock =
@@ -160,7 +160,7 @@ public class BlockInfoDALAdaptor extends
       BlockInfo dalClass) throws StorageException {
     if (dalClass != null) {
       Block b = new Block(dalClass.getBlockId(), dalClass.getNumBytes(),
-          dalClass.getGenerationStamp());
+          dalClass.getGenerationStamp(), dalClass.getCloudBucketID());
       org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous blockInfo = null;
 
       if (dalClass.getBlockUCState() >
@@ -174,7 +174,10 @@ public class BlockInfoDALAdaptor extends
         ((BlockInfoContiguousUnderConstruction) blockInfo)
             .setBlockRecoveryIdNoPersistance(dalClass.getBlockRecoveryId());
         if(dalClass.getTruncateBlockNumBytes()>0){
-          Block truncateBlock = new Block(dalClass.getBlockId(), dalClass.getTruncateBlockNumBytes(), dalClass.getTruncateBlockGenerationStamp());
+          Block truncateBlock = new Block(dalClass.getBlockId(),
+                  dalClass.getTruncateBlockNumBytes(),
+                  dalClass.getTruncateBlockGenerationStamp(),
+                  dalClass.getCloudBucketID());
           ((BlockInfoContiguousUnderConstruction) blockInfo).setTruncateBlock(truncateBlock);
         }
       } else if (dalClass.getBlockUCState() ==

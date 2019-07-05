@@ -205,14 +205,15 @@ public class TestInterDatanodeProtocol {
 
       //verify updateBlock
       ExtendedBlock newblock = new ExtendedBlock(b.getBlockPoolId(),
-          b.getBlockId(), b.getNumBytes()/2, b.getGenerationStamp()+1);
+          b.getBlockId(), b.getNumBytes()/2, b.getGenerationStamp()+1,
+          Block.NON_EXISTING_BUCKET_ID);
       idp.updateReplicaUnderRecovery(b, recoveryId, b.getBlockId(),
           newblock.getNumBytes());
       checkMetaInfo(newblock, datanode);
       
       // Verify correct null response trying to init recovery for a missing block
       ExtendedBlock badBlock =
-          new ExtendedBlock("fake-pool", b.getBlockId(), 0, 0);
+          new ExtendedBlock("fake-pool", b.getBlockId(), 0, 0, Block.NON_EXISTING_BUCKET_ID);
       assertNull(idp.initReplicaRecovery(
           new RecoveringBlock(badBlock, locatedblock.getLocations(),
               recoveryId)));
@@ -247,83 +248,101 @@ public class TestInterDatanodeProtocol {
     final long firstblockid = 10000L;
     final long gs = 7777L;
     final long length = 22L;
-    final ReplicaMap map = new ReplicaMap(this);
-    String bpid = "BP-TEST";
     final Block[] blocks = new Block[5];
-    for (int i = 0; i < blocks.length; i++) {
-      blocks[i] = new Block(firstblockid + i, length, gs);
-      map.add(bpid, createReplicaInfo(blocks[i]));
-    }
-    
-    {
+
+
+    MiniDFSCluster cluster = null;
+
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      String bpid = cluster.getNamesystem().getBlockPoolId();
+
+      FsDatasetImpl data = (FsDatasetImpl)cluster.getDataNodes().get(0).getFSDataset();
+      ReplicaMap map = data.getVolumeMap();
+      for (int i = 0; i < blocks.length; i++) {
+        blocks[i] = new Block(firstblockid + i, length, gs, Block.NON_EXISTING_BUCKET_ID );
+        map.add(bpid, createReplicaInfo(blocks[i]));
+      }
+
+      {
       //normal case
-      final Block b = blocks[0];
-      final ReplicaInfo originalInfo = map.get(bpid, b);
+        final Block b = blocks[0];
+        final ReplicaInfo originalInfo = map.get(bpid, b);
 
-      final long recoveryid = gs + 1;
-      final ReplicaRecoveryInfo recoveryInfo = FsDatasetImpl.initReplicaRecovery(bpid, map, blocks[0], recoveryid,
-          DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
-      assertEquals(originalInfo, recoveryInfo);
+        final long recoveryid = gs + 1;
 
-      final ReplicaUnderRecovery updatedInfo =
-          (ReplicaUnderRecovery) map.get(bpid, b);
-      Assert.assertEquals(originalInfo.getBlockId(), updatedInfo.getBlockId());
-      Assert.assertEquals(recoveryid, updatedInfo.getRecoveryID());
+        final ReplicaRecoveryInfo recoveryInfo = data.initReplicaRecovery(bpid, map, blocks[0], recoveryid,
+                DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+        assertEquals(originalInfo, recoveryInfo);
 
-      //recover one more time 
-      final long recoveryid2 = gs + 2;
-      final ReplicaRecoveryInfo recoveryInfo2 = FsDatasetImpl.initReplicaRecovery(bpid, map, blocks[0], recoveryid2,
-          DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
-      assertEquals(originalInfo, recoveryInfo2);
+        final ReplicaUnderRecovery updatedInfo =
+                (ReplicaUnderRecovery) map.get(bpid, b);
+        Assert.assertEquals(originalInfo.getBlockId(), updatedInfo.getBlockId());
+        Assert.assertEquals(recoveryid, updatedInfo.getRecoveryID());
 
-      final ReplicaUnderRecovery updatedInfo2 =
-          (ReplicaUnderRecovery) map.get(bpid, b);
-      Assert.assertEquals(originalInfo.getBlockId(), updatedInfo2.getBlockId());
-      Assert.assertEquals(recoveryid2, updatedInfo2.getRecoveryID());
-      
-      //case RecoveryInProgressException
-      try {
-        FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid,
-            DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
-        Assert.fail();
-      } catch (RecoveryInProgressException ripe) {
-        System.out.println("GOOD: getting " + ripe);
+        //recover one more time
+        final long recoveryid2 = gs + 2;
+        final ReplicaRecoveryInfo recoveryInfo2 = data.initReplicaRecovery(bpid, map, blocks[0], recoveryid2,
+                DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+        assertEquals(originalInfo, recoveryInfo2);
+
+        final ReplicaUnderRecovery updatedInfo2 =
+                (ReplicaUnderRecovery) map.get(bpid, b);
+        Assert.assertEquals(originalInfo.getBlockId(), updatedInfo2.getBlockId());
+        Assert.assertEquals(recoveryid2, updatedInfo2.getRecoveryID());
+
+        //case RecoveryInProgressException
+        try {
+          data.initReplicaRecovery(bpid, map, b, recoveryid,
+                  DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+          Assert.fail();
+        } catch (RecoveryInProgressException ripe) {
+          System.out.println("GOOD: getting " + ripe);
+        }
       }
-    }
 
-    { // BlockRecoveryFI_01: replica not found
-      final long recoveryid = gs + 1;
-      final Block b = new Block(firstblockid - 1, length, gs);
-      ReplicaRecoveryInfo r = FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid,
-          DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
-      Assert.assertNull("Data-node should not have this replica.", r);
-    }
-    
-    { // BlockRecoveryFI_02: "THIS IS NOT SUPPOSED TO HAPPEN" with recovery id < gs  
-      final long recoveryid = gs - 1;
-      final Block b = new Block(firstblockid + 1, length, gs);
-      try {
-        FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid,
-            DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
-        Assert.fail();
-      } catch (IOException ioe) {
-        System.out.println("GOOD: getting " + ioe);
+      { // BlockRecoveryFI_01: replica not found
+        final long recoveryid = gs + 1;
+        final Block b = new Block(firstblockid - 1, length, gs, Block.NON_EXISTING_BUCKET_ID);
+        ReplicaRecoveryInfo r = data.initReplicaRecovery(bpid, map, b, recoveryid,
+                DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+        Assert.assertNull("Data-node should not have this replica.", r);
       }
-    }
+
+
+      { // BlockRecoveryFI_02: "THIS IS NOT SUPPOSED TO HAPPEN" with recovery id < gs
+        final long recoveryid = gs - 1;
+        final Block b = new Block(firstblockid + 1, length, gs, Block.NON_EXISTING_BUCKET_ID);
+        try {
+          data.initReplicaRecovery(bpid, map, b, recoveryid,
+                  DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+          Assert.fail();
+        } catch (IOException ioe) {
+          System.out.println("GOOD: getting " + ioe);
+        }
+      }
+
 
     // BlockRecoveryFI_03: Replica's gs is less than the block's gs
-    {
-      final long recoveryid = gs + 1;
-      final Block b = new Block(firstblockid, length, gs + 1);
-      try {
-        FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid,
-            DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
-        fail("InitReplicaRecovery should fail because replica's " +
-            "gs is less than the block's gs");
-      } catch (IOException e) {
-        e.getMessage().startsWith(
-            "replica.getGenerationStamp() < block.getGenerationStamp(), block=");
+      {
+        final long recoveryid = gs + 1;
+        final Block b = new Block(firstblockid, length, gs + 1, Block.NON_EXISTING_BUCKET_ID);
+        try {
+          data.initReplicaRecovery(bpid, map, b, recoveryid,
+                  DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+          fail("InitReplicaRecovery should fail because replica's " +
+                  "gs is less than the block's gs");
+        } catch (IOException e) {
+          e.getMessage().startsWith(
+                  "replica.getGenerationStamp() < block.getGenerationStamp(), block=");
+        }
       }
+    } catch (Exception e){
+      fail();
+    } finally {
+      if(cluster != null)
+      cluster.shutdown();
     }
   }
 
@@ -374,7 +393,9 @@ public class TestInterDatanodeProtocol {
       Assert.assertEquals(ReplicaState.RUR, replica.getState());
 
       //check meta data before update
-      FsDatasetImpl.checkReplicaFiles(replica);
+
+      FsDatasetImpl data = (FsDatasetImpl)cluster.getDataNodes().get(0).getFSDataset();
+      data.checkReplicaFiles(replica);
 
       //case "THIS IS NOT SUPPOSED TO HAPPEN"
       //with (block length) != (stored replica's on disk length). 
@@ -382,7 +403,7 @@ public class TestInterDatanodeProtocol {
         //create a block with same id and gs but different length.
         final ExtendedBlock tmp =
             new ExtendedBlock(b.getBlockPoolId(), rri.getBlockId(),
-                rri.getNumBytes() - 1, rri.getGenerationStamp());
+                rri.getNumBytes() - 1, rri.getGenerationStamp(), Block.NON_EXISTING_BUCKET_ID);
         try {
           //update should fail
           fsdataset.updateReplicaUnderRecovery(tmp, recoveryid,

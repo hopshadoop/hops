@@ -232,7 +232,7 @@ public abstract class BlockReportTestBase  {
         LOG.debug("Setting new length");
       }
       tempLen = rand.nextInt(BLOCK_SIZE);
-      b.setNoPersistance(b.getBlockId(), tempLen, b.getGenerationStamp());
+      b.setNoPersistance(b.getBlockId(), tempLen, b.getGenerationStamp(), b.getCloudBucketID());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Block " + b.getBlockName() + " after\t " + "Size " +
             b.getNumBytes());
@@ -400,7 +400,7 @@ public abstract class BlockReportTestBase  {
 
     // Create a bogus new block which will not be present on the namenode.
     ExtendedBlock b = new ExtendedBlock(
-        poolId, rand.nextLong(), 1024L, rand.nextLong());
+        poolId, rand.nextLong(), 1024L, rand.nextLong(), Block.NON_EXISTING_BUCKET_ID );
     dn.getFSDataset().createRbw(StorageType.DEFAULT, b);
 
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);

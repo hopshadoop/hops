@@ -47,6 +47,8 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.RollingUpgradeStartupOption;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.CloudPersistenceProvider;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.CloudPersistenceProviderFactory;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMetrics;
@@ -944,6 +946,8 @@ public class NameNode implements NameNodeStatusMXBean {
       throw new RuntimeException(e.getMessage());
     }
 
+    formatCloud(conf);
+
     return false;
   }
 
@@ -975,7 +979,22 @@ public class NameNode implements NameNodeStatusMXBean {
       throw new RuntimeException(e.getMessage());
     }
 
+    formatCloud(conf);
+
     return false;
+  }
+
+  private static void formatCloud(Configuration conf){
+    // Wipe cloud buckets
+    boolean cloud = conf.getBoolean(DFSConfigKeys.DFS_ENABLE_CLOUD_PERSISTENCE,
+            DFSConfigKeys.DFS_ENABLE_CLOUD_PERSISTENCE_DEFAULT);
+    if(cloud){
+      System.out.println("Formatting Cloud Buckets");
+      CloudPersistenceProvider cloudConnector =
+              CloudPersistenceProviderFactory.getCloudClient(conf);
+      cloudConnector.format();
+      cloudConnector.shutdown();
+    }
   }
 
   public static void checkAllowFormat(Configuration conf) throws IOException {
@@ -1454,5 +1473,8 @@ public class NameNode implements NameNodeStatusMXBean {
   NameNodeRpcServer getNameNodeRpcServer(){
     return rpcServer;
   }
+
+
 }
+
 

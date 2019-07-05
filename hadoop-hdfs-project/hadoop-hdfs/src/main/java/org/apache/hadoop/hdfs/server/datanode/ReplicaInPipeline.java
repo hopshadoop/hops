@@ -61,9 +61,9 @@ public class ReplicaInPipeline extends ReplicaInfo
    * @param bytesToReserve disk space to reserve for this replica, based on
    *                       the estimated maximum block length.
    */
-  public ReplicaInPipeline(long blockId, long genStamp, 
+  public ReplicaInPipeline(long blockId, long genStamp, short cloudBucketID,
         FsVolumeSpi vol, File dir, long bytesToReserve) {
-    this(blockId, 0L, genStamp, vol, dir, Thread.currentThread(), bytesToReserve);
+    this(blockId, 0L, genStamp, cloudBucketID, vol, dir, Thread.currentThread(), bytesToReserve);
   }
 
   /**
@@ -81,7 +81,7 @@ public class ReplicaInPipeline extends ReplicaInfo
   ReplicaInPipeline(Block block, 
       FsVolumeSpi vol, File dir, Thread writer) {
     this( block.getBlockId(), block.getNumBytes(), block.getGenerationStamp(),
-        vol, dir, writer, 0L);
+        block.getCloudBucketID(), vol, dir, writer, 0L);
   }
 
   /**
@@ -95,9 +95,9 @@ public class ReplicaInPipeline extends ReplicaInfo
    * @param bytesToReserve disk space to reserve for this replica, based on
    *                       the estimated maximum block length.
    */
-  ReplicaInPipeline(long blockId, long len, long genStamp,
+  ReplicaInPipeline(long blockId, long len, long genStamp, short cloudBucketID,
       FsVolumeSpi vol, File dir, Thread writer, long bytesToReserve) {
-    super( blockId, len, genStamp, vol, dir);
+    super( blockId, len, genStamp, cloudBucketID, vol, dir);
     this.bytesAcked = len;
     this.bytesOnDisk = len;
     this.writer = writer;

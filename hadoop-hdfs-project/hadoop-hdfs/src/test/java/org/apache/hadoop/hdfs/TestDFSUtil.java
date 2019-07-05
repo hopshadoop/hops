@@ -34,6 +34,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.alias.CredentialProvider;
 import org.apache.hadoop.security.alias.CredentialProviderFactory;
@@ -73,13 +74,13 @@ public class TestDFSUtil {
     ds[0] = d;
 
     // ok
-    ExtendedBlock b1 = new ExtendedBlock("bpid", 1, 1, 1);
+    ExtendedBlock b1 = new ExtendedBlock("bpid", 1, 1, 1, Block.NON_EXISTING_BUCKET_ID);
     LocatedBlock l1 = new LocatedBlock(b1, ds);
     l1.setStartOffset(0);
     l1.setCorrupt(false);
 
     // corrupt
-    ExtendedBlock b2 = new ExtendedBlock("bpid", 2, 1, 1);
+    ExtendedBlock b2 = new ExtendedBlock("bpid", 2, 1, 1, Block.NON_EXISTING_BUCKET_ID);
     LocatedBlock l2 = new LocatedBlock(b2, ds);
     l2.setStartOffset(0);
     l2.setCorrupt(true);
@@ -115,7 +116,7 @@ public class TestDFSUtil {
     DatanodeInfo[] ds = new DatanodeInfo[1];
     ds[0] = d;
     
-    ExtendedBlock b1 = new ExtendedBlock("bpid", 1, 1, 1);
+    ExtendedBlock b1 = new ExtendedBlock("bpid", 1, 1, 1, Block.NON_EXISTING_BUCKET_ID);
     LocatedBlock l1 = new LocatedBlock(b1, ds, null, null, 0, false, null);
     final DatanodeInfo[] cachedLocs = l1.getCachedLocations();
     assertTrue(cachedLocs.length == 0);

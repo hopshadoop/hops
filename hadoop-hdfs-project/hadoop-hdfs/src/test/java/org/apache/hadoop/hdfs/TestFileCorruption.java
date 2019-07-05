@@ -198,7 +198,8 @@ public class TestFileCorruption {
     File metadataFile = metadataFiles.get(0);
     File blockFile = Block.metaToBlockFile(metadataFile);
     return new ExtendedBlock(bpid, Block.getBlockId(blockFile.getName()),
-        blockFile.length(), Block.getGenerationStamp(metadataFile.getName()));
+        blockFile.length(), Block.getGenerationStamp(metadataFile.getName()),
+        Block.NON_EXISTING_BUCKET_ID);
   }
 
 }

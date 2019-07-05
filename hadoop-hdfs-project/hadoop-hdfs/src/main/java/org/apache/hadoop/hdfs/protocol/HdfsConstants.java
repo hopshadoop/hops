@@ -146,6 +146,7 @@ public class HdfsConstants {
   10	      One_SSD	      SSD: 1,DISK: n-1           SSD, DISK	        SSD, DISK
   7	        Hot (default)	DISK: n	                   <none>	            ARCHIVE
   5	        Warm	        DISK: 1, ARCHIVE: n-1    	 ARCHIVE, DISK	    ARCHIVE, DISK
+  3         Cloud         S3 or other block stores   DISK               DISK
   2	        Cold	        ARCHIVE: n	               <none>	            <none>
   */
   public static final String DB_STORAGE_POLICY_NAME = "DB";
@@ -165,6 +166,9 @@ public class HdfsConstants {
 
   public static final String RAID5_STORAGE_POLICY_NAME = "RAID5";
   public static final byte RAID5_STORAGE_POLICY_ID = 4;
+
+  public static final String CLOUD_STORAGE_POLICY_NAME = "CLOUD";
+  public static final byte CLOUD_STORAGE_POLICY_ID = 3;
 
   public static final String COLD_STORAGE_POLICY_NAME = "COLD";
   public static final byte COLD_STORAGE_POLICY_ID = 2;

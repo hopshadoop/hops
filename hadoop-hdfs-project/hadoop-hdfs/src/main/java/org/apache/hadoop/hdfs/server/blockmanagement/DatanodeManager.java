@@ -1741,13 +1741,13 @@ public class DatanodeManager {
   }
 
   Random rand = new Random(System.currentTimeMillis());
-  public DatanodeDescriptor getRandomDN(List<DatanodeInfo> existing, int tries){
+  public DatanodeDescriptor getRandomDN(List<DatanodeInfo> existing){
     if(datanodeMap.isEmpty()){
         return null;
     }else{
-      for(int i = 0; i < tries; i++){
-        DatanodeDescriptor dd = (DatanodeDescriptor) datanodeMap.values()
-                .toArray()[rand.nextInt(datanodeMap.size())];
+      Object[] dns = datanodeMap.values().toArray();
+      for(int i = 0; i < datanodeMap.size(); i++){
+        DatanodeDescriptor dd = (DatanodeDescriptor)dns[rand.nextInt(dns.length)];
         if(!existing.contains(dd)){
           return dd;
         }

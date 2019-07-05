@@ -38,7 +38,8 @@ public class ReplicaUnderRecovery extends ReplicaInfo {
 
   public ReplicaUnderRecovery(ReplicaInfo replica, long recoveryId) {
     super(replica.getBlockId(), replica.getNumBytes(),
-        replica.getGenerationStamp(), replica.getVolume(), replica.getDir());
+        replica.getGenerationStamp(), replica.getCloudBucketID(),
+            replica.getVolume(), replica.getDir());
     if (replica.getState() != ReplicaState.FINALIZED &&
         replica.getState() != ReplicaState.RBW &&
         replica.getState() != ReplicaState.RWR) {
@@ -167,6 +168,6 @@ public class ReplicaUnderRecovery extends ReplicaInfo {
   public ReplicaRecoveryInfo createInfo() {
     return new ReplicaRecoveryInfo(original.getBlockId(),
         original.getBytesOnDisk(), original.getGenerationStamp(),
-        original.getState());
+        original.getCloudBucketID(), original.getState());
   }
 }

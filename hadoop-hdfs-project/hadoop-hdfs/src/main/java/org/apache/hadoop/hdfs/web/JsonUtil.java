@@ -138,7 +138,6 @@ public class JsonUtil {
     m.put("fileId", status.getFileId());
     m.put("childrenNum", status.getChildrenNum());
     m.put("storagePolicy", status.getStoragePolicy());
-    m.put("isFileStoredInDB", status.isFileStoredInDB());
     ObjectMapper mapper = new ObjectMapper();
     try {
       return includeType ?
@@ -159,6 +158,7 @@ public class JsonUtil {
     m.put("blockId", extendedblock.getBlockId());
     m.put("numBytes", extendedblock.getNumBytes());
     m.put("generationStamp", extendedblock.getGenerationStamp());
+    m.put("cloudBucketID", extendedblock.getCloudBucketID());
     return m;
   }
 

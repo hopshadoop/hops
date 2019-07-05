@@ -52,6 +52,7 @@ public class TestIncrementalBlockReports {
   private static final long DUMMY_BLOCK_ID = 5678;
   private static final long DUMMY_BLOCK_LENGTH = 1024 * 1024;
   private static final long DUMMY_BLOCK_GENSTAMP = 1000;
+  private static final short NON_EXISTING_BUCKET_ID  = Block.NON_EXISTING_BUCKET_ID;
 
   private MiniDFSCluster cluster = null;
   private DistributedFileSystem fs;
@@ -75,7 +76,7 @@ public class TestIncrementalBlockReports {
   }
 
   private static Block getDummyBlock() {
-    return new Block(DUMMY_BLOCK_ID, DUMMY_BLOCK_LENGTH, DUMMY_BLOCK_GENSTAMP);
+    return new Block(DUMMY_BLOCK_ID, DUMMY_BLOCK_LENGTH, DUMMY_BLOCK_GENSTAMP, NON_EXISTING_BUCKET_ID);
   }
 
   /**

@@ -36,11 +36,7 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
+import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.DataNode.BlockRecord;
@@ -110,8 +106,9 @@ public class TestBlockRecovery {
   private final static long BLOCK_LEN = 3000L;
   private final static long REPLICA_LEN1 = 6000L;
   private final static long REPLICA_LEN2 = 5000L;
+  private final static short NON_EXISTING_BUCKET_ID = Block.NON_EXISTING_BUCKET_ID;
   private final static ExtendedBlock block =
-      new ExtendedBlock(POOL_ID, BLOCK_ID, BLOCK_LEN, GEN_STAMP);
+      new ExtendedBlock(POOL_ID, BLOCK_ID, BLOCK_LEN, GEN_STAMP, NON_EXISTING_BUCKET_ID);
   
   static {
     ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
@@ -295,10 +292,10 @@ public class TestBlockRecovery {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     ReplicaRecoveryInfo replica1 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1, NON_EXISTING_BUCKET_ID,
             ReplicaState.FINALIZED);
     ReplicaRecoveryInfo replica2 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2, NON_EXISTING_BUCKET_ID,
             ReplicaState.FINALIZED);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -311,9 +308,9 @@ public class TestBlockRecovery {
         REPLICA_LEN1);
 
     // two finalized replicas have different length
-    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,NON_EXISTING_BUCKET_ID,
         ReplicaState.FINALIZED);
-    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,NON_EXISTING_BUCKET_ID,
         ReplicaState.FINALIZED);
 
     try {
@@ -341,10 +338,10 @@ public class TestBlockRecovery {
     
     // rbw and finalized replicas have the same length
     ReplicaRecoveryInfo replica1 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,NON_EXISTING_BUCKET_ID,
             ReplicaState.FINALIZED);
     ReplicaRecoveryInfo replica2 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,NON_EXISTING_BUCKET_ID,
             ReplicaState.RBW);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -357,9 +354,9 @@ public class TestBlockRecovery {
         REPLICA_LEN1);
     
     // rbw replica has a different length from the finalized one
-    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,NON_EXISTING_BUCKET_ID,
         ReplicaState.FINALIZED);
-    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,NON_EXISTING_BUCKET_ID,
         ReplicaState.RBW);
 
     dn1 = mock(InterDatanodeProtocol.class);
@@ -386,10 +383,10 @@ public class TestBlockRecovery {
     
     // rbw and finalized replicas have the same length
     ReplicaRecoveryInfo replica1 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,NON_EXISTING_BUCKET_ID,
             ReplicaState.FINALIZED);
     ReplicaRecoveryInfo replica2 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,NON_EXISTING_BUCKET_ID,
             ReplicaState.RWR);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -402,9 +399,9 @@ public class TestBlockRecovery {
         block, RECOVERY_ID, BLOCK_ID, REPLICA_LEN1);
     
     // rbw replica has a different length from the finalized one
-    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,NON_EXISTING_BUCKET_ID,
         ReplicaState.FINALIZED);
-    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,NON_EXISTING_BUCKET_ID,
         ReplicaState.RBW);
 
     dn1 = mock(InterDatanodeProtocol.class);
@@ -430,10 +427,10 @@ public class TestBlockRecovery {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     ReplicaRecoveryInfo replica1 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,NON_EXISTING_BUCKET_ID,
             ReplicaState.RBW);
     ReplicaRecoveryInfo replica2 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,NON_EXISTING_BUCKET_ID,
             ReplicaState.RBW);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -458,10 +455,10 @@ public class TestBlockRecovery {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     ReplicaRecoveryInfo replica1 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,NON_EXISTING_BUCKET_ID,
             ReplicaState.RBW);
     ReplicaRecoveryInfo replica2 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,NON_EXISTING_BUCKET_ID,
             ReplicaState.RWR);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -487,10 +484,10 @@ public class TestBlockRecovery {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     ReplicaRecoveryInfo replica1 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,NON_EXISTING_BUCKET_ID,
             ReplicaState.RWR);
     ReplicaRecoveryInfo replica2 =
-        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,NON_EXISTING_BUCKET_ID,
             ReplicaState.RWR);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
@@ -575,7 +572,7 @@ public class TestBlockRecovery {
     }
     DataNode spyDN = spy(dn);
     doReturn(new ReplicaRecoveryInfo(block.getBlockId(), 0,
-        block.getGenerationStamp(), ReplicaState.FINALIZED)).when(spyDN).
+        block.getGenerationStamp(),NON_EXISTING_BUCKET_ID, ReplicaState.FINALIZED)).when(spyDN).
         initReplicaRecovery(any(RecoveringBlock.class));
     Daemon d = spyDN.recoverBlocks("fake NN", initRecoveringBlocks());
     d.join();
@@ -591,7 +588,7 @@ public class TestBlockRecovery {
         dn.getDNRegistrationForBP(block.getBlockPoolId());
     BlockRecord blockRecord = new BlockRecord(new DatanodeID(dnR), spyDN,
         new ReplicaRecoveryInfo(block.getBlockId(), block.getNumBytes(),
-            block.getGenerationStamp(), ReplicaState.FINALIZED));
+            block.getGenerationStamp(),NON_EXISTING_BUCKET_ID, ReplicaState.FINALIZED));
     blocks.add(blockRecord);
     return blocks;
   }

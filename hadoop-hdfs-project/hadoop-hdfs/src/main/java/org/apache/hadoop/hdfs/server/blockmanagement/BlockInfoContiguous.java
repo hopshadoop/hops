@@ -16,23 +16,30 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import com.google.common.collect.Iterables;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.common.FinderType;
-import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
+import io.hops.metadata.hdfs.entity.ProvidedBlockCacheLoc;
 import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.hdfs.entity.ReplicaBase;
 import io.hops.transaction.EntityManager;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
+import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -223,9 +230,59 @@ public class BlockInfoContiguous extends Block {
    * @return array of storages that store a replica of this block
    */
   public DatanodeStorageInfo[] getStorages(DatanodeManager datanodeMgr)
-      throws StorageException, TransactionContextException {
+          throws TransactionContextException, StorageException {
     List<Replica> replicas = getReplicas(datanodeMgr);
+    if (replicas.size() == 0 && isProvidedBlock()) {
+      // get a phantom block
+      return phantomStoragesForProvidedBlocks(datanodeMgr);
+    }
     return getStorages(datanodeMgr, replicas);
+  }
+
+  public DatanodeStorageInfo[] phantomStoragesForProvidedBlocks(DatanodeManager dnMgm) throws StorageException {
+    //NOTE: The solution for HopsFS-Cloud assumes that a single replica (DN)
+    //manipulates a provided block. Returning multiple replica locations
+    //will break the solution
+
+    final int STORAGES = 1;
+
+    //returning a phantom 'cloud' storage
+    List<DatanodeInfo> existing = new ArrayList<>();
+    List<DatanodeStorageInfo> ret = new ArrayList<>();
+
+    ProvidedBlockCacheLoc loc =
+            ProvidedBlocksCacheHelper.getProvidedBlockCacheLocation(getBlockId());
+    if (loc != null) {
+      // check that the datanode is alive
+      DatanodeDescriptor dns = dnMgm.getDatanodeBySid(loc.getStorageID());
+      if(dns.isAlive && !dns.isStale(dnMgm.getStaleInterval())){
+        LOG.info("HopsFS-Cloud. The block ID: "+getBlockId()+" is cached on DN: "+dns.toString());
+        DatanodeStorageInfo storageInfo = dnMgm.getStorage(loc.getStorageID());
+        ret.add(storageInfo);
+      }
+    }
+
+    while (ret.size() < STORAGES) {
+      DatanodeDescriptor dnDesc = dnMgm.getRandomDN(existing);
+      if (dnDesc == null) {
+        break;
+      }
+      existing.add(dnDesc);
+
+      //A data node may have multiple CLOUD volumes. Retruen a random
+      //CLOUD Volumen on the datanode.
+      List<DatanodeStorageInfo> storages = Arrays.asList(dnDesc.getStorageInfos());
+      Collections.shuffle(storages);
+      for (DatanodeStorageInfo info : storages) {
+        if (info.getStorageType() == StorageType.CLOUD) {
+          LOG.info("HopsFS-Cloud. The block ID: "+getBlockId()+" will be cached on DN: "+info.toString());
+          ret.add(info);
+          break;
+        }
+      }
+    }
+
+    return Iterables.toArray(ret, DatanodeStorageInfo.class);
   }
 
   /**
@@ -564,9 +621,9 @@ public class BlockInfoContiguous extends Block {
     save();
   }
 
-  public void set(long blkid, long len, long genStamp)
+  public void set(long blkid, long len, long genStamp, short cloudBucketID)
       throws StorageException, TransactionContextException {
-    setNoPersistance(blkid, len, genStamp);
+    setNoPersistance(blkid, len, genStamp, cloudBucketID);
     save();
   }
 

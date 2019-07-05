@@ -85,6 +85,69 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String  DFS_DIR_DELETE_BATCH_SIZE= "dfs.dir.delete.batch.size";
   public static final int DFS_DIR_DELETE_BATCH_SIZE_DEFAULT = 50;
 
+  //HopsFS Cloud
+  public static final String DFS_ENABLE_CLOUD_PERSISTENCE = "dfs.enable.cloud.persistence";
+  public static final boolean DFS_ENABLE_CLOUD_PERSISTENCE_DEFAULT = false;
+
+  public static final String DFS_CLOUD_PROVIDER = "dfs.cloud.provider";
+  public static final String DFS_CLOUD_PROVIDER_DEFAULT = "AWS";
+
+  public static final String S3_BUCKET_PREFIX = "dfs.cloud.aws.s3.bucket.prefix";
+  public static final String S3_BUCKET_PREFIX_DEFAULT = "hopsfs.bucket";
+
+  public static final String DFS_CLOUD_AWS_S3_REGION = "dfs.cloud.aws.s3.region";
+  public static final String DFS_CLOUD_AWS_S3_REGION_DEFAULT = "eu-north-1";
+
+  public static final String DFS_CLOUD_AWS_S3_NUM_BUCKETS = "dfs.cloud.aws.s3.num.buckets";
+  public static final int DFS_CLOUD_AWS_S3_NUM_BUCKETS_DEFAULT = 5;
+
+  public static final String DFS_NAMENODE_INVALIDATE_PROVIDED_BLOCKS_PER_ITERATION =
+          "dfs.namenode.invalidate.cloud.blocks.per.iteration";
+  public static final int DFS_NAMENODE_INVALIDATE_PROVIDED_BLOCKS_PER_ITERATION_DEFAULT = 10000;
+
+  public static final String DFS_CLOUD_MULTIPART_SIZE = "dfs.cloud.multipart.size";
+  public static final long DFS_CLOUD_MULTIPART_SIZE_DEFAULT = 10*1024*1024; // 10 MB
+
+  public static final String DFS_CLOUD_MIN_MULTIPART_THRESHOLD = "dfs.cloud.multipart.threshold";
+  public static final long DFS_CLOUD_MIN_MULTIPART_THRESHOLD_DEFAULT = Integer.MAX_VALUE;
+
+  // the maximum number of threads to allow in the pool used by TransferManager
+  public static final String DFS_DN_CLOUD_MAX_TRANSFER_THREADS = "dfs.dn.cloud.max.upload.threads";
+  public static final int DFS_DN_CLOUD_MAX_TRANSFER_THREADS_DEFAULT = 20;
+
+  // the time an idle thread waits before terminating
+  public static final String DFS_CLOUD_KEEPALIVE_TIME = "dfs.cloud.threads.keepalivetime.sec";
+  public static final int DFS_CLOUD_KEEPALIVE_TIME_DEFAULT = 60;
+
+  // Data node provided blocks cache params
+  public static final String DFS_DN_CLOUD_BYPASS_CACHE_KEY =
+          "dfs.dn.cloud.bypass.cache";
+  public static final boolean DFS_DN_CLOUD_BYPASS_CACHE_DEFAULT = false;
+
+  public static final String DFS_DN_CLOUD_CACHE_CHECK_INTERVAL_KEY =
+          "dfs.dnfcloud.cache.check.interval";
+  public static final long DFS_DN_CLOUD_CACHE_CHECK_INTERVAL_DEFAULT = 3000;
+
+  public static final String DFS_DN_CLOUD_CACHE_DELETE_ACTIVATION_PRECENTAGE_KEY =
+          "dfs.dn.cloud.cache.delete.activation.percentage";
+  public static final int DFS_DN_CLOUD_CACHE_DELETE_ACTIVATION_PRECENTAGE_DEFAULT = 80;
+
+  public static final String DFS_DN_CLOUD_CACHE_DELETE_BATCH_SIZE_KEY =
+          "dfs.dn.cloud.cache.delete.batch.size";
+  public static final int DFS_DN_CLOUD_CACHE_DELETE_BATCH_SIZE_DEFAULT = 100;
+
+  public static final String DFS_DN_CLOUD_CACHE_DELETE_WAIT_KEY =
+          "dfs.dn.cloud.cache.delete.wait";
+  public static final int DFS_DN_CLOUD_CACHE_DELETE_WAIT_DEFAULT = 30*60*1000;
+  // block file must be an 30 mins old before it can be deleted.
+  // This is to make sure that we do not delete newly downloaded
+  // blocks in the cache that are being read by remote clients
+
+
+  public static final String DFS_NN_MAX_THREADS_FOR_FORMATTING_CLOUD_BUCKETS_KEY =
+          "dfs.nn.max.threads.for.formatting.cloud.buckets";
+  public static final int DFS_NN_MAX_THREADS_FOR_FORMATTING_CLOUD_BUCKETS_DEFAULT = 30;
+
   /*for client failover api*/
   // format {ip:port, ip:port, ip:port} comma separated
   public static final String DFS_NAMENODES_RPC_ADDRESS_KEY = "dfs.namenodes.rpc.addresses";

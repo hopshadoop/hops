@@ -74,8 +74,8 @@ abstract public class ReplicaInfo extends Block implements Replica {
    * @param dir
    *     directory path where block and meta files are located
    */
-  ReplicaInfo(long blockId, long genStamp, FsVolumeSpi vol, File dir) {
-    this(blockId, 0L, genStamp, vol, dir);
+  ReplicaInfo(long blockId, long genStamp, short cloudBucketID, FsVolumeSpi vol, File dir) {
+    this(blockId, 0L, genStamp, cloudBucketID, vol, dir);
   }
   
   /**
@@ -90,7 +90,7 @@ abstract public class ReplicaInfo extends Block implements Replica {
    */
   ReplicaInfo(Block block, FsVolumeSpi vol, File dir) {
     this(block.getBlockId(), block.getNumBytes(), block.getGenerationStamp(),
-        vol, dir);
+        block.getCloudBucketID(), vol, dir);
   }
   
   /**
@@ -107,9 +107,9 @@ abstract public class ReplicaInfo extends Block implements Replica {
    * @param dir
    *     directory path where block and meta files are located
    */
-  ReplicaInfo(long blockId, long len, long genStamp, FsVolumeSpi vol,
-      File dir) {
-    super(blockId, len, genStamp);
+  ReplicaInfo(long blockId, long len, long genStamp, short cloudBucketID,
+              FsVolumeSpi vol, File dir) {
+    super(blockId, len, genStamp, cloudBucketID);
     this.volume = vol;
     setDirInternal(dir);
   }

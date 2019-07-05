@@ -26,6 +26,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeReference;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.LengthInputStream;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.CloudFsDatasetImpl;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.LongWritable;
@@ -254,18 +255,29 @@ class BlockSender implements java.io.Closeable {
         Preconditions.checkArgument(sendChecksum,
             "If verifying checksum, currently must also send it.");
       }
-      
-      final Replica replica;
+
+      Replica replica = null;
       final long replicaVisibleLength;
-      synchronized (datanode.data) {
-        if(block.getBlockId()<0){
-          LOG.debug("Suffed Inode: Reading Phantom data block.");
-          replica = new FinalizedReplica(block.getBlockId(), block.getNumBytes(), block.getGenerationStamp(), null, null);
-        } else {
+      if (block.getBlockId() < 0) {
+        // No need to take a lock as the block is not stored on this datanode
+        replica = new FinalizedReplica(block.getBlockId(), block.getNumBytes(),
+                block.getGenerationStamp(), block.getCloudBucketID(), null, null);
+      } else if (block.isProvidedBlock()) {
+        //finalized provided blocks are stored in the Cloud. Datanodes only cache these blocks.
+        //However, non finalized provided blocks are stored on datanodes during modification.
+        if (((CloudFsDatasetImpl) datanode.data).isProvideBlockFinalized(block)) {
+          //this is get the information from the cloud
+          replica = getReplica(block, datanode);
+        } // else read with lock
+      }
+
+      if (replica == null) {
+        synchronized (datanode.data) {
           replica = getReplica(block, datanode);
         }
-        replicaVisibleLength = replica.getVisibleLength();
       }
+      replicaVisibleLength = replica.getVisibleLength();
+
       // if there is a write in progress
       ChunkChecksum chunkChecksum = null;
       if (replica instanceof ReplicaBeingWritten) {
@@ -477,7 +489,7 @@ class BlockSender implements java.io.Closeable {
   private static Replica getReplica(ExtendedBlock block, DataNode datanode)
       throws ReplicaNotFoundException {
     Replica replica =
-        datanode.data.getReplica(block.getBlockPoolId(), block.getBlockId());
+        datanode.data.getReplica(block);
     if (replica == null) {
       throw new ReplicaNotFoundException(block);
     }
