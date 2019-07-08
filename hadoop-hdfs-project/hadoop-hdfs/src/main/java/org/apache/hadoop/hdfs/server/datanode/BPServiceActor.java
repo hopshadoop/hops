@@ -78,8 +78,6 @@ class BPServiceActor implements Runnable {
 
   private DatanodeRegistration bpRegistration;
 
-  private final Object waitForHeartBeats = new Object();
-
   private boolean connectedToNN = false;
 
   BPServiceActor(InetSocketAddress nnAddr, BPOfferService bpos) {
@@ -397,9 +395,7 @@ class BPServiceActor implements Runnable {
           // set wait time to 1 ms to send a new HB immediately
           waitTime = 1;
         }
-        synchronized (waitForHeartBeats) {
-          waitForHeartBeats.wait(waitTime);
-        }
+        Thread.sleep(waitTime);
 
       } catch (RemoteException re) {
         String reClass = re.getClassName();
