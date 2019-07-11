@@ -37,6 +37,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.HtmlQuoting;
+import org.apache.hadoop.http.IsActiveServlet;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -68,7 +69,7 @@ public class RMWebAppFilter extends GuiceContainer {
 
   // define a set of URIs which do not need to do redirection
   private static final Set<String> NON_REDIRECTED_URIS = Sets.newHashSet(
-      "/conf", "/stacks", "/logLevel", "/logs");
+      "/conf", "/stacks", "/logLevel", "/logs", IsActiveServlet.PATH_SPEC);
   private String path;
   private boolean ahsEnabled;
   private String ahsPageURLPrefix;
@@ -156,8 +157,6 @@ public class RMWebAppFilter extends GuiceContainer {
         String redirectMsg =
             doRetry ? "Can not find any active RM. Will retry in next " + next
                 + " seconds." : "There is no active RM right now.";
-        redirectMsg += "\nHA Zookeeper Connection State: "
-            + rmWebApp.getHAZookeeperConnectionState();
         PrintWriter out = response.getWriter();
         out.println(redirectMsg);
         if (doRetry) {

@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.server;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileUtil;
@@ -45,6 +43,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.junit.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Verify if NodeManager's in-memory good local dirs list and good log dirs list
@@ -54,7 +54,7 @@ import org.junit.Assert;
  */
 public class TestDiskFailures {
 
-  private static final Log LOG = LogFactory.getLog(TestDiskFailures.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestDiskFailures.class);
 
   private static final long DISK_HEALTH_CHECK_INTERVAL = 1000;//1 sec
 
@@ -244,7 +244,9 @@ public class TestDiskFailures {
     for (int i = 0; i < 10; i++) {
       Iterator<RMNode> iter = yarnCluster.getResourceManager().getRMContext()
                               .getRMNodes().values().iterator();
-      if ((iter.next().getState() != NodeState.UNHEALTHY) == isHealthy) {
+      // RMNode # might be zero because of timing related issue.
+      if (iter.hasNext() &&
+          (iter.next().getState() != NodeState.UNHEALTHY) == isHealthy) {
         break;
       }
       // wait for the node health info to go to RM

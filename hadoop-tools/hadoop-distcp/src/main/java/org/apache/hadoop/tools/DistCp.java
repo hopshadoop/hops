@@ -19,11 +19,11 @@
 package org.apache.hadoop.tools;
 
 import java.io.IOException;
-import java.net.URL;
 import java.util.Random;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -64,31 +64,56 @@ public class DistCp extends Configured implements Tool {
    */
   static final int SHUTDOWN_HOOK_PRIORITY = 30;
 
-  static final Log LOG = LogFactory.getLog(DistCp.class);
+  static final Logger LOG = LoggerFactory.getLogger(DistCp.class);
 
-  private DistCpOptions inputOptions;
+  @VisibleForTesting
+  DistCpContext context;
+
   private Path metaFolder;
 
   private static final String PREFIX = "_distcp";
   private static final String WIP_PREFIX = "._WIP_";
   private static final String DISTCP_DEFAULT_XML = "distcp-default.xml";
+  private static final String DISTCP_SITE_XML = "distcp-site.xml";
   static final Random rand = new Random();
 
   private boolean submitted;
   private FileSystem jobFS;
 
+  private void prepareFileListing(Job job) throws Exception {
+    if (context.shouldUseSnapshotDiff()) {
+      throw new UnsupportedOperationException("snapshot not supported");
+      // When "-diff" or "-rdiff" is passed, do sync() first, then
+      // create copyListing based on snapshot diff.
+//      DistCpSync distCpSync = new DistCpSync(context, getConf());
+//      if (distCpSync.sync()) {
+//        createInputFileListingWithDiff(job, distCpSync);
+//      } else {
+//        throw new Exception("DistCp sync failed, input options: " + context);
+//      }
+    } else {
+      // When no "-diff" or "-rdiff" is passed, create copyListing
+      // in regular way.
+      createInputFileListing(job);
+    }
+  }
+
   /**
    * Public Constructor. Creates DistCp object with specified input-parameters.
    * (E.g. source-paths, target-location, etc.)
-   * @param inputOptions Options (indicating source-paths, target-location.)
-   * @param configuration The Hadoop configuration against which the Copy-mapper must run.
+   * @param configuration configuration against which the Copy-mapper must run
+   * @param inputOptions Immutable options
    * @throws Exception
    */
-  public DistCp(Configuration configuration, DistCpOptions inputOptions) throws Exception {
+  public DistCp(Configuration configuration, DistCpOptions inputOptions)
+      throws Exception {
     Configuration config = new Configuration(configuration);
     config.addResource(DISTCP_DEFAULT_XML);
+    config.addResource(DISTCP_SITE_XML);
     setConf(config);
-    this.inputOptions = inputOptions;
+    if (inputOptions != null) {
+      this.context = new DistCpContext(inputOptions);
+    }
     this.metaFolder   = createMetaFolderPath();
   }
 
@@ -114,9 +139,10 @@ public class DistCp extends Configured implements Tool {
     }
     
     try {
-      inputOptions = (OptionsParser.parse(argv));
+      context = new DistCpContext(OptionsParser.parse(argv));
+      checkSplitLargeFile();
       setTargetPathExists();
-      LOG.info("Input Options: " + inputOptions);
+      LOG.info("Input Options: " + context);
     } catch (Throwable e) {
       LOG.error("Invalid arguments: ", e);
       System.err.println("Invalid arguments: " + e.getMessage());
@@ -152,9 +178,11 @@ public class DistCp extends Configured implements Tool {
    * @throws Exception
    */
   public Job execute() throws Exception {
+    Preconditions.checkState(context != null,
+        "The DistCpContext should have been created before running DistCp!");
     Job job = createAndSubmitJob();
 
-    if (inputOptions.shouldBlock()) {
+    if (context.shouldBlock()) {
       waitForJobCompletion(job);
     }
     return job;
@@ -165,7 +193,7 @@ public class DistCp extends Configured implements Tool {
    * @return The mapreduce job object that has been submitted
    */
   public Job createAndSubmitJob() throws Exception {
-    assert inputOptions != null;
+    assert context != null;
     assert getConf() != null;
     Job job = null;
     try {
@@ -175,16 +203,7 @@ public class DistCp extends Configured implements Tool {
         jobFS = metaFolder.getFileSystem(getConf());
         job = createJob();
       }
-      if (inputOptions.shouldUseDiff()) {
-          throw new Exception("Not compatible with current version of HDFS, need snapshot: "
-              + inputOptions);
-      }
-
-      // Fallback to default DistCp if without "diff" option or sync failed.
-      if (!inputOptions.shouldUseDiff()) {
-        createInputFileListing(job);
-      }
-
+      prepareFileListing(job);
       job.submit();
       submitted = true;
     } finally {
@@ -194,7 +213,8 @@ public class DistCp extends Configured implements Tool {
     }
 
     String jobID = job.getJobID().toString();
-    job.getConfiguration().set(DistCpConstants.CONF_LABEL_DISTCP_JOB_ID, jobID);
+    job.getConfiguration().set(DistCpConstants.CONF_LABEL_DISTCP_JOB_ID,
+        jobID);
     LOG.info("DistCp job-id: " + jobID);
 
     return job;
@@ -217,13 +237,45 @@ public class DistCp extends Configured implements Tool {
    * for the benefit of CopyCommitter
    */
   private void setTargetPathExists() throws IOException {
-    Path target = inputOptions.getTargetPath();
+    Path target = context.getTargetPath();
     FileSystem targetFS = target.getFileSystem(getConf());
     boolean targetExists = targetFS.exists(target);
-    inputOptions.setTargetPathExists(targetExists);
+    context.setTargetPathExists(targetExists);
     getConf().setBoolean(DistCpConstants.CONF_LABEL_TARGET_PATH_EXISTS, 
         targetExists);
   }
+
+  /**
+   * Check splitting large files is supported and populate configs.
+   */
+  private void checkSplitLargeFile() throws IOException {
+    if (!context.splitLargeFile()) {
+      return;
+    }
+
+    final Path target = context.getTargetPath();
+    final FileSystem targetFS = target.getFileSystem(getConf());
+    try {
+      Path[] src = null;
+      Path tgt = null;
+      targetFS.concat(tgt, src);
+    } catch (UnsupportedOperationException use) {
+      throw new UnsupportedOperationException(
+          DistCpOptionSwitch.BLOCKS_PER_CHUNK.getSwitch() +
+              " is not supported since the target file system doesn't" +
+              " support concat.", use);
+    } catch (Exception e) {
+      // Ignore other exception
+    }
+
+    LOG.info("Set " +
+        DistCpConstants.CONF_LABEL_SIMPLE_LISTING_RANDOMIZE_FILES
+        + " to false since " + DistCpOptionSwitch.BLOCKS_PER_CHUNK.getSwitch()
+        + " is passed.");
+    getConf().setBoolean(
+        DistCpConstants.CONF_LABEL_SIMPLE_LISTING_RANDOMIZE_FILES, false);
+  }
+
   /**
    * Create Job object for submitting it, with all the configuration
    *
@@ -237,7 +289,7 @@ public class DistCp extends Configured implements Tool {
       jobName += ": " + userChosenName;
     Job job = Job.getInstance(getConf());
     job.setJobName(jobName);
-    job.setInputFormatClass(DistCpUtils.getStrategy(getConf(), inputOptions));
+    job.setInputFormatClass(DistCpUtils.getStrategy(getConf(), context));
     job.setJarByClass(CopyMapper.class);
     configureOutputFormat(job);
 
@@ -248,88 +300,10 @@ public class DistCp extends Configured implements Tool {
     job.setOutputFormatClass(CopyOutputFormat.class);
     job.getConfiguration().set(JobContext.MAP_SPECULATIVE, "false");
     job.getConfiguration().set(JobContext.NUM_MAPS,
-                  String.valueOf(inputOptions.getMaxMaps()));
+                  String.valueOf(context.getMaxMaps()));
 
-    if (inputOptions.getSslConfigurationFile() != null) {
-      setupSSLConfig(job);
-    }
-
-    inputOptions.appendToConf(job.getConfiguration());
+    context.appendToConf(job.getConfiguration());
     return job;
-  }
-
-  /**
-   * Setup ssl configuration on the job configuration to enable hsftp access
-   * from map job. Also copy the ssl configuration file to Distributed cache
-   *
-   * @param job - Reference to job's handle
-   * @throws java.io.IOException - Exception if unable to locate ssl config file
-   */
-  private void setupSSLConfig(Job job) throws IOException  {
-    Configuration configuration = job.getConfiguration();
-    URL sslFileUrl = configuration.getResource(inputOptions
-        .getSslConfigurationFile());
-    if (sslFileUrl == null) {
-      throw new IOException(
-          "Given ssl configuration file doesn't exist in class path : "
-              + inputOptions.getSslConfigurationFile());
-    }
-    Path sslConfigPath = new Path(sslFileUrl.toString());
-
-    addSSLFilesToDistCache(job, sslConfigPath);
-    configuration.set(DistCpConstants.CONF_LABEL_SSL_CONF, sslConfigPath.getName());
-    configuration.set(DistCpConstants.CONF_LABEL_SSL_KEYSTORE, sslConfigPath.getName());
-  }
-
-  /**
-   * Add SSL files to distributed cache. Trust store, key store and ssl config xml
-   *
-   * @param job - Job handle
-   * @param sslConfigPath - ssl Configuration file specified through options
-   * @throws IOException - If any
-   */
-  private void addSSLFilesToDistCache(Job job,
-                                      Path sslConfigPath) throws IOException {
-    Configuration configuration = job.getConfiguration();
-    FileSystem localFS = FileSystem.getLocal(configuration);
-
-    Configuration sslConf = new Configuration(false);
-    sslConf.addResource(sslConfigPath);
-
-    Path localStorePath = getLocalStorePath(sslConf,
-                            DistCpConstants.CONF_LABEL_SSL_TRUST_STORE_LOCATION);
-    job.addCacheFile(localStorePath.makeQualified(localFS.getUri(),
-                                      localFS.getWorkingDirectory()).toUri());
-    configuration.set(DistCpConstants.CONF_LABEL_SSL_TRUST_STORE_LOCATION,
-                      localStorePath.getName());
-
-    localStorePath = getLocalStorePath(sslConf,
-                             DistCpConstants.CONF_LABEL_SSL_KEY_STORE_LOCATION);
-    job.addCacheFile(localStorePath.makeQualified(localFS.getUri(),
-                                      localFS.getWorkingDirectory()).toUri());
-    configuration.set(DistCpConstants.CONF_LABEL_SSL_KEY_STORE_LOCATION,
-                                      localStorePath.getName());
-
-    job.addCacheFile(sslConfigPath.makeQualified(localFS.getUri(),
-                                      localFS.getWorkingDirectory()).toUri());
-
-  }
-
-  /**
-   * Get Local Trust store/key store path
-   *
-   * @param sslConf - Config from SSL Client xml
-   * @param storeKey - Key for either trust store or key store
-   * @return - Path where the store is present
-   * @throws IOException -If any
-   */
-  private Path getLocalStorePath(Configuration sslConf, String storeKey) throws IOException {
-    if (sslConf.get(storeKey) != null) {
-      return new Path(sslConf.get(storeKey));
-    } else {
-      throw new IOException("Store for " + storeKey + " is not set in " +
-          inputOptions.getSslConfigurationFile());
-    }
   }
 
   /**
@@ -340,18 +314,20 @@ public class DistCp extends Configured implements Tool {
    */
   private void configureOutputFormat(Job job) throws IOException {
     final Configuration configuration = job.getConfiguration();
-    Path targetPath = inputOptions.getTargetPath();
+    Path targetPath = context.getTargetPath();
     FileSystem targetFS = targetPath.getFileSystem(configuration);
     targetPath = targetPath.makeQualified(targetFS.getUri(),
                                           targetFS.getWorkingDirectory());
-    if (inputOptions.shouldPreserve(DistCpOptions.FileAttribute.ACL)) {
+    if (context.shouldPreserve(
+        DistCpOptions.FileAttribute.ACL)) {
       DistCpUtils.checkFileSystemAclSupport(targetFS);
     }
-    if (inputOptions.shouldPreserve(DistCpOptions.FileAttribute.XATTR)) {
+    if (context.shouldPreserve(
+        DistCpOptions.FileAttribute.XATTR)) {
       DistCpUtils.checkFileSystemXAttrSupport(targetFS);
     }
-    if (inputOptions.shouldAtomicCommit()) {
-      Path workDir = inputOptions.getAtomicWorkPath();
+    if (context.shouldAtomicCommit()) {
+      Path workDir = context.getAtomicWorkPath();
       if (workDir == null) {
         workDir = targetPath.getParent();
       }
@@ -368,7 +344,7 @@ public class DistCp extends Configured implements Tool {
     }
     CopyOutputFormat.setCommitDirectory(job, targetPath);
 
-    Path logPath = inputOptions.getLogPath();
+    Path logPath = context.getLogPath();
     if (logPath == null) {
       logPath = new Path(metaFolder, "_logs");
     } else {
@@ -389,10 +365,26 @@ public class DistCp extends Configured implements Tool {
   protected Path createInputFileListing(Job job) throws IOException {
     Path fileListingPath = getFileListingPath();
     CopyListing copyListing = CopyListing.getCopyListing(job.getConfiguration(),
-        job.getCredentials(), inputOptions);
-    copyListing.buildListing(fileListingPath, inputOptions);
+        job.getCredentials(), context);
+    copyListing.buildListing(fileListingPath, context);
     return fileListingPath;
   }
+
+  /**
+   * Create input listing based on snapshot diff report.
+   * @param job - Handle to job
+   * @param distCpSync the class wraps the snapshot diff report
+   * @return Returns the path where the copy listing is created
+   * @throws IOException - If any
+   */
+//  private Path createInputFileListingWithDiff(Job job, DistCpSync distCpSync)
+//      throws IOException {
+//    Path fileListingPath = getFileListingPath();
+//    CopyListing copyListing = new SimpleCopyListing(job.getConfiguration(),
+//        job.getCredentials(), distCpSync);
+//    copyListing.buildListing(fileListingPath, context);
+//    return fileListingPath;
+//  }
 
   /**
    * Get default name of the copy listing file. Use the meta folder
@@ -451,19 +443,23 @@ public class DistCp extends Configured implements Tool {
    * Loads properties from distcp-default.xml into configuration
    * object
    * @return Configuration which includes properties from distcp-default.xml
+   *         and distcp-site.xml
    */
   private static Configuration getDefaultConf() {
     Configuration config = new Configuration();
     config.addResource(DISTCP_DEFAULT_XML);
+    config.addResource(DISTCP_SITE_XML);
     return config;
   }
 
   private synchronized void cleanup() {
     try {
-      if (metaFolder == null) return;
-
-      jobFS.delete(metaFolder, true);
-      metaFolder = null;
+      if (metaFolder != null) {
+        if (jobFS != null) {
+          jobFS.delete(metaFolder, true);
+        }
+        metaFolder = null;
+      }
     } catch (IOException e) {
       LOG.error("Unable to cleanup meta folder: " + metaFolder, e);
     }

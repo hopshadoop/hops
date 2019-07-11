@@ -32,7 +32,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 public class TestKeyProviderDelegationTokenExtension {
-
+  
   public static abstract class MockKeyProvider extends
       KeyProvider implements DelegationTokenExtension {
 
@@ -44,30 +44,34 @@ public class TestKeyProviderDelegationTokenExtension {
   @Test
   public void testCreateExtension() throws Exception {
     Configuration conf = new Configuration();
-    Credentials credentials = new Credentials();
-    KeyProvider kp =
+    Credentials credentials = new Credentials();    
+    KeyProvider kp = 
         new UserProvider.Factory().createProvider(new URI("user:///"), conf);
-    KeyProviderDelegationTokenExtension kpDTE1 =
+    KeyProviderDelegationTokenExtension kpDTE1 = 
         KeyProviderDelegationTokenExtension
         .createKeyProviderDelegationTokenExtension(kp);
     Assert.assertNotNull(kpDTE1);
-    // Default implementation should be a no-op and return null
-    Assert.assertNull(kpDTE1.addDelegationTokens("user", credentials));
-
+    Token<?>[] tokens = kpDTE1.addDelegationTokens("user", credentials);
+    // Default implementation should return no tokens.
+    Assert.assertNotNull(tokens);
+    Assert.assertEquals(0, tokens.length);
+    
     MockKeyProvider mock = mock(MockKeyProvider.class);
     Mockito.when(mock.getConf()).thenReturn(new Configuration());
-    when(mock.addDelegationTokens("renewer", credentials)).thenReturn(
-        new Token<?>[]{new Token(null, null, new Text("kind"), new Text(
-            "service"))}
+    when(mock.getCanonicalServiceName()).thenReturn("cservice");
+    when(mock.getDelegationToken("renewer")).thenReturn(
+        new Token(null, null, new Text("kind"), new Text(
+            "tservice"))
     );
     KeyProviderDelegationTokenExtension kpDTE2 =
         KeyProviderDelegationTokenExtension
         .createKeyProviderDelegationTokenExtension(mock);
-    Token<?>[] tokens =
-        kpDTE2.addDelegationTokens("renewer", credentials);
+    tokens = kpDTE2.addDelegationTokens("renewer", credentials);
     Assert.assertNotNull(tokens);
+    Assert.assertEquals(1, tokens.length);
     Assert.assertEquals("kind", tokens[0].getKind().toString());
-
+    Assert.assertEquals("tservice", tokens[0].getService().toString());
+    Assert.assertNotNull(credentials.getToken(new Text("cservice")));
   }
 
 }

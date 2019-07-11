@@ -19,8 +19,8 @@
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -42,6 +42,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
+import org.apache.hadoop.yarn.webapp.GuiceServletConfig;
 import org.apache.hadoop.yarn.webapp.JerseyTestBase;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -53,19 +54,11 @@ import org.junit.Test;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.servlet.GuiceServletContextListener;
 import com.google.inject.servlet.ServletModule;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.test.framework.WebAppDescriptor;
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
-import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Tests partition resource usage per application.
@@ -75,43 +68,39 @@ public class TestRMWebServiceAppsNodelabel extends JerseyTestBase {
 
   private static final int AM_CONTAINER_MB = 1024;
 
+  private static RMNodeLabelsManager nodeLabelManager;
 
   private static MockRM rm;
   private static CapacitySchedulerConfiguration csConf;
   private static YarnConfiguration conf;
 
-  public Injector injector = Guice.createInjector(new ServletModule() {
+  private static class WebServletModule extends ServletModule {
+
+    private static final String LABEL_X = "X";
 
     @Override
     protected void configureServlets() {
+      bind(JAXBContextResolver.class);
+      bind(RMWebServices.class);
+      bind(GenericExceptionHandler.class);
+      csConf = new CapacitySchedulerConfiguration();
+      setupQueueConfiguration(csConf);
+      conf = new YarnConfiguration(csConf);
+      conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
+          ResourceScheduler.class);
+      rm = new MockRM(conf);
+      Set<NodeLabel> labels = new HashSet<NodeLabel>();
+      labels.add(NodeLabel.newInstance(LABEL_X));
       try {
-        bind(JAXBContextResolver.class);
-        bind(RMWebServices.class);
-        bind(GenericExceptionHandler.class);
-        csConf = new CapacitySchedulerConfiguration();
-        setupQueueConfiguration(csConf);
-        conf = new YarnConfiguration(csConf);
-        conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
-            ResourceScheduler.class);
-        RMStorageFactory.setConfiguration(conf);
-        YarnAPIStorageFactory.setConfiguration(conf);
-        DBUtility.InitializeDB();
-        rm = new MockRM(conf);
-        
-        bind(ResourceManager.class).toInstance(rm);
-        serve("/*").with(GuiceContainer.class);
-      } catch (IOException ex) {
-        Logger.getLogger(TestRMWebServiceAppsNodelabel.class.getName()).log(Level.SEVERE, null, ex);
+        nodeLabelManager = rm.getRMContext().getNodeLabelManager();
+        nodeLabelManager.addToCluserNodeLabels(labels);
+      } catch (Exception e) {
+        Assert.fail();
       }
+      bind(ResourceManager.class).toInstance(rm);
+      serve("/*").with(GuiceContainer.class);
     }
-  });
-
-  public class GuiceServletConfig extends GuiceServletContextListener {
-    @Override
-    protected Injector getInjector() {
-      return injector;
-    }
-  }
+  };
 
   public TestRMWebServiceAppsNodelabel() {
     super(new WebAppDescriptor.Builder(
@@ -147,6 +136,8 @@ public class TestRMWebServiceAppsNodelabel extends JerseyTestBase {
   @Before
   public void setUp() throws Exception {
     super.setUp();
+    GuiceServletConfig
+        .setInjector(Guice.createInjector(new WebServletModule()));
   }
 
   @Test
@@ -165,9 +156,10 @@ public class TestRMWebServiceAppsNodelabel extends JerseyTestBase {
     assertEquals("incorrect number of elements", 1, apps.length());
     try {
       apps.getJSONArray("app").getJSONObject(0).getJSONObject("resourceInfo");
-      fail("resourceInfo object shouldnt be available for finished apps");
+      fail("resourceInfo object shouldn't be available for finished apps");
     } catch (Exception e) {
-      assertTrue("resourceInfo shouldn't be available for finished apps", true);
+      assertTrue("resourceInfo shouldn't be available for finished apps",
+          true);
     }
     rm.stop();
   }
@@ -175,70 +167,64 @@ public class TestRMWebServiceAppsNodelabel extends JerseyTestBase {
   @Test
   public void testAppsRunning() throws JSONException, Exception {
     rm.start();
-    String LABEL_X = "X";
-    RMNodeLabelsManager nodeLabelManager;
-    Set<NodeLabel> labels = new HashSet<NodeLabel>();
-    labels.add(NodeLabel.newInstance(LABEL_X));
-    try {
-      nodeLabelManager = rm.getRMContext().getNodeLabelManager();
-      nodeLabelManager.addToCluserNodeLabels(labels);
-    
-      rm.getRMContext().setNodeLabelManager(nodeLabelManager);
-      MockNM nm1 = rm.registerNode("h1:1234", 2048);
-      MockNM nm2 = rm.registerNode("h2:1235", 2048);
+    MockNM nm1 = rm.registerNode("h1:1234", 2048);
+    MockNM nm2 = rm.registerNode("h2:1235", 2048);
 
-      nodeLabelManager.addLabelsToNode(
-          ImmutableMap.of(NodeId.newInstance("h2", 1235), toSet("X")));
+    nodeLabelManager.addLabelsToNode(
+        ImmutableMap.of(NodeId.newInstance("h2", 1235), toSet("X")));
 
-      RMApp app1 = rm.submitApp(AM_CONTAINER_MB, "app", "user", null, "default");
-      MockAM am1 = MockRM.launchAndRegisterAM(app1, rm, nm1);
-      nm1.nodeHeartbeat(true);
+    RMApp app1 = rm.submitApp(AM_CONTAINER_MB, "app", "user", null, "default");
+    MockAM am1 = MockRM.launchAndRegisterAM(app1, rm, nm1);
+    nm1.nodeHeartbeat(true);
 
-      // AM request for resource in partition X
-      am1.allocate("*", 1024, 1, new ArrayList<ContainerId>(), "X");
-      Thread.sleep(500);
-      nm2.nodeHeartbeat(true);
+    // AM request for resource in partition X
+    am1.allocate("*", 1024, 1, new ArrayList<ContainerId>(), "X");
+    nm2.nodeHeartbeat(true);
 
-      WebResource r = resource();
+    WebResource r = resource();
 
-      ClientResponse response = r.path("ws").path("v1").path("cluster").path("apps")
-          .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-      JSONObject json = response.getEntity(JSONObject.class);
+    ClientResponse response =
+        r.path("ws").path("v1").path("cluster").path("apps")
+            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
+    JSONObject json = response.getEntity(JSONObject.class);
 
-      // Verify apps resource
-      JSONObject apps = json.getJSONObject("apps");
-      assertEquals("incorrect number of elements", 1, apps.length());
-      JSONObject jsonObject = apps.getJSONArray("app").getJSONObject(0).getJSONObject("resourceInfo");
-      JSONArray jsonArray = jsonObject.getJSONArray("resourceUsagesByPartition");
-      assertEquals("Partition expected is 2", 2, jsonArray.length());
+    // Verify apps resource
+    JSONObject apps = json.getJSONObject("apps");
+    assertEquals("incorrect number of elements", 1, apps.length());
+    JSONObject jsonObject =
+        apps.getJSONArray("app").getJSONObject(0).getJSONObject("resourceInfo");
+    JSONArray jsonArray = jsonObject.getJSONArray("resourceUsagesByPartition");
+    assertEquals("Partition expected is 2", 2, jsonArray.length());
 
-      // Default partition resource
-      JSONObject defaultPartition = jsonArray.getJSONObject(0);
-      verifyResource(defaultPartition, "", getResource(1024, 1, 0),
-          getResource(1024, 1, 0), getResource(0, 0, 0));
-      // verify resource used for parition x
-      JSONObject paritionX = jsonArray.getJSONObject(1);
-      verifyResource(paritionX, "X", getResource(0, 0, 0), getResource(1024, 1, 0),
-          getResource(0, 0, 0));
-    } catch (Exception e) {
-      Assert.fail();
-    }
+    // Default partition resource
+    JSONObject defaultPartition = jsonArray.getJSONObject(0);
+    verifyResource(defaultPartition, "", getResource(1024, 1),
+        getResource(1024, 1), getResource(0, 0));
+    // verify resource used for parition x
+    JSONObject paritionX = jsonArray.getJSONObject(1);
+    verifyResource(paritionX, "X", getResource(0, 0), getResource(1024, 1),
+        getResource(0, 0));
     rm.stop();
   }
 
-  private String getResource(int memory, int vcore, int gpu) {
-    return "{\"memory\":" + memory + ",\"vCores\":" + vcore + ",\"gpus\":" + gpu + "}";
+  private String getResource(int memory, int vcore) {
+    return "{\"memory\":" + memory + ",\"vCores\":" + vcore + "}";
   }
 
   private void verifyResource(JSONObject partition, String partitionName,
       String amused, String used, String reserved) throws JSONException {
+    JSONObject amusedObject = (JSONObject) partition.get("amUsed");
+    JSONObject usedObject = (JSONObject) partition.get("used");
+    JSONObject reservedObject = (JSONObject) partition.get("reserved");
     assertEquals("Partition expected", partitionName,
         partition.get("partitionName"));
-    assertEquals("partition amused", amused,
-        partition.get("amUsed").toString());
-    assertEquals("partition used", used, partition.get("used").toString());
+    assertEquals("partition amused", amused, getResource(
+        (int) amusedObject.get("memory"), (int) amusedObject.get("vCores")));
+    assertEquals("partition used", used, getResource(
+        (int) usedObject.get("memory"), (int) usedObject.get("vCores")));
     assertEquals("partition reserved", reserved,
-        partition.get("reserved").toString());
+        getResource((int) reservedObject.get("memory"),
+            (int) reservedObject.get("vCores")));
   }
 
   @SuppressWarnings("unchecked")

@@ -43,14 +43,11 @@ import org.apache.hadoop.yarn.server.api.ResourceManagerAdministrationProtocol;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import io.hops.util.GroupMembership;
-import org.apache.hadoop.net.NetUtils;
 
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class ClientRMProxy<T> extends RMProxy<T>  {
   private static final Log LOG = LogFactory.getLog(ClientRMProxy.class);
-  private static final ClientRMProxy INSTANCE = new ClientRMProxy();
 
   private interface ClientRMProtocols extends ApplicationClientProtocol,
       ApplicationMasterProtocol, ResourceManagerAdministrationProtocol {
@@ -70,8 +67,9 @@ public class ClientRMProxy<T> extends RMProxy<T>  {
    * @throws IOException
    */
   public static <T> T createRMProxy(final Configuration configuration,
-      final Class<T> protocol, boolean toLeader) throws IOException {
-    return createRMProxy(configuration, protocol, INSTANCE, toLeader);
+      final Class<T> protocol) throws IOException {
+    ClientRMProxy<T> clientRMProxy = new ClientRMProxy<>();
+    return createRMProxy(configuration, protocol, clientRMProxy);
   }
 
   private static void setAMRMTokenService(final Configuration conf)
@@ -86,7 +84,7 @@ public class ClientRMProxy<T> extends RMProxy<T>  {
 
   @Private
   @Override
-  protected InetSocketAddress getRMAddress(YarnConfiguration conf,
+  public InetSocketAddress getRMAddress(YarnConfiguration conf,
       Class<?> protocol) throws IOException {
     if (protocol == ApplicationClientProtocol.class) {
       return conf.getSocketAddr(YarnConfiguration.RM_ADDRESS,
@@ -102,10 +100,6 @@ public class ClientRMProxy<T> extends RMProxy<T>  {
       return conf.getSocketAddr(YarnConfiguration.RM_SCHEDULER_ADDRESS,
           YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
           YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
-    } else if (protocol == GroupMembership.class) {
-      return conf.getSocketAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT);
     } else {
       String message = "Unsupported protocol found when creating the proxy " +
           "connection to ResourceManager: " +
@@ -115,54 +109,9 @@ public class ClientRMProxy<T> extends RMProxy<T>  {
     }
   }
 
-  protected InetSocketAddress getRMAddress(YarnConfiguration conf,
-          Class<?> protocol, String host) throws IOException {
-    if (protocol == ApplicationClientProtocol.class) {
-      return conf.getSocketAddr(YarnConfiguration.RM_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_PORT, host);
-    } else if (protocol == ResourceManagerAdministrationProtocol.class) {
-      return conf.getSocketAddr(
-              YarnConfiguration.RM_ADMIN_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_ADMIN_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_ADMIN_PORT, host);
-    } else if (protocol == ApplicationMasterProtocol.class) {
-      setAMRMTokenService(conf);
-      return conf.getSocketAddr(YarnConfiguration.RM_SCHEDULER_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT, host);
-    } else if (protocol == GroupMembership.class) {
-      return conf.getSocketAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT, host);
-    } else {
-      String message = "Unsupported protocol found when creating the proxy " +
-              "connection to ResourceManager: " +
-              ((protocol != null) ? protocol.getClass().getName() : "null");
-      LOG.error(message);
-      throw new IllegalStateException(message);
-    }
-  }
-
-  private static void setupTokens(InetSocketAddress resourceManagerAddress)
-          throws IOException {
-    // It is assumed for now that the only AMRMToken in AM's UGI is for this
-    // cluster/RM. TODO: Fix later when we have some kind of cluster-ID as
-    // default service-address, see YARN-1779.
-    for (Token<? extends TokenIdentifier> token : UserGroupInformation
-            .getCurrentUser().getTokens()) {
-      if (token.getKind().equals(AMRMTokenIdentifier.KIND_NAME)) {
-        // This token needs to be directly provided to the AMs, so set the
-        // appropriate service-name. We'll need more infrastructure when we
-        // need to set it in HA case.
-        SecurityUtil.setTokenService(token, resourceManagerAddress);
-      }
-    }
-  }
-    
   @Private
   @Override
-  protected void checkAllowedProtocols(Class<?> protocol) {
+  public void checkAllowedProtocols(Class<?> protocol) {
     Preconditions.checkArgument(
         protocol.isAssignableFrom(ClientRMProtocols.class),
         "RM does not support this client protocol");

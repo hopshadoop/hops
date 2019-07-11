@@ -42,7 +42,7 @@ import org.junit.After;
 import org.junit.Test;
 
 public abstract class QueueACLsTestBase extends ACLsTestBase {
-  
+
   @After
   public void tearDown() {
     if (resourceManager != null) {

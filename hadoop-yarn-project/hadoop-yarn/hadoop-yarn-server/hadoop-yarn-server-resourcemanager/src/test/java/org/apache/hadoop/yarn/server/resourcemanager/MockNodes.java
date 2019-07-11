@@ -21,14 +21,14 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.NodeAttribute;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -37,12 +37,14 @@ import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
-import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
+import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 
 /**
  * Test helper to generate mock nodes
@@ -50,6 +52,10 @@ import com.google.common.collect.Lists;
 public class MockNodes {
   private static int NODE_ID = 0;
   private static RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
+
+  public static void resetHostIds() {
+    NODE_ID = 0;
+  }
 
   public static List<RMNode> newNodes(int racks, int nodesPerRack,
                                         Resource perNode) {
@@ -59,8 +65,7 @@ public class MockNodes {
         if (j == (nodesPerRack - 1)) {
           // One unhealthy node per rack.
           list.add(nodeInfo(i, perNode, NodeState.UNHEALTHY));
-        }
-        if (j == 0) {
+        } else if (j == 0) {
           // One node with label
           list.add(nodeInfo(i, perNode, NodeState.RUNNING, ImmutableSet.of("x")));
         } else {
@@ -115,6 +120,7 @@ public class MockNodes {
     private Set<String> labels;
     private ResourceUtilization containersUtilization;
     private ResourceUtilization nodeUtilization;
+    private Resource physicalResource;
     private Map<ApplicationId, UpdatedCryptoForApp> x509MaterialToUpdate = new ConcurrentHashMap<>();
     private Map<ApplicationId, UpdatedCryptoForApp> jwtMaterialToUpdate = new ConcurrentHashMap<>();
 
@@ -122,7 +128,7 @@ public class MockNodes {
         Resource perNode, String rackName, String healthReport,
         long lastHealthReportTime, int cmdPort, String hostName, NodeState state,
         Set<String> labels, ResourceUtilization containersUtilization,
-        ResourceUtilization nodeUtilization) {
+        ResourceUtilization nodeUtilization, Resource pPhysicalResource) {
       this.nodeId = nodeId;
       this.nodeAddr = nodeAddr;
       this.httpAddress = httpAddress;
@@ -136,6 +142,7 @@ public class MockNodes {
       this.labels = labels;
       this.containersUtilization = containersUtilization;
       this.nodeUtilization = nodeUtilization;
+      this.physicalResource = pPhysicalResource;
     }
 
     @Override
@@ -204,7 +211,8 @@ public class MockNodes {
     }
 
     @Override
-    public void updateNodeHeartbeatResponseForCleanup(NodeHeartbeatResponse response) {
+    public void setAndUpdateNodeHeartbeatResponse(
+        NodeHeartbeatResponse response) {
     }
 
     @Override
@@ -245,12 +253,6 @@ public class MockNodes {
     }
 
     @Override
-    public void updateNodeHeartbeatResponseForContainersDecreasing(
-        NodeHeartbeatResponse response) {
-      
-    }
-
-    @Override
     public List<Container> pullNewlyIncreasedContainers() {
       return Collections.emptyList();
     }
@@ -265,6 +267,10 @@ public class MockNodes {
       return this.nodeUtilization;
     }
 
+    public OpportunisticContainersStatus getOpportunisticContainersStatus() {
+      return OpportunisticContainersStatus.newInstance();
+    }
+
     @Override
     public long getUntrackedTimeStamp() {
       return 0;
@@ -273,7 +279,37 @@ public class MockNodes {
     @Override
     public void setUntrackedTimeStamp(long timeStamp) {
     }
-  
+
+    @Override
+    public Integer getDecommissioningTimeout() {
+      return null;
+    }
+
+    @Override
+    public Map<String, Long> getAllocationTagsWithCount() {
+      return null;
+    }
+
+    public void setNodeAttributes(String prefix,
+        Set<NodeAttribute> nodeAttributes) {
+
+    }
+
+    @Override
+    public Set<NodeAttribute> getAllNodeAttributes() {
+      return Collections.emptySet();
+    }
+
+    @Override
+    public RMContext getRMContext() {
+      return null;
+    }
+
+    @Override
+    public Resource getPhysicalResource() {
+      return this.physicalResource;
+    }
+    
     @Override
     public Map<ApplicationId, UpdatedCryptoForApp> getAppX509ToUpdate() {
       return x509MaterialToUpdate;
@@ -293,19 +329,19 @@ public class MockNodes {
   private static RMNode buildRMNode(int rack, final Resource perNode,
       NodeState state, String httpAddr, Set<String> labels) {
     return buildRMNode(rack, perNode, state, httpAddr, NODE_ID++, null, 123,
-        labels, null, null);
+        labels, null, null, null);
   }
   
   private static RMNode buildRMNode(int rack, final Resource perNode,
       NodeState state, String httpAddr, int hostnum, String hostName, int port) {
     return buildRMNode(rack, perNode, state, httpAddr, hostnum, hostName, port,
-        null, null, null);
+        null, null, null, null);
   }
 
   private static RMNode buildRMNode(int rack, final Resource perNode,
       NodeState state, String httpAddr, int hostnum, String hostName, int port,
       Set<String> labels, ResourceUtilization containersUtilization,
-      ResourceUtilization nodeUtilization) {
+      ResourceUtilization nodeUtilization, Resource physicalResource) {
     final String rackName = "rack"+ rack;
     final int nid = hostnum;
     final String nodeAddr = hostName + ":" + nid;
@@ -318,7 +354,7 @@ public class MockNodes {
     String healthReport = (state == NodeState.UNHEALTHY) ? null : "HealthyMe";
     return new MockRMNodeImpl(nodeID, nodeAddr, httpAddress, perNode,
         rackName, healthReport, 0, nid, hostName, state, labels,
-        containersUtilization, nodeUtilization);
+        containersUtilization, nodeUtilization, physicalResource);
   }
 
   public static RMNode nodeInfo(int rack, final Resource perNode,
@@ -336,17 +372,17 @@ public class MockNodes {
   }
 
   public static RMNode newNodeInfo(int rack, final Resource perNode, int hostnum) {
-    return buildRMNode(rack, perNode, null, "localhost:0", hostnum, null, 123);
+    return buildRMNode(rack, perNode, NodeState.RUNNING, "localhost:0", hostnum, null, 123);
   }
   
   public static RMNode newNodeInfo(int rack, final Resource perNode,
       int hostnum, String hostName) {
-    return buildRMNode(rack, perNode, null, "localhost:0", hostnum, hostName, 123);
+    return buildRMNode(rack, perNode, NodeState.RUNNING, "localhost:0", hostnum, hostName, 123);
   }
 
   public static RMNode newNodeInfo(int rack, final Resource perNode,
       int hostnum, String hostName, int port) {
-    return buildRMNode(rack, perNode, null, "localhost:0", hostnum, hostName, port);
+    return buildRMNode(rack, perNode, NodeState.RUNNING, "localhost:0", hostnum, hostName, port);
   }
 
 }

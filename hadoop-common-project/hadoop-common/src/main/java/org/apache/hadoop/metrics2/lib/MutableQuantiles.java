@@ -23,14 +23,16 @@ import static org.apache.hadoop.metrics2.lib.Interns.info;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.util.Quantile;
+import org.apache.hadoop.metrics2.util.QuantileEstimator;
 import org.apache.hadoop.metrics2.util.SampleQuantiles;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -54,8 +56,9 @@ public class MutableQuantiles extends MutableMetric {
   private final MetricsInfo[] quantileInfos;
   private final int interval;
 
-  private SampleQuantiles estimator;
+  private QuantileEstimator estimator;
   private long previousCount = 0;
+  private ScheduledFuture<?> scheduledTask = null;
 
   @VisibleForTesting
   protected Map<Quantile, Long> previousSnapshot = null;
@@ -104,8 +107,8 @@ public class MutableQuantiles extends MutableMetric {
     estimator = new SampleQuantiles(quantiles);
 
     this.interval = interval;
-    scheduler.scheduleAtFixedRate(new RolloverSample(this), interval, interval,
-        TimeUnit.SECONDS);
+    scheduledTask = scheduler.scheduleAtFixedRate(new RolloverSample(this),
+        interval, interval, TimeUnit.SECONDS);
   }
 
   @Override
@@ -132,6 +135,27 @@ public class MutableQuantiles extends MutableMetric {
 
   public int getInterval() {
     return interval;
+  }
+
+  public void stop() {
+    if (scheduledTask != null) {
+      scheduledTask.cancel(false);
+    }
+    scheduledTask = null;
+  }
+
+  /**
+   * Get the quantile estimator.
+   *
+   * @return the quantile estimator
+   */
+  @VisibleForTesting
+  public synchronized QuantileEstimator getEstimator() {
+    return estimator;
+  }
+
+  public synchronized void setEstimator(QuantileEstimator quantileEstimator) {
+    this.estimator = quantileEstimator;
   }
 
   /**

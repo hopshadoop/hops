@@ -47,7 +47,6 @@ import org.apache.hadoop.yarn.api.records.ReservationRequest;
 import org.apache.hadoop.yarn.api.records.ReservationRequestInterpreter;
 import org.apache.hadoop.yarn.api.records.ReservationRequests;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.Plan;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
@@ -463,9 +462,7 @@ public class ReservationACLsTestBase extends ACLsTestBase {
       int attempts = 10;
       Collection<Plan> plans;
       do {
-        DrainDispatcher dispatcher =
-                (DrainDispatcher) resourceManager.getRMContext().getDispatcher();
-        dispatcher.await();
+        resourceManager.drainEvents();
         LOG.info("Waiting for node capacity to be added to plan");
         plans = resourceManager.getRMContext().getReservationSystem()
                 .getAllPlans().values();
@@ -549,8 +546,8 @@ public class ReservationACLsTestBase extends ACLsTestBase {
     csConf.setBoolean(YarnConfiguration.RM_RESERVATION_SYSTEM_ENABLE, true);
     csConf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
     csConf.setBoolean(YarnConfiguration.YARN_RESERVATION_ACL_ENABLE, true);
-    csConf.set("yarn.resourcemanager.scheduler.class", CapacityScheduler
-            .class.getName());
+    csConf.set(YarnConfiguration.RM_SCHEDULER,
+        CapacityScheduler.class.getName());
 
     return csConf;
   }
@@ -566,6 +563,8 @@ public class ReservationACLsTestBase extends ACLsTestBase {
     PrintWriter out = new PrintWriter(new FileWriter(ALLOC_FILE));
     out.println("<?xml version=\"1.0\"?>");
     out.println("<allocations>");
+    out.println("  <defaultQueueSchedulingPolicy>drf" +
+        "</defaultQueueSchedulingPolicy>");
     out.println("  <queue name=\"queueA\">");
     out.println("    <aclSubmitReservations>" +
             "queueA_user,common_user " +
@@ -600,8 +599,7 @@ public class ReservationACLsTestBase extends ACLsTestBase {
     fsConf.setBoolean(YarnConfiguration.RM_RESERVATION_SYSTEM_ENABLE, true);
     fsConf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
     fsConf.setBoolean(YarnConfiguration.YARN_RESERVATION_ACL_ENABLE, true);
-    fsConf.set("yarn.resourcemanager.scheduler.class", FairScheduler.class
-            .getName());
+    fsConf.set(YarnConfiguration.RM_SCHEDULER, FairScheduler.class.getName());
 
     return fsConf;
   }

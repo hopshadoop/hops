@@ -15,21 +15,78 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+## @description  usage info
+## @audience     private
+## @stability    evolving
+## @replaceable  no
+function hadoop_usage
+{
+  hadoop_generate_usage "${MYNAME}" false
+}
 
-# Stop all yarn daemons.  Run this on master node.
+MYNAME="${BASH_SOURCE-$0}"
 
-echo "stopping yarn daemons"
+bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
 
-bin=`dirname "${BASH_SOURCE-$0}"`
-bin=`cd "$bin"; pwd`
+# let's locate libexec...
+if [[ -n "${HADOOP_HOME}" ]]; then
+  HADOOP_DEFAULT_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
+else
+  HADOOP_DEFAULT_LIBEXEC_DIR="${bin}/../libexec"
+fi
 
-DEFAULT_LIBEXEC_DIR="$bin"/../libexec
-HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-. $HADOOP_LIBEXEC_DIR/yarn-config.sh
+HADOOP_LIBEXEC_DIR="${HADOOP_LIBEXEC_DIR:-$HADOOP_DEFAULT_LIBEXEC_DIR}"
+# shellcheck disable=SC2034
+HADOOP_NEW_CONFIG=true
+if [[ -f "${HADOOP_LIBEXEC_DIR}/yarn-config.sh" ]]; then
+  . "${HADOOP_LIBEXEC_DIR}/yarn-config.sh"
+else
+  echo "ERROR: Cannot execute ${HADOOP_LIBEXEC_DIR}/yarn-config.sh." 2>&1
+  exit 1
+fi
+
+# stop nodemanager
+echo "Stopping nodemanagers"
+hadoop_uservar_su yarn nodemanager "${HADOOP_YARN_HOME}/bin/yarn" \
+    --config "${HADOOP_CONF_DIR}" \
+    --workers \
+    --daemon stop \
+    nodemanager
 
 # stop resourceManager
-"$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  stop resourcemanager
-# stop nodeManager
-"$bin"/yarn-daemons.sh --config $YARN_CONF_DIR  stop nodemanager
-# stop proxy server
-"$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  stop proxyserver
+HARM=$("${HADOOP_HDFS_HOME}/bin/hdfs" getconf -confKey yarn.resourcemanager.ha.enabled 2>&-)
+if [[ ${HARM} = "false" ]]; then
+  echo "Stopping resourcemanager"
+  hadoop_uservar_su yarn resourcemanager "${HADOOP_YARN_HOME}/bin/yarn" \
+      --config "${HADOOP_CONF_DIR}" \
+      --daemon stop \
+      resourcemanager
+else
+  logicals=$("${HADOOP_HDFS_HOME}/bin/hdfs" getconf -confKey yarn.resourcemanager.ha.rm-ids 2>&-)
+  logicals=${logicals//,/ }
+  for id in ${logicals}
+  do
+      rmhost=$("${HADOOP_HDFS_HOME}/bin/hdfs" getconf -confKey "yarn.resourcemanager.hostname.${id}" 2>&-)
+      RMHOSTS="${RMHOSTS} ${rmhost}"
+  done
+  echo "Stopping resourcemanagers on [${RMHOSTS}]"
+  hadoop_uservar_su yarn resourcemanager "${HADOOP_YARN_HOME}/bin/yarn" \
+      --config "${HADOOP_CONF_DIR}" \
+      --daemon stop \
+      --workers \
+      --hostnames "${RMHOSTS}" \
+      resourcemanager
+fi
+
+# stop proxyserver
+PROXYSERVER=$("${HADOOP_HDFS_HOME}/bin/hdfs" getconf -confKey  yarn.web-proxy.address 2>&- | cut -f1 -d:)
+if [[ -n ${PROXYSERVER} ]]; then
+  echo "Stopping proxy server [${PROXYSERVER}]"
+  hadoop_uservar_su yarn proxyserver "${HADOOP_YARN_HOME}/bin/yarn" \
+      --config "${HADOOP_CONF_DIR}" \
+      --workers \
+      --hostnames "${PROXYSERVER}" \
+      --daemon stop \
+      proxyserver
+fi
+

@@ -20,7 +20,6 @@ package org.apache.hadoop.tools;
 import java.io.BufferedReader;
 import java.io.DataInput;
 import java.io.DataOutput;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
@@ -28,8 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -41,7 +40,7 @@ import org.apache.hadoop.mapred.JobConf;
  * An abstract class for distributed tool for file related operations.
  */
 abstract class DistTool implements org.apache.hadoop.util.Tool {
-  protected static final Log LOG = LogFactory.getLog(DistTool.class);
+  protected static final Logger LOG = LoggerFactory.getLogger(DistTool.class);
 
   protected JobConf jobconf;
 
@@ -68,11 +67,10 @@ abstract class DistTool implements org.apache.hadoop.util.Tool {
     List<IOException> ioes = new ArrayList<IOException>();
     for(Path p : srcs) {
       try {
-        if (!p.getFileSystem(conf).exists(p)) {
-          ioes.add(new FileNotFoundException("Source "+p+" does not exist."));
-        }
+        p.getFileSystem(conf).getFileStatus(p);
+      } catch(IOException e) {
+        ioes.add(e);
       }
-      catch(IOException e) {ioes.add(e);}
     }
     if (!ioes.isEmpty()) {
       throw new InvalidInputException(ioes);

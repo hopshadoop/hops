@@ -26,8 +26,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -36,6 +34,8 @@ import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.NativeCodeLoader;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -45,8 +45,8 @@ import static org.mockito.Mockito.verify;
 @InterfaceStability.Evolving
 public class TestAccessControlList {
 
-  private static final Log LOG =
-    LogFactory.getLog(TestAccessControlList.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestAccessControlList.class);
 
   /**
    * Test the netgroups (groups in ACL rules that start with @)
@@ -187,18 +187,18 @@ public class TestAccessControlList {
     AccessControlList acl;
 
     acl = new AccessControlList("*");
-    assertTrue(acl.toString().equals("All users are allowed"));
+    assertEquals("All users are allowed", acl.toString());
     validateGetAclString(acl);
 
     acl = new AccessControlList(" ");
-    assertTrue(acl.toString().equals("No users are allowed"));
+    assertEquals("No users are allowed", acl.toString());
 
     acl = new AccessControlList("user1,user2");
-    assertTrue(acl.toString().equals("Users [user1, user2] are allowed"));
+    assertEquals("Users [user1, user2] are allowed", acl.toString());
     validateGetAclString(acl);
 
     acl = new AccessControlList("user1,user2 ");// with space
-    assertTrue(acl.toString().equals("Users [user1, user2] are allowed"));
+    assertEquals("Users [user1, user2] are allowed", acl.toString());
     validateGetAclString(acl);
 
     acl = new AccessControlList(" group1,group2");
@@ -383,10 +383,10 @@ public class TestAccessControlList {
     assertTrue(acl.isAllAllowed());
 
     UserGroupInformation drwho =
-      UserGroupInformation.createUserForTesting("drwho@APACHE.ORG",
+      UserGroupInformation.createUserForTesting("drwho@EXAMPLE.COM",
           new String[] { "aliens" });
     UserGroupInformation drwho2 =
-      UserGroupInformation.createUserForTesting("drwho2@APACHE.ORG",
+      UserGroupInformation.createUserForTesting("drwho2@EXAMPLE.COM",
           new String[] { "tardis" });
 
     acl.addUser("drwho");
@@ -412,16 +412,16 @@ public class TestAccessControlList {
     AccessControlList acl;
 
     UserGroupInformation drwho =
-        UserGroupInformation.createUserForTesting("drwho@APACHE.ORG",
+        UserGroupInformation.createUserForTesting("drwho@EXAMPLE.COM",
             new String[] { "aliens", "humanoids", "timelord" });
     UserGroupInformation susan =
-        UserGroupInformation.createUserForTesting("susan@APACHE.ORG",
+        UserGroupInformation.createUserForTesting("susan@EXAMPLE.COM",
             new String[] { "aliens", "humanoids", "timelord" });
     UserGroupInformation barbara =
-        UserGroupInformation.createUserForTesting("barbara@APACHE.ORG",
+        UserGroupInformation.createUserForTesting("barbara@EXAMPLE.COM",
             new String[] { "humans", "teachers" });
     UserGroupInformation ian =
-        UserGroupInformation.createUserForTesting("ian@APACHE.ORG",
+        UserGroupInformation.createUserForTesting("ian@EXAMPLE.COM",
             new String[] { "humans", "teachers" });
 
     acl = new AccessControlList("drwho humanoids");

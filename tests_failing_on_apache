@@ -1,0 +1,2 @@
+org.apache.hadoop.yarn.server.nodemanager.containermanager.TestAuxServices.testRemoteAuxServiceClassPath
+org.apache.hadoop.net.TestDNS.testLookupWithoutHostsFallback

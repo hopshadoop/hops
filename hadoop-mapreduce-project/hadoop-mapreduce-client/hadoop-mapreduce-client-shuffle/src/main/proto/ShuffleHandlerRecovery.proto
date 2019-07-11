@@ -26,5 +26,4 @@ import "Security.proto";
 message JobShuffleInfoProto {
   optional string user = 1;
   optional hadoop.common.TokenProto jobToken = 2;
-  optional string userFolder = 3;
 }

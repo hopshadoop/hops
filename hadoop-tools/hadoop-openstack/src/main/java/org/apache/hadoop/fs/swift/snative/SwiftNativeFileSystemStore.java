@@ -17,10 +17,13 @@
  */
 package org.apache.hadoop.fs.swift.snative;
 
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import com.fasterxml.jackson.databind.type.CollectionType;
+
+import org.apache.http.Header;
+import org.apache.http.HttpStatus;
+import org.apache.http.message.BasicHeader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
@@ -36,7 +39,6 @@ import org.apache.hadoop.fs.swift.util.DurationStats;
 import org.apache.hadoop.fs.swift.util.JSONUtil;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
-import org.codehaus.jackson.map.type.CollectionType;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
@@ -63,8 +65,8 @@ import java.util.regex.Pattern;
 public class SwiftNativeFileSystemStore {
   private static final Pattern URI_PATTERN = Pattern.compile("\"\\S+?\"");
   private static final String PATTERN = "EEE, d MMM yyyy hh:mm:ss zzz";
-  private static final Log LOG =
-          LogFactory.getLog(SwiftNativeFileSystemStore.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SwiftNativeFileSystemStore.class);
   private URI uri;
   private SwiftRestClient swiftRestClient;
 
@@ -165,9 +167,9 @@ public class SwiftNativeFileSystemStore {
     }
 
     swiftRestClient.upload(toObjectPath(path),
-            new ByteArrayInputStream(new byte[0]),
-            0,
-            new Header(SwiftProtocolConstants.X_OBJECT_MANIFEST, pathString));
+        new ByteArrayInputStream(new byte[0]),
+        0,
+        new BasicHeader(SwiftProtocolConstants.X_OBJECT_MANIFEST, pathString));
   }
 
   /**
@@ -576,7 +578,7 @@ public class SwiftNativeFileSystemStore {
 
     //enum the child entries and everything underneath
     List<FileStatus> childStats = listDirectory(srcObject, true, true);
-    boolean srcIsFile = !srcMetadata.isDir();
+    boolean srcIsFile = !srcMetadata.isDirectory();
     if (srcIsFile) {
 
       //source is a simple file OR a partitioned file
@@ -590,7 +592,7 @@ public class SwiftNativeFileSystemStore {
           //outcome #2 -move to subdir of dest
           destPath = toObjectPath(new Path(dst, src.getName()));
         } else {
-          //outcome #1 dest it's a file: fail if differeent
+          //outcome #1 dest it's a file: fail if different
           if (!renamingOnToSelf) {
             throw new FileAlreadyExistsException(
                     "cannot rename a file over one that already exists");
@@ -718,7 +720,7 @@ public class SwiftNativeFileSystemStore {
     if (LOG.isDebugEnabled()) {
       LOG.debug(message + ": listing of " + objectPath);
       for (FileStatus fileStatus : statuses) {
-        LOG.debug(fileStatus.getPath());
+        LOG.debug(fileStatus.getPath().toString());
       }
     }
   }
@@ -943,7 +945,7 @@ public class SwiftNativeFileSystemStore {
     //>1 entry implies directory with children. Run through them,
     // but first check for the recursive flag and reject it *unless it looks
     // like a partitioned file (len > 0 && has children)
-    if (!fileStatus.isDir()) {
+    if (!fileStatus.isDirectory()) {
       LOG.debug("Multiple child entries but entry has data: assume partitioned");
     } else if (!recursive) {
       //if there are children, unless this is a recursive operation, fail immediately
@@ -953,7 +955,7 @@ public class SwiftNativeFileSystemStore {
                                                         statuses, "; "));
     }
 
-    //delete the entries. including ourself.
+    //delete the entries. including ourselves.
     for (FileStatus entryStatus : statuses) {
       Path entryPath = entryStatus.getPath();
       try {

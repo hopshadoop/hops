@@ -76,6 +76,7 @@ This provider supports LDAP with simple password authentication using JNDI API.
 `hadoop.security.group.mapping.ldap.url` must be set. This refers to the URL of the LDAP server for resolving user groups.
 
 `hadoop.security.group.mapping.ldap.base` configures the search base for the LDAP connection. This is a distinguished name, and will typically be the root of the LDAP directory.
+Get groups for a given username first looks up the user and then looks up the groups for the user result. If the directory setup has different user and group search bases, use `hadoop.security.group.mapping.ldap.userbase` and `hadoop.security.group.mapping.ldap.groupbase` configs.
 
 If the LDAP server does not support anonymous binds,
 set the distinguished name of the user to bind in `hadoop.security.group.mapping.ldap.bind.user`.
@@ -84,9 +85,10 @@ This file should be readable only by the Unix user running the daemons.
 
 It is possible to set a maximum time limit when searching and awaiting a result.
 Set `hadoop.security.group.mapping.ldap.directory.search.timeout` to 0 if infinite wait period is desired. Default is 10,000 milliseconds (10 seconds).
+This is the limit for each ldap query.  If `hadoop.security.group.mapping.ldap.search.group.hierarchy.levels` is set to a positive value, then the total latency will be bounded by max(Recur Depth in LDAP, `hadoop.security.group.mapping.ldap.search.group.hierarchy.levels` ) * `hadoop.security.group.mapping.ldap.directory.search.timeout`.
 
-The implementation does not attempt to resolve group hierarchies. Therefore, a user must be an explicit member of a group object
-in order to be considered a member.
+`hadoop.security.group.mapping.ldap.base` configures how far to walk up the groups hierarchy when resolving groups.
+By default, with a limit of 0, in order to be considered a member of a group, the user must be an explicit member in LDAP.  Otherwise, it will traverse the group hierarchy `hadoop.security.group.mapping.ldap.search.group.hierarchy.levels` levels up.
 
 
 ### Active Directory ###
@@ -99,8 +101,19 @@ If the LDAP server supports POSIX group semantics (RFC-2307), Hadoop can perform
 
 ### SSL ###
 To secure the connection, the implementation supports LDAP over SSL (LDAPS). SSL is enable by setting `hadoop.security.group.mapping.ldap.ssl` to `true`.
-In addition, specify the path to the keystore file for SSL connection in `hadoop.security.group.mapping.ldap.ssl.keystore` and keystore password in `hadoop.security.group.mapping.ldap.ssl.keystore.password`.
-Alternatively, store the keystore password in a file, and point `hadoop.security.group.mapping.ldap.ssl.keystore.password.file` to that file. For security purposes, this file should be readable only by the Unix user running the daemons.
+In addition, specify the path to the keystore file for SSL connection in `hadoop.security.group.mapping.ldap.ssl.keystore` and keystore password in `hadoop.security.group.mapping.ldap.ssl.keystore.password`, at the same time, make sure `hadoop.security.credential.clear-text-fallback` is true.
+Alternatively, store the keystore password in a file, and point `hadoop.security.group.mapping.ldap.ssl.keystore.password.file` to that file.
+For security purposes, this file should be readable only by the Unix user running the daemons, and for preventing recursive dependency, this file should be a local file.
+The first approach aka using `hadoop.security.group.mapping.ldap.ssl.keystore.password` is highly discouraged because it exposes the password in the configuration file.
+
+### Low latency group mapping resolution ###
+Typically, Hadoop resolves a user's group names by making two LDAP queries: the first query gets the user object, and the second query uses the user's Distinguished Name to find the groups.
+For some LDAP servers, such as Active Directory, the user object returned in the first query also contains the DN of the user's groups in its `memberOf` attribute, and the name of a group is its Relative Distinguished Name.
+Therefore, it is possible to infer the user's groups from the first query without sending the second one, and it may reduce group name resolution latency incurred by the second query. If it fails to get group names, it will fall back to the typical two-query scenario and send the second query to get group names.
+To enable this feature, set `hadoop.security.group.mapping.ldap.search.attr.memberof` to `memberOf`, and Hadoop will resolve group names using this attribute in the user object.
+
+If the LDAP server's certificate is not signed by a well known certificate authority, specify the path to the truststore in `hadoop.security.group.mapping.ldap.ssl.truststore`.
+Similar to keystore, specify the truststore password file in `hadoop.security.group.mapping.ldap.ssl.truststore.password.file`.
 
 Composite Groups Mapping
 --------

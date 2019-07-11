@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.ipc.metrics;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -31,6 +31,8 @@ import org.apache.hadoop.metrics2.lib.MutableCounterInt;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is for maintaining  the various RPC statistics
@@ -40,7 +42,7 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 @Metrics(about="Aggregate RPC metrics", context="rpc")
 public class RpcMetrics {
 
-  static final Log LOG = LogFactory.getLog(RpcMetrics.class);
+  static final Logger LOG = LoggerFactory.getLogger(RpcMetrics.class);
   final Server server;
   final MetricsRegistry registry;
   final String name;
@@ -50,7 +52,9 @@ public class RpcMetrics {
     String port = String.valueOf(server.getListenerAddress().getPort());
     name = "RpcActivityForPort" + port;
     this.server = server;
-    registry = new MetricsRegistry("rpc").tag("port", "RPC port", port);
+    registry = new MetricsRegistry("rpc")
+        .tag("port", "RPC port", port)
+        .tag("serverName", "Name of the RPC server", server.getServerName());
     int[] intervals = conf.getInts(
         CommonConfigurationKeys.RPC_METRICS_PERCENTILES_INTERVALS_KEY);
     rpcQuantileEnable = (intervals.length > 0) && conf.getBoolean(
@@ -61,6 +65,8 @@ public class RpcMetrics {
           new MutableQuantiles[intervals.length];
       rpcProcessingTimeMillisQuantiles =
           new MutableQuantiles[intervals.length];
+      deferredRpcProcessingTimeMillisQuantiles =
+          new MutableQuantiles[intervals.length];
       for (int i = 0; i < intervals.length; i++) {
         int interval = intervals[i];
         rpcQueueTimeMillisQuantiles[i] = registry.newQuantiles("rpcQueueTime"
@@ -69,6 +75,10 @@ public class RpcMetrics {
         rpcProcessingTimeMillisQuantiles[i] = registry.newQuantiles(
             "rpcProcessingTime" + interval + "s",
             "rpc processing time in milli second", "ops", "latency", interval);
+        deferredRpcProcessingTimeMillisQuantiles[i] = registry
+            .newQuantiles("deferredRpcProcessingTime" + interval + "s",
+                "deferred rpc processing time in milli seconds", "ops",
+                "latency", interval);
       }
     }
     LOG.debug("Initialized " + registry);
@@ -87,6 +97,8 @@ public class RpcMetrics {
   MutableQuantiles[] rpcQueueTimeMillisQuantiles;
   @Metric("Processing time") MutableRate rpcProcessingTime;
   MutableQuantiles[] rpcProcessingTimeMillisQuantiles;
+  @Metric("Deferred Processing time") MutableRate deferredRpcProcessingTime;
+  MutableQuantiles[] deferredRpcProcessingTimeMillisQuantiles;
   @Metric("Number of authentication failures")
   MutableCounterLong rpcAuthenticationFailures;
   @Metric("Number of authentication successes")
@@ -111,6 +123,10 @@ public class RpcMetrics {
 
   @Metric("Length of the call queue") public int callQueueLength() {
     return server.getCallQueueLen();
+  }
+
+  @Metric("Number of dropped connections") public long numDroppedConnections() {
+    return server.getNumDroppedConnections();
   }
 
   // Public instrumentation methods that could be extracted to an
@@ -202,6 +218,15 @@ public class RpcMetrics {
     }
   }
 
+  public void addDeferredRpcProcessingTime(long processingTime) {
+    deferredRpcProcessingTime.add(processingTime);
+    if (rpcQuantileEnable) {
+      for (MutableQuantiles q : deferredRpcProcessingTimeMillisQuantiles) {
+        q.add(processingTime);
+      }
+    }
+  }
+
   /**
    * One client backoff event
    */
@@ -254,5 +279,26 @@ public class RpcMetrics {
    */
   public long getRpcSlowCalls() {
     return rpcSlowCalls.value();
+  }
+
+  public MutableRate getDeferredRpcProcessingTime() {
+    return deferredRpcProcessingTime;
+  }
+
+  public long getDeferredRpcProcessingSampleCount() {
+    return deferredRpcProcessingTime.lastStat().numSamples();
+  }
+
+  public double getDeferredRpcProcessingMean() {
+    return deferredRpcProcessingTime.lastStat().mean();
+  }
+
+  public double getDeferredRpcProcessingStdDev() {
+    return deferredRpcProcessingTime.lastStat().stddev();
+  }
+
+  @VisibleForTesting
+  public MetricsTag getTag(String tagName) {
+    return registry.getTag(tagName);
   }
 }

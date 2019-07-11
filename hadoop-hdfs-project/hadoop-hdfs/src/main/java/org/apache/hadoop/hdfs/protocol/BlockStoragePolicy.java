@@ -25,6 +25,7 @@ import java.util.List;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.BlockStoragePolicySpi;
 import org.apache.hadoop.fs.StorageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * for the replicas of a block.
  */
 @InterfaceAudience.Private
-public class BlockStoragePolicy {
+public class BlockStoragePolicy implements BlockStoragePolicySpi{
   public static final Logger LOG = LoggerFactory.getLogger(BlockStoragePolicy
       .class);
 
@@ -237,5 +238,15 @@ public class BlockStoragePolicy {
       }
     }
     return null;
+  }
+  
+    /**
+   * Returns true if the policy is inherit-only and cannot be changed for
+   * an existing file.
+   *
+   * @return true if the policy is inherit-only.
+   */
+  public boolean isCopyOnCreateFile(){
+    return false;
   }
 }

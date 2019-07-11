@@ -55,13 +55,15 @@ public class AppInfo {
   protected FinalApplicationStatus finalAppStatus;
   protected long submittedTime;
   protected long startedTime;
+  private long launchTime;
   protected long finishedTime;
   protected long elapsedTime;
   protected String applicationTags;
   protected int priority;
   private long allocatedCpuVcores;
   private long allocatedMemoryMB;
-  private long allocatedGpu;
+  private long reservedCpuVcores;
+  private long reservedMemoryMB;
   protected boolean unmanagedApplication;
   private String appNodeLabelExpression;
   private String amNodeLabelExpression;
@@ -87,6 +89,7 @@ public class AppInfo {
     originalTrackingUrl = app.getOriginalTrackingUrl();
     submittedTime = app.getStartTime();
     startedTime = app.getStartTime();
+    launchTime = app.getLaunchTime();
     finishedTime = app.getFinishTime();
     elapsedTime = Times.elapsed(startedTime, finishedTime);
     finalAppStatus = app.getFinalApplicationStatus();
@@ -102,8 +105,10 @@ public class AppInfo {
             .getUsedResources().getVirtualCores();
         allocatedMemoryMB = app.getApplicationResourceUsageReport()
             .getUsedResources().getMemorySize();
-        allocatedGpu = app.getApplicationResourceUsageReport()
-            .getUsedResources().getGPUs();
+        reservedCpuVcores = app.getApplicationResourceUsageReport()
+            .getReservedResources().getVirtualCores();
+        reservedMemoryMB = app.getApplicationResourceUsageReport()
+            .getReservedResources().getMemorySize();
       }
     }
     progress = app.getProgress() * 100; // in percent
@@ -163,10 +168,14 @@ public class AppInfo {
     return allocatedMemoryMB;
   }
 
-  public long getAllocatedGpu(){
-    return allocatedGpu;
+  public long getReservedCpuVcores() {
+    return reservedCpuVcores;
   }
-  
+
+  public long getReservedMemoryMB() {
+    return reservedMemoryMB;
+  }
+
   public float getProgress() {
     return progress;
   }
@@ -189,6 +198,10 @@ public class AppInfo {
 
   public long getSubmittedTime() {
     return submittedTime;
+  }
+
+  public long getLaunchTime() {
+    return launchTime;
   }
 
   public long getStartedTime() {

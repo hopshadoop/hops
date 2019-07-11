@@ -25,6 +25,8 @@ import org.junit.After;
 import org.junit.Before;
 
 import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 
 /**
  * Abstract Test case class to run MR in local or cluster mode and in local FS
@@ -154,8 +156,8 @@ public abstract class HadoopTestCase {
     else {
       //noinspection deprecation
       boolean formatDB=true;
-      if(!localFS){
-        formatDB=false;
+      if (!localFS) {
+        formatDB = false;
       }
       mrCluster = new MiniMRCluster(taskTrackers, fileSystem.getUri().toString(), 1, formatDB);
     }

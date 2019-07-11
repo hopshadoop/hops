@@ -17,28 +17,28 @@
 */
 package org.apache.hadoop.mapred;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import com.google.common.base.Supplier;
+import org.apache.hadoop.mapred.Counters.Counter;
+import org.apache.hadoop.mapreduce.checkpoint.EnumCounter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
-
-import junit.framework.Assert;
+import java.util.List;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TypeConverter;
+import org.apache.hadoop.mapreduce.checkpoint.CheckpointID;
+import org.apache.hadoop.mapreduce.checkpoint.FSCheckpointID;
+import org.apache.hadoop.mapreduce.checkpoint.TaskCheckpointID;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
+import org.apache.hadoop.mapreduce.v2.api.records.Phase;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptCompletionEvent;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptCompletionEventStatus;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
@@ -46,27 +46,100 @@ import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.TaskHeartbeatHandler;
 import org.apache.hadoop.mapreduce.v2.app.job.Job;
+import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptStatusUpdateEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptStatusUpdateEvent.TaskAttemptStatus;
+import org.apache.hadoop.mapreduce.v2.app.rm.preemption.AMPreemptionPolicy;
+import org.apache.hadoop.mapreduce.v2.app.rm.preemption.CheckpointAMPreemptionPolicy;
 import org.apache.hadoop.mapreduce.v2.app.rm.RMHeartbeatHandler;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.event.Event;
+import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.util.ControlledClock;
 import org.apache.hadoop.yarn.util.SystemClock;
+import org.junit.After;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * Tests the behavior of TaskAttemptListenerImpl.
+ */
+@RunWith(MockitoJUnitRunner.class)
 public class TestTaskAttemptListenerImpl {
-  public static class MockTaskAttemptListenerImpl extends TaskAttemptListenerImpl {
+  private static final String ATTEMPT1_ID =
+      "attempt_123456789012_0001_m_000001_0";
+  private static final String ATTEMPT2_ID =
+      "attempt_123456789012_0001_m_000002_0";
+
+  private static final TaskAttemptId TASKATTEMPTID1 =
+      TypeConverter.toYarn(TaskAttemptID.forName(ATTEMPT1_ID));
+  private static final TaskAttemptId TASKATTEMPTID2 =
+      TypeConverter.toYarn(TaskAttemptID.forName(ATTEMPT2_ID));
+
+  @Mock
+  private AppContext appCtx;
+
+  @Mock
+  private JobTokenSecretManager secret;
+
+  @Mock
+  private RMHeartbeatHandler rmHeartbeatHandler;
+
+  @Mock
+  private TaskHeartbeatHandler hbHandler;
+
+  @Mock
+  private Dispatcher dispatcher;
+
+  @Mock
+  private Task task;
+
+  @SuppressWarnings("rawtypes")
+  @Mock
+  private EventHandler<Event> ea;
+
+  @SuppressWarnings("rawtypes")
+  @Captor
+  private ArgumentCaptor<Event> eventCaptor;
+
+  private CheckpointAMPreemptionPolicy policy;
+  private JVMId id;
+  private WrappedJvmID wid;
+  private TaskAttemptID attemptID;
+  private TaskAttemptId attemptId;
+  private ReduceTaskStatus firstReduceStatus;
+  private ReduceTaskStatus secondReduceStatus;
+  private ReduceTaskStatus thirdReduceStatus;
+
+  private MockTaskAttemptListenerImpl listener;
+
+  public static class MockTaskAttemptListenerImpl
+      extends TaskAttemptListenerImpl {
 
     public MockTaskAttemptListenerImpl(AppContext context,
         JobTokenSecretManager jobTokenSecretManager,
-        RMHeartbeatHandler rmHeartbeatHandler) {
-      super(context, jobTokenSecretManager, rmHeartbeatHandler, null);
+        RMHeartbeatHandler rmHeartbeatHandler, AMPreemptionPolicy policy) {
+
+      super(context, jobTokenSecretManager, rmHeartbeatHandler, policy);
     }
-    
+
     public MockTaskAttemptListenerImpl(AppContext context,
         JobTokenSecretManager jobTokenSecretManager,
         RMHeartbeatHandler rmHeartbeatHandler,
-        TaskHeartbeatHandler hbHandler) {
-      super(context, jobTokenSecretManager, rmHeartbeatHandler, null);
+        TaskHeartbeatHandler hbHandler,
+        AMPreemptionPolicy policy) {
+
+      super(context, jobTokenSecretManager, rmHeartbeatHandler, policy);
       this.taskHeartbeatHandler = hbHandler;
     }
     
@@ -85,26 +158,24 @@ public class TestTaskAttemptListenerImpl {
       //Empty
     }
   }
-  
+
+  @After
+  public void after() throws IOException {
+    if (listener != null) {
+      listener.close();
+      listener = null;
+    }
+  }
+
   @Test  (timeout=5000)
   public void testGetTask() throws IOException {
-    AppContext appCtx = mock(AppContext.class);
-    JobTokenSecretManager secret = mock(JobTokenSecretManager.class); 
-    RMHeartbeatHandler rmHeartbeatHandler =
-        mock(RMHeartbeatHandler.class);
-    TaskHeartbeatHandler hbHandler = mock(TaskHeartbeatHandler.class);
-    MockTaskAttemptListenerImpl listener = 
-      new MockTaskAttemptListenerImpl(appCtx, secret,
-          rmHeartbeatHandler, hbHandler);
-    Configuration conf = new Configuration();
-    listener.init(conf);
-    listener.start();
-    JVMId id = new JVMId("foo",1, true, 1);
-    WrappedJvmID wid = new WrappedJvmID(id.getJobId(), id.isMap, id.getId());
+    configureMocks();
+    startListener(false);
 
     // Verify ask before registration.
     //The JVM ID has not been registered yet so we should kill it.
     JvmContext context = new JvmContext();
+
     context.jvmId = id; 
     JvmTask result = listener.getTask(context);
     assertNotNull(result);
@@ -112,20 +183,18 @@ public class TestTaskAttemptListenerImpl {
 
     // Verify ask after registration but before launch. 
     // Don't kill, should be null.
-    TaskAttemptId attemptID = mock(TaskAttemptId.class);
-    Task task = mock(Task.class);
     //Now put a task with the ID
     listener.registerPendingTask(task, wid);
     result = listener.getTask(context);
     assertNull(result);
     // Unregister for more testing.
-    listener.unregister(attemptID, wid);
+    listener.unregister(attemptId, wid);
 
     // Verify ask after registration and launch
     //Now put a task with the ID
     listener.registerPendingTask(task, wid);
-    listener.registerLaunchedTask(attemptID, wid);
-    verify(hbHandler).register(attemptID);
+    listener.registerLaunchedTask(attemptId, wid);
+    verify(hbHandler).register(attemptId);
     result = listener.getTask(context);
     assertNotNull(result);
     assertFalse(result.shouldDie);
@@ -136,21 +205,19 @@ public class TestTaskAttemptListenerImpl {
     assertNotNull(result);
     assertTrue(result.shouldDie);
 
-    listener.unregister(attemptID, wid);
+    listener.unregister(attemptId, wid);
 
     // Verify after unregistration.
     result = listener.getTask(context);
     assertNotNull(result);
     assertTrue(result.shouldDie);
 
-    listener.stop();
-
     // test JVMID
     JVMId jvmid = JVMId.forName("jvm_001_002_m_004");
     assertNotNull(jvmid);
     try {
       JVMId.forName("jvm_001_002_m_004_006");
-      Assert.fail();
+      fail();
     } catch (IllegalArgumentException e) {
       assertEquals(e.getMessage(),
           "TaskId string : jvm_001_002_m_004_006 is not properly formed");
@@ -190,14 +257,11 @@ public class TestTaskAttemptListenerImpl {
     when(mockJob.getMapAttemptCompletionEvents(2, 100)).thenReturn(
         TypeConverter.fromYarn(empty));
 
-    AppContext appCtx = mock(AppContext.class);
+    configureMocks();
     when(appCtx.getJob(any(JobId.class))).thenReturn(mockJob);
-    JobTokenSecretManager secret = mock(JobTokenSecretManager.class);
-    RMHeartbeatHandler rmHeartbeatHandler =
-        mock(RMHeartbeatHandler.class);
-    final TaskHeartbeatHandler hbHandler = mock(TaskHeartbeatHandler.class);
-    TaskAttemptListenerImpl listener =
-        new MockTaskAttemptListenerImpl(appCtx, secret, rmHeartbeatHandler) {
+
+    listener = new MockTaskAttemptListenerImpl(
+        appCtx, secret, rmHeartbeatHandler, policy) {
       @Override
       protected void registerHeartbeatHandler(Configuration conf) {
         taskHeartbeatHandler = hbHandler;
@@ -225,7 +289,8 @@ public class TestTaskAttemptListenerImpl {
         isMap ? org.apache.hadoop.mapreduce.v2.api.records.TaskType.MAP
             : org.apache.hadoop.mapreduce.v2.api.records.TaskType.REDUCE);
     TaskAttemptId attemptId = MRBuilderUtils.newTaskAttemptId(tid, 0);
-    RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
+    RecordFactory recordFactory =
+      RecordFactoryProvider.getRecordFactory(null);
     TaskAttemptCompletionEvent tce = recordFactory
         .newRecordInstance(TaskAttemptCompletionEvent.class);
     tce.setEventId(eventId);
@@ -236,22 +301,20 @@ public class TestTaskAttemptListenerImpl {
 
   @Test (timeout=10000)
   public void testCommitWindow() throws IOException {
-    SystemClock clock = new SystemClock();
+    SystemClock clock = SystemClock.getInstance();
+
+    configureMocks();
 
     org.apache.hadoop.mapreduce.v2.app.job.Task mockTask =
         mock(org.apache.hadoop.mapreduce.v2.app.job.Task.class);
     when(mockTask.canCommit(any(TaskAttemptId.class))).thenReturn(true);
     Job mockJob = mock(Job.class);
     when(mockJob.getTask(any(TaskId.class))).thenReturn(mockTask);
-    AppContext appCtx = mock(AppContext.class);
     when(appCtx.getJob(any(JobId.class))).thenReturn(mockJob);
     when(appCtx.getClock()).thenReturn(clock);
-    JobTokenSecretManager secret = mock(JobTokenSecretManager.class);
-    RMHeartbeatHandler rmHeartbeatHandler =
-        mock(RMHeartbeatHandler.class);
-    final TaskHeartbeatHandler hbHandler = mock(TaskHeartbeatHandler.class);
-    TaskAttemptListenerImpl listener =
-        new MockTaskAttemptListenerImpl(appCtx, secret, rmHeartbeatHandler) {
+
+    listener = new MockTaskAttemptListenerImpl(
+        appCtx, secret, rmHeartbeatHandler, policy) {
       @Override
       protected void registerHeartbeatHandler(Configuration conf) {
         taskHeartbeatHandler = hbHandler;
@@ -269,11 +332,254 @@ public class TestTaskAttemptListenerImpl {
     verify(mockTask, never()).canCommit(any(TaskAttemptId.class));
 
     // verify commit allowed when RM heartbeat is recent
-    when(rmHeartbeatHandler.getLastHeartbeatTime()).thenReturn(clock.getTime());
+    when(rmHeartbeatHandler.getLastHeartbeatTime())
+      .thenReturn(clock.getTime());
     canCommit = listener.canCommit(tid);
     assertTrue(canCommit);
     verify(mockTask, times(1)).canCommit(any(TaskAttemptId.class));
+  }
 
-    listener.stop();
+  @Test
+  public void testCheckpointIDTracking()
+    throws IOException, InterruptedException{
+    SystemClock clock = SystemClock.getInstance();
+
+    configureMocks();
+
+    org.apache.hadoop.mapreduce.v2.app.job.Task mockTask =
+        mock(org.apache.hadoop.mapreduce.v2.app.job.Task.class);
+    when(mockTask.canCommit(any(TaskAttemptId.class))).thenReturn(true);
+    Job mockJob = mock(Job.class);
+    when(mockJob.getTask(any(TaskId.class))).thenReturn(mockTask);
+    when(appCtx.getJob(any(JobId.class))).thenReturn(mockJob);
+    when(appCtx.getClock()).thenReturn(clock);
+
+    listener = new MockTaskAttemptListenerImpl(
+        appCtx, secret, rmHeartbeatHandler, policy) {
+      @Override
+      protected void registerHeartbeatHandler(Configuration conf) {
+        taskHeartbeatHandler = hbHandler;
+      }
+    };
+
+    Configuration conf = new Configuration();
+    conf.setBoolean(MRJobConfig.TASK_PREEMPTION, true);
+    //conf.setBoolean("preemption.reduce", true);
+
+    listener.init(conf);
+    listener.start();
+
+    TaskAttemptID tid = new TaskAttemptID("12345", 1, TaskType.REDUCE, 1, 0);
+
+    List<Path> partialOut = new ArrayList<Path>();
+    partialOut.add(new Path("/prev1"));
+    partialOut.add(new Path("/prev2"));
+
+    Counters counters = mock(Counters.class);
+    final long CBYTES = 64L * 1024 * 1024;
+    final long CTIME = 4344L;
+    final Path CLOC = new Path("/test/1");
+    Counter cbytes = mock(Counter.class);
+    when(cbytes.getValue()).thenReturn(CBYTES);
+    Counter ctime = mock(Counter.class);
+    when(ctime.getValue()).thenReturn(CTIME);
+    when(counters.findCounter(eq(EnumCounter.CHECKPOINT_BYTES)))
+        .thenReturn(cbytes);
+    when(counters.findCounter(eq(EnumCounter.CHECKPOINT_MS)))
+        .thenReturn(ctime);
+
+    // propagating a taskstatus that contains a checkpoint id
+    TaskCheckpointID incid = new TaskCheckpointID(new FSCheckpointID(
+          CLOC), partialOut, counters);
+    listener.setCheckpointID(
+        org.apache.hadoop.mapred.TaskID.downgrade(tid.getTaskID()), incid);
+
+    // and try to get it back
+    CheckpointID outcid = listener.getCheckpointID(tid.getTaskID());
+    TaskCheckpointID tcid = (TaskCheckpointID) outcid;
+    assertEquals(CBYTES, tcid.getCheckpointBytes());
+    assertEquals(CTIME, tcid.getCheckpointTime());
+    assertTrue(partialOut.containsAll(tcid.getPartialCommittedOutput()));
+    assertTrue(tcid.getPartialCommittedOutput().containsAll(partialOut));
+
+    //assert it worked
+    assert outcid == incid;
+  }
+
+  @Test
+  public void testStatusUpdateProgress()
+      throws IOException, InterruptedException {
+    configureMocks();
+    startListener(true);
+    verify(hbHandler).register(attemptId);
+
+    // make sure a ping doesn't report progress
+    AMFeedback feedback = listener.statusUpdate(attemptID, null);
+    assertTrue(feedback.getTaskFound());
+    verify(hbHandler, never()).progressing(eq(attemptId));
+
+    // make sure a status update does report progress
+    MapTaskStatus mockStatus = new MapTaskStatus(attemptID, 0.0f, 1,
+        TaskStatus.State.RUNNING, "", "RUNNING", "", TaskStatus.Phase.MAP,
+        new Counters());
+    feedback = listener.statusUpdate(attemptID, mockStatus);
+    assertTrue(feedback.getTaskFound());
+    verify(hbHandler).progressing(eq(attemptId));
+  }
+
+  @Test
+  public void testSingleStatusUpdate()
+      throws IOException, InterruptedException {
+    configureMocks();
+    startListener(true);
+
+    listener.statusUpdate(attemptID, firstReduceStatus);
+
+    verify(ea).handle(eventCaptor.capture());
+    TaskAttemptStatusUpdateEvent updateEvent =
+        (TaskAttemptStatusUpdateEvent) eventCaptor.getValue();
+
+    TaskAttemptStatus status = updateEvent.getTaskAttemptStatusRef().get();
+    assertTrue(status.fetchFailedMaps.contains(TASKATTEMPTID1));
+    assertEquals(1, status.fetchFailedMaps.size());
+    assertEquals(Phase.SHUFFLE, status.phase);
+  }
+
+  @Test
+  public void testStatusUpdateEventCoalescing()
+      throws IOException, InterruptedException {
+    configureMocks();
+    startListener(true);
+
+    listener.statusUpdate(attemptID, firstReduceStatus);
+    listener.statusUpdate(attemptID, secondReduceStatus);
+
+    verify(ea).handle(any(Event.class));
+    ConcurrentMap<TaskAttemptId,
+        AtomicReference<TaskAttemptStatus>> attemptIdToStatus =
+        listener.getAttemptIdToStatus();
+    TaskAttemptStatus status = attemptIdToStatus.get(attemptId).get();
+
+    assertTrue(status.fetchFailedMaps.contains(TASKATTEMPTID1));
+    assertTrue(status.fetchFailedMaps.contains(TASKATTEMPTID2));
+    assertEquals(2, status.fetchFailedMaps.size());
+    assertEquals(Phase.SORT, status.phase);
+  }
+
+  @Test
+  public void testCoalescedStatusUpdatesCleared()
+      throws IOException, InterruptedException {
+    // First two events are coalesced, the third is not
+    configureMocks();
+    startListener(true);
+
+    listener.statusUpdate(attemptID, firstReduceStatus);
+    listener.statusUpdate(attemptID, secondReduceStatus);
+    ConcurrentMap<TaskAttemptId,
+        AtomicReference<TaskAttemptStatus>> attemptIdToStatus =
+        listener.getAttemptIdToStatus();
+    attemptIdToStatus.get(attemptId).set(null);
+    listener.statusUpdate(attemptID, thirdReduceStatus);
+
+    verify(ea, times(2)).handle(eventCaptor.capture());
+    TaskAttemptStatusUpdateEvent updateEvent =
+        (TaskAttemptStatusUpdateEvent) eventCaptor.getValue();
+
+    TaskAttemptStatus status = updateEvent.getTaskAttemptStatusRef().get();
+    assertNull(status.fetchFailedMaps);
+    assertEquals(Phase.REDUCE, status.phase);
+  }
+
+  @Test
+  public void testStatusUpdateFromUnregisteredTask() throws Exception {
+    configureMocks();
+    ControlledClock clock = new ControlledClock();
+    clock.setTime(0);
+    doReturn(clock).when(appCtx).getClock();
+
+    final TaskAttemptListenerImpl tal = new TaskAttemptListenerImpl(appCtx,
+        secret, rmHeartbeatHandler, policy) {
+      @Override
+      protected void startRpcServer() {
+        // Empty
+      }
+      @Override
+      protected void stopRpcServer() {
+        // Empty
+      }
+    };
+
+    Configuration conf = new Configuration();
+    conf.setLong(MRJobConfig.TASK_TIMEOUT_CHECK_INTERVAL_MS, 1);
+    tal.init(conf);
+    tal.start();
+
+    AMFeedback feedback = tal.statusUpdate(attemptID, firstReduceStatus);
+    assertFalse(feedback.getTaskFound());
+    tal.registerPendingTask(task, wid);
+    tal.registerLaunchedTask(attemptId, wid);
+    feedback = tal.statusUpdate(attemptID, firstReduceStatus);
+    assertTrue(feedback.getTaskFound());
+
+    // verify attempt is still reported as found if recently unregistered
+    tal.unregister(attemptId, wid);
+    feedback = tal.statusUpdate(attemptID, firstReduceStatus);
+    assertTrue(feedback.getTaskFound());
+
+    // verify attempt is not found if not recently unregistered
+    long unregisterTimeout = conf.getLong(MRJobConfig.TASK_EXIT_TIMEOUT,
+        MRJobConfig.TASK_EXIT_TIMEOUT_DEFAULT);
+    clock.setTime(unregisterTimeout + 1);
+    GenericTestUtils.waitFor(new Supplier<Boolean>() {
+      @Override
+      public Boolean get() {
+        try {
+          AMFeedback response =
+              tal.statusUpdate(attemptID, firstReduceStatus);
+          return !response.getTaskFound();
+        } catch (Exception e) {
+          throw new RuntimeException("status update failed", e);
+        }
+      }
+    }, 10, 10000);
+  }
+
+  private void configureMocks() {
+    firstReduceStatus = new ReduceTaskStatus(attemptID, 0.0f, 1,
+        TaskStatus.State.RUNNING, "", "RUNNING", "", TaskStatus.Phase.SHUFFLE,
+        new Counters());
+    firstReduceStatus.addFetchFailedMap(TaskAttemptID.forName(ATTEMPT1_ID));
+
+    secondReduceStatus = new ReduceTaskStatus(attemptID, 0.0f, 1,
+        TaskStatus.State.RUNNING, "", "RUNNING", "", TaskStatus.Phase.SORT,
+        new Counters());
+    secondReduceStatus.addFetchFailedMap(TaskAttemptID.forName(ATTEMPT2_ID));
+
+    thirdReduceStatus = new ReduceTaskStatus(attemptID, 0.0f, 1,
+        TaskStatus.State.RUNNING, "", "RUNNING", "",
+        TaskStatus.Phase.REDUCE, new Counters());
+
+    when(dispatcher.getEventHandler()).thenReturn(ea);
+    when(appCtx.getEventHandler()).thenReturn(ea);
+    policy = new CheckpointAMPreemptionPolicy();
+    policy.init(appCtx);
+    listener = new MockTaskAttemptListenerImpl(appCtx, secret,
+          rmHeartbeatHandler, hbHandler, policy);
+    id = new JVMId("foo", 1, true, 1);
+    wid = new WrappedJvmID(id.getJobId(), id.isMap, id.getId());
+    attemptID = new TaskAttemptID("1", 1, TaskType.MAP, 1, 1);
+    attemptId = TypeConverter.toYarn(attemptID);
+  }
+
+  private void startListener(boolean registerTask) {
+    Configuration conf = new Configuration();
+
+    listener.init(conf);
+    listener.start();
+
+    if (registerTask) {
+      listener.registerPendingTask(task, wid);
+      listener.registerLaunchedTask(attemptId, wid);
+    }
   }
 }

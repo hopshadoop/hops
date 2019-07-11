@@ -200,7 +200,7 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
     RenewDelegationTokenRequest request =
         RenewDelegationTokenRequest.newInstance(cluster.createFakeToken());
     long newExpirationTime =
-        ClientRMProxy.createRMProxy(this.conf, ApplicationClientProtocol.class, true)
+        ClientRMProxy.createRMProxy(this.conf, ApplicationClientProtocol.class)
             .renewDelegationToken(request).getNextExpirationTime();
     Assert.assertEquals(newExpirationTime, cluster.createNextExpirationTime());
   }
@@ -209,7 +209,7 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
   public void testCancelDelegationTokenOnHA() throws Exception {
     CancelDelegationTokenRequest request =
         CancelDelegationTokenRequest.newInstance(cluster.createFakeToken());
-    ClientRMProxy.createRMProxy(this.conf, ApplicationClientProtocol.class, true)
+    ClientRMProxy.createRMProxy(this.conf, ApplicationClientProtocol.class)
         .cancelDelegationToken(request);
   }
 }

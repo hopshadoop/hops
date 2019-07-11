@@ -30,32 +30,26 @@ import com.google.common.cache.LoadingCache;
 public class LocalizerContext {
 
   private final String user;
-  private final String userFolder;
   private final ContainerId containerId;
   private final Credentials credentials;
   private final LoadingCache<Path,Future<FileStatus>> statCache;
 
   public LocalizerContext(String user, ContainerId containerId,
-      Credentials credentials, String userFolder) {
-    this(user, containerId, credentials, null, userFolder);
+      Credentials credentials) {
+    this(user, containerId, credentials, null);
   }
 
   public LocalizerContext(String user, ContainerId containerId,
       Credentials credentials,
-      LoadingCache<Path,Future<FileStatus>> statCache, String userFolder) {
+      LoadingCache<Path,Future<FileStatus>> statCache) {
     this.user = user;
     this.containerId = containerId;
     this.credentials = credentials;
     this.statCache = statCache;
-    this.userFolder = userFolder;
   }
 
   public String getUser() {
     return user;
-  }
-
-  public String getUserFolder() {
-    return userFolder;
   }
 
   public ContainerId getContainerId() {

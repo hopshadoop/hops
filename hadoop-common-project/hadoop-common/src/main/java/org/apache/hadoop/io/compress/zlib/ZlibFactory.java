@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.io.compress.zlib;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.io.compress.Decompressor;
@@ -27,7 +25,10 @@ import org.apache.hadoop.io.compress.DirectDecompressor;
 import org.apache.hadoop.io.compress.zlib.ZlibCompressor.CompressionLevel;
 import org.apache.hadoop.io.compress.zlib.ZlibCompressor.CompressionStrategy;
 import org.apache.hadoop.util.NativeCodeLoader;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+
+import com.google.common.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A collection of factories to create the right 
@@ -35,12 +36,21 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
  * 
  */
 public class ZlibFactory {
-  private static final Log LOG =
-    LogFactory.getLog(ZlibFactory.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ZlibFactory.class);
 
   private static boolean nativeZlibLoaded = false;
   
   static {
+    loadNativeZLib();
+  }
+
+  /**
+   * Load native library and set the flag whether to use native library. The
+   * method is also used for reset the flag modified by setNativeZlibLoaded
+   */
+  @VisibleForTesting
+  public static void loadNativeZLib() {
     if (NativeCodeLoader.isNativeCodeLoaded()) {
       nativeZlibLoaded = ZlibCompressor.isNativeZlibLoaded() &&
         ZlibDecompressor.isNativeZlibLoaded();
@@ -54,6 +64,15 @@ public class ZlibFactory {
   }
   
   /**
+   * Set the flag whether to use native library. Used for testing non-native
+   * libraries
+   *
+   */
+  @VisibleForTesting
+  public static void setNativeZlibLoaded(final boolean isLoaded) {
+    ZlibFactory.nativeZlibLoaded = isLoaded;
+  }
+  /**
    * Check if native-zlib code is loaded & initialized correctly and 
    * can be loaded for this job.
    * 
@@ -62,9 +81,7 @@ public class ZlibFactory {
    *         and can be loaded for this job, else <code>false</code>
    */
   public static boolean isNativeZlibLoaded(Configuration conf) {
-    return nativeZlibLoaded && conf.getBoolean(
-                          CommonConfigurationKeys.IO_NATIVE_LIB_AVAILABLE_KEY, 
-                          CommonConfigurationKeys.IO_NATIVE_LIB_AVAILABLE_DEFAULT);
+    return nativeZlibLoaded;
   }
 
   public static String getLibraryName() {

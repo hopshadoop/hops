@@ -94,7 +94,7 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
         cluster.start();
 
         LOG.info("Started cluster");
-        acClient = ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class, true);
+        acClient = ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class);
     }
 
     @After
@@ -150,7 +150,7 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
         appCtx.setQueue("default");
     
         ApplicationClientProtocol client = ClientRMProxy.createRMProxy(conf,
-            ApplicationClientProtocol.class, true);
+            ApplicationClientProtocol.class);
         
         Thread invoker = new Thread(new Invoker(client));
         invoker.setName("AnotherClient");
@@ -211,8 +211,7 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
         invoker.start();
 
         LOG.debug("Creating the second client");
-        acClient1 = ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class,
-                true);
+        acClient1 = ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class);
 
         GetNewApplicationRequest req1 = GetNewApplicationRequest.newInstance();
         if (error_mode.equals(CERT_ERR.NO_CA)) {

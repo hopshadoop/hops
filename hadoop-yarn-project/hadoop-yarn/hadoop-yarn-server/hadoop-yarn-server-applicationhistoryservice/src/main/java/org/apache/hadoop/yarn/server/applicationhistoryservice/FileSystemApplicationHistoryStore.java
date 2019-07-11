@@ -22,6 +22,7 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,8 +30,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -73,6 +72,8 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.impl.pb.C
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * File system implementation of {@link ApplicationHistoryStore}. In this
@@ -88,8 +89,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 public class FileSystemApplicationHistoryStore extends AbstractService
     implements ApplicationHistoryStore {
 
-  private static final Log LOG = LogFactory
-    .getLog(FileSystemApplicationHistoryStore.class);
+  private static final Logger LOG = LoggerFactory
+      .getLogger(FileSystemApplicationHistoryStore.class);
 
   private static final String ROOT_DIR_NAME = "ApplicationHistoryDataRoot";
   private static final int MIN_BLOCK_SIZE = 256 * 1024;
@@ -123,12 +124,7 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     rootDirPath = new Path(fsWorkingPath, ROOT_DIR_NAME);
     try {
       fs = getFileSystem(fsWorkingPath, conf);
-
-      if (!fs.isDirectory(rootDirPath)) {
-        fs.mkdirs(rootDirPath);
-        fs.setPermission(rootDirPath, ROOT_DIR_UMASK);
-      }
-
+      fs.mkdirs(rootDirPath, ROOT_DIR_UMASK);
     } catch (IOException e) {
       LOG.error("Error when initializing FileSystemHistoryStorage", e);
       throw e;
@@ -145,7 +141,7 @@ public class FileSystemApplicationHistoryStore extends AbstractService
       }
       outstandingWriters.clear();
     } finally {
-      IOUtils.cleanup(LOG, fs);
+      IOUtils.cleanupWithLogger(LOG, fs);
     }
     super.serviceStop();
   }
@@ -405,7 +401,7 @@ public class FileSystemApplicationHistoryStore extends AbstractService
           }
         }
       }
-      LOG.info("Completed reading history information of all conatiners"
+      LOG.info("Completed reading history information of all containers"
           + " of application attempt " + appAttemptId);
     } catch (IOException e) {
       LOG.info("Error when reading history information of some containers"
@@ -659,9 +655,11 @@ public class FileSystemApplicationHistoryStore extends AbstractService
   private HistoryFileReader getHistoryFileReader(ApplicationId appId)
       throws IOException {
     Path applicationHistoryFile = new Path(rootDirPath, appId.toString());
-    if (!fs.exists(applicationHistoryFile)) {
-      throw new IOException("History file for application " + appId
-          + " is not found");
+    try {
+      fs.getFileStatus(applicationHistoryFile);
+    } catch (FileNotFoundException e) {
+      throw (FileNotFoundException) new FileNotFoundException("History file for"
+          + " application " + appId + " is not found: " + e).initCause(e);
     }
     // The history file is still under writing
     if (outstandingWriters.containsKey(appId)) {
@@ -713,12 +711,12 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     }
 
     public void reset() throws IOException {
-      IOUtils.cleanup(LOG, scanner);
+      IOUtils.cleanupWithLogger(LOG, scanner);
       scanner = reader.createScanner();
     }
 
     public void close() {
-      IOUtils.cleanup(LOG, scanner, reader, fsdis);
+      IOUtils.cleanupWithLogger(LOG, scanner, reader, fsdis);
     }
 
   }
@@ -742,13 +740,13 @@ public class FileSystemApplicationHistoryStore extends AbstractService
                 YarnConfiguration.DEFAULT_FS_APPLICATION_HISTORY_STORE_COMPRESSION_TYPE), null,
                 getConfig());
       } catch (IOException e) {
-        IOUtils.cleanup(LOG, fsdos);
+        IOUtils.cleanupWithLogger(LOG, fsdos);
         throw e;
       }
     }
 
     public synchronized void close() {
-      IOUtils.cleanup(LOG, writer, fsdos);
+      IOUtils.cleanupWithLogger(LOG, writer, fsdos);
     }
 
     public synchronized void writeHistoryData(HistoryDataKey key, byte[] value)
@@ -758,13 +756,13 @@ public class FileSystemApplicationHistoryStore extends AbstractService
         dos = writer.prepareAppendKey(-1);
         key.write(dos);
       } finally {
-        IOUtils.cleanup(LOG, dos);
+        IOUtils.cleanupWithLogger(LOG, dos);
       }
       try {
         dos = writer.prepareAppendValue(value.length);
         dos.write(value);
       } finally {
-        IOUtils.cleanup(LOG, dos);
+        IOUtils.cleanupWithLogger(LOG, dos);
       }
     }
 

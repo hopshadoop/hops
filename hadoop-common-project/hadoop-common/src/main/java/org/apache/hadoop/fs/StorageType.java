@@ -18,43 +18,45 @@
 
 package org.apache.hadoop.fs;
 
+import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-
-import java.util.Arrays;
-import java.util.List;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * Defines the types of supported storage media. The default storage
  * medium is assumed to be DISK.
- *
  */
 @InterfaceAudience.Public
-@InterfaceStability.Evolving
+@InterfaceStability.Unstable
 public enum StorageType {
-  DISK(false),
+  // sorted by the speed of the storage types, from fast to slow
+  DB(false),
   SSD(false),
+  DISK(false),
   RAID5(false),
   ARCHIVE(false),
-  DB(false);
+  PROVIDED(false);
 
   private final boolean isTransient;
 
-  public static StorageType DEFAULT = DISK;
+  public static final StorageType DEFAULT = DISK;
 
   public static final StorageType[] EMPTY_ARRAY = {};
-  
+
   private static final StorageType[] VALUES = values();
-  
+
   StorageType(boolean isTransient) {
     this.isTransient = isTransient;
   }
-  
+
   public boolean isTransient() {
     return isTransient;
   }
-    
+
   public boolean supportTypeQuota() {
     return !isTransient;
   }
@@ -62,7 +64,7 @@ public enum StorageType {
   public boolean isMovable() {
     return !isTransient;
   }
-    
+
   public static List<StorageType> asList() {
     return Arrays.asList(VALUES);
   }
@@ -80,7 +82,7 @@ public enum StorageType {
   }
 
   public static StorageType parseStorageType(String s) {
-    return StorageType.valueOf(s.toUpperCase());
+    return StorageType.valueOf(StringUtils.toUpperCase(s));
   }
 
   private static List<StorageType> getNonTransientTypes() {

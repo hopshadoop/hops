@@ -21,26 +21,27 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.server.nodemanager.NodeManager;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
+import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration.PREFIX;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.google.common.collect.ImmutableMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestDistributedShellWithNodeLabels {
-  private static final Log LOG =
-      LogFactory.getLog(TestDistributedShellWithNodeLabels.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestDistributedShellWithNodeLabels.class);
   
   static final int NUM_NMS = 2;
   TestDistributedShell distShellTest;
- 
+
   @Before
   public void setup() throws Exception {
     distShellTest = new TestDistributedShell();
@@ -57,13 +58,12 @@ public class TestDistributedShellWithNodeLabels {
     labelsMgr.addToCluserNodeLabelsWithDefaultExclusivity(labels);
 
     // Setup queue access to node labels
-    distShellTest.conf.set("yarn.scheduler.capacity.root.accessible-node-labels", "x");
-    distShellTest.conf.set("yarn.scheduler.capacity.root.accessible-node-labels.x.capacity",
+    distShellTest.conf.set(PREFIX + "root.accessible-node-labels", "x");
+    distShellTest.conf.set(PREFIX + "root.accessible-node-labels.x.capacity",
         "100");
-    distShellTest.conf.set("yarn.scheduler.capacity.root.default.accessible-node-labels", "x");
-    distShellTest.conf.set(
-        "yarn.scheduler.capacity.root.default.accessible-node-labels.x.capacity",
-        "100");
+    distShellTest.conf.set(PREFIX + "root.default.accessible-node-labels", "x");
+    distShellTest.conf.set(PREFIX
+        + "root.default.accessible-node-labels.x.capacity", "100");
 
     rmContext.getScheduler().reinitialize(distShellTest.conf, rmContext);
 

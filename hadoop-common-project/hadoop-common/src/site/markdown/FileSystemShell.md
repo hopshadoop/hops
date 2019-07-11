@@ -17,7 +17,7 @@
 Overview
 ========
 
-The File System (FS) shell includes various shell-like commands that directly interact with the Hadoop Distributed File System (HDFS) as well as other file systems that Hadoop supports, such as Local FS, HFTP FS, S3 FS, and others. The FS shell is invoked by:
+The File System (FS) shell includes various shell-like commands that directly interact with the Hadoop Distributed File System (HDFS) as well as other file systems that Hadoop supports, such as Local FS, WebHDFS, S3 FS, and others. The FS shell is invoked by:
 
     bin/hadoop fs <args>
 
@@ -141,7 +141,7 @@ Similar to get command, except that the destination is restricted to a local fil
 count
 -----
 
-Usage: `hadoop fs -count [-q] [-h] [-v] [-x] [-t [<storage type>]] [-u] <paths> `
+Usage: `hadoop fs -count [-q] [-h] [-v] [-x] [-t [<storage type>]] [-u] [-e] <paths> `
 
 Count the number of directories, files and bytes under the paths that match the specified file pattern. Get the quota and the usage. The output columns with -count are: DIR\_COUNT, FILE\_COUNT, CONTENT\_SIZE, PATHNAME
 
@@ -149,7 +149,7 @@ The -u and -q options control what columns the output contains.  -q means show q
 
 The output columns with -count -q are: QUOTA, REMAINING\_QUOTA, SPACE\_QUOTA, REMAINING\_SPACE\_QUOTA, DIR\_COUNT, FILE\_COUNT, CONTENT\_SIZE, PATHNAME
 
-The output columns with -count -u are: QUOTA, REMAINING\_QUOTA, SPACE\_QUOTA, REMAINING\_SPACE\_QUOTA
+The output columns with -count -u are: QUOTA, REMAINING\_QUOTA, SPACE\_QUOTA, REMAINING\_SPACE\_QUOTA, PATHNAME
 
 The -t option shows the quota and usage for each storage type. The -t option is ignored if -u or -q option is not given. The list of possible parameters that can be used in -t option(case insensitive except the parameter ""): "", "all", "ram_disk", "ssd", "disk" or "archive".
 
@@ -158,6 +158,12 @@ The -h option shows sizes in human readable format.
 The -v option displays a header line.
 
 The -x option excludes snapshots from the result calculation. Without the -x option (default), the result is always calculated from all INodes, including all snapshots under the given path. The -x option is ignored if -u or -q option is given.
+
+The -e option shows the erasure coding policy for each file.
+
+The output columns with -count -e are: DIR\_COUNT, FILE\_COUNT, CONTENT_SIZE, ERASURECODING\_POLICY, PATHNAME
+
+The ERASURECODING\_POLICY is name of the policy for the file. If a erasure coding policy is setted on that file, it will return name of the policy. If no erasure coding policy is setted, it will return \"Replicated\" which means it use replication storage strategy.
 
 Example:
 
@@ -168,6 +174,7 @@ Example:
 * `hadoop fs -count -u hdfs://nn1.example.com/file1`
 * `hadoop fs -count -u -h hdfs://nn1.example.com/file1`
 * `hadoop fs -count -u -h -v hdfs://nn1.example.com/file1`
+* `hadoop fs -count -e hdfs://nn1.example.com/file1`
 
 Exit Code:
 
@@ -224,7 +231,7 @@ Example:
 du
 ----
 
-Usage: `hadoop fs -du [-s] [-h] [-x] URI [URI ...]`
+Usage: `hadoop fs -du [-s] [-h] [-v] [-x] URI [URI ...]`
 
 Displays sizes of files and directories contained in the given directory or the length of a file in case its just a file.
 
@@ -232,6 +239,7 @@ Options:
 
 * The -s option will result in an aggregate summary of file lengths being displayed, rather than the individual files. Without the -s option, calculation is done by going 1-level deep from the given path.
 * The -h option will format file sizes in a "human-readable" fashion (e.g 64.0m instead of 67108864)
+* The -v option will display the names of columns as a header line.
 * The -x option will exclude snapshots from the result calculation. Without the -x option (default), the result is always calculated from all INodes, including all snapshots under the given path.
 
 The du returns three columns with the following format:
@@ -392,6 +400,19 @@ Exit Code:
 
 Returns 0 on success and non-zero on error.
 
+head
+----
+
+Usage: `hadoop fs -head URI`
+
+Displays first kilobyte of the file to stdout.
+
+Example:
+
+* `hadoop fs -head pathname`
+
+Exit Code: Returns 0 on success and -1 on error.
+
 help
 ----
 
@@ -402,7 +423,7 @@ Return usage output.
 ls
 ----
 
-Usage: `hadoop fs -ls [-C] [-d] [-h] [-q] [-R] [-t] [-S] [-r] [-u] <args> `
+Usage: `hadoop fs -ls [-C] [-d] [-h] [-q] [-R] [-t] [-S] [-r] [-u] [-e] <args> `
 
 Options:
 
@@ -415,6 +436,7 @@ Options:
 * -S: Sort output by file size.
 * -r: Reverse the sort order.
 * -u: Use access time rather than modification time for display and sorting.  
+* -e: Display the erasure coding policy of files and directories only.
 
 For a file ls returns stat on the file with the following format:
 
@@ -429,6 +451,7 @@ Files within a directory are order by filename by default.
 Example:
 
 * `hadoop fs -ls /user/hadoop/file1`
+* `hadoop fs -ls -e /ecdir`
 
 Exit Code:
 
@@ -646,7 +669,7 @@ setrep
 
 Usage: `hadoop fs -setrep [-R] [-w] <numReplicas> <path> `
 
-Changes the replication factor of a file. If *path* is a directory then the command recursively changes the replication factor of all files under the directory tree rooted at *path*.
+Changes the replication factor of a file. If *path* is a directory then the command recursively changes the replication factor of all files under the directory tree rooted at *path*. The EC files will be ignored when executing this command.
 
 Options:
 
@@ -666,11 +689,11 @@ stat
 
 Usage: `hadoop fs -stat [format] <path> ...`
 
-Print statistics about the file/directory at \<path\> in the specified format. Format accepts filesize in blocks (%b), type (%F), group name of owner (%g), name (%n), block size (%o), replication (%r), user name of owner(%u), and modification date (%y, %Y). %y shows UTC date as "yyyy-MM-dd HH:mm:ss" and %Y shows milliseconds since January 1, 1970 UTC. If the format is not specified, %y is used by default.
+Print statistics about the file/directory at \<path\> in the specified format. Format accepts permissions in octal (%a) and symbolic (%A), filesize in bytes (%b), type (%F), group name of owner (%g), name (%n), block size (%o), replication (%r), user name of owner(%u), access date(%x, %X), and modification date (%y, %Y). %x and %y show UTC date as "yyyy-MM-dd HH:mm:ss", and %X and %Y show milliseconds since January 1, 1970 UTC. If the format is not specified, %y is used by default.
 
 Example:
 
-* `hadoop fs -stat "%F %u:%g %b %y %n" /file`
+* `hadoop fs -stat "type:%F perm:%a %u:%g size:%b mtime:%y atime:%x name:%n" /file`
 
 Exit Code: Returns 0 on success and -1 on error.
 
@@ -718,6 +741,38 @@ Usage: `hadoop fs -text <src> `
 
 Takes a source file and outputs the file in text format. The allowed formats are zip and TextRecordInputStream.
 
+touch
+------
+
+Usage: `hadoop fs -touch [-a] [-m] [-t TIMESTAMP] [-c] URI [URI ...]`
+
+Updates the access and modification times of the file specified by the URI to the current time.
+If the file does not exist, then a zero length file is created at URI with current time as the
+timestamp of that URI.
+
+* Use -a option to change only the access time
+* Use -m option to change only the modification time
+* Use -t option to specify timestamp (in format yyyyMMddHHmmss) instead of current time
+* Use -c option to not create file if it does not exist
+
+The timestamp format is as follows
+* yyyy Four digit year (e.g. 2018)
+* MM Two digit month of the year (e.g. 08 for month of August)
+* dd Two digit day of the month (e.g. 01 for first day of the month)
+* HH Two digit hour of the day using 24 hour notation (e.g. 23 stands for 11 pm, 11 stands for 11 am)
+* mm Two digit minutes of the hour
+* ss Two digit seconds of the minute
+e.g. 20180809230000 represents August 9th 2018, 11pm
+
+Example:
+
+* `hadoop fs -touch pathname`
+* `hadoop fs -touch -m -t 20180809230000 pathname`
+* `hadoop fs -touch -t 20180809230000 pathname`
+* `hadoop fs -touch -a pathname`
+
+Exit Code: Returns 0 on success and -1 on error.
+
 touchz
 ------
 
@@ -736,15 +791,14 @@ truncate
 
 Usage: `hadoop fs -truncate [-w] <length> <paths>`
 
-Truncate all files that match the specified file pattern to the
-specified length.
+Truncate all files that match the specified file pattern
+to the specified length.
 
 Options:
 
-* The `-w` flag requests that the command waits for block recovery
-  to complete, if necessary. Without -w flag the file may remain
-  unclosed for some time while the recovery is in progress.
-  During this time file cannot be reopened for append.
+* The -w flag requests that the command waits for block recovery to complete, if necessary.  
+Without -w flag the file may remain unclosed for some time while the recovery is in progress.  
+During this time file cannot be reopened for append.
 
 Example:
 

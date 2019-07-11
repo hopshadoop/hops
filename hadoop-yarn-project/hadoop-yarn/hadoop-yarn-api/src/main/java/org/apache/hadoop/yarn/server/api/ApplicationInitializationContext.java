@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.api;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -39,25 +38,16 @@ import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 public class ApplicationInitializationContext {
 
   private final String user;
-  private final String userFolder;
   private final ApplicationId applicationId;
   private ByteBuffer appDataForService;
 
-  @VisibleForTesting
-  public ApplicationInitializationContext(String user, ApplicationId applicationId,
-      ByteBuffer appDataForService) {
-    this(user, applicationId, appDataForService, user);
-    
-  }
-  
   @Private
   @Unstable
   public ApplicationInitializationContext(String user, ApplicationId applicationId,
-      ByteBuffer appDataForService, String userFolder) {
+      ByteBuffer appDataForService) {
     this.user = user;
     this.applicationId = applicationId;
     this.appDataForService = appDataForService;
-    this.userFolder = userFolder;
   }
 
   /**
@@ -69,15 +59,6 @@ public class ApplicationInitializationContext {
     return this.user;
   }
 
-  /**
-   * Get the user-folder of the application-submitter
-   * 
-   * @return user-name
-   */
-  public String getUserFolder() {
-    return this.userFolder;
-  }
-  
   /**
    * Get {@link ApplicationId} of the application
    * 

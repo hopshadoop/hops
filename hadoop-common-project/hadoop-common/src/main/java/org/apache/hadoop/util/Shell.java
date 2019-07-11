@@ -22,13 +22,16 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -48,6 +51,8 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public abstract class Shell {
+  private static final Map<Shell, Object> CHILD_SHELLS =
+      Collections.synchronizedMap(new WeakHashMap<Shell, Object>());
   public static final Logger LOG = LoggerFactory.getLogger(Shell.class);
 
   /**
@@ -81,6 +86,21 @@ public abstract class Shell {
   @Deprecated
   public static boolean isJava7OrAbove() {
     return true;
+  }
+
+  // "1.8"->8, "9"->9, "10"->10
+  private static final int JAVA_SPEC_VER = Math.max(8, Integer.parseInt(
+      System.getProperty("java.specification.version").split("\\.")[0]));
+
+  /**
+   * Query to see if major version of Java specification of the system
+   * is equal or greater than the parameter.
+   *
+   * @param version 8, 9, 10 etc.
+   * @return comparison with system property, always true for 8
+   */
+  public static boolean isJavaVersionAtLeast(int version) {
+    return JAVA_SPEC_VER >= version;
   }
 
   /**
@@ -751,6 +771,10 @@ public abstract class Shell {
     } catch (IOException ioe) {
       LOG.warn("Bash is not supported by the OS", ioe);
       supported = false;
+    } catch (SecurityException se) {
+      LOG.info("Bash execution is not allowed by the JVM " +
+          "security manager.Considering it not supported.");
+      supported = false;
     }
 
     return supported;
@@ -778,7 +802,11 @@ public abstract class Shell {
     } catch (IOException ioe) {
       LOG.debug("setsid is not available on this machine. So not using it.");
       setsidSupported = false;
-    }  catch (Error err) {
+    } catch (SecurityException se) {
+      LOG.debug("setsid is not allowed to run by the JVM "+
+          "security manager. So not using it.");
+      setsidSupported = false;
+    } catch (Error err) {
       if (err.getMessage() != null
           && err.getMessage().contains("posix_spawn is not " +
           "a supported process launch mechanism")
@@ -808,6 +836,7 @@ public abstract class Shell {
   private File dir;
   private Process process; // sub process used to execute the command
   private int exitCode;
+  private Thread waitingThread;
 
   /** Flag to indicate whether or not the script has finished executing. */
   private final AtomicBoolean completed = new AtomicBoolean(false);
@@ -866,6 +895,9 @@ public abstract class Shell {
       return;
     }
     exitCode = 0; // reset for next run
+    if (Shell.MAC) {
+      System.setProperty("jdk.lang.Process.launchMechanism", "POSIX_SPAWN");
+    }
     runCommand();
   }
 
@@ -877,21 +909,14 @@ public abstract class Shell {
     timedOut.set(false);
     completed.set(false);
 
-    if (environment != null) {
-      builder.environment().putAll(this.environment);
-    }
-
     // Remove all env vars from the Builder to prevent leaking of env vars from
     // the parent process.
     if (!inheritParentEnv) {
-      // branch-2: Only do this for HADOOP_CREDSTORE_PASSWORD
-      // Sometimes daemons are configured to use the CredentialProvider feature
-      // and given their jceks password via an environment variable.  We need to
-      // make sure to remove it so it doesn't leak to child processes, which
-      // might be owned by a different user.  For example, the NodeManager
-      // running a User's container.
-      builder.environment().remove(
-          AbstractJavaKeyStoreProvider.CREDENTIAL_PASSWORD_ENV_VAR);
+      builder.environment().clear();
+    }
+
+    if (environment != null) {
+      builder.environment().putAll(this.environment);
     }
 
     if (dir != null) {
@@ -912,6 +937,9 @@ public abstract class Shell {
     } else {
       process = builder.start();
     }
+
+    waitingThread = Thread.currentThread();
+    CHILD_SHELLS.put(this, null);
 
     if (timeOutInterval > 0) {
       timeOutTimer = new Timer("Shell command timeout");
@@ -941,7 +969,15 @@ public abstract class Shell {
             line = errReader.readLine();
           }
         } catch(IOException ioe) {
-          LOG.warn("Error reading the error stream", ioe);
+          // Its normal to observe a "Stream closed" I/O error on
+          // command timeouts destroying the underlying process
+          // so only log a WARN if the command didn't time out
+          if (!isTimedOut()) {
+            LOG.warn("Error reading the error stream", ioe);
+          } else {
+            LOG.debug("Error reading the error stream due to shell "
+                + "command timeout", ioe);
+          }
         }
       }
     };
@@ -981,17 +1017,7 @@ public abstract class Shell {
       }
       // close the input stream
       try {
-        // JDK 7 tries to automatically drain the input streams for us
-        // when the process exits, but since close is not synchronized,
-        // it creates a race if we close the stream first and the same
-        // fd is recycled.  the stream draining thread will attempt to
-        // drain that fd!!  it may block, OOM, or cause bizarre behavior
-        // see: https://bugs.openjdk.java.net/browse/JDK-8024521
-        //      issue is fixed in build 7u60
-        InputStream stdout = process.getInputStream();
-        synchronized (stdout) {
-          inReader.close();
-        }
+        inReader.close();
       } catch (IOException ioe) {
         LOG.warn("Error while closing the input stream", ioe);
       }
@@ -1000,14 +1026,13 @@ public abstract class Shell {
         joinThread(errThread);
       }
       try {
-        InputStream stderr = process.getErrorStream();
-        synchronized (stderr) {
-          errReader.close();
-        }
+        errReader.close();
       } catch (IOException ioe) {
         LOG.warn("Error while closing the error stream", ioe);
       }
       process.destroy();
+      waitingThread = null;
+      CHILD_SHELLS.remove(this);
       lastTime = Time.monotonicNow();
     }
   }
@@ -1054,6 +1079,15 @@ public abstract class Shell {
   public int getExitCode() {
     return exitCode;
   }
+
+  /** get the thread that is waiting on this instance of <code>Shell</code>.
+   * @return the thread that ran runCommand() that spawned this shell
+   * or null if no thread is waiting for this shell to complete
+   */
+  public Thread getWaitingThread() {
+    return waitingThread;
+  }
+
 
   /**
    * This is an IOException with exit code added.
@@ -1153,6 +1187,15 @@ public abstract class Shell {
       }
       timeOutInterval = timeout;
       this.inheritParentEnv = inheritParentEnv;
+    }
+
+    /**
+     * Returns the timeout value set for the executor's sub-commands.
+     * @return The timeout value in milliseconds
+     */
+    @VisibleForTesting
+    public long getTimeoutInterval() {
+      return timeOutInterval;
     }
 
     /**
@@ -1305,5 +1348,45 @@ public abstract class Shell {
         }
       }
     }
+  }
+
+  /**
+   * Static method to destroy all running <code>Shell</code> processes.
+   * Iterates through a map of all currently running <code>Shell</code>
+   * processes and destroys them one by one. This method is thread safe
+   */
+  public static void destroyAllShellProcesses() {
+    synchronized (CHILD_SHELLS) {
+      for (Shell shell : CHILD_SHELLS.keySet()) {
+        if (shell.getProcess() != null) {
+          shell.getProcess().destroy();
+        }
+      }
+      CHILD_SHELLS.clear();
+    }
+  }
+
+  /**
+   * Static method to return a Set of all <code>Shell</code> objects.
+   */
+  public static Set<Shell> getAllShells() {
+    synchronized (CHILD_SHELLS) {
+      return new HashSet<>(CHILD_SHELLS.keySet());
+    }
+  }
+
+  /**
+   * Static method to return the memory lock limit for datanode.
+   * @param ulimit max value at which memory locked should be capped.
+   * @return long value specifying the memory lock limit.
+   */
+  public static Long getMemlockLimit(Long ulimit) {
+    if (WINDOWS) {
+      // HDFS-13560: if ulimit is too large on Windows, Windows will complain
+      // "1450: Insufficient system resources exist to complete the requested
+      // service". Thus, cap Windows memory lock limit at Integer.MAX_VALUE.
+      return Math.min(Integer.MAX_VALUE, ulimit);
+    }
+    return ulimit;
   }
 }

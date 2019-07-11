@@ -38,6 +38,11 @@
   </property>
 
   <property>
+    <name>fs.contract.create-visibility-delayed</name>
+    <value>true</value>
+  </property>
+
+  <property>
     <name>fs.contract.is-case-sensitive</name>
     <value>true</value>
   </property>
@@ -103,13 +108,18 @@
   </property>
 
   <property>
+    <name>fs.contract.supports-multipartuploader</name>
+    <value>true</value>
+  </property>
+
+  <property>
     <name>fs.contract.supports-unix-permissions</name>
     <value>false</value>
   </property>
 
   <property>
     <name>fs.contract.rename-overwrites-dest</name>
-    <value>true</value>
+    <value>false</value>
   </property>
 
 </configuration>

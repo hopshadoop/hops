@@ -36,8 +36,28 @@ import org.apache.hadoop.yarn.util.Records;
  *     {@link Resource} capability of the container after the update request
  *     is completed.
  *   </li>
+ *   <li>
+ *     {@link ExecutionType} of the container after the update request is
+ *     completed.
+ *   </li>
  * </ul>
  *
+ * Update rules:
+ * <ul>
+ *   <li>
+ *     Currently only ONE aspect of the container can be updated per request
+ *     (user can either update Capability OR ExecutionType in one request..
+ *     not both).
+ *   </li>
+ *   <li>
+ *     There must be only 1 update request per container in an allocate call.
+ *   </li>
+ *   <li>
+ *     If a new update request is sent for a container (in a subsequent allocate
+ *     call) before the first one is satisfied by the Scheduler, it will
+ *     overwrite the previous request.
+ *   </li>
+ * </ul>
  * @see ApplicationMasterProtocol#allocate(org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest)
  */
 @InterfaceAudience.Public
@@ -48,12 +68,13 @@ public abstract class UpdateContainerRequest {
   @InterfaceStability.Unstable
   public static UpdateContainerRequest newInstance(int version,
       ContainerId containerId, ContainerUpdateType updateType,
-      Resource targetCapability) {
+      Resource targetCapability, ExecutionType targetExecutionType) {
     UpdateContainerRequest request =
         Records.newRecord(UpdateContainerRequest.class);
     request.setContainerVersion(version);
     request.setContainerId(containerId);
     request.setContainerUpdateType(updateType);
+    request.setExecutionType(targetExecutionType);
     request.setCapability(targetCapability);
     return request;
   }
@@ -107,32 +128,63 @@ public abstract class UpdateContainerRequest {
   public abstract void setContainerId(ContainerId containerId);
 
   /**
-   * Get the <code>Resource</code> capability of the container.
-   * @return <code>Resource</code> capability of the container
+   * Get the target <code>ExecutionType</code> of the container.
+   * @return <code>ExecutionType</code> of the container
    */
   @InterfaceAudience.Public
   @InterfaceStability.Unstable
-  public abstract Resource getCapability();
+  public abstract ExecutionType getExecutionType();
 
   /**
-   * Set the <code>Resource</code> capability of the container.
-   * @param capability <code>Resource</code> capability of the container
+   * Set the target <code>ExecutionType</code> of the container.
+   * @param executionType <code>ExecutionType</code> of the container
+   */
+  @InterfaceAudience.Public
+  @InterfaceStability.Unstable
+  public abstract void setExecutionType(ExecutionType executionType);
+
+  /**
+   * Set the <code>Resource</code> capability of the request.
+   * @param capability <code>Resource</code> capability of the request
    */
   @InterfaceAudience.Public
   @InterfaceStability.Unstable
   public abstract void setCapability(Resource capability);
+
+  /**
+   * Get the <code>Resource</code> capability of the request.
+   * @return <code>Resource</code> capability of the request
+   */
+  @InterfaceAudience.Public
+  @InterfaceStability.Unstable
+  public abstract Resource getCapability();
 
   @Override
   public int hashCode() {
     final int prime = 2153;
     int result = 2459;
     ContainerId cId = getContainerId();
+    ExecutionType execType = getExecutionType();
     Resource capability = getCapability();
+    ContainerUpdateType updateType = getContainerUpdateType();
     result =
         prime * result + ((capability == null) ? 0 : capability.hashCode());
     result = prime * result + ((cId == null) ? 0 : cId.hashCode());
     result = prime * result + getContainerVersion();
+    result = prime * result + ((execType == null) ? 0 : execType.hashCode());
+    result = prime * result + ((updateType== null) ? 0 : updateType.hashCode());
     return result;
+  }
+
+  @Override
+  public String toString() {
+    return "UpdateReq{" +
+        "containerId=" + getContainerId() + ", " +
+        "containerVersion=" + getContainerVersion() + ", " +
+        "targetExecType=" + getExecutionType() + ", " +
+        "targetCapability=" + getCapability() + ", " +
+        "updateType=" + getContainerUpdateType() + ", " +
+        "}";
   }
 
   @Override
@@ -164,6 +216,22 @@ public abstract class UpdateContainerRequest {
       return false;
     }
     if (getContainerVersion() != other.getContainerVersion()) {
+      return false;
+    }
+    ExecutionType execType = getExecutionType();
+    if (execType == null) {
+      if (other.getExecutionType() != null) {
+        return false;
+      }
+    } else if (!execType.equals(other.getExecutionType())) {
+      return false;
+    }
+    ContainerUpdateType updateType = getContainerUpdateType();
+    if (updateType == null) {
+      if (other.getContainerUpdateType() != null) {
+        return false;
+      }
+    } else if (!updateType.equals(other.getContainerUpdateType())) {
       return false;
     }
     return true;

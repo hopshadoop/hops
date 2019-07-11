@@ -252,8 +252,6 @@ public class AclStatus {
       // accuracy.
       permArg = this.permission;
     }
-    
-    
     if ((entry.getName() != null || entry.getType() == AclEntryType.GROUP)) {
       if (entry.getScope() == AclEntryScope.ACCESS) {
         FsAction entryPerm = entry.getPermission();

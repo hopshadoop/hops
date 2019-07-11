@@ -119,7 +119,7 @@ class FSDirDeleteOp {
     }
 
     INodeIdentifier subtreeRoot = null;
-    if (pathInode.isFile()) {
+    if (pathInode.isFile() || pathInode.isSymlink()) {
       return deleteTransaction(fsn, src, false);
     }
 

@@ -54,7 +54,7 @@ public class TestJMXJsonServlet extends HttpServerFunctionalTest {
     assertTrue("'"+p+"' does not match "+value, m.find());
   }
   
-  @Test public void testQury() throws Exception {
+  @Test public void testQuery() throws Exception {
     String result = readOutput(new URL(baseUrl, "/jmx?qry=java.lang:type=Runtime"));
     assertReFind("\"name\"\\s*:\\s*\"java.lang:type=Runtime\"", result);
     assertReFind("\"modelerType\"", result);

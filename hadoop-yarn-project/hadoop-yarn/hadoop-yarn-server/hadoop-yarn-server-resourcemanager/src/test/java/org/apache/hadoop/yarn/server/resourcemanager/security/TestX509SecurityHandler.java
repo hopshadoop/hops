@@ -92,6 +92,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import static junit.framework.TestCase.assertTrue;
+import org.apache.hadoop.yarn.server.resourcemanager.placement.ApplicationPlacementContext;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -460,6 +461,7 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     // By now material rotation should have stopped
     assertFalse(appState.isDuringMaterialRotation());
     assertEquals(-1L, appState.getMaterialRotationStartTime());
+    Thread.sleep(1000);
     // Application should still be registered with the certificate renewer
     X509SecurityHandler x509SecurityHandler = (X509SecurityHandler) rm.getRMContext().getRMAppSecurityManager()
         .getSecurityHandler(X509SecurityHandler.class);
@@ -575,21 +577,6 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     rm.stop();
   }
   
-  private RMApp createNewTestApplication(int appId) throws IOException {
-    ApplicationId applicationID = MockApps.newAppID(appId);
-    String user = MockApps.newUserName();
-    String name = MockApps.newAppName();
-    String queue = MockApps.newQueue();
-    YarnScheduler scheduler = Mockito.mock(YarnScheduler.class);
-    ApplicationMasterService appMasterService = new ApplicationMasterService(rmContext, scheduler);
-    ApplicationSubmissionContext applicationSubmissionContext = new ApplicationSubmissionContextPBImpl();
-    applicationSubmissionContext.setApplicationId(applicationID);
-    RMApp app = new RMAppImpl(applicationID, rmContext, conf, name, user, queue, applicationSubmissionContext,
-        scheduler, appMasterService, System.currentTimeMillis(), "YARN", null, Mockito.mock(ResourceRequest.class));
-    rmContext.getRMApps().put(applicationID, app);
-    return app;
-  }
-  
   private class MyMockRM2 extends MockRM {
     public MyMockRM2(Configuration conf) {
       super(conf);
@@ -611,24 +598,28 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
       }
   
       @Override
-      protected RMApp createRMApp(ApplicationId applicationId, String user,
-          ApplicationSubmissionContext submissionContext,
-          long submitTime, ResourceRequest amReq) throws IOException {
-        return new MyRMApp(applicationId, rmContext, getConfig(), submissionContext.getApplicationName(),
-            user, submissionContext.getQueue(), submissionContext, scheduler, masterService, submitTime,
-            submissionContext.getApplicationType(), submissionContext.getApplicationTags(), amReq);
+      protected RMAppImpl createRMApp(ApplicationId applicationId, RMContext rmContext,
+      Configuration config, String name, String user, String queue,
+      ApplicationSubmissionContext submissionContext, YarnScheduler scheduler,
+      ApplicationMasterService masterService, long submitTime,
+      String applicationType, Set<String> applicationTags,
+      List<ResourceRequest> amReqs, ApplicationPlacementContext
+      placementContext, long startTime) {
+        return new MyRMApp(applicationId, rmContext, config, name, user, queue, submissionContext, scheduler,
+            masterService, submitTime, applicationType, applicationTags, amReqs, placementContext, startTime);
       }
     }
     
     private class MyRMApp extends RMAppImpl {
   
-      public MyRMApp(ApplicationId applicationId, RMContext rmContext, Configuration config, String name,
-          String user, String queue, ApplicationSubmissionContext submissionContext,
-          YarnScheduler scheduler, ApplicationMasterService masterService, long submitTime, String applicationType,
-          Set<String> applicationTags, ResourceRequest amReq) throws IOException {
+      public MyRMApp(ApplicationId applicationId, RMContext rmContext,
+          Configuration config, String name, String user, String queue,
+          ApplicationSubmissionContext submissionContext, YarnScheduler scheduler,
+          ApplicationMasterService masterService, long submitTime,
+          String applicationType, Set<String> applicationTags,
+          List<ResourceRequest> amReqs, ApplicationPlacementContext placementContext, long startTime) {
         super(applicationId, rmContext, config, name, user, queue, submissionContext, scheduler, masterService,
-            submitTime,
-            applicationType, applicationTags, amReq);
+            submitTime, applicationType, applicationTags, amReqs, placementContext, startTime);
       }
       
       @Override

@@ -25,9 +25,7 @@ import java.net.URLDecoder;
 
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
@@ -45,12 +43,15 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 import com.google.common.base.Joiner;
 import com.google.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class renders the various pages that the web app supports.
  */
 public class AppController extends Controller implements AMParams {
-  private static final Log LOG = LogFactory.getLog(AppController.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AppController.class);
   private static final Joiner JOINER = Joiner.on("");
   
   protected final App app;
@@ -84,11 +85,11 @@ public class AppController extends Controller implements AMParams {
   public void info() {
     AppInfo info = new AppInfo(app, app.context);
     info("Application Master Overview").
-      _("Application ID:", info.getId()).
-      _("Application Name:", info.getName()).
-      _("User:", info.getUser()).
-      _("Started on:", Times.format(info.getStartTime())).
-      _("Elasped: ", org.apache.hadoop.util.StringUtils.formatTime(
+        __("Application ID:", info.getId()).
+        __("Application Name:", info.getName()).
+        __("User:", info.getUser()).
+        __("Started on:", Times.format(info.getStartTime())).
+        __("Elasped: ", org.apache.hadoop.util.StringUtils.formatTime(
           info.getElapsedTime() ));
     render(InfoPage.class);
   }
@@ -321,6 +322,40 @@ public class AppController extends Controller implements AMParams {
       return;
     }
     render(confPage());
+  }
+
+  /**
+   * Handle requests to download the job configuration.
+   */
+  public void downloadConf() {
+    try {
+      requireJob();
+    } catch (Exception e) {
+      renderText(e.getMessage());
+      return;
+    }
+    writeJobConf();
+  }
+
+  private void writeJobConf() {
+    String jobId = $(JOB_ID);
+    assert(!jobId.isEmpty());
+
+    JobId jobID = MRApps.toJobID($(JOB_ID));
+    Job job = app.context.getJob(jobID);
+    assert(job != null);
+
+    try {
+      Configuration jobConf = job.loadConfFile();
+      response().setContentType("text/xml");
+      response().setHeader("Content-Disposition",
+          "attachment; filename=" + jobId + ".xml");
+      jobConf.writeXml(writer());
+    } catch (IOException e) {
+      LOG.error("Error reading/writing job" +
+          " conf file for job: " + jobId, e);
+      renderText(e.getMessage());
+    }
   }
 
   /**

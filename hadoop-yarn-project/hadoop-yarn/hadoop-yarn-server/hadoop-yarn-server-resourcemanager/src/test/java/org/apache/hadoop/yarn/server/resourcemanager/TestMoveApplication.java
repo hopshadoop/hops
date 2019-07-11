@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -55,9 +52,6 @@ public class TestMoveApplication {
         FifoSchedulerWithMove.class);
     conf.set(YarnConfiguration.YARN_ADMIN_ACL, " ");
     conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
     resourceManager = new MockRM(conf);
     resourceManager.getRMContext().getContainerTokenSecretManager().rollMasterKey();
     resourceManager.getRMContext().getNMTokenSecretManager().rollMasterKey();
@@ -93,10 +87,10 @@ public class TestMoveApplication {
               application.getApplicationId(), "newqueue"));
       fail("Should have hit exception");
     } catch (YarnException ex) {
-      assertEquals("Move not supported", ex.getCause().getMessage());
+      assertEquals("Move not supported", ex.getMessage());
     }
   }
-  
+
   @Test (timeout = 10000)
   public void testMoveTooLate() throws Exception {
     // Submit application
@@ -183,6 +177,14 @@ public class TestMoveApplication {
     public synchronized boolean checkAccess(UserGroupInformation callerUGI,
         QueueACL acl, String queueName) {
       return acl != QueueACL.ADMINISTER_QUEUE;
+    }
+
+    @Override
+    public void preValidateMoveApplication(ApplicationId appId, String newQueue)
+        throws YarnException {
+      if (failMove) {
+        throw new YarnException("Move not supported");
+      }
     }
   }
 }

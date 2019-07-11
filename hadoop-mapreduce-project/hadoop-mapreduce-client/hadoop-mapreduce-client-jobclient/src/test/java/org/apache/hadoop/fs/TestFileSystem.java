@@ -34,12 +34,12 @@ import java.util.HashMap;
 import java.net.InetSocketAddress;
 import java.net.URI;
 
-import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.fs.shell.CommandFormat;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
@@ -49,6 +49,8 @@ import org.apache.hadoop.mapred.lib.LongSumReducer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
@@ -57,7 +59,8 @@ import static org.junit.Assert.fail;
 
 
 public class TestFileSystem {
-  private static final Log LOG = FileSystem.LOG;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestFileSystem.class);
 
   private static Configuration conf = new Configuration();
   private static int BUFFER_SIZE = conf.getInt("io.file.buffer.size", 4096);
@@ -576,18 +579,6 @@ public class TestFileSystem {
       new Path("file:///").getFileSystem(conf);
       FileSystem.closeAll();
     }
-
-    {
-      Configuration conf = new Configuration();
-      new Path("hftp://localhost:12345/").getFileSystem(conf);
-      FileSystem.closeAll();
-    }
-
-    {
-      Configuration conf = new Configuration();
-      FileSystem fs = new Path("hftp://localhost:12345/").getFileSystem(conf);
-      FileSystem.closeAll();
-    }
   }
 
   @Test
@@ -629,12 +620,12 @@ public class TestFileSystem {
     Configuration conf = new Configuration();
     
     // check basic equality
-    FileSystem.Cache.Key lowercaseCachekey1 = new FileSystem.Cache.Key(new URI("hftp://localhost:12345/"), conf);
-    FileSystem.Cache.Key lowercaseCachekey2 = new FileSystem.Cache.Key(new URI("hftp://localhost:12345/"), conf);
+    FileSystem.Cache.Key lowercaseCachekey1 = new FileSystem.Cache.Key(new URI("hdfs://localhost:12345/"), conf);
+    FileSystem.Cache.Key lowercaseCachekey2 = new FileSystem.Cache.Key(new URI("hdfs://localhost:12345/"), conf);
     assertEquals( lowercaseCachekey1, lowercaseCachekey2 );
 
     // check insensitive equality    
-    FileSystem.Cache.Key uppercaseCachekey = new FileSystem.Cache.Key(new URI("HFTP://Localhost:12345/"), conf);
+    FileSystem.Cache.Key uppercaseCachekey = new FileSystem.Cache.Key(new URI("HDFS://Localhost:12345/"), conf);
     assertEquals( lowercaseCachekey2, uppercaseCachekey );
 
     // check behaviour with collections

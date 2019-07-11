@@ -41,7 +41,7 @@ public class HsTasksPage extends HsView {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.hs.webapp.HsView#preHead(org.apache.hadoop.yarn.webapp.hamlet.Hamlet.HTML)
    */
-  @Override protected void preHead(Page.HTML<_> html) {
+  @Override protected void preHead(Page.HTML<__> html) {
     commonPreHead(html);
     set(DATATABLES_ID, "tasks");
     set(DATATABLES_SELECTOR, ".dt-tasks" );
@@ -96,7 +96,8 @@ public class HsTasksPage extends HsView {
   private String jobsPostTableInit() {
     return "var asInitVals = new Array();\n" +
            "$('tfoot input').keyup( function () \n{"+
-           "  tasksDataTable.fnFilter( this.value, $('tfoot input').index(this) );\n"+
+           "  $('.dt-tasks').dataTable().fnFilter("+
+           " this.value, $('tfoot input').index(this) );\n"+
            "} );\n"+
            "$('tfoot input').each( function (i) {\n"+
            "  asInitVals[i] = this.value;\n"+

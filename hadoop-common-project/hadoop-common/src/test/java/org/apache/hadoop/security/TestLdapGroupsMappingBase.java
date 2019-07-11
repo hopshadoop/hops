@@ -20,7 +20,6 @@ package org.apache.hadoop.security;
 
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import javax.naming.NamingEnumeration;
@@ -30,34 +29,53 @@ import javax.naming.directory.Attributes;
 import javax.naming.directory.BasicAttribute;
 import javax.naming.directory.BasicAttributes;
 import javax.naming.directory.DirContext;
+import javax.naming.directory.SearchControls;
 import javax.naming.directory.SearchResult;
 
 import org.junit.Before;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
+import org.mockito.Spy;
 
 public class TestLdapGroupsMappingBase {
-  protected DirContext mockContext;
+  @Mock
+  private DirContext context;
+  @Mock
+  private NamingEnumeration<SearchResult> userNames;
+  @Mock
+  private NamingEnumeration<SearchResult> groupNames;
+  @Mock
+  private NamingEnumeration<SearchResult> parentGroupNames;
+  @Mock
+  private SearchResult userSearchResult;
+  @Mock
+  private Attributes attributes;
+  @Spy
+  private LdapGroupsMapping groupsMapping = new LdapGroupsMapping();
 
-  protected LdapGroupsMapping mappingSpy = spy(new LdapGroupsMapping());
-  protected NamingEnumeration mockUserNamingEnum =
-      mock(NamingEnumeration.class);
-  protected NamingEnumeration mockGroupNamingEnum =
-      mock(NamingEnumeration.class);
-  protected String[] testGroups = new String[] {"group1", "group2"};
+  private String[] testGroups = new String[] {"group1", "group2"};
+  private String[] testParentGroups =
+      new String[] {"group1", "group2", "group1_1"};
 
   @Before
   public void setupMocksBase() throws NamingException {
-    mockContext = mock(DirContext.class);
-    doReturn(mockContext).when(mappingSpy).getDirContext();
+    MockitoAnnotations.initMocks(this);
+    DirContext ctx = getContext();
+    doReturn(ctx).when(groupsMapping).getDirContext();
 
+    when(ctx.search(Mockito.anyString(), Mockito.anyString(),
+        Mockito.any(Object[].class), Mockito.any(SearchControls.class))).
+        thenReturn(userNames);
     // We only ever call hasMoreElements once for the user NamingEnum, so
     // we can just have one return value
-    when(mockUserNamingEnum.hasMoreElements()).thenReturn(true);
+    when(userNames.hasMoreElements()).thenReturn(true);
 
-    SearchResult mockGroupResult = mock(SearchResult.class);
+    SearchResult groupSearchResult = mock(SearchResult.class);
     // We're going to have to define the loop here. We want two iterations,
     // to get both the groups
-    when(mockGroupNamingEnum.hasMoreElements()).thenReturn(true, true, false);
-    when(mockGroupNamingEnum.nextElement()).thenReturn(mockGroupResult);
+    when(groupNames.hasMoreElements()).thenReturn(true, true, false);
+    when(groupNames.nextElement()).thenReturn(groupSearchResult);
 
     // Define the attribute for the name of the first group
     Attribute group1Attr = new BasicAttribute("cn");
@@ -72,6 +90,62 @@ public class TestLdapGroupsMappingBase {
     group2Attrs.put(group2Attr);
 
     // This search result gets reused, so return group1, then group2
-    when(mockGroupResult.getAttributes()).thenReturn(group1Attrs, group2Attrs);
+    when(groupSearchResult.getAttributes()).
+        thenReturn(group1Attrs, group2Attrs);
+
+    when(getUserNames().nextElement()).
+        thenReturn(getUserSearchResult());
+
+    when(getUserSearchResult().getAttributes()).thenReturn(getAttributes());
+    // Define results for groups 1 level up
+    SearchResult parentGroupResult = mock(SearchResult.class);
+
+    // only one parent group
+    when(parentGroupNames.hasMoreElements()).thenReturn(true, false);
+    when(parentGroupNames.nextElement()).
+        thenReturn(parentGroupResult);
+
+    // Define the attribute for the parent group
+    Attribute parentGroup1Attr = new BasicAttribute("cn");
+    parentGroup1Attr.add(testParentGroups[2]);
+    Attributes parentGroup1Attrs = new BasicAttributes();
+    parentGroup1Attrs.put(parentGroup1Attr);
+
+    // attach the attributes to the result
+    when(parentGroupResult.getAttributes()).thenReturn(parentGroup1Attrs);
+    when(parentGroupResult.getNameInNamespace()).
+        thenReturn("CN=some_group,DC=test,DC=com");
+  }
+
+  protected DirContext getContext() {
+    return context;
+  }
+  protected NamingEnumeration<SearchResult> getUserNames() {
+    return userNames;
+  }
+
+  protected NamingEnumeration<SearchResult> getGroupNames() {
+    return groupNames;
+  }
+
+  protected SearchResult getUserSearchResult() {
+    return userSearchResult;
+  }
+
+  protected Attributes getAttributes() {
+    return attributes;
+  }
+
+  protected LdapGroupsMapping getGroupsMapping() {
+    return groupsMapping;
+  }
+  protected String[] getTestGroups() {
+    return testGroups;
+  }
+  protected NamingEnumeration getParentGroupNames() {
+    return parentGroupNames;
+  }
+  protected String[] getTestParentGroups() {
+    return testParentGroups;
   }
 }

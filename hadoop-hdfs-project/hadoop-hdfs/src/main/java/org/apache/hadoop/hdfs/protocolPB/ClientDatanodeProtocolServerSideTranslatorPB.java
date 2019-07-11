@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
-import com.google.common.base.Optional;
 import com.google.common.primitives.Longs;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
@@ -57,6 +56,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Implementation for protobuf service that forwards requests

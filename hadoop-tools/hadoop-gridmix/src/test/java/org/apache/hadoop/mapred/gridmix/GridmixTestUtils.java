@@ -16,8 +16,8 @@
  */
 package org.apache.hadoop.mapred.gridmix;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -27,6 +27,7 @@ import org.apache.hadoop.mapred.MiniMRClientClusterFactory;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.conf.Configuration;
+import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration.PREFIX;
 
 import java.io.IOException;
 
@@ -34,7 +35,7 @@ import java.io.IOException;
  * This is a test class.
  */
 public class GridmixTestUtils {
-  private static final Log LOG = LogFactory.getLog(GridmixTestUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(GridmixTestUtils.class);
   static final Path DEST = new Path("/gridmix");
   static FileSystem dfs = null;
   static MiniDFSCluster dfsCluster = null;
@@ -48,8 +49,8 @@ public class GridmixTestUtils {
     Configuration conf = new Configuration();
 //    conf.set("mapred.queue.names", "default,q1,q2");
   conf.set("mapred.queue.names", "default");
-    conf.set("yarn.scheduler.capacity.root.queues", "default");
-    conf.set("yarn.scheduler.capacity.root.default.capacity", "100.0");
+    conf.set(PREFIX + "root.queues", "default");
+    conf.set(PREFIX + "root.default.capacity", "100.0");
     
     
     conf.setBoolean(GRIDMIX_USE_QUEUE_IN_TRACE, false);

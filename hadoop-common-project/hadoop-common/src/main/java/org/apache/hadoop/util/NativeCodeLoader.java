@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.util;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A helper to load the native hadoop code i.e. libhadoop.so.
@@ -33,26 +33,25 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Unstable
 public final class NativeCodeLoader {
 
-  private static final Log LOG =
-    LogFactory.getLog(NativeCodeLoader.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(NativeCodeLoader.class);
   
   private static boolean nativeCodeLoaded = false;
   
   static {
     // Try to load native hadoop library and set fallback flag appropriately
     if(LOG.isDebugEnabled()) {
-      LOG.warn("Trying to load the custom-built native-hadoop library...");
+      LOG.debug("Trying to load the custom-built native-hadoop library...");
     }
     try {
       System.loadLibrary("hadoop");
-      LOG.warn("Loaded the native-hadoop library");
+      LOG.debug("Loaded the native-hadoop library");
       nativeCodeLoaded = true;
     } catch (Throwable t) {
       // Ignore failure to load
       if(LOG.isDebugEnabled()) {
-        System.out.println(t);
-        LOG.warn("Failed to load native-hadoop with error: " + t);
-        LOG.warn("java.library.path=" +
+        LOG.debug("Failed to load native-hadoop with error: " + t);
+        LOG.debug("java.library.path=" +
             System.getProperty("java.library.path"));
       }
     }
@@ -79,16 +78,21 @@ public final class NativeCodeLoader {
    * Returns true only if this build was compiled with support for snappy.
    */
   public static native boolean buildSupportsSnappy();
-  
-  /**
-   * Returns true only if this build was compiled with support for openssl.
-   */
-  public static native boolean buildSupportsOpenssl();
 
   /**
    * Returns true only if this build was compiled with support for ISA-L.
    */
   public static native boolean buildSupportsIsal();
+
+  /**
+  * Returns true only if this build was compiled with support for ZStandard.
+   */
+  public static native boolean buildSupportsZstd();
+
+  /**
+   * Returns true only if this build was compiled with support for openssl.
+   */
+  public static native boolean buildSupportsOpenssl();
 
   public static native String getLibraryName();
 

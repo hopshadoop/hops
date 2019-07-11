@@ -211,6 +211,17 @@ public class KeyAuthorizationKeyProvider extends KeyProviderCryptoExtension {
   }
 
   @Override
+  public void invalidateCache(String name) throws IOException {
+    writeLock.lock();
+    try {
+      doAccessCheck(name, KeyOpType.MANAGEMENT);
+      provider.invalidateCache(name);
+    } finally {
+      writeLock.unlock();
+    }
+  }
+
+  @Override
   public void warmUpEncryptedKeys(String... names) throws IOException {
     readLock.lock();
     try {
@@ -259,6 +270,38 @@ public class KeyAuthorizationKeyProvider extends KeyProviderCryptoExtension {
       doAccessCheck(
           encryptedKeyVersion.getEncryptionKeyName(), KeyOpType.DECRYPT_EEK);
       return provider.decryptEncryptedKey(encryptedKeyVersion);
+    } finally {
+      readLock.unlock();
+    }
+  }
+
+  @Override
+  public EncryptedKeyVersion reencryptEncryptedKey(EncryptedKeyVersion ekv)
+      throws IOException, GeneralSecurityException {
+    readLock.lock();
+    try {
+      verifyKeyVersionBelongsToKey(ekv);
+      doAccessCheck(ekv.getEncryptionKeyName(), KeyOpType.GENERATE_EEK);
+      return provider.reencryptEncryptedKey(ekv);
+    } finally {
+      readLock.unlock();
+    }
+  }
+
+  @Override
+  public void reencryptEncryptedKeys(List<EncryptedKeyVersion> ekvs)
+      throws IOException, GeneralSecurityException {
+    if (ekvs.isEmpty()) {
+      return;
+    }
+    readLock.lock();
+    try {
+      for (EncryptedKeyVersion ekv : ekvs) {
+        verifyKeyVersionBelongsToKey(ekv);
+      }
+      final String keyName = ekvs.get(0).getEncryptionKeyName();
+      doAccessCheck(keyName, KeyOpType.GENERATE_EEK);
+      provider.reencryptEncryptedKeys(ekvs);
     } finally {
       readLock.unlock();
     }

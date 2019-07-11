@@ -34,8 +34,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputByteBuffer;
@@ -54,6 +52,7 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceUtilization;
+import org.apache.hadoop.yarn.api.records.NodeAttribute;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -61,6 +60,7 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factories.impl.pb.RecordFactoryPBImpl;
 import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
+import org.apache.hadoop.yarn.nodelabels.NodeLabelUtil;
 import org.apache.hadoop.yarn.server.api.ResourceManagerConstants;
 import org.apache.hadoop.yarn.server.api.ResourceTracker;
 import org.apache.hadoop.yarn.server.api.ServerRMProxy;
@@ -71,24 +71,33 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerRequest;
-import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
+import org.apache.hadoop.yarn.server.api.records.AppCollectorData;
+import org.apache.hadoop.yarn.server.api.records.ContainerQueuingLimit;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
+import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
 import org.apache.hadoop.yarn.server.nodemanager.NodeManager.NMContext;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.ContainerManagerImpl;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Application;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationState;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitor;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.ResourcePlugin;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.ResourcePluginManager;
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
+import org.apache.hadoop.yarn.server.nodemanager.nodelabels.NodeAttributesProvider;
 import org.apache.hadoop.yarn.server.nodemanager.nodelabels.NodeLabelsProvider;
+import org.apache.hadoop.yarn.server.nodemanager.timelineservice.NMTimelinePublisher;
 import org.apache.hadoop.yarn.server.nodemanager.util.NodeManagerHardwareUtils;
-import org.apache.hadoop.yarn.util.resource.Resources;
+import org.apache.hadoop.yarn.util.ResourceCalculatorPlugin;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
+import org.apache.hadoop.yarn.util.resource.Resources;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 
 public class NodeStatusUpdaterImpl extends AbstractService implements
     NodeStatusUpdater {
@@ -96,7 +105,8 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   public static final String YARN_NODEMANAGER_DURATION_TO_TRACK_STOPPED_CONTAINERS =
       YarnConfiguration.NM_PREFIX + "duration-to-track-stopped-containers";
 
-  private static final Log LOG = LogFactory.getLog(NodeStatusUpdaterImpl.class);
+  private static final Logger LOG =
+       LoggerFactory.getLogger(NodeStatusUpdaterImpl.class);
 
   private final Object heartbeatMonitor = new Object();
   private final Object shutdownMonitor = new Object();
@@ -108,6 +118,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   private long nextHeartBeatInterval;
   private ResourceTracker resourceTracker;
   private Resource totalResource;
+  private Resource physicalResource;
   private int httpPort;
   private String nodeManagerVersionId;
   private String minimumResourceManagerVersion;
@@ -144,23 +155,18 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   Set<ContainerId> pendingContainersToRemove = new HashSet<ContainerId>();
 
   private NMNodeLabelsHandler nodeLabelsHandler;
-  private final NodeLabelsProvider nodeLabelsProvider;
-  
+  private NMNodeAttributesHandler nodeAttributesHandler;
+  private NodeLabelsProvider nodeLabelsProvider;
+  private NodeAttributesProvider nodeAttributesProvider;
+
   private Set<ApplicationId> applicationsWithUpdatedCryptoMaterial;
 
   public NodeStatusUpdaterImpl(Context context, Dispatcher dispatcher,
       NodeHealthCheckerService healthChecker, NodeManagerMetrics metrics) {
-    this(context, dispatcher, healthChecker, metrics, null);
-  }
-
-  public NodeStatusUpdaterImpl(Context context, Dispatcher dispatcher,
-      NodeHealthCheckerService healthChecker, NodeManagerMetrics metrics,
-      NodeLabelsProvider nodeLabelsProvider) {
     super(NodeStatusUpdaterImpl.class.getName());
     this.healthChecker = healthChecker;
     this.context = context;
     this.dispatcher = dispatcher;
-    this.nodeLabelsProvider = nodeLabelsProvider;
     this.metrics = metrics;
     this.recentlyStoppedContainers = new LinkedHashMap<ContainerId, Long>();
     this.pendingCompletedContainers =
@@ -171,28 +177,45 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   }
 
   @Override
+  public void setNodeAttributesProvider(NodeAttributesProvider provider) {
+    this.nodeAttributesProvider = provider;
+  }
+
+  @Override
+  public void setNodeLabelsProvider(NodeLabelsProvider provider) {
+    this.nodeLabelsProvider = provider;
+  }
+
+  @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    int memoryMb = NodeManagerHardwareUtils.getContainerMemoryMB(conf);
+    this.totalResource = NodeManagerHardwareUtils.getNodeResources(conf);
+    long memoryMb = totalResource.getMemorySize();
     float vMemToPMem =
         conf.getFloat(
-            YarnConfiguration.NM_VMEM_PMEM_RATIO, 
-            YarnConfiguration.DEFAULT_NM_VMEM_PMEM_RATIO); 
-    int virtualMemoryMb = (int)Math.ceil(memoryMb * vMemToPMem);
-    
-    int virtualCores = NodeManagerHardwareUtils.getVCores(conf);
-    LOG.info("Nodemanager resources: memory set to " + memoryMb + "MB.");
-    LOG.info("Nodemanager resources: vcores set to " + virtualCores + ".");
+            YarnConfiguration.NM_VMEM_PMEM_RATIO,
+            YarnConfiguration.DEFAULT_NM_VMEM_PMEM_RATIO);
+    long virtualMemoryMb = (long)Math.ceil(memoryMb * vMemToPMem);
+    int virtualCores = totalResource.getVirtualCores();
 
-    boolean gpuEnabled = conf.getBoolean(YarnConfiguration.NM_GPU_RESOURCE_ENABLED,
-            YarnConfiguration.DEFAULT_NM_GPU_RESOURCE_ENABLED);
+    // Update configured resources via plugins.
+    updateConfiguredResourcesViaPlugins(totalResource);
 
-    int gpus = 0;
-    if(gpuEnabled) {
-      gpus = NodeManagerHardwareUtils.getNodeGPUs(conf);
-    }
+    LOG.info("Nodemanager resources is set to: " + totalResource);
 
-    this.totalResource = Resource.newInstance(memoryMb, virtualCores, gpus);
     metrics.addResource(totalResource);
+
+    // Get actual node physical resources
+    long physicalMemoryMb = memoryMb;
+    int physicalCores = virtualCores;
+    ResourceCalculatorPlugin rcp =
+        ResourceCalculatorPlugin.getNodeResourceMonitorPlugin(conf);
+    if (rcp != null) {
+      physicalMemoryMb = rcp.getPhysicalMemorySize() / (1024 * 1024);
+      physicalCores = rcp.getNumProcessors();
+    }
+    this.physicalResource =
+        Resource.newInstance(physicalMemoryMb, physicalCores);
+
     this.tokenKeepAliveEnabled = isTokenKeepAliveEnabled(conf);
     this.tokenRemovalDelayMs =
         conf.getInt(YarnConfiguration.RM_NM_EXPIRY_INTERVAL_MS,
@@ -202,7 +225,11 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         YarnConfiguration.NM_RESOURCEMANAGER_MINIMUM_VERSION,
         YarnConfiguration.DEFAULT_NM_RESOURCEMANAGER_MINIMUM_VERSION);
 
-    nodeLabelsHandler = createNMNodeLabelsHandler(nodeLabelsProvider);
+    nodeLabelsHandler =
+        createNMNodeLabelsHandler(nodeLabelsProvider);
+    nodeAttributesHandler =
+        createNMNodeAttributesHandler(nodeAttributesProvider);
+
     // Default duration to track stopped containers on nodemanager is 10Min.
     // This should not be assigned very large value as it will remember all the
     // containers stopped during that time.
@@ -223,7 +250,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     super.serviceInit(conf);
     LOG.info("Initialized nodemanager with :" +
         " physical-memory=" + memoryMb + " virtual-memory=" + virtualMemoryMb +
-        " virtual-cores=" + virtualCores + " gpus=" + gpus);
+        " virtual-cores=" + virtualCores);
 
     this.logAggregationEnabled =
         conf.getBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED,
@@ -303,8 +330,8 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         statusUpdater.join();
         registerWithRM();
         statusUpdater = new Thread(statusUpdaterRunnable, "Node Status Updater");
-        statusUpdater.start();
         this.isStopped = false;
+        statusUpdater.start();
         LOG.info("NodeStatusUpdater thread is reRegistered and restarted");
       } catch (Exception e) {
         String errorMessage = "Unexpected error rebooting NodeStatusUpdater";
@@ -331,9 +358,22 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   @VisibleForTesting
   protected ResourceTracker getRMClient() throws IOException {
     Configuration conf = getConfig();
-    return ServerRMProxy.createRMProxy(conf, ResourceTracker.class, 
-            conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
-            YarnConfiguration.DEFAULT_DISTRIBUTED_RM));
+    return ServerRMProxy.createRMProxy(conf, ResourceTracker.class);
+  }
+
+  private void updateConfiguredResourcesViaPlugins(
+      Resource configuredResource) throws YarnException {
+    ResourcePluginManager pluginManager = context.getResourcePluginManager();
+    if (pluginManager != null && pluginManager.getNameToPlugins() != null) {
+      // Update configured resource
+      for (ResourcePlugin resourcePlugin : pluginManager.getNameToPlugins()
+          .values()) {
+        if (resourcePlugin.getNodeResourceHandlerInstance() != null) {
+          resourcePlugin.getNodeResourceHandlerInstance()
+              .updateConfiguredResource(configuredResource);
+        }
+      }
+    }
   }
 
   @VisibleForTesting
@@ -341,7 +381,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       throws YarnException, IOException {
     RegisterNodeManagerResponse regNMResponse;
     Set<NodeLabel> nodeLabels = nodeLabelsHandler.getNodeLabelsForRegistration();
- 
+
     // Synchronize NM-RM registration with
     // ContainerManagerImpl#increaseContainersResource and
     // ContainerManagerImpl#startContainers to avoid race condition
@@ -351,9 +391,24 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       RegisterNodeManagerRequest request =
           RegisterNodeManagerRequest.newInstance(nodeId, httpPort, totalResource,
               nodeManagerVersionId, containerReports, getRunningApplications(),
-              nodeLabels);
+              nodeLabels, physicalResource);
+
       if (containerReports != null) {
         LOG.info("Registering with RM using containers :" + containerReports);
+      }
+      if (logAggregationEnabled) {
+        // pull log aggregation status for application running in this NM
+        List<LogAggregationReport> logAggregationReports =
+            context.getNMLogAggregationStatusTracker()
+                .pullCachedLogAggregationReports();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("The cache log aggregation status size:"
+              + logAggregationReports.size());
+        }
+        if (logAggregationReports != null
+            && !logAggregationReports.isEmpty()) {
+          request.setLogAggregationReportsForApps(logAggregationReports);
+        }
       }
       regNMResponse =
           resourceTracker.registerNodeManager(request);
@@ -367,7 +422,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
           "Message from ResourceManager: "
               + regNMResponse.getDiagnosticsMessage();
       throw new YarnRuntimeException(
-        "Recieved SHUTDOWN signal from Resourcemanager, Registration of NodeManager failed, "
+        "Received SHUTDOWN signal from Resourcemanager, Registration of NodeManager failed, "
             + message);
     }
 
@@ -400,7 +455,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     if (masterKey != null) {
       this.context.getContainerTokenSecretManager().setMasterKey(masterKey);
     }
-    
+
     masterKey = regNMResponse.getNMTokenMasterKey();
     if (masterKey != null) {
       this.context.getNMTokenSecretManager().setMasterKey(masterKey);
@@ -423,10 +478,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     successfullRegistrationMsg.append(nodeLabelsHandler
         .verifyRMRegistrationResponseForNodeLabels(regNMResponse));
 
-    LOG.info(successfullRegistrationMsg);
-    LOG.info("Notifying ContainerManager to unblock new container-requests");
-    ((ContainerManagerImpl) this.context.getContainerManager())
-      .setBlockNewContainerRequests(false);
+    LOG.info(successfullRegistrationMsg.toString());
   }
 
   private List<ApplicationId> createKeepAliveApplicationList() {
@@ -474,7 +526,19 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
           createKeepAliveApplicationList(), nodeHealthStatus,
           containersUtilization, nodeUtilization, increasedContainers);
 
+    nodeStatus.setOpportunisticContainersStatus(
+        getOpportunisticContainersStatus());
     return nodeStatus;
+  }
+
+  /**
+   * Get the status of the OPPORTUNISTIC containers.
+   * @return the status of the OPPORTUNISTIC containers.
+   */
+  private OpportunisticContainersStatus getOpportunisticContainersStatus() {
+    OpportunisticContainersStatus status =
+        this.context.getContainerManager().getOpportunisticContainersStatus();
+    return status;
   }
 
   /**
@@ -482,10 +546,8 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
    * @return Resource utilization of all the containers.
    */
   private ResourceUtilization getContainersUtilization() {
-    ContainerManagerImpl containerManager =
-        (ContainerManagerImpl) this.context.getContainerManager();
     ContainersMonitor containersMonitor =
-        containerManager.getContainersMonitor();
+        this.context.getContainerManager().getContainersMonitor();
     return containersMonitor.getContainersUtilization();
   }
 
@@ -553,14 +615,16 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         containerStatuses.add(containerStatus);
       }
     }
+
     containerStatuses.addAll(pendingCompletedContainers.values());
+
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending out " + containerStatuses.size()
           + " container statuses: " + containerStatuses);
     }
     return containerStatuses;
   }
-  
+
   private Map<ApplicationId, UpdatedCryptoForApp> getRunningApplications() {
     Map<ApplicationId, Application> runningApps = this.context.getApplications();
     Map<ApplicationId, UpdatedCryptoForApp> runningApplications = new HashMap<>(runningApps.size());
@@ -702,11 +766,12 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   public void removeVeryOldStoppedContainersFromCache() {
     synchronized (recentlyStoppedContainers) {
       long currentTime = System.currentTimeMillis();
-      Iterator<ContainerId> i =
-          recentlyStoppedContainers.keySet().iterator();
+      Iterator<Entry<ContainerId, Long>> i =
+          recentlyStoppedContainers.entrySet().iterator();
       while (i.hasNext()) {
-        ContainerId cid = i.next();
-        if (recentlyStoppedContainers.get(cid) < currentTime) {
+        Entry<ContainerId, Long> mapEntry = i.next();
+        ContainerId cid = mapEntry.getKey();
+        if (mapEntry.getValue() < currentTime) {
           if (!context.getContainers().containsKey(cid)) {
             i.remove();
             try {
@@ -721,7 +786,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       }
     }
   }
-  
+
   @Override
   public long getRMIdentifier() {
     return this.rmIdentifier;
@@ -750,237 +815,44 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   }
 
   protected void startStatusUpdater() {
-
-    statusUpdaterRunnable = new Runnable() {
-      @Override
-      @SuppressWarnings("unchecked")
-      public void run() {
-        int lastHeartbeatID = 0;
-        while (!isStopped) {
-          // Send heartbeat
-          try {
-            NodeHeartbeatResponse response = null;
-            Set<NodeLabel> nodeLabelsForHeartbeat =
-                nodeLabelsHandler.getNodeLabelsForHeartbeat();
-            NodeStatus nodeStatus = getNodeStatus(lastHeartbeatID);
-
-            NodeHeartbeatRequest request =
-                NodeHeartbeatRequest.newInstance(nodeStatus,
-                    NodeStatusUpdaterImpl.this.context
-                        .getContainerTokenSecretManager().getCurrentKey(),
-                    NodeStatusUpdaterImpl.this.context
-                        .getNMTokenSecretManager().getCurrentKey(),
-                    nodeLabelsForHeartbeat);
-
-            if (logAggregationEnabled) {
-              // pull log aggregation status for application running in this NM
-              List<LogAggregationReport> logAggregationReports =
-                  getLogAggregationReportsForApps(context
-                    .getLogAggregationStatusForApps());
-              if (logAggregationReports != null
-                  && !logAggregationReports.isEmpty()) {
-                request.setLogAggregationReportsForApps(logAggregationReports);
-              }
-            }
-            
-            Set<ApplicationId> setForRequest = applicationsWithUpdatedCryptoMaterial;
-            applicationsWithUpdatedCryptoMaterial = new HashSet<>();
-            request.setUpdatedApplicationsWithNewCryptoMaterial(setForRequest);
-            
-            response = resourceTracker.nodeHeartbeat(request);
-            //get next heartbeat interval from response
-            nextHeartBeatInterval = response.getNextHeartBeatInterval();
-            updateMasterKeys(response);
-
-            if (response.getNodeAction() == NodeAction.SHUTDOWN) {
-              LOG.warn("Recieved SHUTDOWN signal from Resourcemanager as part of"
-                  + " heartbeat, hence shutting down.");
-              LOG.warn("Message from ResourceManager: "
-                  + response.getDiagnosticsMessage());
-              context.setDecommissioned(true);
-              dispatcher.getEventHandler().handle(
-                  new NodeManagerEvent(NodeManagerEventType.SHUTDOWN));
-              break;
-            }
-            if (response.getNodeAction() == NodeAction.RESYNC) {
-              LOG.warn("Node is out of sync with ResourceManager,"
-                  + " hence resyncing.");
-              LOG.warn("Message from ResourceManager: "
-                  + response.getDiagnosticsMessage());
-              // Invalidate the RMIdentifier while resync
-              NodeStatusUpdaterImpl.this.rmIdentifier =
-                  ResourceManagerConstants.RM_INVALID_IDENTIFIER;
-              dispatcher.getEventHandler().handle(
-                  new NodeManagerEvent(NodeManagerEventType.RESYNC));
-              pendingCompletedContainers.clear();
-              break;
-            }
-
-            nodeLabelsHandler.verifyRMHeartbeatResponseForNodeLabels(response);
-
-            // Explicitly put this method after checking the resync response. We
-            // don't want to remove the completed containers before resync
-            // because these completed containers will be reported back to RM
-            // when NM re-registers with RM.
-            // Only remove the cleanedup containers that are acked
-            removeOrTrackCompletedContainersFromContext(response
-                  .getContainersToBeRemovedFromNM());
-
-            logAggregationReportForAppsTempList.clear();
-            lastHeartbeatID = response.getResponseId();
-            List<ContainerId> containersToCleanup = response
-                .getContainersToCleanup();
-            if (!containersToCleanup.isEmpty()) {
-              dispatcher.getEventHandler().handle(
-                  new CMgrCompletedContainersEvent(containersToCleanup,
-                    CMgrCompletedContainersEvent.Reason.BY_RESOURCEMANAGER));
-            }
-            List<ApplicationId> appsToCleanup =
-                response.getApplicationsToCleanup();
-            //Only start tracking for keepAlive on FINISH_APP
-            trackAppsForKeepAlive(appsToCleanup);
-            if (!appsToCleanup.isEmpty()) {
-              dispatcher.getEventHandler().handle(
-                  new CMgrCompletedAppsEvent(appsToCleanup,
-                      CMgrCompletedAppsEvent.Reason.BY_RESOURCEMANAGER));
-            }
-
-            Map<ApplicationId, ByteBuffer> systemCredentials =
-                response.getSystemCredentialsForApps();
-            if (systemCredentials != null && !systemCredentials.isEmpty()) {
-              ((NMContext) context)
-                .setSystemCrendentialsForApps(parseCredentials(systemCredentials));
-            }
-
-            List<org.apache.hadoop.yarn.api.records.Container>
-                containersToDecrease = response.getContainersToDecrease();
-            if (!containersToDecrease.isEmpty()) {
-              dispatcher.getEventHandler().handle(
-                  new CMgrDecreaseContainersResourceEvent(containersToDecrease)
-              );
-            }
-
-            // SignalContainer request originally comes from end users via
-            // ClientRMProtocol's SignalContainer. Forward the request to
-            // ContainerManager which will dispatch the event to ContainerLauncher.
-            List<SignalContainerRequest> containersToSignal = response
-                .getContainersToSignalList();
-            if (containersToSignal.size() != 0) {
-              dispatcher.getEventHandler().handle(
-                  new CMgrSignalContainersEvent(containersToSignal));
-            }
-            // Handling node resource update case.
-            Resource newResource = response.getResource();
-            if (newResource != null) {
-              updateNMResource(newResource);
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("Node's resource is updated to " +
-                    newResource.toString());
-              }
-            }
-            
-            if (((NMContext) context).isHopsTLSEnabled() || ((NMContext) context).isJWTEnabled()) {
-              Map<ApplicationId, UpdatedCryptoForApp> cryptoMaterialToUpdate = response.getUpdatedCryptoForApps();
-              if (cryptoMaterialToUpdate != null) {
-                for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : cryptoMaterialToUpdate.entrySet()) {
-                  Application application = context.getApplications().get(entry.getKey());
-                  UpdatedCryptoForApp crypto = entry.getValue();
-                  UpdatedCryptoForApp.UPDATE_TYPE updateType = crypto.determineUpdateType();
-                  if (updateType.equals(UpdatedCryptoForApp.UPDATE_TYPE.X509_JWT)) {
-                    if (crypto.getVersion() > application.getX509Version()) {
-                      handleSecurityUpdateForX509(crypto, application, entry.getKey());
-                    }
-                    if (crypto.getJWTExpiration() > application.getJWTExpiration()) {
-                      handleSecurityUpdateForJWT(crypto, application);
-                    }
-                  } else if (updateType.equals(UpdatedCryptoForApp.UPDATE_TYPE.X509)) {
-                    if (crypto.getVersion() > application.getX509Version()) {
-                      handleSecurityUpdateForX509(crypto, application, entry.getKey());
-                    }
-                  } else if (updateType.equals(UpdatedCryptoForApp.UPDATE_TYPE.JWT)) {
-                    if (application != null
-                        && crypto.getJWTExpiration() > application.getJWTExpiration()) {
-                      handleSecurityUpdateForJWT(crypto, application);
-                    }
-                  }
-                }
-              }
-            }
-          } catch (ConnectException e) {
-            //catch and throw the exception if tried MAX wait time to connect RM
-            dispatcher.getEventHandler().handle(
-                new NodeManagerEvent(NodeManagerEventType.SHUTDOWN));
-            // failed to connect to RM.
-            failedToConnect = true;
-            throw new YarnRuntimeException(e);
-          } catch (Throwable e) {
-
-            // TODO Better error handling. Thread can die with the rest of the
-            // NM still running.
-            LOG.error("Caught exception in status-updater", e);
-          } finally {
-            synchronized (heartbeatMonitor) {
-              nextHeartBeatInterval = nextHeartBeatInterval <= 0 ?
-                  YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_MS :
-                    nextHeartBeatInterval;
-              try {
-                heartbeatMonitor.wait(nextHeartBeatInterval);
-              } catch (InterruptedException e) {
-                // Do Nothing
-              }
-            }
-          }
-        }
-      }
-
-      private void handleSecurityUpdateForX509(UpdatedCryptoForApp crypto, Application application,
-          ApplicationId appId) throws IOException, InterruptedException {
-        if (application != null) {
-          context.getCertificateLocalizationService()
-              .updateX509(application.getUser(), application.getAppId().toString(),
-                  crypto.getKeyStore(), String.valueOf(crypto.getKeyStorePassword()),
-                  crypto.getTrustStore(), String.valueOf(crypto.getTrustStorePassword()));
-  
-          for (ContainerId cid : application.getContainers().keySet()) {
-            CMgrUpdateX509Event event =
-                new CMgrUpdateX509Event(cid, crypto.getKeyStore(),
-                    crypto.getKeyStorePassword(), crypto.getTrustStore(), crypto.getTrustStorePassword(),
-                    crypto.getVersion());
-            dispatcher.getEventHandler().handle(event);
-          }
-        }
-        applicationsWithUpdatedCryptoMaterial.add(appId);
-      }
-      
-      private void handleSecurityUpdateForJWT(UpdatedCryptoForApp crypto, Application application)
-        throws IOException, InterruptedException {
-        if (application != null) {
-          context.getCertificateLocalizationService().updateJWT(application.getUser(), application.getAppId().toString(),
-              crypto.getJWT());
-          for (ContainerId cid : application.getContainers().keySet()) {
-            CMgrUpdateJWTEvent event = new CMgrUpdateJWTEvent(cid, crypto.getJWT(), crypto.getJWTExpiration());
-            dispatcher.getEventHandler().handle(event);
-          }
-        }
-      }
-      
-      private void updateMasterKeys(NodeHeartbeatResponse response) {
-        // See if the master-key has rolled over
-        MasterKey updatedMasterKey = response.getContainerTokenMasterKey();
-        if (updatedMasterKey != null) {
-          // Will be non-null only on roll-over on RM side
-          context.getContainerTokenSecretManager().setMasterKey(updatedMasterKey);
-        }
-        
-        updatedMasterKey = response.getNMTokenMasterKey();
-        if (updatedMasterKey != null) {
-          context.getNMTokenSecretManager().setMasterKey(updatedMasterKey);
-        }
-      }
-    };
+    statusUpdaterRunnable = new StatusUpdaterRunnable();
     statusUpdater =
         new Thread(statusUpdaterRunnable, "Node Status Updater");
     statusUpdater.start();
+  }
+
+  private boolean handleShutdownOrResyncCommand(
+      NodeHeartbeatResponse response) {
+    if (response.getNodeAction() == NodeAction.SHUTDOWN) {
+      LOG.warn("Received SHUTDOWN signal from Resourcemanager as part of"
+          + " heartbeat, hence shutting down.");
+      LOG.warn("Message from ResourceManager: "
+          + response.getDiagnosticsMessage());
+      context.setDecommissioned(true);
+      dispatcher.getEventHandler().handle(
+          new NodeManagerEvent(NodeManagerEventType.SHUTDOWN));
+      return true;
+    }
+    if (response.getNodeAction() == NodeAction.RESYNC) {
+      LOG.warn("Node is out of sync with ResourceManager,"
+          + " hence resyncing.");
+      LOG.warn("Message from ResourceManager: "
+          + response.getDiagnosticsMessage());
+      // Invalidate the RMIdentifier while resync
+      NodeStatusUpdaterImpl.this.rmIdentifier =
+          ResourceManagerConstants.RM_INVALID_IDENTIFIER;
+      dispatcher.getEventHandler().handle(
+          new NodeManagerEvent(NodeManagerEventType.RESYNC));
+      pendingCompletedContainers.clear();
+      return true;
+    }
+    return false;
+  }
+
+  @Override
+  public void reportException(Exception ex) {
+    healthChecker.reportException(ex);
+    sendOutofBandHeartBeat();
   }
 
   private List<LogAggregationReport> getLogAggregationReportsForApps(
@@ -1003,6 +875,43 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
           this.getConfig());
     }
   }
+
+  /**
+   * Returns a handler based on the configured node attributes provider.
+   * returns null if no provider is configured.
+   * @param provider
+   * @return attributes handler
+   */
+  private NMNodeAttributesHandler createNMNodeAttributesHandler(
+      NodeAttributesProvider provider) {
+    return provider == null ? null :
+        new NMDistributedNodeAttributesHandler(nodeAttributesProvider);
+  }
+
+  private interface NMNodeAttributesHandler {
+
+    /**
+     * @return the node attributes of this node manager.
+     */
+    Set<NodeAttribute> getNodeAttributesForHeartbeat();
+  }
+
+  private static class NMDistributedNodeAttributesHandler
+      implements NMNodeAttributesHandler {
+
+    private final NodeAttributesProvider attributesProvider;
+
+    protected NMDistributedNodeAttributesHandler(
+        NodeAttributesProvider provider) {
+      this.attributesProvider = provider;
+    }
+
+    @Override
+    public Set<NodeAttribute> getNodeAttributesForHeartbeat() {
+      return attributesProvider.getDescriptors();
+    }
+  }
+
 
   private static interface NMNodeLabelsHandler {
     /**
@@ -1080,7 +989,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
 
     @Override
     public Set<NodeLabel> getNodeLabelsForRegistration() {
-      Set<NodeLabel> nodeLabels = nodeLabelsProvider.getNodeLabels();
+      Set<NodeLabel> nodeLabels = nodeLabelsProvider.getDescriptors();
       nodeLabels = (null == nodeLabels)
           ? CommonNodeLabelsManager.EMPTY_NODELABEL_SET : nodeLabels;
       previousNodeLabels = nodeLabels;
@@ -1115,7 +1024,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     @Override
     public Set<NodeLabel> getNodeLabelsForHeartbeat() {
       Set<NodeLabel> nodeLabelsForHeartbeat =
-          nodeLabelsProvider.getNodeLabels();
+          nodeLabelsProvider.getDescriptors();
       // if the provider returns null then consider empty labels are set
       nodeLabelsForHeartbeat = (nodeLabelsForHeartbeat == null)
           ? CommonNodeLabelsManager.EMPTY_NODELABEL_SET
@@ -1160,7 +1069,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       StringBuilder errorMsg = new StringBuilder("");
       while (iterator.hasNext()) {
         try {
-          CommonNodeLabelsManager
+          NodeLabelUtil
               .checkAndThrowLabelName(iterator.next().getName());
         } catch (IOException e) {
           errorMsg.append(e.getMessage());
@@ -1190,9 +1099,12 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     public void verifyRMHeartbeatResponseForNodeLabels(
         NodeHeartbeatResponse response) {
       if (areLabelsSentToRM) {
-        if (response.getAreNodeLabelsAcceptedByRM() && LOG.isDebugEnabled()) {
-          LOG.debug("Node Labels {" + StringUtils.join(",", previousNodeLabels)
-              + "} were Accepted by RM ");
+        if (response.getAreNodeLabelsAcceptedByRM()) {
+          if(LOG.isDebugEnabled()){
+            LOG.debug(
+                "Node Labels {" + StringUtils.join(",", previousNodeLabels)
+                    + "} were Accepted by RM ");
+          }
         } else {
           // case where updated labels from NodeLabelsProvider is sent to RM and
           // RM rejected the labels
@@ -1201,6 +1113,274 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
                   + "} were not accepted by RM and message from RM : "
                   + response.getDiagnosticsMessage());
         }
+      }
+    }
+  }
+
+  private class StatusUpdaterRunnable implements Runnable {
+    @Override
+    @SuppressWarnings("unchecked")
+    public void run() {
+      int lastHeartbeatID = 0;
+      while (!isStopped) {
+        // Send heartbeat
+        try {
+          NodeHeartbeatResponse response = null;
+          Set<NodeLabel> nodeLabelsForHeartbeat =
+              nodeLabelsHandler.getNodeLabelsForHeartbeat();
+          Set<NodeAttribute> nodeAttributesForHeartbeat =
+              nodeAttributesHandler == null ? null :
+                  nodeAttributesHandler.getNodeAttributesForHeartbeat();
+          NodeStatus nodeStatus = getNodeStatus(lastHeartbeatID);
+          NodeHeartbeatRequest request =
+              NodeHeartbeatRequest.newInstance(nodeStatus,
+                  NodeStatusUpdaterImpl.this.context
+                      .getContainerTokenSecretManager().getCurrentKey(),
+                  NodeStatusUpdaterImpl.this.context
+                      .getNMTokenSecretManager().getCurrentKey(),
+                  nodeLabelsForHeartbeat,
+                  nodeAttributesForHeartbeat,
+                  NodeStatusUpdaterImpl.this.context
+                      .getRegisteringCollectors());
+
+          if (logAggregationEnabled) {
+            // pull log aggregation status for application running in this NM
+            List<LogAggregationReport> logAggregationReports =
+                getLogAggregationReportsForApps(context
+                    .getLogAggregationStatusForApps());
+            if (logAggregationReports != null
+                && !logAggregationReports.isEmpty()) {
+              request.setLogAggregationReportsForApps(logAggregationReports);
+            }
+          }
+
+          Set<ApplicationId> setForRequest = applicationsWithUpdatedCryptoMaterial;
+          applicationsWithUpdatedCryptoMaterial = new HashSet<>();
+          request.setUpdatedApplicationsWithNewCryptoMaterial(setForRequest);
+
+          response = resourceTracker.nodeHeartbeat(request);
+          //get next heartbeat interval from response
+          nextHeartBeatInterval = response.getNextHeartBeatInterval();
+          updateMasterKeys(response);
+
+          if (!handleShutdownOrResyncCommand(response)) {
+            nodeLabelsHandler.verifyRMHeartbeatResponseForNodeLabels(
+                response);
+
+            // Explicitly put this method after checking the resync
+            // response. We
+            // don't want to remove the completed containers before resync
+            // because these completed containers will be reported back to RM
+            // when NM re-registers with RM.
+            // Only remove the cleanedup containers that are acked
+            removeOrTrackCompletedContainersFromContext(response
+                .getContainersToBeRemovedFromNM());
+
+            logAggregationReportForAppsTempList.clear();
+            lastHeartbeatID = response.getResponseId();
+            List<ContainerId> containersToCleanup = response
+                .getContainersToCleanup();
+            if (!containersToCleanup.isEmpty()) {
+              dispatcher.getEventHandler().handle(
+                  new CMgrCompletedContainersEvent(containersToCleanup,
+                      CMgrCompletedContainersEvent.Reason
+                          .BY_RESOURCEMANAGER));
+            }
+            List<ApplicationId> appsToCleanup =
+                response.getApplicationsToCleanup();
+            //Only start tracking for keepAlive on FINISH_APP
+            trackAppsForKeepAlive(appsToCleanup);
+            if (!appsToCleanup.isEmpty()) {
+              dispatcher.getEventHandler().handle(
+                  new CMgrCompletedAppsEvent(appsToCleanup,
+                      CMgrCompletedAppsEvent.Reason.BY_RESOURCEMANAGER));
+            }
+            Map<ApplicationId, ByteBuffer> systemCredentials =
+                response.getSystemCredentialsForApps();
+            if (systemCredentials != null && !systemCredentials.isEmpty()) {
+              ((NMContext) context).setSystemCrendentialsForApps(
+                  parseCredentials(systemCredentials));
+              context.getContainerManager().handleCredentialUpdate();
+            }
+            List<org.apache.hadoop.yarn.api.records.Container>
+                containersToUpdate = response.getContainersToUpdate();
+            if (!containersToUpdate.isEmpty()) {
+              dispatcher.getEventHandler().handle(
+                  new CMgrUpdateContainersEvent(containersToUpdate));
+            }
+
+            // SignalContainer request originally comes from end users via
+            // ClientRMProtocol's SignalContainer. Forward the request to
+            // ContainerManager which will dispatch the event to
+            // ContainerLauncher.
+            List<SignalContainerRequest> containersToSignal = response
+                .getContainersToSignalList();
+            if (!containersToSignal.isEmpty()) {
+              dispatcher.getEventHandler().handle(
+                  new CMgrSignalContainersEvent(containersToSignal));
+            }
+
+            // Update QueuingLimits if ContainerManager supports queuing
+            ContainerQueuingLimit queuingLimit =
+                response.getContainerQueuingLimit();
+            if (queuingLimit != null) {
+              context.getContainerManager().updateQueuingLimit(queuingLimit);
+            }
+          }
+          // Handling node resource update case.
+          Resource newResource = response.getResource();
+          if (newResource != null) {
+            updateNMResource(newResource);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Node's resource is updated to " +
+                  newResource.toString());
+            }
+          }
+          if (YarnConfiguration.timelineServiceV2Enabled(context.getConf())) {
+            updateTimelineCollectorData(response);
+          }
+          
+          if (((NMContext) context).isHopsTLSEnabled() || ((NMContext) context).isJWTEnabled()) {
+            Map<ApplicationId, UpdatedCryptoForApp> cryptoMaterialToUpdate = response.getUpdatedCryptoForApps();
+            if (cryptoMaterialToUpdate != null) {
+              for (Map.Entry<ApplicationId, UpdatedCryptoForApp> entry : cryptoMaterialToUpdate.entrySet()) {
+                Application application = context.getApplications().get(entry.getKey());
+                UpdatedCryptoForApp crypto = entry.getValue();
+                UpdatedCryptoForApp.UPDATE_TYPE updateType = crypto.determineUpdateType();
+                if (updateType.equals(UpdatedCryptoForApp.UPDATE_TYPE.X509_JWT)) {
+                  if (crypto.getVersion() > application.getX509Version()) {
+                    handleSecurityUpdateForX509(crypto, application, entry.getKey());
+                  }
+                  if (crypto.getJWTExpiration() > application.getJWTExpiration()) {
+                    handleSecurityUpdateForJWT(crypto, application);
+                  }
+                } else if (updateType.equals(UpdatedCryptoForApp.UPDATE_TYPE.X509)) {
+                  if (crypto.getVersion() > application.getX509Version()) {
+                    handleSecurityUpdateForX509(crypto, application, entry.getKey());
+                  }
+                } else if (updateType.equals(UpdatedCryptoForApp.UPDATE_TYPE.JWT)) {
+                  if (application != null
+                      && crypto.getJWTExpiration() > application.getJWTExpiration()) {
+                    handleSecurityUpdateForJWT(crypto, application);
+                  }
+                }
+              }
+            }
+          }
+
+        } catch (ConnectException e) {
+          //catch and throw the exception if tried MAX wait time to connect RM
+          dispatcher.getEventHandler().handle(
+              new NodeManagerEvent(NodeManagerEventType.SHUTDOWN));
+          // failed to connect to RM.
+          failedToConnect = true;
+          throw new YarnRuntimeException(e);
+        } catch (Exception e) {
+
+          // TODO Better error handling. Thread can die with the rest of the
+          // NM still running.
+          LOG.error("Caught exception in status-updater", e);
+        } finally {
+          synchronized (heartbeatMonitor) {
+            nextHeartBeatInterval = nextHeartBeatInterval <= 0 ?
+                YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_MS :
+                nextHeartBeatInterval;
+            try {
+              heartbeatMonitor.wait(nextHeartBeatInterval);
+            } catch (InterruptedException e) {
+              // Do Nothing
+            }
+          }
+        }
+      }
+    }
+
+    private void handleSecurityUpdateForX509(UpdatedCryptoForApp crypto, Application application,
+        ApplicationId appId) throws IOException, InterruptedException {
+      if (application != null) {
+        context.getCertificateLocalizationService()
+            .updateX509(application.getUser(), application.getAppId().toString(),
+                crypto.getKeyStore(), String.valueOf(crypto.getKeyStorePassword()),
+                crypto.getTrustStore(), String.valueOf(crypto.getTrustStorePassword()));
+
+        for (ContainerId cid : application.getContainers().keySet()) {
+          CMgrUpdateX509Event event = new CMgrUpdateX509Event(cid, crypto.getKeyStore(),
+              crypto.getKeyStorePassword(), crypto.getTrustStore(), crypto.getTrustStorePassword(),
+              crypto.getVersion());
+          dispatcher.getEventHandler().handle(event);
+        }
+      }
+      applicationsWithUpdatedCryptoMaterial.add(appId);
+    }
+
+    private void handleSecurityUpdateForJWT(UpdatedCryptoForApp crypto, Application application)
+        throws IOException, InterruptedException {
+      if (application != null) {
+        context.getCertificateLocalizationService().updateJWT(application.getUser(), application.getAppId().toString(),
+            crypto.getJWT());
+        for (ContainerId cid : application.getContainers().keySet()) {
+          CMgrUpdateJWTEvent event = new CMgrUpdateJWTEvent(cid, crypto.getJWT(), crypto.getJWTExpiration());
+          dispatcher.getEventHandler().handle(event);
+        }
+      }
+    }
+     
+    private void updateTimelineCollectorData(
+        NodeHeartbeatResponse response) {
+      Map<ApplicationId, AppCollectorData> incomingCollectorsMap =
+          response.getAppCollectors();
+      if (incomingCollectorsMap == null) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("No collectors to update RM");
+        }
+        return;
+      }
+      Map<ApplicationId, AppCollectorData> knownCollectors =
+          context.getKnownCollectors();
+      for (Map.Entry<ApplicationId, AppCollectorData> entry
+          : incomingCollectorsMap.entrySet()) {
+        ApplicationId appId = entry.getKey();
+        AppCollectorData collectorData = entry.getValue();
+
+        // Only handle applications running on local node.
+        Application application = context.getApplications().get(appId);
+        if (application != null) {
+          // Update collector data if the newly received data happens after
+          // the known data (updates the known data).
+          AppCollectorData existingData = knownCollectors.get(appId);
+          if (AppCollectorData.happensBefore(existingData, collectorData)) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Sync a new collector address: "
+                  + collectorData.getCollectorAddr()
+                  + " for application: " + appId + " from RM.");
+            }
+            // Update information for clients.
+            NMTimelinePublisher nmTimelinePublisher =
+                context.getNMTimelinePublisher();
+            if (nmTimelinePublisher != null) {
+              nmTimelinePublisher.setTimelineServiceAddress(
+                  application.getAppId(), collectorData.getCollectorAddr());
+            }
+            // Update information for the node manager itself.
+            knownCollectors.put(appId, collectorData);
+          }
+        }
+        // Remove the registering collector data
+        context.getRegisteringCollectors().remove(entry.getKey());
+      }
+    }
+
+    private void updateMasterKeys(NodeHeartbeatResponse response) {
+      // See if the master-key has rolled over
+      MasterKey updatedMasterKey = response.getContainerTokenMasterKey();
+      if (updatedMasterKey != null) {
+        // Will be non-null only on roll-over on RM side
+        context.getContainerTokenSecretManager().setMasterKey(updatedMasterKey);
+      }
+
+      updatedMasterKey = response.getNMTokenMasterKey();
+      if (updatedMasterKey != null) {
+        context.getNMTokenSecretManager().setMasterKey(updatedMasterKey);
       }
     }
   }

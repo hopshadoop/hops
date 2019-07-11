@@ -21,10 +21,12 @@ package org.apache.hadoop.yarn.server.nodemanager;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.net.ServerSocketUtil;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersRequest;
@@ -80,7 +82,7 @@ public class TestEventFlow {
     
     Context context = new NMContext(new NMContainerTokenSecretManager(conf),
         new NMTokenSecretManagerInNM(), null, null,
-        new NMNullStateStoreService()) {
+        new NMNullStateStoreService(), false, conf) {
       @Override
       public int getHttpPort() {
         return 1234;
@@ -91,6 +93,8 @@ public class TestEventFlow {
     conf.set(YarnConfiguration.NM_LOG_DIRS, localLogDir.getAbsolutePath());
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR, 
         remoteLogDir.getAbsolutePath());
+    conf.set(YarnConfiguration.NM_LOCALIZER_ADDRESS, "0.0.0.0:"
+        + ServerSocketUtil.getPort(8040, 10));
 
     ContainerExecutor exec = new DefaultContainerExecutor();
     exec.setConf(conf);
@@ -143,12 +147,11 @@ public class TestEventFlow {
     ContainerId cID = ContainerId.newContainerId(applicationAttemptId, 0);
 
     String user = "testing";
-    String userFolder = "testingFolder";
     StartContainerRequest scRequest =
         StartContainerRequest.newInstance(launchContext,
           TestContainerManager.createContainerToken(cID,
             SIMULATED_RM_IDENTIFIER, context.getNodeId(), user,
-            context.getContainerTokenSecretManager(), userFolder));
+            context.getContainerTokenSecretManager()));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -156,7 +159,7 @@ public class TestEventFlow {
     containerManager.startContainers(allRequests);
 
     BaseContainerManagerTest.waitForContainerState(containerManager, cID,
-        ContainerState.RUNNING);
+        Arrays.asList(ContainerState.RUNNING), 20);
 
     List<ContainerId> containerIds = new ArrayList<ContainerId>();
     containerIds.add(cID);

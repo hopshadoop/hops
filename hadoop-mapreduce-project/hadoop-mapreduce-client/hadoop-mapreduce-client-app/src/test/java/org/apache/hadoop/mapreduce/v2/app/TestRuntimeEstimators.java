@@ -29,8 +29,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.TaskCompletionEvent;
@@ -71,6 +69,7 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
+import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
@@ -80,6 +79,8 @@ import org.apache.hadoop.yarn.util.ControlledClock;
 import org.apache.hadoop.yarn.util.SystemClock;
 import org.junit.Assert;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class TestRuntimeEstimators {
@@ -97,7 +98,8 @@ public class TestRuntimeEstimators {
 
   AppContext myAppContext;
 
-  private static final Log LOG = LogFactory.getLog(TestRuntimeEstimators.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestRuntimeEstimators.class);
 
   private final AtomicInteger slotsInUse = new AtomicInteger(0);
 
@@ -532,6 +534,26 @@ public class TestRuntimeEstimators {
     public void setJobPriority(Priority priority) {
       // do nothing
     }
+
+    @Override
+    public int getFailedMaps() {
+      return 0;
+    }
+
+    @Override
+    public int getFailedReduces() {
+      return 0;
+    }
+
+    @Override
+    public int getKilledMaps() {
+      return 0;
+    }
+
+    @Override
+    public int getKilledReduces() {
+      return 0;
+    }
   }
 
   /*
@@ -788,7 +810,7 @@ public class TestRuntimeEstimators {
       public MyAppMaster(Clock clock) {
         super(MyAppMaster.class.getName());
         if (clock == null) {
-          clock = new SystemClock();
+          clock = SystemClock.getInstance();
         }
       this.clock = clock;
       LOG.info("Created MyAppMaster");
@@ -835,7 +857,7 @@ public class TestRuntimeEstimators {
     }
 
     @Override
-    public EventHandler getEventHandler() {
+    public EventHandler<Event> getEventHandler() {
       return dispatcher.getEventHandler();
     }
 
@@ -894,6 +916,16 @@ public class TestRuntimeEstimators {
     @Override
     public TaskAttemptFinishingMonitor getTaskAttemptFinishingMonitor() {
       return null;
+    }
+
+    @Override
+    public String getHistoryUrl() {
+      return null;
+    }
+
+    @Override
+    public void setHistoryUrl(String historyUrl) {
+      return;
     }
   }
 }

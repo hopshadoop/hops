@@ -29,6 +29,4 @@ public interface ResourceView {
   boolean isPmemCheckEnabled();
 
   long getVCoresAllocatedForContainers();
-  
-  long getGPUsAllocatedForContainers();
 }

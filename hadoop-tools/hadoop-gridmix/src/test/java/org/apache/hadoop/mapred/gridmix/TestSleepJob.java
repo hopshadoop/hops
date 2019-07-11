@@ -17,32 +17,32 @@
  */
 package org.apache.hadoop.mapred.gridmix;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.tools.rumen.JobStory;
-import org.apache.log4j.Level;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.util.List;
 
 import static org.junit.Assert.*;
+import static org.slf4j.LoggerFactory.getLogger;
 
 public class TestSleepJob extends CommonJobTest {
 
-  public static final Log LOG = LogFactory.getLog(Gridmix.class);
+  public static final Logger LOG = getLogger(Gridmix.class);
 
   static {
-    ((Log4JLogger) LogFactory.getLog("org.apache.hadoop.mapred.gridmix"))
-            .getLogger().setLevel(Level.DEBUG);
+    GenericTestUtils.setLogLevel(
+        getLogger("org.apache.hadoop.mapred.gridmix"), Level.DEBUG);
   }
 
   static GridmixJobSubmissionPolicy policy = GridmixJobSubmissionPolicy.REPLAY;
@@ -58,7 +58,7 @@ public class TestSleepJob extends CommonJobTest {
   }
 
 
-  @Test  (timeout=600000)
+  @Test
   public void testMapTasksOnlySleepJobs() throws Exception {
     Configuration configuration = GridmixTestUtils.mrvl.getConfig();
 
@@ -82,7 +82,7 @@ public class TestSleepJob extends CommonJobTest {
   /*
   * test RandomLocation
   */
-  @Test (timeout=600000)
+  @Test
   public void testRandomLocation() throws Exception {
     UserGroupInformation ugi = UserGroupInformation.getLoginUser();
 
@@ -91,7 +91,7 @@ public class TestSleepJob extends CommonJobTest {
   }
 
   // test Serial submit
-  @Test  (timeout=600000)
+  @Test
   public void testSerialSubmit() throws Exception {
     // set policy
     policy = GridmixJobSubmissionPolicy.SERIAL;
@@ -100,7 +100,7 @@ public class TestSleepJob extends CommonJobTest {
     LOG.info("Serial ended at " + System.currentTimeMillis());
   }
 
-  @Test  (timeout=600000)
+  @Test
   public void testReplaySubmit() throws Exception {
     policy = GridmixJobSubmissionPolicy.REPLAY;
     LOG.info(" Replay started at " + System.currentTimeMillis());
@@ -108,7 +108,7 @@ public class TestSleepJob extends CommonJobTest {
     LOG.info(" Replay ended at " + System.currentTimeMillis());
   }
 
-  @Test   (timeout=600000)
+  @Test
   public void testStressSubmit() throws Exception {
     policy = GridmixJobSubmissionPolicy.STRESS;
     LOG.info(" Replay started at " + System.currentTimeMillis());

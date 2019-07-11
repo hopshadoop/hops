@@ -339,6 +339,11 @@ public class LeaderElection extends Thread {
       }
     }
   }
+  
+  public void forceLead(long id) throws IOException{
+    LETransaction transaction = new LETransaction();
+    transaction.forceLead(id);
+  }
 
   public synchronized List<FailedNodeLeDescriptor> getDeadNodes(){
     List<FailedNodeLeDescriptor> ret = deadNodes;

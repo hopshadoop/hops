@@ -21,19 +21,21 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
 
-import java.awt.image.DataBuffer;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairSchedulerConfiguration;
+import org.junit.After;
 import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -44,6 +46,7 @@ import org.apache.hadoop.service.Service.STATE;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
@@ -60,19 +63,17 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStoreFactory;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.QueueACLsManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-public class TestApplicationACLs {
+public class TestApplicationACLs extends ParameterizedSchedulerTestBase {
 
   private static final String APP_OWNER = "owner";
   private static final String FRIEND = "friend";
@@ -85,30 +86,34 @@ public class TestApplicationACLs {
 
   private static final Log LOG = LogFactory.getLog(TestApplicationACLs.class);
 
-  static MockRM resourceManager;
-  static Configuration conf = new YarnConfiguration();
-  final static YarnRPC rpc = YarnRPC.create(conf);
-  final static InetSocketAddress rmAddress = conf.getSocketAddr(
-      YarnConfiguration.RM_ADDRESS,
-      YarnConfiguration.DEFAULT_RM_ADDRESS,
-      YarnConfiguration.DEFAULT_RM_PORT);
-  private static ApplicationClientProtocol rmClient;
+  private MockRM resourceManager;
+  private Configuration conf;
+  private YarnRPC rpc;
+  private InetSocketAddress rmAddress;
+  private ApplicationClientProtocol rmClient;
+  private RecordFactory recordFactory;
+  private boolean isQueueUser;
 
-  private static RecordFactory recordFactory = RecordFactoryProvider
-      .getRecordFactory(conf);
+  public TestApplicationACLs(SchedulerType type) throws IOException {
+    super(type);
+  }
 
-  private static boolean isQueueUser = false;
-
-  @BeforeClass
-  public static void setup() throws InterruptedException, IOException {
-    RMStateStore store = RMStateStoreFactory.getStore(conf);
+  @Before
+  public void setup() throws InterruptedException, IOException {
+    conf = getConf();
+    rpc = YarnRPC.create(conf);
+    rmAddress = conf.getSocketAddr(
+        YarnConfiguration.RM_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_PORT);
+    RMStateStoreFactory.getStore(conf);
     conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
     AccessControlList adminACL = new AccessControlList("");
     adminACL.addGroup(SUPER_GROUP);
     conf.set(YarnConfiguration.YARN_ADMIN_ACL, adminACL.getAclString());
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
+    recordFactory = RecordFactoryProvider
+        .getRecordFactory(conf);
+    isQueueUser = false;
 
     resourceManager = new MockRM(conf) {
 
@@ -118,7 +123,8 @@ public class TestApplicationACLs {
           Configuration conf) {
         QueueACLsManager mockQueueACLsManager = mock(QueueACLsManager.class);
         when(mockQueueACLsManager.checkAccess(any(UserGroupInformation.class),
-            any(QueueACL.class), anyString())).thenAnswer(new Answer() {
+            any(QueueACL.class), any(RMApp.class), any(String.class),
+            any())).thenAnswer(new Answer() {
           public Object answer(InvocationOnMock invocation) {
             return isQueueUser;
           }
@@ -166,11 +172,34 @@ public class TestApplicationACLs {
     });
   }
 
-  @AfterClass
-  public static void tearDown() {
+  @After
+  public void tearDown() {
     if(resourceManager != null) {
       resourceManager.stop();
     }
+  }
+
+  @Override
+  protected void configureFairScheduler(YarnConfiguration conf)
+      throws IOException {
+    final String testDir = new File(System.getProperty("test.build.data",
+        "/tmp")).getAbsolutePath();
+    final String allocFile = new File(testDir, "test-queues.xml")
+        .getAbsolutePath();
+    PrintWriter out = new PrintWriter(new FileWriter(allocFile));
+    out.println("<?xml version=\"1.0\"?>");
+    out.println("<allocations>");
+    out.println("<queue name=\"root\" >");
+    out.println("  <queue name=\"default\">");
+    out.println("  </queue>");
+    out.println("</queue>");
+    out.println("<queuePlacementPolicy>");
+    out.println("  <rule name=\"specified\" create=\"false\" />");
+    out.println("  <rule name=\"reject\" />");
+    out.println("</queuePlacementPolicy>");
+    out.println("</allocations>");
+    out.close();
+    conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, allocFile);
   }
 
   @Test
@@ -185,6 +214,8 @@ public class TestApplicationACLs {
     verifyEnemyAccess();
 
     verifyAdministerQueueUserAccess();
+
+    verifyInvalidQueueWithAcl();
   }
 
   @SuppressWarnings("deprecation")
@@ -210,6 +241,10 @@ public class TestApplicationACLs {
     Resource resource = BuilderUtils.newResource(1024, 1);
     context.setResource(resource);
     amContainer.setApplicationACLs(acls);
+    if (conf.get(YarnConfiguration.RM_SCHEDULER)
+        .equals(FairScheduler.class.getName())) {
+      context.setQueue("root.default");
+    }
     context.setAMContainerSpec(amContainer);
     submitRequest.setApplicationSubmissionContext(context);
     rmClient.submitApplication(submitRequest);
@@ -396,6 +431,45 @@ public class TestApplicationACLs {
         -1, usageReport.getReservedResources().getMemorySize());
     Assert.assertEquals("Enemy should not see app needed resources",
         -1, usageReport.getNeededResources().getMemorySize());
+  }
+
+  private void verifyInvalidQueueWithAcl() throws Exception {
+    isQueueUser = true;
+    SubmitApplicationRequest submitRequest =
+        recordFactory.newRecordInstance(SubmitApplicationRequest.class);
+    ApplicationSubmissionContext context =
+        recordFactory.newRecordInstance(ApplicationSubmissionContext.class);
+    ApplicationId applicationId = rmClient
+        .getNewApplication(
+            recordFactory.newRecordInstance(GetNewApplicationRequest.class))
+        .getApplicationId();
+    context.setApplicationId(applicationId);
+    Map<ApplicationAccessType, String> acls =
+        new HashMap<ApplicationAccessType, String>();
+    ContainerLaunchContext amContainer =
+        recordFactory.newRecordInstance(ContainerLaunchContext.class);
+    Resource resource = BuilderUtils.newResource(1024, 1);
+    context.setResource(resource);
+    amContainer.setApplicationACLs(acls);
+    context.setQueue("InvalidQueue");
+    context.setAMContainerSpec(amContainer);
+    submitRequest.setApplicationSubmissionContext(context);
+    rmClient.submitApplication(submitRequest);
+    resourceManager.waitForState(applicationId, RMAppState.FAILED);
+    final GetApplicationReportRequest appReportRequest =
+        recordFactory.newRecordInstance(GetApplicationReportRequest.class);
+    appReportRequest.setApplicationId(applicationId);
+    GetApplicationReportResponse applicationReport =
+        rmClient.getApplicationReport(appReportRequest);
+    ApplicationReport appReport = applicationReport.getApplicationReport();
+    if (conf.get(YarnConfiguration.RM_SCHEDULER)
+        .equals(FairScheduler.class.getName())) {
+      Assert.assertTrue(appReport.getDiagnostics()
+          .contains("Application rejected by queue placement policy"));
+    } else {
+      Assert.assertTrue(appReport.getDiagnostics()
+          .contains("submitted by user owner to unknown queue: InvalidQueue"));
+    }
   }
 
   private void verifyAdministerQueueUserAccess() throws Exception {

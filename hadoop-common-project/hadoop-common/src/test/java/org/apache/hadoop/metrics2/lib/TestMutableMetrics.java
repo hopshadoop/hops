@@ -34,18 +34,19 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.util.Quantile;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test metrics record builder interface and mutable metrics
  */
 public class TestMutableMetrics {
 
-  private static final Log LOG = LogFactory.getLog(TestMutableMetrics.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestMutableMetrics.class);
   private final double EPSILON = 1e-42;
 
   /**
@@ -59,6 +60,7 @@ public class TestMutableMetrics {
     registry.newCounter("c2", "long counter", 2L);
     registry.newGauge("g1", "int gauge", 3);
     registry.newGauge("g2", "long gauge", 4L);
+    registry.newGauge("g3", "float gauge", 5f);
     registry.newStat("s1", "stat", "Ops", "Time", true).add(0);
     registry.newRate("s2", "stat", false).add(0);
 
@@ -74,6 +76,7 @@ public class TestMutableMetrics {
     verify(mb).addCounter(info("c2", "long counter"), 2L);
     verify(mb).addGauge(info("g1", "int gauge"), 3);
     verify(mb).addGauge(info("g2", "long gauge"), 4L);
+    verify(mb).addGauge(info("g3", "float gauge"), 5f);
     verify(mb).addCounter(info("S1NumOps", "Number of ops for stat"), 1L);
     verify(mb).addGauge(eq(info("S1AvgTime", "Average time for stat")),
                            eq(0.0, EPSILON));
@@ -90,6 +93,10 @@ public class TestMutableMetrics {
                            eq(0.0, EPSILON));
     verify(mb).addGauge(eq(info("S1MaxTime","Max time for stat")),
                            eq(0.0, EPSILON));
+    verify(mb).addGauge(
+        eq(info("S1INumOps", "Interval number of ops for stat")),
+        eq(1L));
+
     verify(mb, times(2))
         .addCounter(info("S2NumOps", "Number of ops for stat"), 1L);
     verify(mb, times(2)).addGauge(eq(info("S2AvgTime",
@@ -98,6 +105,16 @@ public class TestMutableMetrics {
     verify(mb).addCounter(info("S2NumOps", "Number of ops for stat"), 2L);
     verify(mb).addGauge(eq(info("S2AvgTime", "Average time for stat")),
                            eq(1.0, EPSILON));
+
+    // Add one more sample to s1 and verify that total number of ops
+    // has increased to 2, but interval number is 1 for both intervals.
+    MutableStat s1 = (MutableStat) registry.get("s1");
+    s1.add(0);
+    registry.snapshot(mb, true);
+    verify(mb).addCounter(info("S1NumOps", "Number of ops for stat"), 2L);
+    verify(mb, times(2)).addGauge(
+        eq(info("S1INumOps", "Interval number of ops for stat")),
+        eq(1L));
   }
 
   interface TestProtocol {

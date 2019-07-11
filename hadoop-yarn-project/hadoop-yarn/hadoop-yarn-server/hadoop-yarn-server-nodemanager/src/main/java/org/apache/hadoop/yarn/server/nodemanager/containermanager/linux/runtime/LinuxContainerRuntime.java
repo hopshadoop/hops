@@ -23,16 +23,37 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerExecutionException;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerRuntime;
 
-/** Linux-specific container runtime implementations must implement this
+import java.util.Map;
+
+/**
+ * Linux-specific container runtime implementations must implement this
  * interface.
  */
 
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface LinuxContainerRuntime extends ContainerRuntime {
-  void initialize(Configuration conf) throws ContainerExecutionException;
+  /**
+   * Initialize the runtime.
+   *
+   * @param conf the {@link Configuration} to use
+   * @param nmContext NMContext
+   * @throws ContainerExecutionException if an error occurs while initializing
+   * the runtime
+   */
+  void initialize(Configuration conf, Context nmContext) throws ContainerExecutionException;
+
+  /**
+   * Return whether the given environment variables indicate that the operation
+   * is requesting this runtime.
+   *
+   * @param env the environment variable settings for the operation
+   * @return whether this runtime is requested
+   */
+  boolean isRuntimeRequested(Map<String, String> env);
 }
 

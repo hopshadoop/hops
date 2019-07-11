@@ -23,18 +23,22 @@ import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 
 /**
  * A provider of credentials or password for Hadoop applications. Provides an
  * abstraction to separate credential storage from users of them. It
  * is intended to support getting or storing passwords in a variety of ways,
  * including third party bindings.
+ * 
+ * <code>CredentialProvider</code> implementations must be thread safe.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public abstract class CredentialProvider {
-  public static final String CLEAR_TEXT_FALLBACK 
-      = "hadoop.security.credential.clear-text-fallback";
+  public static final String CLEAR_TEXT_FALLBACK =
+      CommonConfigurationKeysPublic.
+          HADOOP_SECURITY_CREDENTIAL_CLEAR_TEXT_FALLBACK;
 
   /**
    * The combination of both the alias and the actual credential value.

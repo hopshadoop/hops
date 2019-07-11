@@ -18,26 +18,40 @@ package org.apache.hadoop.security;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.*;
+
 import static org.junit.Assert.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import javax.security.auth.kerberos.KerberosPrincipal;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.alias.CredentialProvider;
+import org.apache.hadoop.security.alias.CredentialProviderFactory;
+import org.apache.hadoop.security.alias.LocalJavaKeyStoreProvider;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.ZKUtil.ZKAuthInfo;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import com.google.common.io.Files;
+
 public class TestSecurityUtil {
+
+  private static final String ZK_AUTH_VALUE = "a_scheme:a_password";
+
   @BeforeClass
   public static void unsetKerberosRealm() {
     // prevent failures if kinit-ed or on os x with no realm
@@ -110,7 +124,7 @@ public class TestSecurityUtil {
 
   @Test
   public void testLocalHostNameForNullOrWild() throws Exception {
-    String local = StringUtils.toLowerCase(SecurityUtil.getLocalHostName());
+    String local = StringUtils.toLowerCase(SecurityUtil.getLocalHostName(null));
     assertEquals("hdfs/" + local + "@REALM",
                  SecurityUtil.getServerPrincipal("hdfs/_HOST@REALM", (String)null));
     assertEquals("hdfs/" + local + "@REALM",
@@ -144,7 +158,10 @@ public class TestSecurityUtil {
 
   @Test
   public void testBuildDTServiceName() {
-    SecurityUtil.setTokenServiceUseIp(true);
+    Configuration conf = new Configuration(false);
+    conf.setBoolean(
+        CommonConfigurationKeys.HADOOP_SECURITY_TOKEN_SERVICE_USE_IP, true);
+    SecurityUtil.setConfiguration(conf);
     assertEquals("127.0.0.1:123",
         SecurityUtil.buildDTServiceName(URI.create("test://LocalHost"), 123)
     );
@@ -161,7 +178,10 @@ public class TestSecurityUtil {
   
   @Test
   public void testBuildTokenServiceSockAddr() {
-    SecurityUtil.setTokenServiceUseIp(true);
+    Configuration conf = new Configuration(false);
+    conf.setBoolean(
+        CommonConfigurationKeys.HADOOP_SECURITY_TOKEN_SERVICE_USE_IP, true);
+    SecurityUtil.setConfiguration(conf);
     assertEquals("127.0.0.1:123",
         SecurityUtil.buildTokenService(new InetSocketAddress("LocalHost", 123)).toString()
     );
@@ -260,7 +280,10 @@ public class TestSecurityUtil {
   verifyTokenService(InetSocketAddress addr, String host, String ip, int port, boolean useIp) {
     //LOG.info("address:"+addr+" host:"+host+" ip:"+ip+" port:"+port);
 
-    SecurityUtil.setTokenServiceUseIp(useIp);
+    Configuration conf = new Configuration(false);
+    conf.setBoolean(
+        CommonConfigurationKeys.HADOOP_SECURITY_TOKEN_SERVICE_USE_IP, useIp);
+    SecurityUtil.setConfiguration(conf);
     String serviceHost = useIp ? ip : StringUtils.toLowerCase(host);
     
     Token<?> token = new Token<TokenIdentifier>();
@@ -392,5 +415,74 @@ public class TestSecurityUtil {
     // kerberos
     SecurityUtil.setAuthenticationMethod(KERBEROS, conf);
     assertEquals("kerberos", conf.get(HADOOP_SECURITY_AUTHENTICATION));
+  }
+
+  @Test
+  public void testAuthPlainPasswordProperty() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(CommonConfigurationKeys.ZK_AUTH, ZK_AUTH_VALUE);
+    List<ZKAuthInfo> zkAuths = SecurityUtil.getZKAuthInfos(conf,
+        CommonConfigurationKeys.ZK_AUTH);
+    assertEquals(1, zkAuths.size());
+    ZKAuthInfo zkAuthInfo = zkAuths.get(0);
+    assertEquals("a_scheme", zkAuthInfo.getScheme());
+    assertArrayEquals("a_password".getBytes(), zkAuthInfo.getAuth());
+  }
+
+  @Test
+  public void testAuthPlainTextFile() throws Exception {
+    Configuration conf = new Configuration();
+    File passwordTxtFile = File.createTempFile(
+        getClass().getSimpleName() +  ".testAuthAtPathNotation-", ".txt");
+    Files.write(ZK_AUTH_VALUE, passwordTxtFile, StandardCharsets.UTF_8);
+    try {
+      conf.set(CommonConfigurationKeys.ZK_AUTH,
+          "@" + passwordTxtFile.getAbsolutePath());
+      List<ZKAuthInfo> zkAuths = SecurityUtil.getZKAuthInfos(conf,
+          CommonConfigurationKeys.ZK_AUTH);
+      assertEquals(1, zkAuths.size());
+      ZKAuthInfo zkAuthInfo = zkAuths.get(0);
+      assertEquals("a_scheme", zkAuthInfo.getScheme());
+      assertArrayEquals("a_password".getBytes(), zkAuthInfo.getAuth());
+    } finally {
+      boolean deleted = passwordTxtFile.delete();
+      assertTrue(deleted);
+    }
+  }
+
+  @Test
+  public void testAuthLocalJceks() throws Exception {
+    File localJceksFile = File.createTempFile(
+        getClass().getSimpleName() +".testAuthLocalJceks-", ".localjceks");
+    populateLocalJceksTestFile(localJceksFile.getAbsolutePath());
+    try {
+      String localJceksUri = "localjceks://file/" +
+          localJceksFile.getAbsolutePath();
+      Configuration conf = new Configuration();
+      conf.set(CredentialProviderFactory.CREDENTIAL_PROVIDER_PATH,
+          localJceksUri);
+      List<ZKAuthInfo> zkAuths = SecurityUtil.getZKAuthInfos(conf,
+          CommonConfigurationKeys.ZK_AUTH);
+      assertEquals(1, zkAuths.size());
+      ZKAuthInfo zkAuthInfo = zkAuths.get(0);
+      assertEquals("a_scheme", zkAuthInfo.getScheme());
+      assertArrayEquals("a_password".getBytes(), zkAuthInfo.getAuth());
+    } finally {
+      boolean deleted = localJceksFile.delete();
+      assertTrue(deleted);
+    }
+  }
+
+  private void populateLocalJceksTestFile(String path) throws IOException {
+    Configuration conf = new Configuration();
+    conf.set(CredentialProviderFactory.CREDENTIAL_PROVIDER_PATH,
+        "localjceks://file/" + path);
+    CredentialProvider provider =
+        CredentialProviderFactory.getProviders(conf).get(0);
+    assertEquals(LocalJavaKeyStoreProvider.class.getName(),
+        provider.getClass().getName());
+    provider.createCredentialEntry(CommonConfigurationKeys.ZK_AUTH,
+        ZK_AUTH_VALUE.toCharArray());
+    provider.flush();
   }
 }

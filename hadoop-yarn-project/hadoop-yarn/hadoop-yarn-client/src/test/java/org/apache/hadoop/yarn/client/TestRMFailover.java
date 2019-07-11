@@ -22,30 +22,38 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.ClientBaseWithFixes;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.service.Service.STATE;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.client.api.YarnClient;
-import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
 import org.apache.hadoop.yarn.server.resourcemanager.AdminService;
 import org.apache.hadoop.yarn.server.resourcemanager.HATestUtil;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.RMCriticalThreadUncaughtExceptionHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
+import org.apache.hadoop.yarn.server.resourcemanager.RMFatalEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.RMFatalEventType;
 import org.apache.hadoop.yarn.server.webproxy.WebAppProxyServer;
 import org.apache.hadoop.yarn.webapp.YarnWebParams;
 import org.junit.After;
@@ -53,9 +61,13 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.common.base.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class TestRMFailover extends ClientBaseWithFixes {
-  private static final Log LOG =
-      LogFactory.getLog(TestRMFailover.class.getName());
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestRMFailover.class.getName());
   private static final HAServiceProtocol.StateChangeRequestInfo req =
       new HAServiceProtocol.StateChangeRequestInfo(
           HAServiceProtocol.RequestSource.REQUEST_BY_USER);
@@ -68,28 +80,6 @@ public class TestRMFailover extends ClientBaseWithFixes {
   private Configuration conf;
   private MiniYARNCluster cluster;
   private ApplicationId fakeAppId;
-
-
-  private void setConfForRM(String rmId, String prefix, String value) {
-    conf.set(HAUtil.addSuffix(prefix, rmId), value);
-  }
-
-  private void setRpcAddressForRM(String rmId, int base) {
-    setConfForRM(rmId, YarnConfiguration.RM_ADDRESS, "0.0.0.0:" +
-        (base + YarnConfiguration.DEFAULT_RM_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_ADDRESS, "0.0.0.0:" +
-        (base + YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS, "0.0.0.0:" +
-        (base + YarnConfiguration.DEFAULT_RM_ADMIN_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS, "0.0.0.0:" +
-        (base + YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS, "0.0.0.0:" +
-        (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "0.0.0.0:" +
-        (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "0.0.0.0:" +
-        (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
-  }
 
   @Before
   public void setup() throws IOException {
@@ -104,8 +94,6 @@ public class TestRMFailover extends ClientBaseWithFixes {
 
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
-    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
-            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
 
     cluster = new MiniYARNCluster(TestRMFailover.class.getName(), 2, 1, 1, 1);
   }
@@ -126,7 +114,7 @@ public class TestRMFailover extends ClientBaseWithFixes {
         client.getApplications();
         return;
       } catch (Exception e) {
-        LOG.error(e);
+        LOG.error(e.toString());
       } finally {
         client.stop();
       }
@@ -167,32 +155,34 @@ public class TestRMFailover extends ClientBaseWithFixes {
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
     cluster.init(conf);
     cluster.start();
-    LOG.info("Checkpoint 1");
     assertFalse("RM never turned active", -1 == cluster.getActiveRMIndex());
     verifyConnections();
 
-    LOG.info("Checkpoint 2");
     explicitFailover();
-    LOG.info("Checkpoint 3");
     verifyConnections();
-    LOG.info("Checkpoint 4");
+
     explicitFailover();
-    LOG.info("Checkpoint 5");
     verifyConnections();
-    LOG.info("Checkpoint 6");
+  }
+
+  private void verifyRMTransitionToStandby(ResourceManager rm)
+      throws InterruptedException {
+    try {
+      GenericTestUtils.waitFor(new Supplier<Boolean>() {
+        @Override
+        public Boolean get() {
+          return rm.getRMContext().getHAServiceState() ==
+              HAServiceState.STANDBY;
+        }
+      }, 100, 20000);
+    } catch (TimeoutException e) {
+      fail("RM didn't transition to Standby.");
+    }
   }
 
   @Test
   public void testAutomaticFailover()
       throws YarnException, InterruptedException, IOException {
-    /*conf.set(YarnConfiguration.RM_CLUSTER_ID, "yarn-test-cluster");
-    conf.set(YarnConfiguration.RM_ZK_ADDRESS, hostPort);
-    conf.setInt(YarnConfiguration.RM_ZK_TIMEOUT_MS, 2000);*/
-
-    // Configuration parameters to use for Hops leader election
-    conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_EMBEDDED, false);
-    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
-            YarnConfiguration.DEFAULT_LEADER_CLIENT_FAILOVER_PROXY_PROVIDER);
 
     cluster.init(conf);
     cluster.start();
@@ -209,16 +199,9 @@ public class TestRMFailover extends ClientBaseWithFixes {
     // so it transitions to standby.
     ResourceManager rm = cluster.getResourceManager(
         cluster.getActiveRMIndex());
-    rm.handleTransitionToStandBy();
-    int maxWaitingAttempts = 2000;
-    while (maxWaitingAttempts-- > 0 ) {
-      if (rm.getRMContext().getHAServiceState() == HAServiceState.STANDBY) {
-        break;
-      }
-      Thread.sleep(1);
-    }
-    Assert.assertFalse("RM didn't transition to Standby ",
-        maxWaitingAttempts == 0);
+    rm.getRMContext().getDispatcher().getEventHandler().handle(
+        new RMFatalEvent(RMFatalEventType.STATE_STORE_FENCED, "test"));
+    verifyRMTransitionToStandby(rm);
     verifyConnections();
   }
 
@@ -383,5 +366,86 @@ public class TestRMFailover extends ClientBaseWithFixes {
       // throw new RuntimeException(e);
     }
     return redirectUrl;
+  }
+
+  /**
+   * Throw {@link RuntimeException} inside a thread of
+   * {@link ResourceManager} with HA enabled and check if the
+   * {@link ResourceManager} is transited to standby state.
+   *
+   * @throws InterruptedException if any
+   */
+  @Test
+  public void testUncaughtExceptionHandlerWithHAEnabled()
+      throws InterruptedException {
+    cluster.init(conf);
+    cluster.start();
+    assertFalse("RM never turned active", -1 == cluster.getActiveRMIndex());
+
+    ResourceManager resourceManager = cluster.getResourceManager(
+        cluster.getActiveRMIndex());
+
+    final RMCriticalThreadUncaughtExceptionHandler exHandler =
+        new RMCriticalThreadUncaughtExceptionHandler(
+            resourceManager.getRMContext());
+
+    // Create a thread and throw a RTE inside it
+    final RuntimeException rte = new RuntimeException("TestRuntimeException");
+    final Thread testThread = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        throw rte;
+      }
+    });
+    testThread.setName("TestThread");
+    testThread.setUncaughtExceptionHandler(exHandler);
+    testThread.start();
+    testThread.join();
+
+    verifyRMTransitionToStandby(resourceManager);
+  }
+
+  /**
+   * Throw {@link RuntimeException} inside a thread of
+   * {@link ResourceManager} with HA disabled and check
+   * {@link RMCriticalThreadUncaughtExceptionHandler} instance.
+   *
+   * Used {@link ExitUtil} class to avoid jvm exit through
+   * {@code System.exit(-1)}.
+   *
+   * @throws InterruptedException if any
+   */
+  @Test
+  public void testUncaughtExceptionHandlerWithoutHA()
+      throws InterruptedException {
+    ExitUtil.disableSystemExit();
+
+    // Create a MockRM and start it
+    ResourceManager resourceManager = new MockRM();
+    ((AsyncDispatcher) resourceManager.getRMContext().getDispatcher()).start();
+    resourceManager.getRMContext().getStateStore().start();
+    resourceManager.getRMContext().getContainerTokenSecretManager().
+        rollMasterKey();
+
+    final RMCriticalThreadUncaughtExceptionHandler exHandler =
+        new RMCriticalThreadUncaughtExceptionHandler(
+            resourceManager.getRMContext());
+    final RMCriticalThreadUncaughtExceptionHandler spyRTEHandler =
+        spy(exHandler);
+
+    // Create a thread and throw a RTE inside it
+    final RuntimeException rte = new RuntimeException("TestRuntimeException");
+    final Thread testThread = new Thread(new Runnable() {
+      @Override public void run() {
+        throw rte;
+      }
+    });
+    testThread.setName("TestThread");
+    testThread.setUncaughtExceptionHandler(spyRTEHandler);
+    assertSame(spyRTEHandler, testThread.getUncaughtExceptionHandler());
+    testThread.start();
+    testThread.join();
+
+    verify(spyRTEHandler).uncaughtException(testThread, rte);
   }
 }

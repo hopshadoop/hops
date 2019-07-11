@@ -24,6 +24,7 @@ public enum RMStateStoreEventType {
   UPDATE_APP,
   UPDATE_APP_ATTEMPT,
   REMOVE_APP,
+  REMOVE_APP_ATTEMPT,
   FENCED,
 
   // Below events should be called synchronously

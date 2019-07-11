@@ -22,9 +22,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -35,7 +35,8 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
  */
 public class ProcessIdFileReader {
 
-  private static final Log LOG = LogFactory.getLog(ProcessIdFileReader.class);
+  private static final Logger LOG =
+       LoggerFactory.getLogger(ProcessIdFileReader.class);
   
   /**
    * Get the process id from specified file path.
@@ -48,8 +49,9 @@ public class ProcessIdFileReader {
     if (path == null) {
       throw new IOException("Trying to access process id from a null path");
     }
-    
-    LOG.debug("Accessing pid from pid file " + path);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Accessing pid from pid file " + path);
+    }
     String processId = null;
     BufferedReader bufReader = null;
 
@@ -97,9 +99,10 @@ public class ProcessIdFileReader {
         bufReader.close();
       }
     }
-    LOG.debug("Got pid " 
-        + (processId != null? processId : "null")  
-        + " from path " + path);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Got pid " + (processId != null ? processId : "null")
+          + " from path " + path);
+    }
     return processId;
   }
 

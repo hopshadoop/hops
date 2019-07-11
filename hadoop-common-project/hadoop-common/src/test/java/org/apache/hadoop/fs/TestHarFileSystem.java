@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.fs;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
@@ -27,9 +25,12 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.util.Progressable;
 import org.junit.Assert;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -48,7 +49,8 @@ import static org.junit.Assert.assertTrue;
 
 @SuppressWarnings("deprecation")
 public class TestHarFileSystem {
-  public static final Log LOG = LogFactory.getLog(TestHarFileSystem.class);
+  public static final Logger LOG =
+      LoggerFactory.getLogger(TestHarFileSystem.class);
 
   /**
    * FileSystem methods that must not be overwritten by
@@ -79,6 +81,7 @@ public class TestHarFileSystem {
 
     public boolean mkdirs(Path f);
     public FSDataInputStream open(Path f);
+    public FSDataInputStream open(PathHandle f);
     public FSDataOutputStream create(Path f);
     public FSDataOutputStream create(Path f, boolean overwrite);
     public FSDataOutputStream create(Path f, Progressable progress);
@@ -115,6 +118,7 @@ public class TestHarFileSystem {
     public QuotaUsage getQuotaUsage(Path f);
     public FsStatus getStatus();
     public FileStatus[] listStatus(Path f, PathFilter filter);
+    public FileStatus[] listStatusBatch(Path f, byte[] token);
     public FileStatus[] listStatus(Path[] files);
     public FileStatus[] listStatus(Path[] files, PathFilter filter);
     public FileStatus[] globStatus(Path pathPattern);
@@ -142,6 +146,8 @@ public class TestHarFileSystem {
     public int getDefaultPort();
     public String getCanonicalServiceName();
     public Token<?> getDelegationToken(String renewer) throws IOException;
+    public DelegationTokenIssuer[] getAdditionalTokenIssuers()
+        throws IOException;
     public FileChecksum getFileChecksum(Path f) throws IOException;
     public boolean deleteOnExit(Path f) throws IOException;
     public boolean cancelDeleteOnExit(Path f) throws IOException;
@@ -186,8 +192,6 @@ public class TestHarFileSystem {
 
     public void setAcl(Path path, List<AclEntry> aclSpec) throws IOException;
 
-    public AclStatus getAclStatus(Path path) throws IOException;
-
     public void setXAttr(Path path, String name, byte[] value)
         throws IOException;
 
@@ -204,6 +208,8 @@ public class TestHarFileSystem {
     public List<String> listXAttrs(Path path) throws IOException;
 
     public void removeXAttr(Path path, String name) throws IOException;
+
+    public AclStatus getAclStatus(Path path) throws IOException;
 
     public void access(Path path, FsAction mode) throws IOException;
 

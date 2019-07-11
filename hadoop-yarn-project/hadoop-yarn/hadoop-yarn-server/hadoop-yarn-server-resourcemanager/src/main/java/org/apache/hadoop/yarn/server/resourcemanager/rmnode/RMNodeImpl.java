@@ -18,50 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-import org.apache.hadoop.net.Node;
-import org.apache.hadoop.util.DateUtils;
-import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerState;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.NodeState;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceOption;
-import org.apache.hadoop.yarn.api.records.ResourceUtilization;
-import org.apache.hadoop.yarn.event.EventHandler;
-import org.apache.hadoop.yarn.factories.RecordFactory;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
-import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
-import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
-import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
-import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
-import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
-import org.apache.hadoop.yarn.server.resourcemanager.ClusterMetrics;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
-import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeResourceUpdateSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
-import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
-import org.apache.hadoop.yarn.server.utils.BuilderUtils.ContainerIdComparator;
-import org.apache.hadoop.yarn.state.MultipleArcTransition;
-import org.apache.hadoop.yarn.state.SingleArcTransition;
-import org.apache.hadoop.yarn.state.StateMachine;
-import org.apache.hadoop.yarn.state.StateMachineFactory;
-import org.apache.hadoop.yarn.util.resource.Resources;
-
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -71,13 +27,77 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.net.Node;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.ContainerUpdateType;
+import org.apache.hadoop.yarn.api.records.ExecutionType;
+import org.apache.hadoop.yarn.api.records.NodeAttribute;
+import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeState;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceOption;
+import org.apache.hadoop.yarn.api.records.ResourceUtilization;
+import org.apache.hadoop.yarn.event.EventHandler;
+import org.apache.hadoop.yarn.factories.RecordFactory;
+import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.nodelabels.AttributeValue;
+import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
+import org.apache.hadoop.yarn.nodelabels.NodeAttributesManager;
+import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
+import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
+import org.apache.hadoop.yarn.server.resourcemanager.ClusterMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.NodesListManager;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppRunningOnNodeEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.AllocationExpirationInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeResourceUpdateSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
+import org.apache.hadoop.yarn.server.utils.BuilderUtils.ContainerIdComparator;
+import org.apache.hadoop.yarn.state.InvalidStateTransitionException;
+import org.apache.hadoop.yarn.state.MultipleArcTransition;
+import org.apache.hadoop.yarn.state.SingleArcTransition;
+import org.apache.hadoop.yarn.state.StateMachine;
+import org.apache.hadoop.yarn.state.StateMachineFactory;
+import org.apache.hadoop.yarn.util.resource.Resources;
+
+import com.google.common.annotations.VisibleForTesting;
+import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.util.DateUtils;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
+import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 
 /**
  * This class is used to keep track of all the applications/containers
@@ -87,7 +107,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 @Private
 @Unstable
 @SuppressWarnings("unchecked")
-public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
+public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
   private static final Log LOG = LogFactory.getLog(RMNodeImpl.class);
 
@@ -95,26 +115,27 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       .getRecordFactory(null);
 
   private final ReadLock readLock;
-  protected final WriteLock writeLock;
+  private final WriteLock writeLock;
 
-  protected final ConcurrentLinkedQueue<UpdatedContainerInfo> nodeUpdateQueue;
-  protected volatile boolean nextHeartBeat = true;
+  private final ConcurrentLinkedQueue<UpdatedContainerInfo> nodeUpdateQueue;
+  private volatile boolean nextHeartBeat = true;
 
-  protected final NodeId nodeId;
-  protected final RMContext context;
-  protected final String hostName;
-  protected final int commandPort;
-  protected int httpPort;
+  private final NodeId nodeId;
+  private final RMContext context;
+  private final String hostName;
+  private final int commandPort;
+  private int httpPort;
   private final String nodeAddress; // The containerManager address
-  protected String httpAddress;
+  private String httpAddress;
   /* Snapshot of total resources before receiving decommissioning command */
   private volatile Resource originalTotalCapability;
-  protected volatile Resource totalCapability;
+  private volatile Resource totalCapability;
   private final Node node;
 
   private String healthReport;
   private long lastHealthReportTime;
-  protected String nodeManagerVersion;
+  private String nodeManagerVersion;
+  private Integer decommissioningTimeout;
 
   private long timeStamp;
   /* Aggregated resource utilization for the containers. */
@@ -122,40 +143,54 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   /* Resource utilization for the node. */
   private ResourceUtilization nodeUtilization;
 
-  protected final ContainerAllocationExpirer containerAllocationExpirer;
+  /** Physical resources in the node. */
+  private volatile Resource physicalResource;
+
+  /* Container Queue Information for the node.. Used by Distributed Scheduler */
+  private OpportunisticContainersStatus opportunisticContainersStatus;
+
+  private final ContainerAllocationExpirer containerAllocationExpirer;
   /* set of containers that have just launched */
-  protected final Set<ContainerId> launchedContainers =
+  private final Set<ContainerId> launchedContainers =
     new HashSet<ContainerId>();
 
+  /* track completed container globally */
+  private final Set<ContainerId> completedContainers =
+      new HashSet<ContainerId>();
+
   /* set of containers that need to be cleaned */
-  protected final Set<ContainerId> containersToClean = new TreeSet<ContainerId>(
+  private final Set<ContainerId> containersToClean = new TreeSet<ContainerId>(
       new ContainerIdComparator());
 
   /* set of containers that need to be signaled */
-  protected final List<SignalContainerRequest> containersToSignal =
+  private final List<SignalContainerRequest> containersToSignal =
       new ArrayList<SignalContainerRequest>();
 
   /*
    * set of containers to notify NM to remove them from its context. Currently,
    * this includes containers that were notified to AM about their completion
    */
-  protected final Set<ContainerId> containersToBeRemovedFromNM =
+  private final Set<ContainerId> containersToBeRemovedFromNM =
       new HashSet<ContainerId>();
 
   /* the list of applications that have finished and need to be purged */
-  protected final List<ApplicationId> finishedApplications =
+  private final List<ApplicationId> finishedApplications =
       new ArrayList<ApplicationId>();
 
   /* the list of applications that are running on this node */
-  protected final List<ApplicationId> runningApplications =
+  private final List<ApplicationId> runningApplications =
       new ArrayList<ApplicationId>();
   
-  protected final Map<ContainerId, Container> toBeDecreasedContainers =
+  private final Map<ContainerId, Container> toBeUpdatedContainers =
       new HashMap<>();
-  
+
+  // NOTE: This is required for backward compatibility.
+  private final Map<ContainerId, Container> toBeDecreasedContainers =
+      new HashMap<>();
+
   private final Map<ContainerId, Container> nmReportedIncreasedContainers =
       new HashMap<>();
-  
+
   // Map of renewed application certificates that should be propagated to NM
   private final Map<ApplicationId, UpdatedCryptoForApp> appX509ToUpdate =
       new ConcurrentHashMap<>();
@@ -163,8 +198,8 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   // Map of renewed application JWT that should be propagated to NM
   private final Map<ApplicationId, UpdatedCryptoForApp> appJWTToUpdate =
       new ConcurrentHashMap<>();
-
-  protected NodeHeartbeatResponse latestNodeHeartBeatResponse = recordFactory
+  
+  private NodeHeartbeatResponse latestNodeHeartBeatResponse = recordFactory
       .newRecordInstance(NodeHeartbeatResponse.class);
 
   private static final StateMachineFactory<RMNodeImpl,
@@ -175,7 +210,6 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                                            NodeState,
                                            RMNodeEventType,
                                            RMNodeEvent>(NodeState.NEW)
-
       //Transitions from NEW state
       .addTransition(NodeState.NEW, NodeState.RUNNING,
           RMNodeEventType.STARTED, new AddNodeTransition())
@@ -216,8 +250,8 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       .addTransition(NodeState.RUNNING, NodeState.RUNNING,
           RMNodeEventType.RESOURCE_UPDATE, new UpdateNodeResourceWhenRunningTransition())
       .addTransition(NodeState.RUNNING, NodeState.RUNNING,
-          RMNodeEventType.DECREASE_CONTAINER,
-          new DecreaseContainersTransition())
+          RMNodeEventType.UPDATE_CONTAINER,
+          new UpdateContainersTransition())
       .addTransition(NodeState.RUNNING, NodeState.RUNNING,
           RMNodeEventType.SIGNAL_CONTAINER, new SignalContainerTransition())
       .addTransition(NodeState.RUNNING, NodeState.SHUTDOWN,
@@ -263,6 +297,9 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       .addTransition(NodeState.DECOMMISSIONING, NodeState.REBOOTED,
           RMNodeEventType.REBOOTING,
           new DeactivateNodeTransition(NodeState.REBOOTED))
+      .addTransition(NodeState.DECOMMISSIONING, NodeState.DECOMMISSIONING,
+         RMNodeEventType.FINISHED_CONTAINERS_PULLED_BY_AM,
+         new AddContainersToBeRemovedFromNMTransition())
 
       .addTransition(NodeState.DECOMMISSIONING, NodeState.DECOMMISSIONING,
           RMNodeEventType.CLEANUP_APP, new CleanUpAppTransition())
@@ -339,11 +376,19 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       // create the topology tables
       .installTopology();
 
-  protected final StateMachine<NodeState, RMNodeEventType,
+  private final StateMachine<NodeState, RMNodeEventType,
                              RMNodeEvent> stateMachine;
 
   public RMNodeImpl(NodeId nodeId, RMContext context, String hostName,
-      int cmPort, int httpPort, Node node, Resource capability, String nodeManagerVersion) {
+      int cmPort, int httpPort, Node node, Resource capability,
+      String nodeManagerVersion) {
+    this(nodeId, context, hostName, cmPort, httpPort, node, capability,
+        nodeManagerVersion, null);
+  }
+
+  public RMNodeImpl(NodeId nodeId, RMContext context, String hostName,
+      int cmPort, int httpPort, Node node, Resource capability,
+      String nodeManagerVersion, Resource physResource) {
     this.nodeId = nodeId;
     this.context = context;
     this.hostName = hostName;
@@ -357,6 +402,7 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     this.lastHealthReportTime = System.currentTimeMillis();
     this.nodeManagerVersion = nodeManagerVersion;
     this.timeStamp = 0;
+    this.physicalResource = physResource;
 
     this.latestNodeHeartBeatResponse.setResponseId(0);
 
@@ -517,6 +563,15 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   }
 
   @Override
+  public Resource getPhysicalResource() {
+    return this.physicalResource;
+  }
+
+  public void setPhysicalResource(Resource physicalResource) {
+    this.physicalResource = physicalResource;
+  }
+
+  @Override
   public NodeState getState() {
     this.readLock.lock();
 
@@ -561,16 +616,47 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     }
   };
 
+  @Override
+  public void setAndUpdateNodeHeartbeatResponse(
+      NodeHeartbeatResponse response) {
+    this.writeLock.lock();
+
+    try {
+      response.addAllContainersToCleanup(
+          new ArrayList<ContainerId>(this.containersToClean));
+      response.addAllApplicationsToCleanup(this.finishedApplications);
+      response.addContainersToBeRemovedFromNM(
+          new ArrayList<ContainerId>(this.containersToBeRemovedFromNM));
+      response.addAllContainersToSignal(this.containersToSignal);
+      this.completedContainers.removeAll(this.containersToBeRemovedFromNM);
+      this.containersToClean.clear();
+      this.finishedApplications.clear();
+      this.containersToSignal.clear();
+      this.containersToBeRemovedFromNM.clear();
+
+      response.addAllContainersToUpdate(toBeUpdatedContainers.values());
+      toBeUpdatedContainers.clear();
+
+      // NOTE: This is required for backward compatibility.
+      response.addAllContainersToDecrease(toBeDecreasedContainers.values());
+      toBeDecreasedContainers.clear();
+
+      // Synchronously update the last response in rmNode with updated
+      // responseId
+      this.latestNodeHeartBeatResponse = response;
+    } finally {
+      this.writeLock.unlock();
+    }
+  };
+
   @VisibleForTesting
-  public Collection<Container> getToBeDecreasedContainers() {
-    return toBeDecreasedContainers.values(); 
+  public Collection<Container> getToBeUpdatedContainers() {
+    return toBeUpdatedContainers.values();
   }
 
   @Override
   public NodeHeartbeatResponse getLastNodeHeartBeatResponse() {
-
     this.readLock.lock();
-
     try {
       return this.latestNodeHeartBeatResponse;
     } finally {
@@ -588,7 +674,30 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     }
   }
 
-  protected void updateMetricsForRejoinedNode(NodeState previousNodeState) {
+  public void handle(RMNodeEvent event) {
+    LOG.debug("Processing " + event.getNodeId() + " of type " + event.getType());
+    try {
+      writeLock.lock();
+      NodeState oldState = getState();
+      try {
+         stateMachine.doTransition(event.getType(), event);
+      } catch (InvalidStateTransitionException e) {
+        LOG.error("Can't handle this event at current state", e);
+        LOG.error("Invalid event " + event.getType() + 
+            " on Node  " + this.nodeId + " oldState " + oldState);
+      }
+      if (oldState != getState()) {
+        LOG.info(nodeId + " Node Transitioned from " + oldState + " to "
+                 + getState());
+      }
+    }
+    
+    finally {
+      writeLock.unlock();
+    }
+  }
+
+  private void updateMetricsForRejoinedNode(NodeState previousNodeState) {
     ClusterMetrics metrics = ClusterMetrics.getMetrics();
     metrics.incrNumActiveNodes();
 
@@ -607,6 +716,9 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       break;
     case SHUTDOWN:
       metrics.decrNumShutdownNMs();
+      break;
+    case DECOMMISSIONING:
+      metrics.decrDecommissioningNMs();
       break;
     default:
       LOG.debug("Unexpected previous node state");
@@ -628,7 +740,7 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       metrics.decrDecommissioningNMs();
       break;
     default :
-      LOG.warn("Unexpcted initial state");
+      LOG.warn("Unexpected initial state");
     }
 
     switch (finalState) {
@@ -643,7 +755,7 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     }
   }
 
-  protected void updateMetricsForDeactivatedNode(NodeState initialState,
+  private void updateMetricsForDeactivatedNode(NodeState initialState,
                                                NodeState finalState) {
     ClusterMetrics metrics = ClusterMetrics.getMetrics();
 
@@ -653,6 +765,9 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       break;
     case DECOMMISSIONING:
       metrics.decrDecommissioningNMs();
+      break;
+    case DECOMMISSIONED:
+      metrics.decrDecommisionedNMs();
       break;
     case UNHEALTHY:
       metrics.decrNumUnhealthyNMs();
@@ -683,9 +798,27 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       LOG.warn("Unexpected final state");
     }
   }
-  
-  abstract protected void handleRunningAppOnNode(RMNodeImpl rmNode,
-          RMContext context, ApplicationId appId, NodeId nodeId);
+
+  private static void handleRunningAppOnNode(RMNodeImpl rmNode,
+      RMContext context, ApplicationId appId, NodeId nodeId) {
+    RMApp app = context.getRMApps().get(appId);
+
+    // if we failed getting app by appId, maybe something wrong happened, just
+    // add the app to the finishedApplications list so that the app can be
+    // cleaned up on the NM
+    if (null == app) {
+      LOG.warn("Cannot get RMApp by appId=" + appId
+          + ", just added it to finishedApplications list for cleanup");
+      rmNode.finishedApplications.add(appId);
+      rmNode.runningApplications.remove(appId);
+      return;
+    }
+
+    // Add running applications back due to Node add or Node reconnection.
+    rmNode.runningApplications.add(appId);
+    context.getDispatcher().getEventHandler()
+        .handle(new RMAppRunningOnNodeEvent(appId, nodeId));
+  }
   
   private static void updateNodeResourceFromEvent(RMNodeImpl rmNode, 
      RMNodeResourceUpdateEvent event){
@@ -694,53 +827,71 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       rmNode.totalCapability = resourceOption.getResource();
   }
 
+  private static NodeHealthStatus updateRMNodeFromStatusEvents(
+      RMNodeImpl rmNode, RMNodeStatusEvent statusEvent) {
+    // Switch the last heartbeatresponse.
+    NodeHealthStatus remoteNodeHealthStatus = statusEvent.getNodeHealthStatus();
+    rmNode.setHealthReport(remoteNodeHealthStatus.getHealthReport());
+    rmNode.setLastHealthReportTime(remoteNodeHealthStatus
+        .getLastHealthReportTime());
+    rmNode.setAggregatedContainersUtilization(statusEvent
+        .getAggregatedContainersUtilization());
+    rmNode.setNodeUtilization(statusEvent.getNodeUtilization());
+    return remoteNodeHealthStatus;
+  }
+
   public static class AddNodeTransition implements
       SingleArcTransition<RMNodeImpl, RMNodeEvent> {
-  
+
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
-      rmNode.addNodeTransitionInternal(rmNode,event);
-    }
-  }
+      // Inform the scheduler
+      RMNodeStartedEvent startEvent = (RMNodeStartedEvent) event;
+      List<NMContainerStatus> containers = null;
 
-  protected abstract void addNodeTransitionInternal(RMNodeImpl rmNode, RMNodeEvent event);
-
-  protected static List<NMContainerStatus> updateNewNodeMetricsAndContainers(
-          RMNodeImpl rmNode, RMNodeStartedEvent startEvent) {
-    List<NMContainerStatus> containers;
-    ClusterMetrics.getMetrics().incrNumActiveNodes();
-    containers = startEvent.getNMContainerStatuses();
-    if (containers != null && !containers.isEmpty()) {
-      for (NMContainerStatus container : containers) {
-        if (container.getContainerState() == ContainerState.RUNNING) {
-          rmNode.launchedContainers.add(container.getContainerId());
+      NodeId nodeId = rmNode.nodeId;
+      RMNode previousRMNode =
+          rmNode.context.getInactiveRMNodes().remove(nodeId);
+      if (previousRMNode != null) {
+        rmNode.updateMetricsForRejoinedNode(previousRMNode.getState());
+      } else {
+        NodeId unknownNodeId =
+            NodesListManager.createUnknownNodeId(nodeId.getHost());
+        previousRMNode =
+            rmNode.context.getInactiveRMNodes().remove(unknownNodeId);
+        if (previousRMNode != null) {
+          ClusterMetrics.getMetrics().decrDecommisionedNMs();
+        }
+        // Increment activeNodes explicitly because this is a new node.
+        ClusterMetrics.getMetrics().incrNumActiveNodes();
+        containers = startEvent.getNMContainerStatuses();
+        if (containers != null && !containers.isEmpty()) {
+          for (NMContainerStatus container : containers) {
+            if (container.getContainerState() == ContainerState.RUNNING) {
+              rmNode.launchedContainers.add(container.getContainerId());
+            }
+          }
         }
       }
-    }
-    return containers;
-  }
-  
-  protected abstract NodeState reconnectNodeTransitionInternal(RMNodeImpl rmNode, RMNodeEvent event);
-  
-  protected void handleNMContainerStatus(
-          List<NMContainerStatus> nmContainerStatuses, RMNodeImpl rmnode) {
-    if (nmContainerStatuses != null) {
-      List<ContainerStatus> containerStatuses = new ArrayList<ContainerStatus>();
-      for (NMContainerStatus nmContainerStatus : nmContainerStatuses) {
-        containerStatuses.add(createContainerStatus(nmContainerStatus));
-      }
-      rmnode.handleContainerStatus(containerStatuses);
-    }
-  }
 
-  private ContainerStatus createContainerStatus(
-          NMContainerStatus remoteContainer) {
-    ContainerStatus cStatus = ContainerStatus.newInstance(remoteContainer.
-            getContainerId(),
-            remoteContainer.getContainerState(),
-            remoteContainer.getDiagnostics(),
-            remoteContainer.getContainerExitStatus());
-    return cStatus;
+      if (null != startEvent.getRunningApplications()) {
+        for (ApplicationId appId : startEvent.getRunningApplications()) {
+          handleRunningAppOnNode(rmNode, rmNode.context, appId, rmNode.nodeId);
+        }
+      }
+
+      rmNode.context.getDispatcher().getEventHandler()
+        .handle(new NodeAddedSchedulerEvent(rmNode, containers));
+      rmNode.context.getDispatcher().getEventHandler().handle(
+        new NodesListManagerEvent(
+            NodesListManagerEventType.NODE_USABLE, rmNode));
+      List<LogAggregationReport> logAggregationReportsForApps =
+          startEvent.getLogAggregationReportsForApps();
+      if (logAggregationReportsForApps != null
+          && !logAggregationReportsForApps.isEmpty()) {
+        rmNode.handleLogAggregationStatus(logAggregationReportsForApps);
+      }
+    }
   }
 
   public static class ReconnectNodeTransition implements
@@ -748,7 +899,89 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
     @Override
     public NodeState transition(RMNodeImpl rmNode, RMNodeEvent event) {
-      return rmNode.reconnectNodeTransitionInternal(rmNode, event);
+      RMNodeReconnectEvent reconnectEvent = (RMNodeReconnectEvent) event;
+      RMNode newNode = reconnectEvent.getReconnectedNode();
+      rmNode.nodeManagerVersion = newNode.getNodeManagerVersion();
+      List<ApplicationId> runningApps = reconnectEvent.getRunningApplications();
+      boolean noRunningApps = 
+          (runningApps == null) || (runningApps.size() == 0);
+      
+      // No application running on the node, so send node-removal event with 
+      // cleaning up old container info.
+      if (noRunningApps) {
+        if (rmNode.getState() == NodeState.DECOMMISSIONING) {
+          // When node in decommissioning, and no running apps on this node,
+          // it will return as decommissioned state.
+          deactivateNode(rmNode, NodeState.DECOMMISSIONED);
+          return NodeState.DECOMMISSIONED;
+        }
+        rmNode.nodeUpdateQueue.clear();
+        rmNode.context.getDispatcher().getEventHandler().handle(
+            new NodeRemovedSchedulerEvent(rmNode));
+
+        if (rmNode.getHttpPort() == newNode.getHttpPort()) {
+          if (!rmNode.getTotalCapability().equals(
+              newNode.getTotalCapability())) {
+            rmNode.totalCapability = newNode.getTotalCapability();
+          }
+          if (rmNode.getState().equals(NodeState.RUNNING)) {
+            // Only add old node if old state is RUNNING
+            rmNode.context.getDispatcher().getEventHandler().handle(
+                new NodeAddedSchedulerEvent(rmNode));
+          }
+        }
+
+      } else {
+        rmNode.httpPort = newNode.getHttpPort();
+        rmNode.httpAddress = newNode.getHttpAddress();
+        boolean isCapabilityChanged = false;
+        if (!rmNode.getTotalCapability().equals(
+            newNode.getTotalCapability())) {
+          rmNode.totalCapability = newNode.getTotalCapability();
+          isCapabilityChanged = true;
+        }
+      
+        handleNMContainerStatus(reconnectEvent.getNMContainerStatuses(), rmNode);
+
+        for (ApplicationId appId : reconnectEvent.getRunningApplications()) {
+          handleRunningAppOnNode(rmNode, rmNode.context, appId, rmNode.nodeId);
+        }
+
+        if (isCapabilityChanged
+            && rmNode.getState().equals(NodeState.RUNNING)) {
+          // Update scheduler node's capacity for reconnect node.
+          rmNode.context
+              .getDispatcher()
+              .getEventHandler()
+              .handle(
+                  new NodeResourceUpdateSchedulerEvent(rmNode, ResourceOption
+                      .newInstance(newNode.getTotalCapability(), -1)));
+        }
+
+      }
+      return rmNode.getState();
+    }
+
+    private void handleNMContainerStatus(
+        List<NMContainerStatus> nmContainerStatuses, RMNodeImpl rmnode) {
+      if (nmContainerStatuses != null) {
+        List<ContainerStatus> containerStatuses =
+            new ArrayList<ContainerStatus>();
+        for (NMContainerStatus nmContainerStatus : nmContainerStatuses) {
+          containerStatuses.add(createContainerStatus(nmContainerStatus));
+        }
+        rmnode.handleContainerStatus(containerStatuses);
+      }
+    }
+
+    private ContainerStatus createContainerStatus(
+        NMContainerStatus remoteContainer) {
+      ContainerStatus cStatus =
+          ContainerStatus.newInstance(remoteContainer.getContainerId(),
+              remoteContainer.getContainerState(),
+              remoteContainer.getDiagnostics(),
+              remoteContainer.getContainerExitStatus());
+      return cStatus;
     }
   }
   
@@ -811,29 +1044,27 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   }
   
   public static class CleanUpAppTransition
-          implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
+    implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
-      rmNode.cleanUpAppTransitionInternal(rmNode, event);
+      ApplicationId appId = ((RMNodeCleanAppEvent) event).getAppId();
+      rmNode.finishedApplications.add(appId);
+      rmNode.runningApplications.remove(appId);
+      rmNode.getAppX509ToUpdate().remove(appId);
     }
   }
-
-  abstract protected void cleanUpAppTransitionInternal(RMNodeImpl rmNode,
-          RMNodeEvent event);
 
   public static class CleanUpContainerTransition implements
-          SingleArcTransition<RMNodeImpl, RMNodeEvent> {
+      SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
-      rmNode.cleanUpContainerTransitionInternal(rmNode, event);
+      rmNode.containersToClean.add(((
+          RMNodeCleanContainerEvent) event).getContainerId());
     }
   }
 
-  abstract protected void cleanUpContainerTransitionInternal(RMNodeImpl rmNode,
-          RMNodeEvent event);
-    
   public static class AddContainersToBeRemovedFromNMTransition implements
       SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
@@ -843,20 +1074,28 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           RMNodeFinishedContainersPulledByAMEvent) event).getContainers());
     }
   }
-  
-  public static class DecreaseContainersTransition
+
+  /**
+   * Transition to Update a container.
+   */
+  public static class UpdateContainersTransition
       implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
  
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
-      RMNodeDecreaseContainerEvent de = (RMNodeDecreaseContainerEvent) event;
+      RMNodeUpdateContainerEvent de = (RMNodeUpdateContainerEvent) event;
 
-      rmNode.decreaseContainersInt(rmNode, de);
+      for (Map.Entry<Container, ContainerUpdateType> e :
+          de.getToBeUpdatedContainers().entrySet()) {
+        // NOTE: This is required for backward compatibility.
+        if (ContainerUpdateType.DECREASE_RESOURCE == e.getValue()) {
+          rmNode.toBeDecreasedContainers.put(e.getKey().getId(), e.getKey());
+        }
+        rmNode.toBeUpdatedContainers.put(e.getKey().getId(), e.getKey());
+      }
     }
   }
 
-  protected abstract void decreaseContainersInt(RMNodeImpl rmNode, RMNodeDecreaseContainerEvent de);
-  
   public static class DeactivateNodeTransition
     implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
@@ -867,114 +1106,253 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
-      rmNode.deactivateNode(rmNode, finalState);
+      RMNodeImpl.deactivateNode(rmNode, finalState);
     }
   }
 
-  abstract protected void deactivateNode(RMNodeImpl rmNode, final NodeState finalState);
-  
+  /**
+   * Put a node in deactivated (decommissioned or shutdown) status.
+   * @param rmNode
+   * @param finalState
+   */
+  public static void deactivateNode(RMNodeImpl rmNode, NodeState finalState) {
 
+    if (rmNode.getNodeID().getPort() == -1) {
+      rmNode.updateMetricsForDeactivatedNode(rmNode.getState(), finalState);
+      return;
+    }
+    reportNodeUnusable(rmNode, finalState);
+
+    // Deactivate the node
+    rmNode.context.getRMNodes().remove(rmNode.nodeId);
+    LOG.info("Deactivating Node " + rmNode.nodeId + " as it is now "
+        + finalState);
+    rmNode.context.getInactiveRMNodes().put(rmNode.nodeId, rmNode);
+    if (rmNode.context.getNodesListManager().isUntrackedNode(rmNode.hostName)) {
+      rmNode.setUntrackedTimeStamp(Time.monotonicNow());
+    }
+  }
+
+  /**
+   * Report node is UNUSABLE and update metrics.
+   * @param rmNode
+   * @param finalState
+   */
+  public static void reportNodeUnusable(RMNodeImpl rmNode,
+      NodeState finalState) {
+    // Inform the scheduler
+    rmNode.nodeUpdateQueue.clear();
+    // If the current state is NodeState.UNHEALTHY
+    // Then node is already been removed from the
+    // Scheduler
+    NodeState initialState = rmNode.getState();
+    if (!initialState.equals(NodeState.UNHEALTHY)) {
+      rmNode.context.getDispatcher().getEventHandler()
+        .handle(new NodeRemovedSchedulerEvent(rmNode));
+    }
+    rmNode.context.getDispatcher().getEventHandler().handle(
+        new NodesListManagerEvent(
+            NodesListManagerEventType.NODE_UNUSABLE, rmNode));
+
+    //Update the metrics
+    rmNode.updateMetricsForDeactivatedNode(initialState, finalState);
+  }
 
   /**
    * The transition to put node in decommissioning state.
    */
   public static class DecommissioningNodeTransition
-    implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
+      implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
+    private final NodeState initState;
+    private final NodeState finalState;
 
-  private final NodeState initState;
-  private final NodeState finalState;
+    public DecommissioningNodeTransition(NodeState initState,
+        NodeState finalState) {
+      this.initState = initState;
+      this.finalState = finalState;
+    }
 
-  public DecommissioningNodeTransition(NodeState initState,
-      NodeState finalState) {
-    this.initState = initState;
-    this.finalState = finalState;
-  }
-
-  @Override
-  public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
-    LOG.info("Put Node " + rmNode.nodeId + " in DECOMMISSIONING.");
-    // Update NM metrics during graceful decommissioning.
-    rmNode.updateMetricsForGracefulDecommission(initState, finalState);
-    if (rmNode.originalTotalCapability == null) {
-      rmNode.originalTotalCapability = Resources.clone(rmNode.totalCapability);
-      LOG.info("Preserve original total capability: "
-          + rmNode.originalTotalCapability);
+    @Override
+    public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
+      Integer timeout = null;
+      if (RMNodeDecommissioningEvent.class.isInstance(event)) {
+        RMNodeDecommissioningEvent e = ((RMNodeDecommissioningEvent) event);
+        timeout = e.getDecommissioningTimeout();
+      }
+      // Pick up possible updates on decommissioningTimeout.
+      if (rmNode.getState() == NodeState.DECOMMISSIONING) {
+        if (!Objects.equals(rmNode.getDecommissioningTimeout(), timeout)) {
+          LOG.info("Update " + rmNode.getNodeID() +
+                   " DecommissioningTimeout to be " + timeout);
+          rmNode.decommissioningTimeout = timeout;
+        } else {
+          LOG.info(rmNode.getNodeID() + " is already DECOMMISSIONING");
+        }
+        return;
+      }
+      LOG.info("Put Node " + rmNode.nodeId + " in DECOMMISSIONING.");
+      // Update NM metrics during graceful decommissioning.
+      rmNode.updateMetricsForGracefulDecommission(initState, finalState);
+      rmNode.decommissioningTimeout = timeout;
+      // Notify NodesListManager to notify all RMApp so that each
+      // Application Master could take any required actions.
+      rmNode.context.getDispatcher().getEventHandler().handle(
+          new NodesListManagerEvent(
+              NodesListManagerEventType.NODE_DECOMMISSIONING, rmNode));
+      if (rmNode.originalTotalCapability == null){
+        rmNode.originalTotalCapability =
+            Resources.clone(rmNode.totalCapability);
+        LOG.info("Preserve original total capability: "
+            + rmNode.originalTotalCapability);
+      }
     }
   }
-}
 
-public static class RecommissionNodeTransition
-    implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
+  public static class RecommissionNodeTransition
+      implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
-  private final NodeState finalState;
-
-  public RecommissionNodeTransition(NodeState finalState) {
-    this.finalState = finalState;
-  }
-
-  @Override
-  public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
-    // Restore the original total capability
-    if (rmNode.originalTotalCapability != null) {
-      rmNode.totalCapability = rmNode.originalTotalCapability;
-      rmNode.originalTotalCapability = null;
+    private final NodeState finalState;
+    public RecommissionNodeTransition(NodeState finalState) {
+      this.finalState = finalState;
     }
-    LOG.info("Node " + rmNode.nodeId + " in DECOMMISSIONING is " + "recommissioned back to RUNNING.");
-    rmNode
-        .updateMetricsForGracefulDecommission(rmNode.getState(), finalState);
-    //update the scheduler with the restored original total capability
-    rmNode.context
-        .getDispatcher()
-        .getEventHandler()
-        .handle(
-            new NodeResourceUpdateSchedulerEvent(rmNode, ResourceOption
-                .newInstance(rmNode.totalCapability, 0)));
+
+    @Override
+    public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
+      // Restore the original total capability
+      if (rmNode.originalTotalCapability != null) {
+        rmNode.totalCapability = rmNode.originalTotalCapability;
+        rmNode.originalTotalCapability = null;
+      }
+      LOG.info("Node " + rmNode.nodeId + " in DECOMMISSIONING is " +
+          "recommissioned back to RUNNING.");
+      rmNode
+          .updateMetricsForGracefulDecommission(rmNode.getState(), finalState);
+      //update the scheduler with the restored original total capability
+      rmNode.context
+          .getDispatcher()
+          .getEventHandler()
+          .handle(
+              new NodeResourceUpdateSchedulerEvent(rmNode, ResourceOption
+                  .newInstance(rmNode.totalCapability, 0)));
+    }
   }
-}
 
   /**
    * Status update transition when node is healthy.
    */
   public static class StatusUpdateWhenHealthyTransition implements
-          MultipleArcTransition<RMNodeImpl, RMNodeEvent, NodeState> {
-
+      MultipleArcTransition<RMNodeImpl, RMNodeEvent, NodeState> {
     @Override
     public NodeState transition(RMNodeImpl rmNode, RMNodeEvent event) {
-      return rmNode.statusUpdateWhenHealthyTransitionInternal(rmNode, event);
+
+      RMNodeStatusEvent statusEvent = (RMNodeStatusEvent) event;
+      rmNode.setOpportunisticContainersStatus(
+          statusEvent.getOpportunisticContainersStatus());
+      NodeHealthStatus remoteNodeHealthStatus = updateRMNodeFromStatusEvents(
+          rmNode, statusEvent);
+      NodeState initialState = rmNode.getState();
+      boolean isNodeDecommissioning =
+          initialState.equals(NodeState.DECOMMISSIONING);
+      if (isNodeDecommissioning) {
+        List<ApplicationId> keepAliveApps = statusEvent.getKeepAliveAppIds();
+        if (rmNode.runningApplications.isEmpty() &&
+            (keepAliveApps == null || keepAliveApps.isEmpty())) {
+          RMNodeImpl.deactivateNode(rmNode, NodeState.DECOMMISSIONED);
+          return NodeState.DECOMMISSIONED;
+        }
+      }
+
+      if (!remoteNodeHealthStatus.getIsNodeHealthy()) {
+        LOG.info("Node " + rmNode.nodeId +
+            " reported UNHEALTHY with details: " +
+            remoteNodeHealthStatus.getHealthReport());
+        // if a node in decommissioning receives an unhealthy report,
+        // it will stay in decommissioning.
+        if (isNodeDecommissioning) {
+          return NodeState.DECOMMISSIONING;
+        } else {
+          reportNodeUnusable(rmNode, NodeState.UNHEALTHY);
+          return NodeState.UNHEALTHY;
+        }
+      }
+
+      rmNode.handleContainerStatus(statusEvent.getContainers());
+      rmNode.handleReportedIncreasedContainers(
+          statusEvent.getNMReportedIncreasedContainers());
+
+      List<LogAggregationReport> logAggregationReportsForApps =
+          statusEvent.getLogAggregationReportsForApps();
+      if (logAggregationReportsForApps != null
+          && !logAggregationReportsForApps.isEmpty()) {
+        rmNode.handleLogAggregationStatus(logAggregationReportsForApps);
+      }
+
+      if(rmNode.nextHeartBeat) {
+        rmNode.nextHeartBeat = false;
+        rmNode.context.getDispatcher().getEventHandler().handle(
+            new NodeUpdateSchedulerEvent(rmNode));
+      }
+
+      // Update DTRenewer in secure mode to keep these apps alive. Today this is
+      // needed for log-aggregation to finish long after the apps are gone.
+      if (UserGroupInformation.isSecurityEnabled()) {
+        rmNode.context.getDelegationTokenRenewer().updateKeepAliveApplications(
+          statusEvent.getKeepAliveAppIds());
+      }
+
+      return initialState;
     }
   }
-
-  abstract protected NodeState statusUpdateWhenHealthyTransitionInternal(
-          RMNodeImpl rmNode, RMNodeEvent event);
 
   public static class StatusUpdateWhenUnHealthyTransition implements
       MultipleArcTransition<RMNodeImpl, RMNodeEvent, NodeState> {
 
     @Override
     public NodeState transition(RMNodeImpl rmNode, RMNodeEvent event) {
-      return rmNode.statusUpdateWhenUnHealthyTransitionInternal(rmNode, event);
+      RMNodeStatusEvent statusEvent = (RMNodeStatusEvent)event;
+
+      // Switch the last heartbeatresponse.
+      NodeHealthStatus remoteNodeHealthStatus = updateRMNodeFromStatusEvents(
+          rmNode, statusEvent);
+      if (remoteNodeHealthStatus.getIsNodeHealthy()) {
+        rmNode.context.getDispatcher().getEventHandler().handle(
+            new NodeAddedSchedulerEvent(rmNode));
+        rmNode.context.getDispatcher().getEventHandler().handle(
+                new NodesListManagerEvent(
+                    NodesListManagerEventType.NODE_USABLE, rmNode));
+        // ??? how about updating metrics before notifying to ensure that
+        // notifiers get update metadata because they will very likely query it
+        // upon notification
+        // Update metrics
+        rmNode.updateMetricsForRejoinedNode(NodeState.UNHEALTHY);
+        return NodeState.RUNNING;
+      }
+
+      return NodeState.UNHEALTHY;
     }
   }
-
-  protected abstract NodeState statusUpdateWhenUnHealthyTransitionInternal(RMNodeImpl rmNode, RMNodeEvent event);
 
   public static class SignalContainerTransition implements
       SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
-      rmNode.signalContainerInt(rmNode, event);
+      rmNode.containersToSignal.add(((
+          RMNodeSignalContainerEvent) event).getSignalRequest());
     }
   }
 
-  protected abstract void signalContainerInt(RMNodeImpl rmNode, RMNodeEvent event);
-  
   @Override
   public List<UpdatedContainerInfo> pullContainerUpdates() {
-    return this.pullContainerUpdatesInternal();
+    List<UpdatedContainerInfo> latestContainerInfoList = 
+        new ArrayList<UpdatedContainerInfo>();
+    UpdatedContainerInfo containerInfo;
+    while ((containerInfo = nodeUpdateQueue.poll()) != null) {
+      latestContainerInfoList.add(containerInfo);
+    }
+    this.nextHeartBeat = true;
+    return latestContainerInfoList;
   }
-  
-  protected abstract List<UpdatedContainerInfo> pullContainerUpdatesInternal();
 
   @VisibleForTesting
   public void setNextHeartBeat(boolean nextHeartBeat) {
@@ -992,6 +1370,11 @@ public static class RecommissionNodeTransition
     return this.launchedContainers;
   }
 
+  @VisibleForTesting
+  public Set<ContainerId> getCompletedContainers() {
+    return this.completedContainers;
+  }
+
   @Override
   public Set<String> getNodeLabels() {
     RMNodeLabelsManager nlm = context.getNodeLabelManager();
@@ -1001,7 +1384,7 @@ public static class RecommissionNodeTransition
     return nlm.getLabelsOnNode(nodeId);
   }
   
-  protected void handleReportedIncreasedContainers(
+  private void handleReportedIncreasedContainers(
       List<Container> reportedIncreasedContainers) {
     for (Container container : reportedIncreasedContainers) {
       ContainerId containerId = container.getId();
@@ -1029,9 +1412,83 @@ public static class RecommissionNodeTransition
     }
   }
 
-  abstract protected void handleContainerStatus(List<ContainerStatus> containerStatuses);
+  private void handleContainerStatus(List<ContainerStatus> containerStatuses) {
+    // Filter the map to only obtain just launched containers and finished
+    // containers.
+    List<ContainerStatus> newlyLaunchedContainers =
+        new ArrayList<ContainerStatus>();
+    List<ContainerStatus> newlyCompletedContainers =
+        new ArrayList<ContainerStatus>();
+    int numRemoteRunningContainers = 0;
+    for (ContainerStatus remoteContainer : containerStatuses) {
+      ContainerId containerId = remoteContainer.getContainerId();
 
-  protected List<ContainerStatus> findLostContainers(int numRemoteRunning,
+      // Don't bother with containers already scheduled for cleanup, or for
+      // applications already killed. The scheduler doens't need to know any
+      // more about this container
+      if (containersToClean.contains(containerId)) {
+        LOG.info("Container " + containerId + " already scheduled for "
+            + "cleanup, no further processing");
+        continue;
+      }
+
+      ApplicationId containerAppId =
+          containerId.getApplicationAttemptId().getApplicationId();
+
+      if (finishedApplications.contains(containerAppId)) {
+        LOG.info("Container " + containerId
+            + " belongs to an application that is already killed,"
+            + " no further processing");
+        continue;
+      } else if (!runningApplications.contains(containerAppId)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Container " + containerId
+              + " is the first container get launched for application "
+              + containerAppId);
+        }
+        handleRunningAppOnNode(this, context, containerAppId, nodeId);
+      }
+
+      // Process running containers
+      if (remoteContainer.getState() == ContainerState.RUNNING) {
+        ++numRemoteRunningContainers;
+        if (!launchedContainers.contains(containerId)) {
+          // Just launched container. RM knows about it the first time.
+          launchedContainers.add(containerId);
+          newlyLaunchedContainers.add(remoteContainer);
+          // Unregister from containerAllocationExpirer.
+          containerAllocationExpirer
+              .unregister(new AllocationExpirationInfo(containerId));
+        }
+      } else {
+        // A finished container
+        launchedContainers.remove(containerId);
+        if (completedContainers.add(containerId)) {
+          newlyCompletedContainers.add(remoteContainer);
+        }
+        // Unregister from containerAllocationExpirer.
+        containerAllocationExpirer
+            .unregister(new AllocationExpirationInfo(containerId));
+      }
+    }
+
+    List<ContainerStatus> lostContainers =
+        findLostContainers(numRemoteRunningContainers, containerStatuses);
+    for (ContainerStatus remoteContainer : lostContainers) {
+      ContainerId containerId = remoteContainer.getContainerId();
+      if (completedContainers.add(containerId)) {
+        newlyCompletedContainers.add(remoteContainer);
+      }
+    }
+
+    if (newlyLaunchedContainers.size() != 0
+        || newlyCompletedContainers.size() != 0) {
+      nodeUpdateQueue.add(new UpdatedContainerInfo(newlyLaunchedContainers,
+          newlyCompletedContainers));
+    }
+  }
+
+  private List<ContainerStatus> findLostContainers(int numRemoteRunning,
       List<ContainerStatus> containerStatuses) {
     if (numRemoteRunning >= launchedContainers.size()) {
       return Collections.emptyList();
@@ -1041,7 +1498,8 @@ public static class RecommissionNodeTransition
     List<ContainerStatus> lostContainers = new ArrayList<ContainerStatus>(
         launchedContainers.size() - numRemoteRunning);
     for (ContainerStatus remoteContainer : containerStatuses) {
-      if (remoteContainer.getState() == ContainerState.RUNNING) {
+      if (remoteContainer.getState() == ContainerState.RUNNING
+          && remoteContainer.getExecutionType() == ExecutionType.GUARANTEED) {
         nodeContainers.add(remoteContainer.getContainerId());
       }
     }
@@ -1060,7 +1518,7 @@ public static class RecommissionNodeTransition
     return lostContainers;
   }
 
-  protected void handleLogAggregationStatus(
+  private void handleLogAggregationStatus(
       List<LogAggregationReport> logAggregationReportsForApps) {
     for (LogAggregationReport report : logAggregationReportsForApps) {
       RMApp rmApp = this.context.getRMApps().get(report.getApplicationId());
@@ -1076,7 +1534,7 @@ public static class RecommissionNodeTransition
       writeLock.lock();
 
       if (nmReportedIncreasedContainers.isEmpty()) {
-        return Collections.EMPTY_LIST;
+        return Collections.emptyList();
       } else {
         List<Container> container =
             new ArrayList<Container>(nmReportedIncreasedContainers.values());
@@ -1093,6 +1551,27 @@ public static class RecommissionNodeTransition
     return this.originalTotalCapability;
   }
 
+  public OpportunisticContainersStatus getOpportunisticContainersStatus() {
+    this.readLock.lock();
+
+    try {
+      return this.opportunisticContainersStatus;
+    } finally {
+      this.readLock.unlock();
+    }
+  }
+
+  public void setOpportunisticContainersStatus(
+      OpportunisticContainersStatus opportunisticContainersStatus) {
+    this.writeLock.lock();
+
+    try {
+      this.opportunisticContainersStatus = opportunisticContainersStatus;
+    } finally {
+      this.writeLock.unlock();
+    }
+  }
+
   @Override
   public long getUntrackedTimeStamp() {
     return this.timeStamp;
@@ -1102,9 +1581,29 @@ public static class RecommissionNodeTransition
   public void setUntrackedTimeStamp(long ts) {
     this.timeStamp = ts;
   }
-  
-  public boolean getNextHeartbeat(){
-    return nextHeartBeat;
+
+  @Override
+  public Integer getDecommissioningTimeout() {
+    return decommissioningTimeout;
+  }
+
+  @Override
+  public Map<String, Long> getAllocationTagsWithCount() {
+    return context.getAllocationTagsManager()
+        .getAllocationTagsWithCount(getNodeID());
+  }
+
+  @Override
+  public RMContext getRMContext() {
+    return this.context;
+  }
+
+  @Override
+  public Set<NodeAttribute> getAllNodeAttributes() {
+    NodeAttributesManager attrMgr = context.getNodeAttributesManager();
+    Map<NodeAttribute, AttributeValue> nodeattrs =
+        attrMgr.getAttributesForNode(hostName);
+    return nodeattrs.keySet();
   }
   
   @Override

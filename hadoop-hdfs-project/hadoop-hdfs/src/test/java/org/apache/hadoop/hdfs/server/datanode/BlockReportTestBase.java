@@ -22,8 +22,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
@@ -74,6 +72,8 @@ import org.junit.Assert;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This is the base class for simulating a variety of situations
@@ -85,7 +85,8 @@ import static org.junit.Assert.fail;
  * and messages.
  */
 public abstract class BlockReportTestBase  {
-  public static final Log LOG = LogFactory.getLog(BlockReportTestBase.class);
+  public static final Logger LOG =
+    LoggerFactory.getLogger(BlockReportTestBase.class);
 
   private static short REPL_FACTOR = 1;
   private static final int RAND_LIMIT = 2000;

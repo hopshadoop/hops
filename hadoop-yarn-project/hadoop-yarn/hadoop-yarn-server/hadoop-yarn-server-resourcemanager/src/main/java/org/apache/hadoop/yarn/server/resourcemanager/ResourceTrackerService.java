@@ -17,14 +17,25 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import com.google.common.annotations.VisibleForTesting;
-import io.hops.metadata.yarn.entity.Load;
-import io.hops.util.DBUtility;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+
+import com.google.common.collect.ImmutableMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.Node;
@@ -41,6 +52,7 @@ import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.NodeAttribute;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
@@ -55,7 +67,7 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequ
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerResponse;
-import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
+import org.apache.hadoop.yarn.server.api.records.AppCollectorData;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
@@ -69,11 +81,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplDist;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplNotDist;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeReconnectEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStartedEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStatusEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.authorize.RMPolicyProvider;
@@ -81,21 +92,12 @@ import org.apache.hadoop.yarn.server.utils.YarnServerBuilderUtils;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
+import com.google.common.annotations.VisibleForTesting;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.yarn.server.api.protocolrecords.UpdatedCryptoForApp;
 
 public class ResourceTrackerService extends AbstractService implements
     ResourceTracker {
@@ -121,13 +123,14 @@ public class ResourceTrackerService extends AbstractService implements
 
   private int minAllocMb;
   private int minAllocVcores;
-  private int minAllocGPUs;
+
+  private DecommissioningNodesWatcher decommissioningWatcher;
 
   private boolean isDistributedNodeLabelsConf;
   private boolean isDelegatedCentralizedNodeLabelsConf;
   private DynamicResourceConfiguration drConf;
-  private AtomicInteger load = new AtomicInteger(0);
-  
+
+  private final AtomicLong timelineCollectorVersion = new AtomicLong(0);
 
   public ResourceTrackerService(RMContext rmContext,
       NodesListManager nodesListManager,
@@ -143,6 +146,7 @@ public class ResourceTrackerService extends AbstractService implements
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     this.readLock = lock.readLock();
     this.writeLock = lock.writeLock();
+    this.decommissioningWatcher = new DecommissioningNodesWatcher(rmContext);
   }
 
   @Override
@@ -169,9 +173,6 @@ public class ResourceTrackerService extends AbstractService implements
     minAllocVcores = conf.getInt(
         YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES,
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
-    minAllocGPUs = conf.getInt(
-        YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS,
-        YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_GPUS);
 
     minimumNodeManagerVersion = conf.get(
         YarnConfiguration.RM_NODEMANAGER_MINIMUM_VERSION,
@@ -185,6 +186,7 @@ public class ResourceTrackerService extends AbstractService implements
     }
 
     loadDynamicResourceConfiguration(conf);
+    decommissioningWatcher.init(conf);
     super.serviceInit(conf);
   }
 
@@ -298,6 +300,11 @@ public class ResourceTrackerService extends AbstractService implements
     }
 
     RMAppAttempt rmAppAttempt = rmApp.getRMAppAttempt(appAttemptId);
+    if (rmAppAttempt == null) {
+      LOG.info("Ignoring not found attempt " + appAttemptId);
+      return;
+    }
+
     Container masterContainer = rmAppAttempt.getMasterContainer();
     if (masterContainer.getId().equals(containerStatus.getContainerId())
         && containerStatus.getContainerState() == ContainerState.COMPLETE) {
@@ -318,13 +325,13 @@ public class ResourceTrackerService extends AbstractService implements
   public RegisterNodeManagerResponse registerNodeManager(
       RegisterNodeManagerRequest request) throws YarnException,
       IOException {
-    LOG.info("receive registration request");
     NodeId nodeId = request.getNodeId();
     String host = nodeId.getHost();
     int cmPort = nodeId.getPort();
     int httpPort = request.getHttpPort();
     Resource capability = request.getResource();
     String nodeManagerVersion = request.getNMVersion();
+    Resource physicalResource = request.getPhysicalResource();
 
     RegisterNodeManagerResponse response = recordFactory
         .newRecordInstance(RegisterNodeManagerResponse.class);
@@ -377,12 +384,12 @@ public class ResourceTrackerService extends AbstractService implements
 
     // Check if this node has minimum allocations
     if (capability.getMemorySize() < minAllocMb
-        || capability.getVirtualCores() < minAllocVcores
-        || capability.getGPUs() < minAllocGPUs) {
-      String message =
-          "NodeManager from  " + host
-              + " doesn't satisfy minimum allocations, Sending SHUTDOWN"
-              + " signal to the NodeManager.";
+        || capability.getVirtualCores() < minAllocVcores) {
+      String message = "NodeManager from  " + host
+          + " doesn't satisfy minimum allocations, Sending SHUTDOWN"
+          + " signal to the NodeManager. Node capabilities are " + capability
+          + "; minimums are " + minAllocMb + "mb and " + minAllocVcores
+          + " vcores";
       LOG.info(message);
       response.setDiagnosticsMessage(message);
       response.setNodeAction(NodeAction.SHUTDOWN);
@@ -394,49 +401,70 @@ public class ResourceTrackerService extends AbstractService implements
     response.setNMTokenMasterKey(nmTokenSecretManager
         .getCurrentKey());
 
-    //TODO get the class to use from the config file
-    RMNode rmNode;
-    if (!rmContext.isDistributed()) {
-      rmNode = new RMNodeImplNotDist(nodeId, rmContext, host, cmPort, httpPort,
-              resolve(host), capability, nodeManagerVersion);
-    } else {
-      rmNode = new RMNodeImplDist(nodeId, rmContext, host, cmPort, httpPort,
-              resolve(host), capability, nodeManagerVersion);
-    }
+    RMNode rmNode = new RMNodeImpl(nodeId, rmContext, host, cmPort, httpPort,
+        resolve(host), capability, nodeManagerVersion, physicalResource);
+
     RMNode oldNode = this.rmContext.getRMNodes().putIfAbsent(nodeId, rmNode);
     Map<ApplicationId, UpdatedCryptoForApp> runningsAppsWithCryptoVersion = request.getRunningApplications();
     List<ApplicationId> runningApplications = new ArrayList<>(runningsAppsWithCryptoVersion.size());
     runningApplications.addAll(runningsAppsWithCryptoVersion.keySet());
     if (oldNode == null) {
+      RMNodeStartedEvent startEvent = new RMNodeStartedEvent(nodeId,
+          request.getNMContainerStatuses(),
+          runningApplications);
+      if (request.getLogAggregationReportsForApps() != null
+          && !request.getLogAggregationReportsForApps().isEmpty()) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Found the number of previous cached log aggregation "
+              + "status from nodemanager:" + nodeId + " is :"
+              + request.getLogAggregationReportsForApps().size());
+        }
+        startEvent.setLogAggregationReportsForApps(request
+            .getLogAggregationReportsForApps());
+      }
       this.rmContext.getDispatcher().getEventHandler().handle(
-              new RMNodeStartedEvent(nodeId, request.getNMContainerStatuses(), runningApplications));
+          startEvent);
       pushCryptoUpdatedEventsForRunningApps(runningsAppsWithCryptoVersion, rmNode);
     } else {
       LOG.info("Reconnect from the node at: " + host);
       this.nmLivelinessMonitor.unregister(nodeId);
-      if (this.rmContext.isDistributed()) {
-        load.decrementAndGet();
-        DBUtility.updateLoad(new Load(rmContext.getGroupMembershipService().
-                getRMId(), load.get()));
+
+      if ((request.getRunningApplications()==null || request.getRunningApplications().isEmpty())
+          && rmNode.getState() != NodeState.DECOMMISSIONING
+          && rmNode.getHttpPort() != oldNode.getHttpPort()) {
+        // Reconnected node differs, so replace old node and start new node
+        switch (rmNode.getState()) {
+        case RUNNING:
+          ClusterMetrics.getMetrics().decrNumActiveNodes();
+          break;
+        case UNHEALTHY:
+          ClusterMetrics.getMetrics().decrNumUnhealthyNMs();
+          break;
+        default:
+          LOG.debug("Unexpected Rmnode state");
+        }
+        this.rmContext.getDispatcher().getEventHandler()
+            .handle(new NodeRemovedSchedulerEvent(rmNode));
+
+        this.rmContext.getRMNodes().put(nodeId, rmNode);
+        this.rmContext.getDispatcher().getEventHandler()
+            .handle(new RMNodeStartedEvent(nodeId, null, null));
+      } else {
+        // Reset heartbeat ID since node just restarted.
+        oldNode.resetLastNodeHeartBeatResponse();
+
+        this.rmContext.getDispatcher().getEventHandler()
+            .handle(new RMNodeReconnectEvent(nodeId, rmNode,
+                runningApplications,
+                request.getNMContainerStatuses()));
+        pushCryptoUpdatedEventsForRunningApps(runningsAppsWithCryptoVersion, oldNode);
       }
-      // Reset heartbeat ID since node just restarted.
-      oldNode.resetLastNodeHeartBeatResponse();
-      this.rmContext
-          .getDispatcher()
-          .getEventHandler()
-          .handle(
-              new RMNodeReconnectEvent(nodeId, rmNode, runningApplications, request.getNMContainerStatuses()));
-      pushCryptoUpdatedEventsForRunningApps(runningsAppsWithCryptoVersion, oldNode);
     }
     // On every node manager register we will be clearing NMToken keys if
     // present for any running application.
     this.nmTokenSecretManager.removeNodeKey(nodeId);
     this.nmLivelinessMonitor.register(nodeId);
-    if (this.rmContext.isDistributed()) {
-      load.incrementAndGet();
-      DBUtility.updateLoad(new Load(rmContext.getGroupMembershipService().
-              getRMId(), load.get()));
-    }
+    
     // Handle received container status, this should be processed after new
     // RMNode inserted
     if (!rmContext.isWorkPreservingRecoveryEnabled()) {
@@ -482,7 +510,7 @@ public class ResourceTrackerService extends AbstractService implements
     response.setRMVersion(YarnVersionInfo.getVersion());
     return response;
   }
-  
+
   private void pushCryptoUpdatedEventsForRunningApps(Map<ApplicationId, UpdatedCryptoForApp> runningApps, RMNode rmNode) {
     if (!isHopsTLSEnabled() && !isJWTEnabled()) {
       return;
@@ -537,7 +565,6 @@ public class ResourceTrackerService extends AbstractService implements
      * 4. Send healthStatus to RMNode
      * 5. Update node's labels if distributed Node Labels configuration is enabled
      */
-
     NodeId nodeId = remoteNodeStatus.getNodeId();
 
     // 1. Check if it's a valid (i.e. not excluded) node, if not, see if it is
@@ -564,7 +591,8 @@ public class ResourceTrackerService extends AbstractService implements
 
     // Send ping
     this.nmLivelinessMonitor.receivedPing(nodeId);
-    
+    this.decommissioningWatcher.update(rmNode, remoteNodeStatus);
+
     if (isHopsTLSEnabled()) {
       Set<ApplicationId> updatedApps = request.getUpdatedApplicationsWithNewCryptoMaterial();
       if (updatedApps != null) {
@@ -578,12 +606,13 @@ public class ResourceTrackerService extends AbstractService implements
 
     // 3. Check if it's a 'fresh' heartbeat i.e. not duplicate heartbeat
     NodeHeartbeatResponse lastNodeHeartbeatResponse = rmNode.getLastNodeHeartBeatResponse();
-    if (remoteNodeStatus.getResponseId() + 1 == lastNodeHeartbeatResponse
-        .getResponseId()) {
+    if (getNextResponseId(
+        remoteNodeStatus.getResponseId()) == lastNodeHeartbeatResponse
+            .getResponseId()) {
       LOG.info("Received duplicate heartbeat from node "
           + rmNode.getNodeAddress()+ " responseId=" + remoteNodeStatus.getResponseId());
       return lastNodeHeartbeatResponse;
-    } else if (remoteNodeStatus.getResponseId() + 1 < lastNodeHeartbeatResponse
+    } else if (remoteNodeStatus.getResponseId() != lastNodeHeartbeatResponse
         .getResponseId()) {
       String message =
           "Too far behind rm response id:"
@@ -597,32 +626,55 @@ public class ResourceTrackerService extends AbstractService implements
           message);
     }
 
+    // Evaluate whether a DECOMMISSIONING node is ready to be DECOMMISSIONED.
+    if (rmNode.getState() == NodeState.DECOMMISSIONING &&
+        decommissioningWatcher.checkReadyToBeDecommissioned(
+            rmNode.getNodeID())) {
+      String message = "DECOMMISSIONING " + nodeId +
+          " is ready to be decommissioned";
+      LOG.info(message);
+      this.rmContext.getDispatcher().getEventHandler().handle(
+          new RMNodeEvent(nodeId, RMNodeEventType.DECOMMISSION));
+      this.nmLivelinessMonitor.unregister(nodeId);
+      return YarnServerBuilderUtils.newNodeHeartbeatResponse(
+          NodeAction.SHUTDOWN, message);
+    }
+
+    boolean timelineV2Enabled =
+        YarnConfiguration.timelineServiceV2Enabled(getConfig());
+    if (timelineV2Enabled) {
+      // Check & update collectors info from request.
+      updateAppCollectorsMap(request);
+    }
+
     // Heartbeat response
-    NodeHeartbeatResponse nodeHeartBeatResponse = YarnServerBuilderUtils
-        .newNodeHeartbeatResponse(lastNodeHeartbeatResponse.
-            getResponseId() + 1, NodeAction.NORMAL, null, null, null, null,
-            nextHeartBeatInterval);
-    rmNode.updateNodeHeartbeatResponseForCleanup(nodeHeartBeatResponse);
-    rmNode.updateNodeHeartbeatResponseForContainersDecreasing(
-        nodeHeartBeatResponse);
+    NodeHeartbeatResponse nodeHeartBeatResponse =
+        YarnServerBuilderUtils.newNodeHeartbeatResponse(
+            getNextResponseId(lastNodeHeartbeatResponse.getResponseId()),
+            NodeAction.NORMAL, null, null, null, null, nextHeartBeatInterval);
+    rmNode.setAndUpdateNodeHeartbeatResponse(nodeHeartBeatResponse);
 
     populateKeys(request, nodeHeartBeatResponse);
     if (isHopsTLSEnabled() || isJWTEnabled()) {
       Map<ApplicationId, UpdatedCryptoForApp> mergedUpdates = mergeNewSecurityMaterialForApps(rmNode);
       nodeHeartBeatResponse.setUpdatedCryptoForApps(mergedUpdates);
     }
-    
+
     ConcurrentMap<ApplicationId, ByteBuffer> systemCredentials =
         rmContext.getSystemCredentialsForApps();
     if (!systemCredentials.isEmpty()) {
       nodeHeartBeatResponse.setSystemCredentialsForApps(systemCredentials);
     }
 
-    nodeHeartBeatResponse.setNextheartbeat(((RMNodeImpl) rmNode).
-            getNextHeartbeat());
+    if (timelineV2Enabled) {
+      // Return collectors' map that NM needs to know
+      setAppCollectorsMapToResponse(rmNode.getRunningApps(),
+          nodeHeartBeatResponse);
+    }
+
     // 4. Send status to RMNode, saving the latest response.
     RMNodeStatusEvent nodeStatusEvent =
-        new RMNodeStatusEvent(nodeId, remoteNodeStatus, nodeHeartBeatResponse);
+        new RMNodeStatusEvent(nodeId, remoteNodeStatus);
     if (request.getLogAggregationReportsForApps() != null
         && !request.getLogAggregationReportsForApps().isEmpty()) {
       nodeStatusEvent.setLogAggregationReportsForApps(request
@@ -653,9 +705,118 @@ public class ResourceTrackerService extends AbstractService implements
       nodeHeartBeatResponse.setResource(capability);
     }
 
+    // 7. Send Container Queuing Limits back to the Node. This will be used by
+    // the node to truncate the number of Containers queued for execution.
+    if (this.rmContext.getNodeManagerQueueLimitCalculator() != null) {
+      nodeHeartBeatResponse.setContainerQueuingLimit(
+          this.rmContext.getNodeManagerQueueLimitCalculator()
+              .createContainerQueuingLimit());
+    }
+
+    // 8. Get node's attributes and update node-to-attributes mapping
+    // in RMNodeAttributeManager.
+    Set<NodeAttribute> nodeAttributes = request.getNodeAttributes();
+    if (nodeAttributes != null && !nodeAttributes.isEmpty()) {
+      nodeAttributes.forEach(nodeAttribute ->
+          LOG.debug(nodeId.toString() + " ATTRIBUTE : "
+              + nodeAttribute.toString()));
+
+      // Validate attributes
+      if (!nodeAttributes.stream().allMatch(
+          nodeAttribute -> NodeAttribute.PREFIX_DISTRIBUTED
+              .equals(nodeAttribute.getAttributeKey().getAttributePrefix()))) {
+        // All attributes must be in same prefix: nm.yarn.io.
+        // Since we have the checks in NM to make sure attributes reported
+        // in HB are with correct prefix, so it should not reach here.
+        LOG.warn("Reject invalid node attributes from host: "
+            + nodeId.toString() + ", attributes in HB must have prefix "
+            + NodeAttribute.PREFIX_DISTRIBUTED);
+      } else {
+        // Replace all distributed node attributes associated with this host
+        // with the new reported attributes in node attribute manager.
+        this.rmContext.getNodeAttributesManager()
+            .replaceNodeAttributes(NodeAttribute.PREFIX_DISTRIBUTED,
+                ImmutableMap.of(nodeId.getHost(), nodeAttributes));
+      }
+    }
+
     return nodeHeartBeatResponse;
   }
-  
+
+  private int getNextResponseId(int responseId) {
+    // Loop between 0 and Integer.MAX_VALUE
+    return (responseId + 1) & Integer.MAX_VALUE;
+  }
+
+  private void setAppCollectorsMapToResponse(
+      List<ApplicationId> runningApps, NodeHeartbeatResponse response) {
+    Map<ApplicationId, AppCollectorData> liveAppCollectorsMap = new
+        HashMap<>();
+    Map<ApplicationId, RMApp> rmApps = rmContext.getRMApps();
+    // Set collectors for all running apps on this node.
+    for (ApplicationId appId : runningApps) {
+      RMApp app = rmApps.get(appId);
+      if (app != null) {
+        AppCollectorData appCollectorData = rmApps.get(appId)
+            .getCollectorData();
+        if (appCollectorData != null) {
+          liveAppCollectorsMap.put(appId, appCollectorData);
+        } else {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Collector for applicaton: " + appId +
+                " hasn't registered yet!");
+          }
+        }
+      }
+    }
+    response.setAppCollectors(liveAppCollectorsMap);
+  }
+
+  private void updateAppCollectorsMap(NodeHeartbeatRequest request) {
+    Map<ApplicationId, AppCollectorData> registeringCollectorsMap =
+        request.getRegisteringCollectors();
+    if (registeringCollectorsMap != null
+        && !registeringCollectorsMap.isEmpty()) {
+      Map<ApplicationId, RMApp> rmApps = rmContext.getRMApps();
+      for (Map.Entry<ApplicationId, AppCollectorData> entry:
+          registeringCollectorsMap.entrySet()) {
+        ApplicationId appId = entry.getKey();
+        AppCollectorData collectorData = entry.getValue();
+        if (collectorData != null) {
+          if (!collectorData.isStamped()) {
+            // Stamp the collector if we have not done so
+            collectorData.setRMIdentifier(
+                ResourceManager.getClusterTimeStamp());
+            collectorData.setVersion(
+                timelineCollectorVersion.getAndIncrement());
+          }
+          RMApp rmApp = rmApps.get(appId);
+          if (rmApp == null) {
+            LOG.warn("Cannot update collector info because application ID: " +
+                appId + " is not found in RMContext!");
+          } else {
+            synchronized (rmApp) {
+              AppCollectorData previousCollectorData = rmApp.getCollectorData();
+              if (AppCollectorData.happensBefore(previousCollectorData,
+                  collectorData)) {
+                // Sending collector update event.
+                // Note: RM has to store the newly received collector data
+                // synchronously. Otherwise, the RM may send out stale collector
+                // data before this update is done, and the RM then crashes, the
+                // newly updated collector data will get lost.
+                LOG.info("Update collector information for application " + appId
+                    + " with new address: " + collectorData.getCollectorAddr()
+                    + " timestamp: " + collectorData.getRMIdentifier()
+                    + ", " + collectorData.getVersion());
+                ((RMAppImpl) rmApp).setCollectorData(collectorData);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   // TODO(Antonis): Replace with Stream.concat when we upgrade to Java 8 (HADOOP-11858)
   @InterfaceAudience.Private
   @VisibleForTesting

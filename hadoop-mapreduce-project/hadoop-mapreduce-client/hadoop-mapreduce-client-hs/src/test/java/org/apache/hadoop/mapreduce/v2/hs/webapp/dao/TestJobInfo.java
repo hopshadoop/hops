@@ -22,6 +22,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 
 import org.junit.Assert;
@@ -67,6 +70,7 @@ public class TestJobInfo {
 
     HistoryFileInfo info = mock(HistoryFileInfo.class);
     when(info.getConfFile()).thenReturn(fullConfPath);
+    when(info.getHistoryFile()).thenReturn(fulleHistoryPath);
 
     JobId jobId = MRBuilderUtils.newJobId(1329348432655l, 1, 1);
     CompletedJob completedJob =
@@ -135,5 +139,53 @@ public class TestJobInfo {
     JobInfo jobInfo = new JobInfo(job);
   
     Assert.assertEquals(11L, jobInfo.getAvgReduceTime().longValue());
-  }  
+  }
+
+  @Test
+  public void testGetStartTimeStr() {
+    JobReport jobReport = mock(JobReport.class);
+    when(jobReport.getStartTime()).thenReturn(-1L);
+
+    Job job = mock(Job.class);
+    when(job.getReport()).thenReturn(jobReport);
+    when(job.getName()).thenReturn("TestJobInfo");
+    when(job.getState()).thenReturn(JobState.SUCCEEDED);
+
+    JobId  jobId = MRBuilderUtils.newJobId(1L, 1, 1);
+    when(job.getID()).thenReturn(jobId);
+
+    JobInfo jobInfo = new JobInfo(job);
+    Assert.assertEquals(JobInfo.NA, jobInfo.getStartTimeStr());
+
+    Date date = new Date();
+    when(jobReport.getStartTime()).thenReturn(date.getTime());
+
+    jobInfo = new JobInfo(job);
+    Assert.assertEquals(date.toString(), jobInfo.getStartTimeStr());
+  }
+
+  @Test
+  public void testGetFormattedStartTimeStr() {
+    JobReport jobReport = mock(JobReport.class);
+    when(jobReport.getStartTime()).thenReturn(-1L);
+
+    Job job = mock(Job.class);
+    when(job.getReport()).thenReturn(jobReport);
+    when(job.getName()).thenReturn("TestJobInfo");
+    when(job.getState()).thenReturn(JobState.SUCCEEDED);
+
+    JobId jobId = MRBuilderUtils.newJobId(1L, 1, 1);
+    when(job.getID()).thenReturn(jobId);
+    DateFormat dateFormat = new SimpleDateFormat();
+
+    JobInfo jobInfo = new JobInfo(job);
+    Assert.assertEquals(
+        JobInfo.NA, jobInfo.getFormattedStartTimeStr(dateFormat));
+
+    Date date = new Date();
+    when(jobReport.getStartTime()).thenReturn(date.getTime());
+    jobInfo = new JobInfo(job);
+    Assert.assertEquals(
+        dateFormat.format(date), jobInfo.getFormattedStartTimeStr(dateFormat));
+  }
 }

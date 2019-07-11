@@ -38,7 +38,6 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.PlanningException;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.planning.ReservationAgent;
-import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
@@ -51,7 +50,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairSchedule
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairSchedulerTestBase;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.util.Clock;
-import org.junit.*;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TestName;
 import org.mockito.Matchers;
 import org.mockito.Mockito;
@@ -113,7 +116,6 @@ public class TestFairSchedulerPlanFollower extends
     policy.init(reservationQ, allocConf);
   }
 
-  @Ignore
   @Test
   public void testWithMoveOnExpiry() throws PlanningException,
       InterruptedException, AccessControlException {
@@ -121,7 +123,6 @@ public class TestFairSchedulerPlanFollower extends
     testPlanFollower(true);
   }
 
-  @Ignore
   @Test
   public void testWithKillOnExpiry() throws PlanningException,
       InterruptedException, AccessControlException {
@@ -130,8 +131,12 @@ public class TestFairSchedulerPlanFollower extends
   }
 
   @Override
+  protected void checkDefaultQueueBeforePlanFollowerRun() {
+    Assert.assertNull(getDefaultQueue());
+  }
+  @Override
   protected void verifyCapacity(Queue defQ) {
-    assertTrue(((FSQueue) defQ).getWeights().getWeight(ResourceType.MEMORY) > 0.9);
+    assertTrue(((FSQueue) defQ).getWeight() > 0.9);
   }
 
   @Override
@@ -167,8 +172,7 @@ public class TestFairSchedulerPlanFollower extends
             false);
     assertNotNull(q);
     // For now we are setting both to same weight
-    Assert.assertEquals(expectedCapacity,
-        q.getWeights().getWeight(ResourceType.MEMORY), 0.01);
+    Assert.assertEquals(expectedCapacity, q.getWeight(), 0.01);
   }
 
   @Override

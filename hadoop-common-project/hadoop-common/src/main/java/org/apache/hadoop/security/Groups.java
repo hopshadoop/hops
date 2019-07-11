@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import io.hops.security.HopsGroupsWithFallBack;
 import org.apache.htrace.core.TraceScope;
 import org.apache.htrace.core.Tracer;
 import com.google.common.annotations.VisibleForTesting;
@@ -50,6 +49,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.hops.security.HopsGroupsWithFallBack;
 
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -60,9 +60,8 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Timer;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A user-to-groups mapping service.
@@ -75,7 +74,8 @@ import org.apache.commons.logging.LogFactory;
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
 @InterfaceStability.Evolving
 public class Groups {
-  private static final Log LOG = LogFactory.getLog(Groups.class);
+  @VisibleForTesting
+  static final Logger LOG = LoggerFactory.getLogger(Groups.class);
   
   private final GroupMappingServiceProvider impl;
 
@@ -106,13 +106,12 @@ public class Groups {
   }
 
   public Groups(Configuration conf, final Timer timer) {
-    impl = 
-      ReflectionUtils.newInstance(
-          conf.getClass(CommonConfigurationKeys.HADOOP_SECURITY_GROUP_MAPPING, 
-                        ShellBasedUnixGroupsMapping.class, 
-                        GroupMappingServiceProvider.class), 
-          conf);
-    
+    impl = ReflectionUtils.newInstance(
+        conf.getClass(CommonConfigurationKeys.HADOOP_SECURITY_GROUP_MAPPING,
+            JniBasedUnixGroupsMappingWithFallback.class,
+            GroupMappingServiceProvider.class),
+        conf);
+
     bypassCache = impl instanceof HopsGroupsWithFallBack;
     
     cacheTimeout = 
@@ -223,7 +222,7 @@ public class Groups {
       }
     }
 
-    if(!bypassCache) {
+    if (!bypassCache) {
       // Check the negative cache first
       if (isNegativeCacheEnabled()) {
         if (negativeCache.contains(user)) {
@@ -233,9 +232,9 @@ public class Groups {
     }
 
     try {
-      if(bypassCache){
+      if (bypassCache) {
         return fetchGroupList(user);
-      }else {
+      } else {
         return cache.get(user);
       }
     } catch (ExecutionException e) {
@@ -297,7 +296,7 @@ public class Groups {
             reloadGroupsThreadCount,
             60,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<Runnable>(),
+            new LinkedBlockingQueue<>(),
             threadFactory);
         parentExecutor.allowCoreThreadTimeOut(true);
         executorService = MoreExecutors.listeningDecorator(parentExecutor);
@@ -321,6 +320,7 @@ public class Groups {
      */
     @Override
     public List<String> load(String user) throws Exception {
+      LOG.debug("GroupCacheLoader - load.");
       TraceScope scope = null;
       Tracer tracer = Tracer.curThreadTracer();
       if (tracer != null) {
@@ -359,6 +359,7 @@ public class Groups {
     public ListenableFuture<List<String>> reload(final String key,
                                                  List<String> oldValue)
         throws Exception {
+      LOG.debug("GroupCacheLoader - reload (async).");
       if (!reloadGroupsInBackground) {
         return super.reload(key, oldValue);
       }
@@ -388,7 +389,7 @@ public class Groups {
       });
       return listenableFuture;
     }
-    
+
   }
   
   /**
@@ -398,13 +399,12 @@ public class Groups {
     long startMs = timer.monotonicNow();
     List<String> groupList = impl.getGroups(user);
     long endMs = timer.monotonicNow();
-    long deltaMs = endMs - startMs ;
+    long deltaMs = endMs - startMs;
     UserGroupInformation.metrics.addGetGroups(deltaMs);
     if (deltaMs > warningDeltaMs) {
-      LOG.warn("Potential performance problem: getGroups(user=" + user +") " +
-          "took " + deltaMs + " milliseconds.");
+      LOG.warn("Potential performance problem: getGroups(user=" + user + ") " + "took " + deltaMs + " milliseconds.");
     }
-    
+
     return groupList;
   }
   

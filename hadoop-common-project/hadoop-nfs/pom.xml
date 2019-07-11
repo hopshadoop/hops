@@ -20,12 +20,11 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>2.8.2.9-SNAPSHOT</version>
+    <version>3.2.0.0-SNAPSHOT</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
-  <groupId>io.hops</groupId>
   <artifactId>hadoop-nfs</artifactId>
-  <version>2.8.2.9-SNAPSHOT</version>
+  <version>3.2.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>Apache Hadoop NFS</name>
@@ -49,12 +48,20 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <scope>test</scope>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-all</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>commons-logging</groupId>
@@ -63,7 +70,7 @@
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
-      <artifactId>servlet-api</artifactId>
+      <artifactId>javax.servlet-api</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>

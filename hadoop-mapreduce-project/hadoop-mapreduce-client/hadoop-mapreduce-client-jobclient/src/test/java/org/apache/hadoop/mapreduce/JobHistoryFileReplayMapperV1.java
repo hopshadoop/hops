@@ -20,38 +20,24 @@ package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapreduce.Mapper.Context;
-import org.apache.hadoop.mapreduce.TimelineServicePerformance.PerfCounters;
-import org.apache.hadoop.mapreduce.JobHistoryFileReplayHelper;
 import org.apache.hadoop.mapreduce.JobHistoryFileReplayHelper.JobFiles;
-import org.apache.hadoop.mapreduce.MRJobConfig;
-import org.apache.hadoop.mapreduce.TypeConverter;
+import org.apache.hadoop.mapreduce.TimelineServicePerformance.PerfCounters;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEntity;
 import org.apache.hadoop.yarn.client.api.TimelineClient;
-import org.apache.hadoop.yarn.client.api.impl.TimelineClientImpl;
 import org.apache.hadoop.yarn.exceptions.YarnException;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Mapper for TimelineServicePerformanceV1 that replays job history files to the
@@ -61,12 +47,12 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 class JobHistoryFileReplayMapperV1 extends
     org.apache.hadoop.mapreduce.
         Mapper<IntWritable,IntWritable,Writable,Writable> {
-  private static final Log LOG =
-      LogFactory.getLog(JobHistoryFileReplayMapperV1.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(JobHistoryFileReplayMapperV1.class);
 
   public void map(IntWritable key, IntWritable val, Context context) throws IOException {
     // collect the apps it needs to process
-    TimelineClient tlc = new TimelineClientImpl();
+    TimelineClient tlc = TimelineClient.createTimelineClient();
     TimelineEntityConverterV1 converter = new TimelineEntityConverterV1();
     JobHistoryFileReplayHelper helper = new JobHistoryFileReplayHelper(context);
     int replayMode = helper.getReplayMode();

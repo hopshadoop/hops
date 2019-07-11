@@ -81,7 +81,7 @@ public class TestTransaction {
       @Override
       public Object performTask() throws StorageException, IOException {
         LightWeightRequestHandler setRMDTMasterKeyHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
           @Override
           public Object performTask() throws IOException {
             if (firstTime.getAndSet(false)) {

@@ -138,12 +138,21 @@ public class TestKeyShell {
     assertTrue(outContent.toString().contains("key1 has been successfully " +
         "rolled."));
 
+    // jceks provider's invalidate is a no-op.
+    outContent.reset();
+    final String[] args3 =
+        {"invalidateCache", keyName, "-provider", jceksProvider};
+    rc = ks.run(args3);
+    assertEquals(0, rc);
+    assertTrue(outContent.toString()
+        .contains("key1 has been successfully " + "invalidated."));
+
     deleteKey(ks, keyName);
 
     listOut = listKeys(ks, false);
     assertFalse(listOut, listOut.contains(keyName));
   }
-
+  
   /* HADOOP-10586 KeyShell didn't allow -description. */
   @Test
   public void testKeySuccessfulCreationWithDescription() throws Exception {
@@ -193,7 +202,7 @@ public class TestKeyShell {
   public void testInvalidProvider() throws Exception {
     final String[] args1 = {"create", "key1", "-cipher", "AES", "-provider",
       "sdff://file/tmp/keystore.jceks"};
-
+    
     int rc = 0;
     KeyShell ks = new KeyShell();
     ks.setConf(new Configuration());
@@ -206,7 +215,7 @@ public class TestKeyShell {
   public void testTransientProviderWarning() throws Exception {
     final String[] args1 = {"create", "key1", "-cipher", "AES", "-provider",
       "user:///"};
-
+    
     int rc = 0;
     KeyShell ks = new KeyShell();
     ks.setConf(new Configuration());
@@ -215,11 +224,11 @@ public class TestKeyShell {
     assertTrue(outContent.toString().contains("WARNING: you are modifying a " +
         "transient provider."));
   }
-
+  
   @Test
   public void testTransientProviderOnlyConfig() throws Exception {
     final String[] args1 = {"create", "key1"};
-
+    
     int rc = 0;
     KeyShell ks = new KeyShell();
     Configuration config = new Configuration();
@@ -251,7 +260,7 @@ public class TestKeyShell {
     final String keyName = "key1";
     final String[] args1 = {"create", keyName, "-cipher", "AES/CBC/pkcs5Padding",
         "-provider", jceksProvider};
-
+    
     int rc = 0;
     KeyShell ks = new KeyShell();
     ks.setConf(new Configuration());

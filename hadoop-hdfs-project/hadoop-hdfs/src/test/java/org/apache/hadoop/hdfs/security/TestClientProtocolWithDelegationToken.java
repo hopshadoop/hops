@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdfs.security;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -45,7 +43,10 @@ import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import org.apache.hadoop.test.GenericTestUtils;
 import static org.mockito.Mockito.mock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Unit tests for using Delegation Token over RPC.
@@ -53,8 +54,7 @@ import static org.mockito.Mockito.mock;
 public class TestClientProtocolWithDelegationToken {
   private static final String ADDRESS = "0.0.0.0";
 
-  public static final Log LOG =
-      LogFactory.getLog(TestClientProtocolWithDelegationToken.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestClientProtocolWithDelegationToken.class);
 
   private static Configuration conf;
 
@@ -65,11 +65,11 @@ public class TestClientProtocolWithDelegationToken {
   }
 
   static {
-    ((Log4JLogger) Client.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) Server.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SaslRpcClient.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SaslRpcServer.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SaslInputStream.LOG).getLogger().setLevel(Level.ALL);
+    GenericTestUtils.setLogLevel(Client.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(Server.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(SaslRpcClient.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(SaslRpcServer.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(SaslInputStream.LOG, Level.ALL);
   }
 
   @Test

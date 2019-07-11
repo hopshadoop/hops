@@ -26,46 +26,79 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Charsets;
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.util.Map.Entry;
+import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.service.Service;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.ApplicationClassLoader;
+import org.apache.hadoop.util.JarFinder;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.ApplicationInitializationContext;
 import org.apache.hadoop.yarn.server.api.ApplicationTerminationContext;
+import org.apache.hadoop.yarn.server.api.AuxiliaryLocalPathHandler;
 import org.apache.hadoop.yarn.server.api.AuxiliaryService;
 import org.apache.hadoop.yarn.server.api.ContainerInitializationContext;
 import org.apache.hadoop.yarn.server.api.ContainerTerminationContext;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
+import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
+import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerImpl;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.deletion.task.FileDeletionTask;
 import org.junit.Assert;
 import org.junit.Test;
 
 public class TestAuxServices {
-  private static final Log LOG = LogFactory.getLog(TestAuxServices.class);
+  private static final Logger LOG =
+       LoggerFactory.getLogger(TestAuxServices.class);
   private static final File TEST_DIR = new File(
       System.getProperty("test.build.data",
           System.getProperty("java.io.tmpdir")),
       TestAuxServices.class.getName());
+  private final static AuxiliaryLocalPathHandler MOCK_AUX_PATH_HANDLER =
+      mock(AuxiliaryLocalPathHandler.class);
+  private final static Context MOCK_CONTEXT = mock(Context.class);
+  private final static DeletionService MOCK_DEL_SERVICE = mock(
+      DeletionService.class);
 
   static class LightService extends AuxiliaryService implements Service
        {
@@ -150,6 +183,233 @@ public class TestAuxServices {
     }
   }
 
+  // Override getMetaData() method to return current
+  // class path. This class would be used for
+  // testCustomizedAuxServiceClassPath.
+  static class ServiceC extends LightService {
+    public ServiceC() {
+      super("C", 'C', 66, ByteBuffer.wrap("C".getBytes()));
+    }
+
+    @Override
+    public ByteBuffer getMetaData() {
+      ClassLoader loader = Thread.currentThread().getContextClassLoader();
+      URL[] urls = ((URLClassLoader)loader).getURLs();
+      List<String> urlString = new ArrayList<String>();
+      for (URL url : urls) {
+        urlString.add(url.toString());
+      }
+      String joinedString = StringUtils.join(",", urlString);
+      return ByteBuffer.wrap(joinedString.getBytes());
+    }
+  }
+
+  @SuppressWarnings("resource")
+  @Test
+  public void testRemoteAuxServiceClassPath() throws Exception {
+    Configuration conf = new YarnConfiguration();
+    FileSystem fs = FileSystem.get(conf);
+    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES,
+        new String[] {"ServiceC"});
+    conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT,
+        "ServiceC"), ServiceC.class, Service.class);
+
+    Context mockContext2 = mock(Context.class);
+    LocalDirsHandlerService mockDirsHandler = mock(
+        LocalDirsHandlerService.class);
+    String root = "target/LocalDir";
+    Path rootAuxServiceDirPath = new Path(root, "nmAuxService");
+    when(mockDirsHandler.getLocalPathForWrite(anyString())).thenReturn(
+        rootAuxServiceDirPath);
+    when(mockContext2.getLocalDirsHandler()).thenReturn(mockDirsHandler);
+
+    File rootDir = GenericTestUtils.getTestDir(getClass()
+        .getSimpleName());
+    if (!rootDir.exists()) {
+      rootDir.mkdirs();
+    }
+    AuxServices aux = null;
+    File testJar = null;
+    try {
+      // the remote jar file should not be be writable by group or others.
+      try {
+        testJar = JarFinder.makeClassLoaderTestJar(this.getClass(), rootDir,
+            "test-runjar.jar", 2048, ServiceC.class.getName());
+        // Give group a write permission.
+        // We should not load the auxservice from remote jar file.
+        Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
+        perms.add(PosixFilePermission.OWNER_READ);
+        perms.add(PosixFilePermission.OWNER_WRITE);
+        perms.add(PosixFilePermission.GROUP_WRITE);
+        Files.setPosixFilePermissions(Paths.get(testJar.getAbsolutePath()),
+            perms);
+        conf.set(String.format(
+            YarnConfiguration.NM_AUX_SERVICE_REMOTE_CLASSPATH, "ServiceC"),
+            testJar.getAbsolutePath());
+        aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+            mockContext2, MOCK_DEL_SERVICE);
+        aux.init(conf);
+        Assert.fail("The permission of the jar is wrong."
+            + "Should throw out exception.");
+      } catch (YarnRuntimeException ex) {
+        Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(
+            "The remote jarfile should not be writable by group or others"));
+      }
+
+      Files.delete(Paths.get(testJar.getAbsolutePath()));
+
+      testJar = JarFinder.makeClassLoaderTestJar(this.getClass(), rootDir,
+          "test-runjar.jar", 2048, ServiceC.class.getName());
+      conf.set(String.format(
+          YarnConfiguration.NM_AUX_SERVICE_REMOTE_CLASSPATH, "ServiceC"),
+          testJar.getAbsolutePath());
+      aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+          mockContext2, MOCK_DEL_SERVICE);
+      aux.init(conf);
+      aux.start();
+      Map<String, ByteBuffer> meta = aux.getMetaData();
+      String auxName = "";
+      Assert.assertTrue(meta.size() == 1);
+      for(Entry<String, ByteBuffer> i : meta.entrySet()) {
+        auxName = i.getKey();
+      }
+      Assert.assertEquals("ServiceC", auxName);
+      aux.serviceStop();
+      FileStatus[] status = fs.listStatus(rootAuxServiceDirPath);
+      Assert.assertTrue(status.length == 1);
+
+      // initialize the same auxservice again, and make sure that we did not
+      // re-download the jar from remote directory.
+      aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+          mockContext2, MOCK_DEL_SERVICE);
+      aux.init(conf);
+      aux.start();
+      meta = aux.getMetaData();
+      Assert.assertTrue(meta.size() == 1);
+      for(Entry<String, ByteBuffer> i : meta.entrySet()) {
+        auxName = i.getKey();
+      }
+      Assert.assertEquals("ServiceC", auxName);
+      verify(MOCK_DEL_SERVICE, times(0)).delete(any(FileDeletionTask.class));
+      status = fs.listStatus(rootAuxServiceDirPath);
+      Assert.assertTrue(status.length == 1);
+      aux.serviceStop();
+
+      // change the last modification time for remote jar,
+      // we will re-download the jar and clean the old jar
+      long time = System.currentTimeMillis() + 3600*1000;
+      FileTime fileTime = FileTime.fromMillis(time);
+      Files.setLastModifiedTime(Paths.get(testJar.getAbsolutePath()),
+          fileTime);
+      conf.set(
+          String.format(YarnConfiguration.NM_AUX_SERVICE_REMOTE_CLASSPATH,
+              "ServiceC"),
+          testJar.getAbsolutePath());
+      aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+          mockContext2, MOCK_DEL_SERVICE);
+      aux.init(conf);
+      aux.start();
+      verify(MOCK_DEL_SERVICE, times(1)).delete(any(FileDeletionTask.class));
+      status = fs.listStatus(rootAuxServiceDirPath);
+      Assert.assertTrue(status.length == 2);
+      aux.serviceStop();
+    } finally {
+      if (testJar != null) {
+        testJar.delete();
+        rootDir.delete();
+      }
+      if (fs.exists(new Path(root))) {
+        fs.delete(new Path(root), true);
+      }
+    }
+  }
+
+  // To verify whether we could load class from customized class path.
+  // We would use ServiceC in this test. Also create a separate jar file
+  // including ServiceC class, and add this jar to customized directory.
+  // By setting some proper configurations, we should load ServiceC class
+  // from customized class path.
+  @Test (timeout = 15000)
+  public void testCustomizedAuxServiceClassPath() throws Exception {
+    // verify that we can load AuxService Class from default Class path
+    Configuration conf = new YarnConfiguration();
+    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES,
+        new String[] {"ServiceC"});
+    conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT,
+        "ServiceC"), ServiceC.class, Service.class);
+    @SuppressWarnings("resource")
+    AuxServices aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+        MOCK_CONTEXT, MOCK_DEL_SERVICE);
+    aux.init(conf);
+    aux.start();
+    Map<String, ByteBuffer> meta = aux.getMetaData();
+    String auxName = "";
+    Set<String> defaultAuxClassPath = null;
+    Assert.assertTrue(meta.size() == 1);
+    for(Entry<String, ByteBuffer> i : meta.entrySet()) {
+      auxName = i.getKey();
+      String auxClassPath = Charsets.UTF_8.decode(i.getValue()).toString();
+      defaultAuxClassPath = new HashSet<String>(Arrays.asList(StringUtils
+          .getTrimmedStrings(auxClassPath)));
+    }
+    Assert.assertEquals("ServiceC", auxName);
+    aux.serviceStop();
+
+    // create a new jar file, and configure it as customized class path
+    // for this AuxService, and make sure that we could load the class
+    // from this configured customized class path
+    File rootDir = GenericTestUtils.getTestDir(getClass()
+        .getSimpleName());
+    if (!rootDir.exists()) {
+      rootDir.mkdirs();
+    }
+    File testJar = null;
+    try {
+      testJar = JarFinder.makeClassLoaderTestJar(this.getClass(), rootDir,
+          "test-runjar.jar", 2048, ServiceC.class.getName());
+      conf = new YarnConfiguration();
+      conf.setStrings(YarnConfiguration.NM_AUX_SERVICES,
+          new String[] {"ServiceC"});
+      conf.set(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "ServiceC"),
+          ServiceC.class.getName());
+      conf.set(String.format(
+          YarnConfiguration.NM_AUX_SERVICES_CLASSPATH, "ServiceC"),
+          testJar.getAbsolutePath());
+      // remove "-org.apache.hadoop." from system classes
+      String systemClasses = "-org.apache.hadoop." + "," +
+              ApplicationClassLoader.SYSTEM_CLASSES_DEFAULT;
+      conf.set(String.format(
+          YarnConfiguration.NM_AUX_SERVICES_SYSTEM_CLASSES,
+          "ServiceC"), systemClasses);
+      aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+          MOCK_CONTEXT, MOCK_DEL_SERVICE);
+      aux.init(conf);
+      aux.start();
+      meta = aux.getMetaData();
+      Assert.assertTrue(meta.size() == 1);
+      Set<String> customizedAuxClassPath = null;
+      for(Entry<String, ByteBuffer> i : meta.entrySet()) {
+        Assert.assertTrue(auxName.equals(i.getKey()));
+        String classPath = Charsets.UTF_8.decode(i.getValue()).toString();
+        customizedAuxClassPath = new HashSet<String>(Arrays.asList(StringUtils
+            .getTrimmedStrings(classPath)));
+        Assert.assertTrue(classPath.contains(testJar.getName()));
+      }
+      aux.stop();
+
+      // Verify that we do not have any overlap between customized class path
+      // and the default class path.
+      Set<String> mutalClassPath = Sets.intersection(defaultAuxClassPath,
+          customizedAuxClassPath);
+      Assert.assertTrue(mutalClassPath.isEmpty());
+    } finally {
+      if (testJar != null) {
+        testJar.delete();
+        rootDir.delete();
+      }
+    }
+  }
+
   @Test
   public void testAuxEventDispatch() {
     Configuration conf = new Configuration();
@@ -160,7 +420,8 @@ public class TestAuxServices {
         ServiceB.class, Service.class);
     conf.setInt("A.expected.init", 1);
     conf.setInt("B.expected.stop", 1);
-    final AuxServices aux = new AuxServices();
+    final AuxServices aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+        MOCK_CONTEXT, MOCK_DEL_SERVICE);
     aux.init(conf);
     aux.start();
 
@@ -170,11 +431,11 @@ public class TestAuxServices {
     buf.putInt(65);
     buf.flip();
     AuxServicesEvent event = new AuxServicesEvent(
-        AuxServicesEventType.APPLICATION_INIT, "user0", appId1, "Asrv", buf, "user0Folder");
+        AuxServicesEventType.APPLICATION_INIT, "user0", appId1, "Asrv", buf);
     aux.handle(event);
     ApplicationId appId2 = ApplicationId.newInstance(0, 66);
     event = new AuxServicesEvent(
-        AuxServicesEventType.APPLICATION_STOP, "user0", appId2, "Bsrv", null, "user0Folder");
+        AuxServicesEventType.APPLICATION_STOP, "user0", appId2, "Bsrv", null);
     // verify all services got the stop event 
     aux.handle(event);
     Collection<AuxiliaryService> servs = aux.getServices();
@@ -193,9 +454,9 @@ public class TestAuxServices {
     ApplicationAttemptId attemptId = ApplicationAttemptId.newInstance(appId1, 1);
     ContainerTokenIdentifier cti = new ContainerTokenIdentifier(
         ContainerId.newContainerId(attemptId, 1), "", "",
-        Resource.newInstance(1, 1), 0,0,0, Priority.newInstance(0), 0, "");
+        Resource.newInstance(1, 1), 0,0,0, Priority.newInstance(0), 0);
     Context context = mock(Context.class);
-    Container container = new ContainerImpl(null, null, null, null,
+    Container container = new ContainerImpl(new YarnConfiguration(), null, null, null,
         null, cti, context);
     ContainerId containerId = container.getContainerId();
     Resource resource = container.getResource();
@@ -224,7 +485,8 @@ public class TestAuxServices {
         ServiceA.class, Service.class);
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Bsrv"),
         ServiceB.class, Service.class);
-    final AuxServices aux = new AuxServices();
+    final AuxServices aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+        MOCK_CONTEXT, MOCK_DEL_SERVICE);
     aux.init(conf);
 
     int latch = 1;
@@ -236,8 +498,10 @@ public class TestAuxServices {
     }
     assertEquals("Invalid mix of services", 6, latch);
     aux.start();
-    for (Service s : aux.getServices()) {
+    for (AuxiliaryService s : aux.getServices()) {
       assertEquals(STARTED, s.getServiceState());
+      assertEquals(s.getAuxiliaryLocalPathHandler(),
+          MOCK_AUX_PATH_HANDLER);
     }
 
     aux.stop();
@@ -255,7 +519,8 @@ public class TestAuxServices {
         ServiceA.class, Service.class);
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Bsrv"),
         ServiceB.class, Service.class);
-    final AuxServices aux = new AuxServices();
+    final AuxServices aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+        MOCK_CONTEXT, MOCK_DEL_SERVICE);
     aux.init(conf);
 
     int latch = 1;
@@ -292,7 +557,8 @@ public class TestAuxServices {
         ServiceA.class, Service.class);
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Bsrv"),
         ServiceB.class, Service.class);
-    final AuxServices aux = new AuxServices();
+    final AuxServices aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+        MOCK_CONTEXT, MOCK_DEL_SERVICE);
     aux.init(conf);
     aux.start();
 
@@ -305,7 +571,8 @@ public class TestAuxServices {
 
   @Test
   public void testValidAuxServiceName() {
-    final AuxServices aux = new AuxServices();
+    final AuxServices aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+        MOCK_CONTEXT, MOCK_DEL_SERVICE);
     Configuration conf = new Configuration();
     conf.setStrings(YarnConfiguration.NM_AUX_SERVICES, new String[] {"Asrv1", "Bsrv_2"});
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Asrv1"),
@@ -319,7 +586,8 @@ public class TestAuxServices {
     }
 
     //Test bad auxService Name
-    final AuxServices aux1 = new AuxServices();
+    final AuxServices aux1 = new AuxServices(MOCK_AUX_PATH_HANDLER,
+        MOCK_CONTEXT, MOCK_DEL_SERVICE);
     conf.setStrings(YarnConfiguration.NM_AUX_SERVICES, new String[] {"1Asrv1"});
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "1Asrv1"),
         ServiceA.class, Service.class);
@@ -345,7 +613,8 @@ public class TestAuxServices {
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Bsrv"),
         RecoverableServiceB.class, Service.class);
     try {
-      final AuxServices aux = new AuxServices();
+      final AuxServices aux = new AuxServices(MOCK_AUX_PATH_HANDLER,
+          MOCK_CONTEXT, MOCK_DEL_SERVICE);
       aux.init(conf);
       Assert.assertEquals(2, aux.getServices().size());
       File auxStorageDir = new File(TEST_DIR,
@@ -408,5 +677,53 @@ public class TestAuxServices {
     RecoverableServiceB() {
       super("RecoverableServiceB", "Bsrv");
     }
+  }
+
+  static class ConfChangeAuxService extends AuxiliaryService
+      implements Service {
+
+    ConfChangeAuxService() {
+      super("ConfChangeAuxService");
+    }
+
+    @Override
+    protected void serviceInit(Configuration conf) throws Exception {
+      conf.set("dummyConfig", "changedTestValue");
+      super.serviceInit(conf);
+    }
+
+    @Override
+    public void initializeApplication(
+        ApplicationInitializationContext initAppContext) {
+    }
+
+    @Override
+    public void stopApplication(ApplicationTerminationContext stopAppContext) {
+    }
+
+    @Override
+    public ByteBuffer getMetaData() {
+      return null;
+    }
+  }
+
+  @Test
+  public void testAuxServicesConfChange() {
+    Configuration conf = new Configuration();
+    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES,
+        new String[]{"ConfChangeAuxService"});
+    conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT,
+        "ConfChangeAuxService"), ConfChangeAuxService.class, Service.class);
+    AuxServices aux = new AuxServices(MOCK_AUX_PATH_HANDLER, MOCK_CONTEXT,
+        MOCK_DEL_SERVICE);
+    conf.set("dummyConfig", "testValue");
+    aux.init(conf);
+    aux.start();
+    for (AuxiliaryService s : aux.getServices()) {
+      assertEquals(STARTED, s.getServiceState());
+      assertEquals(conf.get("dummyConfig"), "testValue");
+    }
+
+    aux.stop();
   }
 }

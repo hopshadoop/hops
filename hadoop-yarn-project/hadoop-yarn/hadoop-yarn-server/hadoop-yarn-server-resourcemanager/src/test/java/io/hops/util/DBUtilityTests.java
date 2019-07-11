@@ -40,7 +40,7 @@ import io.hops.metadata.yarn.dal.RMNodeApplicationsDataAccess;
 public class DBUtilityTests {
   public static Map<String, io.hops.metadata.yarn.entity.RMNode> getAllRMNodess() throws IOException {
     LightWeightRequestHandler getRMNodesHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
 
       @Override
       public Object performTask() throws IOException {
@@ -58,7 +58,7 @@ public class DBUtilityTests {
   
   public static Map<String, io.hops.metadata.yarn.entity.Resource> getAllResources() throws IOException {
     LightWeightRequestHandler getResourcesHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
 
       @Override
       public Object performTask() throws IOException {
@@ -76,7 +76,7 @@ public class DBUtilityTests {
   
     public static List<PendingEvent> getAllPendingEvents() throws IOException {
     LightWeightRequestHandler getPendingEventsHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
 
       @Override
       public Object performTask() throws IOException {
@@ -95,7 +95,7 @@ public class DBUtilityTests {
   public static Map<String, Map<Integer, List<UpdatedContainerInfo>>> getAllUCIs()
           throws IOException {
     LightWeightRequestHandler getUCIHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
 
       @Override
       public Object performTask() throws IOException {
@@ -115,7 +115,7 @@ public class DBUtilityTests {
   public static Map<String, io.hops.metadata.yarn.entity.ContainerStatus> getAllContainerStatus()
           throws IOException {
     LightWeightRequestHandler getContainerStatusHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
 
       @Override
       public Object performTask() throws IOException {
@@ -135,7 +135,7 @@ public class DBUtilityTests {
   public static  Map<String, Boolean> getAllNextHeartbeat()
           throws IOException {
     LightWeightRequestHandler getNextHeartBeatHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
 
       @Override
       public Object performTask() throws IOException {
@@ -155,7 +155,7 @@ public class DBUtilityTests {
   public static  Map<String, Set<ContainerId>> getAllContainersToCleanUp()
           throws IOException {
     LightWeightRequestHandler getContainerToCleanHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
 
       @Override
       public Object performTask() throws IOException {
@@ -175,7 +175,7 @@ public class DBUtilityTests {
   public static  Map<String, List<ContainerId>> getAllAppsToCleanup()
           throws IOException {
     LightWeightRequestHandler getAppsToCleanHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
 
       @Override
       public Object performTask() throws IOException {

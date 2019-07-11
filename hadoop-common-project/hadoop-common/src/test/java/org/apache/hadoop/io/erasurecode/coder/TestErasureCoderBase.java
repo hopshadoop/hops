@@ -20,9 +20,13 @@ package org.apache.hadoop.io.erasurecode.coder;
 import org.apache.hadoop.io.erasurecode.ECBlock;
 import org.apache.hadoop.io.erasurecode.ECBlockGroup;
 import org.apache.hadoop.io.erasurecode.ECChunk;
+import org.apache.hadoop.io.erasurecode.ErasureCoderOptions;
 import org.apache.hadoop.io.erasurecode.TestCoderBase;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
+
+import static org.junit.Assert.fail;
 
 /**
  * Erasure coder test base with utilities.
@@ -84,14 +88,22 @@ public abstract class TestErasureCoderBase extends TestCoderBase {
 
     ErasureCodingStep codingStep;
     codingStep = encoder.calculateCoding(blockGroup);
-    performCodingStep(codingStep);
+    try {
+      performCodingStep(codingStep);
+    } catch (IOException e) {
+      fail("Should not expect IOException: " + e.getMessage());
+    }
     // Erase specified sources but return copies of them for later comparing
     TestBlock[] backupBlocks = backupAndEraseBlocks(clonedDataBlocks, parityBlocks);
 
     // Decode
     blockGroup = new ECBlockGroup(clonedDataBlocks, blockGroup.getParityBlocks());
     codingStep = decoder.calculateCoding(blockGroup);
-    performCodingStep(codingStep);
+    try {
+      performCodingStep(codingStep);
+    } catch (IOException e) {
+      fail("Should not expect IOException: " + e.getMessage());
+    }
 
     // Compare
     compareAndVerify(backupBlocks, codingStep.getOutputBlocks());
@@ -101,7 +113,8 @@ public abstract class TestErasureCoderBase extends TestCoderBase {
    * This is typically how a coding step should be performed.
    * @param codingStep
    */
-  protected void performCodingStep(ErasureCodingStep codingStep) {
+  protected void performCodingStep(ErasureCodingStep codingStep)
+      throws IOException {
     // Pretend that we're opening these input blocks and output blocks.
     ECBlock[] inputBlocks = codingStep.getInputBlocks();
     ECBlock[] outputBlocks = codingStep.getOutputBlocks();
@@ -158,10 +171,12 @@ public abstract class TestErasureCoderBase extends TestCoderBase {
   protected ErasureCoder createEncoder() {
     ErasureCoder encoder;
     try {
+      ErasureCoderOptions options = new ErasureCoderOptions(
+          numDataUnits, numParityUnits, allowChangeInputs, allowDump);
       Constructor<? extends ErasureCoder> constructor =
           (Constructor<? extends ErasureCoder>)
-              encoderClass.getConstructor(int.class, int.class);
-      encoder = constructor.newInstance(numDataUnits, numParityUnits);
+              encoderClass.getConstructor(ErasureCoderOptions.class);
+      encoder = constructor.newInstance(options);
     } catch (Exception e) {
       throw new RuntimeException("Failed to create encoder", e);
     }
@@ -177,10 +192,12 @@ public abstract class TestErasureCoderBase extends TestCoderBase {
   protected ErasureCoder createDecoder() {
     ErasureCoder decoder;
     try {
+      ErasureCoderOptions options = new ErasureCoderOptions(
+          numDataUnits, numParityUnits, allowChangeInputs, allowDump);
       Constructor<? extends ErasureCoder> constructor =
           (Constructor<? extends ErasureCoder>)
-              decoderClass.getConstructor(int.class, int.class);
-      decoder = constructor.newInstance(numDataUnits, numParityUnits);
+              decoderClass.getConstructor(ErasureCoderOptions.class);
+      decoder = constructor.newInstance(options);
     } catch (Exception e) {
       throw new RuntimeException("Failed to create decoder", e);
     }

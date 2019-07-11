@@ -38,9 +38,6 @@ import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -58,12 +55,14 @@ import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /* File Append tests for HDFS-200 & HDFS-142, specifically focused on:
  *  using append()/sync() to recover block information
  */
 public class TestFileAppend4 {
-  static final Log LOG = LogFactory.getLog(TestFileAppend4.class);
+  static final Logger LOG = LoggerFactory.getLogger(TestFileAppend4.class);
   static final long BLOCK_SIZE = 1024;
 
   Configuration conf;

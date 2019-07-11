@@ -104,7 +104,7 @@ abstract class CommandWithDestination extends FsCommand {
     direct = flag;
   }
 
-  protected void setNumThreads(int numThreads){
+  protected void setNumberThreads(int numThreads){
     this.numThreads = numThreads;
   }
 
@@ -136,7 +136,7 @@ abstract class CommandWithDestination extends FsCommand {
     }
   }
   
-  protected static enum FileAttribute {
+  protected enum FileAttribute {
     TIMESTAMPS, OWNERSHIP, PERMISSION, ACL, XATTR;
 
     public static FileAttribute getAttribute(char symbol) {
@@ -462,8 +462,8 @@ abstract class CommandWithDestination extends FsCommand {
           src.stat.getPermission());
     }
     if (shouldPreserve(FileAttribute.ACL)) {
-      FsPermission perm = src.stat.getPermission();
-      if (perm.getAclBit()) {
+      if (src.stat.hasAcl()) {
+        FsPermission perm = src.stat.getPermission();
         List<AclEntry> srcEntries =
             src.fs.getAclStatus(src.path).getEntries();
         List<AclEntry> srcFullEntries =
@@ -519,7 +519,7 @@ abstract class CommandWithDestination extends FsCommand {
                         createFlags,
                         getConf().getInt(IO_FILE_BUFFER_SIZE_KEY,
                             IO_FILE_BUFFER_SIZE_DEFAULT),
-                        lazyPersist ? 1 : getDefaultReplication(item.path),
+                        (short) 1,
                         getDefaultBlockSize(),
                         null,
                         null);

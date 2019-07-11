@@ -32,7 +32,7 @@ import org.junit.Test;
  * Tests resolution of AbstractFileSystems for a given path with symlinks.
  */
 public class TestFileContextResolveAfs {
-  static{
+  static {
     FileSystem.enableSymlinks();
   }
 

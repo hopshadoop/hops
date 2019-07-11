@@ -309,7 +309,6 @@ class NameNodeRpcServer implements NamenodeProtocols {
       InetSocketAddress listenAddr = serviceRpcServer.getListenerAddress();
       serviceRPCAddress = new InetSocketAddress(
             serviceRpcAddr.getHostName(), listenAddr.getPort());
-      serviceRpcServer.setThreadNamePrefix("Service");
       nn.setRpcServiceServerAddress(conf, serviceRPCAddress);
     } else {
       serviceRpcServer = null;
@@ -361,7 +360,6 @@ class NameNodeRpcServer implements NamenodeProtocols {
     InetSocketAddress listenAddr = clientRpcServer.getListenerAddress();
       clientRpcAddress = new InetSocketAddress(
           rpcAddr.getHostName(), listenAddr.getPort());
-    clientRpcServer.setThreadNamePrefix("RPC");
     nn.setRpcServerAddress(conf, clientRpcAddress);
     
     minimumDataNodeVersion =

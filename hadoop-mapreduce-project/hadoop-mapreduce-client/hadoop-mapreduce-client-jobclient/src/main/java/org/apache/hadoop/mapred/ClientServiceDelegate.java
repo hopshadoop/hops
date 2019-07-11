@@ -28,9 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.RPC;
@@ -79,11 +77,14 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.security.client.ClientToAMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 
 public class ClientServiceDelegate {
-  private static final Log LOG = LogFactory.getLog(ClientServiceDelegate.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ClientServiceDelegate.class);
   private static final String UNAVAILABLE = "N/A";
 
   // Caches for per-user NotRunningJobs
@@ -335,8 +336,8 @@ public class ClientServiceDelegate {
           throw new IOException(e.getTargetException());
         }
 
-        // if it's AM shut down, do not decrement maxClientRetry as we wait for
-        // AM to be restarted.
+        // if its AM shut down, do not decrement maxClientRetry while we wait
+        // for its AM to be restarted.
         if (!usingAMProxy.get()) {
           maxClientRetry--;
         }

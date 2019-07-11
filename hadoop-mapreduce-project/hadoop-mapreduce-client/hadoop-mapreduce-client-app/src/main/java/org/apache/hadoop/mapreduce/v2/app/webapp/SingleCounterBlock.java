@@ -33,16 +33,17 @@ import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
+import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
 import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.job.Job;
 import org.apache.hadoop.mapreduce.v2.app.job.Task;
 import org.apache.hadoop.mapreduce.v2.app.job.TaskAttempt;
 import org.apache.hadoop.mapreduce.v2.util.MRApps;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.DIV;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.TABLE;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.TBODY;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.TR;
+import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet;
+import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet.DIV;
+import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet.TABLE;
+import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet.TBODY;
+import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet.TR;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 import com.google.inject.Inject;
@@ -51,6 +52,7 @@ public class SingleCounterBlock extends HtmlBlock {
   protected TreeMap<String, Long> values = new TreeMap<String, Long>(); 
   protected Job job;
   protected Task task;
+  private TaskType counterType;
   
   @Inject SingleCounterBlock(AppContext appCtx, ViewContext ctx) {
     super(ctx);
@@ -60,12 +62,12 @@ public class SingleCounterBlock extends HtmlBlock {
   @Override protected void render(Block html) {
     if (job == null) {
       html.
-        p()._("Sorry, no counters for nonexistent", $(JOB_ID, "job"))._();
+        p().__("Sorry, no counters for nonexistent", $(JOB_ID, "job")).__();
       return;
     }
     if (!$(TASK_ID).isEmpty() && task == null) {
       html.
-        p()._("Sorry, no counters for nonexistent", $(TASK_ID, "task"))._();
+        p().__("Sorry, no counters for nonexistent", $(TASK_ID, "task")).__();
       return;
     }
     
@@ -77,7 +79,7 @@ public class SingleCounterBlock extends HtmlBlock {
         thead().
           tr().
             th(".ui-state-default", columnType).
-            th(".ui-state-default", "Value")._()._().
+            th(".ui-state-default", "Value").__().__().
           tbody();
     for (Map.Entry<String, Long> entry : values.entrySet()) {
       TR<TBODY<TABLE<DIV<Hamlet>>>> row = tbody.tr();
@@ -85,22 +87,29 @@ public class SingleCounterBlock extends HtmlBlock {
       String val = entry.getValue().toString();
       if(task != null) {
         row.td(id);
-        row.td().br().$title(val)._()._(val)._();
+        row.td().br().$title(val).__().__(val).__();
       } else {
         row.td().a(url("singletaskcounter",entry.getKey(),
-            $(COUNTER_GROUP), $(COUNTER_NAME)), id)._();
-        row.td().br().$title(val)._().a(url("singletaskcounter",entry.getKey(),
-            $(COUNTER_GROUP), $(COUNTER_NAME)), val)._();
+            $(COUNTER_GROUP), $(COUNTER_NAME)), id).__();
+        row.td().br().$title(val).__().a(url("singletaskcounter", entry.getKey(),
+            $(COUNTER_GROUP), $(COUNTER_NAME)), val).__();
       }
-      row._();
+      row.__();
     }
-    tbody._()._()._();
+    tbody.__().__().__();
   }
 
   private void populateMembers(AppContext ctx) {
     JobId jobID = null;
     TaskId taskID = null;
     String tid = $(TASK_ID);
+    if ($(TITLE).contains("MAPS")) {
+      counterType = TaskType.MAP;
+    } else if ($(TITLE).contains("REDUCES")) {
+      counterType = TaskType.REDUCE;
+    } else {
+      counterType = null;
+    }
     if (!tid.isEmpty()) {
       taskID = MRApps.toTaskID(tid);
       jobID = taskID.getJobId();
@@ -152,7 +161,10 @@ public class SingleCounterBlock extends HtmlBlock {
           value = c.getValue();
         }
       }
-      values.put(MRApps.toString(entry.getKey()), value);
+      if (counterType == null ||
+              counterType == entry.getValue().getType()) {
+        values.put(MRApps.toString(entry.getKey()), value);
+      }
     }
   }
 }

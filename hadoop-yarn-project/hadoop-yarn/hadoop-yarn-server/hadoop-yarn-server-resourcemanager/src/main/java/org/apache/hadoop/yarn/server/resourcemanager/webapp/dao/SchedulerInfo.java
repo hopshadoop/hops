@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
+import java.util.Arrays;
 import java.util.EnumSet;
 
 import javax.xml.bind.annotation.XmlRootElement;
@@ -40,8 +41,9 @@ public class SchedulerInfo {
   protected EnumSet<SchedulerResourceTypes> schedulingResourceTypes;
   protected int maximumClusterPriority;
 
+  // JAXB needs this
   public SchedulerInfo() {
-  } // JAXB needs this
+  }
 
   public SchedulerInfo(final ResourceManager rm) {
     ResourceScheduler rs = rm.getResourceScheduler();
@@ -73,7 +75,10 @@ public class SchedulerInfo {
   }
 
   public String getSchedulerResourceTypes() {
-    return this.schedulingResourceTypes.toString();
+    if (minAllocResource != null) {
+      return Arrays.toString(minAllocResource.getResource().getResources());
+    }
+    return null;
   }
 
   public int getMaxClusterLevelAppPriority() {

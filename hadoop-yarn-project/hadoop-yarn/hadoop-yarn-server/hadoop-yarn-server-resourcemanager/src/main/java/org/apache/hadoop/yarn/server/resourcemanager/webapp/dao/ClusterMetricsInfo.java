@@ -31,46 +31,50 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ClusterMetricsInfo {
 
-  protected int appsSubmitted;
-  protected int appsCompleted;
-  protected int appsPending;
-  protected int appsRunning;
-  protected int appsFailed;
-  protected int appsKilled;
+  private int appsSubmitted;
+  private int appsCompleted;
+  private int appsPending;
+  private int appsRunning;
+  private int appsFailed;
+  private int appsKilled;
 
-  protected long reservedMB;
-  protected long availableMB;
-  protected long allocatedMB;
+  private long reservedMB;
+  private long availableMB;
+  private long allocatedMB;
 
-  protected long reservedVirtualCores;
-  protected long availableVirtualCores;
-  protected long allocatedVirtualCores;
+  private long reservedVirtualCores;
+  private long availableVirtualCores;
+  private long allocatedVirtualCores;
 
-  protected long reservedGPUs;
-  protected long availableGPUs;
-  protected long allocatedGPUs;
+  private int containersAllocated;
+  private int containersReserved;
+  private int containersPending;
 
-  protected int containersAllocated;
-  protected int containersReserved;
-  protected int containersPending;
+  private long totalMB;
+  private long totalVirtualCores;
+  private int totalNodes;
+  private int lostNodes;
+  private int unhealthyNodes;
+  private int decommissioningNodes;
+  private int decommissionedNodes;
+  private int rebootedNodes;
+  private int activeNodes;
+  private int shutdownNodes;
 
-  protected long totalMB;
-  protected long totalVirtualCores;
-  protected long totalGPUs;
-  protected int totalNodes;
-  protected int lostNodes;
-  protected int unhealthyNodes;
-  protected int decommissioningNodes;
-  protected int decommissionedNodes;
-  protected int rebootedNodes;
-  protected int activeNodes;
-  protected int shutdownNodes;
+  // Total used resource of the cluster, including all partitions
+  private ResourceInfo totalUsedResourcesAcrossPartition;
+
+  // Total registered resources of the cluster, including all partitions
+  private ResourceInfo totalClusterResourcesAcrossPartition;
 
   public ClusterMetricsInfo() {
   } // JAXB needs this
 
   public ClusterMetricsInfo(final ResourceManager rm) {
-    ResourceScheduler rs = rm.getResourceScheduler();
+    this(rm.getResourceScheduler());
+  }
+
+  public ClusterMetricsInfo(final ResourceScheduler rs) {
     QueueMetrics metrics = rs.getRootQueueMetrics();
     ClusterMetrics clusterMetrics = ClusterMetrics.getMetrics();
 
@@ -89,23 +93,28 @@ public class ClusterMetricsInfo {
     this.availableVirtualCores = metrics.getAvailableVirtualCores();
     this.allocatedVirtualCores = metrics.getAllocatedVirtualCores();
 
-    this.reservedGPUs = metrics.getReservedGPUs();
-    this.availableGPUs = metrics.getAvailableGPUs();
-    this.allocatedGPUs = metrics.getAllocatedGPUs();
-
     this.containersAllocated = metrics.getAllocatedContainers();
     this.containersPending = metrics.getPendingContainers();
     this.containersReserved = metrics.getReservedContainers();
 
     if (rs instanceof CapacityScheduler) {
+      CapacityScheduler cs = (CapacityScheduler) rs;
       this.totalMB = availableMB + allocatedMB + reservedMB;
-      this.totalVirtualCores = availableVirtualCores + allocatedVirtualCores
-          + containersReserved;
-      this.totalGPUs = availableGPUs + allocatedGPUs + reservedGPUs;
+      this.totalVirtualCores =
+          availableVirtualCores + allocatedVirtualCores + reservedVirtualCores;
+      // TODO, add support of other schedulers to get total used resources
+      // across partition.
+      if (cs.getRootQueue() != null
+          && cs.getRootQueue().getQueueResourceUsage() != null
+          && cs.getRootQueue().getQueueResourceUsage().getAllUsed() != null) {
+        totalUsedResourcesAcrossPartition = new ResourceInfo(
+            cs.getRootQueue().getQueueResourceUsage().getAllUsed());
+        totalClusterResourcesAcrossPartition = new ResourceInfo(
+            cs.getClusterResource());
+      }
     } else {
       this.totalMB = availableMB + allocatedMB;
       this.totalVirtualCores = availableVirtualCores + allocatedVirtualCores;
-      this.totalGPUs = availableGPUs + allocatedGPUs;
     }
     this.activeNodes = clusterMetrics.getNumActiveNMs();
     this.lostNodes = clusterMetrics.getNumLostNMs();
@@ -115,7 +124,7 @@ public class ClusterMetricsInfo {
     this.rebootedNodes = clusterMetrics.getNumRebootedNMs();
     this.shutdownNodes = clusterMetrics.getNumShutdownNMs();
     this.totalNodes = activeNodes + lostNodes + decommissionedNodes
-        + rebootedNodes + unhealthyNodes + shutdownNodes;
+        + rebootedNodes + unhealthyNodes + decommissioningNodes + shutdownNodes;
   }
 
   public int getAppsSubmitted() {
@@ -166,18 +175,6 @@ public class ClusterMetricsInfo {
     return this.allocatedVirtualCores;
   }
 
-  public long getReservedGPUs() {
-    return this.reservedGPUs;
-  }
-
-  public long getAvailableGPUs() {
-    return this.availableGPUs;
-  }
-
-  public long getAllocatedGPUs() {
-    return this.allocatedGPUs;
-  }
-
   public int getContainersAllocated() {
     return this.containersAllocated;
   }
@@ -196,10 +193,6 @@ public class ClusterMetricsInfo {
 
   public long getTotalVirtualCores() {
     return this.totalVirtualCores;
-  }
-
-  public long getTotalGPUs() {
-    return this.totalGPUs;
   }
 
   public int getTotalNodes() {
@@ -234,4 +227,111 @@ public class ClusterMetricsInfo {
     return this.shutdownNodes;
   }
 
+  public void setContainersReserved(int containersReserved) {
+    this.containersReserved = containersReserved;
+  }
+
+  public void setContainersPending(int containersPending) {
+    this.containersPending = containersPending;
+  }
+
+  public void setAppsSubmitted(int appsSubmitted) {
+    this.appsSubmitted = appsSubmitted;
+  }
+
+  public void setAppsCompleted(int appsCompleted) {
+    this.appsCompleted = appsCompleted;
+  }
+
+  public void setAppsPending(int appsPending) {
+    this.appsPending = appsPending;
+  }
+
+  public void setAppsRunning(int appsRunning) {
+    this.appsRunning = appsRunning;
+  }
+
+  public void setAppsFailed(int appsFailed) {
+    this.appsFailed = appsFailed;
+  }
+
+  public void setAppsKilled(int appsKilled) {
+    this.appsKilled = appsKilled;
+  }
+
+  public void setReservedMB(long reservedMB) {
+    this.reservedMB = reservedMB;
+  }
+
+  public void setAvailableMB(long availableMB) {
+    this.availableMB = availableMB;
+  }
+
+  public void setAllocatedMB(long allocatedMB) {
+    this.allocatedMB = allocatedMB;
+  }
+
+  public void setReservedVirtualCores(long reservedVirtualCores) {
+    this.reservedVirtualCores = reservedVirtualCores;
+  }
+
+  public void setAvailableVirtualCores(long availableVirtualCores) {
+    this.availableVirtualCores = availableVirtualCores;
+  }
+
+  public void setAllocatedVirtualCores(long allocatedVirtualCores) {
+    this.allocatedVirtualCores = allocatedVirtualCores;
+  }
+
+  public void setContainersAllocated(int containersAllocated) {
+    this.containersAllocated = containersAllocated;
+  }
+
+  public void setTotalMB(long totalMB) {
+    this.totalMB = totalMB;
+  }
+
+  public void setTotalVirtualCores(long totalVirtualCores) {
+    this.totalVirtualCores = totalVirtualCores;
+  }
+
+  public void setTotalNodes(int totalNodes) {
+    this.totalNodes = totalNodes;
+  }
+
+  public void setLostNodes(int lostNodes) {
+    this.lostNodes = lostNodes;
+  }
+
+  public void setUnhealthyNodes(int unhealthyNodes) {
+    this.unhealthyNodes = unhealthyNodes;
+  }
+
+  public void setDecommissioningNodes(int decommissioningNodes) {
+    this.decommissioningNodes = decommissioningNodes;
+  }
+
+  public void setDecommissionedNodes(int decommissionedNodes) {
+    this.decommissionedNodes = decommissionedNodes;
+  }
+
+  public void setRebootedNodes(int rebootedNodes) {
+    this.rebootedNodes = rebootedNodes;
+  }
+
+  public void setActiveNodes(int activeNodes) {
+    this.activeNodes = activeNodes;
+  }
+
+  public void setShutdownNodes(int shutdownNodes) {
+    this.shutdownNodes = shutdownNodes;
+  }
+
+  public ResourceInfo getTotalUsedResourcesAcrossPartition() {
+    return totalUsedResourcesAcrossPartition;
+  }
+
+  public ResourceInfo getTotalClusterResourcesAcrossPartition() {
+    return totalClusterResourcesAcrossPartition;
+  }
 }

@@ -34,6 +34,8 @@ import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
+import org.apache.hadoop.fs.Options.HandleOpt;
+import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.Progressable;
 
@@ -163,6 +165,17 @@ public class FilterFileSystem extends FileSystem {
   }
 
   @Override
+  public FSDataInputStream open(PathHandle fd, int bufferSize)
+      throws IOException {
+    return fs.open(fd, bufferSize);
+  }
+
+  @Override
+  protected PathHandle createPathHandle(FileStatus stat, HandleOpt... opts) {
+    return fs.getPathHandle(stat, opts);
+  }
+
+  @Override
   public FSDataOutputStream append(Path f, int bufferSize,
       Progressable progress) throws IOException {
     return fs.append(f, bufferSize, progress);
@@ -193,9 +206,16 @@ public class FilterFileSystem extends FileSystem {
     return fs.create(f, permission,
       flags, bufferSize, replication, blockSize, progress, checksumOpt);
   }
-  
+
   @Override
-  @Deprecated
+  protected RemoteIterator<LocatedFileStatus> listLocatedStatus(final Path f,
+      final PathFilter filter)
+  throws FileNotFoundException, IOException {
+    return fs.listLocatedStatus(f, filter);
+  }
+
+
+  @Override
   public FSDataOutputStream createNonRecursive(Path f, FsPermission permission,
       EnumSet<CreateFlag> flags, int bufferSize, short replication, long blockSize,
       Progressable progress) throws IOException {
@@ -225,6 +245,12 @@ public class FilterFileSystem extends FileSystem {
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
     return fs.rename(src, dst);
+  }
+
+  @Override
+  protected void rename(Path src, Path dst, Rename... options)
+      throws IOException {
+    fs.rename(src, dst, options);
   }
 
   @Override
@@ -382,7 +408,13 @@ public class FilterFileSystem extends FileSystem {
   public long getUsed() throws IOException{
     return fs.getUsed();
   }
-  
+
+  /** Return the total size of all files from a specified path.*/
+  @Override
+  public long getUsed(Path path) throws IOException {
+    return fs.getUsed(path);
+  }
+
   @Override
   public long getDefaultBlockSize() {
     return fs.getDefaultBlockSize();
@@ -398,7 +430,7 @@ public class FilterFileSystem extends FileSystem {
     return fs.getServerDefaults();
   }
 
-  // path variants delegate to underlying filesystem
+  // path variants delegate to underlying filesystem 
   @Override
   public long getDefaultBlockSize(Path f) {
     return fs.getDefaultBlockSize(f);
@@ -612,7 +644,30 @@ public class FilterFileSystem extends FileSystem {
   public void removeXAttr(Path path, String name) throws IOException {
     fs.removeXAttr(path, name);
   }
-  
+
+  @Override
+  public void setStoragePolicy(Path src, String policyName)
+      throws IOException {
+    fs.setStoragePolicy(src, policyName);
+  }
+
+  @Override
+  public void unsetStoragePolicy(Path src) throws IOException {
+    fs.unsetStoragePolicy(src);
+  }
+
+  @Override
+  public BlockStoragePolicySpi getStoragePolicy(final Path src)
+      throws IOException {
+    return fs.getStoragePolicy(src);
+  }
+
+  @Override
+  public Collection<? extends BlockStoragePolicySpi> getAllStoragePolicies()
+      throws IOException {
+    return fs.getAllStoragePolicies();
+  }
+
   @Override
   public Path getTrashRoot(Path path) {
     return fs.getTrashRoot(path);
@@ -621,5 +676,15 @@ public class FilterFileSystem extends FileSystem {
   @Override
   public Collection<FileStatus> getTrashRoots(boolean allUsers) {
     return fs.getTrashRoots(allUsers);
+  }
+
+  @Override
+  public FSDataOutputStreamBuilder createFile(Path path) {
+    return fs.createFile(path);
+  }
+
+  @Override
+  public FSDataOutputStreamBuilder appendFile(Path path) {
+    return fs.appendFile(path);
   }
 }

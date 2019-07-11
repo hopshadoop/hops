@@ -33,23 +33,26 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import static org.junit.Assert.*;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.TrashPolicyDefault.Emptier;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
-import org.junit.Before;
-import org.junit.Test;
 
 /**
  * This class tests commands from Trash.
  */
-public class TestTrash extends TestCase {
+public class TestTrash {
 
-  private final static Path TEST_DIR = new Path(GenericTestUtils.getTempPath(
+  private final static File BASE_PATH = new File(GenericTestUtils.getTempPath(
       "testTrash"));
+
+  private final static Path TEST_DIR = new Path(BASE_PATH.getAbsolutePath());
 
   @Before
   public void setUp() throws IOException {
@@ -127,6 +130,9 @@ public class TestTrash extends TestCase {
     FileSystem fs = FileSystem.get(conf);
 
     conf.setLong(FS_TRASH_INTERVAL_KEY, 0); // disabled
+    assertFalse(new Trash(conf).isEnabled());
+
+    conf.setLong(FS_TRASH_INTERVAL_KEY, -1); // disabled
     assertFalse(new Trash(conf).isEnabled());
 
     conf.setLong(FS_TRASH_INTERVAL_KEY, 10); // 10 minute
@@ -507,19 +513,79 @@ public class TestTrash extends TestCase {
     }
   }
 
+  @Test
   public void testTrash() throws IOException {
     Configuration conf = new Configuration();
     conf.setClass("fs.file.impl", TestLFS.class, FileSystem.class);
     trashShell(FileSystem.getLocal(conf), TEST_DIR);
   }
 
+  @Test
+  public void testExistingFileTrash() throws IOException {
+    Configuration conf = new Configuration();
+    conf.setClass("fs.file.impl", TestLFS.class, FileSystem.class);
+    FileSystem fs = FileSystem.getLocal(conf);
+    conf.set("fs.defaultFS", fs.getUri().toString());
+    conf.setLong(FS_TRASH_INTERVAL_KEY, 0); // disabled
+    assertFalse(new Trash(conf).isEnabled());
+
+    conf.setLong(FS_TRASH_INTERVAL_KEY, -1); // disabled
+    assertFalse(new Trash(conf).isEnabled());
+
+    conf.setLong(FS_TRASH_INTERVAL_KEY, 10); // 10 minute
+    assertTrue(new Trash(conf).isEnabled());
+
+    FsShell shell = new FsShell();
+    shell.setConf(conf);
+
+    // First create a new directory with mkdirs
+    Path myPath = new Path(TEST_DIR, "test/mkdirs");
+    mkdir(fs, myPath);
+
+    // Second, create a file in that directory.
+    Path myFile = new Path(TEST_DIR, "test/mkdirs/myExistingFile");
+    writeFile(fs, myFile, 10);
+    // First rm a file
+    mkdir(fs, myPath);
+    writeFile(fs, myFile, 10);
+
+    String[] args1 = new String[2];
+    args1[0] = "-rm";
+    args1[1] = myFile.toString();
+    int val1 = -1;
+    try {
+      val1 = shell.run(args1);
+    } catch (Exception e) {
+      System.err.println("Exception raised from Trash.run " +
+          e.getLocalizedMessage());
+    }
+    assertTrue(val1 == 0);
+
+    // Second  rm a file which parent path is the same as above
+    mkdir(fs, myFile);
+    writeFile(fs, new Path(myFile, "mySubFile"), 10);
+    String[] args2 = new String[2];
+    args2[0] = "-rm";
+    args2[1] = new Path(myFile, "mySubFile").toString();
+    int val2 = -1;
+    try {
+      val2 = shell.run(args2);
+    } catch (Exception e) {
+      System.err.println("Exception raised from Trash.run " +
+          e.getLocalizedMessage());
+    }
+    assertTrue(val2 == 0);
+  }
+
+  @Test
   public void testNonDefaultFS() throws IOException {
     Configuration conf = new Configuration();
     conf.setClass("fs.file.impl", TestLFS.class, FileSystem.class);
     conf.set("fs.defaultFS", "invalid://host/bar/foo");
     trashNonDefaultFS(conf);
   }
-  
+
+  @Test
   public void testPluggableTrash() throws IOException {
     Configuration conf = new Configuration();
 
@@ -604,6 +670,7 @@ public class TestTrash extends TestCase {
     verifyTrashPermission(FileSystem.getLocal(conf), conf);
   }
 
+  @Test
   public void testTrashEmptier() throws Exception {
     Configuration conf = new Configuration();
     // Trash with 12 second deletes and 6 seconds checkpoints
@@ -665,12 +732,9 @@ public class TestTrash extends TestCase {
     emptierThread.interrupt();
     emptierThread.join();
   }
-  
-  /**
-   * @see TestCase#tearDown()
-   */
-  @Override
-  protected void tearDown() throws IOException {
+
+  @After
+  public void tearDown() throws IOException {
     File trashDir = new File(TEST_DIR.toUri().getPath());
     if (trashDir.exists() && !FileUtil.fullyDelete(trashDir)) {
       throw new IOException("Cannot remove data directory: " + trashDir);
@@ -680,7 +744,7 @@ public class TestTrash extends TestCase {
   static class TestLFS extends LocalFileSystem {
     Path home;
     TestLFS() {
-      this(new Path(TEST_DIR, "user/test"));
+      this(TEST_DIR);
     }
     TestLFS(final Path home) {
       super(new RawLocalFileSystem() {
@@ -772,7 +836,8 @@ public class TestTrash extends TestCase {
 
   public static void verifyMoveEmptyDirToTrash(FileSystem fs,
       Configuration conf) throws IOException {
-    Path caseRoot = new Path(TEST_DIR, "testUserTrash");
+    Path caseRoot = new Path(
+        GenericTestUtils.getTempPath("testUserTrash"));
     Path testRoot = new Path(caseRoot, "trash-users");
     Path emptyDir = new Path(testRoot, "empty-dir");
     try (FileSystem fileSystem = fs){
@@ -806,7 +871,8 @@ public class TestTrash extends TestCase {
    */
   public static void verifyTrashPermission(FileSystem fs, Configuration conf)
       throws IOException {
-    Path caseRoot = new Path(TEST_DIR, "testTrashPermission");
+    Path caseRoot = new Path(BASE_PATH.getPath(),
+        "testTrashPermission");
     try (FileSystem fileSystem = fs){
       Trash trash = new Trash(fileSystem, conf);
       FileSystemTestWrapper wrapper =

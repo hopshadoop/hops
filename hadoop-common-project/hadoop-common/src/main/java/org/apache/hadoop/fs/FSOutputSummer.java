@@ -21,11 +21,11 @@ package org.apache.hadoop.fs;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.util.DataChecksum;
+import org.apache.htrace.core.TraceScope;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.zip.Checksum;
-import org.apache.htrace.core.TraceScope;
 
 /**
  * This is a generic output stream for generating checksums for
@@ -91,7 +91,7 @@ abstract public class FSOutputSummer extends OutputStream {
    * in a checksum chunk are in the buffer.  If the buffer is empty and
    * requested length is at least as large as the size of next checksum chunk
    * size, this method will checksum and write the chunk directly 
-   * to the underlying output stream.  Thus it avoids uneccessary data copy.
+   * to the underlying output stream.  Thus it avoids unnecessary data copy.
    *
    * @param      b     the data.
    * @param      off   the start offset in the data.
@@ -195,23 +195,27 @@ abstract public class FSOutputSummer extends OutputStream {
     return sum.getChecksumSize();
   }
 
+  protected DataChecksum getDataChecksum() {
+    return sum;
+  }
+
   protected TraceScope createWriteTraceScope() {
     return null;
   }
-  
+
   /** Generate checksums for the given data chunks and output chunks & checksums
    * to the underlying output stream.
    */
   private void writeChecksumChunks(byte b[], int off, int len)
-      throws IOException {
+  throws IOException {
     sum.calculateChunkedSums(b, off, len, checksum, 0);
     TraceScope scope = createWriteTraceScope();
     try {
       for (int i = 0; i < len; i += sum.getBytesPerChecksum()) {
         int chunkLen = Math.min(sum.getBytesPerChecksum(), len - i);
-        int ckOffset = i / sum.getBytesPerChecksum() * sum.getChecksumSize();
+        int ckOffset = i / sum.getBytesPerChecksum() * getChecksumSize();
         writeChunk(b, off + i, chunkLen, checksum, ckOffset,
-            sum.getChecksumSize());
+            getChecksumSize());
       }
     } finally {
       if (scope != null) {
@@ -243,8 +247,7 @@ abstract public class FSOutputSummer extends OutputStream {
    */
   protected synchronized void setChecksumBufSize(int size) {
     this.buf = new byte[size];
-    this.checksum = new byte[((size - 1) / sum.getBytesPerChecksum() + 1) *
-        sum.getChecksumSize()];
+    this.checksum = new byte[sum.getChecksumSize(size)];
     this.count = 0;
   }
 

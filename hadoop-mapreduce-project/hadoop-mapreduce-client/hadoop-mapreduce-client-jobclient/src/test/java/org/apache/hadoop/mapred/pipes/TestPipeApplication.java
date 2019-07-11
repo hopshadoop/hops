@@ -36,6 +36,7 @@ import java.util.Map.Entry;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.FsConstants;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.BooleanWritable;
@@ -66,7 +67,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
-import org.junit.Ignore;
 
 public class TestPipeApplication {
   private static File workSpace = new File("target",
@@ -79,7 +79,6 @@ public class TestPipeApplication {
    *
    * @throws Exception
    */
-  @Ignore //also time out on apache hadoop
   @Test
   public void testRunner() throws Exception {
 
@@ -96,7 +95,7 @@ public class TestPipeApplication {
       CombineOutputCollector<IntWritable, Text> output = new CombineOutputCollector<IntWritable, Text>(
               new Counters.Counter(), new Progress());
       FileSystem fs = new RawLocalFileSystem();
-      fs.setConf(conf);
+      fs.initialize(FsConstants.LOCAL_FS_URI, conf);
       Writer<IntWritable, Text> wr = new Writer<IntWritable, Text>(conf, fs.create(
               new Path(workSpace + File.separator + "outfile")), IntWritable.class,
               Text.class, null, null, true);
@@ -151,7 +150,7 @@ public class TestPipeApplication {
    *
    * @throws Throwable
    */
-  @Ignore //also time out on apache hadoop
+
   @Test
   public void testApplication() throws Throwable {
     JobConf conf = new JobConf();
@@ -178,7 +177,7 @@ public class TestPipeApplication {
       FakeCollector output = new FakeCollector(new Counters.Counter(),
               new Progress());
       FileSystem fs = new RawLocalFileSystem();
-      fs.setConf(conf);
+      fs.initialize(FsConstants.LOCAL_FS_URI, conf);
       Writer<IntWritable, Text> wr = new Writer<IntWritable, Text>(conf, fs.create(
               new Path(workSpace.getAbsolutePath() + File.separator + "outfile")),
               IntWritable.class, Text.class, null, null, true);
@@ -301,30 +300,27 @@ public class TestPipeApplication {
       assertTrue(out.toString().contains(
               "[-lazyOutput <true/false>] // createOutputLazily"));
 
-      assertTrue(out
-              .toString()
-              .contains(
-                      "-conf <configuration file>     specify an application configuration file"));
       assertTrue(out.toString().contains(
-              "-D <property=value>            use value for given property"));
+          "-conf <configuration file>        specify an application "
+              + "configuration file"));
       assertTrue(out.toString().contains(
-          "-fs <file:///|hdfs://namenode:port> "
-          + "specify default filesystem URL to use, overrides "
-          + "'fs.defaultFS' property from configurations."));
+          "-D <property=value>               define a value for a given "
+              + "property"));
+      assertTrue(out.toString()
+          .contains("-fs <file:///|hdfs://namenode:port> "
+              + "specify default filesystem URL to use, overrides "
+              + "'fs.defaultFS' property from configurations."));
       assertTrue(out.toString().contains(
-              "-jt <local|resourcemanager:port>    specify a ResourceManager"));
-      assertTrue(out
-              .toString()
-              .contains(
-                      "-files <comma separated list of files>    specify comma separated files to be copied to the map reduce cluster"));
-      assertTrue(out
-              .toString()
-              .contains(
-                      "-libjars <comma separated list of jars>    specify comma separated jar files to include in the classpath."));
-      assertTrue(out
-              .toString()
-              .contains(
-                      "-archives <comma separated list of archives>    specify comma separated archives to be unarchived on the compute machines."));
+          "-jt <local|resourcemanager:port>  specify a ResourceManager"));
+      assertTrue(out.toString().contains(
+          "-files <file1,...>                specify a comma-separated list of "
+              + "files to be copied to the map reduce cluster"));
+      assertTrue(out.toString().contains(
+          "-libjars <jar1,...>               specify a comma-separated list of "
+              + "jar files to be included in the classpath"));
+      assertTrue(out.toString().contains(
+          "-archives <archive1,...>          specify a comma-separated list of "
+              + "archives to be unarchived on the compute machines"));
     } finally {
       System.setOut(oldps);
       // restore
@@ -389,7 +385,6 @@ public class TestPipeApplication {
    *
    * @throws Exception
    */
-  @Ignore //also time out on apache hadoop
   @Test
   public void testPipesReduser() throws Exception {
 

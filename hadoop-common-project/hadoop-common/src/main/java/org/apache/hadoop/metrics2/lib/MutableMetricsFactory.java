@@ -21,20 +21,21 @@ package org.apache.hadoop.metrics2.lib;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class MutableMetricsFactory {
-  private static final Log LOG = LogFactory.getLog(MutableMetricsFactory.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MutableMetricsFactory.class);
 
   MutableMetric newForField(Field field, Metric annotation,
                             MetricsRegistry registry) {
@@ -60,6 +61,9 @@ public class MutableMetricsFactory {
     if (cls == MutableGaugeLong.class) {
       return registry.newGauge(info, 0L);
     }
+    if (cls == MutableGaugeFloat.class) {
+      return registry.newGauge(info, 0f);
+    }
     if (cls == MutableRate.class) {
       return registry.newRate(info.name(), info.description(),
                               annotation.always());
@@ -74,6 +78,14 @@ public class MutableMetricsFactory {
       return registry.newStat(info.name(), info.description(),
                               annotation.sampleName(), annotation.valueName(),
                               annotation.always());
+    }
+    if (cls == MutableRollingAverages.class) {
+      return registry.newMutableRollingAverages(info.name(),
+          annotation.valueName());
+    }
+    if (cls == MutableQuantiles.class) {
+      return registry.newQuantiles(info.name(), annotation.about(),
+          annotation.sampleName(), annotation.valueName(), annotation.interval());
     }
     throw new MetricsException("Unsupported metric field "+ field.getName() +
                                " of type "+ field.getType().getName());
@@ -133,6 +145,10 @@ public class MutableMetricsFactory {
     return Interns.info(name2, about.isEmpty() ? name2 : about);
   }
 
+  /**
+   * Remove the prefix "get", if any, from the method name. Return the
+   * capacitalized method name."
+   */
   protected String getName(Method method) {
     String methodName = method.getName();
     if (methodName.startsWith("get")) {
@@ -143,12 +159,15 @@ public class MutableMetricsFactory {
 
   protected MetricsInfo getInfo(Metric annotation, String defaultName) {
     String[] value = annotation.value();
-     if (value.length == 2) {
+    if (value.length == 2) {
+      // Use name and description from the annotation
       return Interns.info(value[0], value[1]);
     }
     if (value.length == 1) {
+      // Use description from the annotation and method name as metric name
       return Interns.info(defaultName, value[0]);
     }
+    // Use method name as metric name and description
     return Interns.info(defaultName, defaultName);
   }
 }

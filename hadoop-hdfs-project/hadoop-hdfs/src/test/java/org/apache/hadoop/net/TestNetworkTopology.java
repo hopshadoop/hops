@@ -182,11 +182,9 @@ public class TestNetworkTopology {
     testNodes[2] = dataNodes[3];
     cluster.setRandomSeed(0xDEAD);
     cluster.sortByDistance(dataNodes[0], testNodes, testNodes.length);
-    // sortByDistance does not take the "data center" layer into consideration
-    // and it doesn't sort by getDistance, so 1, 5, 3 is also valid here
     assertTrue(testNodes[0] == dataNodes[1]);
-    assertTrue(testNodes[1] == dataNodes[5]);
-    assertTrue(testNodes[2] == dataNodes[3]);
+    assertTrue(testNodes[1] == dataNodes[3]);
+    assertTrue(testNodes[2] == dataNodes[5]);
 
     // Array of just rack-local nodes
     // Expect a random first node

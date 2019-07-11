@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.tools;
 
-import org.apache.commons.logging.Log;
+import org.slf4j.Logger;
 import org.apache.hadoop.fs.viewfs.*;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -35,10 +35,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import org.junit.After;
 
 public class TestDistCpViewFs {
-  private static final Log LOG = LogFactory.getLog(TestDistCpViewFs.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestDistCpViewFs.class);
 
   private static FileSystem fs;
 
@@ -61,18 +60,18 @@ public class TestDistCpViewFs {
       ConfigUtil.addLink(vConf, "/usr", new URI(fswd.toString())); 
       fs = FileSystem.get(FsConstants.VIEWFS_URI, vConf);
       fs.setWorkingDirectory(new Path("/usr"));
-      listFile = new Path("target/tmp/root/listing").makeQualified(fs.getUri(),
+      listFile = new Path("target/tmp/listing").makeQualified(fs.getUri(),
               fs.getWorkingDirectory());
-      target = new Path("target/tmp/root/target").makeQualified(fs.getUri(),
+      target = new Path("target/tmp/target").makeQualified(fs.getUri(),
               fs.getWorkingDirectory()); 
-      root = new Path("target/tmp/root").makeQualified(fs.getUri(),
+      root = new Path("target/tmp").makeQualified(fs.getUri(),
               fs.getWorkingDirectory()).toString();
       TestDistCpUtils.delete(fs, root);
     } catch (IOException e) {
       LOG.error("Exception encountered ", e);
     }
   }
- 
+
   @Test
   public void testSingleFileMissingTarget() throws IOException {
     caseSingleFileMissingTarget(false);
@@ -414,11 +413,13 @@ public class TestDistCpViewFs {
 
   private void runTest(Path listFile, Path target, boolean targetExists, 
       boolean sync) throws IOException {
-    DistCpOptions options = new DistCpOptions(listFile, target);
-    options.setSyncFolder(sync);
-    options.setTargetPathExists(targetExists);
+    final DistCpOptions options = new DistCpOptions.Builder(listFile, target)
+        .withSyncFolder(sync)
+        .build();
     try {
-      new DistCp(getConf(), options).execute();
+      final DistCp distcp = new DistCp(getConf(), options);
+      distcp.context.setTargetPathExists(targetExists);
+      distcp.execute();
     } catch (Exception e) {
       LOG.error("Exception encountered ", e);
       throw new IOException(e);

@@ -28,8 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.net.SocketFactory;
 
-import org.apache.commons.logging.*;
-
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client.ConnectionId;
@@ -43,11 +41,14 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.*;
 import org.apache.htrace.core.TraceScope;
 import org.apache.htrace.core.Tracer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** An RpcEngine implementation for Writable data. */
 @InterfaceStability.Evolving
+@Deprecated
 public class WritableRpcEngine implements RpcEngine {
-  private static final Log LOG = LogFactory.getLog(RPC.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RPC.class);
   
   //writableRpcVersion should be updated if there is a change
   //in format of the rpc messages.
@@ -182,10 +183,13 @@ public class WritableRpcEngine implements RpcEngine {
       StringBuilder buffer = new StringBuilder();
       buffer.append(methodName);
       buffer.append("(");
-      for (int i = 0; i < parameters.length; i++) {
-        if (i != 0)
-          buffer.append(", ");
-        buffer.append(parameters[i]);
+      if (parameters != null) {
+        for (int i = 0; i < parameters.length; i++) {
+          if (i != 0) {
+            buffer.append(", ");
+          }
+          buffer.append(parameters[i]);
+        }
       }
       buffer.append(")");
       buffer.append(", rpc version="+rpcVersion);
@@ -230,7 +234,7 @@ public class WritableRpcEngine implements RpcEngine {
       throws Throwable {
       long startTime = 0;
       if (LOG.isDebugEnabled()) {
-        startTime = Time.now();
+        startTime = Time.monotonicNow();
       }
 
       // if Tracing is on then start a new span for this rpc.
@@ -250,7 +254,7 @@ public class WritableRpcEngine implements RpcEngine {
         if (traceScope != null) traceScope.close();
       }
       if (LOG.isDebugEnabled()) {
-        long callTime = Time.now() - startTime;
+        long callTime = Time.monotonicNow() - startTime;
         LOG.debug("Call: " + method.getName() + " " + callTime);
       }
       return value.get();
@@ -331,8 +335,9 @@ public class WritableRpcEngine implements RpcEngine {
 
 
   /** An RPC Server. */
+  @Deprecated
   public static class Server extends RPC.Server {
-    /**
+    /** 
      * Construct an RPC server.
      * @param instance the instance whose methods will be called
      * @param conf the configuration to use
@@ -404,7 +409,7 @@ public class WritableRpcEngine implements RpcEngine {
         throws IOException {
       super(bindAddress, port, null, numHandlers, numReaders,
           queueSizePerHandler, conf,
-          classNameBase(protocolImpl.getClass().getName()), secretManager,
+          serverNameFromClass(protocolImpl.getClass()), secretManager,
           portRangeConfig);
 
       this.verbose = verbose;
@@ -443,7 +448,8 @@ public class WritableRpcEngine implements RpcEngine {
         value = value.substring(0, 55)+"...";
       LOG.info(value);
     }
-    
+
+    @Deprecated
     static class WritableRpcInvoker implements RpcInvoker {
 
      @Override
@@ -549,7 +555,8 @@ public class WritableRpcEngine implements RpcEngine {
           String detailedMetricsName = (exception == null) ?
               call.getMethodName() :
               exception.getClass().getSimpleName();
-          server.updateMetrics(detailedMetricsName, qTime, processingTime);
+          server
+              .updateMetrics(detailedMetricsName, qTime, processingTime, false);
         }
       }
     }

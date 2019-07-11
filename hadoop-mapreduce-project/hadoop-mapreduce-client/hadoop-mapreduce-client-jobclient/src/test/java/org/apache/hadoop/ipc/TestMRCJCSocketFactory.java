@@ -18,11 +18,9 @@
 package org.apache.hadoop.ipc;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
-import java.net.URI;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,6 +33,7 @@ import org.apache.hadoop.mapred.JobStatus;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
 import org.apache.hadoop.net.StandardSocketFactory;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -77,7 +76,7 @@ public class TestMRCJCSocketFactory {
 
       Assert.assertFalse(directDfs.exists(filePath));
       Assert.assertFalse(dfs.exists(filePath));
-      
+
       directDfs.mkdirs(filePath);
       Assert.assertTrue(directDfs.exists(filePath));
       Assert.assertTrue(dfs.exists(filePath));
@@ -91,9 +90,9 @@ public class TestMRCJCSocketFactory {
       jconf.set("hadoop.rpc.socket.factory.class.default",
                 "org.apache.hadoop.ipc.DummySocketFactory");
       jconf.set(MRConfig.FRAMEWORK_NAME, MRConfig.YARN_FRAMEWORK_NAME);
-      String rmAddress = jconf.get("yarn.resourcemanager.address");
+      String rmAddress = jconf.get(YarnConfiguration.RM_ADDRESS);
       String[] split = rmAddress.split(":");
-      jconf.set("yarn.resourcemanager.address", split[0] + ':'
+      jconf.set(YarnConfiguration.RM_ADDRESS, split[0] + ':'
           + (Integer.parseInt(split[1]) + 10));
       client = new JobClient(jconf);
 
@@ -111,7 +110,7 @@ public class TestMRCJCSocketFactory {
 
   private MiniMRYarnCluster initAndStartMiniMRYarnCluster(JobConf jobConf) {
     MiniMRYarnCluster miniMRYarnCluster;
-    miniMRYarnCluster = new MiniMRYarnCluster(this.getClass().getName(), 1, false);
+    miniMRYarnCluster = new MiniMRYarnCluster(this.getClass().getName(), 1);
     miniMRYarnCluster.init(jobConf);
     miniMRYarnCluster.start();
     return miniMRYarnCluster;

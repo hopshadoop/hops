@@ -18,15 +18,21 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
+import java.util.Collections;
+import java.util.List;
+
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
+import org.apache.hadoop.yarn.api.records.ApplicationTimeoutType;
+import org.apache.hadoop.yarn.api.records.CollectorInfo;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.LogAggregationStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeUpdateType;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -35,11 +41,13 @@ import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationSubmissionContextPBImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
+import org.apache.hadoop.yarn.server.api.records.AppCollectorData;
+import org.apache.hadoop.yarn.server.resourcemanager.placement
+    .ApplicationPlacementContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +59,7 @@ public class MockRMApp implements RMApp {
   String name = MockApps.newAppName();
   String queue = MockApps.newQueue();
   long start = System.currentTimeMillis() - (int) (Math.random() * DT);
+  private long launch = start;
   long submit = start - (int) (Math.random() * DT);
   long finish = 0;
   RMAppState state = RMAppState.NEW;
@@ -61,7 +70,10 @@ public class MockRMApp implements RMApp {
   StringBuilder diagnostics = new StringBuilder();
   RMAppAttempt attempt;
   int maxAppAttempts = 1;
-  ResourceRequest amReq;
+  List<ResourceRequest> amReqs;
+  private Set<String> applicationTags = null;
+  private boolean logAggregationEnabled;
+  private boolean logAggregationFinished;
   byte[] keyStore;
   char[] keyStorePassword;
   byte[] trustStore;
@@ -77,13 +89,19 @@ public class MockRMApp implements RMApp {
     finish = time;
     id = MockApps.newAppID(newid);
     state = newState;
-    amReq = ResourceRequest.newInstance(Priority.UNDEFINED, "0.0.0.0",
-        Resource.newInstance(0, 0), 1);
+    amReqs = Collections.singletonList(ResourceRequest.newInstance(
+        Priority.UNDEFINED, "0.0.0.0", Resource.newInstance(0, 0), 1));
   }
 
   public MockRMApp(int newid, long time, RMAppState newState, String userName) {
     this(newid, time, newState);
     user = userName;
+  }
+
+  public MockRMApp(int newid, long time, RMAppState newState,
+      String userName, Set<String> appTags) {
+    this(newid, time, newState, userName);
+    this.applicationTags = appTags;
   }
 
   public MockRMApp(int newid, long time, RMAppState newState, String userName, String diag) {
@@ -191,6 +209,11 @@ public class MockRMApp implements RMApp {
     return submit;
   }
 
+  @Override
+  public long getLaunchTime() {
+    return launch;
+  }
+
   public void setStartTime(long time) {
     this.start = time;
   }
@@ -227,6 +250,24 @@ public class MockRMApp implements RMApp {
     return maxAppAttempts;
   }
 
+  @Override
+  public boolean isLogAggregationEnabled() {
+    return logAggregationEnabled;
+  }
+
+  @Override
+  public boolean isLogAggregationFinished() {
+    return logAggregationFinished;
+  }
+
+  public void setLogAggregationEnabled(boolean enabled) {
+    this.logAggregationEnabled = enabled;
+  }
+
+  public void setLogAggregationFinished(boolean finished) {
+    this.logAggregationFinished = finished;
+  }
+
   public void setNumMaxRetries(int maxAppAttempts) {
     this.maxAppAttempts = maxAppAttempts;
   }
@@ -241,7 +282,7 @@ public class MockRMApp implements RMApp {
   }
 
   @Override
-  public int pullRMNodeUpdates(Collection<RMNode> updatedNodes) {
+  public int pullRMNodeUpdates(Map<RMNode, NodeUpdateType> updatedNodes) {
     throw new UnsupportedOperationException("Not supported yet.");
   }
 
@@ -252,7 +293,7 @@ public class MockRMApp implements RMApp {
 
   @Override
   public Set<String> getApplicationTags() {
-    return null;
+    return this.applicationTags;
   }
 
   @Override
@@ -285,8 +326,8 @@ public class MockRMApp implements RMApp {
   }
   
   @Override
-  public ResourceRequest getAMResourceRequest() {
-    return this.amReq; 
+  public List<ResourceRequest> getAMResourceRequests() {
+    return this.amReqs;
   }
 
   @Override
@@ -311,6 +352,41 @@ public class MockRMApp implements RMApp {
 
   public CallerContext getCallerContext() {
     throw new UnsupportedOperationException("Not supported yet.");
+  }
+
+  @Override
+  public AppCollectorData getCollectorData() {
+    throw new UnsupportedOperationException("Not supported yet.");
+  }
+
+  @Override
+  public Map<ApplicationTimeoutType, Long> getApplicationTimeouts() {
+    return Collections.emptyMap();
+  }
+
+  @Override
+  public Priority getApplicationPriority() {
+    return null;
+  }
+
+  @Override
+  public boolean isAppInCompletedStates() {
+    return false;
+  }
+
+  @Override
+  public ApplicationPlacementContext getApplicationPlacementContext() {
+    return null;
+  }
+
+  @Override
+  public CollectorInfo getCollectorInfo() {
+    throw new UnsupportedOperationException("Not supported yet.");
+  }
+
+  @Override
+  public Map<String, String> getApplicationSchedulingEnvs() {
+    return null;
   }
   
   @Override

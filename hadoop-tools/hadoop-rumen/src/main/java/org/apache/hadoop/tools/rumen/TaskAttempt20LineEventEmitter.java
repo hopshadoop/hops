@@ -110,7 +110,7 @@ public abstract class TaskAttempt20LineEventEmitter extends HistoryEventEmitter 
 
       if (finishTime != null && status != null
           && status.equalsIgnoreCase("success")) {
-        String hostName = line.get("RPC_ADDRESSES");
+        String hostName = line.get("HOSTNAME");
         String counters = line.get("COUNTERS");
         String state = line.get("STATE_STRING");
 
@@ -144,7 +144,7 @@ public abstract class TaskAttempt20LineEventEmitter extends HistoryEventEmitter 
 
       if (finishTime != null && status != null
           && !status.equalsIgnoreCase("success")) {
-        String hostName = line.get("RPC_ADDRESSES");
+        String hostName = line.get("HOSTNAME");
         String error = line.get("ERROR");
 
         TaskAttempt20LineEventEmitter that =

@@ -296,7 +296,7 @@ public class QuotaUsage {
       quotaStr = formatSize(quota, hOption);
       quotaRem = formatSize(quota-fileAndDirectoryCount, hOption);
     }
-    if (spaceQuota >= 0) {
+    if (spaceQuota > 0) {
       spaceQuotaStr = formatSize(spaceQuota, hOption);
       spaceQuotaRem = formatSize(spaceQuota - spaceConsumed, hOption);
     }

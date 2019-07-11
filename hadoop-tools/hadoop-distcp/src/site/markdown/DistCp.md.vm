@@ -14,7 +14,7 @@
 
 #set ( $H3 = '###' )
 
-DistCp Version2 Guide
+DistCp Guide
 =====================
 
 ---
@@ -32,7 +32,6 @@ DistCp Version2 Guide
      - [Map sizing](#Map_sizing)
      - [Copying Between Versions of HDFS](#Copying_Between_Versions_of_HDFS)
      - [MapReduce and other side-effects](#MapReduce_and_other_side-effects)
-     - [SSL Configurations for HSFTP sources](#SSL_Configurations_for_HSFTP_sources)
  - [Frequently Asked Questions](#Frequently_Asked_Questions)
 
 ---
@@ -40,7 +39,7 @@ DistCp Version2 Guide
 Overview
 --------
 
-  DistCp Version 2 (distributed copy) is a tool used for large
+  DistCp (distributed copy) is a tool used for large
   inter/intra-cluster copying. It uses MapReduce to effect its distribution,
   error handling and recovery, and reporting. It expands a list of files and
   directories into input to map tasks, each of which will copy a partition of
@@ -218,9 +217,10 @@ Command Line Options
 
 Flag              | Description                          | Notes
 ----------------- | ------------------------------------ | --------
-`-p[rbugpcaxt]` | Preserve r: replication number b: block size u: user g: group p: permission c: checksum-type a: ACL x: XAttr t: timestamp | When `-update` is specified, status updates will **not** be synchronized unless the file sizes also differ (i.e. unless the file is re-created). If -pa is specified, DistCp preserves the permissions also because ACLs are a super-set of permissions.
+`-p[rbugpcaxt]` | Preserve r: replication number b: block size u: user g: group p: permission c: checksum-type a: ACL x: XAttr t: timestamp | When `-update` is specified, status updates will **not** be synchronized unless the file sizes also differ (i.e. unless the file is re-created). If -pa is specified, DistCp preserves the permissions also because ACLs are a super-set of permissions. The option -pr is only valid if both source and target directory are not erasure coded. **Note:** If -p option's are not specified, then by default block size is preserved.
 `-i` | Ignore failures | As explained in the Appendix, this option will keep more accurate statistics about the copy than the default case. It also preserves logs from failed copies, which can be valuable for debugging. Finally, a failing map will not cause the job to fail before all splits are attempted.
 `-log <logdir>` | Write logs to \<logdir\> | DistCp keeps logs of each file it attempts to copy as map output. If a map fails, the log output will not be retained if it is re-executed.
+`-v` | Log additional info (path, size) in the SKIP/COPY log | This option can only be used with -log option.
 `-m <num_maps>` | Maximum number of simultaneous copies | Specify the number of maps to copy data. Note that more maps may not necessarily improve throughput.
 `-overwrite` | Overwrite destination | If a map fails and `-i` is not specified, all the files in the split, not only those that failed, will be recopied. As discussed in the Usage documentation, it also changes the semantics for generating destination paths, so users should use this carefully.
 `-update` | Overwrite if source and destination differ in size, blocksize, or checksum | As noted in the preceding, this is not a "sync" operation. The criteria examined are the source and destination file sizes, blocksizes, and checksums; if they differ, the source file replaces the destination file. As discussed in the Usage documentation, it also changes the semantics for generating destination paths, so users should use this carefully.
@@ -229,15 +229,17 @@ Flag              | Description                          | Notes
 `-filters` | The path to a file containing a list of pattern strings, one string per line, such that paths matching the pattern will be excluded from the copy. | Support regular expressions specified by java.util.regex.Pattern.
 `-filelimit <n>` | Limit the total number of files to be <= n | **Deprecated!** Ignored in the new DistCp.
 `-sizelimit <n>` | Limit the total size to be <= n bytes | **Deprecated!** Ignored in the new DistCp.
-`-delete` | Delete the files existing in the dst but not in src | The deletion is done by FS Shell. So the trash will be used, if it is enable.
+`-delete` | Delete the files existing in the dst but not in src | The deletion is done by FS Shell. So the trash will be used, if it is enable. Delete is applicable only with update or overwrite options.
 `-strategy {dynamic|uniformsize}` | Choose the copy-strategy to be used in DistCp. | By default, uniformsize is used. (i.e. Maps are balanced on the total size of files copied by each map. Similar to legacy.) If "dynamic" is specified, `DynamicInputFormat` is used instead. (This is described in the Architecture section, under InputFormats.)
 `-bandwidth` | Specify bandwidth per map, in MB/second. | Each map will be restricted to consume only the specified bandwidth. This is not always exact. The map throttles back its bandwidth consumption during a copy, such that the **net** bandwidth used tends towards the specified value.
 `-atomic {-tmp <tmp_dir>}` | Specify atomic commit, with optional tmp directory. | `-atomic` instructs DistCp to copy the source data to a temporary target location, and then move the temporary target to the final-location atomically. Data will either be available at final target in a complete and consistent form, or not at all. Optionally, `-tmp` may be used to specify the location of the tmp-target. If not specified, a default is chosen. **Note:** tmp_dir must be on the final target cluster.
-`-mapredSslConf <ssl_conf_file>` | Specify SSL Config file, to be used with HSFTP source | When using the hsftp protocol with a source, the security- related properties may be specified in a config-file and passed to DistCp. \<ssl_conf_file\> needs to be in the classpath.
 `-async` | Run DistCp asynchronously. Quits as soon as the Hadoop Job is launched. | The Hadoop Job-id is logged, for tracking.
-`-diff <fromSnapshot> <toSnapshot>` | Use snapshot diff report between given two snapshots to identify the difference between source and target. | This option is valid only with `-update` option and the following conditions should be satisfied. 1. Both the source and target FileSystem must be DistributedFileSystem. 2. Two snapshots (e.g., s1 and s2) have been created on the source FS. The diff between these two snapshots will be copied to the target FS. 3. The target has the same snapshot s1. No changes have been made on the target since s1. All the files/directories in the target are the same with source.s1. |
+`-diff <oldSnapshot> <newSnapshot>` | Use snapshot diff report between given two snapshots to identify the difference between source and target, and apply the diff to the target to make it in sync with source. | This option is valid only with `-update` option and the following conditions should be satisfied. <ol><li> Both the source and the target FileSystem must be DistributedFileSystem.</li> <li> Two snapshots `<oldSnapshot>` and `<newSnapshot>` have been created on the source FS, and `<oldSnapshot>` is older than `<newSnapshot>`. </li> <li> The target has the same snapshot `<oldSnapshot>`. No changes have been made on the target since `<oldSnapshot>` was created, thus `<oldSnapshot>` has the same content as the current state of the target. All the files/directories in the target are the same with source's `<oldSnapshot>`.</li></ol> |
+`-rdiff <newSnapshot> <oldSnapshot>` | Use snapshot diff report between given two snapshots to identify what has been changed on the target since the snapshot `<oldSnapshot>` was created on the target, and apply the diff reversely to the target, and copy modified files from the source's `<oldSnapshot>`, to make the target the same as `<oldSnapshot>`. | This option is valid only with `-update` option and the following conditions should be satisfied. <ol><li>Both the source and the target FileSystem must be DistributedFileSystem. The source and the target can be two different clusters/paths, or they can be exactly the same cluster/path. In the latter case, modified files are copied from target's `<oldSnapshot>` to target's current state).</li>  <li> Two snapshots `<newSnapshot>` and `<oldSnapshot>` have been created on the target FS, and `<oldSnapshot>` is older than `<newSnapshot>`. No change has been made on target since `<newSnapshot>` was created on the target. </li> <li> The source has the same snapshot `<oldSnapshot>`, which has the same content as the `<oldSnapshot>` on the target. All the files/directories in the target's `<oldSnapshot>` are the same with source's `<oldSnapshot>`.</li> </ol> |
 `-numListstatusThreads` | Number of threads to use for building file listing | At most 40 threads.
 `-skipcrccheck` | Whether to skip CRC checks between source and target paths. |
+`-blocksperchunk <blocksperchunk>` | Number of blocks per chunk. When specified, split files into chunks to copy in parallel | If set to a positive value, files with more blocks than this value will be split into chunks of `<blocksperchunk>` blocks to be transferred in parallel, and reassembled on the destination. By default, `<blocksperchunk>` is 0 and the files will be transmitted in their entirety without splitting. This switch is only applicable when the source file system implements getBlockLocations method and the target file system implements concat method. |
+`-copybuffersize <copybuffersize>` | Size of the copy buffer to use. By default, `<copybuffersize>` is set to 8192B |
 
 Architecture of DistCp
 ----------------------
@@ -434,43 +436,6 @@ $H3 MapReduce and other side-effects
   * If `mapreduce.map.speculative` is set set final and true, the result of the
     copy is undefined.
 
-$H3 SSL Configurations for HSFTP sources
-
-  To use an HSFTP source (i.e. using the hsftp protocol), a SSL configuration
-  file needs to be specified (via the `-mapredSslConf` option). This must
-  specify 3 parameters:
-
-  * `ssl.client.truststore.location`: The local-filesystem location of the
-    trust-store file, containing the certificate for the NameNode.
-  * `ssl.client.truststore.type`: (Optional) The format of the trust-store
-    file.
-  * `ssl.client.truststore.password`: (Optional) Password for the trust-store
-    file.
-
-  The following is an example SSL configuration file:
-
-    <configuration>
-      <property>
-        <name>ssl.client.truststore.location</name>
-        <value>/work/keystore.jks</value>
-        <description>Truststore to be used by clients like distcp. Must be specified.</description>
-      </property>
-
-      <property>
-        <name>ssl.client.truststore.password</name>
-        <value>changeme</value>
-        <description>Optional. Default value is "".</description>
-      </property>
-
-      <property>
-        <name>ssl.client.truststore.type</name>
-        <value>jks</value>
-        <description>Optional. Default value is "jks".</description>
-      </property>
-    </configuration>
-
-  The SSL configuration file must be in the class-path of the DistCp program.
-
 $H3 DistCp and Object Stores
 
 DistCp works with Object Stores such as Amazon S3, Azure WASB and OpenStack Swift.
@@ -541,7 +506,7 @@ the `-atomic` operation doesn't actually deliver what is promised. *Avoid*.
 
 * The `-append` option is not supported.
 
-* The `-diff` option is not supported.
+* The `-diff` and `rdiff` options are not supported
 
 * CRC checking will not be performed, irrespective of the value of the `-skipCrc`
 flag.

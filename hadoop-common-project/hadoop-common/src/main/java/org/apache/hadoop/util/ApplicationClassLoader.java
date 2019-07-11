@@ -19,7 +19,6 @@
 package org.apache.hadoop.util;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -30,10 +29,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A {@link URLClassLoader} for application isolation. Classes from the
@@ -55,16 +56,8 @@ public class ApplicationClassLoader extends URLClassLoader {
   private static final String SYSTEM_CLASSES_DEFAULT_KEY =
       "system.classes.default";
 
-  private static final Log LOG =
-    LogFactory.getLog(ApplicationClassLoader.class.getName());
-
-  private static final FilenameFilter JAR_FILENAME_FILTER =
-    new FilenameFilter() {
-      @Override
-      public boolean accept(File dir, String name) {
-        return name.endsWith(".jar") || name.endsWith(".JAR");
-      }
-  };
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ApplicationClassLoader.class.getName());
 
   static {
     try (InputStream is = ApplicationClassLoader.class.getClassLoader()
@@ -116,11 +109,10 @@ public class ApplicationClassLoader extends URLClassLoader {
     List<URL> urls = new ArrayList<URL>();
     for (String element : classpath.split(File.pathSeparator)) {
       if (element.endsWith("/*")) {
-        String dir = element.substring(0, element.length() - 1);
-        File[] files = new File(dir).listFiles(JAR_FILENAME_FILTER);
-        if (files != null) {
-          for (File file : files) {
-            urls.add(file.toURI().toURL());
+        List<Path> jars = FileUtil.getJarsInDirectory(element);
+        if (!jars.isEmpty()) {
+          for (Path jar: jars) {
+            urls.add(jar.toUri().toURL());
           }
         }
       } else {
@@ -187,7 +179,7 @@ public class ApplicationClassLoader extends URLClassLoader {
         }
       } catch (ClassNotFoundException e) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug(e);
+          LOG.debug(e.toString());
         }
         ex = e;
       }

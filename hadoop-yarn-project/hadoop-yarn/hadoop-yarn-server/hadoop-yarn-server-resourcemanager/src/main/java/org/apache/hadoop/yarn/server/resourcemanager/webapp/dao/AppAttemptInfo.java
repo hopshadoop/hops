@@ -21,7 +21,7 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
@@ -35,12 +35,14 @@ public class AppAttemptInfo {
 
   protected int id;
   protected long startTime;
+  protected long finishedTime;
   protected String containerId;
   protected String nodeHttpAddress;
   protected String nodeId;
   protected String logsLink;
   protected String blacklistedNodes;
-  protected String nodesBlacklistedBySystem;
+  private String nodesBlacklistedBySystem;
+  protected String appAttemptId;
 
   public AppAttemptInfo() {
   }
@@ -56,6 +58,7 @@ public class AppAttemptInfo {
     if (attempt != null) {
       this.id = attempt.getAppAttemptId().getAttemptId();
       this.startTime = attempt.getStartTime();
+      this.finishedTime = attempt.getFinishTime();
       Container masterContainer = attempt.getMasterContainer();
       if (masterContainer != null) {
         this.containerId = masterContainer.getId().toString();
@@ -79,6 +82,7 @@ public class AppAttemptInfo {
           }
         }
       }
+      this.appAttemptId = attempt.getAppAttemptId().toString();
     }
   }
 
@@ -90,11 +94,19 @@ public class AppAttemptInfo {
     return this.startTime;
   }
 
+  public long getFinishedTime() {
+    return this.finishedTime;
+  }
+
   public String getNodeHttpAddress() {
     return this.nodeHttpAddress;
   }
 
   public String getLogsLink() {
     return this.logsLink;
+  }
+
+  public String getAppAttemptId() {
+    return this.appAttemptId;
   }
 }

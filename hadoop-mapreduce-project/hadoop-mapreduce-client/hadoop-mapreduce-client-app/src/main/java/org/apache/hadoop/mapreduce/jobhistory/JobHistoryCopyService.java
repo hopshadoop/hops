@@ -20,8 +20,6 @@ package org.apache.hadoop.mapreduce.jobhistory;
 
 import java.io.IOException;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileContext;
@@ -31,8 +29,11 @@ import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.jobhistory.JobHistoryUtils;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Reads in history events from the JobHistoryFile and sends them out again
@@ -40,15 +41,16 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
  */
 public class JobHistoryCopyService extends CompositeService implements HistoryEventHandler {
 
-  private static final Log LOG = LogFactory.getLog(JobHistoryCopyService.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(JobHistoryCopyService.class);
 
   private final ApplicationAttemptId applicationAttemptId;
-  private final EventHandler handler;
+  private final EventHandler<Event> handler;
   private final JobId jobId;
 
 
   public JobHistoryCopyService(ApplicationAttemptId applicationAttemptId, 
-      EventHandler handler) {
+      EventHandler<Event> handler) {
     super("JobHistoryCopyService");
     this.applicationAttemptId = applicationAttemptId;
     this.jobId =  TypeConverter.toYarn(

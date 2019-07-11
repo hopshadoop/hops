@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -35,8 +36,8 @@ import java.util.Stack;
 import java.util.TreeSet;
 import java.util.Map.Entry;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import javax.annotation.Nonnull;
+
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -46,6 +47,7 @@ import org.apache.hadoop.fs.Options.CreateOpts;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsCreateModes;
 import org.apache.hadoop.fs.permission.FsPermission;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT;
@@ -62,72 +64,64 @@ import org.apache.hadoop.util.ShutdownHookManager;
 
 import com.google.common.base.Preconditions;
 import org.apache.htrace.core.Tracer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * The FileContext class provides an interface to the application writer for
- * using the Hadoop file system.
- * It provides a set of methods for the usual operation: create, open, 
- * list, etc 
+ * The FileContext class provides an interface for users of the Hadoop
+ * file system. It exposes a number of file system operations, e.g. create,
+ * open, list.
  * 
- * <p>
- * <b> *** Path Names *** </b>
- * <p>
+ * <h2>Path Names</h2>
  * 
- * The Hadoop file system supports a URI name space and URI names.
- * It offers a forest of file systems that can be referenced using fully
- * qualified URIs.
- * Two common Hadoop file systems implementations are
+ * The Hadoop file system supports a URI namespace and URI names. This enables
+ * multiple types of file systems to be referenced using fully-qualified URIs.
+ * Two common Hadoop file system implementations are
  * <ul>
- * <li> the local file system: file:///path
- * <li> the hdfs file system hdfs://nnAddress:nnPort/path
+ * <li>the local file system: file:///path
+ * <li>the HDFS file system: hdfs://nnAddress:nnPort/path
  * </ul>
  * 
- * While URI names are very flexible, it requires knowing the name or address
- * of the server. For convenience one often wants to access the default system
- * in one's environment without knowing its name/address. This has an
- * additional benefit that it allows one to change one's default fs
- *  (e.g. admin moves application from cluster1 to cluster2).
+ * The Hadoop file system also supports additional naming schemes besides URIs.
+ * Hadoop has the concept of a <i>default file system</i>, which implies a
+ * default URI scheme and authority. This enables <i>slash-relative names</i>
+ * relative to the default FS, which are more convenient for users and
+ * application writers. The default FS is typically set by the user's
+ * environment, though it can also be manually specified.
  * <p>
  * 
- * To facilitate this, Hadoop supports a notion of a default file system.
- * The user can set his default file system, although this is
- * typically set up for you in your environment via your default config.
- * A default file system implies a default scheme and authority; slash-relative
- * names (such as /for/bar) are resolved relative to that default FS.
- * Similarly a user can also have working-directory-relative names (i.e. names
- * not starting with a slash). While the working directory is generally in the
- * same default FS, the wd can be in a different FS.
+ * Hadoop also supports <i>working-directory-relative</i> names, which are paths
+ * relative to the current working directory (similar to Unix). The working
+ * directory can be in a different file system than the default FS.
  * <p>
- *  Hence Hadoop path names can be one of:
- *  <ul>
- *  <li> fully qualified URI: scheme://authority/path
- *  <li> slash relative names: /path relative to the default file system
- *  <li> wd-relative names: path  relative to the working dir
- *  </ul>   
+ * Thus, Hadoop path names can be specified as one of the following:
+ * <ul>
+ * <li>a fully-qualified URI: scheme://authority/path (e.g.
+ * hdfs://nnAddress:nnPort/foo/bar)
+ * <li>a slash-relative name: path relative to the default file system (e.g.
+ * /foo/bar)
+ * <li>a working-directory-relative name: path relative to the working dir (e.g.
+ * foo/bar)
+ * </ul>
  *  Relative paths with scheme (scheme:foo/bar) are illegal.
  *  
- *  <p>
- *  <b>****The Role of the FileContext and configuration defaults****</b>
- *  <p>
- *  The FileContext provides file namespace context for resolving file names;
- *  it also contains the umask for permissions, In that sense it is like the
- *  per-process file-related state in Unix system.
- *  These two properties
- *  <ul> 
- *  <li> default file system i.e your slash)
- *  <li> umask
- *  </ul>
- *  in general, are obtained from the default configuration file
- *  in your environment,  (@see {@link Configuration}).
- *  
- *  No other configuration parameters are obtained from the default config as 
- *  far as the file context layer is concerned. All file system instances
- *  (i.e. deployments of file systems) have default properties; we call these
- *  server side (SS) defaults. Operation like create allow one to select many 
- *  properties: either pass them in as explicit parameters or use
- *  the SS properties.
- *  <p>
- *  The file system related SS defaults are
+ * <h2>Role of FileContext and Configuration Defaults</h2>
+ *
+ * The FileContext is the analogue of per-process file-related state in Unix. It
+ * contains two properties:
+ * 
+ * <ul>
+ * <li>the default file system (for resolving slash-relative names)
+ * <li>the umask (for file permissions)
+ * </ul>
+ * In general, these properties are obtained from the default configuration file
+ * in the user's environment (see {@link Configuration}).
+ * 
+ * Further file system properties are specified on the server-side. File system
+ * operations default to using these server-side defaults unless otherwise
+ * specified.
+ * <p>
+ * The file system related server-side defaults are:
  *  <ul>
  *  <li> the home directory (default is "/user/userName")
  *  <li> the initial wd (only for local fs)
@@ -138,34 +132,34 @@ import org.apache.htrace.core.Tracer;
  *  <li> checksum option. (checksumType and  bytesPerChecksum)
  *  </ul>
  *
- * <p>
- * <b> *** Usage Model for the FileContext class *** </b>
- * <p>
+ * <h2>Example Usage</h2>
+ *
  * Example 1: use the default config read from the $HADOOP_CONFIG/core.xml.
  *   Unspecified values come from core-defaults.xml in the release jar.
  *  <ul>  
  *  <li> myFContext = FileContext.getFileContext(); // uses the default config
  *                                                // which has your default FS 
  *  <li>  myFContext.create(path, ...);
- *  <li>  myFContext.setWorkingDir(path)
+ *  <li>  myFContext.setWorkingDir(path);
  *  <li>  myFContext.open (path, ...);  
+ *  <li>...
  *  </ul>  
  * Example 2: Get a FileContext with a specific URI as the default FS
  *  <ul>  
- *  <li> myFContext = FileContext.getFileContext(URI)
+ *  <li> myFContext = FileContext.getFileContext(URI);
  *  <li> myFContext.create(path, ...);
- *   ...
- * </ul> 
+ *  <li>...
+ * </ul>
  * Example 3: FileContext with local file system as the default
  *  <ul> 
- *  <li> myFContext = FileContext.getLocalFSFileContext()
+ *  <li> myFContext = FileContext.getLocalFSFileContext();
  *  <li> myFContext.create(path, ...);
  *  <li> ...
  *  </ul> 
  * Example 4: Use a specific config, ignoring $HADOOP_CONFIG
  *  Generally you should not need use a config unless you are doing
  *   <ul> 
- *   <li> configX = someConfigSomeOnePassedToYou.
+ *   <li> configX = someConfigSomeOnePassedToYou;
  *   <li> myFContext = getFileContext(configX); // configX is not changed,
  *                                              // is passed down 
  *   <li> myFContext.create(path, ...);
@@ -178,7 +172,7 @@ import org.apache.htrace.core.Tracer;
 @InterfaceStability.Stable
 public class FileContext {
   
-  public static final Log LOG = LogFactory.getLog(FileContext.class);
+  public static final Logger LOG = LoggerFactory.getLogger(FileContext.class);
   /**
    * Default permission for directory and symlink
    * In previous versions, this default permission was also used to
@@ -225,7 +219,8 @@ public class FileContext {
    * The FileContext is defined by.
    *  1) defaultFS (slash)
    *  2) wd
-   *  3) umask
+   *  3) umask (explicitly set via setUMask(),
+   *      falling back to FsPermission.getUMask(conf))
    */   
   private final AbstractFileSystem defaultFS; //default FS for this FileContext.
   private Path workingDir;          // Fully qualified
@@ -236,9 +231,8 @@ public class FileContext {
   private final Tracer tracer;
 
   private FileContext(final AbstractFileSystem defFs,
-    final FsPermission theUmask, final Configuration aConf) {
+                      final Configuration aConf) {
     defaultFS = defFs;
-    umask = theUmask;
     conf = aConf;
     tracer = FsTracer.get(aConf);
     try {
@@ -342,8 +336,17 @@ public class FileContext {
           return AbstractFileSystem.get(uri, conf);
         }
       });
+    } catch (RuntimeException ex) {
+      // RTEs can wrap other exceptions; if there is an IOException inner,
+      // throw it direct.
+      Throwable cause = ex.getCause();
+      if (cause instanceof IOException) {
+        throw (IOException) cause;
+      } else {
+        throw ex;
+      }
     } catch (InterruptedException ex) {
-      LOG.error(ex);
+      LOG.error(ex.toString());
       throw new IOException("Failed to get the AbstractFileSystem for path: "
           + uri, ex);
     }
@@ -360,11 +363,11 @@ public class FileContext {
    * 
    * @param defFS
    * @param aConf
-   * @return new FileContext with specifed FS as default.
+   * @return new FileContext with specified FS as default.
    */
   public static FileContext getFileContext(final AbstractFileSystem defFS,
                     final Configuration aConf) {
-    return new FileContext(defFS, FsPermission.getUMask(aConf), aConf);
+    return new FileContext(defFS, aConf);
   }
   
   /**
@@ -457,7 +460,7 @@ public class FileContext {
     } catch (UnsupportedFileSystemException ex) {
       throw ex;
     } catch (IOException ex) {
-      LOG.error(ex);
+      LOG.error(ex.toString());
       throw new RuntimeException(ex);
     }
     return getFileContext(defaultAfs, aConf);
@@ -574,7 +577,7 @@ public class FileContext {
    * @return the umask of this FileContext
    */
   public FsPermission getUMask() {
-    return umask;
+    return (umask != null ? umask : FsPermission.getUMask(conf));
   }
   
   /**
@@ -582,9 +585,8 @@ public class FileContext {
    * @param newUmask  the new umask
    */
   public void setUMask(final FsPermission newUmask) {
-    umask = newUmask;
+    this.umask = newUmask;
   }
-  
   
   /**
    * Resolve the path following any symlinks or mount points
@@ -630,7 +632,7 @@ public class FileContext {
    * @param opts file creation options; see {@link Options.CreateOpts}.
    *          <ul>
    *          <li>Progress - to report progress on the operation - default null
-   *          <li>Permission - umask is applied against permisssion: default is
+   *          <li>Permission - umask is applied against permission: default is
    *          FsPermissions:getDefault()
    * 
    *          <li>CreateParent - create missing parent path; default is to not
@@ -683,7 +685,7 @@ public class FileContext {
     CreateOpts.Perms permOpt = CreateOpts.getOpt(CreateOpts.Perms.class, opts);
     FsPermission permission = (permOpt != null) ? permOpt.getValue() :
                                       FILE_DEFAULT_PERM;
-    permission = permission.applyUMask(umask);
+    permission = FsCreateModes.applyUMask(permission, getUMask());
 
     final CreateOpts[] updatedOpts = 
                       CreateOpts.setOpt(CreateOpts.perms(permission), opts);
@@ -694,6 +696,69 @@ public class FileContext {
         return fs.create(p, createFlag, updatedOpts);
       }
     }.resolve(this, absF);
+  }
+
+  /**
+   * {@link FSDataOutputStreamBuilder} for {@liink FileContext}.
+   */
+  private static final class FCDataOutputStreamBuilder extends
+      FSDataOutputStreamBuilder<
+        FSDataOutputStream, FCDataOutputStreamBuilder> {
+    private final FileContext fc;
+
+    private FCDataOutputStreamBuilder(
+        @Nonnull FileContext fc, @Nonnull Path p) throws IOException {
+      super(fc, p);
+      this.fc = fc;
+      Preconditions.checkNotNull(fc);
+    }
+
+    @Override
+    protected FCDataOutputStreamBuilder getThisBuilder() {
+      return this;
+    }
+
+    @Override
+    public FSDataOutputStream build() throws IOException {
+      final EnumSet<CreateFlag> flags = getFlags();
+      List<CreateOpts> createOpts = new ArrayList<>(Arrays.asList(
+          CreateOpts.blockSize(getBlockSize()),
+          CreateOpts.bufferSize(getBufferSize()),
+          CreateOpts.repFac(getReplication()),
+          CreateOpts.perms(getPermission())
+      ));
+      if (getChecksumOpt() != null) {
+        createOpts.add(CreateOpts.checksumParam(getChecksumOpt()));
+      }
+      if (getProgress() != null) {
+        createOpts.add(CreateOpts.progress(getProgress()));
+      }
+      if (isRecursive()) {
+        createOpts.add(CreateOpts.createParent());
+      }
+      return fc.create(getPath(), flags,
+          createOpts.toArray(new CreateOpts[0]));
+    }
+  }
+
+  /**
+   * Create a {@link FSDataOutputStreamBuilder} for creating or overwriting
+   * a file on indicated path.
+   *
+   * @param f the file path to create builder for.
+   * @return {@link FSDataOutputStreamBuilder} to build a
+   *         {@link FSDataOutputStream}.
+   *
+   * Upon {@link FSDataOutputStreamBuilder#build()} being invoked,
+   * builder parameters will be verified by {@link FileContext} and
+   * {@link AbstractFileSystem#create}. And filesystem states will be modified.
+   *
+   * Client should expect {@link FSDataOutputStreamBuilder#build()} throw the
+   * same exceptions as create(Path, EnumSet, CreateOpts...).
+   */
+  public FSDataOutputStreamBuilder<FSDataOutputStream, ?> create(final Path f)
+      throws IOException {
+    return new FCDataOutputStreamBuilder(this, f).create();
   }
 
   /**
@@ -729,8 +794,9 @@ public class FileContext {
       ParentNotDirectoryException, UnsupportedFileSystemException, 
       IOException {
     final Path absDir = fixRelativePart(dir);
-    final FsPermission absFerms = (permission == null ? 
-          FsPermission.getDirDefault() : permission).applyUMask(umask);
+    final FsPermission absFerms = FsCreateModes.applyUMask(
+        permission == null ?
+            FsPermission.getDirDefault() : permission, getUMask());
     new FSLinkResolver<Void>() {
       @Override
       public Void next(final AbstractFileSystem fs, final Path p) 
@@ -1294,7 +1360,36 @@ public class FileContext {
    *
    * This call is most helpful with DFS, where it returns 
    * hostnames of machines that contain the given file.
-   * 
+   *
+   * In HDFS, if file is three-replicated, the returned array contains
+   * elements like:
+   * <pre>
+   * BlockLocation(offset: 0, length: BLOCK_SIZE,
+   *   hosts: {"host1:9866", "host2:9866, host3:9866"})
+   * BlockLocation(offset: BLOCK_SIZE, length: BLOCK_SIZE,
+   *   hosts: {"host2:9866", "host3:9866, host4:9866"})
+   * </pre>
+   *
+   * And if a file is erasure-coded, the returned BlockLocation are logical
+   * block groups.
+   *
+   * Suppose we have a RS_3_2 coded file (3 data units and 2 parity units).
+   * 1. If the file size is less than one stripe size, say 2 * CELL_SIZE, then
+   * there will be one BlockLocation returned, with 0 offset, actual file size
+   * and 4 hosts (2 data blocks and 2 parity blocks) hosting the actual blocks.
+   * 3. If the file size is less than one group size but greater than one
+   * stripe size, then there will be one BlockLocation returned, with 0 offset,
+   * actual file size with 5 hosts (3 data blocks and 2 parity blocks) hosting
+   * the actual blocks.
+   * 4. If the file size is greater than one group size, 3 * BLOCK_SIZE + 123
+   * for example, then the result will be like:
+   * <pre>
+   * BlockLocation(offset: 0, length: 3 * BLOCK_SIZE, hosts: {"host1:9866",
+   *   "host2:9866","host3:9866","host4:9866","host5:9866"})
+   * BlockLocation(offset: 3 * BLOCK_SIZE, length: 123, hosts: {"host1:9866",
+   *   "host4:9866", "host5:9866"})
+   * </pre>
+   *
    * @param f - get blocklocations of this file
    * @param start position (byte offset)
    * @param len (in bytes)
@@ -1528,7 +1623,7 @@ public class FileContext {
    * Return the file's status and block locations If the path is a file.
    * 
    * If a returned status is a file, it contains the file's block locations.
-   * 
+   *
    * @param f is the path
    *
    * @return an iterator that traverses statuses of the files/directories 
@@ -1984,7 +2079,7 @@ public class FileContext {
      *  </dd>
      * </dl>
      *
-     * @param pathPattern a regular expression specifying a pth pattern
+     * @param pathPattern a glob specifying a path pattern
      *
      * @return an array of paths that match the path pattern
      *
@@ -2012,7 +2107,7 @@ public class FileContext {
      * Return null if pathPattern has no glob and the path does not exist.
      * Return an empty array if pathPattern has a glob and no path matches it. 
      * 
-     * @param pathPattern regular expression specifying the path pattern
+     * @param pathPattern glob specifying the path pattern
      * @param filter user-supplied path filter
      *
      * @return an array of FileStatus objects
@@ -2093,17 +2188,13 @@ public class FileContext {
               content.getPath().getName())), deleteSource, overwrite);
         }
       } else {
-        InputStream in=null;
-        OutputStream out = null;
-        try {
-          in = open(qSrc);
-          EnumSet<CreateFlag> createFlag = overwrite ? EnumSet.of(
-              CreateFlag.CREATE, CreateFlag.OVERWRITE) : 
-                EnumSet.of(CreateFlag.CREATE);
-          out = create(qDst, createFlag);
+        EnumSet<CreateFlag> createFlag = overwrite ? EnumSet.of(
+            CreateFlag.CREATE, CreateFlag.OVERWRITE) :
+            EnumSet.of(CreateFlag.CREATE);
+        InputStream in = open(qSrc);
+        try (OutputStream out = create(qDst, createFlag)) {
           IOUtils.copyBytes(in, out, conf, true);
         } finally {
-          IOUtils.closeStream(out);
           IOUtils.closeStream(in);
         }
       }

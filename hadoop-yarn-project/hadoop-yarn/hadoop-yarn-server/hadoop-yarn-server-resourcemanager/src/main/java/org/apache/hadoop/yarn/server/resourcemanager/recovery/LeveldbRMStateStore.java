@@ -64,12 +64,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.AM
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationAttemptStateDataPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationStateDataPBImpl;
 import org.apache.hadoop.yarn.server.utils.LeveldbIterator;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.fusesource.leveldbjni.JniDBFactory;
 import org.fusesource.leveldbjni.internal.NativeDB;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBException;
-import org.iq80.leveldb.Logger;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.WriteBatch;
 
@@ -165,7 +163,6 @@ public class LeveldbRMStateStore extends RMStateStore {
     Path storeRoot = createStorageDir();
     Options options = new Options();
     options.createIfMissing(false);
-    options.logger(new LeveldbLogger());
     LOG.info("Using state database at " + storeRoot + " for recovery");
     File dbfile = new File(storeRoot.toString());
     try {
@@ -255,14 +252,14 @@ public class LeveldbRMStateStore extends RMStateStore {
 
   @Override
   public synchronized long getAndIncrementEpoch() throws Exception {
-    long currentEpoch = 0;
+    long currentEpoch = baseEpoch;
     byte[] dbKeyBytes = bytes(EPOCH_NODE);
     try {
       byte[] data = db.get(dbKeyBytes);
       if (data != null) {
         currentEpoch = EpochProto.parseFrom(data).getEpoch();
       }
-      EpochProto proto = Epoch.newInstance(currentEpoch + 1).getProto();
+      EpochProto proto = Epoch.newInstance(nextEpoch(currentEpoch)).getProto();
       db.put(dbKeyBytes, proto.toByteArray());
     } catch (DBException e) {
       throw new IOException(e);
@@ -410,11 +407,10 @@ public class LeveldbRMStateStore extends RMStateStore {
 
   private RMDelegationTokenIdentifierData loadDelegationToken(byte[] data)
       throws IOException {
-    RMDelegationTokenIdentifierData tokenData =
-        new RMDelegationTokenIdentifierData();
+    RMDelegationTokenIdentifierData tokenData = null;
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(data));
     try {
-      tokenData.readFields(in);
+      tokenData = RMStateStoreUtils.readRMDelegationTokenIdentifierData(in);
     } finally {
       IOUtils.cleanup(LOG, in);
     }
@@ -535,6 +531,22 @@ public class LeveldbRMStateStore extends RMStateStore {
     return createApplicationState(appId.toString(), data);
   }
 
+  @VisibleForTesting
+  ApplicationAttemptStateData loadRMAppAttemptState(
+      ApplicationAttemptId attemptId) throws IOException {
+    String attemptKey = getApplicationAttemptNodeKey(attemptId);
+    byte[] data = null;
+    try {
+      data = db.get(bytes(attemptKey));
+    } catch (DBException e) {
+      throw new IOException(e);
+    }
+    if (data == null) {
+      return null;
+    }
+    return createAttemptState(attemptId.toString(), data);
+  }
+
   private ApplicationAttemptStateData createAttemptState(String itemName,
       byte[] data) throws IOException {
     ApplicationAttemptId attemptId = ApplicationAttemptId.fromString(itemName);
@@ -606,6 +618,22 @@ public class LeveldbRMStateStore extends RMStateStore {
       ApplicationAttemptId attemptId,
       ApplicationAttemptStateData attemptStateData) throws IOException {
     storeApplicationAttemptStateInternal(attemptId, attemptStateData);
+  }
+
+  @Override
+  public synchronized void removeApplicationAttemptInternal(
+      ApplicationAttemptId attemptId)
+      throws IOException {
+    String attemptKey = getApplicationAttemptNodeKey(attemptId);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Removing state for attempt " + attemptId + " at "
+          + attemptKey);
+    }
+    try {
+      db.delete(bytes(attemptKey));
+    } catch (DBException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
@@ -841,13 +869,9 @@ public class LeveldbRMStateStore extends RMStateStore {
       LOG.info("Full compaction cycle completed in " + duration + " msec");
     }
   }
-
-  private static class LeveldbLogger implements Logger {
-    private static final Log LOG = LogFactory.getLog(LeveldbLogger.class);
-
-    @Override
-    public void log(String message) {
-      LOG.info(message);
-    }
+  
+  @Override
+  public void fence() throws IOException {
+    // Do nothing
   }
 }

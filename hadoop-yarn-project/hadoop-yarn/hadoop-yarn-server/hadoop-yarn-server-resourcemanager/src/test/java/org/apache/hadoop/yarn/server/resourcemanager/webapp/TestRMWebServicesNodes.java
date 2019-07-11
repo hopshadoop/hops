@@ -18,25 +18,26 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
+import static org.apache.hadoop.yarn.webapp.WebServicesTestUtils.assertResponseStatusCode;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.Iterator;
 
 import javax.ws.rs.core.MediaType;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.http.JettyUtils;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
@@ -44,6 +45,7 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceUtilization;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
+import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
@@ -54,9 +56,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStartedEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStatusEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint.AllocationTagsManager;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
+import org.apache.hadoop.yarn.webapp.GuiceServletConfig;
 import org.apache.hadoop.yarn.webapp.JerseyTestBase;
 import org.apache.hadoop.yarn.webapp.WebServicesTestUtils;
 import org.codehaus.jettison.json.JSONArray;
@@ -71,8 +75,6 @@ import org.xml.sax.InputSource;
 
 import com.google.common.base.Joiner;
 import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.servlet.GuiceServletContextListener;
 import com.google.inject.servlet.ServletModule;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.ClientResponse.Status;
@@ -80,48 +82,37 @@ import com.sun.jersey.api.client.UniformInterfaceException;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.test.framework.WebAppDescriptor;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplNotDist;
 
 public class TestRMWebServicesNodes extends JerseyTestBase {
 
-  private final Log LOG = LogFactory.getLog(TestRMWebServicesNodes.class);
-
   private static MockRM rm;
 
-  private Injector injector = Guice.createInjector(new ServletModule() {
+  private static class WebServletModule extends ServletModule {
     @Override
     protected void configureServlets() {
-      Configuration conf = new Configuration();
-      try {
-        RMStorageFactory.setConfiguration(conf);
-        YarnAPIStorageFactory.setConfiguration(conf);
-        DBUtility.InitializeDB();
-      } catch (IOException ex) {
-        LOG.error(ex, ex);
-      }
       bind(JAXBContextResolver.class);
       bind(RMWebServices.class);
       bind(GenericExceptionHandler.class);
-      rm = new MockRM(conf);
+      rm = new MockRM(new Configuration());
       rm.getRMContext().getContainerTokenSecretManager().rollMasterKey();
       rm.getRMContext().getNMTokenSecretManager().rollMasterKey();
+      rm.disableDrainEventsImplicitly();
       bind(ResourceManager.class).toInstance(rm);
       serve("/*").with(GuiceContainer.class);
     }
-  });
+  }
 
-  public class GuiceServletConfig extends GuiceServletContextListener {
-
-    @Override
-    protected Injector getInjector() {
-      return injector;
-    }
+  static {
+    GuiceServletConfig.setInjector(
+        Guice.createInjector(new WebServletModule()));
   }
 
   @Before
   @Override
   public void setUp() throws Exception {
     super.setUp();
+    GuiceServletConfig.setInjector(
+        Guice.createInjector(new WebServletModule()));
   }
 
   public TestRMWebServicesNodes() {
@@ -172,7 +163,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
         r.path("ws").path("v1").path("cluster").path("nodes")
           .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
 
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject nodes = json.getJSONObject("nodes");
@@ -200,7 +192,7 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
 
   private RMNodeImpl getNewRMNode(String host, int port, int memory) {
     NodeId nodeId = NodeId.newInstance(host, port);
-    RMNodeImpl nodeImpl = new RMNodeImplNotDist(nodeId, rm.getRMContext(),
+    RMNodeImpl nodeImpl = new RMNodeImpl(nodeId, rm.getRMContext(),
         nodeId.getHost(), nodeId.getPort(), nodeId.getPort() + 1,
         RackResolver.resolve(nodeId.getHost()), Resource.newInstance(memory, 4),
         YarnVersionInfo.getVersion());
@@ -219,7 +211,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
         .path("nodes").queryParam("states", NodeState.NEW.toString())
         .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
 
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject nodes = json.getJSONObject("nodes");
@@ -241,10 +234,12 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
         .path("nodes")
         .queryParam("states", NodeState.DECOMMISSIONED.toString())
         .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
-    assertEquals("nodes is not null", JSONObject.NULL, json.get("nodes"));
+    assertEquals("nodes is not empty",
+        new JSONObject().toString(), json.get("nodes").toString());
   }
 
   @Test
@@ -262,8 +257,9 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
     } catch (UniformInterfaceException ue) {
       ClientResponse response = ue.getResponse();
 
-      assertEquals(Status.BAD_REQUEST, response.getClientResponseStatus());
-      assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+      assertResponseStatusCode(Status.BAD_REQUEST, response.getStatusInfo());
+      assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+          response.getType().toString());
 
       JSONObject msg = response.getEntity(JSONObject.class);
       JSONObject exception = msg.getJSONObject("RemoteException");
@@ -296,7 +292,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
         .path("nodes").queryParam("states", NodeState.LOST.toString())
         .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
 
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     JSONObject nodes = json.getJSONObject("nodes");
     assertEquals("incorrect number of elements", 1, nodes.length());
@@ -327,7 +324,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
         .path("nodes").path("h2:1234").accept(MediaType.APPLICATION_JSON)
         .get(ClientResponse.class);
 
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     JSONObject info = json.getJSONObject("node");
     String id = info.get("id").toString();
@@ -353,7 +351,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
     ClientResponse response = r.path("ws").path("v1").path("cluster")
         .path("nodes").queryParam("states", "running")
         .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject nodes = json.getJSONObject("nodes");
@@ -371,10 +370,12 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
     ClientResponse response = r.path("ws").path("v1").path("cluster")
         .path("nodes").queryParam("states", "UNHEALTHY")
         .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
-    assertEquals("nodes is not null", JSONObject.NULL, json.get("nodes"));
+    assertEquals("nodes is not empty",
+        new JSONObject().toString(), json.get("nodes").toString());
   }
 
   public void testNodesHelper(String path, String media) throws JSONException,
@@ -385,7 +386,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
 
     ClientResponse response = r.path("ws").path("v1").path("cluster")
         .path(path).accept(media).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject nodes = json.getJSONObject("nodes");
@@ -431,7 +433,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
     ClientResponse response = r.path("ws").path("v1").path("cluster")
         .path("nodes").path(nodeid).accept(media).get(ClientResponse.class);
 
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject info = json.getJSONObject("node");
@@ -453,8 +456,9 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
       fail("should have thrown exception on non-existent nodeid");
     } catch (UniformInterfaceException ue) {
       ClientResponse response = ue.getResponse();
-      assertEquals(Status.NOT_FOUND, response.getClientResponseStatus());
-      assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+      assertResponseStatusCode(Status.NOT_FOUND, response.getStatusInfo());
+      assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+          response.getType().toString());
       JSONObject msg = response.getEntity(JSONObject.class);
       JSONObject exception = msg.getJSONObject("RemoteException");
       assertEquals("incorrect number of elements", 3, exception.length());
@@ -462,6 +466,7 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
       String type = exception.getString("exception");
       String classname = exception.getString("javaClassName");
       verifyNonexistNodeException(message, type, classname);
+
     }
   }
 
@@ -478,8 +483,9 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
       fail("should have thrown exception on non-existent nodeid");
     } catch (UniformInterfaceException ue) {
       ClientResponse response = ue.getResponse();
-      assertEquals(Status.NOT_FOUND, response.getClientResponseStatus());
-      assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+      assertResponseStatusCode(Status.NOT_FOUND, response.getStatusInfo());
+      assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+          response.getType().toString());
       JSONObject msg = response.getEntity(JSONObject.class);
       JSONObject exception = msg.getJSONObject("RemoteException");
       assertEquals("incorrect number of elements", 3, exception.length());
@@ -504,8 +510,9 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
       fail("should have thrown exception on non-existent nodeid");
     } catch (UniformInterfaceException ue) {
       ClientResponse response = ue.getResponse();
-      assertEquals(Status.NOT_FOUND, response.getClientResponseStatus());
-      assertEquals(MediaType.APPLICATION_XML_TYPE, response.getType());
+      assertResponseStatusCode(Status.NOT_FOUND, response.getStatusInfo());
+      assertEquals(MediaType.APPLICATION_XML_TYPE + "; " + JettyUtils.UTF_8,
+          response.getType().toString());
       String msg = response.getEntity(String.class);
       System.out.println(msg);
       DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -547,8 +554,9 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
     } catch (UniformInterfaceException ue) {
       ClientResponse response = ue.getResponse();
 
-      assertEquals(Status.BAD_REQUEST, response.getClientResponseStatus());
-      assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+      assertResponseStatusCode(Status.BAD_REQUEST, response.getStatusInfo());
+      assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+          response.getType().toString());
       JSONObject msg = response.getEntity(JSONObject.class);
       JSONObject exception = msg.getJSONObject("RemoteException");
       assertEquals("incorrect number of elements", 3, exception.length());
@@ -572,7 +580,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
     ClientResponse response = r.path("ws").path("v1").path("cluster")
         .path("nodes").accept(MediaType.APPLICATION_XML)
         .get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_XML_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_XML_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     String xml = response.getEntity(String.class);
     DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
     DocumentBuilder db = dbf.newDocumentBuilder();
@@ -596,7 +605,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
         .path("nodes").path("h1:1234").accept(MediaType.APPLICATION_XML)
         .get(ClientResponse.class);
 
-    assertEquals(MediaType.APPLICATION_XML_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_XML_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     String xml = response.getEntity(String.class);
 
     DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -617,7 +627,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
     ClientResponse response = r.path("ws").path("v1").path("cluster")
         .path("nodes").accept(MediaType.APPLICATION_XML)
         .get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_XML_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_XML_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     String xml = response.getEntity(String.class);
 
     DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -646,7 +657,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
         .queryParam("states", Joiner.on(',').join(EnumSet.allOf(NodeState.class)))
         .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
 
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     JSONObject nodes = json.getJSONObject("nodes");
     assertEquals("incorrect number of elements", 1, nodes.length());
@@ -678,7 +690,8 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
         .path("nodes").accept(MediaType.APPLICATION_JSON)
         .get(ClientResponse.class);
 
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject nodes = json.getJSONObject("nodes");
@@ -709,8 +722,6 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
           WebServicesTestUtils.getXmlLong(element, "availMemoryMB"),
           WebServicesTestUtils.getXmlLong(element, "usedVirtualCores"),
           WebServicesTestUtils.getXmlLong(element,  "availableVirtualCores"),
-          WebServicesTestUtils.getXmlLong(element, "usedGPUs"),
-          WebServicesTestUtils.getXmlLong(element, "availableGPUs"),
           WebServicesTestUtils.getXmlString(element, "version"),
           WebServicesTestUtils.getXmlInt(element, "nodePhysicalMemoryMB"),
           WebServicesTestUtils.getXmlInt(element, "nodeVirtualMemoryMB"),
@@ -719,13 +730,17 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
               "aggregatedContainersPhysicalMemoryMB"),
           WebServicesTestUtils.getXmlInt(element,
               "aggregatedContainersVirtualMemoryMB"),
-          WebServicesTestUtils.getXmlFloat(element, "containersCPUUsage"));
+          WebServicesTestUtils.getXmlFloat(element, "containersCPUUsage"),
+          WebServicesTestUtils.getXmlInt(element, "numRunningOpportContainers"),
+          WebServicesTestUtils.getXmlLong(element, "usedMemoryOpportGB"),
+          WebServicesTestUtils.getXmlInt(element, "usedVirtualCoresOpport"),
+          WebServicesTestUtils.getXmlInt(element, "numQueuedContainers"));
     }
   }
 
   public void verifyNodeInfo(JSONObject nodeInfo, RMNode nm)
       throws JSONException, Exception {
-    assertEquals("incorrect number of elements", 16, nodeInfo.length());
+    assertEquals("incorrect number of elements", 20, nodeInfo.length());
 
     JSONObject resourceInfo = nodeInfo.getJSONObject("resourceUtilization");
     verifyNodeInfoGeneric(nm, nodeInfo.getString("state"),
@@ -736,28 +751,35 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
         nodeInfo.getString("healthReport"), nodeInfo.getInt("numContainers"),
         nodeInfo.getLong("usedMemoryMB"), nodeInfo.getLong("availMemoryMB"),
         nodeInfo.getLong("usedVirtualCores"), nodeInfo.getLong("availableVirtualCores"),
-        nodeInfo.getLong("usedGPUs"), nodeInfo.getLong("availableGPUs"),
         nodeInfo.getString("version"),
         resourceInfo.getInt("nodePhysicalMemoryMB"),
         resourceInfo.getInt("nodeVirtualMemoryMB"),
         resourceInfo.getDouble("nodeCPUUsage"),
         resourceInfo.getInt("aggregatedContainersPhysicalMemoryMB"),
         resourceInfo.getInt("aggregatedContainersVirtualMemoryMB"),
-        resourceInfo.getDouble("containersCPUUsage"));
+        resourceInfo.getDouble("containersCPUUsage"),
+        nodeInfo.getInt("numRunningOpportContainers"),
+        nodeInfo.getLong("usedMemoryOpportGB"),
+        nodeInfo.getInt("usedVirtualCoresOpport"),
+        nodeInfo.getInt("numQueuedContainers"));
   }
 
   public void verifyNodeInfoGeneric(RMNode node, String state, String rack,
       String id, String nodeHostName,
       String nodeHTTPAddress, long lastHealthUpdate, String healthReport,
-      int numContainers, long usedMemoryMB, long availMemoryMB, long usedVirtualCores, 
-      long availVirtualCores, long usedGPUs, long availGPUs, String version, int nodePhysicalMemoryMB,
-      int nodeVirtualMemoryMB, double nodeCPUUsage,
+      int numContainers, long usedMemoryMB, long availMemoryMB,
+      long usedVirtualCores, long availVirtualCores, String version,
+      int nodePhysicalMemoryMB, int nodeVirtualMemoryMB, double nodeCPUUsage,
       int containersPhysicalMemoryMB, int containersVirtualMemoryMB,
-      double containersCPUUsage)
+      double containersCPUUsage, int numRunningOpportContainers,
+      long usedMemoryOpportGB, int usedVirtualCoresOpport,
+      int numQueuedContainers)
       throws JSONException, Exception {
 
     ResourceScheduler sched = rm.getResourceScheduler();
     SchedulerNodeReport report = sched.getNodeReport(node.getNodeID());
+    OpportunisticContainersStatus opportunisticStatus =
+        node.getOpportunisticContainersStatus();
 
     WebServicesTestUtils.checkStringMatch("state", node.getState().toString(),
         state);
@@ -804,10 +826,89 @@ public class TestRMWebServicesNodes extends JerseyTestBase {
           .getUsedResource().getVirtualCores(), usedVirtualCores);
       assertEquals("availVirtualCores doesn't match: " + availVirtualCores, report
           .getAvailableResource().getVirtualCores(), availVirtualCores);
-      assertEquals("usedGPUs doesn't match: " + usedGPUs, report
-          .getUsedResource().getGPUs(), usedGPUs);
-      assertEquals("availGPUs doesn't match: " + availGPUs, report
-          .getAvailableResource().getGPUs(), availGPUs);
+    }
+
+    if (opportunisticStatus != null) {
+      assertEquals("numRunningOpportContainers doesn't match: " +
+              numRunningOpportContainers,
+          opportunisticStatus.getRunningOpportContainers(),
+          numRunningOpportContainers);
+      assertEquals("usedMemoryOpportGB doesn't match: " + usedMemoryOpportGB,
+          opportunisticStatus.getOpportMemoryUsed(), usedMemoryOpportGB);
+      assertEquals(
+          "usedVirtualCoresOpport doesn't match: " + usedVirtualCoresOpport,
+          opportunisticStatus.getOpportCoresUsed(), usedVirtualCoresOpport);
+      assertEquals("numQueuedContainers doesn't match: " + numQueuedContainers,
+          opportunisticStatus.getQueuedOpportContainers(), numQueuedContainers);
+    }
+  }
+
+  @Test
+  public void testNodesAllocationTags() throws Exception {
+    NodeId nm1 = NodeId.newInstance("host1", 1234);
+    NodeId nm2 = NodeId.newInstance("host2", 2345);
+    AllocationTagsManager atm = mock(AllocationTagsManager.class);
+
+    Map<String, Map<String, Long>> expectedAllocationTags = new TreeMap<>();
+    Map<String, Long> nm1Tags = new TreeMap<>();
+    nm1Tags.put("A", 1L);
+    nm1Tags.put("B", 2L);
+    Map<String, Long> nm2Tags = new TreeMap<>();
+    nm2Tags.put("C", 1L);
+    nm2Tags.put("D", 2L);
+    expectedAllocationTags.put(nm1.toString(), nm1Tags);
+    expectedAllocationTags.put(nm2.toString(), nm2Tags);
+
+    when(atm.getAllocationTagsWithCount(nm1)).thenReturn(nm1Tags);
+    when(atm.getAllocationTagsWithCount(nm2)).thenReturn(nm2Tags);
+    rm.getRMContext().setAllocationTagsManager(atm);
+
+    rm.start();
+
+    rm.registerNode(nm1.toString(), 1024);
+    rm.registerNode(nm2.toString(), 1024);
+
+    WebResource r = resource();
+    ClientResponse response = r.path("ws").path("v1").path("cluster")
+        .path("nodes").accept("application/json").get(ClientResponse.class);
+    assertEquals(MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
+    JSONObject nodesInfoJson = response.getEntity(JSONObject.class);
+    verifyNodeAllocationTag(nodesInfoJson, expectedAllocationTags);
+
+    rm.stop();
+  }
+
+  private void verifyNodeAllocationTag(JSONObject json,
+      Map<String, Map<String, Long>> expectedAllocationTags)
+      throws JSONException {
+    JSONArray nodes = json.getJSONObject("nodes").getJSONArray("node");
+    assertEquals(expectedAllocationTags.size(), nodes.length());
+    for (int i=0; i<nodes.length(); i++) {
+      JSONObject nodeJson = nodes.getJSONObject(i);
+      String nodeId = nodeJson.getString("id");
+
+      // Ensure the response contains all nodes info
+      assertTrue("Nodes info should have expected node IDs",
+          expectedAllocationTags.containsKey(nodeId));
+
+      Map<String, Long> expectedTags = expectedAllocationTags.get(nodeId);
+      JSONArray tagsInfo = nodeJson.getJSONObject("allocationTags")
+          .getJSONArray("allocationTagInfo");
+
+      // Ensure number of tags are expected.
+      assertEquals(expectedTags.size(), tagsInfo.length());
+
+      // Iterate expected tags and make sure the actual
+      // tags/counts are matched.
+      Iterator<String> it = expectedTags.keySet().iterator();
+      for (int j=0; j<tagsInfo.length(); j++) {
+        JSONObject tagInfo = tagsInfo.getJSONObject(j);
+        String expectedTag = it.next();
+        assertEquals(tagInfo.getString("allocationTag"), expectedTag);
+        assertEquals(tagInfo.getLong("allocationsCount"),
+            expectedTags.get(expectedTag).longValue());
+      }
     }
   }
 

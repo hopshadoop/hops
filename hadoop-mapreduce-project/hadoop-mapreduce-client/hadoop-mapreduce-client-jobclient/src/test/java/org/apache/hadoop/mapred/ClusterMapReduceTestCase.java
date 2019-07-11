@@ -17,16 +17,12 @@
  */
 package org.apache.hadoop.mapred;
 
-import junit.framework.TestCase;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.After;
 import org.junit.Before;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
@@ -47,8 +43,6 @@ import java.util.Properties;
  * The DFS filesystem is formated before the testcase starts and after it ends.
  */
 public abstract class ClusterMapReduceTestCase {
-  private final Log LOG = LogFactory.getLog(ClusterMapReduceTestCase.class);
-
   private MiniDFSCluster dfsCluster = null;
   private MiniMRCluster mrCluster = null;
 
@@ -60,19 +54,6 @@ public abstract class ClusterMapReduceTestCase {
   @Before
   public void setUp() throws Exception {
     startCluster(true, null);
-  }
-
-  protected void purgeOutputDir() throws IOException {
-    try {
-      // TODO: Remove debugging messages. Only there to test the output on Jenkins
-      LOG.info("Purging output directory: " + getOutputDir());
-      dfsCluster.getFileSystem().getFileStatus(getOutputDir());
-      LOG.info("Purging output directory, gotten FileStatus");
-      dfsCluster.getFileSystem().delete(getOutputDir(), true);
-      LOG.info("Purged output directory");
-    } catch (FileNotFoundException ex) {
-      // Ignore, output dir does not exist
-    }
   }
 
   /**

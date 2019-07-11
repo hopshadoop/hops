@@ -19,21 +19,26 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.RejectedExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.util.concurrent.HadoopScheduledThreadPoolExecutor;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
@@ -43,6 +48,7 @@ import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.deletion.task.FileDeletionTask;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppFinishedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppStartedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerEvent;
@@ -58,12 +64,11 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 public class NonAggregatingLogHandler extends AbstractService implements
     LogHandler {
 
-  private static final Log LOG = LogFactory
-      .getLog(NonAggregatingLogHandler.class);
+  private static final Logger LOG =
+       LoggerFactory.getLogger(NonAggregatingLogHandler.class);
   private final Dispatcher dispatcher;
   private final DeletionService delService;
   private final Map<ApplicationId, String> appOwners;
-  private final Map<ApplicationId, String> appOwnersFolder;
 
   private final LocalDirsHandlerService dirsHandler;
   private final NMStateStoreService stateStore;
@@ -79,7 +84,6 @@ public class NonAggregatingLogHandler extends AbstractService implements
     this.dirsHandler = dirsHandler;
     this.stateStore = stateStore;
     this.appOwners = new ConcurrentHashMap<ApplicationId, String>();
-    this.appOwnersFolder = new ConcurrentHashMap<ApplicationId, String>();
   }
 
   @Override
@@ -132,7 +136,8 @@ public class NonAggregatingLogHandler extends AbstractService implements
           LOG.debug("Scheduling deletion of " + appId + " logs in "
               + deleteDelayMsec + " msec");
         }
-        LogDeleterRunnable logDeleter = new LogDeleterRunnable(proto.getUser(), appId, proto.getUserFolder());
+        LogDeleterRunnable logDeleter =
+            new LogDeleterRunnable(proto.getUser(), appId);
         try {
           sched.schedule(logDeleter, deleteDelayMsec, TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException e) {
@@ -153,7 +158,6 @@ public class NonAggregatingLogHandler extends AbstractService implements
             (LogHandlerAppStartedEvent) event;
         this.appOwners.put(appStartedEvent.getApplicationId(),
             appStartedEvent.getUser());
-        this.appOwnersFolder.put(appStartedEvent.getApplicationId(), appStartedEvent.getUserFolder());
         this.dispatcher.getEventHandler().handle(
             new ApplicationEvent(appStartedEvent.getApplicationId(),
                 ApplicationEventType.APPLICATION_LOG_HANDLING_INITED));
@@ -170,7 +174,6 @@ public class NonAggregatingLogHandler extends AbstractService implements
             + appId + ", with delay of "
             + this.deleteDelaySeconds + " seconds");
         String user = appOwners.remove(appId);
-        String userFolder = appOwnersFolder.remove(appId);
         if (user == null) {
           LOG.error("Unable to locate user for " + appId);
           // send LOG_HANDLING_FAILED out
@@ -179,13 +182,12 @@ public class NonAggregatingLogHandler extends AbstractService implements
                   ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED));
           break;
         }
-        LogDeleterRunnable logDeleter = new LogDeleterRunnable(user, appId, userFolder);
+        LogDeleterRunnable logDeleter = new LogDeleterRunnable(user, appId);
         long deletionTimestamp = System.currentTimeMillis()
             + this.deleteDelaySeconds * 1000;
         LogDeleterProto deleterProto = LogDeleterProto.newBuilder()
             .setUser(user)
             .setDeletionTime(deletionTimestamp)
-            .setUserFolder(userFolder)
             .build();
         try {
           stateStore.storeLogDeleter(appId, deleterProto);
@@ -206,12 +208,17 @@ public class NonAggregatingLogHandler extends AbstractService implements
     }
   }
 
+  @Override
+  public Set<ApplicationId> getInvalidTokenApps() {
+    return Collections.emptySet();
+  }
+
   ScheduledThreadPoolExecutor createScheduledThreadPoolExecutor(
       Configuration conf) {
     ThreadFactory tf =
         new ThreadFactoryBuilder().setNameFormat("LogDeleter #%d").build();
     sched =
-        new ScheduledThreadPoolExecutor(conf.getInt(
+        new HadoopScheduledThreadPoolExecutor(conf.getInt(
             YarnConfiguration.NM_LOG_DELETION_THREADS_COUNT,
             YarnConfiguration.DEFAULT_NM_LOG_DELETE_THREAD_COUNT), tf);
     return sched;
@@ -220,12 +227,10 @@ public class NonAggregatingLogHandler extends AbstractService implements
   class LogDeleterRunnable implements Runnable {
     private String user;
     private ApplicationId applicationId;
-    private String userFolder;
 
-    public LogDeleterRunnable(String user, ApplicationId applicationId, String userFolder) {
+    public LogDeleterRunnable(String user, ApplicationId applicationId) {
       this.user = user;
       this.applicationId = applicationId;
-      this.userFolder = userFolder;
     }
 
     @Override
@@ -234,8 +239,7 @@ public class NonAggregatingLogHandler extends AbstractService implements
       List<Path> localAppLogDirs = new ArrayList<Path>();
       FileContext lfs = getLocalFileContext(getConfig());
       for (String rootLogDir : dirsHandler.getLogDirsForCleanup()) {
-        Path userLogDir = new Path(rootLogDir, userFolder);
-        Path logDir = new Path(userLogDir, applicationId.toString());
+        Path logDir = new Path(rootLogDir, applicationId.toString());
         try {
           lfs.getFileStatus(logDir);
           localAppLogDirs.add(logDir);
@@ -253,8 +257,10 @@ public class NonAggregatingLogHandler extends AbstractService implements
         new ApplicationEvent(this.applicationId,
           ApplicationEventType.APPLICATION_LOG_HANDLING_FINISHED));
       if (localAppLogDirs.size() > 0) {
-        NonAggregatingLogHandler.this.delService.delete(user, null,
-          (Path[]) localAppLogDirs.toArray(new Path[localAppLogDirs.size()]));
+        FileDeletionTask deletionTask = new FileDeletionTask(
+            NonAggregatingLogHandler.this.delService, user, null,
+            localAppLogDirs);
+        NonAggregatingLogHandler.this.delService.delete(deletionTask);
       }
       try {
         NonAggregatingLogHandler.this.stateStore.removeLogDeleter(

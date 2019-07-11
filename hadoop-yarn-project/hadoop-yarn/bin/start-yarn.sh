@@ -15,21 +15,85 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+## @description  usage info
+## @audience     private
+## @stability    evolving
+## @replaceable  no
+function hadoop_usage
+{
+  hadoop_generate_usage "${MYNAME}" false
+}
 
-# Start all yarn daemons.  Run this on master node.
+MYNAME="${BASH_SOURCE-$0}"
 
-echo "starting yarn daemons"
+bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
 
-bin=`dirname "${BASH_SOURCE-$0}"`
-bin=`cd "$bin"; pwd`
+# let's locate libexec...
+if [[ -n "${HADOOP_HOME}" ]]; then
+  HADOOP_DEFAULT_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
+else
+  HADOOP_DEFAULT_LIBEXEC_DIR="${bin}/../libexec"
+fi
 
-DEFAULT_LIBEXEC_DIR="$bin"/../libexec
-HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-. $HADOOP_LIBEXEC_DIR/yarn-config.sh
+HADOOP_LIBEXEC_DIR="${HADOOP_LIBEXEC_DIR:-$HADOOP_DEFAULT_LIBEXEC_DIR}"
+# shellcheck disable=SC2034
+HADOOP_NEW_CONFIG=true
+if [[ -f "${HADOOP_LIBEXEC_DIR}/yarn-config.sh" ]]; then
+  . "${HADOOP_LIBEXEC_DIR}/yarn-config.sh"
+else
+  echo "ERROR: Cannot execute ${HADOOP_LIBEXEC_DIR}/yarn-config.sh." 2>&1
+  exit 1
+fi
+
+HADOOP_JUMBO_RETCOUNTER=0
 
 # start resourceManager
-"$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start resourcemanager
-# start nodeManager
-"$bin"/yarn-daemons.sh --config $YARN_CONF_DIR  start nodemanager
+HARM=$("${HADOOP_HDFS_HOME}/bin/hdfs" getconf -confKey yarn.resourcemanager.ha.enabled 2>&-)
+if [[ ${HARM} = "false" ]]; then
+  echo "Starting resourcemanager"
+  hadoop_uservar_su yarn resourcemanager "${HADOOP_YARN_HOME}/bin/yarn" \
+      --config "${HADOOP_CONF_DIR}" \
+      --daemon start \
+      resourcemanager
+  (( HADOOP_JUMBO_RETCOUNTER=HADOOP_JUMBO_RETCOUNTER + $? ))
+else
+  logicals=$("${HADOOP_HDFS_HOME}/bin/hdfs" getconf -confKey yarn.resourcemanager.ha.rm-ids 2>&-)
+  logicals=${logicals//,/ }
+  for id in ${logicals}
+  do
+      rmhost=$("${HADOOP_HDFS_HOME}/bin/hdfs" getconf -confKey "yarn.resourcemanager.hostname.${id}" 2>&-)
+      RMHOSTS="${RMHOSTS} ${rmhost}"
+  done
+  echo "Starting resourcemanagers on [${RMHOSTS}]"
+  hadoop_uservar_su yarn resourcemanager "${HADOOP_YARN_HOME}/bin/yarn" \
+      --config "${HADOOP_CONF_DIR}" \
+      --daemon start \
+      --workers \
+      --hostnames "${RMHOSTS}" \
+      resourcemanager
+  (( HADOOP_JUMBO_RETCOUNTER=HADOOP_JUMBO_RETCOUNTER + $? ))
+fi
+
+# start nodemanager
+echo "Starting nodemanagers"
+hadoop_uservar_su yarn nodemanager "${HADOOP_YARN_HOME}/bin/yarn" \
+    --config "${HADOOP_CONF_DIR}" \
+    --workers \
+    --daemon start \
+    nodemanager
+(( HADOOP_JUMBO_RETCOUNTER=HADOOP_JUMBO_RETCOUNTER + $? ))
+
+
 # start proxyserver
-#"$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start proxyserver
+PROXYSERVER=$("${HADOOP_HDFS_HOME}/bin/hdfs" getconf -confKey  yarn.web-proxy.address 2>&- | cut -f1 -d:)
+if [[ -n ${PROXYSERVER} ]]; then
+ hadoop_uservar_su yarn proxyserver "${HADOOP_YARN_HOME}/bin/yarn" \
+      --config "${HADOOP_CONF_DIR}" \
+      --workers \
+      --hostnames "${PROXYSERVER}" \
+      --daemon start \
+      proxyserver
+ (( HADOOP_JUMBO_RETCOUNTER=HADOOP_JUMBO_RETCOUNTER + $? ))
+fi
+
+exit ${HADOOP_JUMBO_RETCOUNTER}

@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.token.Token;
@@ -35,45 +37,17 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManag
 import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 import org.mockito.Mockito;
 
-import java.net.InetSocketAddress;
-
 public class MockRMWithCustomAMLauncher extends MockRM {
 
   private final ContainerManagementProtocol containerManager;
-  private final boolean mockRMAppCertificateManager;
 
   public MockRMWithCustomAMLauncher(ContainerManagementProtocol containerManager) {
     this(new Configuration(), containerManager);
   }
 
   public MockRMWithCustomAMLauncher(Configuration conf, ContainerManagementProtocol containerManager) {
-    this(conf, containerManager, false);
-  }
-  
-  public MockRMWithCustomAMLauncher(Configuration conf,
-      ContainerManagementProtocol containerManager,
-      boolean mockRMAppCertificateManager) {
     super(conf);
     this.containerManager = containerManager;
-    this.mockRMAppCertificateManager = mockRMAppCertificateManager;
-  }
-  
-  
-  @Override
-  protected RMAppSecurityManager createRMAppSecurityManager() throws Exception {
-    if (mockRMAppCertificateManager) {
-      RMAppSecurityManager rmAppSecurityManager = Mockito.spy(new RMAppSecurityManager(rmContext));
-      RMAppSecurityHandler<X509SecurityHandler.X509SecurityManagerMaterial, X509SecurityHandler.X509MaterialParameter>
-          x509SecurityHandler = Mockito.spy(new X509SecurityHandler(rmContext, rmAppSecurityManager));
-      rmAppSecurityManager.registerRMAppSecurityHandlerWithType(x509SecurityHandler, X509SecurityHandler.class);
-      
-      RMAppSecurityHandler<JWTSecurityHandler.JWTSecurityManagerMaterial, JWTSecurityHandler.JWTMaterialParameter>
-          jwtSecurityMaterial = Mockito.spy(new JWTSecurityHandler(rmContext, rmAppSecurityManager));
-      rmAppSecurityManager.registerRMAppSecurityHandlerWithType(jwtSecurityMaterial, JWTSecurityHandler.class);
-      
-      return rmAppSecurityManager;
-    }
-    return super.createRMAppSecurityManager();
   }
   
   @Override

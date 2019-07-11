@@ -245,6 +245,7 @@ public class TestNameNodeMetrics {
     final Path file = getTestPath("testCorruptBlock");
     createFile(file, 100, (short) 2);
     
+    Thread.sleep(3000);
     // Corrupt first replica of the block
     LocatedBlock block = NameNodeAdapter
         .getBlockLocations(cluster.getNameNode(), file.toString(), 0, 1).get(0);

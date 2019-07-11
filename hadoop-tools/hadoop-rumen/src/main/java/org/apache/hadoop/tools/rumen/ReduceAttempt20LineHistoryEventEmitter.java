@@ -60,7 +60,7 @@ public class ReduceAttempt20LineHistoryEventEmitter
 
       if (finishTime != null && status != null
           && status.equalsIgnoreCase("success")) {
-        String hostName = line.get("RPC_ADDRESSES");
+        String hostName = line.get("HOSTNAME");
         String counters = line.get("COUNTERS");
         String state = line.get("STATE_STRING");
         String shuffleFinish = line.get("SHUFFLE_FINISHED");

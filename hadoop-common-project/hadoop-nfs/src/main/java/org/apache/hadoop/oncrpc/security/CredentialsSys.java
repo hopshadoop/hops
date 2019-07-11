@@ -33,10 +33,10 @@ public class CredentialsSys extends Credentials {
       String s = InetAddress.getLocalHost().getHostName();
       HOSTNAME = s;
       if(LOG.isDebugEnabled()) {
-        LOG.debug("RPC_ADDRESSES = " + HOSTNAME);
+        LOG.debug("HOSTNAME = " + HOSTNAME);
       }
     } catch (UnknownHostException e) {
-      LOG.error("Error setting RPC_ADDRESSES", e);
+      LOG.error("Error setting HOSTNAME", e);
       throw new RuntimeException(e);
     }
   }

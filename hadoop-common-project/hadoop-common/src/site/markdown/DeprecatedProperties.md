@@ -43,22 +43,27 @@ The following table lists the configuration property names that are deprecated i
 | dfs.permissions | dfs.permissions.enabled |
 | dfs.permissions.supergroup | dfs.permissions.superusergroup |
 | dfs.read.prefetch.size | dfs.client.read.prefetch.size |
-| dfs.replication.considerLoad | dfs.namenode.replication.considerLoad |
-| dfs.replication.interval | dfs.namenode.replication.interval |
+| dfs.replication.considerLoad | dfs.namenode.redundancy.considerLoad |
+| dfs.namenode.replication.considerLoad | dfs.namenode.redundancy.considerLoad |
+| dfs.namenode.replication.considerLoad.factor | dfs.namenode.redundancy.considerLoad.factor |
+| dfs.replication.interval | dfs.namenode.redundancy.interval |
+| dfs.namenode.replication.interval | dfs.namenode.redundancy.interval |
 | dfs.replication.min | dfs.namenode.replication.min |
-| dfs.replication.pending.timeout.sec | dfs.namenode.replication.pending.timeout-sec |
+| dfs.replication.pending.timeout.sec | dfs.namenode.reconstruction.pending.timeout-sec |
+| dfs.namenode.replication.pending.timeout-sec | dfs.namenode.reconstruction.pending.timeout-sec |
 | dfs.safemode.extension | dfs.namenode.safemode.extension |
 | dfs.safemode.threshold.pct | dfs.namenode.safemode.threshold-pct |
 | dfs.secondary.http.address | dfs.namenode.secondary.http-address |
 | dfs.socket.timeout | dfs.client.socket-timeout |
 | dfs.umaskmode | fs.permissions.umask-mode |
+| dfs.web.ugi | hadoop.http.staticuser.user |
 | dfs.write.packet.size | dfs.client-write-packet-size |
 | fs.checkpoint.dir | dfs.namenode.checkpoint.dir |
 | fs.checkpoint.edits.dir | dfs.namenode.checkpoint.edits.dir |
 | fs.checkpoint.period | dfs.namenode.checkpoint.period |
 | fs.default.name | fs.defaultFS |
+| fs.s3a.server-side-encryption-key | fs.s3a.server-side-encryption.key |
 | hadoop.configured.node.mapping | net.topology.configured.node.mapping |
-| hadoop.job.history.location | mapreduce.jobtracker.jobhistory.location |
 | hadoop.native.lib | io.native.lib.available |
 | hadoop.net.static.resolutions | mapreduce.tasktracker.net.static.resolutions |
 | hadoop.pipes.command-file.keep | mapreduce.pipes.commandfile.preserve |
@@ -100,7 +105,6 @@ The following table lists the configuration property names that are deprecated i
 | mapred.cache.localArchives | mapreduce.job.cache.local.archives |
 | mapred.cache.localFiles | mapreduce.job.cache.local.files |
 | mapred.child.tmp | mapreduce.task.tmp.dir |
-| mapred.cluster.average.blacklist.threshold | mapreduce.jobtracker.blacklist.average.threshold |
 | mapred.cluster.map.memory.mb | mapreduce.cluster.mapmemory.mb |
 | mapred.cluster.max.map.memory.mb | mapreduce.jobtracker.maxmapmemory.mb |
 | mapred.cluster.max.reduce.memory.mb | mapreduce.jobtracker.maxreducememory.mb |
@@ -113,9 +117,6 @@ The following table lists the configuration property names that are deprecated i
 | mapred.healthChecker.script.args | mapreduce.tasktracker.healthchecker.script.args |
 | mapred.healthChecker.script.path | mapreduce.tasktracker.healthchecker.script.path |
 | mapred.healthChecker.script.timeout | mapreduce.tasktracker.healthchecker.script.timeout |
-| mapred.heartbeats.in.second | mapreduce.jobtracker.heartbeats.in.second |
-| mapred.hosts.exclude | mapreduce.jobtracker.hosts.exclude.filename |
-| mapred.hosts | mapreduce.jobtracker.hosts.filename |
 | mapred.inmem.merge.threshold | mapreduce.reduce.merge.inmem.threshold |
 | mapred.input.dir.formats | mapreduce.input.multipleinputs.dir.formats |
 | mapred.input.dir.mappers | mapreduce.input.multipleinputs.dir.mappers |
@@ -125,7 +126,6 @@ The following table lists the configuration property names that are deprecated i
 | mapred.job.classpath.archives | mapreduce.job.classpath.archives |
 | mapred.job.classpath.files | mapreduce.job.classpath.files |
 | mapred.job.id | mapreduce.job.id |
-| mapred.jobinit.threads | mapreduce.jobtracker.jobinit.threads |
 | mapred.job.map.memory.mb | mapreduce.map.memory.mb |
 | mapred.job.name | mapreduce.job.name |
 | mapred.job.priority | mapreduce.job.priority |
@@ -137,23 +137,9 @@ The following table lists the configuration property names that are deprecated i
 | mapred.job.reuse.jvm.num.tasks | mapreduce.job.jvm.numtasks |
 | mapred.job.shuffle.input.buffer.percent | mapreduce.reduce.shuffle.input.buffer.percent |
 | mapred.job.shuffle.merge.percent | mapreduce.reduce.shuffle.merge.percent |
-| mapred.job.tracker.handler.count | mapreduce.jobtracker.handler.count |
-| mapred.job.tracker.history.completed.location | mapreduce.jobtracker.jobhistory.completed.location |
-| mapred.job.tracker.http.address | mapreduce.jobtracker.http.address |
-| mapred.jobtracker.instrumentation | mapreduce.jobtracker.instrumentation |
-| mapred.jobtracker.job.history.block.size | mapreduce.jobtracker.jobhistory.block.size |
-| mapred.job.tracker.jobhistory.lru.cache.size | mapreduce.jobtracker.jobhistory.lru.cache.size |
 | mapred.job.tracker | mapreduce.jobtracker.address |
-| mapred.jobtracker.maxtasks.per.job | mapreduce.jobtracker.maxtasks.perjob |
 | mapred.job.tracker.persist.jobstatus.active | mapreduce.jobtracker.persist.jobstatus.active |
-| mapred.job.tracker.persist.jobstatus.dir | mapreduce.jobtracker.persist.jobstatus.dir |
-| mapred.job.tracker.persist.jobstatus.hours | mapreduce.jobtracker.persist.jobstatus.hours |
-| mapred.jobtracker.restart.recover | mapreduce.jobtracker.restart.recover |
-| mapred.job.tracker.retiredjobs.cache.size | mapreduce.jobtracker.retiredjobs.cache.size |
 | mapred.job.tracker.retire.jobs | mapreduce.jobtracker.retirejobs |
-| mapred.jobtracker.taskalloc.capacitypad | mapreduce.jobtracker.taskscheduler.taskalloc.capacitypad |
-| mapred.jobtracker.taskScheduler | mapreduce.jobtracker.taskscheduler |
-| mapred.jobtracker.taskScheduler.maxRunningTasksPerJob | mapreduce.jobtracker.taskscheduler.maxrunningtasks.perjob |
 | mapred.join.expr | mapreduce.join.expr |
 | mapred.join.keycomparator | mapreduce.join.keycomparator |
 | mapred.lazy.output.format | mapreduce.output.lazyoutputformat.outputformat |
@@ -177,7 +163,6 @@ The following table lists the configuration property names that are deprecated i
 | mapred.max.map.failures.percent | mapreduce.map.failures.maxpercent |
 | mapred.max.reduce.failures.percent | mapreduce.reduce.failures.maxpercent |
 | mapred.max.split.size | mapreduce.input.fileinputformat.split.maxsize |
-| mapred.max.tracker.blacklists | mapreduce.jobtracker.tasktracker.maxblacklists |
 | mapred.max.tracker.failures | mapreduce.job.maxtaskfailures.per.tracker |
 | mapred.merge.recordsBeforeProgress | mapreduce.task.merge.progress.records |
 | mapred.min.split.size | mapreduce.input.fileinputformat.split.minsize |
@@ -230,7 +215,6 @@ The following table lists the configuration property names that are deprecated i
 | mapred.tasktracker.dns.interface | mapreduce.tasktracker.dns.interface |
 | mapred.tasktracker.dns.nameserver | mapreduce.tasktracker.dns.nameserver |
 | mapred.tasktracker.events.batchsize | mapreduce.tasktracker.events.batchsize |
-| mapred.tasktracker.expiry.interval | mapreduce.jobtracker.expire.trackers.interval |
 | mapred.task.tracker.http.address | mapreduce.tasktracker.http.address |
 | mapred.tasktracker.indexcache.mb | mapreduce.tasktracker.indexcache.mb |
 | mapred.tasktracker.instrumentation | mapreduce.tasktracker.instrumentation |
@@ -249,7 +233,6 @@ The following table lists the configuration property names that are deprecated i
 | mapreduce.combine.class | mapreduce.job.combine.class |
 | mapreduce.inputformat.class | mapreduce.job.inputformat.class |
 | mapreduce.job.counters.limit | mapreduce.job.counters.max |
-| mapreduce.jobtracker.permissions.supergroup | mapreduce.cluster.permissions.supergroup |
 | mapreduce.map.class | mapreduce.job.map.class |
 | mapreduce.outputformat.class | mapreduce.job.outputformat.class |
 | mapreduce.partitioner.class | mapreduce.job.partitioner.class |
@@ -275,7 +258,6 @@ The following table lists the configuration property names that are deprecated i
 | topology.script.file.name | net.topology.script.file.name |
 | topology.script.number.args | net.topology.script.number.args |
 | user.name | mapreduce.job.user.name |
-| webinterface.private.actions | mapreduce.jobtracker.webinterface.trusted |
 | yarn.app.mapreduce.yarn.app.mapreduce.client-am.ipc.max-retries-on-timeouts | yarn.app.mapreduce.client-am.ipc.max-retries-on-timeouts |
 | yarn.client.app-submission.poll-interval | yarn.client.application-client-protocol.poll-timeout-ms |
 
@@ -285,5 +267,6 @@ The following table lists additional changes to some configuration properties:
 |:---- |:---- |
 | mapred.create.symlink | NONE - symlinking is always on |
 | mapreduce.job.cache.symlink.create | NONE - symlinking is always on |
+| io.native.lib.available | NONE - Always use native libraries if available. |
 
 

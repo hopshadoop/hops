@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,35 +14,37 @@
 #
 
 # Set kms specific environment variables here.
-
-# Settings for the Embedded Tomcat that runs KMS
-# Java System properties for KMS should be specified in this variable
 #
-# export CATALINA_OPTS=
-
-# KMS logs directory
+# hadoop-env.sh is read prior to this file.
 #
-# export KMS_LOG=${KMS_HOME}/logs
+
+# KMS config directory
+#
+# export KMS_CONFIG=${HADOOP_CONF_DIR}
+
+# KMS log directory
+#
+# export KMS_LOG=${HADOOP_LOG_DIR}
 
 # KMS temporary directory
 #
-# export KMS_TEMP=${KMS_HOME}/temp
+# export KMS_TEMP=${HADOOP_HOME}/temp
 
 # The HTTP port used by KMS
 #
-# export KMS_HTTP_PORT=16000
+# export KMS_HTTP_PORT=9600
 
-# The Admin port used by KMS
-#
-# export KMS_ADMIN_PORT=`expr ${KMS_HTTP_PORT} + 1`
-
-# The maximum number of Tomcat handler threads
+# The maximum number of HTTP handler threads
 #
 # export KMS_MAX_THREADS=1000
 
-# The maximum size of Tomcat HTTP header
+# The maximum size of HTTP header
 #
 # export KMS_MAX_HTTP_HEADER_SIZE=65536
+
+# Whether SSL is enabled
+#
+# export KMS_SSL_ENABLED=false
 
 # The location of the SSL keystore if using SSL
 #
@@ -51,9 +53,3 @@
 # The password of the SSL keystore if using SSL
 #
 # export KMS_SSL_KEYSTORE_PASS=password
-
-# The full path to any native libraries that need to be loaded
-# (For eg. location of natively compiled tomcat Apache portable
-# runtime (APR) libraries
-#
-# export JAVA_LIBRARY_PATH=${HOME}/lib/native

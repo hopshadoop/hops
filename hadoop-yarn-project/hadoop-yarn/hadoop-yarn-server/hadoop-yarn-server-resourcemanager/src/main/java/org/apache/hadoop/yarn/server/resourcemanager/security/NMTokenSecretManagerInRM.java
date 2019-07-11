@@ -46,7 +46,7 @@ public class NMTokenSecretManagerInRM extends BaseNMTokenSecretManager {
   private static Log LOG = LogFactory
       .getLog(NMTokenSecretManagerInRM.class);
 
-  protected MasterKeyData nextMasterKey;
+  private MasterKeyData nextMasterKey;
   private Configuration conf;
 
   private final Timer timer;
@@ -151,7 +151,7 @@ public class NMTokenSecretManagerInRM extends BaseNMTokenSecretManager {
     }
   }
 
-  protected void clearApplicationNMTokenKeys() {
+  private void clearApplicationNMTokenKeys() {
     // We should clear all node entries from this set.
     // TODO : Once we have per node master key then it will change to only
     // remove specific node from it.

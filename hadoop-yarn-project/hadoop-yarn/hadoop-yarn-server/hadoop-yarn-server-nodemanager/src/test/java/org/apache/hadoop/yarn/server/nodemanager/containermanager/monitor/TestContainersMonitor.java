@@ -22,6 +22,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -29,15 +31,17 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.apache.commons.logging.LogFactory;
+import com.google.common.base.Supplier;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
@@ -65,7 +69,6 @@ import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.BaseContainerManagerTest;
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerSignalContext;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.LinuxResourceCalculatorPlugin;
 import org.apache.hadoop.yarn.util.ProcfsBasedProcessTree;
 import org.apache.hadoop.yarn.util.ResourceCalculatorPlugin;
@@ -73,6 +76,8 @@ import org.apache.hadoop.yarn.util.TestProcfsBasedProcessTree;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
+import org.slf4j.LoggerFactory;
 
 public class TestContainersMonitor extends BaseContainerManagerTest {
 
@@ -81,7 +86,7 @@ public class TestContainersMonitor extends BaseContainerManagerTest {
   }
 
   static {
-    LOG = LogFactory.getLog(TestContainersMonitor.class);
+    LOG = LoggerFactory.getLogger(TestContainersMonitor.class);
   }
   @Before
   public void setup() throws IOException {
@@ -89,7 +94,24 @@ public class TestContainersMonitor extends BaseContainerManagerTest {
         YarnConfiguration.NM_MON_RESOURCE_CALCULATOR,
         LinuxResourceCalculatorPlugin.class, ResourceCalculatorPlugin.class);
     conf.setBoolean(YarnConfiguration.NM_VMEM_CHECK_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.NM_MEMORY_RESOURCE_ENFORCED, false);
     super.setup();
+  }
+
+  @Test
+  public void testMetricsUpdate() throws Exception {
+    // This test doesn't verify the correction of those metrics
+    // updated by the monitor, it only verifies that the monitor
+    // do publish these info to node manager metrics system in
+    // each monitor interval.
+    Context spyContext = spy(context);
+    ContainersMonitorImpl cm =
+        new ContainersMonitorImpl(mock(ContainerExecutor.class),
+            mock(AsyncDispatcher.class), spyContext);
+    cm.init(getConfForCM(false, true, 1024, 2.1f));
+    cm.start();
+    Mockito.verify(spyContext, timeout(500).atLeastOnce())
+        .getNodeManagerMetrics();
   }
 
   /**
@@ -181,6 +203,42 @@ public class TestContainersMonitor extends BaseContainerManagerTest {
     }
   }
 
+  // Test that even if VMEM_PMEM_CHECK is not enabled, container monitor will
+  // run.
+  @Test
+  public void testContainerMonitor() throws Exception {
+    conf.setBoolean(YarnConfiguration.NM_VMEM_CHECK_ENABLED, false);
+    conf.setBoolean(YarnConfiguration.NM_PMEM_CHECK_ENABLED, false);
+    containerManager.start();
+    ContainerLaunchContext context =
+        recordFactory.newRecordInstance(ContainerLaunchContext.class);
+    context.setCommands(Arrays.asList("sleep 6"));
+    ContainerId cId = createContainerId(1705);
+
+    // start the container
+    StartContainerRequest scRequest = StartContainerRequest.newInstance(context,
+        createContainerToken(cId, DUMMY_RM_IDENTIFIER, this.context.getNodeId(),
+            user, this.context.getContainerTokenSecretManager()));
+    StartContainersRequest allRequests =
+        StartContainersRequest.newInstance(Arrays.asList(scRequest));
+    containerManager.startContainers(allRequests);
+    BaseContainerManagerTest
+        .waitForContainerState(containerManager, cId, ContainerState.RUNNING);
+    Thread.sleep(2000);
+    GenericTestUtils.waitFor(new Supplier<Boolean>() {
+      public Boolean get() {
+        try {
+          return containerManager.getContainerStatuses(
+              GetContainerStatusesRequest.newInstance(Arrays.asList(cId)))
+              .getContainerStatuses().get(0).getHost() != null;
+        } catch (Exception e) {
+          return false;
+        }
+      }
+
+    }, 300, 10000);
+  }
+
   @Test
   public void testContainerKillOnMemoryOverflow() throws IOException,
       InterruptedException, YarnException {
@@ -232,7 +290,7 @@ public class TestContainersMonitor extends BaseContainerManagerTest {
     ContainerTokenIdentifier containerIdentifier =
         new ContainerTokenIdentifier(cId, context.getNodeId().toString(), user,
           r, System.currentTimeMillis() + 120000, 123, DUMMY_RM_IDENTIFIER,
-          Priority.newInstance(0), 0, userFolder);
+          Priority.newInstance(0), 0);
     Token containerToken =
         BuilderUtils.newContainerToken(context.getNodeId(),
           containerManager.getContext().getContainerTokenSecretManager()
@@ -275,8 +333,8 @@ public class TestContainersMonitor extends BaseContainerManagerTest {
     Assert.assertEquals(ContainerExitStatus.KILLED_EXCEEDED_VMEM,
         containerStatus.getExitStatus());
     String expectedMsgPattern =
-        "Container \\[pid=" + pid + ",containerID=" + cId
-            + "\\] is running beyond virtual memory limits. Current usage: "
+        "Container \\[pid=" + pid + ",containerID=" + cId + "\\] is running "
+            + "[0-9]+B beyond the 'VIRTUAL' memory limit. Current usage: "
             + "[0-9.]+ ?[KMGTPE]?B of [0-9.]+ ?[KMGTPE]?B physical memory used; "
             + "[0-9.]+ ?[KMGTPE]?B of [0-9.]+ ?[KMGTPE]?B virtual memory used. "
             + "Killing container.\nDump of the process-tree for "

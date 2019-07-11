@@ -22,9 +22,9 @@ import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys
 
 import java.util.List;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 
 import org.apache.hadoop.fs.permission.AclEntry;
-import org.apache.commons.lang.StringUtils;
 
 /** AclPermission parameter. */
 public class AclPermissionParam extends StringParam {

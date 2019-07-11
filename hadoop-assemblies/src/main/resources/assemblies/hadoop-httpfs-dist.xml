@@ -12,13 +12,23 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<assembly>
+<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.3"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.3 http://maven.apache.org/xsd/assembly-1.1.3.xsd">
   <id>hadoop-httpfs-dist</id>
   <formats>
     <format>dir</format>
   </formats>
   <includeBaseDirectory>false</includeBaseDirectory>
   <fileSets>
+    <!-- Jar file -->
+    <fileSet>
+      <directory>target</directory>
+      <outputDirectory>/share/hadoop/hdfs</outputDirectory>
+      <includes>
+        <include>${project.artifactId}-${project.version}.jar</include>
+      </includes>
+    </fileSet>
     <!-- Configuration files -->
     <fileSet>
       <directory>${basedir}/src/main/conf</directory>
@@ -39,7 +49,7 @@
       <directory>${basedir}/src/main/libexec</directory>
       <outputDirectory>/libexec</outputDirectory>
       <includes>
-        <include>*</include>
+        <include>**/*</include>
       </includes>
       <fileMode>0755</fileMode>
     </fileSet>
@@ -49,4 +59,19 @@
       <outputDirectory>/share/doc/hadoop/httpfs</outputDirectory>
     </fileSet>
   </fileSets>
+  <dependencySets>
+    <dependencySet>
+      <useProjectArtifact>false</useProjectArtifact>
+      <outputDirectory>/share/hadoop/hdfs/lib</outputDirectory>
+      <!-- Exclude hadoop artifacts. They will be found via HADOOP* env -->
+      <excludes>
+        <exclude>org.apache.hadoop:hadoop-common</exclude>
+        <exclude>org.apache.hadoop:hadoop-hdfs</exclude>
+        <!-- use slf4j from common to avoid multiple binding warnings -->
+        <exclude>org.slf4j:slf4j-api</exclude>
+        <exclude>org.slf4j:slf4j-log4j12</exclude>
+        <exclude>org.hsqldb:hsqldb</exclude>
+      </excludes>
+    </dependencySet>
+  </dependencySets>
 </assembly>

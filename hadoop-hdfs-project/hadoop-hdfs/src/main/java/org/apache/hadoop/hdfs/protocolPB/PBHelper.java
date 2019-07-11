@@ -1710,6 +1710,8 @@ public class PBHelper {
         return StorageTypeProto.ARCHIVE;
       case DB:
         return StorageTypeProto.DB;
+      case PROVIDED:
+        return StorageTypeProto.PROVIDED;
       default:
         Preconditions.checkState(
             false,
@@ -1731,6 +1733,8 @@ public class PBHelper {
         return StorageType.ARCHIVE;
       case DB:
         return StorageType.DB;
+      case PROVIDED:
+        return StorageType.PROVIDED;
       default:
         throw new IllegalStateException(
             "BUG: StorageTypeProto not found, type=" + type);

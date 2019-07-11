@@ -17,6 +17,10 @@
 */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
 
+import static org.apache.hadoop.util.Shell.getAllShells;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -24,10 +28,14 @@ import java.net.InetSocketAddress;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -35,12 +43,9 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
@@ -53,8 +58,12 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.util.DiskChecker;
+import org.apache.hadoop.util.DiskValidator;
+import org.apache.hadoop.util.DiskValidatorFactory;
+import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
+import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.SerializedException;
@@ -71,7 +80,6 @@ import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerHe
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerStatus;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.ResourceStatusType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.security.LocalizerTokenIdentifier;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.FSDownload;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -79,14 +87,13 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 public class ContainerLocalizer {
 
-  static final Log LOG = LogFactory.getLog(ContainerLocalizer.class);
+  static final Logger LOG =
+       LoggerFactory.getLogger(ContainerLocalizer.class);
 
   public static final String FILECACHE = "filecache";
   public static final String APPCACHE = "appcache";
   public static final String USERCACHE = "usercache";
-  public static final String OUTPUTDIR = "output";
   public static final String TOKEN_FILE_NAME_FMT = "%s.tokens";
-  public static final String WORKDIR = "work";
   private static final String APPCACHE_CTXT_FMT = "%s.app.cache.dirs";
   private static final String USERCACHE_CTXT_FMT = "%s.user.cache.dirs";
   private static final FsPermission FILECACHE_PERMS =
@@ -95,7 +102,6 @@ public class ContainerLocalizer {
       new FsPermission((short) 0755);
 
   private final String user;
-  private final String userFolder;
   private final String appId;
   private final List<Path> localDirs;
   private final String localizerId;
@@ -104,10 +110,14 @@ public class ContainerLocalizer {
   private final RecordFactory recordFactory;
   private final Map<LocalResource,Future<Path>> pendingResources;
   private final String appCacheDirContextName;
+  private final DiskValidator diskValidator;
+
+  private Set<Thread> localizingThreads =
+      Collections.synchronizedSet(new HashSet<>());
 
   public ContainerLocalizer(FileContext lfs, String user, String appId,
       String localizerId, List<Path> localDirs,
-      RecordFactory recordFactory, String userFolder) throws IOException {
+      RecordFactory recordFactory) throws IOException {
     if (null == user) {
       throw new IOException("Cannot initialize for null user");
     }
@@ -116,12 +126,13 @@ public class ContainerLocalizer {
     }
     this.lfs = lfs;
     this.user = user;
-    this.userFolder = userFolder;
     this.appId = appId;
     this.localDirs = localDirs;
     this.localizerId = localizerId;
     this.recordFactory = recordFactory;
-    this.conf = new Configuration();
+    this.conf = new YarnConfiguration();
+    this.diskValidator = DiskValidatorFactory.getInstance(
+        YarnConfiguration.DEFAULT_DISK_VALIDATOR);
     this.appCacheDirContextName = String.format(APPCACHE_CTXT_FMT, appId);
     this.pendingResources = new HashMap<LocalResource,Future<Path>>();
   }
@@ -138,7 +149,7 @@ public class ContainerLocalizer {
   public void runLocalization(final InetSocketAddress nmAddr)
       throws IOException, InterruptedException {
     // load credentials
-    initDirs(conf, user, appId, lfs, localDirs, userFolder);
+    initDirs(conf, user, appId, lfs, localDirs);
     final Credentials creds = new Credentials();
     DataInputStream credFile = null;
     try {
@@ -179,13 +190,14 @@ public class ContainerLocalizer {
       exec = createDownloadThreadPool();
       CompletionService<Path> ecs = createCompletionService(exec);
       localizeFiles(nodeManager, ecs, ugi);
-      return;
     } catch (Throwable e) {
       throw new IOException(e);
     } finally {
       try {
         if (exec != null) {
-          exec.shutdownNow();
+          exec.shutdown();
+          destroyShellProcesses(getAllShells());
+          exec.awaitTermination(10, TimeUnit.SECONDS);
         }
         LocalDirAllocator.removeContext(appCacheDirContextName);
       } finally {
@@ -195,12 +207,36 @@ public class ContainerLocalizer {
   }
 
   ExecutorService createDownloadThreadPool() {
-    return Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
+    return HadoopExecutors.newSingleThreadExecutor(new ThreadFactoryBuilder()
       .setNameFormat("ContainerLocalizer Downloader").build());
   }
 
   CompletionService<Path> createCompletionService(ExecutorService exec) {
     return new ExecutorCompletionService<Path>(exec);
+  }
+
+  class FSDownloadWrapper extends FSDownload {
+
+    FSDownloadWrapper(FileContext files, UserGroupInformation ugi,
+        Configuration conf, Path destDirPath, LocalResource resource) {
+      super(files, ugi, conf, destDirPath, resource);
+    }
+
+    @Override
+    public Path call() throws Exception {
+      Thread currentThread = Thread.currentThread();
+      localizingThreads.add(currentThread);
+      try {
+        return doDownloadCall();
+      } finally {
+        localizingThreads.remove(currentThread);
+      }
+    }
+
+    Path doDownloadCall() throws Exception {
+      return super.call();
+    }
+
   }
 
   Callable<Path> download(Path destDirPath, LocalResource rsrc,
@@ -210,8 +246,8 @@ public class ContainerLocalizer {
     if (rsrc.getVisibility() == LocalResourceVisibility.PRIVATE) {
       createParentDirs(destDirPath);
     }
-    DiskChecker.checkDir(new File(destDirPath.toUri().getRawPath()));
-    return new FSDownload(lfs, ugi, conf, destDirPath, rsrc);
+    diskValidator.checkStatus(new File(destDirPath.toUri().getRawPath()));
+    return new FSDownloadWrapper(lfs, ugi, conf, destDirPath, rsrc);
   }
 
   private void createParentDirs(Path destDirPath) throws IOException {
@@ -310,13 +346,13 @@ public class ContainerLocalizer {
     final List<LocalResourceStatus> currentResources =
       new ArrayList<LocalResourceStatus>();
     // TODO: Synchronization??
-    for (Iterator<LocalResource> i = pendingResources.keySet().iterator();
-         i.hasNext();) {
-      LocalResource rsrc = i.next();
+    for (Iterator<Entry<LocalResource, Future<Path>>> i =
+        pendingResources.entrySet().iterator(); i.hasNext();) {
+      Entry<LocalResource, Future<Path>> mapEntry = i.next();
       LocalResourceStatus stat =
         recordFactory.newRecordInstance(LocalResourceStatus.class);
-      stat.setResource(rsrc);
-      Future<Path> fPath = pendingResources.get(rsrc);
+      stat.setResource(mapEntry.getKey());
+      Future<Path> fPath = mapEntry.getValue();
       if (fPath.isDone()) {
         try {
           Path localPath = fPath.get();
@@ -368,11 +404,14 @@ public class ContainerLocalizer {
    */
   public static void buildMainArgs(List<String> command,
       String user, String appId, String locId,
-      InetSocketAddress nmAddr, List<String> localDirs, String userFolder) {
-    
+      InetSocketAddress nmAddr, List<String> localDirs, Configuration conf) {
+
+    String logLevel = conf.get(YarnConfiguration.
+            NM_CONTAINER_LOCALIZER_LOG_LEVEL,
+        YarnConfiguration.NM_CONTAINER_LOCALIZER_LOG_LEVEL_DEFAULT);
+    addLog4jSystemProperties(logLevel, command);
     command.add(ContainerLocalizer.class.getName());
     command.add(user);
-    command.add(userFolder);
     command.add(appId);
     command.add(locId);
     command.add(nmAddr.getHostName());
@@ -382,9 +421,20 @@ public class ContainerLocalizer {
     }
   }
 
+  private static void addLog4jSystemProperties(
+      String logLevel, List<String> command) {
+    command.add("-Dlog4j.configuration=container-log4j.properties");
+    command.add("-D" + YarnConfiguration.YARN_APP_CONTAINER_LOG_DIR + "=" +
+        ApplicationConstants.LOG_DIR_EXPANSION_VAR);
+    command.add("-D" + YarnConfiguration.YARN_APP_CONTAINER_LOG_SIZE + "=0");
+    command.add("-Dhadoop.root.logger=" + logLevel + ",CLA");
+    command.add("-Dhadoop.root.logfile=container-localizer-syslog");
+  }
+
   public static void main(String[] argv) throws Throwable {
     Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
-    // usage: $0 user userFolder appId locId host port app_log_dir user_dir [user_dir]*
+    int nRet = 0;
+    // usage: $0 user appId locId host port app_log_dir user_dir [user_dir]*
     // let $x = $x/usercache for $local.dir
     // MKDIR $x/$user/appcache/$appid
     // MKDIR $x/$user/appcache/$appid/output
@@ -392,12 +442,11 @@ public class ContainerLocalizer {
     // LOAD $x/$user/appcache/$appid/appTokens
     try {
       String user = argv[0];
-      String userFolder = argv[1];
-      String appId = argv[2];
-      String locId = argv[3];
+      String appId = argv[1];
+      String locId = argv[2];
       InetSocketAddress nmAddr =
-          new InetSocketAddress(argv[4], Integer.parseInt(argv[5]));
-      String[] sLocaldirs = Arrays.copyOfRange(argv, 6, argv.length);
+          new InetSocketAddress(argv[3], Integer.parseInt(argv[4]));
+      String[] sLocaldirs = Arrays.copyOfRange(argv, 5, argv.length);
       ArrayList<Path> localDirs = new ArrayList<Path>(sLocaldirs.length);
       for (String sLocaldir : sLocaldirs) {
         localDirs.add(new Path(sLocaldir));
@@ -413,7 +462,7 @@ public class ContainerLocalizer {
       ContainerLocalizer localizer =
           new ContainerLocalizer(FileContext.getLocalFSFileContext(), user,
               appId, locId, localDirs,
-              RecordFactoryProvider.getRecordFactory(null), userFolder);
+              RecordFactoryProvider.getRecordFactory(null));
       localizer.runLocalization(nmAddr);
       return;
     } catch (Throwable e) {
@@ -421,12 +470,14 @@ public class ContainerLocalizer {
       // space in both DefaultCE and LCE cases
       e.printStackTrace(System.out);
       LOG.error("Exception in main:", e);
-      System.exit(-1);
+      nRet = -1;
+    } finally {
+      System.exit(nRet);
     }
   }
 
   private static void initDirs(Configuration conf, String user, String appId,
-      FileContext lfs, List<Path> localDirs, String userFolder) throws IOException {
+      FileContext lfs, List<Path> localDirs) throws IOException {
     if (null == localDirs || 0 == localDirs.size()) {
       throw new IOException("Cannot initialize without local dirs");
     }
@@ -435,7 +486,7 @@ public class ContainerLocalizer {
     for (int i = 0, n = localDirs.size(); i < n; ++i) {
       // $x/usercache/$user
       Path base = lfs.makeQualified(
-          new Path(new Path(localDirs.get(i), USERCACHE), userFolder));
+          new Path(new Path(localDirs.get(i), USERCACHE), user));
       // $x/usercache/$user/filecache
       Path userFileCacheDir = new Path(base, FILECACHE);
       usersFileCacheDirs[i] = userFileCacheDir.toString();
@@ -456,6 +507,14 @@ public class ContainerLocalizer {
     lfs.mkdir(dirPath, perms, false);
     if (!perms.equals(perms.applyUMask(lfs.getUMask()))) {
       lfs.setPermission(dirPath, perms);
+    }
+  }
+
+  private void destroyShellProcesses(Set<Shell> shells) {
+    for (Shell shell : shells) {
+      if(localizingThreads.contains(shell.getWaitingThread())) {
+        shell.getProcess().destroy();
+      }
     }
   }
 }

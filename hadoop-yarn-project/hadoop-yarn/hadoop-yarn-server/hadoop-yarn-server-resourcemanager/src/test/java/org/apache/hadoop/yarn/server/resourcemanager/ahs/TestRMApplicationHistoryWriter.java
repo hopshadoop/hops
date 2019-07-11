@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
-import java.io.IOException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -81,15 +77,12 @@ public class TestRMApplicationHistoryWriter {
       new ArrayList<CounterDispatcher>();
 
   @Before
-  public void setup() throws IOException {
+  public void setup() {
     store = new MemoryApplicationHistoryStore();
     Configuration conf = new Configuration();
     conf.setBoolean(YarnConfiguration.APPLICATION_HISTORY_ENABLED, true);
     conf.setClass(YarnConfiguration.APPLICATION_HISTORY_STORE,
         MemoryApplicationHistoryStore.class, ApplicationHistoryStore.class);
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
     writer = new RMApplicationHistoryWriter() {
 
       @Override
@@ -175,7 +168,7 @@ public class TestRMApplicationHistoryWriter {
     when(container.getAllocatedNode()).thenReturn(
       NodeId.newInstance("test host", -100));
     when(container.getAllocatedResource()).thenReturn(
-      Resource.newInstance(-1, -1, -1));
+      Resource.newInstance(-1, -1));
     when(container.getAllocatedPriority()).thenReturn(Priority.UNDEFINED);
     when(container.getCreationTime()).thenReturn(0L);
     when(container.getFinishTime()).thenReturn(1L);
@@ -306,7 +299,7 @@ public class TestRMApplicationHistoryWriter {
     Assert.assertNotNull(containerHD);
     Assert.assertEquals(NodeId.newInstance("test host", -100),
       containerHD.getAssignedNode());
-    Assert.assertEquals(Resource.newInstance(-1, -1, -1),
+    Assert.assertEquals(Resource.newInstance(-1, -1),
       containerHD.getAllocatedResource());
     Assert.assertEquals(Priority.UNDEFINED, containerHD.getPriority());
     Assert.assertEquals(0L, container.getCreationTime());
@@ -396,10 +389,9 @@ public class TestRMApplicationHistoryWriter {
     YarnConfiguration conf = new YarnConfiguration();
     if (isFS) {
       conf.setBoolean(FairSchedulerConfiguration.ASSIGN_MULTIPLE, true);
-      conf.set("yarn.resourcemanager.scheduler.class",
-          FairScheduler.class.getName());
+      conf.set(YarnConfiguration.RM_SCHEDULER, FairScheduler.class.getName());
     } else {
-      conf.set("yarn.resourcemanager.scheduler.class",
+      conf.set(YarnConfiguration.RM_SCHEDULER,
           CapacityScheduler.class.getName());
     }
     // don't process history events
@@ -453,6 +445,9 @@ public class TestRMApplicationHistoryWriter {
     MockNM nm = rm.registerNode("127.0.0.1:1234", 1024 * 10100);
 
     RMApp app = rm.submitApp(1024);
+    //Wait to make sure the attempt has the right state
+    //TODO explore a better way than sleeping for a while (YARN-4929)
+    Thread.sleep(1000);
     nm.nodeHeartbeat(true);
     RMAppAttempt attempt = app.getCurrentAppAttempt();
     MockAM am = rm.sendAMLaunched(attempt.getAppAttemptId());
@@ -477,9 +472,9 @@ public class TestRMApplicationHistoryWriter {
     Assert.assertEquals(request, allocatedSize);
 
     am.unregisterAppAttempt();
-    am.waitForState(RMAppAttemptState.FINISHING);
+    rm.waitForState(am.getApplicationAttemptId(), RMAppAttemptState.FINISHING);
     nm.nodeHeartbeat(am.getApplicationAttemptId(), 1, ContainerState.COMPLETE);
-    am.waitForState(RMAppAttemptState.FINISHED);
+    rm.waitForState(am.getApplicationAttemptId(), RMAppAttemptState.FINISHED);
 
     NodeHeartbeatResponse resp = nm.nodeHeartbeat(true);
     List<ContainerId> cleaned = resp.getContainersToCleanup();

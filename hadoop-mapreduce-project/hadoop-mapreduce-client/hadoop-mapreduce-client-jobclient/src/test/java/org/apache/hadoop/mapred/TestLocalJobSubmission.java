@@ -18,31 +18,23 @@
 package org.apache.hadoop.mapred;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URL;
 import java.util.jar.JarOutputStream;
 import java.util.zip.ZipEntry;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.Job;
 
-import org.apache.hadoop.hdfs.server.namenode.ha.HopsRandomStickyFailoverProxyProvider;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.util.ToolRunner;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
-import org.apache.log4j.Level;
-import org.apache.commons.logging.impl.Log4JLogger;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 
 /**
  * check for the job submission options of
@@ -52,33 +44,33 @@ public class TestLocalJobSubmission {
   private static Path TEST_ROOT_DIR =
       new Path(System.getProperty("test.build.data","/tmp"));
 
-  @Before
-  public void configure() throws Exception {
-  }
-
-  private static void initLoggers() {
-    ((Log4JLogger) HopsRandomStickyFailoverProxyProvider.LOG).getLogger().setLevel(Level.ALL);
-  }
-
-  @After
-  public void cleanup() {
-  }
-
   /**
-   * test the local job submission options of
-   * -jt local -libjars
-   * @throws IOException
+   * Test the local job submission options of -jt local -libjars.
+   *
+   * @throws IOException thrown if there's an error creating the JAR file
    */
   @Test
   public void testLocalJobLibjarsOption() throws IOException {
-    initLoggers();
+    Configuration conf = new Configuration();
+
+    testLocalJobLibjarsOption(conf);
+
+    conf.setBoolean(Job.USE_WILDCARD_FOR_LIBJARS, false);
+    testLocalJobLibjarsOption(conf);
+  }
+
+  /**
+   * Test the local job submission options of -jt local -libjars.
+   *
+   * @param conf the {@link Configuration} to use
+   * @throws IOException thrown if there's an error creating the JAR file
+   */
+  private void testLocalJobLibjarsOption(Configuration conf)
+      throws IOException {
     Path jarPath = makeJar(new Path(TEST_ROOT_DIR, "test.jar"));
 
-    Configuration conf = new Configuration();
     conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "hdfs://localhost:9000");
     conf.set(MRConfig.FRAMEWORK_NAME, "local");
-    conf.setInt(DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, /*default 15*/ 1);
-    conf.set(HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY, "1,1");
     final String[] args = {
         "-jt" , "local", "-libjars", jarPath.toString(),
         "-m", "1", "-r", "1", "-mt", "1", "-rt", "1"
@@ -107,6 +99,80 @@ public class TestLocalJobSubmission {
     final String[] args = {
         "-m", "1", "-r", "1", "-mt", "1", "-rt", "1"
     };
+    int res = -1;
+    try {
+      res = ToolRunner.run(conf, new SleepJob(), args);
+    } catch (Exception e) {
+      System.out.println("Job failed with " + e.getLocalizedMessage());
+      e.printStackTrace(System.out);
+      fail("Job failed");
+    }
+    assertEquals("dist job res is not 0:", 0, res);
+  }
+
+  /**
+   * test JOB_MAX_MAP configuration.
+   * @throws Exception
+   */
+  @Test
+  public void testJobMaxMapConfig() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(MRConfig.FRAMEWORK_NAME, "local");
+    conf.setInt(MRJobConfig.JOB_MAX_MAP, 0);
+    final String[] args = {
+        "-m", "1", "-r", "1", "-mt", "1", "-rt", "1"
+    };
+    int res = -1;
+    try {
+      res = ToolRunner.run(conf, new SleepJob(), args);
+      fail("Job should fail");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getLocalizedMessage().contains(
+          "The number of map tasks 1 exceeded limit"));
+    }
+  }
+
+  /**
+   * Test local job submission with a file option.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testLocalJobFilesOption() throws IOException {
+    Path jarPath = makeJar(new Path(TEST_ROOT_DIR, "test.jar"));
+
+    Configuration conf = new Configuration();
+    conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "hdfs://localhost:9000");
+    conf.set(MRConfig.FRAMEWORK_NAME, "local");
+    final String[] args =
+        {"-jt", "local", "-files", jarPath.toString(), "-m", "1", "-r", "1",
+            "-mt", "1", "-rt", "1"};
+    int res = -1;
+    try {
+      res = ToolRunner.run(conf, new SleepJob(), args);
+    } catch (Exception e) {
+      System.out.println("Job failed with " + e.getLocalizedMessage());
+      e.printStackTrace(System.out);
+      fail("Job failed");
+    }
+    assertEquals("dist job res is not 0:", 0, res);
+  }
+
+  /**
+   * Test local job submission with an archive option.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testLocalJobArchivesOption() throws IOException {
+    Path jarPath = makeJar(new Path(TEST_ROOT_DIR, "test.jar"));
+
+    Configuration conf = new Configuration();
+    conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "hdfs://localhost:9000");
+    conf.set(MRConfig.FRAMEWORK_NAME, "local");
+    final String[] args =
+        {"-jt", "local", "-archives", jarPath.toString(), "-m", "1", "-r",
+            "1", "-mt", "1", "-rt", "1"};
     int res = -1;
     try {
       res = ToolRunner.run(conf, new SleepJob(), args);

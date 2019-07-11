@@ -20,7 +20,7 @@ package org.apache.hadoop.ipc;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ipc.metrics.RpcMetrics;
@@ -214,7 +214,7 @@ public class TestProtoBufRpc extends TestRpcBase {
     }
   }
 
-  @Test(timeout = 12000)
+  @Test(timeout = 20000)
   public void testLogSlowRPC() throws IOException, ServiceException {
     TestRpcService2 client = getClient2();
     // make 10 K fast calls
@@ -239,7 +239,7 @@ public class TestProtoBufRpc extends TestRpcBase {
     Assert.assertEquals(before + 1L, after);
   }
 
-  @Test(timeout = 12000)
+  @Test(timeout = 20000)
   public void testEnsureNoLogIfDisabled() throws IOException, ServiceException {
     // disable slow RPC  logging
     server.setLogSlowRPC(false);

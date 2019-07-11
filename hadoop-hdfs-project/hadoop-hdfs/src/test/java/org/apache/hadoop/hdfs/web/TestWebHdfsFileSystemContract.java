@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hdfs.web;
 
+
+import static org.junit.Assert.*;
+
 import io.hops.security.GroupAlreadyExistsException;
 import io.hops.security.UserAlreadyExistsException;
 import io.hops.security.UserAlreadyInGroupException;
@@ -59,6 +62,7 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Random;
+import org.junit.Before;
 
 public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
   private static final Configuration conf = new Configuration();
@@ -81,8 +85,8 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
     }
   }
 
-  @Override
-  protected void setUp() throws Exception {
+  @Before
+  public void setUp() throws Exception {
     //get file system as a non-superuser
     final UserGroupInformation current = UserGroupInformation.getCurrentUser();
     try{

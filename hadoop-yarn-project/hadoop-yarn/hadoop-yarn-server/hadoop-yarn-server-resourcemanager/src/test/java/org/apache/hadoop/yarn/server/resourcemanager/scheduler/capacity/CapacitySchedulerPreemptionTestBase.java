@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -49,7 +46,7 @@ public class CapacitySchedulerPreemptionTestBase {
 
   final int GB = 1024;
 
-  Configuration conf;
+  CapacitySchedulerConfiguration conf;
 
   RMNodeLabelsManager mgr;
 
@@ -57,13 +54,15 @@ public class CapacitySchedulerPreemptionTestBase {
 
   @Before
   void setUp() throws Exception {
-    conf = new YarnConfiguration();
+    conf = new CapacitySchedulerConfiguration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
         ResourceScheduler.class);
     conf.setBoolean(YarnConfiguration.RM_SCHEDULER_ENABLE_MONITORS, true);
     conf.setClass(YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES,
         ProportionalCapacityPreemptionPolicy.class, SchedulingEditPolicy.class);
-    conf = TestUtils.getConfigurationWithMultipleQueues(this.conf);
+    conf = (CapacitySchedulerConfiguration) TestUtils
+        .getConfigurationWithMultipleQueues(this.conf);
+    conf.setInt(YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB, 100 * GB);
 
     // Set preemption related configurations
     conf.setInt(CapacitySchedulerConfiguration.PREEMPTION_WAIT_TIME_BEFORE_KILL,
@@ -75,9 +74,6 @@ public class CapacitySchedulerPreemptionTestBase {
         1.0f);
     conf.setLong(CapacitySchedulerConfiguration.PREEMPTION_MONITORING_INTERVAL,
         60000L);
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
     mgr = new NullRMNodeLabelsManager();
     mgr.init(this.conf);
     clock = mock(Clock.class);
@@ -85,7 +81,7 @@ public class CapacitySchedulerPreemptionTestBase {
   }
 
   SchedulingEditPolicy getSchedulingEditPolicy(MockRM rm) {
-    ResourceManager.RMSchedulerServices activeServices = rm.getRMActiveService();
+    ResourceManager.RMActiveServices activeServices = rm.getRMActiveService();
     SchedulingMonitor mon = null;
     for (Service service : activeServices.getServices()) {
       if (service instanceof SchedulingMonitor) {
@@ -135,9 +131,10 @@ public class CapacitySchedulerPreemptionTestBase {
   public void waitNumberOfLiveContainersOnNodeFromApp(FiCaSchedulerNode node,
       ApplicationAttemptId appId, int expected) throws InterruptedException {
     int waitNum = 0;
+    int total = 0;
 
     while (waitNum < 500) {
-      int total = 0;
+      total = 0;
       for (RMContainer c : node.getCopiedListOfRunningContainers()) {
         if (c.getApplicationAttemptId().equals(appId)) {
           total++;
@@ -150,6 +147,22 @@ public class CapacitySchedulerPreemptionTestBase {
       waitNum++;
     }
 
-    Assert.fail();
+    Assert.fail(
+        "Check #live-container-on-node-from-app, actual=" + total + " expected="
+            + expected);
+  }
+
+  public void checkNumberOfPreemptionCandidateFromApp(
+      ProportionalCapacityPreemptionPolicy policy, int expected,
+      ApplicationAttemptId attemptId) {
+    int total = 0;
+
+    for (RMContainer rmContainer : policy.getToPreemptContainers().keySet()) {
+      if (rmContainer.getApplicationAttemptId().equals(attemptId)) {
+        ++ total;
+      }
+    }
+
+    Assert.assertEquals(expected, total);
   }
 }

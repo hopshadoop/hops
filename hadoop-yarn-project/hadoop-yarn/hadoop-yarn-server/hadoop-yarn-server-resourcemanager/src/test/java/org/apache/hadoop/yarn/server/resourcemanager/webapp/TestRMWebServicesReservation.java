@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
+import static org.apache.hadoop.yarn.webapp.WebServicesTestUtils.assertResponseStatusCode;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -38,6 +39,7 @@ import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.http.JettyUtils;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authentication.server.PseudoAuthenticationHandler;
 import org.apache.hadoop.yarn.api.records.ReservationId;
@@ -56,6 +58,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ReservationUpdat
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.UTCClock;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
+import org.apache.hadoop.yarn.webapp.GuiceServletConfig;
 import org.apache.hadoop.yarn.webapp.JerseyTestBase;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -70,7 +73,6 @@ import org.junit.runners.Parameterized.Parameters;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Singleton;
-import com.google.inject.servlet.GuiceServletContextListener;
 import com.google.inject.servlet.ServletModule;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.ClientResponse.Status;
@@ -81,23 +83,20 @@ import com.sun.jersey.api.json.JSONJAXBContext;
 import com.sun.jersey.api.json.JSONUnmarshaller;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.test.framework.WebAppDescriptor;
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 @RunWith(Parameterized.class)
 public class TestRMWebServicesReservation extends JerseyTestBase {
 
   private String webserviceUserName = "testuser";
-  private boolean setAuthFilter = false;
+  private static boolean setAuthFilter = false;
+  private static boolean enableRecurrence = false;
 
   private static MockRM rm;
-  private static Injector injector;
 
-  private static final int MINIMUM_RESOURCE_DURATION = 1000000;
+  private static final int MINIMUM_RESOURCE_DURATION = 100000;
   private static final Clock clock = new UTCClock();
+  private static final int MAXIMUM_PERIOD = 86400000;
+  private static final int DEFAULT_RECURRENCE = MAXIMUM_PERIOD / 10;
   private static final String TEST_DIR = new File(System.getProperty(
       "test.build.data", "/tmp")).getAbsolutePath();
   private static final String FS_ALLOC_FILE = new File(TEST_DIR,
@@ -107,14 +106,6 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
   private static final String LIST_RESERVATION_PATH = "reservation/list";
   private static final String GET_NEW_RESERVATION_PATH =
       "reservation/new-reservation";
-
-  public static class GuiceServletConfig extends GuiceServletContextListener {
-
-    @Override
-    protected Injector getInjector() {
-      return injector;
-    }
-  }
 
   /*
    * Helper class to allow testing of RM web services which require
@@ -144,57 +135,49 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
 
   }
 
-  private abstract class TestServletModule extends ServletModule {
+  private static abstract class TestServletModule extends ServletModule {
     public Configuration conf = new Configuration();
 
     public abstract void configureScheduler();
 
     @Override
     protected void configureServlets() {
-      try {
-        configureScheduler();
-        bind(JAXBContextResolver.class);
-        bind(RMWebServices.class);
-        bind(GenericExceptionHandler.class);
-        conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
-            YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
-        Configuration conf = new Configuration();
-        conf.setBoolean(YarnConfiguration.RM_RESERVATION_SYSTEM_ENABLE, true);
-        conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
-            YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
-        conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
-            ResourceScheduler.class);
-        CapacitySchedulerConfiguration csconf =
-            new CapacitySchedulerConfiguration(conf);
-        String[] queues = { "default", "dedicated" };
-        csconf.setQueues("root", queues);
-        csconf.setCapacity("root.default", 50.0f);
-        csconf.setCapacity("root.dedicated", 50.0f);
-        csconf.setReservable("root.dedicated", true);
-        RMStorageFactory.setConfiguration(csconf);
-        YarnAPIStorageFactory.setConfiguration(csconf);
-        DBUtility.InitializeDB();
-        rm = new MockRM(csconf);
-        bind(ResourceManager.class).toInstance(rm);
-        if (setAuthFilter) {
-          filter("/*").through(TestRMCustomAuthFilter.class);
-        }
-        serve("/*").with(GuiceContainer.class);
-      } catch (IOException ex) {
-        Logger.getLogger(TestRMWebServicesReservation.class.getName()).log(Level.SEVERE, null, ex);
+      configureScheduler();
+      bind(JAXBContextResolver.class);
+      bind(RMWebServices.class);
+      bind(GenericExceptionHandler.class);
+      conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
+          YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
+      conf.setBoolean(YarnConfiguration.RM_RESERVATION_SYSTEM_ENABLE, true);
+
+      rm = new MockRM(conf);
+      bind(ResourceManager.class).toInstance(rm);
+      if (setAuthFilter) {
+        filter("/*").through(TestRMCustomAuthFilter.class);
       }
+      serve("/*").with(GuiceContainer.class);
     }
   }
 
-  private class CapTestServletModule extends TestServletModule {
+  private static class CapTestServletModule extends TestServletModule {
     @Override
     public void configureScheduler() {
-      conf.set("yarn.resourcemanager.scheduler.class",
+      conf.set(YarnConfiguration.RM_SCHEDULER,
           CapacityScheduler.class.getName());
+      conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
+          ResourceScheduler.class);
+      CapacitySchedulerConfiguration csconf =
+          new CapacitySchedulerConfiguration(conf);
+      String[] queues = { "default", "dedicated" };
+      csconf.setQueues("root", queues);
+      csconf.setCapacity("root.default", 50.0f);
+      csconf.setCapacity("root.dedicated", 50.0f);
+      csconf.setReservable("root.dedicated", true);
+      conf = csconf;
     }
   }
 
-  private class FairTestServletModule extends TestServletModule {
+  private static class FairTestServletModule extends TestServletModule {
     @Override
     public void configureScheduler() {
       try {
@@ -207,70 +190,87 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
         out.println("    <aclAdministerApps>someuser </aclAdministerApps>");
         out.println("  </queue>");
         out.println("  <queue name=\"dedicated\">");
+        out.println("    <reservation>");
+        out.println("    </reservation>");
         out.println("    <aclAdministerApps>someuser </aclAdministerApps>");
         out.println("  </queue>");
         out.println("</queue>");
+        out.println("<defaultQueueSchedulingPolicy>drf" +
+            "</defaultQueueSchedulingPolicy>");
         out.println("</allocations>");
         out.close();
       } catch (IOException e) {
       }
       conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, FS_ALLOC_FILE);
-      conf.set("yarn.resourcemanager.scheduler.class",
-          FairScheduler.class.getName());
+      conf.set(YarnConfiguration.RM_SCHEDULER, FairScheduler.class.getName());
     }
   }
 
-  private Injector getNoAuthInjectorCap() {
-    return Guice.createInjector(new CapTestServletModule() {
-      @Override
-      protected void configureServlets() {
-        setAuthFilter = false;
-        super.configureServlets();
-      }
-    });
+  private static class NoAuthServletModule extends CapTestServletModule {
+    @Override
+    protected void configureServlets() {
+      setAuthFilter = false;
+      super.configureServlets();
+    }
   }
 
-  private Injector getSimpleAuthInjectorCap() {
-    return Guice.createInjector(new CapTestServletModule() {
-      @Override
-      protected void configureServlets() {
-        setAuthFilter = true;
-        conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
-        // set the admin acls otherwise all users are considered admins
-        // and we can't test authorization
-        conf.setStrings(YarnConfiguration.YARN_ADMIN_ACL, "testuser1");
-        super.configureServlets();
-      }
-    });
+  private static class SimpleAuthServletModule extends CapTestServletModule {
+    @Override
+    protected void configureServlets() {
+      setAuthFilter = true;
+      conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
+      // set the admin acls otherwise all users are considered admins
+      // and we can't test authorization
+      conf.setStrings(YarnConfiguration.YARN_ADMIN_ACL, "testuser1");
+      super.configureServlets();
+    }
   }
 
-  private Injector getNoAuthInjectorFair() {
-    return Guice.createInjector(new FairTestServletModule() {
-      @Override
-      protected void configureServlets() {
-        setAuthFilter = false;
-        super.configureServlets();
-      }
-    });
+  private static class FairNoAuthServletModule extends FairTestServletModule {
+    @Override
+    protected void configureServlets() {
+      setAuthFilter = false;
+      super.configureServlets();
+    }
   }
 
-  private Injector getSimpleAuthInjectorFair() {
-    return Guice.createInjector(new FairTestServletModule() {
-      @Override
-      protected void configureServlets() {
-        setAuthFilter = true;
-        conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
-        // set the admin acls otherwise all users are considered admins
-        // and we can't test authorization
-        conf.setStrings(YarnConfiguration.YARN_ADMIN_ACL, "testuser1");
-        super.configureServlets();
-      }
-    });
+  private static class FairSimpleAuthServletModule extends
+      FairTestServletModule {
+    @Override
+    protected void configureServlets() {
+      setAuthFilter = true;
+      conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
+      // set the admin acls otherwise all users are considered admins
+      // and we can't test authorization
+      conf.setStrings(YarnConfiguration.YARN_ADMIN_ACL, "testuser1");
+      super.configureServlets();
+    }
+  }
+
+  private Injector initNoAuthInjectorCap() {
+    return GuiceServletConfig.setInjector(
+        Guice.createInjector(new NoAuthServletModule()));
+  }
+
+  private Injector initSimpleAuthInjectorCap() {
+    return GuiceServletConfig.setInjector(
+        Guice.createInjector(new SimpleAuthServletModule()));
+  }
+
+  private Injector initNoAuthInjectorFair() {
+    return GuiceServletConfig.setInjector(
+        Guice.createInjector(new FairNoAuthServletModule()));
+  }
+
+  private Injector initSimpleAuthInjectorFair() {
+    return GuiceServletConfig.setInjector(
+        Guice.createInjector(new FairSimpleAuthServletModule()));
   }
 
   @Parameters
   public static Collection<Object[]> guiceConfigs() {
-    return Arrays.asList(new Object[][] { { 0 }, { 1 }, { 2 }, { 3 } });
+    return Arrays.asList(new Object[][] {{0, true}, {1, true}, {2, true},
+        {3, true}, {0, false}, {1, false}, {2, false}, {3, false}});
   }
 
   @Before
@@ -279,30 +279,32 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
     super.setUp();
   }
 
-  public TestRMWebServicesReservation(int run) {
+  public TestRMWebServicesReservation(int run, boolean recurrence) {
     super(new WebAppDescriptor.Builder(
         "org.apache.hadoop.yarn.server.resourcemanager.webapp")
         .contextListenerClass(GuiceServletConfig.class)
         .filterClass(com.google.inject.servlet.GuiceFilter.class)
         .clientConfig(new DefaultClientConfig(JAXBContextResolver.class))
         .contextPath("jersey-guice-filter").servletPath("/").build());
+
+    enableRecurrence = recurrence;
     switch (run) {
     case 0:
     default:
       // No Auth Capacity Scheduler
-      injector = getNoAuthInjectorCap();
+      initNoAuthInjectorCap();
       break;
     case 1:
       // Simple Auth Capacity Scheduler
-      injector = getSimpleAuthInjectorCap();
+      initSimpleAuthInjectorCap();
       break;
     case 2:
       // No Auth Fair Scheduler
-      injector = getNoAuthInjectorFair();
+      initNoAuthInjectorFair();
       break;
     case 3:
       // Simple Auth Fair Scheduler
-      injector = getSimpleAuthInjectorFair();
+      initSimpleAuthInjectorFair();
       break;
     }
   }
@@ -596,13 +598,22 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
       return;
     }
 
-    JSONObject reservations = json.getJSONObject("reservations");
+    if (!enableRecurrence) {
+      JSONObject reservations = json.getJSONObject("reservations");
 
-    testRDLHelper(reservations);
+      testRDLHelper(reservations);
 
-    String reservationName = reservations.getJSONObject
-            ("reservation-definition").getString("reservation-name");
-    assertEquals(reservationName, "res_2");
+      String reservationName = reservations
+          .getJSONObject("reservation-definition")
+          .getString("reservation-name");
+      assertEquals("res_2", reservationName);
+    } else {
+      // In the case of recurring reservations, both reservations will be
+      // picked up by the search interval since it is greater than the period
+      // of the reservation.
+      JSONArray reservations = json.getJSONArray("reservations");
+      assertEquals(2, reservations.length());
+    }
 
     rm.stop();
   }
@@ -635,13 +646,22 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
       return;
     }
 
-    JSONObject reservations = json.getJSONObject("reservations");
+    if (!enableRecurrence) {
+      JSONObject reservations = json.getJSONObject("reservations");
 
-    testRDLHelper(reservations);
+      testRDLHelper(reservations);
 
-    String reservationName = reservations.getJSONObject
-            ("reservation-definition").getString("reservation-name");
-    assertEquals(reservationName, "res_2");
+      String reservationName = reservations
+          .getJSONObject("reservation-definition")
+          .getString("reservation-name");
+      assertEquals("res_2", reservationName);
+    } else {
+      // In the case of recurring reservations, both reservations will be
+      // picked up by the search interval since it is greater than the period
+      // of the reservation.
+      JSONArray reservations = json.getJSONArray("reservations");
+      assertEquals(2, reservations.length());
+    }
 
     rm.stop();
   }
@@ -680,8 +700,9 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
     testRDLHelper(reservations);
 
     // only res_1 should fall into the time interval given in the request json.
-    String reservationName = reservations.getJSONObject
-            ("reservation-definition").getString("reservation-name");
+    String reservationName = reservations
+        .getJSONObject("reservation-definition")
+        .getString("reservation-name");
     assertEquals(reservationName, "res_1");
 
     rm.stop();
@@ -970,12 +991,13 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
         .post(ClientResponse.class);
 
     if (!this.isAuthenticationEnabled()) {
-      assertEquals(Status.UNAUTHORIZED, response.getClientResponseStatus());
+      assertResponseStatusCode(Status.UNAUTHORIZED, response.getStatusInfo());
       return ReservationId.newInstance(clock.getTime(), fallbackReservationId);
     }
 
     System.out.println("RESPONSE:" + response);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
     JSONObject json = response.getEntity(JSONObject.class);
 
     assertEquals("incorrect number of elements", 1, json.length());
@@ -1001,9 +1023,15 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
       ReservationId reservationId) throws Exception {
     String reservationJson = loadJsonFile("submit-reservation.json");
 
+    String recurrenceExpression = "";
+    if (enableRecurrence) {
+      recurrenceExpression = String.format(
+          "\"recurrence-expression\" : \"%s\",", DEFAULT_RECURRENCE);
+    }
+
     String reservationJsonRequest = String.format(reservationJson,
         reservationId.toString(), arrival, arrival + MINIMUM_RESOURCE_DURATION,
-        reservationName);
+        reservationName, recurrenceExpression);
 
     return submitAndVerifyReservation(path, media, reservationJsonRequest);
   }
@@ -1024,15 +1052,14 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
             .accept(media).post(ClientResponse.class);
 
     if (!this.isAuthenticationEnabled()) {
-      assertEquals(Status.UNAUTHORIZED, response.getClientResponseStatus());
+      assertResponseStatusCode(Status.UNAUTHORIZED, response.getStatusInfo());
     }
 
     return response;
   }
 
   private void updateReservationTestHelper(String path,
-      ReservationId reservationId, String media) throws JSONException,
-      Exception {
+      ReservationId reservationId, String media) throws Exception {
 
     String reservationJson = loadJsonFile("update-reservation.json");
 
@@ -1046,7 +1073,7 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
     if (this.isAuthenticationEnabled()) {
       // only works when previous submit worked
       if(rsci.getReservationId() == null) {
-        throw new IOException("Incorrectly parsed the reservatinId");
+        throw new IOException("Incorrectly parsed the reservationId");
       }
       rsci.setReservationId(reservationId.toString());
     }
@@ -1057,13 +1084,14 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
             .accept(media).post(ClientResponse.class);
 
     if (!this.isAuthenticationEnabled()) {
-      assertEquals(Status.UNAUTHORIZED, response.getClientResponseStatus());
+      assertResponseStatusCode(Status.UNAUTHORIZED, response.getStatusInfo());
       return;
     }
 
     System.out.println("RESPONSE:" + response);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    assertEquals(Status.OK, response.getClientResponseStatus());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
+    assertResponseStatusCode(Status.OK, response.getStatusInfo());
 
   }
 
@@ -1106,13 +1134,14 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
             .accept(media).post(ClientResponse.class);
 
     if (!this.isAuthenticationEnabled()) {
-      assertEquals(Status.UNAUTHORIZED, response.getClientResponseStatus());
+      assertResponseStatusCode(Status.UNAUTHORIZED, response.getStatusInfo());
       return;
     }
 
     System.out.println("RESPONSE:" + response);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    assertEquals(Status.OK, response.getClientResponseStatus());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
+    assertResponseStatusCode(Status.OK, response.getStatusInfo());
   }
 
   private void testRDLHelper(JSONObject json) throws JSONException {
@@ -1137,12 +1166,13 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
     ClientResponse response = resource.get(ClientResponse.class);
 
     if (!this.isAuthenticationEnabled()) {
-      assertEquals(Status.UNAUTHORIZED, response.getClientResponseStatus());
+      assertResponseStatusCode(Status.UNAUTHORIZED, response.getStatusInfo());
       return null;
     }
 
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    assertEquals(status, response.getClientResponseStatus());
+    assertEquals(MediaType.APPLICATION_JSON_TYPE + "; " + JettyUtils.UTF_8,
+        response.getType().toString());
+    assertResponseStatusCode(status, response.getStatusInfo());
 
     return response.getEntity(JSONObject.class);
   }
@@ -1163,7 +1193,7 @@ public class TestRMWebServicesReservation extends JerseyTestBase {
   }
 
   private boolean isHttpSuccessResponse(ClientResponse response) {
-    return (response.getStatus() / 100) == 2;
+    return (response.getStatusInfo().getStatusCode() / 100) == 2;
   }
 
   private void setupCluster(int nodes) throws Exception {

@@ -30,7 +30,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
-import org.mortbay.util.ajax.JSON;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -39,6 +38,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
+import org.eclipse.jetty.util.ajax.JSON;
 
 /**
  * This class drives the creation of a mini-cluster on the local machine. By

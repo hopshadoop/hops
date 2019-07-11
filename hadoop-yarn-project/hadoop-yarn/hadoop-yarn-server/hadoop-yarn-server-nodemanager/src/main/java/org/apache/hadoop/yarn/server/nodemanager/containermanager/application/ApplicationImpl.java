@@ -22,21 +22,34 @@ import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import com.google.common.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.protobuf.ByteString;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.LogAggregationContext;
+import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.LogAggregationContextPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.proto.YarnProtos;
+import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.ContainerManagerApplicationProto;
+import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.FlowContextProto;
+import org.apache.hadoop.yarn.server.api.records.AppCollectorData;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.NodeManager;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.AuxServicesEvent;
@@ -50,14 +63,14 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.even
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.LogAggregationService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppFinishedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppStartedEvent;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService;
+import org.apache.hadoop.yarn.server.nodemanager.timelineservice.NMTimelinePublisher;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.state.InvalidStateTransitionException;
 import org.apache.hadoop.yarn.state.MultipleArcTransition;
 import org.apache.hadoop.yarn.state.SingleArcTransition;
 import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
-
-import com.google.common.annotations.VisibleForTesting;
 
 /**
  * The state machine for the representation of an Application
@@ -67,7 +80,8 @@ public class ApplicationImpl implements Application {
 
   final Dispatcher dispatcher;
   final String user;
-  final String userFolder;
+  // flow context is set only if the timeline service v.2 is enabled
+  private FlowContext flowContext;
   final ApplicationId appId;
   final Credentials credentials;
   Map<ApplicationAccessType, String> applicationACLs;
@@ -76,48 +90,121 @@ public class ApplicationImpl implements Application {
   private final WriteLock writeLock;
   private final Context context;
 
-  private static final Log LOG = LogFactory.getLog(ApplicationImpl.class);
+  private static final Logger LOG =
+       LoggerFactory.getLogger(ApplicationImpl.class);
 
   private LogAggregationContext logAggregationContext;
-  
+
   Map<ContainerId, Container> containers =
       new ConcurrentHashMap<>();
-  
+
   private final AtomicInteger x509Version;
   private final AtomicLong jwtExpiration;
   
-  
-  public ApplicationImpl(Dispatcher dispatcher, String user, ApplicationId appId,
-      Credentials credentials, Context context, String userFolder) {
-    this(dispatcher, user, appId, credentials, context, userFolder, 0, -1L);
+  /**
+   * The timestamp when the log aggregation has started for this application.
+   * Used to determine the age of application log files during log aggregation.
+   * When logAggregationRentention policy is enabled, log files older than
+   * the retention policy will not be uploaded but scheduled for deletion.
+   */
+  private long applicationLogInitedTimestamp = -1;
+  private final NMStateStoreService appStateStore;
+
+  public ApplicationImpl(Dispatcher dispatcher, String user,
+      ApplicationId appId, Credentials credentials, Context context) {
+    this(dispatcher, user, null, appId, credentials, context, -1L, 0, -1L);
+  }
+
+  public ApplicationImpl(Dispatcher dispatcher, String user,
+      FlowContext flowContext, ApplicationId appId, Credentials credentials,
+      Context context, int x509Version,
+      long jwtExpiration) {
+    this(dispatcher, user, flowContext, appId, credentials, context, -1L,
+        x509Version, jwtExpiration);
   }
   
-  public ApplicationImpl(Dispatcher dispatcher, String user, ApplicationId appId,
-      Credentials credentials, Context context, String userFolder, int x509Version,
+  public ApplicationImpl(Dispatcher dispatcher, String user,
+      FlowContext flowContext, ApplicationId appId, Credentials credentials,
+      Context context, long recoveredLogInitedTime) {
+    this(dispatcher, user, flowContext, appId, credentials, context, recoveredLogInitedTime, 0, -1L);
+  }
+  
+  public ApplicationImpl(Dispatcher dispatcher, String user,
+      FlowContext flowContext, ApplicationId appId, Credentials credentials,
+      Context context, long recoveredLogInitedTime, int x509Version,
       long jwtExpiration) {
     this.dispatcher = dispatcher;
     this.user = user;
-    this.userFolder = userFolder;
     this.appId = appId;
     this.credentials = credentials;
     this.aclsManager = context.getApplicationACLsManager();
+    Configuration conf = context.getConf();
+    if (YarnConfiguration.timelineServiceV2Enabled(conf)) {
+      if (flowContext == null) {
+        throw new IllegalArgumentException("flow context cannot be null");
+      }
+      this.flowContext = flowContext;
+      if (YarnConfiguration.systemMetricsPublisherEnabled(conf)) {
+        context.getNMTimelinePublisher().createTimelineClient(appId);
+      }
+    }
     this.context = context;
+    this.appStateStore = context.getNMStateStore();
     this.x509Version = new AtomicInteger(x509Version);
     this.jwtExpiration = new AtomicLong(jwtExpiration);
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     readLock = lock.readLock();
     writeLock = lock.writeLock();
     stateMachine = stateMachineFactory.make(this);
+    setAppLogInitedTimestamp(recoveredLogInitedTime);
+  }
+
+  public ApplicationImpl(Dispatcher dispatcher, String user,
+      FlowContext flowContext, ApplicationId appId,
+      Credentials credentials, Context context) {
+    this(dispatcher, user, flowContext, appId, credentials,
+      context, -1, 0, -1L);
+  }
+
+  /**
+   * Data object that encapsulates the flow context for the application purpose.
+   */
+  public static class FlowContext {
+    private final String flowName;
+    private final String flowVersion;
+    private final long flowRunId;
+
+    public FlowContext(String flowName, String flowVersion, long flowRunId) {
+      this.flowName = flowName;
+      this.flowVersion = flowVersion;
+      this.flowRunId = flowRunId;
+    }
+
+    public String getFlowName() {
+      return flowName;
+    }
+
+    public String getFlowVersion() {
+      return flowVersion;
+    }
+
+    public long getFlowRunId() {
+      return flowRunId;
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("{");
+      sb.append("Flow Name=").append(getFlowName());
+      sb.append(" Flow Versioin=").append(getFlowVersion());
+      sb.append(" Flow Run Id=").append(getFlowRunId()).append(" }");
+      return sb.toString();
+    }
   }
 
   @Override
   public String getUser() {
     return user.toString();
-  }
-
-  @Override
-  public String getUserFolder() {
-    return userFolder;
   }
   
   @Override
@@ -168,6 +255,9 @@ public class ApplicationImpl implements Application {
   private static final ContainerDoneTransition CONTAINER_DONE_TRANSITION =
       new ContainerDoneTransition();
 
+  private static final InitContainerTransition INIT_CONTAINER_TRANSITION =
+      new InitContainerTransition();
+
   private static StateMachineFactory<ApplicationImpl, ApplicationState,
           ApplicationEventType, ApplicationEvent> stateMachineFactory =
       new StateMachineFactory<ApplicationImpl, ApplicationState,
@@ -178,12 +268,12 @@ public class ApplicationImpl implements Application {
                ApplicationEventType.INIT_APPLICATION, new AppInitTransition())
            .addTransition(ApplicationState.NEW, ApplicationState.NEW,
                ApplicationEventType.INIT_CONTAINER,
-               new InitContainerTransition())
+               INIT_CONTAINER_TRANSITION)
 
            // Transitions from INITING state
            .addTransition(ApplicationState.INITING, ApplicationState.INITING,
                ApplicationEventType.INIT_CONTAINER,
-               new InitContainerTransition())
+               INIT_CONTAINER_TRANSITION)
            .addTransition(ApplicationState.INITING,
                EnumSet.of(ApplicationState.FINISHING_CONTAINERS_WAIT,
                    ApplicationState.APPLICATION_RESOURCES_CLEANINGUP),
@@ -206,7 +296,7 @@ public class ApplicationImpl implements Application {
            .addTransition(ApplicationState.RUNNING,
                ApplicationState.RUNNING,
                ApplicationEventType.INIT_CONTAINER,
-               new InitContainerTransition())
+               INIT_CONTAINER_TRANSITION)
            .addTransition(ApplicationState.RUNNING,
                ApplicationState.RUNNING,
                ApplicationEventType.APPLICATION_CONTAINER_FINISHED,
@@ -227,6 +317,10 @@ public class ApplicationImpl implements Application {
                new AppFinishTransition())
           .addTransition(ApplicationState.FINISHING_CONTAINERS_WAIT,
               ApplicationState.FINISHING_CONTAINERS_WAIT,
+              ApplicationEventType.INIT_CONTAINER,
+              INIT_CONTAINER_TRANSITION)
+          .addTransition(ApplicationState.FINISHING_CONTAINERS_WAIT,
+              ApplicationState.FINISHING_CONTAINERS_WAIT,
               EnumSet.of(
                   ApplicationEventType.APPLICATION_LOG_HANDLING_INITED,
                   ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED,
@@ -243,6 +337,10 @@ public class ApplicationImpl implements Application {
                new AppCompletelyDoneTransition())
           .addTransition(ApplicationState.APPLICATION_RESOURCES_CLEANINGUP,
               ApplicationState.APPLICATION_RESOURCES_CLEANINGUP,
+              ApplicationEventType.INIT_CONTAINER,
+              INIT_CONTAINER_TRANSITION)
+          .addTransition(ApplicationState.APPLICATION_RESOURCES_CLEANINGUP,
+              ApplicationState.APPLICATION_RESOURCES_CLEANINGUP,
               EnumSet.of(
                   ApplicationEventType.APPLICATION_LOG_HANDLING_INITED,
                   ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED,
@@ -257,9 +355,14 @@ public class ApplicationImpl implements Application {
                    ApplicationEventType.APPLICATION_LOG_HANDLING_FINISHED,
                    ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED),
                new AppLogsAggregatedTransition())
+          .addTransition(ApplicationState.FINISHED,
+              ApplicationState.FINISHED,
+              ApplicationEventType.INIT_CONTAINER,
+              INIT_CONTAINER_TRANSITION)
            .addTransition(ApplicationState.FINISHED, ApplicationState.FINISHED,
                EnumSet.of(
                   ApplicationEventType.APPLICATION_LOG_HANDLING_INITED,
+                  ApplicationEventType.APPLICATION_CONTAINER_FINISHED,
                   ApplicationEventType.FINISH_APPLICATION))
            // create the topology tables
            .installTopology();
@@ -284,7 +387,7 @@ public class ApplicationImpl implements Application {
       app.dispatcher.getEventHandler().handle(
           new LogHandlerAppStartedEvent(app.appId, app.user,
               app.credentials, app.applicationACLs,
-              app.logAggregationContext, app.userFolder));
+              app.logAggregationContext, app.applicationLogInitedTimestamp));
     }
   }
 
@@ -304,7 +407,65 @@ public class ApplicationImpl implements Application {
       app.dispatcher.getEventHandler().handle(
           new ApplicationLocalizationEvent(
               LocalizationEventType.INIT_APPLICATION_RESOURCES, app));
+      app.setAppLogInitedTimestamp(event.getTimestamp());
+      try {
+        app.appStateStore.storeApplication(app.appId, buildAppProto(app));
+      } catch (Exception ex) {
+        LOG.warn("failed to update application state in state store", ex);
+      }
     }
+  }
+
+  @VisibleForTesting
+  void setAppLogInitedTimestamp(long appLogInitedTimestamp) {
+    this.applicationLogInitedTimestamp = appLogInitedTimestamp;
+  }
+
+  static ContainerManagerApplicationProto buildAppProto(ApplicationImpl app)
+      throws IOException {
+    ContainerManagerApplicationProto.Builder builder =
+        ContainerManagerApplicationProto.newBuilder();
+    builder.setId(((ApplicationIdPBImpl) app.appId).getProto());
+    builder.setUser(app.getUser());
+
+    if (app.logAggregationContext != null) {
+      builder.setLogAggregationContext((
+          (LogAggregationContextPBImpl)app.logAggregationContext).getProto());
+    }
+
+    builder.clearCredentials();
+    if (app.credentials != null) {
+      DataOutputBuffer dob = new DataOutputBuffer();
+      app.credentials.writeTokenStorageToStream(dob);
+      builder.setCredentials(ByteString.copyFrom(dob.getData()));
+    }
+
+    builder.clearAcls();
+    if (app.applicationACLs != null) {
+      for (Map.Entry<ApplicationAccessType, String> acl :  app
+          .applicationACLs.entrySet()) {
+        YarnProtos.ApplicationACLMapProto p = YarnProtos
+            .ApplicationACLMapProto.newBuilder()
+            .setAccessType(ProtoUtils.convertToProtoFormat(acl.getKey()))
+            .setAcl(acl.getValue())
+            .build();
+        builder.addAcls(p);
+      }
+    }
+
+    builder.setAppLogAggregationInitedTime(app.applicationLogInitedTimestamp);
+
+    builder.clearFlowContext();
+    if (app.flowContext != null && app.flowContext.getFlowName() != null
+        && app.flowContext.getFlowVersion() != null) {
+      FlowContextProto fcp = FlowContextProto.newBuilder()
+          .setFlowName(app.flowContext.getFlowName())
+          .setFlowVersion(app.flowContext.getFlowVersion())
+          .setFlowRunId(app.flowContext.getFlowRunId()).build();
+      builder.setFlowContext(fcp);
+    }
+
+    return builder.build();
   }
 
   /**
@@ -344,8 +505,9 @@ public class ApplicationImpl implements Application {
       app.containers.put(container.getContainerId(), container);
       LOG.info("Adding " + container.getContainerId()
           + " to application " + app.toString());
-      
-      switch (app.getApplicationState()) {
+
+      ApplicationState appState = app.getApplicationState();
+      switch (appState) {
       case RUNNING:
         app.dispatcher.getEventHandler().handle(new ContainerInitEvent(
             container.getContainerId()));
@@ -355,8 +517,13 @@ public class ApplicationImpl implements Application {
         // these get queued up and sent out in AppInitDoneTransition
         break;
       default:
-        assert false : "Invalid state for InitContainerTransition: " +
-            app.getApplicationState();
+        LOG.warn("Killing {} because {} is in state {}",
+            container.getContainerId(), app, appState);
+        app.dispatcher.getEventHandler().handle(new ContainerKillEvent(
+            container.getContainerId(),
+            ContainerExitStatus.KILLED_AFTER_APP_COMPLETION,
+            "Application no longer running.\n"));
+        break;
       }
     }
   }
@@ -458,6 +625,29 @@ public class ApplicationImpl implements Application {
   @SuppressWarnings("unchecked")
   static class AppCompletelyDoneTransition implements
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
+
+    private void updateCollectorStatus(ApplicationImpl app) {
+      // Remove collectors info for finished apps.
+      // TODO check we remove related collectors info in failure cases
+      // (YARN-3038)
+      Map<ApplicationId, AppCollectorData> registeringCollectors
+          = app.context.getRegisteringCollectors();
+      if (registeringCollectors != null) {
+        registeringCollectors.remove(app.getAppId());
+      }
+      Map<ApplicationId, AppCollectorData> knownCollectors =
+          app.context.getKnownCollectors();
+      if (knownCollectors != null) {
+        knownCollectors.remove(app.getAppId());
+      }
+      // stop timelineClient when application get finished.
+      NMTimelinePublisher nmTimelinePublisher =
+          app.context.getNMTimelinePublisher();
+      if (nmTimelinePublisher != null) {
+        nmTimelinePublisher.stopTimelineClient(app.getAppId());
+      }
+    }
+
     @Override
     public void transition(ApplicationImpl app, ApplicationEvent event) {
 
@@ -466,6 +656,7 @@ public class ApplicationImpl implements Application {
           new LogHandlerAppFinishedEvent(app.appId));
 
       app.context.getNMTokenSecretManager().appFinished(app.getAppId());
+      updateCollectorStatus(app);
     }
   }
 
@@ -515,8 +706,10 @@ public class ApplicationImpl implements Application {
 
     try {
       ApplicationId applicationID = event.getApplicationID();
-      LOG.debug("Processing " + applicationID + " of type " + event.getType());
-
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Processing " + applicationID + " of type " + event.getType());
+      }
       ApplicationState oldState = stateMachine.getCurrentState();
       ApplicationState newState = null;
       try {
@@ -525,7 +718,7 @@ public class ApplicationImpl implements Application {
       } catch (InvalidStateTransitionException e) {
         LOG.warn("Can't handle this event at current state", e);
       }
-      if (oldState != newState) {
+      if (newState != null && oldState != newState) {
         LOG.info("Application " + applicationID + " transitioned from "
             + oldState + " to " + newState);
       }
@@ -547,5 +740,24 @@ public class ApplicationImpl implements Application {
     } finally {
       this.readLock.unlock();
     }
+  }
+
+  @Override
+  public String getFlowName() {
+    return flowContext == null ? null : flowContext.getFlowName();
+  }
+
+  @Override
+  public String getFlowVersion() {
+    return flowContext == null ? null : flowContext.getFlowVersion();
+  }
+
+  @Override
+  public long getFlowRunId() {
+    return flowContext == null ? 0L : flowContext.getFlowRunId();
+  }
+
+  public void setFlowContext(FlowContext fc) {
+    this.flowContext = fc;
   }
 }

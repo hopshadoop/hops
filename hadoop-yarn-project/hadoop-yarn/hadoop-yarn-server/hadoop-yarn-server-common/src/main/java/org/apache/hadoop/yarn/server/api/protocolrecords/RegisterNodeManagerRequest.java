@@ -42,6 +42,15 @@ public abstract class RegisterNodeManagerRequest {
       int httpPort, Resource resource, String nodeManagerVersionId,
       List<NMContainerStatus> containerStatuses,
       Map<ApplicationId, UpdatedCryptoForApp> runningApplications, Set<NodeLabel> nodeLabels) {
+    return newInstance(nodeId, httpPort, resource, nodeManagerVersionId,
+        containerStatuses, runningApplications, nodeLabels, null);
+  }
+
+  public static RegisterNodeManagerRequest newInstance(NodeId nodeId,
+      int httpPort, Resource resource, String nodeManagerVersionId,
+      List<NMContainerStatus> containerStatuses,
+      Map<ApplicationId, UpdatedCryptoForApp> runningApplications, Set<NodeLabel> nodeLabels,
+      Resource physicalResource) {
     RegisterNodeManagerRequest request =
         Records.newRecord(RegisterNodeManagerRequest.class);
     request.setHttpPort(httpPort);
@@ -51,6 +60,7 @@ public abstract class RegisterNodeManagerRequest {
     request.setContainerStatuses(containerStatuses);
     request.setRunningApplications(runningApplications);
     request.setNodeLabels(nodeLabels);
+    request.setPhysicalResource(physicalResource);
     return request;
   }
   
@@ -70,13 +80,7 @@ public abstract class RegisterNodeManagerRequest {
    * <p>
    * When we have this running application list in node manager register
    * request, we can recover nodes info for running applications. And then we
-   * can take actions accordingly.
-   *
-   * (HOPS TLS & JWT)
-   * Also, for each running application NM sends
-   * the version of application's cryptographic material. If RPC TLS is disabled
-   * the version is always 0. This information is used to determine if ResourceTracker
-   * should push to NM possible missing renewals for the security material
+   * can take actions accordingly
    * 
    * @return running application list in this node
    */
@@ -93,5 +97,25 @@ public abstract class RegisterNodeManagerRequest {
    * Setter for {@link RegisterNodeManagerRequest#getRunningApplications()}
    * @param runningApplications running application in this node
    */
-  public abstract void setRunningApplications(Map<ApplicationId, UpdatedCryptoForApp> runningApplications);
+  public abstract void setRunningApplications(
+      Map<ApplicationId, UpdatedCryptoForApp> runningApplications);
+
+  /**
+   * Get the physical resources in the node to properly estimate resource
+   * utilization.
+   * @return Physical resources in the node.
+   */
+  public abstract Resource getPhysicalResource();
+
+  /**
+   * Set the physical resources in the node to properly estimate resource
+   * utilization.
+   * @param physicalResource Physical resources in the node.
+   */
+  public abstract void setPhysicalResource(Resource physicalResource);
+
+  public abstract List<LogAggregationReport> getLogAggregationReportsForApps();
+
+  public abstract void setLogAggregationReportsForApps(
+      List<LogAggregationReport> logAggregationReportsForApps);
 }

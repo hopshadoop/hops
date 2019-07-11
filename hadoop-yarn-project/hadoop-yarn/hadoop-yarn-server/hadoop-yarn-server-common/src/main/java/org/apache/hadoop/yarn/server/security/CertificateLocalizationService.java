@@ -33,7 +33,6 @@ import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.mortbay.util.ajax.JSON;
 
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
@@ -56,6 +55,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
+import org.eclipse.jetty.util.ajax.JSON;
 
 @InterfaceAudience.LimitedPrivate({"Hive"})
 public class CertificateLocalizationService extends AbstractService
@@ -236,15 +236,15 @@ public class CertificateLocalizationService extends AbstractService
   }
 
   @Override
-  public void materializeCertificates(String username, String userFolder,
+  public void materializeCertificates(String username, String user,
       ByteBuffer keyStore, String keyStorePassword,
       ByteBuffer trustStore, String trustStorePassword) throws InterruptedException {
-    materializeCertificates(username, null, userFolder,
+    materializeCertificates(username, null, user,
         keyStore, keyStorePassword, trustStore, trustStorePassword);
   }
   
   @Override
-  public void materializeCertificates(String username, String applicationId, String userFolder,
+  public void materializeCertificates(String username, String applicationId, String user,
       ByteBuffer keyStore, String keyStorePassword,
       ByteBuffer trustStore, String trustStorePassword) throws InterruptedException {
     
@@ -259,9 +259,9 @@ public class CertificateLocalizationService extends AbstractService
       } else {
         Path appDirPath;
         if (applicationId != null) {
-          appDirPath = Paths.get(materializeDir.toString(), userFolder, applicationId);
+          appDirPath = Paths.get(materializeDir.toString(), user, applicationId);
         } else {
-          appDirPath = Paths.get(materializeDir.toString(), userFolder);
+          appDirPath = Paths.get(materializeDir.toString(), user);
         }
   
         Path keyStorePath = Paths.get(appDirPath.toFile().getAbsolutePath(), username + HopsSSLSocketFactory

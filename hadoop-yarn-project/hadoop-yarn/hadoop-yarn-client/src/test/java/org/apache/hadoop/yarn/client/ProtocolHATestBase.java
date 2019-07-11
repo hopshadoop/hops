@@ -25,6 +25,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
+import org.apache.hadoop.yarn.api.records.CollectorInfo;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -359,7 +360,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     private boolean waittingForFailOver() {
       int maximumWaittingTime = 50;
       int count = 0;
-      while (!failoverTriggered.get() && count >= maximumWaittingTime) {
+      while (!failoverTriggered.get() && count <= maximumWaittingTime) {
         try {
           Thread.sleep(100);
         } catch (InterruptedException e) {
@@ -367,7 +368,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
         }
         count++;
       }
-      if (count >= maximumWaittingTime) {
+      if (count >= maximumWaittingTime && failoverThread != null) {
         return false;
       }
       try {
@@ -581,7 +582,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
       @Override
       public SubmitApplicationResponse submitApplication(
-          SubmitApplicationRequest request) throws YarnException {
+          SubmitApplicationRequest request) throws YarnException, IOException {
         resetStartFailoverFlag(true);
 
         // make sure failover has been triggered
@@ -648,7 +649,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     }
 
     public ApplicationReport createFakeAppReport() {
-      ApplicationId appId = ApplicationId.newInstance(1000l, 1);
+      ApplicationId appId = ApplicationId.newInstance(1000L, 1);
       ApplicationAttemptId attemptId =
           ApplicationAttemptId.newInstance(appId, 1);
       // create a fake application report
@@ -656,7 +657,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
           ApplicationReport.newInstance(appId, attemptId, "fakeUser",
               "fakeQueue", "fakeApplicationName", "localhost", 0, null,
               YarnApplicationState.FINISHED, "fake an application report", "",
-              1000l, 1200l, FinalApplicationStatus.FAILED, null, "", 50f,
+              1000L, 1000L, 1200L, FinalApplicationStatus.FAILED, null, "", 50f,
               "fakeApplicationType", null);
       return report;
     }
@@ -668,7 +669,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     }
 
     public ApplicationId createFakeAppId() {
-      return ApplicationId.newInstance(1000l, 1);
+      return ApplicationId.newInstance(1000L, 1);
     }
 
     public ApplicationAttemptId createFakeApplicationAttemptId() {
@@ -687,7 +688,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
       NodeId nodeId = NodeId.newInstance("localhost", 0);
       NodeReport report =
           NodeReport.newInstance(nodeId, NodeState.RUNNING, "localhost",
-              "rack1", null, null, 4, null, 1000l, null);
+              "rack1", null, null, 4, null, 1000L);
       List<NodeReport> reports = new ArrayList<NodeReport>();
       reports.add(report);
       return reports;
@@ -695,7 +696,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
     public QueueInfo createFakeQueueInfo() {
       return QueueInfo.newInstance("root", 100f, 100f, 50f, null,
-          createFakeAppReports(), QueueState.RUNNING, null, null, null, false);
+          createFakeAppReports(), QueueState.RUNNING, null, null, null, false,
+          null, false);
     }
 
     public List<QueueUserACLInfo> createFakeQueueUserACLInfoList() {
@@ -710,8 +712,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     public ApplicationAttemptReport createFakeApplicationAttemptReport() {
       return ApplicationAttemptReport.newInstance(
           createFakeApplicationAttemptId(), "localhost", 0, "", "", "",
-          YarnApplicationAttemptState.RUNNING, createFakeContainerId(), 1000l,
-          1200l);
+          YarnApplicationAttemptState.RUNNING, createFakeContainerId(), 1000L,
+          1200L);
     }
 
     public List<ApplicationAttemptReport>
@@ -724,7 +726,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
     public ContainerReport createFakeContainerReport() {
       return ContainerReport.newInstance(createFakeContainerId(), null,
-          NodeId.newInstance("localhost", 0), null, 1000l, 1200l, "", "", 0,
+          NodeId.newInstance("localhost", 0), null, 1000L, 1200L, "", "", 0,
           ContainerState.COMPLETE,
           "http://" + NodeId.newInstance("localhost", 0).toString());
     }
@@ -835,11 +837,20 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     }
 
     public AllocateResponse createFakeAllocateResponse() {
-      return AllocateResponse.newInstance(-1,
-          new ArrayList<ContainerStatus>(),
-          new ArrayList<Container>(), new ArrayList<NodeReport>(),
-          Resource.newInstance(1024, 2), null, 1,
-          null, new ArrayList<NMToken>());
+      if (YarnConfiguration.timelineServiceV2Enabled(getConfig())) {
+        return AllocateResponse.newInstance(-1,
+            new ArrayList<ContainerStatus>(), new ArrayList<Container>(),
+            new ArrayList<NodeReport>(), Resource.newInstance(1024, 2), null, 1,
+            null, new ArrayList<NMToken>(), CollectorInfo.newInstance(
+            "host:port", Token.newInstance(new byte[] {0}, "TIMELINE",
+            new byte[] {0}, "rm")));
+      } else {
+        return AllocateResponse.newInstance(-1,
+            new ArrayList<ContainerStatus>(),
+            new ArrayList<Container>(), new ArrayList<NodeReport>(),
+            Resource.newInstance(1024, 2), null, 1,
+            null, new ArrayList<NMToken>());
+      }
     }
   }
 

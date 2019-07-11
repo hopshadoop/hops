@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.fs.swift;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -53,8 +53,8 @@ import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.noteAction;
 public class SwiftFileSystemBaseTest extends Assert implements
                                                     SwiftTestConstants {
 
-  protected static final Log LOG =
-          LogFactory.getLog(SwiftFileSystemBaseTest.class);
+  protected static final Logger LOG =
+      LoggerFactory.getLogger(SwiftFileSystemBaseTest.class);
   protected SwiftNativeFileSystem fs;
   protected static SwiftNativeFileSystem lastFs;
   protected byte[] data = SwiftTestUtils.dataset(getBlockSize() * 2, 0, 255);
@@ -159,7 +159,7 @@ public class SwiftFileSystemBaseTest extends Assert implements
    * @return a qualified path instance
    */
   protected Path path(String pathString) {
-    return new Path(pathString).makeQualified(fs);
+    return fs.makeQualified(new Path(pathString));
   }
 
   /**
@@ -233,7 +233,7 @@ public class SwiftFileSystemBaseTest extends Assert implements
   /**
    * Get a string describing the outcome of a rename, by listing the dest
    * path and its parent along with some covering text
-   * @param src source patj
+   * @param src source path
    * @param dst dest path
    * @return a string for logs and exceptions
    * @throws IOException IO problems

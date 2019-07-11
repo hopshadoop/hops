@@ -19,10 +19,9 @@
 package org.apache.hadoop.test;
 
 import org.apache.hadoop.util.ProgramDriver;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.TestZKRMStateStorePerf;
 
 /**
- * Driver for Yarn tests.
+ * Driver for YARN tests.
  *
  */
 public class YarnTestDriver {
@@ -35,13 +34,6 @@ public class YarnTestDriver {
 
   public YarnTestDriver(ProgramDriver pgd) {
     this.pgd = pgd;
-    try {
-      pgd.addClass(TestZKRMStateStorePerf.class.getSimpleName(),
-          TestZKRMStateStorePerf.class,
-          "ZKRMStateStore i/o benchmark.");
-    } catch(Throwable e) {
-      e.printStackTrace();
-    }
   }
 
   public void run(String argv[]) {

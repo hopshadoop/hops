@@ -22,6 +22,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -30,8 +31,6 @@ import java.util.Set;
 
 import javax.crypto.SecretKey;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
@@ -43,6 +42,8 @@ import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -50,8 +51,8 @@ public abstract
 class AbstractDelegationTokenSecretManager<TokenIdent 
 extends AbstractDelegationTokenIdentifier> 
    extends SecretManager<TokenIdent> {
-  private static final Log LOG = LogFactory
-      .getLog(AbstractDelegationTokenSecretManager.class);
+  private static final Logger LOG = LoggerFactory
+      .getLogger(AbstractDelegationTokenSecretManager.class);
 
   private String formatTokenId(TokenIdent id) {
     return "(" + id + ")";
@@ -627,8 +628,14 @@ extends AbstractDelegationTokenIdentifier>
       }
     }
     // don't hold lock on 'this' to avoid edit log updates blocking token ops
+    logExpireTokens(expiredTokens);
+  }
+
+  protected void logExpireTokens(
+      Collection<TokenIdent> expiredTokens) throws IOException {
     for (TokenIdent ident : expiredTokens) {
       logExpireToken(ident);
+      LOG.info("Removing expired token " + formatTokenId(ident));
       removeStoredToken(ident);
     }
   }

@@ -22,6 +22,7 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.JWSVerifier;
+import com.nimbusds.jose.KeyLengthException;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -35,14 +36,13 @@ public class MockJWTIssuer {
   private final JWSSigner signer;
   private final JWSVerifier verifier;
   
-  public MockJWTIssuer(byte[] sharedSecret) {
+  public MockJWTIssuer(byte[] sharedSecret) throws KeyLengthException, JOSEException {
     this.sharedSecret = sharedSecret;
     signer = new MACSigner(sharedSecret);
     verifier = new MACVerifier(sharedSecret);
   }
   
   public String generate(JWTClaimsSet claims) throws JOSEException {
-    claims.setIssuer("MockJWTIssuer");
     SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
     signedJWT.sign(signer);
     

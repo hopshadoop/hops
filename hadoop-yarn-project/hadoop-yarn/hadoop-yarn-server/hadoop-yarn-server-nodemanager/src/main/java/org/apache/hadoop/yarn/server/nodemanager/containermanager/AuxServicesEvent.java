@@ -29,35 +29,33 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container
 public class AuxServicesEvent extends AbstractEvent<AuxServicesEventType> {
 
   private final String user;
-  private final String userFolder;
   private final String serviceId;
   private final ByteBuffer serviceData;
   private final ApplicationId appId;
   private final Container container;
 
   public AuxServicesEvent(AuxServicesEventType eventType, ApplicationId appId) {
-    this(eventType, null, appId, null, null, null);
+    this(eventType, null, appId, null, null);
   }
 
   public AuxServicesEvent(AuxServicesEventType eventType, Container container) {
     this(eventType, null, container.getContainerId().getApplicationAttemptId()
-        .getApplicationId(), null, null, container, null);
+        .getApplicationId(), null, null, container);
   }
 
   public AuxServicesEvent(AuxServicesEventType eventType, String user,
-      ApplicationId appId, String serviceId, ByteBuffer serviceData, String userFolder) {
-    this(eventType, user, appId, serviceId, serviceData, null, userFolder);
+      ApplicationId appId, String serviceId, ByteBuffer serviceData) {
+    this(eventType, user, appId, serviceId, serviceData, null);
   }
     public AuxServicesEvent(AuxServicesEventType eventType, String user,
       ApplicationId appId, String serviceId, ByteBuffer serviceData,
-        Container container, String userFolder) {
+        Container container) {
     super(eventType);
     this.user = user;
     this.appId = appId;
     this.serviceId = serviceId;
     this.serviceData = serviceData;
     this.container = container;
-    this.userFolder = userFolder;
   }
 
   public String getServiceID() {
@@ -72,10 +70,6 @@ public class AuxServicesEvent extends AbstractEvent<AuxServicesEventType> {
     return user;
   }
 
-  public String getUserFolder() {
-    return userFolder;
-  }
-  
   public ApplicationId getApplicationID() {
     return appId;
   }

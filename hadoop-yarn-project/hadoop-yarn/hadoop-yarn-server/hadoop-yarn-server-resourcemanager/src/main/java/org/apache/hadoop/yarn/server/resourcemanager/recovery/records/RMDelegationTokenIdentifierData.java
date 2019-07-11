@@ -35,9 +35,7 @@ public class RMDelegationTokenIdentifierData {
 
   public RMDelegationTokenIdentifierData(
       YARNDelegationTokenIdentifier identifier, long renewdate) {
-    org.apache.hadoop.yarn.proto.YarnSecurityTokenProtos.YARNDelegationTokenIdentifierProto proto
-            = identifier.getProto();
-    builder.setTokenIdentifier(proto);
+    builder.setTokenIdentifier(identifier.getProto());
     builder.setRenewDate(renewdate);
   }
 
@@ -59,5 +57,13 @@ public class RMDelegationTokenIdentifierData {
 
   public long getRenewDate() {
     return builder.getRenewDate();
+  }
+
+  public void setIdentifier(YARNDelegationTokenIdentifier identifier) {
+    builder.setTokenIdentifier(identifier.getProto());
+  }
+
+  public void setRenewDate(long renewDate) {
+    builder.setRenewDate(renewDate);
   }
 }

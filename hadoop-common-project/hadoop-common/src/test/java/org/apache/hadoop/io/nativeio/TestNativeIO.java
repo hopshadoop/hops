@@ -29,37 +29,47 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.commons.io.FileUtils;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathIOException;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.hadoop.test.StatUtils;
+import org.apache.hadoop.util.NativeCodeLoader;
+import org.apache.hadoop.util.Time;
+import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.*;
+import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.Stat.*;
+import static org.apache.hadoop.test.PlatformAssumptions.assumeNotWindows;
+import static org.apache.hadoop.test.PlatformAssumptions.assumeWindows;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
 import static org.junit.Assume.*;
 import static org.junit.Assert.*;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.NativeCodeLoader;
-import org.apache.hadoop.util.Time;
-
-import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.*;
-import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.Stat.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestNativeIO {
-  static final Log LOG = LogFactory.getLog(TestNativeIO.class);
+  static final Logger LOG = LoggerFactory.getLogger(TestNativeIO.class);
 
   static final File TEST_DIR = GenericTestUtils.getTestDir("testnativeio");
 
@@ -107,9 +117,7 @@ public class TestNativeIO {
    */
   @Test (timeout = 30000)
   public void testMultiThreadedFstat() throws Exception {
-    if (Path.WINDOWS) {
-      return;
-    }
+    assumeNotWindows();
 
     final FileOutputStream fos = new FileOutputStream(
       new File(TEST_DIR, "testfstat"));
@@ -164,10 +172,112 @@ public class TestNativeIO {
   }
 
   @Test (timeout = 30000)
-  public void testSetFilePointer() throws Exception {
-    if (!Path.WINDOWS) {
-      return;
+  public void testStat() throws Exception {
+    Configuration conf = new Configuration();
+    FileSystem fileSystem = FileSystem.getLocal(conf).getRawFileSystem();
+    Path path = new Path(TEST_DIR.getPath(), "teststat2");
+    fileSystem.createNewFile(path);
+    String testFilePath = path.toString();
+
+    try {
+      doStatTest(testFilePath);
+      LOG.info("testStat() is successful.");
+    } finally {
+      ContractTestUtils.cleanup("cleanup test file: " + path.toString(),
+          fileSystem, path);
     }
+  }
+
+  private boolean doStatTest(String testFilePath) throws Exception {
+    NativeIO.POSIX.Stat stat = NativeIO.POSIX.getStat(testFilePath);
+    String owner = stat.getOwner();
+    String group = stat.getGroup();
+    int mode = stat.getMode();
+
+    // direct check with System
+    String expectedOwner = System.getProperty("user.name");
+    assertEquals(expectedOwner, owner);
+    assertNotNull(group);
+    assertTrue(!group.isEmpty());
+
+    // cross check with ProcessBuilder
+    StatUtils.Permission expected =
+        StatUtils.getPermissionFromProcess(testFilePath);
+    StatUtils.Permission permission =
+        new StatUtils.Permission(owner, group, new FsPermission(mode));
+
+    assertEquals(expected.getOwner(), permission.getOwner());
+    assertEquals(expected.getGroup(), permission.getGroup());
+    assertEquals(expected.getFsPermission(), permission.getFsPermission());
+
+    LOG.info("Load permission test is successful for path: {}, stat: {}",
+        testFilePath, stat);
+    LOG.info("On mask, stat is owner: {}, group: {}, permission: {}",
+        owner, group, permission.getFsPermission().toOctal());
+    return true;
+  }
+
+  @Test
+  public void testStatOnError() throws Exception {
+    final String testNullFilePath = null;
+    LambdaTestUtils.intercept(IOException.class,
+            "Path is null",
+            () -> NativeIO.POSIX.getStat(testNullFilePath));
+
+    final String testInvalidFilePath = "C:\\nonexisting_path\\nonexisting_file";
+    LambdaTestUtils.intercept(IOException.class,
+            PathIOException.class.getName(),
+            () -> NativeIO.POSIX.getStat(testInvalidFilePath));
+  }
+
+  @Test (timeout = 30000)
+  public void testMultiThreadedStat() throws Exception {
+    Configuration conf = new Configuration();
+    FileSystem fileSystem = FileSystem.getLocal(conf).getRawFileSystem();
+    Path path = new Path(TEST_DIR.getPath(), "teststat2");
+    fileSystem.createNewFile(path);
+    String testFilePath = path.toString();
+
+    int numOfThreads = 10;
+    ExecutorService executorService =
+        Executors.newFixedThreadPool(numOfThreads);
+    executorService.awaitTermination(1000, TimeUnit.MILLISECONDS);
+    try {
+      for (int i = 0; i < numOfThreads; i++){
+        Future<Boolean> result =
+            executorService.submit(() -> doStatTest(testFilePath));
+        assertTrue(result.get());
+      }
+      LOG.info("testMultiThreadedStat() is successful.");
+    } finally {
+      executorService.shutdown();
+      ContractTestUtils.cleanup("cleanup test file: " + path.toString(),
+          fileSystem, path);
+    }
+  }
+
+  @Test
+  public void testMultiThreadedStatOnError() throws Exception {
+    final String testInvalidFilePath = "C:\\nonexisting_path\\nonexisting_file";
+
+    int numOfThreads = 10;
+    ExecutorService executorService =
+        Executors.newFixedThreadPool(numOfThreads);
+    for (int i = 0; i < numOfThreads; i++) {
+      try {
+        Future<Boolean> result =
+            executorService.submit(() -> doStatTest(testInvalidFilePath));
+        result.get();
+      } catch (Exception e) {
+        assertTrue(e.getCause() instanceof PathIOException);
+      }
+    }
+    executorService.shutdown();
+  }
+
+  @Test (timeout = 30000)
+  public void testSetFilePointer() throws Exception {
+    assumeWindows();
 
     LOG.info("Set a file pointer on Windows");
     try {
@@ -212,9 +322,7 @@ public class TestNativeIO {
 
   @Test (timeout = 30000)
   public void testCreateFile() throws Exception {
-    if (!Path.WINDOWS) {
-      return;
-    }
+    assumeWindows();
 
     LOG.info("Open a file on Windows with SHARE_DELETE shared mode");
     try {
@@ -255,9 +363,7 @@ public class TestNativeIO {
   /** Validate access checks on Windows */
   @Test (timeout = 30000)
   public void testAccess() throws Exception {
-    if (!Path.WINDOWS) {
-      return;
-    }
+    assumeWindows();
 
     File testFile = new File(TEST_DIR, "testfileaccess");
     assertTrue(testFile.createNewFile());
@@ -331,9 +437,7 @@ public class TestNativeIO {
 
   @Test (timeout = 30000)
   public void testOpenMissingWithoutCreate() throws Exception {
-    if (Path.WINDOWS) {
-      return;
-    }
+    assumeNotWindows();
 
     LOG.info("Open a missing file without O_CREAT and it should fail");
     try {
@@ -348,9 +452,7 @@ public class TestNativeIO {
 
   @Test (timeout = 30000)
   public void testOpenWithCreate() throws Exception {
-    if (Path.WINDOWS) {
-      return;
-    }
+    assumeNotWindows();
 
     LOG.info("Test creating a file with O_CREAT");
     FileDescriptor fd = NativeIO.POSIX.open(
@@ -382,9 +484,7 @@ public class TestNativeIO {
    */
   @Test (timeout = 30000)
   public void testFDDoesntLeak() throws IOException {
-    if (Path.WINDOWS) {
-      return;
-    }
+    assumeNotWindows();
 
     for (int i = 0; i < 10000; i++) {
       FileDescriptor fd = NativeIO.POSIX.open(
@@ -403,9 +503,7 @@ public class TestNativeIO {
    */
   @Test (timeout = 30000)
   public void testChmod() throws Exception {
-    if (Path.WINDOWS) {
-      return;
-    }
+    assumeNotWindows();
 
     try {
       NativeIO.POSIX.chmod("/this/file/doesnt/exist", 777);
@@ -428,9 +526,7 @@ public class TestNativeIO {
 
   @Test (timeout = 30000)
   public void testPosixFadvise() throws Exception {
-    if (Path.WINDOWS) {
-      return;
-    }
+    assumeNotWindows();
 
     FileInputStream fis = new FileInputStream("/dev/zero");
     try {
@@ -497,19 +593,13 @@ public class TestNativeIO {
 
   @Test (timeout = 30000)
   public void testGetUserName() throws IOException {
-    if (Path.WINDOWS) {
-      return;
-    }
-
+    assumeNotWindows();
     assertFalse(NativeIO.POSIX.getUserName(0).isEmpty());
   }
 
   @Test (timeout = 30000)
   public void testGetGroupName() throws IOException {
-    if (Path.WINDOWS) {
-      return;
-    }
-
+    assumeNotWindows();
     assertFalse(NativeIO.POSIX.getGroupName(0).isEmpty());
   }
 
@@ -641,16 +731,15 @@ public class TestNativeIO {
       NativeIO.copyFileUnbuffered(srcFile, dstFile);
       Assert.assertEquals(srcFile.length(), dstFile.length());
     } finally {
-      IOUtils.cleanup(LOG, channel);
-      IOUtils.cleanup(LOG, raSrcFile);
+      IOUtils.cleanupWithLogger(LOG, channel);
+      IOUtils.cleanupWithLogger(LOG, raSrcFile);
       FileUtils.deleteQuietly(TEST_DIR);
     }
   }
 
   @Test (timeout=10000)
   public void testNativePosixConsts() {
-    assumeTrue("Native POSIX constants not required for Windows",
-      !Path.WINDOWS);
+    assumeNotWindows("Native POSIX constants not required for Windows");
     assertTrue("Native 0_RDONLY const not set", O_RDONLY >= 0);
     assertTrue("Native 0_WRONLY const not set", O_WRONLY >= 0);
     assertTrue("Native 0_RDWR const not set", O_RDWR >= 0);

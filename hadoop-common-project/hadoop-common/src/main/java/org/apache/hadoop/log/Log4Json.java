@@ -19,16 +19,17 @@
 
 package org.apache.hadoop.log;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MappingJsonFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.node.ContainerNode;
 import org.apache.log4j.Layout;
 import org.apache.log4j.helpers.ISO8601DateFormat;
 import org.apache.log4j.spi.LoggingEvent;
 import org.apache.log4j.spi.ThrowableInformation;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.MappingJsonFactory;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ContainerNode;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -102,9 +103,10 @@ public class Log4Json extends Layout {
   /**
    * Jackson factories are thread safe when constructing parsers and generators.
    * They are not thread safe in configure methods; if there is to be any
-   * configuration it must be done in a static intializer block.
+   * configuration it must be done in a static initializer block.
    */
   private static final JsonFactory factory = new MappingJsonFactory();
+  private static final ObjectReader READER = new ObjectMapper(factory).reader();
   public static final String DATE = "date";
   public static final String EXCEPTION_CLASS = "exceptionclass";
   public static final String LEVEL = "level";
@@ -197,7 +199,7 @@ public class Log4Json extends Layout {
                        final String threadName,
                        final String message,
                        final ThrowableInformation ti) throws IOException {
-    JsonGenerator json = factory.createJsonGenerator(writer);
+    JsonGenerator json = factory.createGenerator(writer);
     json.writeStartObject();
     json.writeStringField(NAME, loggerName);
     json.writeNumberField(TIME, timeStamp);
@@ -252,8 +254,7 @@ public class Log4Json extends Layout {
    * @throws IOException on any parsing problems
    */
   public static ContainerNode parse(String json) throws IOException {
-    ObjectMapper mapper = new ObjectMapper(factory);
-    JsonNode jsonNode = mapper.readTree(json);
+    JsonNode jsonNode = READER.readTree(json);
     if (!(jsonNode instanceof ContainerNode)) {
       throw new IOException("Wrong JSON data: " + json);
     }

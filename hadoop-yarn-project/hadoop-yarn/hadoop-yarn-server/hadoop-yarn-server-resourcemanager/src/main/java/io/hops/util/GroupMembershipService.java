@@ -77,6 +77,7 @@ public class GroupMembershipService extends CompositeService
   private YarnAuthorizationProvider authorizer;
   private UserGroupInformation daemonUser;
   private Configuration conf;
+  boolean isReady = false;
   
   public GroupMembershipService(ResourceManager rm, RMContext rmContext) {
     super(GroupMembershipService.class.getName());
@@ -132,7 +133,7 @@ public class GroupMembershipService extends CompositeService
   }
 
   protected synchronized void startGroupMembership() throws IOException {
-    if (rmContext.isHAEnabled() || rmContext.isDistributed()) {
+    if (rmContext.isHAEnabled()) {
       initLEandGM(conf);
     }
 
@@ -226,7 +227,7 @@ public class GroupMembershipService extends CompositeService
   @Override
   public synchronized void monitorHealth() throws IOException {
     checkAccess("monitorHealth");
-    if (isRMActive() && !rm.areSchedulerServicesRunning()) {
+    if (isRMActive() && !rm.areActiveServicesRunning()) {
       throw new HealthCheckFailedException(
           "Active ResourceManager services are not running!");
     }
@@ -322,8 +323,11 @@ public class GroupMembershipService extends CompositeService
 
   @Override
   public LiveRMsResponse getLiveRMList() {
-
-    List<ActiveNode> rmList = new ArrayList<ActiveNode>();
+    return YarnServerBuilderUtils.newLiveRMsResponse(getSortedActiveRMList());
+  }
+  
+  private SortedActiveRMList getSortedActiveRMList() {
+     List<ActiveNode> rmList = new ArrayList<ActiveNode>();
     Map<String, Load> loads;
     try {
       loads = DBUtility.getAllLoads();
@@ -342,9 +346,7 @@ public class GroupMembershipService extends CompositeService
             get(node.getHostname()).getLoad()));
       }
     }
-    SortedActiveRMList sortedRmList = new SortedActiveRMList(rmList);
-    return YarnServerBuilderUtils.newLiveRMsResponse(sortedRmList);
-
+    return new SortedActiveRMList(rmList);
   }
 
   private void initLEandGM(Configuration conf) throws IOException {
@@ -366,7 +368,7 @@ public class GroupMembershipService extends CompositeService
             groupMembershipServiceAddress.getAddress().getHostAddress() + ":"
 			   + groupMembershipServiceAddress.getPort());
   }
-
+  
   private class LEnGmMonitor implements Runnable {
 
     Boolean previousLeaderRole = null;
@@ -382,7 +384,7 @@ public class GroupMembershipService extends CompositeService
             previousLeaderRole = currentLeaderRole;
             switchLeaderRole(previousLeaderRole);
           }
-          boolean currentLeadingRTRole = isLeadingRT();
+          isReady = true;
           Thread.sleep(100L);
         }
       } catch (Exception ex) {
@@ -403,10 +405,22 @@ public class GroupMembershipService extends CompositeService
     
   }
 
+  public void forceLeader() throws IOException{
+    groupMembership.forceLead(groupMembership.getCurrentId());
+    
+  }
+  
   public void relinquishId() throws InterruptedException {
     if(groupMembership!=null){
       groupMembership.relinquishCurrentIdInNextRound();
     }
   }
+  
+  public boolean isReady(){
+    return isReady;
+  }
 
+  public long getCurrentId(){
+    return groupMembership.getCurrentId();
+  }
 }

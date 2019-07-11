@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.fs.swift.snative;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftConnectionClosedException;
@@ -45,8 +45,8 @@ import java.io.OutputStream;
 class SwiftNativeOutputStream extends OutputStream {
   public static final int ATTEMPT_LIMIT = 3;
   private long filePartSize;
-  private static final Log LOG =
-          LogFactory.getLog(SwiftNativeOutputStream.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SwiftNativeOutputStream.class);
   private Configuration conf;
   private String key;
   private File backupFile;
@@ -261,7 +261,7 @@ class SwiftNativeOutputStream extends OutputStream {
     assert len >= 0  : "remainder to write is negative";
     SwiftUtils.debug(LOG," writeToBackupStream(offset=%d, len=%d)", offset, len);
     if (len == 0) {
-      //no remainder -downgrade to noop
+      //no remainder -downgrade to no-op
       return;
     }
 

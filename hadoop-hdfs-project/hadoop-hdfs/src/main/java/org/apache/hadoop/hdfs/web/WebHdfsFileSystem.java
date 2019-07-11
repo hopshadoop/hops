@@ -171,7 +171,7 @@ public class WebHdfsFileSystem extends FileSystem
         DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_ENABLED_DEFAULT,
         DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_SPEC_KEY,
         DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_SPEC_DEFAULT,
-        SafeModeException.class);
+        SafeModeException.class.getName());
     
     this.workingDir = getHomeDirectory();
 
@@ -188,7 +188,7 @@ public class WebHdfsFileSystem extends FileSystem
    }
 
   /** Is WebHDFS enabled in conf? */
-  public static boolean isEnabled(final Configuration conf, final Log log) {
+  public static boolean isEnabled(final Configuration conf) {
     final boolean b = conf.getBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY,
         DFSConfigKeys.DFS_WEBHDFS_ENABLED_DEFAULT);
     return b;

@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity;
 
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
@@ -35,6 +34,7 @@ import java.util.Set;
 public abstract class PreemptionCandidatesSelector {
   protected CapacitySchedulerPreemptionContext preemptionContext;
   protected ResourceCalculator rc;
+  private long maximumKillWaitTime = -1;
 
   PreemptionCandidatesSelector(
       CapacitySchedulerPreemptionContext preemptionContext) {
@@ -49,7 +49,8 @@ public abstract class PreemptionCandidatesSelector {
    * @param selectedCandidates already selected candidates from previous policies
    * @param clusterResource total resource
    * @param totalPreemptedResourceAllowed how many resources allowed to be
-   *                                      preempted in this round
+   *                                      preempted in this round. Should be
+   *                                      updated(in-place set) after the call
    * @return merged selected candidates.
    */
   public abstract Map<ApplicationAttemptId, Set<RMContainer>> selectCandidates(
@@ -67,16 +68,24 @@ public abstract class PreemptionCandidatesSelector {
     Collections.sort(containers, new Comparator<RMContainer>() {
       @Override
       public int compare(RMContainer a, RMContainer b) {
-        Comparator<Priority> c = new org.apache.hadoop.yarn.server
-            .resourcemanager.resource.Priority.Comparator();
-        int priorityComp = c.compare(b.getContainer().getPriority(),
-            a.getContainer().getPriority());
-        if (priorityComp != 0) {
-           return priorityComp;
+        int schedKeyComp = b.getAllocatedSchedulerKey()
+            .compareTo(a.getAllocatedSchedulerKey());
+        if (schedKeyComp != 0) {
+          return schedKeyComp;
         }
         return b.getContainerId().compareTo(a.getContainerId());
       }
     });
   }
 
+  public long getMaximumKillWaitTimeMs() {
+    if (maximumKillWaitTime > 0) {
+      return maximumKillWaitTime;
+    }
+    return preemptionContext.getDefaultMaximumKillWaitTimeout();
+  }
+
+  public void setMaximumKillWaitTime(long maximumKillWaitTime) {
+    this.maximumKillWaitTime = maximumKillWaitTime;
+  }
 }

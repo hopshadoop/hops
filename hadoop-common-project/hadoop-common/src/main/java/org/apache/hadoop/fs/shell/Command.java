@@ -19,6 +19,7 @@ package org.apache.hadoop.fs.shell;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -26,15 +27,16 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathNotFoundException;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An abstract class for the execution of a file system command
@@ -43,12 +45,12 @@ import org.apache.hadoop.util.StringUtils;
 @InterfaceStability.Evolving
 
 abstract public class Command extends Configured {
-  /** default name of the command */
-  public static String NAME;
-  /** the command's usage switches and arguments format */
-  public static String USAGE;
-  /** the command's long description */
-  public static String DESCRIPTION;
+  /** field name indicating the default name of the command */
+  public static final String COMMAND_NAME_FIELD = "NAME";
+  /** field name indicating the command's usage switches and arguments format */
+  public static final String COMMAND_USAGE_FIELD = "USAGE";
+  /** field name indicating the command's long description */
+  public static final String COMMAND_DESCRIPTION_FIELD = "DESCRIPTION";
     
   protected String[] args;
   protected String name;
@@ -58,7 +60,7 @@ abstract public class Command extends Configured {
   private int depth = 0;
   protected ArrayList<Exception> exceptions = new ArrayList<Exception>();
 
-  private static final Log LOG = LogFactory.getLog(Command.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Command.class);
 
   /** allows stdout to be captured if necessary */
   public PrintStream out = System.out;
@@ -173,6 +175,9 @@ abstract public class Command extends Configured {
       }
       processOptions(args);
       processRawArguments(args);
+    } catch (CommandInterruptException e) {
+      displayError("Interrupted");
+      return 130;
     } catch (IOException e) {
       displayError(e);
     }
@@ -321,18 +326,66 @@ abstract public class Command extends Configured {
    */
   protected void processPaths(PathData parent, PathData ... items)
   throws IOException {
-    // TODO: this really should be iterative
     for (PathData item : items) {
       try {
-        processPath(item);
-        if (recursive && isPathRecursable(item)) {
-          recursePath(item);
-        }
-        postProcessPath(item);
+        processPathInternal(item);
       } catch (IOException e) {
         displayError(e);
       }
     }
+  }
+
+  /**
+   * Iterates over the given expanded paths and invokes
+   * {@link #processPath(PathData)} on each element. If "recursive" is true,
+   * will do a post-visit DFS on directories.
+   * @param parent if called via a recurse, will be the parent dir, else null
+   * @param itemsIterator a iterator of {@link PathData} objects to process
+   * @throws IOException if anything goes wrong...
+   */
+  protected void processPaths(PathData parent,
+      RemoteIterator<PathData> itemsIterator) throws IOException {
+    int groupSize = getListingGroupSize();
+    if (groupSize == 0) {
+      // No grouping of contents required.
+      while (itemsIterator.hasNext()) {
+        processPaths(parent, itemsIterator.next());
+      }
+    } else {
+      List<PathData> items = new ArrayList<PathData>(groupSize);
+      while (itemsIterator.hasNext()) {
+        items.add(itemsIterator.next());
+        if (!itemsIterator.hasNext() || items.size() == groupSize) {
+          processPaths(parent, items.toArray(new PathData[items.size()]));
+          items.clear();
+        }
+      }
+    }
+  }
+
+  private void processPathInternal(PathData item) throws IOException {
+    processPath(item);
+    if (recursive && isPathRecursable(item)) {
+      recursePath(item);
+    }
+    postProcessPath(item);
+  }
+
+  /**
+   * Whether the directory listing for a path should be sorted.?
+   * @return true/false.
+   */
+  protected boolean isSorted() {
+    return false;
+  }
+
+  /**
+   * While using iterator method for listing for a path, whether to group items
+   * and process as array? If so what is the size of array?
+   * @return size of the grouping array.
+   */
+  protected int getListingGroupSize() {
+    return 0;
   }
 
   /**
@@ -380,7 +433,13 @@ abstract public class Command extends Configured {
   protected void recursePath(PathData item) throws IOException {
     try {
       depth++;
-      processPaths(item, item.getDirectoryContents());
+      if (isSorted()) {
+        // use the non-iterative method for listing because explicit sorting is
+        // required. Iterators not guaranteed to return sorted elements
+        processPaths(item, item.getDirectoryContents());
+      } else {
+        processPaths(item, item.getDirectoryContentsIterator());
+      }
     } finally {
       depth--;
     }
@@ -395,6 +454,10 @@ abstract public class Command extends Configured {
   public void displayError(Exception e) {
     // build up a list of exceptions that occurred
     exceptions.add(e);
+    // use runtime so it rips up through the stack and exits out 
+    if (e instanceof InterruptedIOException) {
+      throw new CommandInterruptException();
+    }
     
     String errorMessage = e.getLocalizedMessage();
     if (errorMessage == null) {
@@ -435,7 +498,7 @@ abstract public class Command extends Configured {
    */
   public String getName() {
     return (name == null)
-      ? getCommandField("NAME")
+      ? getCommandField(COMMAND_NAME_FIELD)
       : name.startsWith("-") ? name.substring(1) : name;
   }
 
@@ -453,7 +516,7 @@ abstract public class Command extends Configured {
    */
   public String getUsage() {
     String cmd = "-" + getName();
-    String usage = isDeprecated() ? "" : getCommandField("USAGE");
+    String usage = isDeprecated() ? "" : getCommandField(COMMAND_USAGE_FIELD);
     return usage.isEmpty() ? cmd : cmd + " " + usage; 
   }
 
@@ -464,7 +527,7 @@ abstract public class Command extends Configured {
   public String getDescription() {
     return isDeprecated()
       ? "(DEPRECATED) Same as '" + getReplacementCommand() + "'"
-      : getCommandField("DESCRIPTION");
+      : getCommandField(COMMAND_DESCRIPTION_FIELD);
   }
 
   /**
@@ -500,4 +563,7 @@ abstract public class Command extends Configured {
     }
     return value;
   }
+  
+  @SuppressWarnings("serial")
+  static class CommandInterruptException extends RuntimeException {}
 }

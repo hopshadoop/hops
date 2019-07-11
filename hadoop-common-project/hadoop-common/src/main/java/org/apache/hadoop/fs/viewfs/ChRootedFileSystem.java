@@ -27,6 +27,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.BlockStoragePolicySpi;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -39,8 +40,9 @@ import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -133,7 +135,7 @@ class ChRootedFileSystem extends FilterFileSystem {
   /**
    * Strip out the root from the path.
    * @param p - fully qualified path p
-   * @return -  the remaining path  without the begining /
+   * @return -  the remaining path  without the beginning /
    * @throws IOException if the p is not prefixed with root
    */
   String stripOutRoot(final Path p) throws IOException {
@@ -185,7 +187,6 @@ class ChRootedFileSystem extends FilterFileSystem {
   }
   
   @Override
-  @Deprecated
   public FSDataOutputStream createNonRecursive(Path f, FsPermission permission,
       EnumSet<CreateFlag> flags, int bufferSize, short replication, long blockSize,
       Progressable progress) throws IOException {
@@ -221,9 +222,20 @@ class ChRootedFileSystem extends FilterFileSystem {
   }
 
   @Override
+  public FileChecksum getFileChecksum(final Path f, final long length)
+      throws IOException {
+    return super.getFileChecksum(fullPath(f), length);
+  }
+
+  @Override
   public FileStatus getFileStatus(final Path f) 
       throws IOException {
     return super.getFileStatus(fullPath(f));
+  }
+
+  @Override
+  public Path getLinkTarget(Path f) throws IOException {
+    return super.getLinkTarget(fullPath(f));
   }
 
   @Override
@@ -354,6 +366,11 @@ class ChRootedFileSystem extends FilterFileSystem {
   }
 
   @Override
+  public boolean truncate(Path path, long newLength) throws IOException {
+    return super.truncate(fullPath(path), newLength);
+  }
+
+  @Override
   public List<String> listXAttrs(Path path) throws IOException {
     return super.listXAttrs(fullPath(path));
   }
@@ -361,6 +378,23 @@ class ChRootedFileSystem extends FilterFileSystem {
   @Override
   public void removeXAttr(Path path, String name) throws IOException {
     super.removeXAttr(fullPath(path), name);
+  }
+
+  @Override
+  public Path createSnapshot(Path path, String name) throws IOException {
+    return super.createSnapshot(fullPath(path), name);
+  }
+
+  @Override
+  public void renameSnapshot(Path path, String snapshotOldName,
+      String snapshotNewName) throws IOException {
+    super.renameSnapshot(fullPath(path), snapshotOldName, snapshotNewName);
+  }
+
+  @Override
+  public void deleteSnapshot(Path snapshotDir, String snapshotName)
+      throws IOException {
+    super.deleteSnapshot(fullPath(snapshotDir), snapshotName);
   }
 
   @Override
@@ -372,7 +406,11 @@ class ChRootedFileSystem extends FilterFileSystem {
   public ContentSummary getContentSummary(Path f) throws IOException {
     return fs.getContentSummary(fullPath(f));
   }
-  
+
+  @Override
+  public QuotaUsage getQuotaUsage(Path f) throws IOException {
+    return fs.getQuotaUsage(fullPath(f));
+  }
 
   private static Path rootPath = new Path(Path.SEPARATOR);
 
@@ -404,5 +442,21 @@ class ChRootedFileSystem extends FilterFileSystem {
   @Override
   public FsServerDefaults getServerDefaults(Path f) throws IOException {
     return super.getServerDefaults(fullPath(f));
-  }  
+  }
+
+  @Override
+  public BlockStoragePolicySpi getStoragePolicy(Path src) throws IOException {
+    return super.getStoragePolicy(fullPath(src));
+  }
+
+  @Override
+  public void setStoragePolicy(Path src, String policyName) throws IOException {
+    super.setStoragePolicy(fullPath(src), policyName);
+  }
+
+  @Override
+  public void unsetStoragePolicy(Path src) throws IOException {
+    super.unsetStoragePolicy(fullPath(src));
+  }
+
 }

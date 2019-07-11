@@ -31,8 +31,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileSystem;
@@ -61,10 +59,12 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestLocalContainerLauncher {
-  private static final Log LOG =
-      LogFactory.getLog(TestLocalContainerLauncher.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestLocalContainerLauncher.class);
   private static File testWorkDir;
   private static final String[] localDirs = new String[2];
 
@@ -103,7 +103,7 @@ public class TestLocalContainerLauncher {
     AppContext context = mock(AppContext.class);
     // a simple event handler solely to detect the container cleaned event
     final CountDownLatch isDone = new CountDownLatch(1);
-    EventHandler handler = new EventHandler() {
+    EventHandler<Event> handler = new EventHandler<Event>() {
       @Override
       public void handle(Event event) {
         LOG.info("handling event " + event.getClass() +

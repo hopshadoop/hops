@@ -40,12 +40,16 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfoWithStorage;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.junit.Test;
 import org.mockito.Mockito;
-import org.mortbay.log.Log;
 
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestDatanodeManager {
+  
+  public static final Logger LOG =
+    LoggerFactory.getLogger(TestDatanodeManager.class);
 
   //The number of times the registration / removal of nodes should happen
   final int NUM_ITERATIONS = 500;
@@ -69,7 +73,7 @@ public class TestDatanodeManager {
     Random rng = new Random();
     int seed = rng.nextInt();
     rng = new Random(seed);
-    Log.info("Using seed " + seed + " for testing");
+    LOG.info("Using seed " + seed + " for testing");
 
     //A map of the Storage IDs to the DN registration it was registered with
     HashMap <String, DatanodeRegistration> sIdToDnReg =
@@ -88,7 +92,7 @@ public class TestDatanodeManager {
           it.next();
         }
         DatanodeRegistration toRemove = it.next().getValue();
-        Log.info("Removing node " + toRemove.getDatanodeUuid()+ " ip " +
+        LOG.info("Removing node " + toRemove.getDatanodeUuid()+ " ip " +
         toRemove.getXferAddr() + " version : " + toRemove.getSoftwareVersion());
 
         //Remove that random node
@@ -122,7 +126,7 @@ public class TestDatanodeManager {
         Mockito.when(dr.getSoftwareVersion()).thenReturn(
           "version" + rng.nextInt(5));
 
-        Log.info("Registering node storageID: " + dr.getDatanodeUuid() +
+        LOG.info("Registering node storageID: " + dr.getDatanodeUuid() +
           ", version: " + dr.getSoftwareVersion() + ", IP address: "
           + dr.getXferAddr());
 
@@ -148,7 +152,7 @@ public class TestDatanodeManager {
         }
       }
       for(Entry <String, Integer> entry: mapToCheck.entrySet()) {
-        Log.info("Still in map: " + entry.getKey() + " has "
+        LOG.info("Still in map: " + entry.getKey() + " has "
           + entry.getValue());
       }
       assertEquals("The map of version counts returned by DatanodeManager was"

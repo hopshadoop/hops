@@ -19,11 +19,10 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 import java.io.IOException;
-import java.util.Iterator;
 
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationSystem;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerDynamicEditException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * reservations, but functionality wise is a sub-class of ParentQueue
  *
  */
-public class PlanQueue extends ParentQueue {
+public class PlanQueue extends AbstractManagedParentQueue {
 
   private static final Logger LOG = LoggerFactory.getLogger(PlanQueue.class);
 
@@ -56,7 +55,8 @@ public class PlanQueue extends ParentQueue {
     showReservationsAsQueues = conf.getShowReservationAsQueues(queuePath);
     if (maxAppsForReservation < 0) {
       maxAppsForReservation =
-          (int) (CapacitySchedulerConfiguration.DEFAULT_MAXIMUM_SYSTEM_APPLICATIIONS * super
+          (int) (CapacitySchedulerConfiguration.
+              DEFAULT_MAXIMUM_SYSTEM_APPLICATIIONS * super
               .getAbsoluteCapacity());
     }
     int userLimit = conf.getUserLimit(queuePath);
@@ -79,76 +79,44 @@ public class PlanQueue extends ParentQueue {
   }
 
   @Override
-  public synchronized void reinitialize(CSQueue newlyParsedQueue,
+  public void reinitialize(CSQueue newlyParsedQueue,
       Resource clusterResource) throws IOException {
-    // Sanity check
-    if (!(newlyParsedQueue instanceof PlanQueue)
-        || !newlyParsedQueue.getQueuePath().equals(getQueuePath())) {
-      throw new IOException("Trying to reinitialize " + getQueuePath()
-          + " from " + newlyParsedQueue.getQueuePath());
-    }
-
-    PlanQueue newlyParsedParentQueue = (PlanQueue) newlyParsedQueue;
-
-    if (newlyParsedParentQueue.getChildQueues().size() > 0) {
-      throw new IOException(
-          "Reservable Queue should not have sub-queues in the"
-              + "configuration");
-    }
-
-    // Set new configs
-    setupQueueConfigs(clusterResource);
-
-    updateQuotas(newlyParsedParentQueue.userLimit,
-        newlyParsedParentQueue.userLimitFactor,
-        newlyParsedParentQueue.maxAppsForReservation,
-        newlyParsedParentQueue.maxAppsPerUserForReservation);
-
-    // run reinitialize on each existing queue, to trigger absolute cap
-    // recomputations
-    for (CSQueue res : this.getChildQueues()) {
-      res.reinitialize(res, clusterResource);
-    }
-    showReservationsAsQueues = newlyParsedParentQueue.showReservationsAsQueues;
-  }
-
-  synchronized void addChildQueue(CSQueue newQueue)
-      throws SchedulerDynamicEditException {
-    if (newQueue.getCapacity() > 0) {
-      throw new SchedulerDynamicEditException("Queue " + newQueue
-          + " being added has non zero capacity.");
-    }
-    boolean added = this.childQueues.add(newQueue);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("updateChildQueues (action: add queue): " + added + " "
-          + getChildQueuesToPrint());
-    }
-  }
-
-  synchronized void removeChildQueue(CSQueue remQueue)
-      throws SchedulerDynamicEditException {
-    if (remQueue.getCapacity() > 0) {
-      throw new SchedulerDynamicEditException("Queue " + remQueue
-          + " being removed has non zero capacity.");
-    }
-    Iterator<CSQueue> qiter = childQueues.iterator();
-    while (qiter.hasNext()) {
-      CSQueue cs = qiter.next();
-      if (cs.equals(remQueue)) {
-        qiter.remove();
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Removed child queue: {}", cs.getQueueName());
-        }
+    try {
+      writeLock.lock();
+      // Sanity check
+      if (!(newlyParsedQueue instanceof PlanQueue) || !newlyParsedQueue
+          .getQueuePath().equals(getQueuePath())) {
+        throw new IOException(
+            "Trying to reinitialize " + getQueuePath() + " from "
+                + newlyParsedQueue.getQueuePath());
       }
-    }
-  }
 
-  protected synchronized float sumOfChildCapacities() {
-    float ret = 0;
-    for (CSQueue l : childQueues) {
-      ret += l.getCapacity();
+      PlanQueue newlyParsedParentQueue = (PlanQueue) newlyParsedQueue;
+
+      if (newlyParsedParentQueue.getChildQueues().size() != 1) {
+        throw new IOException(
+            "Reservable Queue should not have sub-queues in the"
+                + "configuration expect the default reservation queue");
+      }
+
+      // Set new configs
+      setupQueueConfigs(clusterResource);
+
+      updateQuotas(newlyParsedParentQueue.userLimit,
+          newlyParsedParentQueue.userLimitFactor,
+          newlyParsedParentQueue.maxAppsForReservation,
+          newlyParsedParentQueue.maxAppsPerUserForReservation);
+
+      // run reinitialize on each existing queue, to trigger absolute cap
+      // recomputations
+      for (CSQueue res : this.getChildQueues()) {
+        res.reinitialize(res, clusterResource);
+      }
+      showReservationsAsQueues =
+          newlyParsedParentQueue.showReservationsAsQueues;
+    } finally {
+      writeLock.unlock();
     }
-    return ret;
   }
 
   private void updateQuotas(int userLimit, float userLimitFactor,

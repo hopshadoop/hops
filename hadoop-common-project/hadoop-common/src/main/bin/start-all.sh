@@ -15,24 +15,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+## @description  catch the ctrl-c
+## @audience     private
+## @stability    evolving
+## @replaceable  no
+function hadoop_abort_startall()
+{
+  exit 1
+}
 
-# Start all hadoop daemons.  Run this on master node.
+# let's locate libexec...
+if [[ -n "${HADOOP_HOME}" ]]; then
+  HADOOP_DEFAULT_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
+else
+  this="${BASH_SOURCE-$0}"
+  bin=$(cd -P -- "$(dirname -- "${this}")" >/dev/null && pwd -P)
+  HADOOP_DEFAULT_LIBEXEC_DIR="${bin}/../libexec"
+fi
 
-echo "This script is Deprecated. Instead use start-dfs.sh and start-yarn.sh"
+HADOOP_LIBEXEC_DIR="${HADOOP_LIBEXEC_DIR:-$HADOOP_DEFAULT_LIBEXEC_DIR}"
+# shellcheck disable=SC2034
+HADOOP_NEW_CONFIG=true
+if [[ -f "${HADOOP_LIBEXEC_DIR}/hadoop-config.sh" ]]; then
+  . "${HADOOP_LIBEXEC_DIR}/hadoop-config.sh"
+else
+  echo "ERROR: Cannot execute ${HADOOP_LIBEXEC_DIR}/hadoop-config.sh." 2>&1
+  exit 1
+fi
 
-bin=`dirname "${BASH_SOURCE-$0}"`
-bin=`cd "$bin"; pwd`
-
-DEFAULT_LIBEXEC_DIR="$bin"/../libexec
-HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-. $HADOOP_LIBEXEC_DIR/hadoop-config.sh
+if ! hadoop_privilege_check; then
+  trap hadoop_abort_startall INT
+  hadoop_error "WARNING: Attempting to start all Apache Hadoop daemons as ${USER} in 10 seconds."
+  hadoop_error "WARNING: This is not a recommended production deployment configuration."
+  hadoop_error "WARNING: Use CTRL-C to abort."
+  sleep 10
+  trap - INT
+fi
 
 # start hdfs daemons if hdfs is present
-if [ -f "${HADOOP_HDFS_HOME}"/sbin/start-dfs.sh ]; then
-  "${HADOOP_HDFS_HOME}"/sbin/start-dfs.sh --config $HADOOP_CONF_DIR
+if [[ -f "${HADOOP_HDFS_HOME}/sbin/start-dfs.sh" ]]; then
+  "${HADOOP_HDFS_HOME}/sbin/start-dfs.sh" --config "${HADOOP_CONF_DIR}"
 fi
 
 # start yarn daemons if yarn is present
-if [ -f "${HADOOP_YARN_HOME}"/sbin/start-yarn.sh ]; then
-  "${HADOOP_YARN_HOME}"/sbin/start-yarn.sh --config $HADOOP_CONF_DIR
+if [[ -f "${HADOOP_YARN_HOME}/sbin/start-yarn.sh" ]]; then
+  "${HADOOP_YARN_HOME}/sbin/start-yarn.sh" --config "${HADOOP_CONF_DIR}"
 fi
+
+

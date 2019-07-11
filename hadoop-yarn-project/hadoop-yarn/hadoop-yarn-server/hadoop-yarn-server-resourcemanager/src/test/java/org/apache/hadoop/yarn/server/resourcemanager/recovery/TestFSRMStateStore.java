@@ -47,6 +47,7 @@ import org.apache.hadoop.yarn.server.records.impl.pb.VersionPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -71,6 +72,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
         init(conf);
         Assert.assertNull(fs);
         assertTrue(workingDirPathURI.equals(fsWorkingPath));
+        dispatcher.disableExitOnDispatchException();
         start();
         Assert.assertNotNull(fs);
       }
@@ -88,6 +90,12 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
         Path appRootDir = new Path(rootDir, RM_APP_ROOT);
         Path appDir = new Path(appRootDir, appId);
         return appDir;
+      }
+
+      public Path getAttemptDir(String appId, String attemptId) {
+        Path appDir = getAppDir(appId);
+        Path attemptDir = new Path(appDir, attemptId);
+        return attemptDir;
       }
     }
 
@@ -107,17 +115,17 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
       YarnConfiguration conf = new YarnConfiguration();
       conf.set(YarnConfiguration.FS_RM_STATE_STORE_URI,
           workingDirPathURI.toString());
-      conf.set(YarnConfiguration.FS_RM_STATE_STORE_RETRY_POLICY_SPEC,
-              "100,6000");
-      conf.setInt(YarnConfiguration.FS_RM_STATE_STORE_NUM_RETRIES, 20);
+      conf.setInt(YarnConfiguration.FS_RM_STATE_STORE_NUM_RETRIES, 8);
       conf.setLong(YarnConfiguration.FS_RM_STATE_STORE_RETRY_INTERVAL_MS,
               900L);
+      conf.setLong(YarnConfiguration.RM_EPOCH, epoch);
+      conf.setLong(YarnConfiguration.RM_EPOCH_RANGE, getEpochRange());
       if (adminCheckEnable) {
         conf.setBoolean(
           YarnConfiguration.YARN_INTERMEDIATE_DATA_ENCRYPTION, true);
       }
       this.store = new TestFileSystemRMStore(conf);
-      Assert.assertEquals(store.getNumRetries(), 20);
+      Assert.assertEquals(store.getNumRetries(), 8);
       Assert.assertEquals(store.getRetryInterval(), 900L);
       Assert.assertTrue(store.fs.getConf() == store.fsConf);
       FileSystem previousFs = store.fs;
@@ -150,6 +158,15 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
       FileSystem fs = cluster.getFileSystem();
       Path nodePath =
               store.getAppDir(app.getApplicationId().toString());
+      return fs.exists(nodePath);
+    }
+
+    public boolean attemptExists(RMAppAttempt attempt) throws IOException {
+      FileSystem fs = cluster.getFileSystem();
+      ApplicationAttemptId attemptId = attempt.getAppAttemptId();
+      Path nodePath =
+          store.getAttemptDir(attemptId.getApplicationId().toString(),
+              attemptId.toString());
       return fs.exists(nodePath);
     }
   }
@@ -186,6 +203,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
       testAppDeletion(fsTester);
       testDeleteStore(fsTester);
       testRemoveApplication(fsTester);
+      testRemoveAttempt(fsTester);
       testAMRMTokenSecretManagerStateStore(fsTester);
       testReservationStateStore(fsTester);
     } finally {
@@ -193,7 +211,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
     }
   }
 
-  @Ignore //probably due to change of behavior in HDFS not implemented in our version
+  @Ignore //Not supported yet in HOPSFS
   @Test(timeout = 60000)
   public void testHDFSRMStateStore() throws Exception {
     final HdfsConfiguration conf = new HdfsConfiguration();
@@ -310,8 +328,6 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
           YarnConfiguration conf = new YarnConfiguration();
           conf.set(YarnConfiguration.FS_RM_STATE_STORE_URI,
               workingDirPathURI.toString());
-          conf.set(YarnConfiguration.FS_RM_STATE_STORE_RETRY_POLICY_SPEC,
-              "100,6000");
           this.store = new TestFileSystemRMStore(conf) {
             Version storedVersion = null;
 
@@ -394,7 +410,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
             store.storeApplicationStateInternal(
                 ApplicationId.newInstance(100L, 1),
                 ApplicationStateData.newInstance(111, 111, "user", null,
-                    RMAppState.ACCEPTED, "diagnostics", 333, null));
+                    RMAppState.ACCEPTED, "diagnostics", 222, 333, null));
           } catch (Exception e) {
             assertionFailedInThread.set(true);
             e.printStackTrace();

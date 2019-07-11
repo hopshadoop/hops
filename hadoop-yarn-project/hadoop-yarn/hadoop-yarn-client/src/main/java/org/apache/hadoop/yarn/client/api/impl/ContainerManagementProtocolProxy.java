@@ -1,5 +1,4 @@
 /**
-/**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
 * distributed with this work for additional information
@@ -19,7 +18,6 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,8 +25,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
@@ -48,6 +44,9 @@ import org.apache.hadoop.yarn.security.NMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -55,7 +54,8 @@ import com.google.common.annotations.VisibleForTesting;
  */
 @LimitedPrivate({ "MapReduce", "YARN" })
 public class ContainerManagementProtocolProxy {
-  static final Log LOG = LogFactory.getLog(ContainerManagementProtocolProxy.class);
+  static final Logger LOG =
+          LoggerFactory.getLogger(ContainerManagementProtocolProxy.class);
 
   private final int maxConnectedNMs;
   private final Map<String, ContainerManagementProtocolProxyData> cmProxy;
@@ -80,8 +80,11 @@ public class ContainerManagementProtocolProxy {
           YarnConfiguration.NM_CLIENT_MAX_NM_PROXIES
               + " (" + maxConnectedNMs + ") can not be less than 0.");
     }
-    LOG.info(YarnConfiguration.NM_CLIENT_MAX_NM_PROXIES + " : "
-        + maxConnectedNMs);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(YarnConfiguration.NM_CLIENT_MAX_NM_PROXIES + " : " +
+          maxConnectedNMs);
+    }
 
     if (maxConnectedNMs > 0) {
       cmProxy =

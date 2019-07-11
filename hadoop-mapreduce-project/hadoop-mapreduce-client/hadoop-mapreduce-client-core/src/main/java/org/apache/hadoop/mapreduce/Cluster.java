@@ -28,8 +28,6 @@ import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -45,6 +43,8 @@ import org.apache.hadoop.mapreduce.v2.LogParams;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides a way to access information about the map/reduce cluster.
@@ -54,7 +54,7 @@ import org.apache.hadoop.security.token.Token;
 public class Cluster {
   
   @InterfaceStability.Evolving
-  public static enum JobTrackerStatus {INITIALIZING, RUNNING};
+  public enum JobTrackerStatus {INITIALIZING, RUNNING};
 
   private ClientProtocolProvider clientProtocolProvider;
   private ClientProtocol client;
@@ -64,7 +64,8 @@ public class Cluster {
   private Path sysDir = null;
   private Path stagingAreaDir = null;
   private Path jobHistoryDir = null;
-  private static final Log LOG = LogFactory.getLog(Cluster.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(Cluster.class);
 
   @VisibleForTesting
   static Iterable<ClientProtocolProvider> frameworkLoader =
@@ -112,6 +113,14 @@ public class Cluster {
       throws IOException {
 
     initProviderList();
+    final IOException initEx = new IOException(
+        "Cannot initialize Cluster. Please check your configuration for "
+            + MRConfig.FRAMEWORK_NAME
+            + " and the correspond server addresses.");
+    if (jobTrackAddr != null) {
+      LOG.info(
+          "Initializing cluster for Job Tracker=" + jobTrackAddr.toString());
+    }
     for (ClientProtocolProvider provider : providerList) {
       LOG.debug("Trying ClientProtocolProvider : "
           + provider.getClass().getName());
@@ -134,16 +143,15 @@ public class Cluster {
               + " as the ClientProtocolProvider - returned null protocol");
         }
       } catch (Exception e) {
-        LOG.info("Failed to use " + provider.getClass().getName()
-            + " due to error: ", e);
+        final String errMsg = "Failed to use " + provider.getClass().getName()
+            + " due to error: ";
+        initEx.addSuppressed(new IOException(errMsg, e));
+        LOG.info(errMsg, e);
       }
     }
 
     if (null == clientProtocolProvider || null == client) {
-      throw new IOException(
-          "Cannot initialize Cluster. Please check your configuration for "
-              + MRConfig.FRAMEWORK_NAME
-              + " and the correspond server addresses.");
+      throw initEx;
     }
   }
 

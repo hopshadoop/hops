@@ -27,7 +27,7 @@ import java.util.concurrent.*;
 
 abstract class ParallelCommandWithDestination extends  CommandWithDestination{
 
-  private ExecutorService copier ;
+  protected ThreadPoolExecutor copier ;
   private ConcurrentLinkedQueue<Future> activeCopiers = new ConcurrentLinkedQueue<>();
 
   /**
@@ -58,7 +58,7 @@ abstract class ParallelCommandWithDestination extends  CommandWithDestination{
       for (PathData item : items) {  // create all dirs at this level in parallel
         if (isPathRecursable(item)) {
           ProcessPathThread processFile = new ProcessPathThread(item, dst/*dst dir*/);
-          Future f = getThreadProol(getConf()).submit(processFile);
+          Future f = getThreadProol().submit(processFile);
           activeCopiers.add(f);
           curdirs.add(item);
         } else { // collect files
@@ -99,7 +99,7 @@ abstract class ParallelCommandWithDestination extends  CommandWithDestination{
         Collections.shuffle(fileToDst);
         for(SrcDstPair srcDstPair : fileToDst){
           ProcessPathThread processFile = new ProcessPathThread(srcDstPair.src, srcDstPair.dst);
-          Future f = getThreadProol(getConf()).submit(processFile);
+          Future f = getThreadProol().submit(processFile);
           activeCopiers.add(f);
         }
 
@@ -170,9 +170,11 @@ abstract class ParallelCommandWithDestination extends  CommandWithDestination{
     }
   }
 
-  protected ExecutorService getThreadProol(Configuration conf){
+  protected ThreadPoolExecutor getThreadProol(){
     if(copier == null){
-      copier = Executors.newFixedThreadPool(getNumThreads());
+      copier = new ThreadPoolExecutor(getNumThreads(), getNumThreads(), 1,
+          TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
+          new ThreadPoolExecutor.CallerRunsPolicy());
     }
     return copier;
   }
@@ -189,5 +191,19 @@ abstract class ParallelCommandWithDestination extends  CommandWithDestination{
       target = dest;
     }
     return target;
+  }
+  
+  @Override
+  protected void processArgument(PathData item) throws IOException {
+    super.processArgument(item);
+    ThreadPoolExecutor executor = getThreadProol();
+    executor.shutdown();
+    try {
+      executor.awaitTermination(Long.MAX_VALUE, TimeUnit.MINUTES);
+    } catch (InterruptedException e) {
+      executor.shutdownNow();
+      displayError(e);
+      Thread.currentThread().interrupt();
+    }
   }
 }

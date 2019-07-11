@@ -115,7 +115,19 @@ public class KMSAuthenticationFilter
       super.sendError(sc);
     }
 
+    /**
+     * Calls setStatus(int sc, String msg) on the wrapped
+     * {@link HttpServletResponseWrapper} object.
+     *
+     * @param sc the status code
+     * @param sm the status message
+     * @deprecated {@link HttpServletResponseWrapper#setStatus(int, String)} is
+     * deprecated. To set a status code use {@link #setStatus(int)}, to send an
+     * error with a description use {@link #sendError(int, String)}
+     */
     @Override
+    @Deprecated
+    @SuppressWarnings("deprecation")
     public void setStatus(int sc, String sm) {
       statusCode = sc;
       msg = sm;
@@ -146,9 +158,13 @@ public class KMSAuthenticationFilter
         requestURL.append("?").append(queryString);
       }
 
-      KMSWebApp.getKMSAudit().unauthenticated(
-          request.getRemoteHost(), method, requestURL.toString(),
-          kmsResponse.msg);
+      if (!method.equals("OPTIONS")) {
+        // an HTTP OPTIONS request is made as part of the SPNEGO authentication
+        // sequence. We do not need to audit log it, since it doesn't belong
+        // to KMS context. KMS server doesn't handle OPTIONS either.
+        KMSWebApp.getKMSAudit().unauthenticated(request.getRemoteHost(), method,
+            requestURL.toString(), kmsResponse.msg);
+      }
     }
   }
 

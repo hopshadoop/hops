@@ -21,7 +21,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang3.ArrayUtils;
 
 /**
  * Counters for an enum type.

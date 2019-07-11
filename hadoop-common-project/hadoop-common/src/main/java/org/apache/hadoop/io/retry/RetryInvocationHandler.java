@@ -130,7 +130,9 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
           Thread.sleep(retryInfo.delay);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
-          LOG.warn("Interrupted while waiting to retry", e);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Interrupted while waiting to retry", e);
+          }
           InterruptedIOException intIOE = new InterruptedIOException(
               "Retry interrupted");
           intIOE.initCause(e);
@@ -293,6 +295,17 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
 
       return new RetryInfo(maxRetryDelay, max, expectedFailoverCount, ex);
     }
+
+    @Override
+    public String toString() {
+      return "RetryInfo{" +
+              "retryTime=" + retryTime +
+              ", delay=" + delay +
+              ", action=" + action +
+              ", expectedFailoverCount=" + expectedFailoverCount +
+              ", failException=" + failException +
+              '}';
+    }
   }
 
   private final ProxyDescriptor<T> proxyDescriptor;
@@ -386,7 +399,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     }
 
     final StringBuilder b = new StringBuilder()
-        .append("Exception while invoking ")
+        .append(ex + ", while invoking ")
         .append(proxyDescriptor.getProxyInfo().getString(method.getName()));
     if (failovers > 0) {
       b.append(" after ").append(failovers).append(" failover attempts");
@@ -395,7 +408,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     b.append(delay > 0? "after sleeping for " + delay + "ms.": "immediately.");
 
     if (info) {
-      LOG.info(b.toString(), ex);
+      LOG.info(b.toString());
     } else {
       LOG.debug(b.toString(), ex);
     }

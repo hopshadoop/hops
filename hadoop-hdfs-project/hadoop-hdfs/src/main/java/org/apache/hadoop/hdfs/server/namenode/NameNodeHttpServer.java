@@ -38,14 +38,14 @@ import java.util.Map;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
 import org.apache.hadoop.hdfs.web.resources.UserParam;
 import org.apache.hadoop.http.HttpConfig;
-import org.apache.hadoop.http.HttpServer3;
+import org.apache.hadoop.http.HttpServer2;
 
 /**
  * Encapsulates the HTTP server started by the NameNode.
  */
 @InterfaceAudience.Private
 public class NameNodeHttpServer {
-  private HttpServer3 httpServer;
+  private HttpServer2 httpServer;
   private final Configuration conf;
   private final NameNode nn;
   
@@ -67,7 +67,7 @@ public class NameNodeHttpServer {
   }
   
   private void initWebHdfs(Configuration conf) throws IOException {
-    if (WebHdfsFileSystem.isEnabled(conf, HttpServer3.LOG)) {
+    if (WebHdfsFileSystem.isEnabled(conf)) {
       UserParam.setUserPattern(conf.get(
           DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
           DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
@@ -80,9 +80,9 @@ public class NameNodeHttpServer {
 
       final String pathSpec = WebHdfsFileSystem.PATH_PREFIX + "/*";
       Map<String, String> params = getAuthFilterParams(conf);
-      HttpServer3.defineFilter(httpServer.getWebAppContext(), name, className,
+      HttpServer2.defineFilter(httpServer.getWebAppContext(), name, className,
           params, new String[] { pathSpec });
-      HttpServer3.LOG.info("Added filter '" + name + "' (class=" + className
+      HttpServer2.LOG.info("Added filter '" + name + "' (class=" + className
           + ")");
 
       // add webhdfs packages
@@ -117,7 +117,7 @@ public class NameNodeHttpServer {
       }
     }
     
-    HttpServer3.Builder builder = DFSUtil.httpServerTemplateForNNAndJN(conf,
+    HttpServer2.Builder builder = DFSUtil.httpServerTemplateForNNAndJN(conf,
         httpAddr, httpsAddr, "hdfs",
         DFSConfigKeys.DFS_NAMENODE_KERBEROS_INTERNAL_SPNEGO_PRINCIPAL_KEY,
         DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY);
@@ -166,7 +166,7 @@ public class NameNodeHttpServer {
               SecurityUtil.getServerPrincipal(principalInConf,
                   bindAddress.getHostName()));
     } else if (UserGroupInformation.isSecurityEnabled()) {
-      HttpServer3.LOG.error(
+      HttpServer2.LOG.error(
           "WebHDFS and security are enabled, but configuration property '"
           + DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY + "' is not set.");
     }
@@ -177,7 +177,7 @@ public class NameNodeHttpServer {
           DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY,
           httpKeytab);
     } else if (UserGroupInformation.isSecurityEnabled()) {
-      HttpServer3.LOG.error(
+      HttpServer2.LOG.error(
           "WebHDFS and security are enabled, but configuration property '"
           + DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY + "' is not set.");
     }
@@ -224,28 +224,11 @@ public class NameNodeHttpServer {
     httpServer.setAttribute(STARTUP_PROGRESS_ATTRIBUTE_KEY, prog);
   }
 
-  private static void setupServlets(HttpServer3 httpServer, Configuration conf) {
+  private static void setupServlets(HttpServer2 httpServer, Configuration conf) {
     httpServer.addInternalServlet("startupProgress",
         StartupProgressServlet.PATH_SPEC, StartupProgressServlet.class);
-    httpServer.addInternalServlet("getDelegationToken",
-        GetDelegationTokenServlet.PATH_SPEC, GetDelegationTokenServlet.class,
+    httpServer.addInternalServlet("fsck", "/fsck", FsckServlet.class,
         true);
-    httpServer.addInternalServlet("renewDelegationToken",
-        RenewDelegationTokenServlet.PATH_SPEC,
-        RenewDelegationTokenServlet.class, true);
-    httpServer.addInternalServlet("cancelDelegationToken",
-        CancelDelegationTokenServlet.PATH_SPEC,
-        CancelDelegationTokenServlet.class, true);
-    httpServer.addInternalServlet("fsck", "/fsck", FsckServlet.class, true);
-    httpServer
-        .addInternalServlet("listPaths", "/listPaths/*", ListPathsServlet.class,
-            false);
-    httpServer
-        .addInternalServlet("data", "/data/*", FileDataServlet.class, false);
-    httpServer.addInternalServlet("checksum", "/fileChecksum/*",
-        FileChecksumServlets.RedirectServlet.class, false);
-    httpServer.addInternalServlet("contentSummary", "/contentSummary/*",
-        ContentSummaryServlet.class, false);
   }
 
   public static NameNode getNameNodeFromContext(ServletContext context) {

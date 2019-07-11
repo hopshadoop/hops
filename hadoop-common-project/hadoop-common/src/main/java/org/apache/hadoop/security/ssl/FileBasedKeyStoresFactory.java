@@ -18,17 +18,19 @@
 package org.apache.hadoop.security.ssl;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManager;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.text.MessageFormat;
@@ -46,8 +48,8 @@ import java.util.concurrent.TimeUnit;
 @InterfaceStability.Evolving
 public class FileBasedKeyStoresFactory implements KeyStoresFactory {
 
-  private static final Log LOG =
-    LogFactory.getLog(FileBasedKeyStoresFactory.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(FileBasedKeyStoresFactory.class);
 
   public static final String SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY =
       "ssl.{0}.keystore.reload.interval";
@@ -85,7 +87,7 @@ public class FileBasedKeyStoresFactory implements KeyStoresFactory {
    * Reload interval in milliseconds.
    */
   public static final int DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL = 10000;
-  
+
   /**
    * Default keystore reload interval
    * See also DEFAULT_SSL_KEYSTORE_RELOAD_TIMEUNIT
@@ -160,39 +162,41 @@ public class FileBasedKeyStoresFactory implements KeyStoresFactory {
   
   private void createKeyManagers(SSLFactory.Mode mode) throws IOException, GeneralSecurityException {
     boolean requireClientCert =
-        conf.getBoolean(SSLFactory.SSL_REQUIRE_CLIENT_CERT_KEY,
-            SSLFactory.DEFAULT_SSL_REQUIRE_CLIENT_CERT);
-  
+      conf.getBoolean(SSLFactory.SSL_REQUIRE_CLIENT_CERT_KEY,
+          SSLFactory.SSL_REQUIRE_CLIENT_CERT_DEFAULT);
+
+    // certificate store
     String keystoreType =
-        conf.get(resolvePropertyName(mode, SSL_KEYSTORE_TYPE_TPL_KEY),
-            DEFAULT_KEYSTORE_TYPE);
-  
+      conf.get(resolvePropertyName(mode, SSL_KEYSTORE_TYPE_TPL_KEY),
+               DEFAULT_KEYSTORE_TYPE);
+
+    String keystoreKeyPassword = null;
     if (requireClientCert || mode == SSLFactory.Mode.SERVER) {
       String locationProperty =
-          resolvePropertyName(mode, SSL_KEYSTORE_LOCATION_TPL_KEY);
+        resolvePropertyName(mode, SSL_KEYSTORE_LOCATION_TPL_KEY);
       String keystoreLocation = conf.get(locationProperty, "");
       if (keystoreLocation.isEmpty()) {
         throw new GeneralSecurityException("The property '" + locationProperty +
-            "' has not been set in the ssl configuration file.");
+          "' has not been set in the ssl configuration file.");
       }
       String passwordProperty =
-          resolvePropertyName(mode, SSL_KEYSTORE_PASSWORD_TPL_KEY);
+        resolvePropertyName(mode, SSL_KEYSTORE_PASSWORD_TPL_KEY);
       String keystorePassword = getPassword(conf, passwordProperty, "");
       if (keystorePassword.isEmpty()) {
         throw new GeneralSecurityException("The property '" + passwordProperty +
-            "' has not been set in the ssl configuration file.");
+          "' has not been set in the ssl configuration file.");
       }
       String keyPasswordProperty =
-          resolvePropertyName(mode, SSL_KEYSTORE_KEYPASSWORD_TPL_KEY);
+        resolvePropertyName(mode, SSL_KEYSTORE_KEYPASSWORD_TPL_KEY);
       // Key password defaults to the same value as store password for
       // compatibility with legacy configurations that did not use a separate
       // configuration property for key password.
-      String keystoreKeyPassword = getPassword(
+      keystoreKeyPassword = getPassword(
           conf, keyPasswordProperty, keystorePassword);
       if (LOG.isDebugEnabled()) {
         LOG.debug(mode.toString() + " KeyStore: " + keystoreLocation);
       }
-    
+
       long keyStoreReloadInterval = conf.getLong(
           resolvePropertyName(mode, SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY),
               DEFAULT_SSL_KEYSTORE_RELOAD_INTERVAL);
@@ -221,14 +225,14 @@ public class FileBasedKeyStoresFactory implements KeyStoresFactory {
       keyManagers = keyMgrFactory.getKeyManagers();
     }
   }
-
+  
   private void createTrustManagers(SSLFactory.Mode mode) throws IOException, GeneralSecurityException {
     String truststoreType =
-        conf.get(resolvePropertyName(mode, SSL_TRUSTSTORE_TYPE_TPL_KEY),
-            DEFAULT_KEYSTORE_TYPE);
-  
+      conf.get(resolvePropertyName(mode, SSL_TRUSTSTORE_TYPE_TPL_KEY),
+               DEFAULT_KEYSTORE_TYPE);
+
     String locationProperty =
-        resolvePropertyName(mode, SSL_TRUSTSTORE_LOCATION_TPL_KEY);
+      resolvePropertyName(mode, SSL_TRUSTSTORE_LOCATION_TPL_KEY);
     String truststoreLocation = conf.get(locationProperty, "");
 
     String passwordFileLocationProperty =
@@ -240,18 +244,20 @@ public class FileBasedKeyStoresFactory implements KeyStoresFactory {
           SSL_TRUSTSTORE_PASSWORD_TPL_KEY);
       String truststorePassword = getPassword(conf, passwordProperty, "");
       if (truststorePassword.isEmpty()) {
-        throw new GeneralSecurityException("The property '" + passwordProperty +
-            "' has not been set in the ssl configuration file.");
+        // An empty trust store password is legal; the trust store password
+        // is only required when writing to a trust store. Otherwise it's
+        // an optional integrity check.
+        truststorePassword = null;
       }
       long truststoreReloadInterval =
           conf.getLong(
               resolvePropertyName(mode, SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY),
               DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL);
-    
+
       if (LOG.isDebugEnabled()) {
         LOG.debug(mode.toString() + " TrustStore: " + truststoreLocation);
       }
-    
+
       trustManager = new ReloadingX509TrustManager(truststoreType,
           truststoreLocation,
           truststorePassword,
@@ -270,7 +276,7 @@ public class FileBasedKeyStoresFactory implements KeyStoresFactory {
       trustManagers = null;
     }
   }
-  
+
   String getPassword(Configuration conf, String alias, String defaultPass) {
     String password = defaultPass;
     try {

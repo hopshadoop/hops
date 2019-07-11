@@ -28,12 +28,16 @@ import com.google.common.annotations.VisibleForTesting;
  * natively.
  */
 class NativeCrc32 {
-  
+  private static final boolean isSparc = System.getProperty("os.arch").toLowerCase().startsWith("sparc");
   /**
    * Return true if the JNI-based native CRC extensions are available.
    */
   public static boolean isAvailable() {
-    return NativeCodeLoader.isNativeCodeLoaded();
+    if (isSparc) {
+      return false;
+    } else {
+      return NativeCodeLoader.isNativeCodeLoaded();
+    }
   }
 
   /**

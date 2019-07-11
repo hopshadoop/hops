@@ -24,6 +24,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.mapred.SortedRanges.Range;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.checkpoint.TaskCheckpointID;
 import org.junit.After;
 import org.junit.Test;
 
@@ -123,7 +124,7 @@ public class TestTaskCommit extends HadoopTestCase {
     }
 
     @Override
-    public void fatalError(TaskAttemptID taskId, String message)
+    public void fatalError(TaskAttemptID taskId, String message, boolean fastFail)
         throws IOException { }
 
     @Override
@@ -142,11 +143,6 @@ public class TestTaskCommit extends HadoopTestCase {
     }
 
     @Override
-    public boolean ping(TaskAttemptID taskid) throws IOException {
-      return true;
-    }
-
-    @Override
     public void reportDiagnosticInfo(TaskAttemptID taskid, String trace)
         throws IOException {
     }
@@ -162,9 +158,11 @@ public class TestTaskCommit extends HadoopTestCase {
     }
 
     @Override
-    public boolean statusUpdate(TaskAttemptID taskId, TaskStatus taskStatus)
+    public AMFeedback statusUpdate(TaskAttemptID taskId, TaskStatus taskStatus)
         throws IOException, InterruptedException {
-      return true;
+      AMFeedback a = new AMFeedback();
+      a.setTaskFound(true);
+      return a;
     }
 
     @Override
@@ -177,6 +175,22 @@ public class TestTaskCommit extends HadoopTestCase {
     public ProtocolSignature getProtocolSignature(String protocol,
         long clientVersion, int clientMethodsHash) throws IOException {
       return null;
+    }
+
+    @Override
+    public void preempted(TaskAttemptID taskId, TaskStatus taskStatus)
+        throws IOException, InterruptedException {
+      fail("Task should not go to commit-pending");
+    }
+
+    @Override
+    public TaskCheckpointID getCheckpointID(TaskID taskId) {
+      return null;
+    }
+
+    @Override
+    public void setCheckpointID(TaskID downgrade, TaskCheckpointID cid) {
+      // ignore
     }
   }
   

@@ -24,6 +24,8 @@ import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.util.Map;
+
 /**
  * Contains various scheduling metrics to be reported by UI and CLI.
  */
@@ -35,9 +37,9 @@ public abstract class ApplicationResourceUsageReport {
   @Unstable
   public static ApplicationResourceUsageReport newInstance(
       int numUsedContainers, int numReservedContainers, Resource usedResources,
-      Resource reservedResources, Resource neededResources, long memorySeconds,
-      long vcoreSeconds, long gpuSeconds, float queueUsagePerc, float clusterUsagePerc,
-      long preemptedMemorySeconds, long preemptedVcoresSeconds, long preemptedGPUSeconds) {
+      Resource reservedResources, Resource neededResources,
+      Map<String, Long> resourceSecondsMap, float queueUsagePerc,
+      float clusterUsagePerc, Map<String, Long> preemtedResourceSecondsMap) {
     ApplicationResourceUsageReport report =
         Records.newRecord(ApplicationResourceUsageReport.class);
     report.setNumUsedContainers(numUsedContainers);
@@ -45,14 +47,10 @@ public abstract class ApplicationResourceUsageReport {
     report.setUsedResources(usedResources);
     report.setReservedResources(reservedResources);
     report.setNeededResources(neededResources);
-    report.setMemorySeconds(memorySeconds);
-    report.setVcoreSeconds(vcoreSeconds);
+    report.setResourceSecondsMap(resourceSecondsMap);
     report.setQueueUsagePercentage(queueUsagePerc);
     report.setClusterUsagePercentage(clusterUsagePerc);
-    report.setPreemptedMemorySeconds(preemptedMemorySeconds);
-    report.setPreemptedVcoreSeconds(preemptedVcoresSeconds);
-    report.setPreemptedGPUSeconds(preemptedGPUSeconds);
-    report.setGPUSeconds(gpuSeconds);
+    report.setPreemptedResourceSecondsMap(preemtedResourceSecondsMap);
     return report;
   }
 
@@ -160,14 +158,6 @@ public abstract class ApplicationResourceUsageReport {
   @Unstable
   public abstract long getVcoreSeconds();
 
-  @Private
-  @Unstable
-  public abstract void setGPUSeconds(long gpuSeconds);
-
-  @Public
-  @Unstable
-  public abstract long getGPUSeconds();
-
   /**
    * Get the percentage of resources of the queue that the app is using.
    * @return the percentage of resources of the queue that the app is using.
@@ -241,20 +231,45 @@ public abstract class ApplicationResourceUsageReport {
   public abstract long getPreemptedVcoreSeconds();
 
   /**
-   * Set the aggregated number of gpu preempted that the application has
+   * Get the aggregated number of resources that the application has
    * allocated times the number of seconds the application has been running.
-   * @param gpuSeconds the aggregated number of vcore seconds
-   */
-  @Private
-  @Unstable
-  public abstract void setPreemptedGPUSeconds(long gpuSeconds);
-
-  /**
-   * Get the aggregated number of gpu preempted that the application has
-   * allocated times the number of seconds the application has been running.
-   * @return the aggregated number of gpu seconds
+   * @return map containing the resource name and aggregated resource-seconds
    */
   @Public
   @Unstable
-  public abstract long getPreemptedGPUSeconds();
+  public abstract Map<String, Long> getResourceSecondsMap();
+
+  /**
+   * Set the aggregated number of resources that the application has
+   * allocated times the number of seconds the application has been running.
+   * @param resourceSecondsMap map containing the resource name and aggregated
+   *                           resource-seconds
+   */
+  @Private
+  @Unstable
+  public abstract void setResourceSecondsMap(
+      Map<String, Long> resourceSecondsMap);
+
+
+  /**
+   * Get the aggregated number of resources preempted that the application has
+   * allocated times the number of seconds the application has been running.
+   * @return map containing the resource name and aggregated preempted
+   * resource-seconds
+   */
+  @Public
+  @Unstable
+  public abstract Map<String, Long> getPreemptedResourceSecondsMap();
+
+  /**
+   * Set the aggregated number of resources preempted that the application has
+   * allocated times the number of seconds the application has been running.
+   * @param preemptedResourceSecondsMap  map containing the resource name and
+   *                                     aggregated preempted resource-seconds
+   */
+  @Private
+  @Unstable
+  public abstract void setPreemptedResourceSecondsMap(
+      Map<String, Long> preemptedResourceSecondsMap);
+
 }

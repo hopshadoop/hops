@@ -71,8 +71,11 @@ public class ContainerExitStatus {
    * Container was terminated after the application finished.
    */
   public static final int KILLED_AFTER_APP_COMPLETION = -107;
-  
-  public static final int CONTAINER_RUNNING_STATE = -201;
 
-  public static final int UNKNOWN_CONTAINER_EXIT  = -404;
+  /**
+   * Container was terminated by the ContainerScheduler to make room
+   * for another container...
+   */
+  public static final int KILLED_BY_CONTAINER_SCHEDULER = -108;
+
 }

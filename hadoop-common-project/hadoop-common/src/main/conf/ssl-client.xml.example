@@ -77,19 +77,4 @@
   </description>
 </property>
 
-<property>
-  <name>ssl.client.keystore.reload.interval</name>
-  <value>10000</value>
-  <description>Keystore reload check interval.
-  Check ssl.client.keystore.reload.timeunit for the time unit
-  </description>
-</property>
-
-<property>
-  <name>ssl.client.keystore.reload.timeunit</name>
-  <value>MILLISECONDS</value>
-  <description>Keystore reload check interval timeunit, accepts values of java.util.concurrent.TimeUnit
-  Default value is MILLISECONDS
-  </description>
-</property>
 </configuration>

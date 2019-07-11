@@ -43,9 +43,9 @@ import org.apache.hadoop.mapred.MapOutputFile;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.task.reduce.MergeManagerImpl.CompressAwarePath;
+import org.apache.hadoop.test.Whitebox;
 import org.junit.Assert;
 import org.junit.Test;
-import org.mockito.internal.util.reflection.Whitebox;
 
 public class TestMergeManager {
 
@@ -207,6 +207,13 @@ public class TestMergeManager {
     }
   }
 
+  @Test
+  public void testIoSortDefaults() {
+    final JobConf jobConf = new JobConf();
+    assertEquals(10, jobConf.getInt(MRJobConfig.IO_SORT_FACTOR, 100));
+    assertEquals(100, jobConf.getInt(MRJobConfig.IO_SORT_MB, 10));
+  }
+
   @SuppressWarnings({ "unchecked", "deprecation" })
   @Test(timeout=10000)
   public void testOnDiskMerger() throws IOException, URISyntaxException,
@@ -302,5 +309,16 @@ public class TestMergeManager {
     assertEquals("Shuffled bytes: " + size, expectedShuffleMode,
         mapOutput.getDescription());
     mgr.unreserve(size);
+  }
+
+  @Test
+  public void testZeroShuffleMemoryLimitPercent() throws Exception {
+    final JobConf jobConf = new JobConf();
+    jobConf.setFloat(MRJobConfig.SHUFFLE_MEMORY_LIMIT_PERCENT, 0.0f);
+    final MergeManagerImpl<Text, Text> mgr =
+        new MergeManagerImpl<>(null, jobConf, mock(LocalFileSystem.class),
+            null, null, null, null, null, null, null, null, null, null,
+            new MROutputFiles());
+    verifyReservedMapOutputType(mgr, 10L, "DISK");
   }
 }

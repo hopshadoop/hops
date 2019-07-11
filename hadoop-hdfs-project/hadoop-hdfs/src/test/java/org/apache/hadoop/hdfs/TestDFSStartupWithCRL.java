@@ -134,7 +134,7 @@ public class TestDFSStartupWithCRL {
     conf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
     String superUser = UserGroupInformation.getCurrentUser().getUserName();
     conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + superUser, "*");
-    conf.set(SSLFactory.SSL_ENABLED_PROTOCOLS, "TLSv1.2,TLSv1.1");
+    conf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2,TLSv1.1");
     conf.set(HopsSSLSocketFactory.CryptoKeys.SOCKET_ENABLED_PROTOCOL.getValue(), "TLSv1.2");
   
     Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(keyStore.toString(), password,
